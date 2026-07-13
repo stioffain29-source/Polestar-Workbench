@@ -13,7 +13,7 @@ import {
   type CentcomListingItem,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
-import { assignAnalystFlags, routeOfficialSource } from "./m15";
+import { assignAnalystFlags, routeOfficialSource, partitionOfficialInserts, appendCentcomImageUrls } from "./m15";
 import {
   CENTCOM_HEALTH_NAME,
   CENTCOM_SOURCE_URL,
@@ -80,6 +80,7 @@ export type CentcomIngestSummary = {
   itemsFetched: number;
   inserted: number;
   duplicateInDb: number;
+  newsEchoSkipped: number;
   totalAfter: number;
   errors: string[];
   logLines: string[];
@@ -97,6 +98,8 @@ export type CentcomIngestOptions = {
   externalIds?: string[];
   /** Skip items at or before this published_at (live incremental ingest). */
   sincePublishedAt?: Date | null;
+  /** Override news-echo lookup (tests). */
+  lookupNewsEchoUrls?: (urls: string[]) => Promise<Set<string>>;
 };
 
 /** Select newest listing items for detail fetch, respecting since/max/existing. */
@@ -142,6 +145,7 @@ export function emptyCentcomIngestSummary(
     itemsFetched: 0,
     inserted: 0,
     duplicateInDb: 0,
+    newsEchoSkipped: 0,
     totalAfter: 0,
     errors: err ? [err instanceof Error ? err.message : String(err)] : [],
     logLines: [],
@@ -154,6 +158,7 @@ type PreparedRelease = {
   publishedAt: Date | null;
   sourceUrl: string;
   bodyText: string;
+  imageUrls?: string[];
 };
 
 async function fetchHtmlWithRetry(url: string): Promise<string> {
@@ -224,17 +229,19 @@ async function defaultFetchDetail(
 }
 
 function buildInsertRow(release: PreparedRelease): InsertOfficialMilitaryMaritimeSource {
+  const bodyText = appendCentcomImageUrls(release.bodyText, release.imageUrls);
   const routed = routeOfficialSource({
     source: CENTCOM_SOURCE,
     title: release.title,
-    body: release.bodyText,
+    body: bodyText,
   });
   const flags = assignAnalystFlags({
     source: CENTCOM_SOURCE,
     title: release.title,
-    body: release.bodyText,
+    body: bodyText,
     hasOfficialUrl: true,
     hasPdf: false,
+    hasImages: (release.imageUrls?.length ?? 0) > 0,
   });
 
   return {
@@ -243,7 +250,7 @@ function buildInsertRow(release: PreparedRelease): InsertOfficialMilitaryMaritim
     title: release.title,
     publishedAt: release.publishedAt,
     sourceUrl: release.sourceUrl,
-    bodyText: release.bodyText,
+    bodyText,
     classification: "official_military_maritime",
     primaryWatch: routed.primaryWatch,
     watchTags: routed.watchTags,
@@ -285,6 +292,7 @@ export async function runCentcomIngest(
     itemsFetched: 0,
     inserted: 0,
     duplicateInDb: 0,
+    newsEchoSkipped: 0,
     totalAfter: 0,
     errors,
     logLines,
@@ -365,6 +373,7 @@ export async function runCentcomIngest(
           publishedAt: detail.publishedAt ?? item.publishedAt,
           sourceUrl: detail.sourceUrl || item.sourceUrl,
           bodyText: detail.bodyText,
+          imageUrls: detail.imageUrls,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -376,44 +385,20 @@ export async function runCentcomIngest(
     log(`  prepared ${prepared.length} release(s) for persist`);
 
     let toInsert = prepared;
+    let newsEchoSkipped = 0;
     if (prepared.length > 0) {
-      const ids = prepared.map((r) => r.externalId);
-      const urls = prepared.map((r) => r.sourceUrl);
-
-      const existingById = await db
-        .select({
-          externalId: officialMilitaryMaritimeSourcesTable.externalId,
-        })
-        .from(officialMilitaryMaritimeSourcesTable)
-        .where(
-          and(
-            eq(officialMilitaryMaritimeSourcesTable.sourceName, CENTCOM_SOURCE),
-            inArray(officialMilitaryMaritimeSourcesTable.externalId, ids),
-          ),
-        );
-
-      const existingByUrl = await db
-        .select({
-          sourceUrl: officialMilitaryMaritimeSourcesTable.sourceUrl,
-        })
-        .from(officialMilitaryMaritimeSourcesTable)
-        .where(
-          and(
-            eq(officialMilitaryMaritimeSourcesTable.sourceName, CENTCOM_SOURCE),
-            inArray(officialMilitaryMaritimeSourcesTable.sourceUrl, urls),
-          ),
-        );
-
-      const haveIds = new Set(existingById.map((r) => r.externalId));
-      const haveUrls = new Set(existingByUrl.map((r) => r.sourceUrl));
-      toInsert = prepared.filter(
-        (r) => !haveIds.has(r.externalId) && !haveUrls.has(r.sourceUrl),
-      );
+      const partitioned = await partitionOfficialInserts(prepared, CENTCOM_SOURCE, {
+        lookupNewsEcho: opts.lookupNewsEchoUrls,
+      });
+      toInsert = partitioned.toInsert;
+      base.duplicateInDb = partitioned.duplicateInDb + prefetchDuplicates;
+      newsEchoSkipped = partitioned.newsEchoSkipped;
+    } else {
+      base.duplicateInDb = prefetchDuplicates;
     }
-
-    base.duplicateInDb = prepared.length - toInsert.length + prefetchDuplicates;
+    base.newsEchoSkipped = newsEchoSkipped;
     log(
-      `  ${prepared.length} release(s); ${base.duplicateInDb} duplicate(s); ${toInsert.length} new`,
+      `  ${prepared.length} release(s); ${base.duplicateInDb} duplicate(s); ${newsEchoSkipped} news echo(s); ${toInsert.length} new`,
     );
 
     if (commit && toInsert.length > 0) {
@@ -445,7 +430,7 @@ export async function runCentcomIngest(
             ok: feedOk,
             collected: prepared.length,
             retained: base.inserted,
-            rejected: prepared.length - toInsert.length,
+            rejected: prepared.length - toInsert.length + newsEchoSkipped,
             error: feedOk
               ? null
               : errors[0] ?? "CENTCOM ingest completed with errors",

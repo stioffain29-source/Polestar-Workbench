@@ -11,6 +11,7 @@ export interface AssignAnalystFlagsInput {
   body: string;
   hasOfficialUrl: boolean;
   hasPdf: boolean;
+  hasImages?: boolean;
 }
 
 export interface AnalystFlags {
@@ -86,7 +87,8 @@ export function assignAnalystFlags(input: AssignAnalystFlagsInput): AnalystFlags
 
   const flagEscalationIndicator = matchesEscalation(input.source, text);
   const flagMaritimeDisruption = matchesMaritimeDisruption(input.source, text);
-  const flagEvidenceAvailable = input.hasOfficialUrl || input.hasPdf;
+  const flagEvidenceAvailable =
+    input.hasOfficialUrl || input.hasPdf || !!input.hasImages;
 
   const flagPossibleSpotReport =
     flagSignificantIncident &&

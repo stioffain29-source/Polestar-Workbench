@@ -182,9 +182,12 @@ describe("UKMTO persist + routing (Step 8)", () => {
       const shape = fields as Record<string, unknown> | undefined;
       const isCount = shape != null && "n" in shape;
       const isLatest = shape != null && "latest" in shape;
+      const isNewsEcho =
+        shape != null && ("resolvedUrl" in shape || "primaryStoryUrl" in shape);
       return {
         from: () => ({
           where: () => {
+            if (isNewsEcho) return Promise.resolve([]);
             if (isCount) return Promise.resolve([{ n: stored.length }]);
             if (isLatest) return Promise.resolve([{ latest: null }]);
             return Promise.resolve(
@@ -267,6 +270,7 @@ describe("UKMTO persist + routing (Step 8)", () => {
 
     expect(second.inserted).toBe(0);
     expect(second.duplicateInDb).toBe(1);
+    expect(second.newsEchoSkipped).toBe(0);
     expect(stored).toHaveLength(1);
   });
 

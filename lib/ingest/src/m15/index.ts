@@ -28,3 +28,20 @@ export { OFFICIAL_M15_HEALTH_TOPIC, UKMTO_HEALTH_NAME, UKMTO_SOURCE_URL, CENTCOM
 
 export { assignAnalystFlags, simulateOfficialSourceIngest } from "./flags";
 export type { AssignAnalystFlagsInput, AnalystFlags } from "./flags";
+
+export {
+  normalizeOfficialSourceUrl,
+  expandOfficialSourceUrlVariants,
+  lookupNewsEchoNormalizedUrls,
+  partitionOfficialInserts,
+} from "./dedupe";
+export type {
+  OfficialPreparedItem,
+  OfficialInsertPartition,
+} from "./dedupe";
+
+export {
+  appendCentcomImageUrls,
+  parseCentcomImageUrlsFromBody,
+  CENTCOM_IMAGE_FOOTER_HEADING,
+} from "./centcomEvidence";

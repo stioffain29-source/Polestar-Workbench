@@ -12,6 +12,10 @@ import {
   CENTCOM_SOURCE,
 } from "../../lib/ingest/src/centcomIngest";
 import { routeOfficialSource } from "../../lib/ingest/src/m15";
+import {
+  normalizeOfficialSourceUrl,
+} from "../../lib/ingest/src/m15/dedupe";
+import { parseCentcomImageUrlsFromBody } from "../../lib/ingest/src/m15/centcomEvidence";
 
 const FIXTURE_DIR = join(__dirname, "../fixtures/m15");
 
@@ -134,9 +138,12 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       const shape = fields as Record<string, unknown> | undefined;
       const isCount = shape != null && "n" in shape;
       const isLatest = shape != null && "latest" in shape;
+      const isNewsEcho =
+        shape != null && ("resolvedUrl" in shape || "primaryStoryUrl" in shape);
       return {
         from: () => ({
           where: () => {
+            if (isNewsEcho) return Promise.resolve([]);
             if (isCount) return Promise.resolve([{ n: stored.length }]);
             if (isLatest) return Promise.resolve([{ latest: null }]);
             return Promise.resolve(
@@ -200,6 +207,7 @@ describe("CENTCOM persist + routing (Step 3)", () => {
 
     expect(first.inserted).toBe(1);
     expect(first.duplicateInDb).toBe(0);
+    expect(first.newsEchoSkipped).toBe(0);
     expect(first.itemsFetched).toBe(1);
     expect(stored).toHaveLength(1);
     expect(stored[0]).toMatchObject({
@@ -207,6 +215,10 @@ describe("CENTCOM persist + routing (Step 3)", () => {
       externalId: "4015365",
       title: expect.stringContaining("Houthi"),
     });
+    expect(stored[0]?.bodyText).toMatch(/\[Image URLs\]/);
+    expect(parseCentcomImageUrlsFromBody(stored[0]?.bodyText)).toEqual([
+      "https://www.centcom.mil/-/media/centcom/press-releases/2024/12/21/houthi-strike-release.jpg",
+    ]);
 
     const second = await runCentcomIngest({
       commit: true,
@@ -218,7 +230,29 @@ describe("CENTCOM persist + routing (Step 3)", () => {
 
     expect(second.inserted).toBe(0);
     expect(second.duplicateInDb).toBe(1);
+    expect(second.newsEchoSkipped).toBe(0);
     expect(stored).toHaveLength(1);
+  });
+
+  it("skips insert when the URL already exists as a news incident (news echo)", async () => {
+    setupDbMock();
+    const listingItem = parseCentcomListing(listingHtml).find(
+      (i) => i.externalId === "4015365",
+    )!;
+    const norm = normalizeOfficialSourceUrl(listingItem.sourceUrl)!;
+
+    const summary = await runCentcomIngest({
+      commit: true,
+      listingHtml,
+      fetchDetailHtml: fetchDetail,
+      externalIds: ["4015365"],
+      sincePublishedAt: null,
+      lookupNewsEchoUrls: async () => new Set([norm]),
+    });
+
+    expect(summary.inserted).toBe(0);
+    expect(summary.duplicateInDb).toBe(0);
+    expect(summary.newsEchoSkipped).toBe(1);
   });
 
   it("routes military release to conflict and maritime terms to both watches", async () => {

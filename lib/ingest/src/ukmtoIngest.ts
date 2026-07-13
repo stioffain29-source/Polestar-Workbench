@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { fetchBody, sleep } from "./feedFetch";
-import { assignAnalystFlags, routeOfficialSource } from "./m15";
+import { assignAnalystFlags, routeOfficialSource, partitionOfficialInserts } from "./m15";
 import {
   OFFICIAL_M15_HEALTH_TOPIC,
   UKMTO_HEALTH_NAME,
@@ -103,6 +103,7 @@ export type UkmtoIngestSummary = {
   itemsFetched: number;
   inserted: number;
   duplicateInDb: number;
+  newsEchoSkipped: number;
   totalAfter: number;
   pdfExtracted: number;
   pdfPartial: number;
@@ -118,6 +119,8 @@ export type UkmtoIngestOptions = {
   maxDetailFetches?: number;
   externalIds?: string[];
   sincePublishedAt?: Date | null;
+  /** Override news-echo lookup (tests). */
+  lookupNewsEchoUrls?: (urls: string[]) => Promise<Set<string>>;
 };
 
 /** Select newest listing items for detail fetch, respecting since/max/existing. */
@@ -161,6 +164,7 @@ export function emptyUkmtoIngestSummary(err?: unknown): UkmtoIngestSummary {
     itemsFetched: 0,
     inserted: 0,
     duplicateInDb: 0,
+    newsEchoSkipped: 0,
     totalAfter: 0,
     pdfExtracted: 0,
     pdfPartial: 0,
@@ -335,6 +339,7 @@ export async function runUkmtoIngest(
     itemsFetched: 0,
     inserted: 0,
     duplicateInDb: 0,
+    newsEchoSkipped: 0,
     totalAfter: 0,
     pdfExtracted: 0,
     pdfPartial: 0,
@@ -453,44 +458,20 @@ export async function runUkmtoIngest(
     log(`  prepared ${prepared.length} product(s) for persist`);
 
     let toInsert = prepared;
+    let newsEchoSkipped = 0;
     if (prepared.length > 0) {
-      const ids = prepared.map((r) => r.externalId);
-      const urls = prepared.map((r) => r.sourceUrl);
-
-      const existingById = await db
-        .select({
-          externalId: officialMilitaryMaritimeSourcesTable.externalId,
-        })
-        .from(officialMilitaryMaritimeSourcesTable)
-        .where(
-          and(
-            eq(officialMilitaryMaritimeSourcesTable.sourceName, UKMTO_SOURCE),
-            inArray(officialMilitaryMaritimeSourcesTable.externalId, ids),
-          ),
-        );
-
-      const existingByUrl = await db
-        .select({
-          sourceUrl: officialMilitaryMaritimeSourcesTable.sourceUrl,
-        })
-        .from(officialMilitaryMaritimeSourcesTable)
-        .where(
-          and(
-            eq(officialMilitaryMaritimeSourcesTable.sourceName, UKMTO_SOURCE),
-            inArray(officialMilitaryMaritimeSourcesTable.sourceUrl, urls),
-          ),
-        );
-
-      const haveIds = new Set(existingById.map((r) => r.externalId));
-      const haveUrls = new Set(existingByUrl.map((r) => r.sourceUrl));
-      toInsert = prepared.filter(
-        (r) => !haveIds.has(r.externalId) && !haveUrls.has(r.sourceUrl),
-      );
+      const partitioned = await partitionOfficialInserts(prepared, UKMTO_SOURCE, {
+        lookupNewsEcho: opts.lookupNewsEchoUrls,
+      });
+      toInsert = partitioned.toInsert;
+      base.duplicateInDb = partitioned.duplicateInDb + prefetchDuplicates;
+      newsEchoSkipped = partitioned.newsEchoSkipped;
+    } else {
+      base.duplicateInDb = prefetchDuplicates;
     }
-
-    base.duplicateInDb = prepared.length - toInsert.length + prefetchDuplicates;
+    base.newsEchoSkipped = newsEchoSkipped;
     log(
-      `  ${prepared.length} product(s); ${base.duplicateInDb} duplicate(s); ${toInsert.length} new`,
+      `  ${prepared.length} product(s); ${base.duplicateInDb} duplicate(s); ${newsEchoSkipped} news echo(s); ${toInsert.length} new`,
     );
 
     if (commit && toInsert.length > 0) {
@@ -522,7 +503,7 @@ export async function runUkmtoIngest(
             ok: feedOk,
             collected: prepared.length,
             retained: base.inserted,
-            rejected: prepared.length - toInsert.length,
+            rejected: prepared.length - toInsert.length + newsEchoSkipped,
             error: feedOk
               ? null
               : errors[0] ?? "UKMTO ingest completed with errors",
