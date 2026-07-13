@@ -32,10 +32,9 @@ by a Tf operator. PASS = no non-Roboto font is ever selected.
 ==== cargo_watch_report.pdf (cargo_watch) ====
   page 1: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
   page 2: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
-  page 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
-  page 4: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
-  page 5: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
-  --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
+  page 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Medium', 'Roboto-Regular']
+  page 4: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Medium', 'Roboto-Regular']
+  --> ALL fonts USED via Tf: ['Roboto-Bold', 'Roboto-Light', 'Roboto-Medium', 'Roboto-Regular']
   --> NON-Roboto used: NONE — PASS
 
 ==== flashpoint_report.pdf (flashpoint) ====
