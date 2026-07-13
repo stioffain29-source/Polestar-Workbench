@@ -668,6 +668,43 @@ const SAME_EVENT_NON_ANCHOR = new Set([
   "video", "watch", "news", "day", "days", "week", "weeks",
 ]);
 
+// Generic editorial / governance / procedural vocabulary that recurs across the
+// DIFFERENT ANGLES an outlet takes on ONE story ("Anatomy of the X riot",
+// "Government moves to fix Y overcrowding", "Parliament debates Z"). These words
+// name neither a place, an actor group, nor the specific grievance, so they must
+// count as NEITHER event anchors (they would let unrelated same-country stories
+// meet the shared-anchor threshold) NOR distinguishing subjects (they would
+// falsely split copies of one event that merely differ in framing). Excluded
+// from both. Do NOT add place names, actor groups (workers/students/inmates), or
+// grievance nouns (fuel/pay/land) here — those are the real event discriminators.
+const SAME_EVENT_GENERIC = new Set([
+  // editorial / analysis framing an outlet layers over one story
+  "anatomy", "lesson", "learnt", "learned", "explainer", "explained",
+  "opinion", "editorial", "analysis", "timeline", "recap", "review",
+  "comment", "commentary", "feature", "factbox", "roundup", "digest",
+  "backstory", "background", "not",
+  // governance / procedural response (institutions, not the protagonists)
+  "government", "govt", "minister", "ministry", "parliament", "cabinet",
+  "committee", "commission", "panel", "probe", "inquiry", "investigation",
+  "authority", "authorities", "official", "officials", "opposition",
+  "statement", "policy", "reform",
+  // generic action verbs common to every angle
+  "move", "moves", "address", "addresses", "tackle", "tackles", "fix",
+  "fixes", "solve", "resolve", "handle", "call", "calls", "urge", "urges",
+  "vow", "vows", "pledge", "pledges", "seek", "seeks", "plan", "plans",
+  "order", "orders", "launch", "launches", "appoint", "appoints",
+  "announce", "announces", "introduce", "consider",
+  // abstract / process nouns
+  "system", "overcrowding", "delay", "delays", "response", "measure",
+  "measures", "step", "steps", "action", "actions", "aftermath", "cause",
+  "causes", "blame", "responsibility", "resignation", "tribute", "control",
+  "issue", "issues", "crisis", "situation", "problem", "problems",
+  "condition", "conditions", "matter", "effort", "efforts", "attempt",
+  "attempts", "bid", "scheme",
+  // modals / generic connectives that survive the stop-word filter
+  "should", "would", "could", "without", "still", "again",
+]);
+
 function singulariseToken(t: string): string {
   if (t.length > 4 && t.endsWith("s") && !t.endsWith("ss")) return t.slice(0, -1);
   return t;
@@ -680,9 +717,9 @@ function anchorTokens(title: string): Set<string> {
   for (const raw of normaliseTitle(title).split(" ")) {
     if (!raw || raw.length < 3) continue;
     if (/^\d+$/.test(raw)) continue;
-    if (TITLE_STOP.has(raw) || SAME_EVENT_NON_ANCHOR.has(raw)) continue;
+    if (TITLE_STOP.has(raw) || SAME_EVENT_NON_ANCHOR.has(raw) || SAME_EVENT_GENERIC.has(raw)) continue;
     const w = singulariseToken(raw);
-    if (w.length < 3 || SAME_EVENT_NON_ANCHOR.has(w)) continue;
+    if (w.length < 3 || SAME_EVENT_NON_ANCHOR.has(w) || SAME_EVENT_GENERIC.has(w)) continue;
     out.add(w);
   }
   return out;
@@ -701,10 +738,19 @@ const SAME_EVENT_TYPE_NOUN = new Set([
 ]);
 
 // Subject tokens = the place / actor / org names that identify WHICH event a
-// headline is about (anchors minus the recurring event-type nouns).
-function subjectTokens(anchors: Set<string>): Set<string> {
+// headline is about (anchors minus the recurring event-type nouns and the
+// country-name tokens). Generic editorial / procedural words are already gone
+// (excluded from anchors above). Country tokens are dropped here for the same
+// reason they are excluded from the shared-anchor count: a country-only headline
+// ("Sri Lanka prison riot") and a city-only headline ("Negombo prison riot") are
+// the SAME event, so nationality must never read as a distinguishing subject.
+function subjectTokens(anchors: Set<string>, countryToks: Set<string>): Set<string> {
   const out = new Set<string>();
-  for (const t of anchors) if (!SAME_EVENT_TYPE_NOUN.has(t)) out.add(t);
+  for (const t of anchors) {
+    if (SAME_EVENT_TYPE_NOUN.has(t)) continue;
+    if (countryToks.has(t)) continue;
+    out.add(t);
+  }
   return out;
 }
 
