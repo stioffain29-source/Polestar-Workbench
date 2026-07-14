@@ -34,6 +34,7 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
 import VesselMap from "@/components/VesselMap";
 import FleetIntelligence from "@/components/FleetIntelligence";
 import RedSeaDirectionalFlowPanel from "@/components/RedSeaDirectionalFlowPanel";
@@ -1152,6 +1153,12 @@ export default function Shipping() {
           </ChartCard>
         </div>
       </Section>
+
+      <OfficialMilitaryMaritimeWatchPanel
+        title="Official UKMTO Products"
+        subtitle="UK Maritime Trade Operations warnings and advisories ingested as standalone official sources — routed to Shipping Watch (and Conflict when escalation terms match). PDF text is merged into the stored body when available."
+        query={{ watch: "shipping", source: "ukmto", limit: 25 }}
+      />
 
       {/* 9. Recent Incidents */}
       <Section title="Recent Shipping Incidents">

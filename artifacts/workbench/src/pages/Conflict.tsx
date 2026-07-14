@@ -19,6 +19,7 @@ import {
 import { ExternalLink } from "lucide-react";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -518,6 +519,12 @@ export default function Conflict() {
           })}
         </div>
       </Section>
+
+      <OfficialMilitaryMaritimeWatchPanel
+        title="Official CENTCOM Releases"
+        subtitle="U.S. Central Command press releases ingested as standalone official sources — routed to Conflict Watch (and Shipping when maritime terms match). These rows never count as incidents."
+        query={{ watch: "conflict", source: "centcom", limit: 25 }}
+      />
 
       {/* 7. Incident table */}
       <Section title="Recent Incidents">
