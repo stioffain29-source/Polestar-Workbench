@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { sourcesTable } from "@workspace/db";
+import { OPTIONAL_INTEGRATION_SOURCE_NAME_LIST } from "../../../../lib/ingest/src/optionalIntegrations";
 
 // Effective Source Health status for a `sources` row.
 //
@@ -26,15 +27,28 @@ export function effectiveSourceStatusSql() {
   )`;
 }
 
-// Optional integrations (GDELT, ReliefWeb) that are intentionally off or still
-// awaiting approval. These must not appear in dashboard source alerts.
+// Optional integrations (GDELT, ReliefWeb, Facebook OSINT) that are
+// intentionally off or still awaiting approval. These must not appear in
+// dashboard source alerts.
 export function optionalIntegrationNoiseSql() {
+  const names = OPTIONAL_INTEGRATION_SOURCE_NAME_LIST.map((n) => sql`${n}`);
   return sql`(
-    ${sourcesTable.name} in (
-      'GDELT Conflict Events',
-      'ReliefWeb (UN OCHA)',
-      'ReliefWeb Situational Reports (UN OCHA)'
-    )
+    ${sourcesTable.name} in (${sql.join(names, sql`, `)})
     and ${sourcesTable.status} in ('not_configured', 'pending')
+  )`;
+}
+
+// Mirrors the workbench `isSourceActionRequired` gate: only feeds that need
+// operator follow-up surface on the dashboard alerts panel.
+export function dashboardSourceAlertsExcludeSql() {
+  const eff = effectiveSourceStatusSql();
+  const optionalNames = OPTIONAL_INTEGRATION_SOURCE_NAME_LIST.map((n) => sql`${n}`);
+  return sql`(
+    ${eff} in ('operational', 'pending')
+    or (
+      ${eff} = 'not_configured'
+      and ${sourcesTable.name} in (${sql.join(optionalNames, sql`, `)})
+    )
+    or ${optionalIntegrationNoiseSql()}
   )`;
 }

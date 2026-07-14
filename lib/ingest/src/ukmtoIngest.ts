@@ -26,7 +26,7 @@ import {
   mergeUkmtoBodyWithPdf,
   type UkmtoPdfExtractResult,
 } from "./ukmtoPdf";
-import { recordSourceHealth } from "./sourceHealth";
+import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 
 // M1.5 — UKMTO official products ingest. Parses listing + detail HTML, merges
 // linked PDF text, routes to Watches, assigns analyst flags, and persists rows.
@@ -349,20 +349,6 @@ export async function runUkmtoIngest(
 
   if (disabled) {
     log("  skipped — UKMTO_INGEST_ENABLED=false");
-    if (commit) {
-      await recordSourceHealth(
-        UKMTO_HEALTH_TOPIC,
-        [
-          {
-            name: UKMTO_HEALTH_NAME,
-            url: UKMTO_SOURCE_URL,
-            ok: false,
-            error: "Switched off (UKMTO_INGEST_ENABLED=false)",
-          },
-        ],
-        { sourceType: "html", notes: UKMTO_HEALTH_NOTES },
-      );
-    }
     return base;
   }
 
@@ -494,6 +480,7 @@ export async function runUkmtoIngest(
 
     if (commit) {
       const feedOk = errors.length === 0;
+      const rawError = feedOk ? null : errors[0] ?? "UKMTO ingest completed with errors";
       await recordSourceHealth(
         UKMTO_HEALTH_TOPIC,
         [
@@ -504,9 +491,8 @@ export async function runUkmtoIngest(
             collected: prepared.length,
             retained: base.inserted,
             rejected: prepared.length - toInsert.length + newsEchoSkipped,
-            error: feedOk
-              ? null
-              : errors[0] ?? "UKMTO ingest completed with errors",
+            error: rawError,
+            failureReason: rawError ? categorizeFeedFailure(rawError) : null,
           },
         ],
         {
@@ -538,6 +524,7 @@ export async function runUkmtoIngest(
             url: UKMTO_SOURCE_URL,
             ok: false,
             error: msg,
+            failureReason: categorizeFeedFailure(msg),
           },
         ],
         { sourceType: "html", notes: UKMTO_HEALTH_NOTES, pending: true },

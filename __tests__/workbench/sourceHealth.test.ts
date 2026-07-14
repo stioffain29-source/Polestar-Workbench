@@ -169,6 +169,12 @@ describe("action-required derivation", () => {
         status: "pending",
       }),
     ).toBe(false);
+    expect(
+      isSourceActionRequired({
+        name: "Facebook OSINT (Papua/PNG)",
+        status: "not_configured",
+      }),
+    ).toBe(false);
   });
 
   it("still flags a manually listed source that is not configured", () => {

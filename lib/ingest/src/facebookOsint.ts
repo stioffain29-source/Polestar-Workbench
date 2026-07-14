@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { recordSourceHealth } from "./sourceHealth";
+import { FACEBOOK_OSINT_HEALTH_NAME } from "./optionalIntegrations";
 import { sanitiseCaption } from "./text";
 import {
   extractPngItem,
@@ -114,7 +115,7 @@ const PLATFORM = "facebook";
 // One Source Health row, under the flashpoint topic (where the Papua/PNG
 // protest + unrest collection lives).
 const HEALTH_TOPIC = "flashpoint";
-export const FACEBOOK_OSINT_HEALTH_NAME = "Facebook OSINT (Papua/PNG)";
+export { FACEBOOK_OSINT_HEALTH_NAME } from "./optionalIntegrations";
 
 const MAX_ITEMS_DEFAULT = 40;
 const FETCH_TIMEOUT_MS = 30000;

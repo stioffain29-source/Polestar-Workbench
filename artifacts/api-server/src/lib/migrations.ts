@@ -176,7 +176,7 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "Nepal Republica",         url: "https://news.google.com/rss/search?q=site:myrepublica.nagariknetwork.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-NP&gl=NP&ceid=NP:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Secondary Nepal national — corroborates Kathmandu Post. Google-News site-scope: the direct feed 404s. Last 14 days." },
   { name: "New Age Bangladesh",      url: "https://news.google.com/rss/search?q=site:newagebd.net+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-BD&gl=BD&ceid=BD:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Bangladesh — labour and student coverage. Google-News site-scope: the direct feed 403s (Cloudflare) our egress IP. Last 14 days." },
   { name: "Sunday Times Sri Lanka",  url: "https://news.google.com/rss/search?q=site:sundaytimes.lk+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-LK&gl=LK&ceid=LK:en", sourceType: "rss",  reliability: 3, notes: "Owner: South Asia desk. Sri Lanka — Colombo weekly, political coverage. Google-News site-scope: the direct feed 404s. Last 14 days." },
-  { name: "The Kathmandu Post",      url: "https://kathmandupost.com/rss",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Kathmandu — political mobilisation, student unions, transport strikes." },
+  { name: "The Kathmandu Post",      url: "https://news.google.com/rss/search?q=site:kathmandupost.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-NP&gl=NP&ceid=NP:en", sourceType: "rss",  reliability: 4, notes: "Owner: South Asia desk. Kathmandu — political mobilisation, student unions, transport strikes. Google-News site-scope: the direct kathmandupost.com/rss feed serves malformed XML entities from our egress IP. Last 14 days." },
   { name: "Philippine Daily Inquirer", url: "https://www.inquirer.net/fullfeed",                                            sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. National daily — city-disruption and protest calendaring across Metro Manila." },
   { name: "Rappler",                 url: "https://www.rappler.com/feed/",                                                  sourceType: "rss",  reliability: 4, notes: "Owner: PH desk. Manila protest activity, union calls, student mobilisation." },
   { name: "Tempo English",           url: "https://rss.tempo.co/en",                                                        sourceType: "rss",  reliability: 4, notes: "Owner: SE Asia desk. Indonesia — investigative weekly, civic-space coverage. Direct RSS (the old en.tempo.co/rss path 404s)." },
@@ -4308,6 +4308,75 @@ export async function runDataMigrations(): Promise<void> {
       await backfillRelevance();
     } catch (relErr) {
       logger.error({ err: relErr }, "Relevance backfill failed");
+    }
+
+    // 7c) Repair dashboard source-health noise: Kathmandu Post malformed direct
+    //     RSS (switch to Google-News site-scope like other South Asia desks);
+    //     relabel CENTCOM/UKMTO rows stuck at "failing" for datacenter 403s to
+    //     "pending" (awaiting production network validation, not an outage).
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "dashboard_source_health_noise_repair_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const kathmanduGoogleNewsUrl =
+          "https://news.google.com/rss/search?q=site:kathmandupost.com+(protest+OR+rally+OR+demonstration+OR+strike+OR+unrest+OR+riot+OR+clash+OR+police+OR+arrest+OR+march)+when:14d&hl=en-NP&gl=NP&ceid=NP:en";
+        const kathmandu = await db
+          .update(sourcesTable)
+          .set({
+            url: kathmanduGoogleNewsUrl,
+            status: "operational",
+            errorMessage: null,
+            consecutiveFailures: 0,
+            lastFailureAt: null,
+            failureReason: null,
+          })
+          .where(
+            and(
+              eq(sourcesTable.topic, "flashpoint"),
+              eq(sourcesTable.name, "The Kathmandu Post"),
+            ),
+          );
+        const m15 = await db
+          .update(sourcesTable)
+          .set({
+            status: "pending",
+            consecutiveFailures: 0,
+            failureReason: "blocked_upstream",
+          })
+          .where(
+            and(
+              eq(sourcesTable.topic, "official_military_maritime"),
+              sql`${sourcesTable.name} in ('CENTCOM Press Releases', 'UKMTO Official Products')`,
+              sql`${sourcesTable.status} in ('failing', 'blocked')`,
+              sql`(
+                ${sourcesTable.errorMessage} ilike '%403%'
+                or ${sourcesTable.failureReason} = 'blocked_upstream'
+              )`,
+            ),
+          );
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            kathmanduRows: kathmandu.rowCount ?? 0,
+            m15Rows: m15.rowCount ?? 0,
+            marker: markerKey,
+          },
+          "Repaired dashboard source-health noise (Kathmandu Post feed + M1.5 403 relabel)",
+        );
+      }
+    } catch (repairErr) {
+      logger.error({ err: repairErr }, "Dashboard source-health noise repair failed");
     }
 
     logger.info("runDataMigrations: finished");

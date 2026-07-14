@@ -19,13 +19,23 @@ export const GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE =
 export const RELIEFWEB_CORROBORATION_HEALTH_NAME = "ReliefWeb (UN OCHA)";
 export const RELIEFWEB_REPORTS_HEALTH_NAME = "ReliefWeb Situational Reports (UN OCHA)";
 
+// Paid / optional social OSINT — needs FACEBOOK_API_KEY; the base flashpoint
+// feed is unaffected when this is off.
+export const FACEBOOK_OSINT_HEALTH_NAME = "Facebook OSINT (Papua/PNG)";
+
 const OPTIONAL_INTEGRATION_SOURCE_NAMES = new Set([
   GDELT_HEALTH_NAME,
   GDELT_STRUCTURED_HEALTH_NAME,
   RELIEFWEB_CORROBORATION_HEALTH_NAME,
   RELIEFWEB_REPORTS_HEALTH_NAME,
+  FACEBOOK_OSINT_HEALTH_NAME,
 ]);
 
 export function isOptionalIntegrationSource(name: string): boolean {
   return OPTIONAL_INTEGRATION_SOURCE_NAMES.has(name);
 }
+
+/** Stable display names for optional integrations (dashboard / SQL filters). */
+export const OPTIONAL_INTEGRATION_SOURCE_NAME_LIST = [
+  ...OPTIONAL_INTEGRATION_SOURCE_NAMES,
+] as const;

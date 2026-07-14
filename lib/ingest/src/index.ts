@@ -415,6 +415,7 @@ export {
   GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_CORROBORATION_HEALTH_NAME,
   RELIEFWEB_REPORTS_HEALTH_NAME,
+  FACEBOOK_OSINT_HEALTH_NAME,
   isOptionalIntegrationSource,
 } from "./optionalIntegrations";
 export type { GdeltEnrichSummary } from "./gdeltEnrich";

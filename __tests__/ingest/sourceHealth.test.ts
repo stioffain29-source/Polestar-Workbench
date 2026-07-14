@@ -317,6 +317,36 @@ describe("recordSourceHealth — scrape-health telemetry", () => {
     expect(row.lastRelevantItemAt).toBeUndefined();
   });
 
+  it("keeps pending (not failing) for blocked_upstream even after a prior success when pending is set", async () => {
+    const cap = setupDb({
+      existing: [
+        {
+          id: 9,
+          consecutiveFailures: 0,
+          lastSuccessAt: new Date("2026-06-01T00:00:00Z"),
+        },
+      ],
+    });
+
+    await recordSourceHealth(
+      "official_military_maritime",
+      [
+        {
+          name: "CENTCOM Press Releases",
+          url: "https://www.centcom.mil/MEDIA/PRESS-RELEASES/",
+          ok: false,
+          error: "Status code 403",
+        },
+      ],
+      { pending: true },
+    );
+
+    expect(cap.updates).toHaveLength(1);
+    expect(cap.updates[0].set.status).toBe("pending");
+    expect(cap.updates[0].set.consecutiveFailures).toBe(0);
+    expect(cap.updates[0].set.failureReason).toBe("blocked_upstream");
+  });
+
   it("writes registry metadata (scrapeMethod/frequency from opts, language/location from feed)", async () => {
     const cap = setupDb();
 

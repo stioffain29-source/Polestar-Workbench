@@ -19,7 +19,7 @@ import {
   CENTCOM_SOURCE_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
-import { recordSourceHealth } from "./sourceHealth";
+import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 
 // M1.5 — CENTCOM press releases ingest. Parses listing + detail HTML, routes to
 // Watches, assigns analyst flags, and persists standalone official-source rows.
@@ -300,20 +300,6 @@ export async function runCentcomIngest(
 
   if (disabled) {
     log("  skipped — CENTCOM_INGEST_ENABLED=false");
-    if (commit) {
-      await recordSourceHealth(
-        CENTCOM_HEALTH_TOPIC,
-        [
-          {
-            name: CENTCOM_HEALTH_NAME,
-            url: CENTCOM_SOURCE_URL,
-            ok: false,
-            error: "Switched off (CENTCOM_INGEST_ENABLED=false)",
-          },
-        ],
-        { sourceType: "html", notes: CENTCOM_HEALTH_NOTES },
-      );
-    }
     return base;
   }
 
@@ -421,6 +407,7 @@ export async function runCentcomIngest(
 
     if (commit) {
       const feedOk = errors.length === 0;
+      const rawError = feedOk ? null : errors[0] ?? "CENTCOM ingest completed with errors";
       await recordSourceHealth(
         CENTCOM_HEALTH_TOPIC,
         [
@@ -431,9 +418,8 @@ export async function runCentcomIngest(
             collected: prepared.length,
             retained: base.inserted,
             rejected: prepared.length - toInsert.length + newsEchoSkipped,
-            error: feedOk
-              ? null
-              : errors[0] ?? "CENTCOM ingest completed with errors",
+            error: rawError,
+            failureReason: rawError ? categorizeFeedFailure(rawError) : null,
           },
         ],
         {
@@ -465,6 +451,7 @@ export async function runCentcomIngest(
             url: CENTCOM_SOURCE_URL,
             ok: false,
             error: msg,
+            failureReason: categorizeFeedFailure(msg),
           },
         ],
         { sourceType: "html", notes: CENTCOM_HEALTH_NOTES, pending: true },

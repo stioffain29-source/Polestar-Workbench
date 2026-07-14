@@ -260,12 +260,16 @@ export async function recordSourceHealth(
           failureReason: null,
           ...((f.retained ?? 0) > 0 ? { lastRelevantItemAt: now } : {}),
         };
-      } else if (opts.pending && !existing?.lastSuccessAt) {
-        // Configured but never validated end-to-end yet, and this run failed.
-        // Record it as the non-alarming "pending" state (awaiting approval /
-        // network validation) rather than escalating to "failing": it stays out
-        // of the red Action Required panel and the dashboard failing count, and
-        // the streak is reset so it never reads as "retrying".
+      } else if (
+        opts.pending &&
+        (!existing?.lastSuccessAt ||
+          (f.failureReason ?? categorizeFeedFailure(f.error)) === "blocked_upstream")
+      ) {
+        // Configured but never validated end-to-end yet, OR blocked by upstream
+        // bot protection (403/Cloudflare from datacenter egress — expected for
+        // CENTCOM/UKMTO/ICC until production network validation). Record as
+        // the non-alarming "pending" state rather than escalating to "failing".
+        const failureReason = f.failureReason ?? categorizeFeedFailure(f.error);
         healthFields = {
           url: f.url,
           sourceType,
@@ -274,11 +278,11 @@ export async function recordSourceHealth(
           consecutiveFailures: 0,
           lastFailureAt: now,
         };
-        // A failed run records its coarse failure category (when supplied) but
-        // never stamps a relevant-item timestamp.
         telemetry = {
           ...runCounts,
-          ...(f.failureReason !== undefined ? { failureReason: f.failureReason } : {}),
+          ...(failureReason !== undefined && failureReason !== null
+            ? { failureReason }
+            : {}),
         };
       } else {
         const next = (existing?.consecutiveFailures ?? 0) + 1;
