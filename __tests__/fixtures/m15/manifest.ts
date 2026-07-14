@@ -20,6 +20,7 @@ export const M15_OPTIONAL_FIXTURES = [
   "ukmto-warning-038-26-attack.html",
   "ukmto-003-26-update-002.pdf",
   "cmf-jmic-overview.html",
+  "cmf-products-listing.html",
   "cmf-threat-assessment-q2-2026.html",
 ] as const;
 

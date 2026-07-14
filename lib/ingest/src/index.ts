@@ -232,6 +232,23 @@ export type {
   CentcomDetail,
 } from "./centcomIngest";
 export {
+  runMaritimePartnerProductsIngest,
+  emptyMaritimePartnerProductsIngestSummary,
+  discoverPartnerProducts,
+  mergeFixturePartnerProducts,
+  selectPartnerListingForFetch,
+  parsePartnerProduct,
+  parsePartnerPdf,
+  PARTNER_HEALTH_TOPIC,
+  PARTNER_FIXTURE_LISTING_ITEMS,
+} from "./maritimePartnerProducts";
+export type {
+  MaritimePartnerProductsIngestSummary,
+  MaritimePartnerProductsIngestOptions,
+  PartnerProviderIngestSummary,
+  PartnerListingItem,
+} from "./maritimePartnerProducts";
+export {
   UKMTO_HEALTH_NAME,
   UKMTO_SOURCE_URL,
   CENTCOM_HEALTH_NAME,

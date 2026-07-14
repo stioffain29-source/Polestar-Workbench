@@ -25,6 +25,8 @@ import {
   emptyUkmtoIngestSummary,
   runCentcomIngest,
   emptyCentcomIngestSummary,
+  runMaritimePartnerProductsIngest,
+  emptyMaritimePartnerProductsIngestSummary,
   runKammiSourceIngest,
   emptyKammiSourceSummary,
   runFacebookOsintIngest,
@@ -55,6 +57,7 @@ import {
   type IccPiracySummary,
   type UkmtoIngestSummary,
   type CentcomIngestSummary,
+  type MaritimePartnerProductsIngestSummary,
   type KammiSourceSummary,
   type FacebookOsintSummary,
   type GdeltEnrichSummary,
@@ -168,6 +171,7 @@ export type IngestRunResult =
       iccPiracy: IccPiracySummary;
       ukmtoOfficial: UkmtoIngestSummary;
       centcomOfficial: CentcomIngestSummary;
+      partnerOfficial: MaritimePartnerProductsIngestSummary;
       kammiSource: KammiSourceSummary;
       facebookOsint: FacebookOsintSummary;
       socialPromote: SocialPromoteSummary;
@@ -275,6 +279,16 @@ export type UkmtoOfficialRunResult =
       finishedAt: Date;
       durationMs: number;
       ukmtoOfficial: UkmtoIngestSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+export type PartnerOfficialRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      partnerOfficial: MaritimePartnerProductsIngestSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -713,6 +727,25 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "CENTCOM official ingest scaffold failed");
       centcomOfficial = emptyCentcomIngestSummary(err);
     }
+    let partnerOfficial: MaritimePartnerProductsIngestSummary;
+    try {
+      partnerOfficial = await runMaritimePartnerProductsIngest({ commit: true });
+      logger.info(
+        {
+          ran: partnerOfficial.ran,
+          disabled: partnerOfficial.disabled,
+          inserted: partnerOfficial.inserted,
+          itemsFetched: partnerOfficial.itemsFetched,
+          pdfExtracted: partnerOfficial.pdfExtracted,
+          jmicInserted: partnerOfficial.providers.jmic.inserted,
+          cmfInserted: partnerOfficial.providers.cmf.inserted,
+        },
+        "Partner official ingest complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "Partner official ingest failed");
+      partnerOfficial = emptyMaritimePartnerProductsIngestSummary(err);
+    }
     // Normalise non-English incident headlines (e.g. Bahasa Indonesia from the
     // West Papua feeds) into clean English advisory titles. Runs EARLY — next to
     // strikes and ICC piracy, BEFORE the multi-minute scraper chain — for the
@@ -1112,6 +1145,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       iccPiracy,
       ukmtoOfficial,
       centcomOfficial,
+      partnerOfficial,
       kammiSource,
       facebookOsint,
       socialPromote,
@@ -1483,6 +1517,35 @@ export async function runUkmtoOfficialOnce(
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       ukmtoOfficial,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+/**
+ * Run ONLY the JMIC / CMF partner product ingest. Supports dry-run
+ * (commit=false) for operator validation before writing rows.
+ */
+export async function runPartnerOfficialOnce(
+  opts: { commit?: boolean } = {},
+): Promise<PartnerOfficialRunResult> {
+  const commit = opts.commit ?? false;
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let partnerOfficial: MaritimePartnerProductsIngestSummary;
+    try {
+      partnerOfficial = await runMaritimePartnerProductsIngest({ commit });
+    } catch (err) {
+      logger.error({ err }, "Partner official ingest failed");
+      partnerOfficial = emptyMaritimePartnerProductsIngestSummary(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      partnerOfficial,
     };
   });
   if (!res.ran) return res;

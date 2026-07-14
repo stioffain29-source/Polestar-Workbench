@@ -8,6 +8,7 @@ import {
   runIccPiracyOnce,
   runCentcomOfficialOnce,
   runUkmtoOfficialOnce,
+  runPartnerOfficialOnce,
   runMovementOnce,
   runGdeltStructuredOnce,
   runTapaPromoteOnce,
@@ -476,6 +477,89 @@ router.post("/admin/ukmto-official", async (req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     req.log.error({ err }, "admin ukmto-official failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "ingestion_failed", message });
+    }
+  }
+});
+
+// Protected manual trigger for ONLY the JMIC / CMF partner product ingest.
+router.post("/admin/partner-official", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin partner-official called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  const commit =
+    req.query.commit === "true" ||
+    req.query.commit === "1" ||
+    req.body?.commit === true;
+
+  try {
+    req.log.info({ commit }, "admin partner-official started");
+    const result = await runPartnerOfficialOnce({ commit });
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    const r = result.partnerOfficial;
+    req.log.info(
+      {
+        commit,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        duplicateInDb: r.duplicateInDb,
+        durationMs: result.durationMs,
+      },
+      "admin partner-official finished",
+    );
+    res.json({
+      ok: true,
+      commit,
+      startedAt: result.startedAt.toISOString(),
+      finishedAt: result.finishedAt.toISOString(),
+      durationMs: result.durationMs,
+      partnerOfficial: {
+        mode: r.mode,
+        disabled: r.disabled,
+        itemsDiscovered: r.itemsDiscovered,
+        itemsFetched: r.itemsFetched,
+        inserted: r.inserted,
+        duplicateInDb: r.duplicateInDb,
+        pdfExtracted: r.pdfExtracted,
+        pdfPartial: r.pdfPartial,
+        providers: {
+          jmic: {
+            inserted: r.providers.jmic.inserted,
+            itemsFetched: r.providers.jmic.itemsFetched,
+            totalAfter: r.providers.jmic.totalAfter,
+          },
+          cmf: {
+            inserted: r.providers.cmf.inserted,
+            itemsFetched: r.providers.cmf.itemsFetched,
+            totalAfter: r.providers.cmf.totalAfter,
+          },
+        },
+        errors: r.errors,
+        logLines: r.logLines,
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin partner-official failed");
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }

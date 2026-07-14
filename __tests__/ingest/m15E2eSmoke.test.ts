@@ -17,16 +17,22 @@ function readRepoFile(rel: string): string {
 }
 
 describe("M1.5 end-to-end smoke + hardening (Step 13)", () => {
-  it("ingestRunner includes CENTCOM + UKMTO official passes in one run", () => {
+  it("ingestRunner includes CENTCOM + UKMTO + partner official passes in one run", () => {
     const src = readRepoFile("artifacts/api-server/src/lib/ingestRunner.ts");
     expect(src).toContain("runUkmtoIngest({ commit: true })");
     expect(src).toContain("runCentcomIngest({ commit: true })");
+    expect(src).toContain("runMaritimePartnerProductsIngest({ commit: true })");
     expect(src).toContain("ukmtoOfficial");
     expect(src).toContain("centcomOfficial");
+    expect(src).toContain("partnerOfficial");
   });
 
   it("official ingest modules write only to official_military_maritime_sources", () => {
-    for (const file of ["lib/ingest/src/centcomIngest.ts", "lib/ingest/src/ukmtoIngest.ts"]) {
+    for (const file of [
+      "lib/ingest/src/centcomIngest.ts",
+      "lib/ingest/src/ukmtoIngest.ts",
+      "lib/ingest/src/maritimePartnerProducts.ts",
+    ]) {
       const src = readRepoFile(file);
       expect(src).toContain("officialMilitaryMaritimeSourcesTable");
       expect(src).not.toMatch(/insert\(\s*incidentsTable/);
