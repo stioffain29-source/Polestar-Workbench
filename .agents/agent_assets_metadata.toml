@@ -689,3 +689,15 @@ id = "HB-nFFjd5iPDfbE81rZbA"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse.pdf"
 type = "pdf"
 title = "Cargo Watch report — sparse period (thin-week fallbacks)"
+
+[[outputs]]
+id = "6DbKqQKve28YQN81TVPab"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_small.pdf"
+type = "pdf"
+title = "Cargo Watch report — real data (1,244 incidents, 10pp, gate PASS)"
+
+[[outputs]]
+id = "LD8DxYYc1W-Uw-l9fRv0g"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse_small.pdf"
+type = "pdf"
+title = "Cargo Watch report — sparse period (thin-week fallbacks, 6pp)"
