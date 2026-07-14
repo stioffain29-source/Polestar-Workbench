@@ -1225,9 +1225,11 @@ function buildAssessment(
     ? `Cargo exposure this period was led by ${leadStage.label.toLowerCase()} activity${geoPhrase}.${limitNote}`
     : `Cargo exposure this period is spread across the supply chain${geoPhrase}.${limitNote}`;
 
+  // No incident counts in the narrative — counts belong on the Fast Facts
+  // tiles and the pattern-dashboard cards, not the prose (user preference).
   const whatMatters: string[] = patterns.slice(0, 3).map((p) => {
     const where = p.primaryGeography ? ` centred on ${p.primaryGeography}` : "";
-    return `${p.name}: ${p.count} unique incident${p.count === 1 ? "" : "s"}${where}, stressing ${p.operationalConcern.toLowerCase()}.`;
+    return `${p.name}${where}, stressing ${p.operationalConcern.toLowerCase()}.`;
   });
 
   const businessPriorities: string[] = patterns.slice(0, 5).map((p) => {

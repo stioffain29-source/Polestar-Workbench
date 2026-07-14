@@ -920,8 +920,6 @@ export async function exportTopicReportPdf(
 
     // Jet Fuel Price Trajectory — rasterise the same React chart the preview
     // uses so chart styling cannot drift from a hand-ported jsPDF replica.
-    drawSectionHeading(ctx, "Jet Fuel Price Trajectory");
-    ensureSpace(ctx, 220);
     await embedReactChartInPdf(
       ctx,
       createElement(JetFuelTrajectoryChart, {
@@ -931,6 +929,7 @@ export async function exportTopicReportPdf(
             : null,
         benchmarkLabel: fuelData.marketData.jetFuelBenchmarkLabel,
       }),
+      { heading: "Jet Fuel Price Trajectory" },
     );
     // Jet-fuel lag note — mirror the preview (ReportPreview.tsx) so the PDF
     // also explains why the jet "as of" date trails the daily Brent/WTI close
@@ -1044,14 +1043,15 @@ export async function exportTopicReportPdf(
     );
 
     if (data.topic === "energy") {
-      drawSectionHeading(ctx, "Market Prices");
       const rows = options.marketPrices ?? [];
       if (rows.length === 0) {
+        drawSectionHeading(ctx, "Market Prices");
         renderProse(ctx, MARKET_PRICES_REPORT_EMPTY_TEXT);
       } else {
         await embedReactChartInPdf(
           ctx,
           createElement(MarketPricesReportGrid, { rows }),
+          { heading: "Market Prices" },
         );
       }
     }
@@ -1060,22 +1060,23 @@ export async function exportTopicReportPdf(
       // Geographic + time pattern. Map/trend caption strings are data-derived
       // in the model, so they render identically on screen and in the PDF.
       if (cargoModel.intensity.size > 0) {
-        drawSectionHeading(ctx, "Cargo Theft Map");
-        ensureSpace(ctx, 260);
+        // Map carries an internal "Cargo Incidents by Country" title; the
+        // preview also wraps it in a "Cargo Theft Map" section, so keep the
+        // external heading here (kept together with the image).
         await embedReactChartInPdf(
           ctx,
           createElement(CargoChoroplethStatic, {
             intensity: cargoModel.intensity,
           }),
+          { heading: "Cargo Theft Map" },
         );
         if (cargoModel.mapCaption.trim()) renderProse(ctx, cargoModel.mapCaption);
       }
       if (cargoModel.extras.trend.length >= 2) {
-        drawSectionHeading(ctx, "Cargo Theft Trend");
-        ensureSpace(ctx, 220);
         await embedReactChartInPdf(
           ctx,
           createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
+          { heading: "Cargo Theft Trend" },
         );
         if (cargoModel.trendCaption.trim())
           renderProse(ctx, cargoModel.trendCaption);
@@ -1083,10 +1084,12 @@ export async function exportTopicReportPdf(
 
       // Operational pattern graphics — supply-chain exposure, the pattern
       // dashboard, and the weekly activity matrix. Each is the SAME React
-      // component the preview renders, rasterised here.
+      // component the preview renders, rasterised here. These carry their OWN
+      // internal GraphicFrame titles ("Supply-Chain Exposure", "Operational
+      // Patterns", the activity-matrix title), and the preview renders them
+      // WITHOUT an external section heading — so no external drawSectionHeading
+      // here either (avoids double-titling and keeps preview == PDF).
       if (cargoModel.totalUnique > 0) {
-        drawSectionHeading(ctx, "Supply-Chain Exposure");
-        ensureSpace(ctx, 300);
         await embedReactChartInPdf(
           ctx,
           createElement(CargoSupplyChainExposure, {
@@ -1095,8 +1098,6 @@ export async function exportTopicReportPdf(
           }),
         );
 
-        drawSectionHeading(ctx, "Operational Patterns");
-        ensureSpace(ctx, 300);
         await embedReactChartInPdf(
           ctx,
           createElement(CargoPatternDashboard, {
@@ -1105,8 +1106,6 @@ export async function exportTopicReportPdf(
         );
       }
       if (cargoModel.activity.total > 0) {
-        ensureSpace(ctx, 320);
-        drawSectionHeading(ctx, "Weekly Activity by Pattern");
         await embedReactChartInPdf(
           ctx,
           createElement(CargoActivityMatrix, {
