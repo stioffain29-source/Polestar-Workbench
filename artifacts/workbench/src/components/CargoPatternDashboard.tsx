@@ -83,7 +83,8 @@ export default function CargoPatternDashboard({
 
             <div style={{ fontSize: 10.5, color: G.dusk, marginTop: 6 }}>
               {p.count} {p.count === 1 ? "incident" : "incidents"} · {p.sharePct}
-              %{p.primaryGeography ? ` · ${p.primaryGeography}` : ""}
+              % of total
+              {p.primaryGeography ? ` · Primary country: ${p.primaryGeography}` : ""}
             </div>
             <div style={{ marginTop: 5 }}>
               <ShareBar pct={p.sharePct} />

@@ -57,6 +57,7 @@ function Section({
     <section className="mb-8" style={{ breakInside: "avoid" }}>
       <h2
         className="uppercase"
+        data-pdf-keep-with-next
         style={{
           fontFamily: "Roboto, sans-serif",
           fontWeight: 700,

@@ -597,6 +597,24 @@ function collectBreakCandidates(
     });
   });
 
+  // Keep-with-next headings (data-pdf-keep-with-next) — a section heading must
+  // never be orphaned at the foot of a page, split from the block it introduces.
+  // Add a short keep-together range spanning the heading plus the first ~56px of
+  // the following block, so a cut that would land between the heading and its
+  // body relocates BEFORE the heading (buildPageSlices pulls the page end back to
+  // the range top), carrying the heading onto the next page with its content.
+  root
+    .querySelectorAll<HTMLElement>("[data-pdf-keep-with-next]")
+    .forEach((node) => {
+      const next = node.nextElementSibling as HTMLElement | null;
+      if (!next) return;
+      const nodeTop = Math.round(node.getBoundingClientRect().top - rootRect.top);
+      const nextRect = next.getBoundingClientRect();
+      const nextTop = Math.round(nextRect.top - rootRect.top);
+      const nextBottom = Math.round(nextRect.bottom - rootRect.top);
+      keepRanges.push({ top: nodeTop, bottom: Math.min(nextBottom, nextTop + 56) });
+    });
+
   return {
     candidates: refineBreakCandidates(rawTops, root.scrollHeight, pageCssHeight),
     keepRanges,

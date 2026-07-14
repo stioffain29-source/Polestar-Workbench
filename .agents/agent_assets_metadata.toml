@@ -701,3 +701,9 @@ id = "LD8DxYYc1W-Uw-l9fRv0g"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse_small.pdf"
 type = "pdf"
 title = "Cargo Watch report — sparse period (thin-week fallbacks, 6pp)"
+
+[[outputs]]
+id = "pkCxMzbBa5YSTQ2AeJccK"
+uri = "file://exports/cargo_watch_report.pdf"
+type = "pdf"
+title = "Cargo Watch report (fresh, post-fix)"

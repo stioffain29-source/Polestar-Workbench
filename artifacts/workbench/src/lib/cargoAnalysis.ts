@@ -511,6 +511,100 @@ export function recoverCargoPortName(
   return matches.length === 1 ? matches[0] : null;
 }
 
+// --- Destination-attribution guard (spec pt2) ----------------------------
+// A shipping-DESTINATION phrase names a country the cargo was HEADING to, not
+// where the incident occurred: "India-bound stowaways", "bound for Bangladesh",
+// "en route to Singapore". When a record's ONLY mention of its attributed
+// in-scope country is such a destination phrase, the event did not happen there
+// and the row must not be counted in-scope.
+type MentionKind = "none" | "dest" | "real";
+
+// Destination cue that immediately PRECEDES a place name. Anchored to the end of
+// the preceding text window so "bound for India" matches but "outbound India
+// trade" does not.
+const DEST_CUE_BEFORE_RE =
+  /\b(bound for|destined for|en ?route to|headed (?:to|for)|heading (?:to|for)|consigned to|shipment to|shipped to|export(?:ed)? to|for export to|delivery to|for delivery to|to be (?:delivered|shipped) to)\s+$/i;
+
+// Classify how a country name appears in the text: "real" (at least one plain,
+// non-destination mention → the incident may genuinely involve that country),
+// "dest" (every mention is destination-embedded) or "none" (not mentioned, so
+// we cannot judge — treated as non-destination to avoid wrongly demoting).
+// Word-bounded via manual char checks so "India" does not match "Indian".
+function destinationMentionKind(text: string, name: string): MentionKind {
+  const needle = name.trim().toLowerCase();
+  if (!needle) return "none";
+  const lower = text.toLowerCase();
+  let idx = lower.indexOf(needle);
+  let kind: MentionKind = "none";
+  while (idx >= 0) {
+    const prevCh = idx > 0 ? text[idx - 1] : " ";
+    const nextCh = text[idx + needle.length] ?? " ";
+    const wordStart = !/[a-z]/i.test(prevCh);
+    const wordEnd = !/[a-z]/i.test(nextCh) || nextCh === "-";
+    if (wordStart && wordEnd) {
+      const before = text.slice(Math.max(0, idx - 30), idx);
+      const after = text.slice(idx + needle.length, idx + needle.length + 7);
+      const isDest = /^-bound\b/i.test(after) || DEST_CUE_BEFORE_RE.test(before);
+      if (!isDest) return "real";
+      kind = "dest";
+    }
+    idx = lower.indexOf(needle, idx + needle.length);
+  }
+  return kind;
+}
+
+// True when EVERY in-scope country attributed to the row appears in the text
+// only as a shipping destination AND no genuine in-scope place is recoverable —
+// i.e. the row was scoped in purely because its cargo was bound for the region.
+export function attributedCountriesAreDestinationOnly(i: CargoIncidentLike): boolean {
+  const text = `${i.title} ${i.summary ?? ""}`;
+  const inScope = splitAttributedCountries(i.country)
+    .map((c) => normalizeCountry(c))
+    .filter((c) => {
+      const r = classifyRegion(c);
+      return r === "APAC" || r === "Middle East";
+    });
+  if (inScope.length === 0) return false;
+  // A genuine, non-destination in-scope place named in the text keeps the row.
+  if (recoverCargoCountryFromText(i) !== null) return false;
+  let anyDest = false;
+  for (const c of inScope) {
+    const kind = destinationMentionKind(text, c);
+    if (kind === "real") return false;
+    if (kind === "dest") anyDest = true;
+  }
+  return anyDest;
+}
+
+// Human-interest / commentary "stowaway" items that are not cargo-crime events:
+// an animal that stowed away (cat, squirrel), a cruise-passenger stowaway scare,
+// or an insurer / P&I-club stowaway statistics-and-trends commentary. A GENUINE
+// human stowaway found in a container or cargo hold at an in-scope port carries
+// none of these cues, so real port stowaway events are not caught here.
+function isNonCargoStowaway(text: string): boolean {
+  if (!/\bstow(?:away|aways)\b/i.test(text)) return false;
+  if (
+    /\b(cat|kitten|feline|squirrel|dog|puppy|rat|mouse|mice|monkey|snake|bird|pigeon|owl|possum|raccoon|insect|spider|animal|animals)\b/i.test(
+      text,
+    )
+  )
+    return true;
+  if (
+    /\b(cruise (?:ship|liner|line|passenger|passengers|vacation|holiday)|passenger (?:ship|vessel|ferry|liner)|holidaymakers?|tourists?)\b/i.test(
+      text,
+    )
+  )
+    return true;
+  if (
+    /\b(p&i|protection and indemnity)\b/i.test(text) &&
+    /\b(statistic|statistics|figure|figures|number|numbers|trend|trends|guidance|advisory|analysis|cases|claims|significant number)\b/i.test(
+      text,
+    )
+  )
+    return true;
+  return false;
+}
+
 export type Scope = "in_scope" | "out_of_scope_geo" | "excluded_non_cargo" | "country_review";
 
 export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
@@ -536,6 +630,11 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|lorry|warehouse|godown|depot|consignment|shipment|logistic|pallet|reefer|cold storage|hijack)\b/i.test(text)) {
     return "excluded_non_cargo";
   }
+  // Human-interest / commentary "stowaway" pieces (an animal stowaway, a cruise-
+  // passenger scare, or P&I stowaway statistics) are not cargo-crime events.
+  // Rejected here, ahead of the port cargo-security rescue, but a genuine human
+  // container / hold stowaway at an in-scope port survives (no such cue).
+  if (isNonCargoStowaway(text)) return "excluded_non_cargo";
   // Livestock / cattle-truck theft is OUT of Cargo Watch scope UNLESS a clear
   // commercial supply-chain anchor is present (a named logistics operator, a
   // warehouse / cold store / reefer / container consignment, a port / rail
@@ -574,6 +673,13 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   if (i.analystInScope === true && (region === "APAC" || region === "Middle East")) {
     return "in_scope";
   }
+  // Destination-attribution guard (spec pt2): a row whose ONLY in-scope country
+  // mention is a shipping DESTINATION ("India-bound stowaways", "bound for
+  // Bangladesh") did not occur in that country. Demote it out of geographic
+  // scope so it is never counted as an in-region cargo incident. Runs after the
+  // analyst override (an explicit "Add to lane" stays authoritative) and before
+  // the vocab / port-security rescue so a destination match cannot re-admit it.
+  if (attributedCountriesAreDestinationOnly(i)) return "out_of_scope_geo";
   // Must reference cargo / logistics crime vocabulary at all (English or Bahasa),
   // OR carry a port cargo-security signal (which names no land freight noun yet
   // is in scope).
@@ -643,11 +749,36 @@ export function cargoCountry(i: CargoIncidentLike): string | null {
 // once, and (4) when the source left the row unattributed, recovers a provable
 // in-scope country from the incident text (mirroring cargoCountry()).
 export function cargoCountriesFor(i: CargoIncidentLike): string[] {
-  const out: string[] = [];
+  const text = `${i.title} ${i.summary ?? ""}`;
+  // Track each distinct normalised country with the STRONGEST evidence of how it
+  // appears in the text (real > dest > none), checking both the raw attribution
+  // token and its normalised form so an aliased destination ("Dubai-bound") is
+  // still recognised as a destination.
+  const seen: Array<{ norm: string; kind: MentionKind }> = [];
   for (const c of splitAttributedCountries(i.country)) {
-    const n = normalizeCountry(c);
-    if (!out.includes(n)) out.push(n);
+    const norm = normalizeCountry(c);
+    const kindRaw = destinationMentionKind(text, c);
+    const kindNorm = destinationMentionKind(text, norm);
+    const kind: MentionKind =
+      kindRaw === "real" || kindNorm === "real"
+        ? "real"
+        : kindRaw === "dest" || kindNorm === "dest"
+          ? "dest"
+          : "none";
+    const existing = seen.find((s) => s.norm === norm);
+    if (existing) {
+      if (kind === "real") existing.kind = "real";
+      else if (kind === "dest" && existing.kind === "none") existing.kind = "dest";
+    } else {
+      seen.push({ norm, kind });
+    }
   }
+  // Drop destination-only countries when at least one non-destination country
+  // remains — the cargo did not occur at its destination. If EVERY attribution
+  // is destination-only, keep them (a coarse tag beats none); the classifyScope
+  // guard demotes such a fully-destination row out of scope separately.
+  const nonDest = seen.filter((s) => s.kind !== "dest").map((s) => s.norm);
+  const out = nonDest.length > 0 ? nonDest : seen.map((s) => s.norm);
   if (out.length === 0) {
     const recovered = recoverCargoCountryFromText(i);
     if (recovered) out.push(recovered);

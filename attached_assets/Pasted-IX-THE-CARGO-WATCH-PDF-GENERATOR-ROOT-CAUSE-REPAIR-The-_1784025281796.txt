@@ -1,0 +1,134 @@
+IX THE CARGO WATCH PDF GENERATOR — ROOT CAUSE REPAIR
+
+The attached Cargo Watch export is still unacceptable. This is not another cosmetic patch. Fix the underlying data preparation, pagination and PDF rendering pipeline used by the live Cargo Watch report.
+
+Do not change the branding or redesign the report. Do not give me a proposed plan. Implement the fix, test it on the live application and provide a newly exported PDF as proof.
+
+1. Create one canonical dataset before generating anything
+
+All maps, totals, charts, pattern cards, enforcement records, key incidents and narrative sections must derive from the same deduplicated dataset.
+
+Before aggregation:
+
+Normalise titles, URLs, dates, country, city, category and status.
+Cluster syndicated or repeated coverage of the same event using canonical URL, location, date proximity and fuzzy title similarity.
+Retain multiple sources inside one canonical record rather than printing multiple incidents.
+Ensure an underlying event cannot appear twice in separate report sections. Where an arrest is an update to an existing incident, show the event once with its updated status.
+Recalculate all totals after deduplication. Do not preserve the current figure of 40 if the clean dataset produces another total.
+
+The two Malaysia entries dated 1 July describe the same bonded-lorry syndicate and must become one record.
+
+2. Add mandatory validation before records enter the report
+
+Reject or flag records where:
+
+The status contradicts the headline or source text.
+The country has been inferred from a destination rather than the incident location.
+The event is not genuinely relevant to cargo security.
+The event date is outside the selected reporting period.
+Required location or classification fields have been filled with unsupported guesses.
+
+The 28 June Leuwidamar headline says police were still being asked to arrest the perpetrators, but the report states “Suspects arrested.” This must not pass validation.
+
+The stowaway story occurred in Nigeria but has been classified as an Indian cargo incident because the vessel was bound for India. Exclude it from Cargo Watch unless there is a genuine cargo-security impact; otherwise assign the actual incident location.
+
+3. Make every number reconcile
+
+Add an export validation function that blocks PDF generation unless:
+
+Country totals equal the unique incident total.
+Weekly totals equal the unique incident total.
+Supply-chain-stage totals equal the unique incident total.
+Operational-pattern totals do not double count records.
+Enforcement outcomes are excluded from incident totals.
+The map, Fast Facts and narrative use the same figures.
+“Highest severity” matches the actual remaining incidents.
+Key incidents are selected from the canonical incident set.
+
+Do not display ambiguous labels such as:
+
+26 incidents · 65% · India
+
+That currently implies all 26 incidents occurred in India even though the report says India has 18 total records. Use wording such as:
+
+26 incidents · 65% of total
+Primary country: India
+
+Or remove the country from the pattern card.
+
+4. Fix weekly-period handling
+
+The selected period is 14 June to 13 July, but the chart begins with a bucket labelled 8 June.
+
+Week buckets must be clipped to the actual reporting period and labelled as ranges, for example:
+
+14 Jun
+15–21 Jun
+22–28 Jun
+29 Jun–5 Jul
+6–12 Jul
+13 Jul
+
+No chart label should visually suggest that out-of-period incidents were included.
+
+5. Replace the current pagination logic
+
+Implement a measured, block-aware paginator rather than fixed page breaks.
+
+Required rules:
+
+Keep each section heading, introductory text and first content block together.
+Never leave a section heading at the bottom of a page.
+Never place a panel on a new page without its section heading.
+Keep individual incident cards together.
+Repeat the section heading with “continued” where a long section spans pages.
+Use available page space before creating another page.
+Rebalance pages after the final data and text have been rendered.
+
+The current export strands ENFORCEMENT ACTIVITY at the bottom of one page while the records begin on the next page and continue onto a third.
+
+Specifically fix:
+
+Supply-Chain Exposure being isolated on a page without a proper section heading.
+Enforcement heading being separated from its first record.
+Enforcement records being spread inefficiently across pages.
+Key Incidents being split between pages despite large unused areas.
+Excessive dead space and undersized incident text.
+6. Fix preview-to-PDF parity
+
+Use the same report component and dataset for both preview and export.
+
+Before calling the PDF renderer:
+
+Await document.fonts.ready.
+Await all charts, maps and images.
+Confirm every report component has a non-zero rendered height.
+Use networkidle only after report assets have finished rendering.
+Preserve print backgrounds.
+Do not use a separate simplified PDF code path.
+Do not rely on arbitrary sleep delays.
+
+Add a regression check comparing the number of report blocks in the preview DOM with the number rendered into the PDF. Export must fail if a chart, table, card or section is missing.
+
+7. Automated regression tests required
+
+Add tests covering at least:
+
+The two 1 July Malaysian articles produce one canonical event.
+The Leuwidamar item cannot receive “Suspects arrested” from unsupported text.
+The Nigeria stowaway item cannot be assigned to India from the destination.
+Incident totals reconcile across map, weekly chart, stages and Fast Facts.
+A section heading cannot be printed without its first content block.
+Preview and PDF contain the same report components.
+Exporting the same dataset twice produces identical totals and pagination.
+DEFINITION OF DONE
+
+This is complete only when you provide:
+
+The actual files changed.
+A short explanation of the root causes.
+Test results.
+A fresh Cargo Watch PDF exported from the live application.
+Confirmation that the fix applies to every Watch report using this generator, not just this individual PDF.
+
+Do not hard-code this report’s records or page numbers. Do not hide bad records with CSS. Do not simply add another forced page break.

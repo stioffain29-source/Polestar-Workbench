@@ -12,6 +12,7 @@
 // render their explicit no-data state and are not validated.
 import { addDays, isValid, parseISO } from "date-fns";
 import type { CargoAppendixRow, CargoPatternModel } from "./cargoPatternModel";
+import { NO_ARREST_RE } from "./cargoPatternModel";
 
 export interface CargoReportOverrides {
   situation?: string | null;
@@ -366,6 +367,27 @@ export function validateCargoReport(
         message: `${implCount} implication(s) have no linked incident`,
       });
   }
+
+  // 11. Client status must not contradict its own source (spec pt2/pt7). A row
+  //     reported as "Suspects arrested" must not sit on a summary that carries a
+  //     NO-ARREST / active-pursuit cue ("no arrests", "manhunt", "still at
+  //     large", "arrest warrant issued"). deriveClientStatus vetoes exactly this
+  //     over its title+summary corpus, and the cleaned `summary` is a subset of
+  //     that corpus, so a NO_ARREST hit on the summary implies the veto already
+  //     fired — the check therefore passes by construction and fires only on a
+  //     regression or a bad edit.
+  const statusContradictions: string[] = [];
+  for (const r of [...model.selected, ...model.appendix]) {
+    if ((r.clientStatus ?? "").trim().toLowerCase() !== "suspects arrested")
+      continue;
+    if (NO_ARREST_RE.test(r.summary ?? "")) statusContradictions.push(String(r.id));
+  }
+  if (statusContradictions.length)
+    issues.push({
+      code: "STATUS_CONTRADICTS_SOURCE",
+      label: "A client status contradicts its source",
+      message: `${statusContradictions.length} record(s) marked "Suspects arrested" while the source reports no arrest`,
+    });
 
   return issues;
 }

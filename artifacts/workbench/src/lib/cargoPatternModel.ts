@@ -72,7 +72,8 @@ import {
   PATTERN_SEVERITY_FLOOR,
   MAX_PATTERN_CARDS,
 } from "./cargoPatternConfig";
-import { parseISO, isValid, startOfWeek, addWeeks, format } from "date-fns";
+import { parseISO, isValid, startOfWeek, addWeeks, addDays, format } from "date-fns";
+import { resolveReportWindow } from "./reportWindow";
 
 // --- Output shapes --------------------------------------------------------
 
@@ -216,9 +217,21 @@ export const MAX_SELECTED_INCIDENTS = 4;
 // default "Ongoing", which would be fabrication). Precedence runs strongest
 // outcome first: an arrest, then a recovery, then an active investigation, then
 // a stated ongoing situation, and finally an unconfirmed/speculative framing.
+// A no-arrest / active-pursuit cue: suspects are NOT in custody. It VETOES the
+// "Suspects arrested" outcome even when the word "arrest" appears in the text
+// ("no arrests", "arrest warrant issued", "manhunt under way", "still at
+// large"), so a status can never contradict its own source (spec pt2 / pt7).
+export const NO_ARREST_RE =
+  /\b(no arrests?|not arrested|yet to be (?:caught|arrested|apprehended)|still at large|remain\w* at large|remains at large|on the run|abscond\w*|manhunt|hunt(?:ing)? for|search(?:ing)? for (?:the )?(?:suspect|suspects|culprit|culprits|perpetrator|perpetrators|attacker|attackers|robber|robbers|thief|thieves|gang)|warrant|sought|fugitive|fled|escaped|evade\w*|no one has been (?:arrested|held)|none (?:have|has) been arrested)\b/i;
+
 function deriveClientStatus(signalText: string): string {
   const t = signalText || "";
-  if (/\b(arrest\w*|detain\w*|apprehend\w*|charged|convict\w*|sentenc\w*)\b/i.test(t))
+  if (
+    /\b(arrest\w*|detain\w*|apprehend\w*|charged|convict\w*|sentenc\w*|remand\w*|taken into custody|in custody)\b/i.test(
+      t,
+    ) &&
+    !NO_ARREST_RE.test(t)
+  )
     return "Suspects arrested";
   if (/\b(recover\w*|recovered|seiz\w*|seized|confiscat\w*|returned)\b/i.test(t))
     return "Cargo recovered";
@@ -1051,6 +1064,24 @@ export function buildCargoPatternModel(
     else undatedByStage.set(d.stage, (undatedByStage.get(d.stage) ?? 0) + 1);
   }
 
+  // Column labels are CLIPPED to the report window [window.start, issueDate] so a
+  // Monday-anchored week never advertises days outside the reporting period
+  // (spec pt4). The label change is DISPLAY-only — bucketing still keys on the
+  // Monday ISO `key`, so weeklyTotals/unconfirmedTotal reconciliation with
+  // totalUnique is unchanged.
+  const win = resolveReportWindow("cargo_watch", issueDate);
+  const winStartMs = win.start.getTime();
+  const winEndMs = win.end.getTime();
+  const weekRangeLabel = (weekStart: Date): string => {
+    const weekEnd = addDays(weekStart, 6);
+    const dispStart =
+      weekStart.getTime() < winStartMs ? win.start : weekStart;
+    const dispEnd = weekEnd.getTime() > winEndMs ? win.end : weekEnd;
+    const a = format(dispStart, "d MMM");
+    const b = format(dispEnd, "d MMM");
+    return a === b ? a : `${a}\u2013${b}`;
+  };
+
   const weeks: CargoActivityWeek[] = [];
   const weekPos = new Map<string, number>();
   if (datedDerived.length > 0) {
@@ -1065,7 +1096,7 @@ export function buildCargoPatternModel(
     ) {
       const key = format(cursor, "yyyy-MM-dd");
       weekPos.set(key, weeks.length);
-      weeks.push({ key, label: format(cursor, "dd MMM") });
+      weeks.push({ key, label: weekRangeLabel(cursor) });
       cursor = addWeeks(cursor, 1);
     }
   }

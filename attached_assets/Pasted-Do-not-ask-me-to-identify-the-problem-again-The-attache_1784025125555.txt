@@ -1,0 +1,24 @@
+Do not ask me to identify the problem again. The attached Cargo Watch PDF is the evidence. Inspect the report, the underlying records and the generator code yourself.
+
+This is not a content-editing request and I do not want another diagnosis or proposed plan. Implement the definitive fix, deploy it and provide a fresh PDF from the live application as proof.
+
+Fix the following at root level:
+
+Deduplicate the source data before any totals, charts, cards or narrative are generated. Syndicated coverage of the same event must become one canonical incident with multiple sources attached.
+Validate every record before publication. Do not infer an incident country from a vessel destination. Do not assign arrests, recoveries, severity or status unless supported by the source text. Exclude irrelevant records.
+Use one canonical dataset across the entire report. Fast Facts, map, country totals, weekly chart, supply-chain stages, operational patterns, enforcement activity, key incidents and narrative must all reconcile.
+Fix the pagination engine. Do not strand section headings at the bottom of pages, isolate graphics without their heading, split incident cards or create large areas of unused space. Enforcement Activity must begin with at least one enforcement record on the same page.
+Fix preview and PDF parity. The preview and exported PDF must use the same component tree and data. Wait for fonts, maps, charts and images to finish rendering before export. The export must fail rather than silently omit a component.
+Apply the fix to the shared Watch-report generator, not only Cargo Watch and not by hard-coding this individual report.
+
+Do not respond asking what looks wrong. Do not give me another explanation without changing the code.
+
+Completion evidence required
+Exact files changed
+Root cause identified
+Automated test results
+Confirmation of successful deployment
+A newly generated Cargo Watch PDF from the live application
+Confirmation that all figures reconcile and that the preview matches the PDF
+
+Work through this independently. Only come back when the corrected live export is ready for review.
