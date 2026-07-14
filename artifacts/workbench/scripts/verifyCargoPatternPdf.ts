@@ -141,7 +141,18 @@ async function main() {
     status?: string | null;
     [k: string]: unknown;
   };
-  const incidents = SPARSE ? SPARSE_INCIDENTS : await fetchTopicIncidents();
+  const fetched = SPARSE ? SPARSE_INCIDENTS : await fetchTopicIncidents();
+  // CARGO_FAST: harness-only speed path. The shared loader deliberately over-
+  // fetches (cargo_watch OR any non-irrelevant row) so the cargo scope gate can
+  // re-admit cargo rows filed under other topics; that ~24k-row payload is slow
+  // to serialise into the browser. For a quick real-data proof render, keep only
+  // the cargo_watch topic rows (the overwhelming majority of the scoped set).
+  const incidents =
+    !SPARSE && process.env.CARGO_FAST === "1"
+      ? (fetched as Array<{ topic?: string }>).filter(
+          (i) => i.topic === "cargo_watch",
+        )
+      : fetched;
 
   // Reproduce the ReportEditor's draft-advance + Option-A clamp so the harness
   // renders the SAME live window the owner sees in-app, not the stored (stale)

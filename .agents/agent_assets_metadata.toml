@@ -677,3 +677,15 @@ id = "OEPfnXOrvUgxnx8xHzmWz"
 uri = "file://screenshots/jakarta_trial_map.jpg"
 type = "image"
 title = "Jakarta City Movement Posture — trial map"
+
+[[outputs]]
+id = "54QPMdE0sIepskHq5WsPi"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify.pdf"
+type = "pdf"
+title = "Cargo Watch report — real data (1,244 incidents, 10pp, gate PASS)"
+
+[[outputs]]
+id = "HB-nFFjd5iPDfbE81rZbA"
+uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse.pdf"
+type = "pdf"
+title = "Cargo Watch report — sparse period (thin-week fallbacks)"
