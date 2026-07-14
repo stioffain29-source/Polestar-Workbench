@@ -76,4 +76,13 @@ describe("M1.5 end-to-end smoke + hardening (Step 13)", () => {
     expect(shipping).toContain('source: "ukmto"');
     expect(shipping).toContain('watch: "shipping"');
   });
+
+  it("analyst queue route and Spot Report prefill are wired (M1.5-T12/T13)", () => {
+    const app = readRepoFile("artifacts/workbench/src/App.tsx");
+    const editor = readRepoFile("artifacts/workbench/src/pages/SpotReportEditor.tsx");
+    expect(app).toContain("/sources/official-queue");
+    expect(app).toContain("OfficialSourcesQueue");
+    expect(editor).toContain("officialSourceId");
+    expect(editor).toContain("fetchOfficialMilitaryMaritimeSource");
+  });
 });

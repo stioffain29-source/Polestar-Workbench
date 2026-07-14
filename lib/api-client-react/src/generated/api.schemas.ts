@@ -2481,6 +2481,10 @@ watch?: ListOfficialMilitaryMaritimeSourcesWatch;
  */
 flag?: ListOfficialMilitaryMaritimeSourcesFlag;
 /**
+ * When true, return only items with any analyst flag set
+ */
+flagged?: boolean;
+/**
  * Max number of most-recent items to return (1-200)
  * @minimum 1
  * @maximum 200

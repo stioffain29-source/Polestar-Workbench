@@ -1,5 +1,8 @@
 import { db } from "@workspace/db";
-import { listOfficialMilitaryMaritimeSources } from "../../artifacts/api-server/src/lib/officialMilitaryMaritimeSourcesList";
+import {
+  getOfficialMilitaryMaritimeSourceById,
+  listOfficialMilitaryMaritimeSources,
+} from "../../artifacts/api-server/src/lib/officialMilitaryMaritimeSourcesList";
 import { ListOfficialMilitaryMaritimeSourcesQueryParams } from "@workspace/api-zod";
 
 type Rows = Record<string, unknown>[];
@@ -21,14 +24,16 @@ describe("official military maritime sources list", () => {
     jest.restoreAllMocks();
   });
 
-  it("validates query params for watch and flag filters", () => {
+  it("validates query params for watch, flag, and flagged filters", () => {
     const parsed = ListOfficialMilitaryMaritimeSourcesQueryParams.parse({
       watch: "shipping",
       flag: "possible_spot_report",
+      flagged: true,
       source: "ukmto",
     });
     expect(parsed.watch).toBe("shipping");
     expect(parsed.flag).toBe("possible_spot_report");
+    expect(parsed.flagged).toBe(true);
     expect(parsed.source).toBe("ukmto");
   });
 
@@ -36,5 +41,24 @@ describe("official military maritime sources list", () => {
     stubSelect([]);
     const rows = await listOfficialMilitaryMaritimeSources({});
     expect(rows).toEqual([]);
+  });
+
+  it("fetches a single row by id", async () => {
+    const row = {
+      id: 7,
+      sourceName: "jmic",
+      externalId: "012-26",
+      title: "JMIC advisory",
+    };
+    jest.spyOn(db, "select").mockImplementation(() => {
+      const chain: Record<string, unknown> = {
+        from: () => chain,
+        where: () => chain,
+        limit: () => Promise.resolve([row]),
+      };
+      return chain as never;
+    });
+    const found = await getOfficialMilitaryMaritimeSourceById(7);
+    expect(found).toMatchObject({ id: 7, sourceName: "jmic" });
   });
 });

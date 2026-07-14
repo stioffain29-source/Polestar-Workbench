@@ -732,6 +732,7 @@ export const ListOfficialMilitaryMaritimeSourcesQueryParams = zod.object({
   "source": zod.enum(['centcom', 'ukmto', 'partner', 'jmic', 'cmf']).optional().describe('Limit to one adapter source key (centcom | ukmto | jmic | cmf | …)'),
   "watch": zod.enum(['conflict', 'shipping']).optional().describe('Limit to items routed to a watch (primary or watch_tags)'),
   "flag": zod.enum(['significant_incident', 'escalation_indicator', 'maritime_disruption', 'evidence_available', 'possible_spot_report']).optional().describe('Limit to items with a specific analyst flag set'),
+  "flagged": zod.coerce.boolean().optional().describe('When true, return only items with any analyst flag set'),
   "limit": zod.coerce.number().min(1).max(listOfficialMilitaryMaritimeSourcesQueryLimitMax).optional().describe('Max number of most-recent items to return (1-200)')
 })
 

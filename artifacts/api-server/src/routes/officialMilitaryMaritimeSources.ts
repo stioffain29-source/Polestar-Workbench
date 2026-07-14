@@ -1,6 +1,9 @@
 import { Router, type IRouter } from "express";
 import { ListOfficialMilitaryMaritimeSourcesQueryParams } from "@workspace/api-zod";
-import { listOfficialMilitaryMaritimeSources } from "../lib/officialMilitaryMaritimeSourcesList";
+import {
+  getOfficialMilitaryMaritimeSourceById,
+  listOfficialMilitaryMaritimeSources,
+} from "../lib/officialMilitaryMaritimeSourcesList";
 
 const router: IRouter = Router();
 
@@ -15,6 +18,22 @@ router.get("/official-military-maritime-sources", async (req, res): Promise<void
   }
 
   res.json(await listOfficialMilitaryMaritimeSources(parsed.data));
+});
+
+router.get("/official-military-maritime-sources/:id", async (req, res): Promise<void> => {
+  const id = Number.parseInt(String(req.params.id), 10);
+  if (!Number.isFinite(id) || id < 1) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+
+  const row = await getOfficialMilitaryMaritimeSourceById(id);
+  if (!row) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+
+  res.json(row);
 });
 
 export default router;

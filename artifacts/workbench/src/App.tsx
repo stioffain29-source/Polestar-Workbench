@@ -21,6 +21,7 @@ import DataCentreRiskFramework from "./pages/DataCentreRiskFramework";
 import Strikes from "./pages/Strikes";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
+import OfficialSourcesQueue from "./pages/OfficialSourcesQueue";
 import GdeltStructured from "./pages/GdeltStructured";
 import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
@@ -209,6 +210,7 @@ function Router() {
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />
         <Route path="/sources" component={Sources} />
+        <Route path="/sources/official-queue" component={OfficialSourcesQueue} />
         <Route path="/gdelt-structured" component={GdeltStructured} />
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />

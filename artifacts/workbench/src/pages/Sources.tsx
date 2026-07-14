@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import {
   useListSources, useGetSourceHealth, useGetIntegrationStatus,
   getListSourcesQueryKey, getGetSourceHealthQueryKey, getGetDashboardOverviewQueryKey,
@@ -443,6 +444,12 @@ export default function Sources() {
           <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Operations</div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Source Health</h1>
           <p className="text-muted-foreground font-sans mt-1 text-sm">Live status of every collection source feeding the workbench</p>
+          <Link
+            href="/sources/official-queue"
+            className="text-xs font-sans font-medium text-accent hover:underline mt-2 inline-block"
+          >
+            Open official sources analyst queue →
+          </Link>
         </div>
         <div className="flex items-end gap-3 flex-wrap">
           <div className="w-64">

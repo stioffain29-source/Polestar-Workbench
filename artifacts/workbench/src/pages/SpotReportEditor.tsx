@@ -33,6 +33,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SEVERITY_LEVELS, CONFIDENCE_LEVELS, TOPIC_LABELS } from "@/lib/topics";
+import {
+  extractRegionFromOfficialBody,
+  fetchOfficialMilitaryMaritimeSource,
+  officialBodyExcerpt,
+  regionToCountryHint,
+} from "@/lib/officialMilitaryMaritimeWatch";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import {
   checkSpotReportQuality,
@@ -423,6 +429,8 @@ export default function SpotReportEditor() {
   // "new" draft (or vice versa).
   const newDraftKey = useMemo(() => {
     const sp = new URLSearchParams(window.location.search);
+    const officialSourceId = sp.get("officialSourceId");
+    if (officialSourceId) return draftKey(`new:official:${officialSourceId}`);
     const idsParam = sp.get("incidentIds") || sp.get("incidentId");
     return draftKey(idsParam ? `new:${idsParam}` : "new");
   }, []);
@@ -497,10 +505,59 @@ export default function SpotReportEditor() {
     return () => clearTimeout(t);
   }, [form, currentDraftKey, ready]);
 
+  // Pre-fill a NEW report from an official military/maritime source (M1.5-T13).
+  useEffect(() => {
+    if (!isNew || prefilled.current) return;
+    const sp = new URLSearchParams(window.location.search);
+    const officialSourceId = sp.get("officialSourceId");
+    if (!officialSourceId) return;
+
+    const id = Number.parseInt(officialSourceId, 10);
+    if (!Number.isFinite(id)) {
+      prefilled.current = true;
+      return;
+    }
+
+    let cancelled = false;
+    void fetchOfficialMilitaryMaritimeSource(id).then((source) => {
+      if (cancelled || prefilled.current) return;
+      if (!source) {
+        prefilled.current = true;
+        return;
+      }
+
+      const region = extractRegionFromOfficialBody(source.bodyText);
+      const summary = officialBodyExcerpt(source.bodyText, 1200);
+      const badge = source.sourceName.toUpperCase();
+
+      setForm((f) => ({
+        ...f,
+        title: f.title || `Spot Report: ${source.title}`,
+        country: f.country || regionToCountryHint(region),
+        city: f.city || region,
+        bluf: f.bluf || summary.slice(0, 500),
+        incidentDetails: f.incidentDetails || summary,
+        internalSourceNotes:
+          f.internalSourceNotes ||
+          `${badge} official source (id ${source.id})\n${source.sourceUrl}`,
+        incidentDate:
+          f.incidentDate ||
+          (source.publishedAt ? toLocalInput(source.publishedAt) : ""),
+        category: f.category || "Maritime / Military",
+      }));
+      prefilled.current = true;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isNew]);
+
   // Pre-fill a NEW report from incident(s) passed via query string.
   useEffect(() => {
     if (!isNew || prefilled.current) return;
     const sp = new URLSearchParams(window.location.search);
+    if (sp.get("officialSourceId")) return;
     const idsParam = sp.get("incidentIds") || sp.get("incidentId");
     if (!idsParam) {
       prefilled.current = true;

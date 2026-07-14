@@ -426,6 +426,10 @@ paths:
               - maritime_disruption
               - evidence_available
               - possible_spot_report
+        - name: flagged
+          in: query
+          description: When true, return only items with any analyst flag set
+          schema: { type: boolean }
         - name: limit
           in: query
           description: Max number of most-recent items to return (1-200)
@@ -438,6 +442,25 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/OfficialMilitaryMaritimeSource" }
+
+  /official-military-maritime-sources/{id}:
+    get:
+      operationId: getOfficialMilitaryMaritimeSource
+      tags: [official-military-maritime-sources]
+      summary: Fetch one M1.5 official military or maritime source by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OfficialMilitaryMaritimeSource" }
+        "404":
+          description: Not found
 
   /incidents:
     get:
