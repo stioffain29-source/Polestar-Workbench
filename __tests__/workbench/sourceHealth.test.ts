@@ -194,6 +194,20 @@ describe("action-required derivation", () => {
       }),
     ).toBe(false);
     expect(
+      isSourceActionRequired({
+        name: "CENTCOM Press Releases",
+        status: "failing",
+        errorMessage: "Status code 403",
+      }),
+    ).toBe(false);
+    expect(
+      isSourceActionRequired({
+        name: "UKMTO Official Products",
+        status: "failing",
+        errorMessage: "Status code 403",
+      }),
+    ).toBe(false);
+    expect(
       isDashboardSourceAlert({
         name: "The Kathmandu Post",
         status: "failing",

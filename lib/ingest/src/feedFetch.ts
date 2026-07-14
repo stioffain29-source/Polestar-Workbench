@@ -30,7 +30,11 @@ class FeedFetchError extends Error {
   }
 }
 
-export async function fetchBody(url: string, timeoutMs: number): Promise<string> {
+async function fetchBodyWithAccept(
+  url: string,
+  timeoutMs: number,
+  accept: string,
+): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -39,8 +43,7 @@ export async function fetchBody(url: string, timeoutMs: number): Promise<string>
       res = await fetch(url, {
         headers: {
           "User-Agent": BROWSER_UA,
-          Accept:
-            "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+          Accept: accept,
           "Accept-Language": "en-US,en;q=0.9",
         },
         signal: ctrl.signal,
@@ -78,6 +81,20 @@ export async function fetchBody(url: string, timeoutMs: number): Promise<string>
   } finally {
     clearTimeout(timer);
   }
+}
+
+const RSS_ACCEPT =
+  "application/rss+xml, application/atom+xml, application/xml, text/xml, */*";
+const HTML_ACCEPT =
+  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+
+export async function fetchBody(url: string, timeoutMs: number): Promise<string> {
+  return fetchBodyWithAccept(url, timeoutMs, RSS_ACCEPT);
+}
+
+/** Fetch an HTML page (government / maritime sites that reject RSS Accept headers). */
+export async function fetchHtmlBody(url: string, timeoutMs: number): Promise<string> {
+  return fetchBodyWithAccept(url, timeoutMs, HTML_ACCEPT);
 }
 
 export interface FetchFeedOptions {

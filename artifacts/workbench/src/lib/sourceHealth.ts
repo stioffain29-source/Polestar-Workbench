@@ -43,11 +43,28 @@ export function effectiveSourceStatus(s: {
   return s.status;
 }
 
+// CENTCOM and UKMTO often return HTTP 403 from datacenter egress (WAF /
+// Cloudflare). That is expected until production network validation — not an
+// operations incident.
+export function isExpectedM15EgressBlock(s: {
+  name?: string;
+  errorMessage?: string | null;
+  failureReason?: string | null;
+}): boolean {
+  if (s.name !== "CENTCOM Press Releases" && s.name !== "UKMTO Official Products") {
+    return false;
+  }
+  const err = (s.errorMessage ?? "").toLowerCase();
+  return /\b403\b/.test(err) || s.failureReason === "blocked_upstream";
+}
+
 // A source needs operations follow-up (appears in Action Required) only when
 // its EFFECTIVE status is not operational.
 export function isSourceActionRequired(s: {
   status: string;
   name?: string;
+  errorMessage?: string | null;
+  failureReason?: string | null;
   lastSuccessAt?: string | Date | null;
   lastFailureAt?: string | Date | null;
 }): boolean {
@@ -59,6 +76,7 @@ export function isSourceActionRequired(s: {
   // Optional integrations that are intentionally off (no secret / appname yet)
   // are documented on the Integrations panel — not operations incidents.
   if (eff === "not_configured" && s.name && isOptionalIntegrationSource(s.name)) return false;
+  if (isExpectedM15EgressBlock(s)) return false;
   return true;
 }
 
@@ -69,18 +87,14 @@ export function isDashboardSourceAlert(s: {
   status: string;
   name?: string;
   errorMessage?: string | null;
+  failureReason?: string | null;
   lastSuccessAt?: string | Date | null;
   lastFailureAt?: string | Date | null;
 }): boolean {
   if (!isSourceActionRequired(s)) return false;
   const err = (s.errorMessage ?? "").toLowerCase();
   if (err.includes("integration not configured")) return false;
-  if (
-    (s.name === "CENTCOM Press Releases" || s.name === "UKMTO Official Products") &&
-    /\b403\b/.test(err)
-  ) {
-    return false;
-  }
+  if (isExpectedM15EgressBlock(s)) return false;
   if (
     s.name === "The Kathmandu Post" &&
     (/invalid character/.test(err) || /malformed/.test(err))

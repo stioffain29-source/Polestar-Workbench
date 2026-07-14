@@ -6,7 +6,7 @@ import {
   type InsertOfficialMilitaryMaritimeSource,
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { fetchBody, sleep } from "./feedFetch";
+import { fetchHtmlBody, sleep } from "./feedFetch";
 import {
   parseCentcomDetail,
   parseCentcomListing,
@@ -165,7 +165,7 @@ async function fetchHtmlWithRetry(url: string): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
     try {
-      return await fetchBody(url, FETCH_TIMEOUT_MS);
+      return await fetchHtmlBody(url, FETCH_TIMEOUT_MS);
     } catch (err) {
       lastErr = err;
       if (attempt < FETCH_ATTEMPTS - 1) {
@@ -408,6 +408,8 @@ export async function runCentcomIngest(
     if (commit) {
       const feedOk = errors.length === 0;
       const rawError = feedOk ? null : errors[0] ?? "CENTCOM ingest completed with errors";
+      const failureReason = rawError ? categorizeFeedFailure(rawError) : null;
+      const blockedUpstream = failureReason === "blocked_upstream";
       await recordSourceHealth(
         CENTCOM_HEALTH_TOPIC,
         [
@@ -419,14 +421,14 @@ export async function runCentcomIngest(
             retained: base.inserted,
             rejected: prepared.length - toInsert.length + newsEchoSkipped,
             error: rawError,
-            failureReason: rawError ? categorizeFeedFailure(rawError) : null,
+            failureReason,
           },
         ],
         {
           sourceType: "html",
           scrapeMethod: "HTML listing + detail",
           notes: CENTCOM_HEALTH_NOTES,
-          pending: !feedOk,
+          pending: !feedOk || blockedUpstream,
         },
       );
     }
@@ -443,6 +445,7 @@ export async function runCentcomIngest(
       // best effort
     }
     if (commit) {
+      const failureReason = categorizeFeedFailure(msg);
       await recordSourceHealth(
         CENTCOM_HEALTH_TOPIC,
         [
@@ -451,10 +454,14 @@ export async function runCentcomIngest(
             url: CENTCOM_SOURCE_URL,
             ok: false,
             error: msg,
-            failureReason: categorizeFeedFailure(msg),
+            failureReason,
           },
         ],
-        { sourceType: "html", notes: CENTCOM_HEALTH_NOTES, pending: true },
+        {
+          sourceType: "html",
+          notes: CENTCOM_HEALTH_NOTES,
+          pending: failureReason === "blocked_upstream",
+        },
       );
     }
     return base;

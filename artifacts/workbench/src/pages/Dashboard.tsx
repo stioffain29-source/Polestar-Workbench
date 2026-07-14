@@ -260,7 +260,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {overview.sourceAlerts.map((source) => (
+                  {sourceAlerts.map((source) => (
                     <div key={source.id} className="p-4 hover:bg-muted/30 transition-colors">
                       <div className="flex justify-between items-start">
                         <div>
