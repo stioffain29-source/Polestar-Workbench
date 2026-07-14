@@ -81,6 +81,7 @@ import {
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
 import { pickRead } from "./pickRead";
+import { assertCargoReportValid } from "./cargoReportValidation";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -116,6 +117,10 @@ export interface ExportTopicReportPdfOptions {
    *  register as a readable annex on a fresh final page. Defaults to false —
    *  the standard report carries only the curated Selected Incidents. */
   includeFullAnnex?: boolean;
+  /** Cargo Watch only. When true, exports even if the report fails the hard
+   *  validation gate (spec pt7) and lets the caller surface the failures.
+   *  Defaults to false (fail closed) so a failing report can never be shipped. */
+  allowValidationFailures?: boolean;
 }
 
 export interface TopicReportData {
@@ -512,6 +517,12 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
     const statusLines: string[] = statusText
       ? pdf.splitTextToSize(`Status: ${statusText}`, innerW)
       : [];
+    // Source line (publisher name) — required alongside the date on every Key
+    // Incident (spec pt5). Blank when the source is unknown (no fabrication).
+    const sourceText = sanitize(r.source || "");
+    const sourceLines: string[] = sourceText
+      ? pdf.splitTextToSize(`Source: ${sourceText}`, innerW)
+      : [];
 
     const cardH =
       PAD + // top pad
@@ -520,6 +531,7 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
       summaryLines.length * lineH + // summary
       relLines.length * lineH + // operational relevance
       statusLines.length * lineH + // resolved status
+      sourceLines.length * lineH + // source
       PAD; // bottom pad
 
     ensureSpace(ctx, cardH + gap);
@@ -593,6 +605,17 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
       pdf.setFontSize(REL_FONT);
       setText(pdf, DUSK);
       for (const line of statusLines) {
+        pdf.text(line, MX + PAD, cursorY);
+        cursorY += lineH;
+      }
+    }
+
+    // Source (wrapped) — publisher name beside the date (spec pt5).
+    if (sourceLines.length) {
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(REL_FONT);
+      setText(pdf, DUSK);
+      for (const line of sourceLines) {
         pdf.text(line, MX + PAD, cursorY);
         cursorY += lineH;
       }
@@ -827,6 +850,24 @@ export async function exportTopicReportPdf(
       )
     : null;
 
+  // HARD validation gate (spec pt7). A Cargo Watch report that fails any check
+  // must not export — the gate runs over the SAME model + resolved (editor-or-
+  // auto) section text the report renders, so the block is identical to the
+  // preview's blocking panel. Fail-closed unless the caller opts out.
+  if (isCargo && cargoModel && !options.allowValidationFailures) {
+    assertCargoReportValid(
+      cargoModel,
+      {
+        situation: data.situation,
+        whatMatters: data.whatMatters,
+        implications: data.implications,
+        watchNext: data.watchNext,
+        polestarView: data.polestarView,
+      },
+      data.issueDate,
+    );
+  }
+
   // Executive Summary. For Cargo Watch it is the deterministic, analytical
   // paragraph from the model (spec TASK A) — an owner override wins, the AI
   // layer is deliberately NOT consulted so the strict format rules always hold.
@@ -1057,38 +1098,60 @@ export async function exportTopicReportPdf(
     }
 
     if (cargoModel) {
-      // Geographic + time pattern. Map/trend caption strings are data-derived
-      // in the model, so they render identically on screen and in the PDF.
+      // Geographic distribution. The map heading follows the theft-only
+      // predicate (spec pt3); the same title is passed into the component so the
+      // external heading and the internal chart title agree. Caption strings are
+      // data-derived in the model, so they render identically on screen and PDF.
       if (cargoModel.intensity.size > 0) {
-        // Map carries an internal "Cargo Incidents by Country" title; the
-        // preview also wraps it in a "Cargo Theft Map" section, so keep the
-        // external heading here (kept together with the image).
         await embedReactChartInPdf(
           ctx,
           createElement(CargoChoroplethStatic, {
             intensity: cargoModel.intensity,
+            title: cargoModel.mapTitle,
           }),
-          { heading: "Cargo Theft Map" },
+          { heading: cargoModel.mapTitle },
         );
         if (cargoModel.mapCaption.trim()) renderProse(ctx, cargoModel.mapCaption);
       }
-      if (cargoModel.extras.trend.length >= 2) {
-        await embedReactChartInPdf(
-          ctx,
-          createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
-          { heading: "Cargo Theft Trend" },
-        );
-        if (cargoModel.trendCaption.trim())
-          renderProse(ctx, cargoModel.trendCaption);
+
+      // Weekly trend AND activity table combined under ONE heading (spec pt6) so
+      // the PDF does not spend two near-duplicate pages on the same dataset.
+      if (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0) {
+        if (cargoModel.extras.trend.length >= 2) {
+          await embedReactChartInPdf(
+            ctx,
+            createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
+            { heading: "Weekly Trend and Activity" },
+          );
+          if (cargoModel.trendCaption.trim())
+            renderProse(ctx, cargoModel.trendCaption);
+          if (cargoModel.activity.total > 0) {
+            await embedReactChartInPdf(
+              ctx,
+              createElement(CargoActivityMatrix, {
+                activity: cargoModel.activity,
+              }),
+            );
+          }
+        } else if (cargoModel.activity.total > 0) {
+          // No trend line (too few periods) — the activity matrix carries its own
+          // internal title, so give it the combined section heading.
+          await embedReactChartInPdf(
+            ctx,
+            createElement(CargoActivityMatrix, {
+              activity: cargoModel.activity,
+            }),
+            { heading: "Weekly Trend and Activity" },
+          );
+        }
       }
 
-      // Operational pattern graphics — supply-chain exposure, the pattern
-      // dashboard, and the weekly activity matrix. Each is the SAME React
-      // component the preview renders, rasterised here. These carry their OWN
-      // internal GraphicFrame titles ("Supply-Chain Exposure", "Operational
-      // Patterns", the activity-matrix title), and the preview renders them
-      // WITHOUT an external section heading — so no external drawSectionHeading
-      // here either (avoids double-titling and keeps preview == PDF).
+      // Operational pattern graphics — supply-chain exposure and the pattern
+      // dashboard. Each is the SAME React component the preview renders,
+      // rasterised here, and each answers a DIFFERENT analytical question
+      // (spec pt6). They carry their OWN internal GraphicFrame titles, and the
+      // preview renders them WITHOUT an external section heading — so no external
+      // drawSectionHeading here either (avoids double-titling, keeps preview==PDF).
       if (cargoModel.totalUnique > 0) {
         await embedReactChartInPdf(
           ctx,
@@ -1105,13 +1168,17 @@ export async function exportTopicReportPdf(
           }),
         );
       }
-      if (cargoModel.activity.total > 0) {
-        await embedReactChartInPdf(
+
+      // Enforcement outcomes — arrests, seizures and recoveries in their OWN
+      // panel, EXCLUDED from every operational total above (spec pt1). The
+      // statement is data-derived and never a "media coverage" claim.
+      if (cargoModel.enforcement.total > 0) {
+        drawSectionWithProse(
           ctx,
-          createElement(CargoActivityMatrix, {
-            activity: cargoModel.activity,
-          }),
+          "Enforcement Activity",
+          cargoModel.enforcement.statement,
         );
+        drawSelectedIncidents(ctx, cargoModel.enforcement.rows);
       }
 
       // Operational assessment. Editor text wins; the deterministic model
@@ -1122,10 +1189,10 @@ export async function exportTopicReportPdf(
       if (sit.trim()) drawSectionWithProse(ctx, "Situation", sit);
       const wm = pickRead(data.whatMatters, a.whatMatters.join("\n"));
       if (wm.trim()) drawBulletSection(ctx, "What Matters", wm, 3);
-      const bp = pickRead(data.implications, a.businessPriorities.join("\n"));
-      if (bp.trim()) drawBulletSection(ctx, "Business Priorities", bp, 5);
+      const bp = pickRead(data.implications, a.implications.join("\n"));
+      if (bp.trim()) drawBulletSection(ctx, "Implications", bp, 3);
       const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
-      if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 6);
+      if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 4);
 
       // Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards that best
       // illustrate the period's operational patterns (NOT the most recent). The

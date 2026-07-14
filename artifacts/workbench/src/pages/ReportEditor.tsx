@@ -1754,7 +1754,13 @@ export default function ReportEditor() {
             />
           </Field>
           {form.topic !== "conflict" && (
-            <Field label="Implications for Business">
+            <Field
+              label={
+                form.topic === "cargo_watch"
+                  ? "Implications"
+                  : "Implications for Business"
+              }
+            >
               <Textarea
                 rows={4}
                 value={form.implications}

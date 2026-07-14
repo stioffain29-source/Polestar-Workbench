@@ -26,6 +26,7 @@ import {
   fetchTopicReport,
   fetchTopicIncidents,
 } from "./topicReportData";
+import { clampIssueDateToLatestRecord } from "../src/lib/reportWindow";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKBENCH = resolve(HERE, "..");
@@ -135,10 +136,33 @@ async function bundleBrowser(): Promise<string> {
 
 async function main() {
   const reportId = await fetchLatestTopicReportId("cargo_watch");
-  const report = await fetchTopicReport(reportId);
+  const report = (await fetchTopicReport(reportId)) as {
+    issueDate?: string | null;
+    status?: string | null;
+    [k: string]: unknown;
+  };
   const incidents = SPARSE ? SPARSE_INCIDENTS : await fetchTopicIncidents();
+
+  // Reproduce the ReportEditor's draft-advance + Option-A clamp so the harness
+  // renders the SAME live window the owner sees in-app, not the stored (stale)
+  // issue date. A draft left at an old issue date advances to today; the clamp
+  // then pulls it back to the latest real cargo record so the window matches the
+  // data the report actually covers (screen == PDF depends on this).
+  const today = new Date().toISOString().slice(0, 10);
+  const storedIssueDate = (report.issueDate ?? today).slice(0, 10);
+  const isDraft = (report.status ?? "draft") === "draft";
+  const draftAdvanced = isDraft && storedIssueDate < today;
+  const renderIssueDate = draftAdvanced ? today : storedIssueDate;
+  const effectiveIssueDate = clampIssueDateToLatestRecord(
+    renderIssueDate,
+    incidents as Array<{ occurredAt: string; topic?: string }>,
+    "cargo_watch",
+  );
+  report.issueDate = effectiveIssueDate;
+
   console.log(
-    `Cargo report ${reportId}; incidents=${incidents.length}${SPARSE ? " (SPARSE synthetic)" : ""}`,
+    `Cargo report ${reportId}; incidents=${incidents.length}${SPARSE ? " (SPARSE synthetic)" : ""}; ` +
+      `stored issueDate=${storedIssueDate} -> effective=${effectiveIssueDate}`,
   );
 
   const bundle = await bundleBrowser();

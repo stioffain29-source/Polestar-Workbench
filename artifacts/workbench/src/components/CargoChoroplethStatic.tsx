@@ -25,6 +25,10 @@ const BORDER = "#8A94A6";
 
 export interface CargoChoroplethStaticProps {
   intensity: Map<string, CargoCountryIntensity>;
+  // Heading wording is driven by the theft-only predicate upstream (spec pt3):
+  // "Cargo Theft Incidents by Country" when the map holds theft only, otherwise
+  // "Cargo Security Reporting by Country". Defaults to the theft wording.
+  title?: string;
 }
 
 const geo = cargoScopeCountriesGeo as unknown as FeatureCollection<
@@ -35,6 +39,7 @@ const projection = buildChoroplethProjection(geo, 640);
 
 export default function CargoChoroplethStatic({
   intensity,
+  title = "Cargo Theft Incidents by Country",
 }: CargoChoroplethStaticProps) {
   const { width: W, height: H, project } = projection;
 
@@ -42,7 +47,7 @@ export default function CargoChoroplethStatic({
     <div style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
         <div style={{ fontWeight: 700, color: NAVY, fontSize: 13 }}>
-          Cargo Incidents by Country
+          {title}
         </div>
         <div style={{ fontSize: 11 }}>
           {intensity.size} {intensity.size === 1 ? "country" : "countries"} with incidents

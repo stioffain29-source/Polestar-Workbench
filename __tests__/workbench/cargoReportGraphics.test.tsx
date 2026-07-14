@@ -47,18 +47,20 @@ function richModel() {
 }
 
 describe("cargo report graphics — supply-chain exposure", () => {
-  it("renders the five physical stages plus the enforcement box and the brand fill colour", () => {
+  it("renders the six physical stages and never the partitioned-out enforcement box", () => {
     const m = richModel();
     const html = renderToStaticMarkup(
       <CargoSupplyChainExposure stages={m.stages} total={m.totalUnique} />,
     );
     expect(html).toContain("Supply-Chain Exposure");
-    // The five physical movement stages present in fixed order.
-    const physical = m.stages.filter((s) => s.key !== "enforcement");
-    expect(physical).toHaveLength(5);
+    // The physical movement stages (everything except the unattributed catch-all)
+    // present in fixed order — including the inland waterway stage (spec pt2).
+    const physical = m.stages.filter((s) => s.key !== "unattributed");
+    expect(physical).toHaveLength(6);
+    // Enforcement is partitioned into its OWN panel upstream (spec pt1) and never
+    // reaches this graphic as a stage.
+    expect(physical.some((s) => s.key === "enforcement")).toBe(false);
     for (const s of physical) expect(html).toContain(s.label);
-    // Cross-cutting/enforcement lifted into its own full-width box beneath.
-    expect(html).toContain("Cross-Cutting and Enforcement Activity");
     // Electric-blue share-bar fill.
     expect(html).toContain("#4655FF");
   });

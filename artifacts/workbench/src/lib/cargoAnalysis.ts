@@ -105,6 +105,13 @@ const NATIONALITY_OFFSHORE_RE = /\b(Indian[- ]origin|Punjab[- ]origin|Pakistani[
 // port-security record that merely mentions congestion is not dropped wholesale.
 const NON_CARGO_RE = /\b(trailer.*film|heist film|movie review|HAM Berat|kekerasan|pemenuhan SDM|nakes|gubernur|pemprov|prioritaskan|infrastruktur|kabupaten|pemkot diminta|fasilitasi penyelesaian|consumer.*anti-theft|anti-theft feature|electricity theft|commercial partnership|payment dispute)\b/i;
 
+// Construction-formwork theft (aluminium formwork panels lifted from a building
+// site) is a construction-materials story, not cargo in transit. "formwork" is
+// unambiguously a construction term (a temporary mould for poured concrete), so
+// a bare single-token gate cannot swallow a genuine freight event. Applied
+// DISPLAY-side in classifyScope only — no ingest / relevance change (spec pt2).
+const CARGO_FORMWORK_RE = /\bformwork\b/i;
+
 // Required cargo / logistics incident vocabulary.
 const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehouse|godown|depot|pilfer|seal[- ]?tamper|consignment|shipment|parcel|logistic|theft|stolen|stole|robbery|burglar|raid|loot|siphon|smuggl|fraud|busted)\b/i;
 
@@ -513,6 +520,12 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // An official oversight / follow-up tour is a governance-response story, not a
   // cargo incident, even when it recounts a truck robbery.
   if (NON_CARGO_OVERSIGHT_VISIT_RE.test(text)) return "excluded_non_cargo";
+  // Aluminium-formwork / construction-formwork theft (e.g. panels lifted from a
+  // Malaysian building site) is a construction-materials story, not cargo in
+  // transit. "formwork" is unambiguously a construction term, so a single-token
+  // gate cannot catch a genuine freight event. DISPLAY-side only — no ingest /
+  // relevance change (spec pt2).
+  if (CARGO_FORMWORK_RE.test(text)) return "excluded_non_cargo";
   // Commercial-shipping / port-OPERATIONS noise (congestion, throughput, rates,
   // expansion, dwell time) is dropped HERE, ahead of the analyst override, so it
   // is treated like the other hard non-cargo rejects: an analyst "Add to lane"

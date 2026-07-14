@@ -20,21 +20,29 @@ import {
 export type CargoStageKey =
   | "warehouse_depot"
   | "inland_transport"
+  | "inland_waterway"
   | "staging_yard"
   | "port_terminal"
   | "maritime"
-  | "enforcement";
+  | "unattributed";
 
-// Fixed left-to-right order of the six supply-chain exposure stages
-// (spec PAGE 3). Every in-scope incident maps to EXACTLY ONE stage so the
-// stage counts sum to the total unique-incident count.
+// Fixed left-to-right order of the OPERATIONAL supply-chain exposure stages
+// (spec PAGE 3). Every OPERATIONAL incident maps to EXACTLY ONE stage so the
+// stage counts sum to the operational unique-incident total. Enforcement
+// outcomes (arrests / seizures / recoveries / investigations) are NOT a
+// supply-chain stage — they are partitioned into their own panel and excluded
+// from these stages (see isEnforcementOutcome / ENFORCEMENT_CATEGORIES). The
+// honest "Other or unattributed" stage holds real cargo-security events the
+// reporting does not place precisely in the chain (the classifier floor), so
+// they still count operationally without inflating a specific stage.
 export const STAGE_ORDER: CargoStageKey[] = [
   "warehouse_depot",
   "inland_transport",
+  "inland_waterway",
   "staging_yard",
   "port_terminal",
   "maritime",
-  "enforcement",
+  "unattributed",
 ];
 
 export interface CargoStageMeta {
@@ -67,9 +75,21 @@ export const STAGE_META: Record<CargoStageKey, CargoStageMeta> = {
       "Route planning",
       "Driver vetting",
       "In-transit tracking",
-      "Convoy protocols",
+      "Escort protocols",
     ],
     watchNext: "Repeat hits on the same corridor, operator or load type.",
+  },
+  inland_waterway: {
+    label: "Inland waterway",
+    primaryConcern: "River and barge movement security",
+    controlAffected: [
+      "Route planning",
+      "On-water escort and watch",
+      "Cargo custody in transit",
+      "Jetty access control",
+    ],
+    watchNext:
+      "Repeat hits on the same river route, jetty or barge operator.",
   },
   staging_yard: {
     label: "Staging yard",
@@ -106,15 +126,15 @@ export const STAGE_META: Record<CargoStageKey, CargoStageMeta> = {
     ],
     watchNext: "Repeat boardings or thefts in the same anchorage or approach.",
   },
-  enforcement: {
-    label: "Cross-cutting or enforcement activity",
-    primaryConcern: "Investigation follow-through and cargo recovery",
+  unattributed: {
+    label: "Other or unattributed",
+    primaryConcern: "Reporting detail insufficient to place the exposure point",
     controlAffected: [
-      "Law-enforcement liaison",
-      "Recovery follow-up",
-      "Intelligence sharing",
+      "Reporting quality",
+      "Source corroboration",
     ],
-    watchNext: "Whether disruption operations reduce repeat offending.",
+    watchNext:
+      "Whether fuller reporting clarifies where in the chain the exposure sits.",
   },
 };
 
@@ -127,22 +147,27 @@ export const OPERATIONAL_RELEVANCE_BY_STAGE: Record<CargoStageKey, string> = {
     "Highlights static-site exposure at storage and distribution facilities, where access control and after-hours security carry the load.",
   inland_transport:
     "Points to exposure during road movement on predictable corridors, where route planning and in-transit tracking are the main defences.",
+  inland_waterway:
+    "Points to exposure during river and barge movement, where on-water escort and jetty access control are the main defences.",
   staging_yard:
     "Underlines custody and seal-integrity risk at handover points between carriers.",
   port_terminal:
     "Reflects cargo-custody and access-control exposure inside the terminal environment.",
   maritime:
     "Shows vessel and anchorage exposure to boarding and theft on the water.",
-  enforcement:
-    "Indicates law-enforcement activity against cargo crime, with a bearing on recovery and repeat-offending.",
+  unattributed:
+    "Records a cargo-security event the reporting does not place precisely in the supply chain.",
 };
 
-// Maps every classifier taxonomy label (see CARGO_CATEGORIES in cargoAnalysis)
-// onto a single supply-chain stage. The floor label routes to the
-// cross-cutting/enforcement stage so it never inflates a specific stage, and
-// the sentinel "Not relevant" is mapped defensively (in-scope rows never carry
-// it). Seizures sit under PORT AND TERMINAL (per spec); arrests/recovery/
-// investigations sit under ENFORCEMENT.
+// Maps every OPERATIONAL classifier taxonomy label (see CARGO_CATEGORIES in
+// cargoAnalysis) onto a single supply-chain stage. The floor label routes to
+// the honest "Other or unattributed" stage so it never inflates a specific
+// stage, and the sentinel "Not relevant" is mapped defensively (in-scope rows
+// never carry it). The three ENFORCEMENT categories (arrest + both seizures)
+// are DELIBERATELY absent — they are partitioned into the enforcement panel
+// before any stage lookup, so they never appear in the supply-chain totals
+// (spec pt1). If one somehow reaches stageForCategory it defaults to
+// "unattributed" rather than silently inflating a stage.
 export const CATEGORY_TO_STAGE: Record<string, CargoStageKey> = {
   // Land-side (12).
   "Truck hijacking": "inland_transport",
@@ -157,7 +182,7 @@ export const CATEGORY_TO_STAGE: Record<string, CargoStageKey> = {
   "Insider / driver collusion theft": "inland_transport",
   "Cargo documentation fraud": "staging_yard",
   "Cargo theft in transit": "inland_transport",
-  // Port-related (16).
+  // Port-related operational (13 — the three enforcement categories excluded).
   "Port armed robbery": "port_terminal",
   "Anchorage robbery / theft": "maritime",
   "Vessel boarding (robbery)": "maritime",
@@ -166,37 +191,138 @@ export const CATEGORY_TO_STAGE: Record<string, CargoStageKey> = {
   "Port intrusion / trespass": "port_terminal",
   "Stowaway incident": "maritime",
   "Port-linked cargo smuggling": "port_terminal",
-  "Narcotics seizure (cargo / port)": "port_terminal",
-  "Weapons / contraband seizure (cargo / port)": "port_terminal",
   "Port sabotage / arson": "port_terminal",
   "Suspicious activity near port": "port_terminal",
   "Port-access blockade (cargo disruption)": "port_terminal",
   "Port labour unrest (cargo risk)": "port_terminal",
   "Truck park / access-road crime": "port_terminal",
-  "Arrest of cargo crime group": "enforcement",
   // Floor + sentinel.
-  [CARGO_FLOOR_LABEL]: "enforcement",
-  [CARGO_NOT_RELEVANT]: "enforcement",
+  [CARGO_FLOOR_LABEL]: "unattributed",
+  [CARGO_NOT_RELEVANT]: "unattributed",
 };
 
 export function stageForCategory(category: string): CargoStageKey {
-  return CATEGORY_TO_STAGE[category] ?? "enforcement";
+  return CATEGORY_TO_STAGE[category] ?? "unattributed";
 }
 
 // --- Weekly activity matrix (spec PAGE 5) ---------------------------------
 //
 // The Weekly Activity by Pattern matrix uses the six supply-chain stages as its
 // rows. These row labels are held here (rather than reusing STAGE_META.label)
-// so the enforcement row reads as the shorter "Enforcement activity" the spec
-// asks for, without changing the supply-chain exposure card wording.
+// so a compact form can be used in the matrix without changing the
+// supply-chain exposure card wording.
 export const WEEKLY_PATTERN_ROW_LABEL: Record<CargoStageKey, string> = {
   warehouse_depot: "Warehouse and depot",
   inland_transport: "Inland transport",
+  inland_waterway: "Inland waterway",
   staging_yard: "Staging yard",
   port_terminal: "Port and terminal",
   maritime: "Maritime",
-  enforcement: "Enforcement activity",
+  unattributed: "Other or unattributed",
 };
+
+// --- Operational vs enforcement partition (spec pt1) ----------------------
+//
+// Enforcement OUTCOMES (arrests, seizures, recoveries, investigations) are a
+// RESPONSE to cargo crime, not a fresh theft event. Counting them alongside
+// theft would double-count (they often report on incidents already in the set)
+// and inflate every operational surface. They are therefore partitioned into
+// their own panel and EXCLUDED from the operational total, the theft trend,
+// the supply-chain percentages, the theft map, the pattern dashboard and the
+// per-country totals (spec pt1). This is a PER-INCIDENT, title-first decision —
+// there is deliberately NO cross-incident matching (that would risk dropping a
+// genuine second event that merely shares a suspect with an earlier one).
+
+// The three taxonomy categories that are, by definition, enforcement outcomes.
+// Kept as string literals (not imported) because they are stable brand-safe
+// labels; mirror CARGO_CATEGORIES in cargoAnalysis if those labels ever change.
+export const ENFORCEMENT_CATEGORIES: ReadonlySet<string> = new Set([
+  "Arrest of cargo crime group",
+  "Narcotics seizure (cargo / port)",
+  "Weapons / contraband seizure (cargo / port)",
+]);
+
+// Completed enforcement-action framing in a headline. Deliberately STRONG,
+// completed-outcome words only (arrest / seizure / recovery / charge /
+// conviction / detention) — NOT weak investigation words like "probe" or
+// "manhunt", which routinely accompany a theft headline that must stay
+// operational.
+export const ENFORCEMENT_TITLE_RE =
+  /\b(arrest\w*|apprehend\w*|detain\w*|nabbed|busted|held over|remand\w*|charged|charge sheet|indict\w*|convict\w*|sentenc\w*|jailed|seiz\w*|confiscat\w*|impound\w*|recover\w*|dismantl\w*|bust\b)\b/i;
+
+// Theft / robbery framing in a headline. When BOTH a theft word and an
+// enforcement word appear in a title we keep the record OPERATIONAL via this
+// guard (an "…arrested after truck robbery" headline is dominated by the fresh
+// robbery event unless the classifier itself assigned an enforcement CATEGORY,
+// which is checked first).
+export const THEFT_TITLE_RE =
+  /\b(theft|thefts|stolen|stole|steal\w*|robber\w*|robbed|loot\w*|hijack\w*|burglar\w*|pilfer\w*|snatch\w*|heist|raid\w*|ransack\w*|siphon\w*|plunder\w*|carted away|made off with)\b/i;
+
+// Inland WATERWAY movement signals (spec pt2 — Mithamoin is an inland
+// waterway, not a road). NARROW on purpose: barge / ferry / jetty / river port
+// / inland waterway. Bare "river" is deliberately excluded (a road that merely
+// crosses a river is still a road incident).
+export const INLAND_WATERWAY_RE =
+  /\b(barge|barges|ferry|ferries|jetty|jetties|river port|river ports|inland waterway|inland waterways|waterway|waterways|riverboat|river boat|river vessel|river cargo|river route|haor)\b/i;
+
+// The theft-type taxonomy categories. Used to decide the map title: when EVERY
+// operational incident is a theft-type category the map may honestly read
+// "Cargo Theft Incidents by Country"; otherwise it reads the broader "Cargo
+// Security Reporting by Country" (spec pt3).
+export const THEFT_CATEGORIES: ReadonlySet<string> = new Set([
+  "Truck hijacking",
+  "Attack on cargo vehicle / convoy",
+  "Highway / road cargo robbery",
+  "Warehouse theft",
+  "Depot / yard theft",
+  "Container theft (inland)",
+  "Pilferage / seal tampering",
+  "Cargo diversion / misrouting",
+  "Insider / driver collusion theft",
+  "Cargo theft in transit",
+  "Port armed robbery",
+  "Anchorage robbery / theft",
+  "Vessel boarding (robbery)",
+  "Theft from vessel at port",
+  "Theft from container at port / terminal",
+  "Truck park / access-road crime",
+]);
+
+// Per-incident enforcement-outcome decision (spec pt1). Category-first (the
+// classifier already isolates arrests + both seizures), then a title-frame
+// backstop for records the classifier left in an operational category but whose
+// HEADLINE leads with a completed enforcement action and carries no theft verb.
+export function isEnforcementOutcome(category: string, title: string): boolean {
+  if (ENFORCEMENT_CATEGORIES.has(category)) return true;
+  if (ENFORCEMENT_TITLE_RE.test(title) && !THEFT_TITLE_RE.test(title)) {
+    return true;
+  }
+  return false;
+}
+
+// Operational supply-chain stage for an incident, applying the inland-waterway
+// override (spec pt2) on top of the category→stage base map. Only called on
+// OPERATIONAL incidents (enforcement is partitioned out beforehand).
+export function stageForIncident(
+  category: string,
+  text: string,
+): CargoStageKey {
+  const base = stageForCategory(category);
+  if (base === "inland_transport" && INLAND_WATERWAY_RE.test(text)) {
+    return "inland_waterway";
+  }
+  return base;
+}
+
+// Whether an operational category set is theft-only (drives the map title).
+export function isTheftOnly(categories: Iterable<string>): boolean {
+  let any = false;
+  for (const c of categories) {
+    any = true;
+    if (!THEFT_CATEGORIES.has(c)) return false;
+  }
+  return any;
+}
 
 // Below this many unique incidents the frequency matrix is not meaningful; the
 // report lists the incidents individually in a compact box instead.

@@ -139,17 +139,18 @@ describe("cargo pattern model — single-source reconciliation", () => {
     expect(one.matrix.sufficient).toBe(false);
   });
 
-  it("handles an enforcement-only period without inflating other stages", () => {
+  it("handles an enforcement-only period without inflating operational totals", () => {
     const rows = [
       inc({ id: 1, title: "Police arrest a cargo theft syndicate in the Philippines", severity: "moderate" }),
       inc({ id: 2, title: "Authorities dismantle a truck-hijacking gang in Malaysia", severity: "moderate" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
-    const enforcement = m.stages.find((s) => s.key === "enforcement");
-    expect(enforcement?.count).toBe(m.totalUnique);
-    for (const s of m.stages) {
-      if (s.key !== "enforcement") expect(s.count).toBe(0);
-    }
+    // Enforcement outcomes are partitioned into their OWN panel and EXCLUDED from
+    // every operational total (spec pt1), so no movement stage is inflated.
+    expect(m.enforcement.total).toBe(2);
+    expect(m.enforcement.rows).toHaveLength(2);
+    expect(m.totalUnique).toBe(0);
+    for (const s of m.stages) expect(s.count).toBe(0);
   });
 
   it("country intensity totals never exceed the deduped set", () => {

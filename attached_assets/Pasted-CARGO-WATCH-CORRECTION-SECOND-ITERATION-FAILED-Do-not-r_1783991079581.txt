@@ -1,0 +1,133 @@
+CARGO WATCH CORRECTION: SECOND ITERATION FAILED
+
+Do not rewrite the existing prose. Correct the report generation logic and regenerate the report from the incident records.
+
+1. DATA VALIDATION
+
+Use the exact reporting period shown on the report.
+
+Deduplicate incidents using date, location, event description, source and underlying event.
+
+Separate operational cargo incidents from enforcement outcomes.
+
+Arrests, investigations, seizures and recoveries must not be counted as new cargo theft incidents unless they relate to a separately recorded underlying theft. Show enforcement activity in a separate panel and exclude it from:
+
+• Total operational incidents
+• Theft trend calculations
+• Supply chain exposure percentages
+• Cargo theft maps
+• Top issue calculations
+• Country incident totals
+
+Recalculate every total and percentage after exclusions.
+
+The total, category totals, country totals, map counts, trend chart and weekly table must reconcile exactly.
+
+Do not claim that reporting reflects stronger local media coverage unless the system has measured source coverage and can demonstrate that conclusion.
+
+2. CLASSIFICATION
+
+Classify incidents according to the actual movement or facility type.
+
+The Mithamoin incident occurred on a waterway. It must be classified as inland waterway exposure, not road transport.
+
+Do not automatically describe every transit theft as a route planning, driver integrity or driver vetting issue.
+
+Only mention driver involvement, insider activity, seal compromise, route predictability or tracking failure when supported by the incident record.
+
+Do not use convoy protocols as a default recommendation.
+
+Review the Malaysia aluminium formwork incident. Confirm whether it was cargo in transit, construction site theft or another property crime. Exclude it if it does not meet the Cargo Watch inclusion criteria.
+
+Remove unnecessary ethnic descriptions from incident summaries.
+
+Exclude unconfirmed incidents from Key Incidents unless they provide exceptional operational value. Clearly state the reason when one is retained.
+
+3. TITLES AND HEADLINES
+
+Rewrite all source headlines in neutral professional language.
+
+Do not reproduce sensational wording such as:
+
+“Fearless thieves terrorize Karnal”
+
+The map must be titled:
+
+“Cargo Theft Incidents by Country”
+
+only when it contains theft incidents exclusively.
+
+If it includes enforcement or other cargo security records, title it:
+
+“Cargo Security Reporting by Country”
+
+4. ANALYSIS STRUCTURE
+
+Remove generic templated statements and repeated recommendations.
+
+Replace Business Priorities with Implications.
+
+Required sections:
+
+SITUATION
+A concise summary of the principal operational patterns, geographic concentration and important data limitations.
+
+WHAT MATTERS
+Three evidence based findings. Each finding must explain why the pattern matters to cargo owners, logistics operators or security teams.
+
+IMPLICATIONS
+Three practical implications directly connected to the incidents. Do not provide generic security controls.
+
+WATCH NEXT
+Three or four observable indicators, including repeat locations, methods, targeted cargo types, insider involvement and recurrence at the same facilities or routes.
+
+POLESTAR VIEW
+120 to 160 words containing:
+
+• The principal analytical judgement
+• What the data supports
+• What the data does not support
+• Important reporting limitations
+• Near term outlook
+• Confidence level
+
+5. KEY INCIDENTS
+
+Select incidents for operational significance, not simply because they received a High severity label.
+
+Use neutral rewritten titles.
+
+Explain the specific operational relevance of each incident. Do not reuse generic road movement or warehouse text.
+
+Show the essential source and publication date for every Key Incident.
+
+Sort incidents consistently by significance or date.
+
+6. PRESENTATION
+
+Reduce the report to five or six useful pages.
+
+Combine the weekly trend and weekly activity table.
+
+Remove excessive empty space.
+
+Do not use separate pages merely to repeat the same 75 record dataset in a chart, map, cards and heat table.
+
+Every visual must answer a different analytical question.
+
+7. AUTOMATED FAILURE CHECKS
+
+The report must fail generation when:
+
+• Totals do not reconcile
+• Enforcement records are included in theft totals
+• The reporting period and chart periods do not align
+• A waterway incident is described as road transport
+• Driver integrity is stated without supporting evidence
+• Identical analytical text appears in multiple sections
+• A sensational source headline remains
+• A Key Incident has no source
+• Polestar View is fewer than 120 words
+• Any recommendation cannot be traced to incident evidence
+
+Do not regenerate the PDF until every validation check passes.

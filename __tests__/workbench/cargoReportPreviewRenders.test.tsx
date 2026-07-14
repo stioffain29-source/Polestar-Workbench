@@ -53,9 +53,10 @@ describe("CargoReportPreview — pattern-report parity", () => {
     );
     for (const section of [
       "Fast Facts",
+      "Weekly Trend and Activity",
       "Situation",
       "What Matters",
-      "Business Priorities",
+      "Implications",
       "Watch Next",
       "Key Incidents",
       "Polestar View",

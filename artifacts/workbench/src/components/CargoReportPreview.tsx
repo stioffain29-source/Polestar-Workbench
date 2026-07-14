@@ -4,6 +4,7 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { pickRead } from "@/lib/pickRead";
+import { validateCargoReport } from "@/lib/cargoReportValidation";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import {
@@ -34,6 +35,7 @@ import type { ReportPreviewData } from "@/components/ReportPreview";
 const NAVY = "#0b0a3d";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
+const EXTREME_RED = "#A33232";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
 
 function toBullets(text: string, max = 8): string[] {
@@ -353,6 +355,19 @@ function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
                 <span style={{ fontWeight: 700 }}>Status:</span> {r.clientStatus}
               </p>
             )}
+            {r.source && (
+              <p
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontSize: 10,
+                  lineHeight: 1.4,
+                  color: DUSK,
+                  margin: "4px 0 0",
+                }}
+              >
+                <span style={{ fontWeight: 700 }}>Source:</span> {r.source}
+              </p>
+            )}
           </div>
         );
       })}
@@ -505,12 +520,85 @@ export default function CargoReportPreview({
   const a = model.assessment;
   const situationText = pickRead(report.situation, a.situation);
   const whatMattersText = pickRead(report.whatMatters, a.whatMatters.join("\n"));
-  const businessPrioritiesText = pickRead(
+  const implicationsText = pickRead(
     report.implications,
-    a.businessPriorities.join("\n"),
+    a.implications.join("\n"),
   );
   const watchNextText = pickRead(report.watchNext, a.watchNext.join("\n"));
   const polestarViewText = pickRead(report.polestarView, a.polestarView);
+
+  // HARD validation gate (spec pt7). Runs the ten checks over the SAME model +
+  // resolved section text this preview renders (and the PDF exporter throws on),
+  // so preview == PDF: a failing report shows a blocking panel here and cannot
+  // be exported. A clean report passes by construction and renders normally.
+  const validationIssues = useMemo(
+    () =>
+      validateCargoReport(
+        model,
+        {
+          situation: report.situation,
+          whatMatters: report.whatMatters,
+          implications: report.implications,
+          watchNext: report.watchNext,
+          polestarView: report.polestarView,
+        },
+        issueDate,
+      ),
+    [
+      model,
+      report.situation,
+      report.whatMatters,
+      report.implications,
+      report.watchNext,
+      report.polestarView,
+      issueDate,
+    ],
+  );
+
+  if (validationIssues.length > 0) {
+    return (
+      <div
+        className="print-report bg-white"
+        style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
+        data-cargo-validation-blocked="true"
+      >
+        <div
+          style={{
+            border: `2px solid ${EXTREME_RED}`,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 700,
+              fontSize: 20,
+              color: EXTREME_RED,
+              marginBottom: 8,
+            }}
+          >
+            Cargo Watch report blocked
+          </div>
+          <p style={{ fontSize: 13, color: DUSK, marginBottom: 16 }}>
+            This report failed {validationIssues.length} validation{" "}
+            {validationIssues.length === 1 ? "check" : "checks"} and cannot be
+            previewed or exported until resolved. Correct the items below in the
+            editor.
+          </p>
+          <ol style={{ margin: 0, paddingLeft: 20 }}>
+            {validationIssues.map((issue) => (
+              <li key={issue.code} style={{ marginBottom: 10 }}>
+                <span style={{ fontWeight: 700, color: NAVY }}>
+                  {issue.label}
+                </span>
+                <div style={{ fontSize: 12, color: DUSK }}>{issue.message}</div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -634,39 +722,60 @@ export default function CargoReportPreview({
           <FastFactsGrid cards={model.fastFacts} />
         </Section>
 
-        {/* PAGE 2 — Geographic and time pattern */}
+        {/* PAGE 2 — Geographic distribution. Map title reflects the theft-only
+            predicate (spec pt3). */}
         {model.intensity.size > 0 && (
-          <Section title="Cargo Theft Map">
-            <CargoChoroplethStatic intensity={model.intensity} />
+          <Section title={model.mapTitle}>
+            <CargoChoroplethStatic intensity={model.intensity} title={model.mapTitle} />
             <GraphicCaption text={model.mapCaption} />
           </Section>
         )}
 
-        {model.extras.trend.length >= 2 && (
-          <Section title="Cargo Theft Trend">
-            <CargoTrendChart data={model.extras.trend} />
-            <GraphicCaption text={model.trendCaption} />
+        {/* PAGE 3 — Weekly trend AND activity table COMBINED into one section so
+            the report answers "how did the week move?" once, not across two
+            near-duplicate pages (spec pt6). */}
+        {(model.extras.trend.length >= 2 || model.activity.total > 0) && (
+          <Section title="Weekly Trend and Activity">
+            {model.extras.trend.length >= 2 && (
+              <>
+                <CargoTrendChart data={model.extras.trend} />
+                <GraphicCaption text={model.trendCaption} />
+              </>
+            )}
+            {model.activity.total > 0 && (
+              <div className="mt-6" style={{ breakInside: "avoid" }}>
+                <CargoActivityMatrix activity={model.activity} />
+              </div>
+            )}
           </Section>
         )}
 
-        {/* PAGE 3 — Supply-chain exposure */}
+        {/* PAGE 4 — Supply-chain exposure + pattern dashboard. Each visual
+            answers a different analytical question (spec pt6). */}
         {model.totalUnique > 0 && (
           <div className="mb-8" style={{ breakInside: "avoid" }}>
             <CargoSupplyChainExposure stages={model.stages} total={model.totalUnique} />
           </div>
         )}
 
-        {/* PAGES 4–5 — Pattern dashboard, weekly activity */}
         {model.totalUnique > 0 && (
           <div className="mb-8" style={{ breakInside: "avoid" }}>
             <CargoPatternDashboard patterns={model.patterns} />
           </div>
         )}
 
-        {model.activity.total > 0 && (
-          <div className="mb-8" style={{ breakInside: "avoid" }}>
-            <CargoActivityMatrix activity={model.activity} />
-          </div>
+        {/* Enforcement outcomes — arrests, seizures and recoveries shown in their
+            OWN panel and EXCLUDED from every operational total above (spec pt1). */}
+        {model.enforcement.total > 0 && (
+          <Section title="Enforcement Activity">
+            <p
+              className="text-[12px] leading-[1.6] mb-3"
+              style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+            >
+              {model.enforcement.statement}
+            </p>
+            <SelectedIncidents rows={model.enforcement.rows} />
+          </Section>
         )}
 
         {/* Operational assessment */}
@@ -680,14 +789,14 @@ export default function CargoReportPreview({
             <Bullets text={whatMattersText} max={3} />
           </Section>
         )}
-        {businessPrioritiesText.trim() && (
-          <Section title="Business Priorities">
-            <Bullets text={businessPrioritiesText} max={5} />
+        {implicationsText.trim() && (
+          <Section title="Implications">
+            <Bullets text={implicationsText} max={3} />
           </Section>
         )}
         {watchNextText.trim() && (
           <Section title="Watch Next">
-            <Bullets text={watchNextText} max={6} />
+            <Bullets text={watchNextText} max={4} />
           </Section>
         )}
         {/* Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards, before

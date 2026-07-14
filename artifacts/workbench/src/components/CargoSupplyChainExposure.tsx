@@ -1,14 +1,15 @@
 // Supply-chain exposure graphic for the Cargo Watch pattern report.
 //
-// Renders the FIVE physical movement stages as a connected, numbered vertical
-// flow (one row per stage in fixed order), so the reader sees WHERE in the
-// chain the period's exposure sits. Stages with no incidents are retained in a
-// muted style — confirming the stage was assessed, not omitted. The
-// cross-cutting/enforcement category is not a physical movement stage, so it
-// sits in its own full-width box BENEATH the flow. Counts come straight from the
-// pattern model (the deduped cluster primaries), so every share reconciles with
-// Fast Facts and every other surface. Shared by the on-screen preview and the
-// PDF (rasterised).
+// Renders the physical movement stages as a connected, numbered vertical flow
+// (one row per stage in fixed order), so the reader sees WHERE in the chain the
+// period's exposure sits. Stages with no incidents are retained in a muted style
+// — confirming the stage was assessed, not omitted. The "unattributed" bucket is
+// not a physical movement position, so it sits in its own full-width box BENEATH
+// the flow. Enforcement outcomes are NOT a stage at all — they are partitioned
+// out into a separate panel upstream (spec pt1) and never reach this graphic.
+// Counts come straight from the pattern model (the deduped OPERATIONAL cluster
+// primaries), so every share reconciles with Fast Facts and every other surface.
+// Shared by the on-screen preview and the PDF (rasterised).
 
 import type { CargoStageSummary } from "@/lib/cargoPatternModel";
 import { G } from "@/lib/cargoGraphicsTheme";
@@ -19,17 +20,17 @@ export interface CargoSupplyChainExposureProps {
   total: number;
 }
 
-const ENFORCEMENT_TITLE = "Cross-Cutting and Enforcement Activity";
+const UNATTRIBUTED_TITLE = "Stage Not Determined";
 const NO_INCIDENTS = "No incidents identified this period.";
 
 export default function CargoSupplyChainExposure({
   stages,
   total,
 }: CargoSupplyChainExposureProps) {
-  // The enforcement category is cross-cutting, not a physical movement stage, so
-  // it is lifted out of the numbered flow into its own box below.
-  const physical = stages.filter((s) => s.key !== "enforcement");
-  const enforcement = stages.find((s) => s.key === "enforcement") ?? null;
+  // The "unattributed" bucket is not a physical movement position, so it is
+  // lifted out of the numbered flow into its own box below.
+  const physical = stages.filter((s) => s.key !== "unattributed");
+  const unattributed = stages.find((s) => s.key === "unattributed") ?? null;
   const last = physical.length - 1;
 
   return (
@@ -147,13 +148,14 @@ export default function CargoSupplyChainExposure({
         })}
       </div>
 
-      {/* Cross-cutting / enforcement — spans the whole chain, so it sits in its
-          own full-width box beneath the numbered physical stages. */}
-      {enforcement ? (
+      {/* Unattributed — incidents that could not be placed at a specific movement
+          position sit in their own full-width box beneath the numbered stages, so
+          the chain stays a clean sequence. Shown only when it carries incidents. */}
+      {unattributed && unattributed.count > 0 ? (
         <div
           style={{
             marginTop: 14,
-            background: enforcement.count > 0 ? G.panelAlt : "#FBFBFD",
+            background: G.panelAlt,
             border: `1px solid ${G.line}`,
             borderRadius: 4,
             padding: "8px 10px",
@@ -176,19 +178,19 @@ export default function CargoSupplyChainExposure({
                 letterSpacing: 0.5,
               }}
             >
-              {ENFORCEMENT_TITLE}
+              {UNATTRIBUTED_TITLE}
             </div>
             <div style={{ fontSize: 10.5, color: G.dusk }}>
-              {enforcement.count}{" "}
-              {enforcement.count === 1 ? "incident" : "incidents"}
-              {total > 0 ? ` · ${enforcement.sharePct}%` : ""}
+              {unattributed.count}{" "}
+              {unattributed.count === 1 ? "incident" : "incidents"}
+              {total > 0 ? ` · ${unattributed.sharePct}%` : ""}
             </div>
           </div>
           <div style={{ marginTop: 6 }}>
-            <ShareBar pct={enforcement.sharePct} />
+            <ShareBar pct={unattributed.sharePct} />
           </div>
           <div style={{ fontSize: 10, color: G.muted, marginTop: 6 }}>
-            {enforcement.primaryConcern}
+            {unattributed.primaryConcern}
           </div>
           <div
             style={{
@@ -198,18 +200,10 @@ export default function CargoSupplyChainExposure({
               marginTop: 6,
             }}
           >
-            {enforcement.count > 0 ? (
-              <SevChip severityKey={enforcement.highestSeverityKey} small />
-            ) : (
-              <span style={{ fontSize: 10, color: G.muted }}>
-                {NO_INCIDENTS}
-              </span>
-            )}
-            {enforcement.count > 0 ? (
-              <span style={{ fontSize: 10, color: G.dusk }}>
-                {enforcement.mainCountry ?? "Not attributed"}
-              </span>
-            ) : null}
+            <SevChip severityKey={unattributed.highestSeverityKey} small />
+            <span style={{ fontSize: 10, color: G.dusk }}>
+              {unattributed.mainCountry ?? "Not attributed"}
+            </span>
           </div>
         </div>
       ) : null}
