@@ -61,6 +61,11 @@ export default function CargoSupplyChainExposure({
                   }}
                 />
                 <div
+                  // Tagged so the PDF export swaps this numeral for a
+                  // pixel-centred <canvas>; inline-flex centres it on screen.
+                  data-raster-numeral=""
+                  data-numeral-bg={active ? G.navy : G.track}
+                  data-numeral-fg={active ? "#FFFFFF" : G.muted}
                   style={{
                     width: 18,
                     height: 18,
@@ -69,8 +74,12 @@ export default function CargoSupplyChainExposure({
                     color: active ? "#FFFFFF" : G.muted,
                     fontSize: 10,
                     fontWeight: 700,
-                    lineHeight: "18px",
+                    lineHeight: 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     textAlign: "center",
+                    boxSizing: "border-box",
                     flex: "0 0 auto",
                   }}
                 >

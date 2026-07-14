@@ -25,6 +25,134 @@ async function waitForFonts(): Promise<void> {
   }
 }
 
+function toNum(v: string | undefined, fallback: number): number {
+  const n = v != null && v !== "" ? Number.parseFloat(v) : Number.NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Draw a pill / circle with a horizontally AND vertically centred label onto a
+ * real <canvas>. html2canvas rasterises the canvas bitmap verbatim, so the label
+ * placement is deterministic — unlike CSS text, which html2canvas draws low.
+ * The canvas backing store is 3x for crispness but is displayed at its true
+ * box size so surrounding layout (and preview==PDF parity) is preserved.
+ */
+function makeCentredLabelCanvas(opts: {
+  text: string;
+  w: number;
+  h: number;
+  bg: string;
+  fg: string;
+  fontPx: number;
+  fontWeight: string;
+  letterSpacingPx: number;
+  radius: number;
+  circle: boolean;
+}): HTMLCanvasElement {
+  const scale = 3;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(opts.w * scale));
+  canvas.height = Math.max(1, Math.round(opts.h * scale));
+  canvas.style.width = `${opts.w}px`;
+  canvas.style.height = `${opts.h}px`;
+  const ctx = canvas.getContext("2d") as
+    | (CanvasRenderingContext2D & { letterSpacing?: string })
+    | null;
+  if (!ctx) return canvas;
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = opts.bg || "#999999";
+  if (opts.circle) {
+    ctx.beginPath();
+    ctx.arc(opts.w / 2, opts.h / 2, Math.min(opts.w, opts.h) / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    const r = Math.max(0, Math.min(opts.radius, opts.w / 2, opts.h / 2));
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.arcTo(opts.w, 0, opts.w, opts.h, r);
+    ctx.arcTo(opts.w, opts.h, 0, opts.h, r);
+    ctx.arcTo(0, opts.h, 0, 0, r);
+    ctx.arcTo(0, 0, opts.w, 0, r);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.font = `${opts.fontWeight} ${opts.fontPx}px Roboto, Arial, sans-serif`;
+  if ("letterSpacing" in ctx) ctx.letterSpacing = `${opts.letterSpacingPx}px`;
+  ctx.fillStyle = opts.fg || "#FFFFFF";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(opts.text, opts.w / 2, opts.h / 2);
+  return canvas;
+}
+
+/**
+ * Replace tagged severity/tag pills (`[data-raster-chip]`) and numbered stage
+ * markers (`[data-raster-numeral]`) in the off-screen export host with real
+ * canvases so their labels stay centred through html2canvas. Runs after the host
+ * is in the DOM (so getBoundingClientRect reports the true box) and before
+ * rasterisation. Scoped to the data attributes, so nothing else is touched.
+ */
+function rasteriseChipsToCanvas(host: HTMLElement): void {
+  host.querySelectorAll<HTMLElement>("[data-raster-chip]").forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const cs = getComputedStyle(node);
+    const raw = (node.dataset.chipLabel ?? node.textContent ?? "").trim();
+    if (!raw) return;
+    const canvas = makeCentredLabelCanvas({
+      text: node.dataset.chipUpper === "1" ? raw.toUpperCase() : raw,
+      w: rect.width,
+      h: rect.height,
+      bg: node.dataset.chipBg || cs.backgroundColor,
+      fg: node.dataset.chipFg || cs.color,
+      fontPx: toNum(node.dataset.chipFont, Number.parseFloat(cs.fontSize) || 10),
+      fontWeight: node.dataset.chipWeight || cs.fontWeight || "700",
+      letterSpacingPx: toNum(node.dataset.chipTracking, 0),
+      radius: toNum(node.dataset.chipRadius, 2),
+      circle: false,
+    });
+    canvas.style.display = "inline-block";
+    canvas.style.verticalAlign = "middle";
+    canvas.style.flex = "0 0 auto";
+    canvas.style.marginTop = cs.marginTop;
+    canvas.style.marginRight = cs.marginRight;
+    canvas.style.marginBottom = cs.marginBottom;
+    canvas.style.marginLeft = cs.marginLeft;
+    node.replaceWith(canvas);
+  });
+
+  host.querySelectorAll<HTMLElement>("[data-raster-numeral]").forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    const cs = getComputedStyle(node);
+    const raw = (node.textContent ?? "").trim();
+    if (!raw) return;
+    const canvas = makeCentredLabelCanvas({
+      text: raw,
+      w: rect.width,
+      h: rect.height,
+      bg: node.dataset.numeralBg || cs.backgroundColor,
+      fg: node.dataset.numeralFg || cs.color,
+      fontPx: toNum(node.dataset.numeralFont, Number.parseFloat(cs.fontSize) || 10),
+      fontWeight: node.dataset.numeralWeight || cs.fontWeight || "700",
+      letterSpacingPx: 0,
+      radius: 0,
+      circle: true,
+    });
+    canvas.style.display = "inline-block";
+    canvas.style.verticalAlign = "middle";
+    canvas.style.flex = "0 0 auto";
+    canvas.style.marginTop = cs.marginTop;
+    canvas.style.marginRight = cs.marginRight;
+    canvas.style.marginBottom = cs.marginBottom;
+    canvas.style.marginLeft = cs.marginLeft;
+    node.replaceWith(canvas);
+  });
+}
+
 /** Render a React element to static HTML in the browser without react-dom/server. */
 function renderElementToHtml(element: ReactElement): string {
   const host = document.createElement("div");
@@ -109,6 +237,12 @@ export async function embedChartMarkupInPdf(
 
   try {
     await waitForFonts();
+    // html2canvas draws CSS text baselines low, so the cargo pattern graphics'
+    // severity/tag pills and numbered stage markers would sit low in the exported
+    // PDF. Swap each tagged chip/numeral for a browser-drawn <canvas>
+    // (textBaseline:"middle") BEFORE rasterising so the labels are genuinely
+    // centred. Sized to each element's measured box, so preview==PDF holds.
+    rasteriseChipsToCanvas(host);
     const canvas = await html2canvas(host, {
       scale: 2,
       backgroundColor: "#ffffff",

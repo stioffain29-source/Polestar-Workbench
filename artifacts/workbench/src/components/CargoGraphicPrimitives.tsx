@@ -16,16 +16,31 @@ export function SevChip({
   small?: boolean;
 }) {
   const { bg, fg } = sevChipColors(severityKey ?? "");
+  const label = sevLabel(severityKey);
+  const fontSize = small ? 9 : 10;
   return (
     <span
+      // Tagged so the PDF export path (embedReactChartInPdf) can swap this pill
+      // for a pixel-centred <canvas> — html2canvas draws CSS text low. On screen
+      // the inline-flex centring below keeps the label centred too (preview==PDF).
+      data-raster-chip=""
+      data-chip-label={label}
+      data-chip-bg={bg}
+      data-chip-fg={fg}
+      data-chip-font={String(fontSize)}
+      data-chip-weight="700"
+      data-chip-radius="2"
+      data-chip-tracking="0.3"
+      data-chip-upper="1"
       style={{
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
         background: bg,
         color: fg,
-        fontSize: small ? 9 : 10,
+        fontSize,
         fontWeight: 700,
-        // lineHeight:1 + symmetric padding keeps the label vertically centred
-        // when html2canvas rasterises the pill (it otherwise renders text low).
         lineHeight: 1,
         padding: small ? "3px 6px" : "4px 8px",
         borderRadius: 2,
@@ -34,7 +49,7 @@ export function SevChip({
         textTransform: "uppercase",
       }}
     >
-      {sevLabel(severityKey)}
+      {label}
     </span>
   );
 }
@@ -42,8 +57,18 @@ export function SevChip({
 export function TagChip({ children }: { children: ReactNode }) {
   return (
     <span
+      // Tagged for the same canvas swap as SevChip in the PDF export path.
+      data-raster-chip=""
+      data-chip-bg={G.track}
+      data-chip-fg={G.dusk}
+      data-chip-font="9"
+      data-chip-weight="600"
+      data-chip-radius="2"
       style={{
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
         background: G.track,
         color: G.dusk,
         fontSize: 9,

@@ -79,3 +79,35 @@ fontSize / letter-spacing / padding / height / border-radius in the canvas. Set
 `measureText` (to size the box) and `fillText`. NOTE `canvas.width=`/`height=`
 RESETS all ctx state — re-apply scale, font, letterSpacing, fillStyle, align,
 baseline after sizing.
+
+## There are TWO html2canvas rasterise paths — each needs its own canvas swap
+
+The `.print-report` DOM-rasterise path (`applySeverityBadgeExportLayout` in
+exportPdf.ts) is NOT the only html2canvas surface. Report *chart/graphic* embeds
+go through a SEPARATE path — `embedChartMarkupInPdf` in `embedReportChartInPdf.ts`
+— which renders a React component into an off-screen host and html2canvases it.
+The exportPdf.ts canvas mechanism does NOT run on this path, so chips inside
+embedded graphics stay low even after the .print-report path was "fixed".
+
+Concretely: the **cargo pattern graphics** (`CargoSupplyChainExposure`,
+`CargoPatternDashboard`, `CargoActivityMatrix`) render `SevChip`/`TagChip`
+(CargoGraphicPrimitives.tsx) and numbered stage markers via this embed path. The
+fix is a `rasteriseChipsToCanvas(host)` pass inside `embedChartMarkupInPdf`, run
+AFTER `document.body.appendChild(host)` + `await waitForFonts()` and BEFORE
+`html2canvas`. Tag each pill `[data-raster-chip]` (+ label/bg/fg/font/weight/
+radius/tracking/upper attrs) and each numeral `[data-raster-numeral]`; the pass
+measures `getBoundingClientRect`, builds a size-matched `<canvas>`
+(`textBaseline:"middle"`, rounded-rect for pills / circle for numerals), copies
+margins + `flex:0 0 auto`, and `replaceWith`s it. Data-attr scoping makes it a
+pure no-op for every non-cargo report sharing embedReportChartInPdf.
+
+Screen side: give those same primitives `display:inline-flex; align-items/
+justify-content:center; lineHeight:1` (per chip-vertical-centering.md) so screen
+stays centred and preview==PDF holds.
+
+**The jsPDF-NATIVE badges were already fine.** The incident-card "SEVERITY: X"
+badges in `drawSelectedIncidents` (exportTopicReportPdf.ts) are drawn with jsPDF
+`pdf.text`, NOT html2canvas, and their hand-tuned baseline sits ~0.15pt high of
+centre — visually correct. A stale PRODUCTION pdf can show ALL badges low while
+current code only has the html2canvas ones low; regenerate from current code via
+the harness before concluding which path is actually broken.
