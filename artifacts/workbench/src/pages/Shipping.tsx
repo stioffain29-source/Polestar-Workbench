@@ -1160,6 +1160,25 @@ export default function Shipping() {
         query={{ watch: "shipping", source: "ukmto", limit: 25 }}
       />
 
+      <OfficialMilitaryMaritimeWatchPanel
+        title="Partner Maritime Context (JMIC / CMF)"
+        subtitle="Threat-level updates and routine partner guidance routed to Shipping Watch. Escalation advisories with conflict terms also surface on Conflict Watch."
+        query={{ watch: "shipping", source: "partner", limit: 15 }}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <OfficialMilitaryMaritimeWatchPanel
+          title="JMIC Products"
+          subtitle="Joint Maritime Information Center advisories and threat-level guidance."
+          query={{ watch: "shipping", source: "jmic", limit: 10 }}
+        />
+        <OfficialMilitaryMaritimeWatchPanel
+          title="CMF Products"
+          subtitle="Combined Maritime Forces regional threat assessments and maritime guidance."
+          query={{ watch: "shipping", source: "cmf", limit: 10 }}
+        />
+      </div>
+
       {/* 9. Recent Incidents */}
       <Section title="Recent Shipping Incidents">
         <div className="bg-white border border-border rounded-sm">

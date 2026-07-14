@@ -11,7 +11,8 @@ export default function OfficialSourcesQueue() {
           Review flagged CENTCOM, UKMTO, JMIC, and CMF products. Use filter tabs to
           slice by analyst flag type. Possible Spot Report rows open the manual
           Spot Report editor with prefilled context — ingest never creates Spot
-          Reports automatically.
+          Reports automatically. Reviewed/dismiss state is not in v1; flagged
+          items remain visible until M2 adds review status.
         </p>
       </header>
 

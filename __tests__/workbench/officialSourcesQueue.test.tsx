@@ -174,4 +174,15 @@ describe("OfficialSourcesQueuePanel render (Steps 9–11)", () => {
     expect(html).toContain(SAMPLE_CENTCOM.title);
     expect(html).not.toContain(SAMPLE_UKMTO.title);
   });
+
+  it("documents v1 triage without dismiss/review state (Step 12)", () => {
+    const html = renderToStaticMarkup(
+      <OfficialSourcesQueuePanel
+        itemsOverride={ALL_SAMPLES}
+        isLoadingOverride={false}
+      />,
+    );
+    expect(html).toMatch(/v1 queue: all flagged items stay visible/i);
+    expect(html).not.toContain("Dismiss");
+  });
 });

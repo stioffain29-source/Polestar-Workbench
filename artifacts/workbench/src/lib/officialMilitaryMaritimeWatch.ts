@@ -214,3 +214,20 @@ export async function fetchOfficialMilitaryMaritimeSource(
   if (!res.ok) return null;
   return res.json() as Promise<OfficialMilitaryMaritimeSource>;
 }
+
+/** Parse threat level from partner ingest body header (`Threat level: SUBSTANTIAL`). */
+export function extractThreatLevelFromOfficialBody(
+  bodyText?: string | null,
+): string | null {
+  const match = bodyText?.match(/^Threat level:\s*(.+)$/im);
+  if (!match?.[1]?.trim()) return null;
+  return match[1].trim().toUpperCase();
+}
+
+/**
+ * Step 12 v1 — official sources have no review_status column. The analyst
+ * queue shows all flagged items; use flag tabs for triage. Dismiss/reviewed
+ * state is deferred to M2 (see primary-military-maritime-sources-phases.md).
+ */
+export const OFFICIAL_QUEUE_V1_TRIAGE_NOTE =
+  "v1 queue: all flagged items stay visible — use flag filters to triage. No dismiss or reviewed state until M2.";

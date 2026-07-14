@@ -12,6 +12,7 @@ import {
   formatOfficialPublishedAt,
   itemMatchesQueueFlagTab,
   OFFICIAL_QUEUE_FLAG_TABS,
+  OFFICIAL_QUEUE_V1_TRIAGE_NOTE,
   officialBodyExcerpt,
   officialSourceBadge,
   type OfficialQueueFlagTab,
@@ -250,7 +251,7 @@ export default function OfficialSourcesQueuePanel({
         CENTCOM, UKMTO, JMIC, and CMF official products with analyst flags. These
         rows are standalone official sources — never incidents — and flag badges
         surface review cues only. Possible Spot Report opens the manual editor;
-        nothing is auto-created.
+        nothing is auto-created. {OFFICIAL_QUEUE_V1_TRIAGE_NOTE}
       </p>
 
       <div className="bg-white border border-border rounded-sm">

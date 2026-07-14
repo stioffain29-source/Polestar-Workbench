@@ -526,6 +526,12 @@ export default function Conflict() {
         query={{ watch: "conflict", source: "centcom", limit: 25 }}
       />
 
+      <OfficialMilitaryMaritimeWatchPanel
+        title="Partner Escalation Advisories"
+        subtitle="JMIC and CMF escalation products routed to Conflict + Shipping context when escalation or kinetic terms match."
+        query={{ watch: "conflict", source: "partner", limit: 15 }}
+      />
+
       {/* 7. Incident table */}
       <Section title="Recent Incidents">
         <div className="bg-white border border-border rounded-sm">

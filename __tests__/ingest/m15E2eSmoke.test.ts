@@ -72,9 +72,14 @@ describe("M1.5 end-to-end smoke + hardening (Step 13)", () => {
     expect(conflict).toContain("OfficialMilitaryMaritimeWatchPanel");
     expect(conflict).toContain('source: "centcom"');
     expect(conflict).toContain('watch: "conflict"');
+    expect(conflict).toContain("Partner Escalation Advisories");
+    expect(conflict).toContain('source: "partner"');
     expect(shipping).toContain("OfficialMilitaryMaritimeWatchPanel");
     expect(shipping).toContain('source: "ukmto"');
     expect(shipping).toContain('watch: "shipping"');
+    expect(shipping).toContain("Partner Maritime Context");
+    expect(shipping).toContain('source: "jmic"');
+    expect(shipping).toContain('source: "cmf"');
   });
 
   it("analyst queue route and Spot Report prefill are wired (M1.5-T12/T13)", () => {

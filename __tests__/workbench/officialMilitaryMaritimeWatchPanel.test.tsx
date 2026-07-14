@@ -5,6 +5,7 @@ import {
 import type { OfficialMilitaryMaritimeSource } from "@workspace/api-client-react";
 import {
   activeAnalystFlags,
+  extractThreatLevelFromOfficialBody,
   formatOfficialPublishedAt,
   officialSourceBadge,
 } from "../../artifacts/workbench/src/lib/officialMilitaryMaritimeWatch";
@@ -46,6 +47,25 @@ const SAMPLE_UKMTO: OfficialMilitaryMaritimeSource = {
   watchTags: ["shipping", "conflict"],
 };
 
+const SAMPLE_JMIC: OfficialMilitaryMaritimeSource = {
+  id: 3,
+  sourceName: "jmic",
+  externalId: "012-26-southern-corridor",
+  title: "JMIC Advisory Note: 012-26 | Southern Corridor Available",
+  publishedAt: new Date("2026-07-06"),
+  sourceUrl: "https://www.ukmto.org/partner-products/jmic/example",
+  bodyText:
+    "Provider: JMIC\nRegion: Strait of Hormuz\nThreat level: SUBSTANTIAL\n\nSouthern route guidance.",
+  classification: "official_military_maritime",
+  flagSignificantIncident: false,
+  flagEscalationIndicator: false,
+  flagMaritimeDisruption: true,
+  flagEvidenceAvailable: true,
+  flagPossibleSpotReport: false,
+  primaryWatch: "shipping",
+  watchTags: ["shipping"],
+};
+
 describe("official military maritime watch helpers (M1.5-T14)", () => {
   it("formats published dates and source badges", () => {
     expect(formatOfficialPublishedAt(SAMPLE_CENTCOM.publishedAt)).toBe("2024-12-21");
@@ -64,6 +84,11 @@ describe("official military maritime watch helpers (M1.5-T14)", () => {
     ]);
     const ukmtoFlags = activeAnalystFlags(SAMPLE_UKMTO).map((f) => f.label);
     expect(ukmtoFlags).toEqual(["Escalation", "Maritime disruption", "Evidence"]);
+  });
+
+  it("extracts partner threat level from body header", () => {
+    expect(extractThreatLevelFromOfficialBody(SAMPLE_JMIC.bodyText)).toBe("SUBSTANTIAL");
+    expect(extractThreatLevelFromOfficialBody(SAMPLE_CENTCOM.bodyText)).toBeNull();
   });
 });
 
@@ -93,5 +118,18 @@ describe("OfficialMilitaryMaritimeWatchTable render (M1.5-T14)", () => {
     expect(html).toContain("UKMTO");
     expect(html).toContain("003-26 Update 002");
     expect(html).toContain("Maritime disruption");
+  });
+
+  it("renders JMIC row with threat level badge on Shipping partner panel", () => {
+    const html = renderToStaticMarkup(
+      <OfficialMilitaryMaritimeWatchTable
+        items={[SAMPLE_JMIC]}
+        isLoading={false}
+        emptyMessage="empty"
+      />,
+    );
+    expect(html).toContain("JMIC");
+    expect(html).toContain("Threat SUBSTANTIAL");
+    expect(html).toContain(SAMPLE_JMIC.title);
   });
 });

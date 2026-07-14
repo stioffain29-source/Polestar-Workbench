@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   activeAnalystFlags,
   formatOfficialPublishedAt,
+  extractThreatLevelFromOfficialBody,
   officialSourceBadge,
 } from "@/lib/officialMilitaryMaritimeWatch";
 
@@ -57,6 +58,7 @@ export function OfficialMilitaryMaritimeWatchTable({
           {items.map((item) => {
             const badge = officialSourceBadge(item.sourceName);
             const flags = activeAnalystFlags(item);
+            const threatLevel = extractThreatLevelFromOfficialBody(item.bodyText);
             return (
               <tr key={item.id} className="hover:bg-muted/30 align-top">
                 <td className="p-2 font-mono text-xs whitespace-nowrap">
@@ -72,7 +74,16 @@ export function OfficialMilitaryMaritimeWatchTable({
                     {badge.label}
                   </span>
                 </td>
-                <td className="p-2 font-medium text-primary">{item.title}</td>
+                <td className="p-2 font-medium text-primary">
+                  <div className="space-y-1">
+                    <div>{item.title}</div>
+                    {threatLevel ? (
+                      <span className="inline-block px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-amber-100 text-amber-900 border border-amber-200">
+                        Threat {threatLevel}
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
                 <td className="p-2">
                   {flags.length === 0 ? (
                     <span className="text-xs text-muted-foreground">—</span>
