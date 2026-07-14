@@ -26,6 +26,13 @@ import {
   mergeUkmtoBodyWithPdf,
   type UkmtoPdfExtractResult,
 } from "./ukmtoPdf";
+import {
+  fetchUkmtoIncidentIndex,
+  fetchUkmtoLiveListing,
+  matchIncidentForListingItem,
+  ukmtoDetailFromApiListing,
+  type UkmtoApiIncident,
+} from "./ukmtoApi";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 
 // M1.5 — UKMTO official products ingest. Parses listing + detail HTML, merges
@@ -207,19 +214,11 @@ async function loadListingItems(opts: UkmtoIngestOptions): Promise<UkmtoListingI
       readFileSync(join(fixtureDir, DEFAULT_FIXTURE_LISTING), "utf8"),
     );
   }
-  const [warningsHtml, advisoriesHtml] = await Promise.all([
-    fetchHtmlWithRetry(`${UKMTO_SOURCE_URL}/warnings`),
-    fetchHtmlWithRetry(`${UKMTO_SOURCE_URL}/advisories`),
-  ]);
-  const merged = [
-    ...parseUkmtoListing(warningsHtml),
-    ...parseUkmtoListing(advisoriesHtml),
-  ];
-  const byId = new Map<string, UkmtoListingItem>();
-  for (const item of merged) {
-    if (!byId.has(item.externalId)) byId.set(item.externalId, item);
-  }
-  return Array.from(byId.values());
+  // Live UKMTO migrated to Next.js — listing HTML no longer contains product
+  // rows. Pull warnings/advisories from the Sitecore Content Delivery API.
+  return fetchUkmtoLiveListing({
+    maxProducts: maxDetailFetchesFromEnv() * 4,
+  });
 }
 
 async function latestUkmtoPublishedAt(): Promise<Date | null> {
@@ -355,7 +354,7 @@ export async function runUkmtoIngest(
   try {
     const usingFixtures = !!opts.listingHtml || !!fixtureDirFromEnv();
     if (!usingFixtures) {
-      log(`  live fetch — ${UKMTO_SOURCE_URL}/warnings + /advisories`);
+      log(`  live fetch — Sitecore API (warnings + advisories)`);
     }
 
     let listing = await loadListingItems(opts);
@@ -392,15 +391,32 @@ export async function runUkmtoIngest(
     const fetchDetail = opts.fetchDetailHtml ?? defaultFetchDetail;
     const fetchPdf = opts.fetchPdfBytes ?? defaultFetchPdf;
     const prepared: PreparedProduct[] = [];
+    let incidentIndex: Map<number, UkmtoApiIncident> | null = null;
+    if (!usingFixtures) {
+      try {
+        incidentIndex = await fetchUkmtoIncidentIndex();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log(`  incident index unavailable (continuing without): ${msg}`);
+      }
+    }
 
     for (const item of listing) {
       try {
-        const detailHtml = await fetchDetail(item);
-        if (!detailHtml) {
-          log(`  skip ${item.externalId} — no detail HTML`);
-          continue;
+        let detail;
+        if (item.apiReference) {
+          const incident = incidentIndex
+            ? matchIncidentForListingItem(item, incidentIndex)
+            : null;
+          detail = ukmtoDetailFromApiListing(item, incident);
+        } else {
+          const detailHtml = await fetchDetail(item);
+          if (!detailHtml) {
+            log(`  skip ${item.externalId} — no detail HTML`);
+            continue;
+          }
+          detail = parseUkmtoDetail(detailHtml, item.sourceUrl);
         }
-        const detail = parseUkmtoDetail(detailHtml, item.sourceUrl);
         const pdfUrl = detail.pdfUrl ?? item.pdfUrl;
         let pdfResult: UkmtoPdfExtractResult | null = null;
 

@@ -13,6 +13,12 @@ import {
   UKMTO_SOURCE,
   UKMTO_SITE_ORIGIN,
 } from "../../lib/ingest/src/ukmtoIngest";
+import {
+  apiProductToListingItem,
+  ukmtoDetailFromApiListing,
+  ukmtoExternalIdFromApiProduct,
+  ukmtoSourceUrlFromApiProduct,
+} from "../../lib/ingest/src/ukmtoApi";
 import { routeOfficialSource } from "../../lib/ingest/src/m15";
 
 const FIXTURE_DIR = join(__dirname, "../fixtures/m15");
@@ -143,6 +149,56 @@ describe("UKMTO PDF extraction (Step 7)", () => {
     const result = await extractUkmtoPdfText(broken);
     expect(result.text).toMatch(/UKMTO partial advisory text/i);
     expect(result.partial).toBe(true);
+  });
+});
+
+describe("UKMTO Sitecore API adapter (live site migration)", () => {
+  const sampleWarning = {
+    id: "233811cc-d47a-4fe1-81cf-b0c6c7e193cb",
+    reference: "UKMTO_WARNING_087-26_ATTACK",
+    issueDate: "2026-07-14T08:13:00Z",
+    name: "UKMTO_WARNING_087-26_ATTACK",
+    location: "Strait of Hormuz",
+    pdfUrl:
+      "https://www.ukmto.org/-/media/ukmto/products/20260714-ukmto_warning_087-26_attack.pdf?rev=abc",
+  };
+
+  it("maps API warning rows to stable listing ids and URLs", () => {
+    expect(ukmtoExternalIdFromApiProduct(sampleWarning)).toBe("087-26-attack");
+    expect(ukmtoSourceUrlFromApiProduct(sampleWarning, "warning")).toBe(
+      "https://www.ukmto.org/ukmto-products/warnings/087-26-attack",
+    );
+
+    const item = apiProductToListingItem(sampleWarning, "warning");
+    expect(item).toMatchObject({
+      externalId: "087-26-attack",
+      productType: "warning",
+      productNumber: "087-26",
+      apiReference: "UKMTO_WARNING_087-26_ATTACK",
+      apiLocation: "Strait of Hormuz",
+    });
+    expect(item.publishedAt).toEqual(new Date("2026-07-14T08:13:00Z"));
+    expect(item.pdfUrl).toContain("ukmto_warning_087-26_attack.pdf");
+  });
+
+  it("builds detail text from API listing + incident enrichment", () => {
+    const item = apiProductToListingItem(sampleWarning, "warning");
+    const detail = ukmtoDetailFromApiListing(item, {
+      incidentNumber: 87,
+      sitecoreId: "f96b0691-31a7-4292-bf53-2839f4298831",
+      utcDateOfIncident: "2026-07-14T08:15:00Z",
+      utcDateCreated: "2026-07-14T08:16:51Z",
+      incidentTypeName: "Attack",
+      place: "Strait of Hormuz",
+      vesselType: "Tanker",
+      otherDetails:
+        "UKMTO WARNING 087-26\r\nA tanker has reported being hit by a missile.",
+    });
+
+    expect(detail.externalId).toBe("087-26-attack");
+    expect(detail.bodyText).toMatch(/hit by a missile/i);
+    expect(detail.locationText).toBe("Strait of Hormuz");
+    expect(detail.vesselType).toBe("Tanker");
   });
 });
 

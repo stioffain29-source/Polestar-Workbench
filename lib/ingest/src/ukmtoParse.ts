@@ -10,6 +10,10 @@ export type UkmtoListingItem = {
   publishedAt: Date | null;
   sourceUrl: string;
   pdfUrl?: string;
+  /** Live Sitecore API reference label (post-2026 site migration). */
+  apiReference?: string;
+  /** Live Sitecore API location label when no incident match is available. */
+  apiLocation?: string;
 };
 
 export type UkmtoDetail = {
