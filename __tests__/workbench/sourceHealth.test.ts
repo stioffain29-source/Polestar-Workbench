@@ -4,6 +4,7 @@ import {
   formatSourceTimestamp,
   effectiveSourceStatus,
   isSourceActionRequired,
+  isDashboardSourceAlert,
   isSourceRetrying,
   RETRY_ESCALATION_THRESHOLD,
   isSourceScrapeStale,
@@ -173,6 +174,30 @@ describe("action-required derivation", () => {
       isSourceActionRequired({
         name: "Facebook OSINT (Papua/PNG)",
         status: "not_configured",
+      }),
+    ).toBe(false);
+  });
+
+  it("suppresses dashboard alerts for expected integration-off and M1.5 egress blocks", () => {
+    expect(
+      isDashboardSourceAlert({
+        name: "Facebook OSINT (Papua/PNG)",
+        status: "failing",
+        errorMessage: "Integration not configured",
+      }),
+    ).toBe(false);
+    expect(
+      isDashboardSourceAlert({
+        name: "CENTCOM Press Releases",
+        status: "failing",
+        errorMessage: "Status code 403",
+      }),
+    ).toBe(false);
+    expect(
+      isDashboardSourceAlert({
+        name: "The Kathmandu Post",
+        status: "failing",
+        errorMessage: "Invalid character in entity name Line: 0 Column: 14748",
       }),
     ).toBe(false);
   });

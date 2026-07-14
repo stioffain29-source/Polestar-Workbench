@@ -11,6 +11,10 @@ import { CorroborationBadge } from "@/components/CorroborationBadge";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { DashboardSkeleton } from "@/components/DashboardSkeleton";
+import {
+  effectiveSourceStatus,
+  isDashboardSourceAlert,
+} from "@/lib/sourceHealth";
 
 // The "Protests & Civil Unrest" card is backed by the flashpoint data topic.
 function dataTopicFor(topic: string): string {
@@ -90,6 +94,22 @@ export default function Dashboard() {
     );
   }
 
+  // Match Source Health Action Required — optional integrations that are off
+  // or awaiting validation must not alarm the dashboard.
+  const sourceAlerts = overview.sourceAlerts.filter((s) =>
+    isDashboardSourceAlert({
+      status: s.status,
+      name: s.name,
+      errorMessage: s.errorMessage,
+      lastSuccessAt: s.lastSuccessAt,
+      lastFailureAt: s.lastFailureAt,
+    }),
+  );
+  const failingSources = sourceAlerts.filter((s) => {
+    const eff = effectiveSourceStatus(s);
+    return eff === "failing" || eff === "blocked" || eff === "stale";
+  }).length;
+
   return (
     <div className="max-w-[1600px] mx-auto space-y-6">
       <div className="flex items-end justify-between mb-2">
@@ -104,7 +124,7 @@ export default function Dashboard() {
         <KpiItem label="Total Incidents (7d)" value={kpi7d.total7d} />
         <KpiItem label="Critical Incidents (7d)" value={kpi7d.critical7d} alert={kpi7d.critical7d > 0} />
         <KpiItem label="Active Sources" value={overview.activeSources} />
-        <KpiItem label="Failing Sources" value={overview.failingSources} alert={overview.failingSources > 0} />
+        <KpiItem label="Failing Sources" value={failingSources} alert={failingSources > 0} />
         <KpiItem label="Reports In Progress" value={overview.reportsInProgress} accent />
       </div>
 
@@ -226,14 +246,14 @@ export default function Dashboard() {
                 <Radio className="w-4 h-4 text-primary" />
                 Source Health Alerts
               </h2>
-              {overview.failingSources > 0 && (
+              {failingSources > 0 && (
                 <span className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center font-bold">
-                  {overview.failingSources}
+                  {failingSources}
                 </span>
               )}
             </div>
             <div className="p-0">
-              {overview.sourceAlerts.length === 0 ? (
+              {sourceAlerts.length === 0 ? (
                 <div className="p-6 text-center text-sm font-sans flex flex-col items-center gap-2 text-muted-foreground">
                   <CheckCircle2 className="w-8 h-8 text-sidebar-primary/50" />
                   All critical sources operational.

@@ -62,6 +62,34 @@ export function isSourceActionRequired(s: {
   return true;
 }
 
+// Subset of Action Required rows that should alarm the dashboard KPI + alerts
+// card. Suppresses known noise that is already tracked on the Integrations
+// panel or is an expected datacenter egress block (CENTCOM/UKMTO 403).
+export function isDashboardSourceAlert(s: {
+  status: string;
+  name?: string;
+  errorMessage?: string | null;
+  lastSuccessAt?: string | Date | null;
+  lastFailureAt?: string | Date | null;
+}): boolean {
+  if (!isSourceActionRequired(s)) return false;
+  const err = (s.errorMessage ?? "").toLowerCase();
+  if (err.includes("integration not configured")) return false;
+  if (
+    (s.name === "CENTCOM Press Releases" || s.name === "UKMTO Official Products") &&
+    /\b403\b/.test(err)
+  ) {
+    return false;
+  }
+  if (
+    s.name === "The Kathmandu Post" &&
+    (/invalid character/.test(err) || /malformed/.test(err))
+  ) {
+    return false;
+  }
+  return true;
+}
+
 // Number of CONSECUTIVE failed ingest runs at which the ingest pipeline
 // escalates a feed from "operational" to "failing". Mirrors
 // FAILURE_ESCALATION_THRESHOLD in `@workspace/ingest` (lib/ingest/src/

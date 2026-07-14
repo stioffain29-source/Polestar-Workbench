@@ -1,6 +1,13 @@
 import { sql } from "drizzle-orm";
 import { sourcesTable } from "@workspace/db";
-import { OPTIONAL_INTEGRATION_SOURCE_NAME_LIST } from "../../../../lib/ingest/src/optionalIntegrations";
+import {
+  FACEBOOK_OSINT_HEALTH_NAME,
+  OPTIONAL_INTEGRATION_SOURCE_NAME_LIST,
+} from "../../../../lib/ingest/src/optionalIntegrations";
+import {
+  CENTCOM_HEALTH_NAME,
+  UKMTO_HEALTH_NAME,
+} from "../../../../lib/ingest/src/m15/health";
 
 // Effective Source Health status for a `sources` row.
 //
@@ -43,11 +50,30 @@ export function optionalIntegrationNoiseSql() {
 export function dashboardSourceAlertsExcludeSql() {
   const eff = effectiveSourceStatusSql();
   const optionalNames = OPTIONAL_INTEGRATION_SOURCE_NAME_LIST.map((n) => sql`${n}`);
+  const m15Names = [CENTCOM_HEALTH_NAME, UKMTO_HEALTH_NAME].map((n) => sql`${n}`);
   return sql`(
     ${eff} in ('operational', 'pending')
     or (
       ${eff} = 'not_configured'
       and ${sourcesTable.name} in (${sql.join(optionalNames, sql`, `)})
+    )
+    or (
+      ${sourcesTable.name} = ${FACEBOOK_OSINT_HEALTH_NAME}
+      and ${sourcesTable.errorMessage} ilike '%integration not configured%'
+    )
+    or (
+      ${sourcesTable.topic} = 'official_military_maritime'
+      and ${sourcesTable.name} in (${sql.join(m15Names, sql`, `)})
+      and ${sourcesTable.errorMessage} ilike '%403%'
+    )
+    or (
+      ${sourcesTable.topic} = 'flashpoint'
+      and ${sourcesTable.name} = 'The Kathmandu Post'
+      and (
+        ${sourcesTable.errorMessage} ilike '%invalid character%'
+        or ${sourcesTable.errorMessage} ilike '%malformed%'
+        or ${sourcesTable.failureReason} = 'parse_error'
+      )
     )
     or ${optionalIntegrationNoiseSql()}
   )`;

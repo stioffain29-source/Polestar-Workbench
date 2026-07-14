@@ -34,6 +34,9 @@ import {
   markerSocialRawId,
   GDELT_NOT_CONFIGURED_MESSAGE,
   RELIEFWEB_NOT_CONFIGURED_MESSAGE,
+  FACEBOOK_OSINT_HEALTH_NAME,
+  CENTCOM_HEALTH_NAME,
+  UKMTO_HEALTH_NAME,
   type Severity,
   type IncidentCandidate,
 } from "@workspace/ingest";
@@ -200,15 +203,106 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
 // Self-heal seed URLs on every startup. The seed loop below only inserts
 // rows whose `name` is new; it never updates an existing row's URL. This
 // block applies any URL corrections to already-inserted seed rows so the
-// scraper picks up the fix without manual DB surgery. Idempotent — if the
-// URL is already correct the UPDATE is a no-op.
+// scraper picks up the fix without manual DB surgery. When the URL changes,
+// stale failure telemetry is cleared so the feed gets a fair retry. Idempotent.
 async function repairFlashpointSeedUrls(): Promise<void> {
   for (const seed of FLASHPOINT_REGIONAL_SOURCES) {
     await db
       .update(sourcesTable)
-      .set({ url: seed.url, sourceType: seed.sourceType, notes: seed.notes })
-      .where(sql`${sourcesTable.name} = ${seed.name} AND ${sourcesTable.topic} = 'flashpoint' AND (${sourcesTable.url} IS DISTINCT FROM ${seed.url})`);
+      .set({
+        url: seed.url,
+        sourceType: seed.sourceType,
+        notes: seed.notes,
+        status: "operational",
+        errorMessage: null,
+        consecutiveFailures: 0,
+        lastFailureAt: null,
+        failureReason: null,
+      })
+      .where(
+        sql`${sourcesTable.name} = ${seed.name} AND ${sourcesTable.topic} = 'flashpoint' AND (${sourcesTable.url} IS DISTINCT FROM ${seed.url})`,
+      );
   }
+}
+
+// Idempotent repairs for dashboard source-health noise. Runs every boot so a
+// deployment picks up fixes without waiting for the next ingest cycle.
+async function repairSourceHealthDashboardNoise(): Promise<void> {
+  // Facebook OSINT without an API key is intentionally off — never alarm red.
+  if (!(process.env.FACEBOOK_API_KEY?.trim())) {
+    await db
+      .update(sourcesTable)
+      .set({
+        status: "not_configured",
+        errorMessage: "Integration not configured",
+        consecutiveFailures: 0,
+        lastSuccessAt: null,
+        lastFailureAt: null,
+        failureReason: null,
+      })
+      .where(eq(sourcesTable.name, FACEBOOK_OSINT_HEALTH_NAME));
+  }
+  // Legacy rows that read "Integration not configured" but were escalated to failing.
+  await db
+    .update(sourcesTable)
+    .set({
+      status: "not_configured",
+      consecutiveFailures: 0,
+      lastSuccessAt: null,
+      lastFailureAt: null,
+      failureReason: null,
+    })
+    .where(
+      and(
+        eq(sourcesTable.name, FACEBOOK_OSINT_HEALTH_NAME),
+        sql`${sourcesTable.status} <> 'not_configured'`,
+        sql`${sourcesTable.errorMessage} ilike '%integration not configured%'`,
+      ),
+    );
+
+  // Kathmandu Post direct RSS serves malformed XML — clear stale parse failures
+  // once the Google-News site-scope URL is in place (repairFlashpointSeedUrls).
+  await db
+    .update(sourcesTable)
+    .set({
+      status: "operational",
+      errorMessage: null,
+      consecutiveFailures: 0,
+      lastFailureAt: null,
+      failureReason: null,
+    })
+    .where(
+      and(
+        eq(sourcesTable.topic, "flashpoint"),
+        eq(sourcesTable.name, "The Kathmandu Post"),
+        sql`${sourcesTable.status} in ('failing', 'blocked')`,
+        sql`(
+          ${sourcesTable.errorMessage} ilike '%invalid character%'
+          or ${sourcesTable.errorMessage} ilike '%malformed%'
+          or ${sourcesTable.failureReason} = 'parse_error'
+        )`,
+      ),
+    );
+
+  // CENTCOM/UKMTO 403 from datacenter egress — pending, not a hard outage.
+  await db
+    .update(sourcesTable)
+    .set({
+      status: "pending",
+      consecutiveFailures: 0,
+      failureReason: "blocked_upstream",
+    })
+    .where(
+      and(
+        eq(sourcesTable.topic, "official_military_maritime"),
+        inArray(sourcesTable.name, [CENTCOM_HEALTH_NAME, UKMTO_HEALTH_NAME]),
+        sql`${sourcesTable.status} in ('failing', 'blocked')`,
+        sql`(
+          ${sourcesTable.errorMessage} ilike '%403%'
+          or ${sourcesTable.failureReason} = 'blocked_upstream'
+        )`,
+      ),
+    );
 }
 
 // Topics that must each have at least one report card in the Report Builder.
@@ -248,6 +342,15 @@ const RETIRED_REPORT_TITLES: string[] = [
 export async function runDataMigrations(): Promise<void> {
   logger.info("runDataMigrations: starting");
   try {
+    // Repair known dashboard noise before heavier migrations so the first
+    // /dashboard/overview after boot is already clean.
+    try {
+      await repairFlashpointSeedUrls();
+      await repairSourceHealthDashboardNoise();
+    } catch (noiseErr) {
+      logger.error({ err: noiseErr }, "Source health dashboard noise repair failed");
+    }
+
     // Schema: analyst-overridable stored risk rating on reports. drizzle-kit
     // push only reaches the dev database; production schema changes must be
     // applied here so the deployment runtime (the only place with a writable
@@ -3455,6 +3558,7 @@ export async function runDataMigrations(): Promise<void> {
         logger.info({ name: seed.name }, "Seeded flashpoint regional source");
       }
       await repairFlashpointSeedUrls();
+      await repairSourceHealthDashboardNoise();
     } catch (srcErr) {
       logger.error({ err: srcErr }, "Flashpoint regional source seed failed");
     }
