@@ -44,6 +44,7 @@ import {
   STAGE_META,
   OPERATIONAL_RELEVANCE_BY_STAGE,
   stageForIncident,
+  stageForCategory,
   isEnforcementOutcome,
   isTheftOnly,
   WEEKLY_PATTERN_ROW_LABEL,
@@ -223,6 +224,16 @@ export const MAX_SELECTED_INCIDENTS = 4;
 // large"), so a status can never contradict its own source (spec pt2 / pt7).
 export const NO_ARREST_RE =
   /\b(no arrests?|not arrested|yet to be (?:caught|arrested|apprehended)|still at large|remain\w* at large|remains at large|on the run|abscond\w*|manhunt|hunt(?:ing)? for|search(?:ing)? for (?:the )?(?:suspect|suspects|culprit|culprits|perpetrator|perpetrators|attacker|attackers|robber|robbers|thief|thieves|gang)|warrant|sought|fugitive|fled|escaped|evade\w*|no one has been (?:arrested|held)|none (?:have|has) been arrested)\b/i;
+
+// A DESIDERATIVE / PROMISED / FUTURE-arrest cue: someone hopes, urges, demands
+// or vows that police WILL arrest — no arrest has actually happened. This also
+// vetoes "Suspects arrested" (spec pt2/pt7) so a headline like "…Hopes Police
+// Will Quickly Arrest Perpetrators" or "family urges police to arrest" can never
+// be reported as a completed arrest. The desire/promise verb must sit within a
+// short window before "arrest" so a genuine "two suspects arrested; family had
+// urged action" is not swept up by the bare verb alone.
+export const PENDING_ARREST_RE =
+  /\b(?:hop(?:e|es|ed|ing)|urg(?:e|es|ed|ing)|demand(?:s|ed|ing)?|appeal(?:s|ed|ing)?|plead(?:s|ed|ing)?|call(?:s|ed|ing)?|press(?:es|ed|ing)?|want(?:s|ed|ing)?|seek(?:s|ing)?|await(?:s|ing|ed)?|expect(?:s|ed|ing)?|vow(?:s|ed|ing)?|promis(?:e|es|ed|ing)|pledg(?:e|es|ed|ing)|plan(?:s|ned|ning)?)\b[^.]{0,40}?\barrest\w*|\bto be (?:caught|arrested|apprehended)\b/i;
 
 function deriveClientStatus(signalText: string): string {
   const t = signalText || "";
@@ -1007,7 +1018,21 @@ export function buildCargoPatternModel(
   }
   const allPatterns: CargoPatternCard[] = [...byCategory.entries()].map(
     ([category, members]) => {
-      const stage = members[0].stage;
+      // Stage for the whole pattern card = the MODAL stage among its members,
+      // NOT an arbitrary first member. A category (e.g. "Cargo theft in transit")
+      // is dominated by one stage; a lone reclassified outlier (e.g. a single
+      // inland-waterway hit) must never make a road-dominated card read as
+      // river/barge in its concern, controls and watch-next. Ties break toward
+      // the category's canonical stage so the aggregate stays honest and stable.
+      const stageCounts = new Map<CargoStageKey, number>();
+      for (const m of members)
+        stageCounts.set(m.stage, (stageCounts.get(m.stage) ?? 0) + 1);
+      const canonicalStage = stageForCategory(category);
+      const stage = [...stageCounts.entries()].sort(
+        (a, b) =>
+          b[1] - a[1] ||
+          (a[0] === canonicalStage ? -1 : b[0] === canonicalStage ? 1 : 0),
+      )[0][0];
       const meta = STAGE_META[stage];
       const hs = highestSeverity(members.map((m) => m.primary));
       const consequenceMean =
