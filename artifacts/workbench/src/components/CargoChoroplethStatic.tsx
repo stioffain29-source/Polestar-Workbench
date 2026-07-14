@@ -37,6 +37,71 @@ const geo = cargoScopeCountriesGeo as unknown as FeatureCollection<
 >;
 const projection = buildChoroplethProjection(geo, 640);
 
+interface PlacedLabel {
+  key: string;
+  x: number;
+  y: number;
+  count: number;
+}
+
+// Minimum spacing between two count labels before they read as overlapping.
+// DY is generous: at font 11 two vertically-stacked labels (Malaysia over
+// Indonesia, both anchored on Borneo) read as a cramped cluster well before
+// their boxes actually touch.
+const LABEL_MIN_DX = 16;
+const LABEL_MIN_DY = 22;
+
+/**
+ * Build the count-label anchors, then nudge apart any that would overlap.
+ * featureCenter anchors on each country's largest polygon, so spread-out
+ * neighbours whose biggest landmass shares an island (Indonesia + Malaysia
+ * both centroid onto Borneo) would stack their labels. A small deterministic
+ * vertical relaxation separates them while keeping preview==PDF.
+ */
+function resolveLabels(
+  fc: FeatureCollection<Geometry, { name?: string }>,
+  intensity: Map<string, CargoCountryIntensity>,
+  project: (lon: number, lat: number) => [number, number],
+  height: number,
+): PlacedLabel[] {
+  const labels: PlacedLabel[] = [];
+  fc.features.forEach((f, idx) => {
+    const name = featureCountryName(f);
+    const count = intensity.get(name)?.count ?? 0;
+    if (count <= 0) return;
+    const c = featureCenter(f, project);
+    if (!c) return;
+    labels.push({ key: `lbl-${name || idx}`, x: c[0], y: c[1], count });
+  });
+
+  for (let iter = 0; iter < 8; iter++) {
+    let moved = false;
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = i + 1; j < labels.length; j++) {
+        const a = labels[i];
+        const b = labels[j];
+        const dy = b.y - a.y;
+        if (Math.abs(a.x - b.x) < LABEL_MIN_DX && Math.abs(dy) < LABEL_MIN_DY) {
+          const push = (LABEL_MIN_DY - Math.abs(dy)) / 2 + 0.5;
+          if (dy >= 0) {
+            a.y -= push;
+            b.y += push;
+          } else {
+            a.y += push;
+            b.y -= push;
+          }
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  // Keep nudged labels inside the map frame.
+  for (const l of labels) l.y = Math.max(8, Math.min(height - 6, l.y));
+  return labels;
+}
+
 export default function CargoChoroplethStatic({
   intensity,
   title = "Cargo Theft Incidents by Country",
@@ -69,26 +134,21 @@ export default function CargoChoroplethStatic({
             />
           );
         })}
-        {geo.features.map((f, idx) => {
-          const name = featureCountryName(f);
-          const count = intensity.get(name)?.count ?? 0;
-          if (count <= 0) return null;
-          const c = featureCenter(f, project);
-          if (!c) return null;
+        {resolveLabels(geo, intensity, project, H).map((l) => {
           // Deep bands get white ink for contrast; the two lightest keep navy.
-          const ink = count >= 21 ? "#ffffff" : NAVY;
+          const ink = l.count >= 21 ? "#ffffff" : NAVY;
           return (
             <text
-              key={`lbl-${name || idx}`}
-              x={c[0]}
-              y={c[1]}
+              key={l.key}
+              x={l.x}
+              y={l.y}
               fontSize={11}
               fontWeight={700}
               fill={ink}
               textAnchor="middle"
               dominantBaseline="middle"
             >
-              {count}
+              {l.count}
             </text>
           );
         })}

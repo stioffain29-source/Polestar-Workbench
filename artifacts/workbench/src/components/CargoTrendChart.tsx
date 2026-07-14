@@ -94,7 +94,10 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           </text>
         ))}
       </svg>
-      <div style={{ fontSize: 11, marginTop: 6 }}>
+      {/* paddingBottom: html2canvas draws text baselines low, so without bottom
+          room this last caption line has its descenders sheared in the PDF
+          rasterisation. Component-level so preview==PDF. */}
+      <div style={{ fontSize: 11, marginTop: 6, paddingBottom: 6, lineHeight: 1.35 }}>
         In-scope cargo incidents per week, {formatWeek(data[0].date)} to {formatWeek(data[data.length - 1].date)}.
       </div>
     </div>
