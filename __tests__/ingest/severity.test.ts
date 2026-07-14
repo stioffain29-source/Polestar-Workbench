@@ -238,6 +238,50 @@ describe("classifySeverity", () => {
     ).toBe("extreme");
   });
 
+  // Reported failure: a sentencing headline whose TITLE names the martial-law
+  // role must not read Extreme.
+  it("does not rate 'gets 25-year prison term for role in martial law declaration' as extreme", () => {
+    expect(
+      classifySeverity(
+        "Former South Korean justice minister gets 25-year prison term for role in martial law declaration",
+        "",
+        "flashpoint",
+      ),
+    ).not.toBe("extreme");
+  });
+
+  // The exact recurring defeat: a jailed-politician headline whose SUMMARY
+  // recaps a PAST live declaration ("who declared martial law in December
+  // 2024"). The recap used to fire ACTIVE_EMERGENCY_RE and re-crown Extreme; a
+  // title-led judicial frame must now dominate.
+  it("does not rate a jailed-politician headline whose summary recaps a past martial-law declaration as extreme", () => {
+    expect(
+      classifySeverity(
+        "Ex-South Korean leader Yoon jailed 2 years over illegal polling",
+        "Yoon, who declared martial law in December 2024, was convicted on Tuesday.",
+        "flashpoint",
+      ),
+    ).not.toBe("extreme");
+  });
+
+  it("does not rate 'appeals court cuts jail term for ex-PM Han to 15 years in martial law case' as extreme", () => {
+    expect(
+      classifySeverity(
+        "South Korea appeals court cuts jail term for ex-PM Han to 15 years in martial law case",
+        "",
+        "flashpoint",
+      ),
+    ).not.toBe("extreme");
+  });
+
+  // Mass-casualty backstop preserved: a genuine live declaration after a mass
+  // toll stays Extreme even though it is not a judicial story.
+  it("still rates 'junta declares martial law after dozens killed' as extreme", () => {
+    expect(
+      classifySeverity("Junta declares martial law after dozens killed", "", "flashpoint"),
+    ).toBe("extreme");
+  });
+
   // Confirmed-killing floor (reported West Papua defect: fatal events reading
   // Low). A past-tense killing bound to a human victim reads High even when the
   // headline names no separate security actor or weapon ("pilot" + "killed";

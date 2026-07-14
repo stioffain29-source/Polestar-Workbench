@@ -4208,7 +4208,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "severity_rerate_2026_06_25_v1";
+      const markerKey = "severity_rerate_2026_07_14_v2_judicial_emergency";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);

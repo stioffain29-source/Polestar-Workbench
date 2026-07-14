@@ -531,10 +531,20 @@ export function classifySeverity(
   // defence-in-depth layer for the recurring "court sentencing crowns a country
   // as highest-severity" failure — even if relevance ever lets a court row
   // through, it can no longer reach the reserved tier.
+  //
+  // The ACTIVE_EMERGENCY_RE backstop (a live "declares martial law" phrase) must
+  // not be defeated by a sentencing story's own text RECAPPING a past
+  // declaration ("Yoon, who declared martial law in December 2024, was jailed").
+  // So when the HEADLINE itself is the judicial story (title-led sentencing /
+  // conviction / jail-term), the court framing dominates and the active-emergency
+  // recap in the body no longer blocks suppression. A genuine live declaration
+  // is title-led on the DECLARATION (not a judicial verb), so it is unaffected —
+  // its Extreme survives via the active-emergency backstop below.
+  const judicialTitleLed = isJudicialProcess(title, "");
   const judicialEmergency =
     isJudicialProcess(title, summary) &&
     EMERGENCY_RULE_RE.test(hay) &&
-    !ACTIVE_EMERGENCY_RE.test(hay) &&
+    (judicialTitleLed || !ACTIVE_EMERGENCY_RE.test(hay)) &&
     !EXTREME.some((re) => re.test(hay.replace(new RegExp(EMERGENCY_RULE_RE.source, "gi"), " ")));
 
   if (
