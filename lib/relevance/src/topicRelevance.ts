@@ -595,6 +595,29 @@ const FP_CANCELLED_KEEP_RE =
 const FP_REAL_UNREST_COMPANION_RE =
   /\b(protest|demonstrat|rally|rallies|rallied|march(es|ers?|ing|ed)|picket|walkout|strike|riot|clash|tear ?gas|water cannon|barricad|sit-?in|curfew|hartal|bandh|gherao|crowd|mob|looting|arson|stormed?|unrest|blockad)\b/i;
 
+// "Demonstration" as a DISPLAY / EXHIBITION of a product, vehicle, craft, sport
+// or skill — NOT a protest. "SkyDrive conducts high-speed demonstration flights
+// of flying car", "cooking demonstration", "skateboard demonstration", "science
+// demonstration", "demonstration lap/run/match". The narrow product-DEMO homonym
+// in FLASHPOINT_EXCLUDE (launch/kick-off/of-AI) only caught a few phrasings and
+// the bare word "demonstration" title-rescues everything else, so this class of
+// showcase headline kept leaking into the Protests feed. Three signals:
+//   (A) "demonstration <display-noun>" — flight/lap/run/match/session/project…
+//   (B) "demonstration of <physical/tech/skill object>" — car/drone/recipe…
+//       (abstract "demonstration of support/anger/solidarity" is NOT listed, so
+//        a genuine "demonstration of people power" is untouched)
+//   (C) "<activity/craft/sport> demonstration" — cooking/martial-arts/pedalo…
+// Gated on the ABSENCE of any protest-specific companion (FP_PROTEST_COMPANION_RE
+// — deliberately NOT the bare word "demonstration", which the display sense
+// shares) so a real "farmers' demonstration turns violent" is always kept.
+const FP_DISPLAY_DEMONSTRATION_RE =
+  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|models?|kitchens?)\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
+// Protest-specific companion (excludes the bare word "demonstration", which the
+// display sense shares) — used only to SPARE a genuine protest from the display-
+// demonstration exclude above.
+const FP_PROTEST_COMPANION_RE =
+  /\b(protest\w*|demonstrators?|rally|rallies|rallied|marched?|marching|marchers?|picket\w*|walkout\w*|sit[- ]?ins?|hartal|bandh|gherao|riot\w*|clash\w*|tear ?gas|water cannon|barricad\w*|placard\w*|banner\w*|chant\w*|slogan\w*|effig\w*|crackdown|dispers\w*|baton|rubber bullet|took to the streets?|grievanc\w*|strike\w*|stoppage|unrest|uprising|demand\w*|angry|anger|fury|outrage|activist\w*)\b/i;
+
 // Travel/safety ADVISORY telling nationals/tourists to AVOID protest or
 // demonstration AREAS — operational safety guidance, not a civil-unrest event.
 // Gated on all three signals (an "avoid" instruction + an advisory issuer + a
@@ -1576,6 +1599,12 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
     // homonym scan — otherwise a lane-vouched "Thousands protest air strikes"
     // event is wrongly demoted (the whole point of the exclude staying in
     // FLASHPOINT_EXCLUDE is that the rescue front-runs it).
+    // Display/exhibition "demonstration" (product/vehicle/skill showcase) must
+    // drop BEFORE the title-rescue here too, mirroring explainRelevance — else a
+    // GDELT-lane "Protests" event with a showcase headline is kept.
+    if (FP_DISPLAY_DEMONSTRATION_RE.test(text) && !FP_PROTEST_COMPANION_RE.test(text)) {
+      return { relevant: false, reason: "slop: product/skill 'demonstration' (display/exhibition, not a protest)" };
+    }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
     }
@@ -1774,6 +1803,13 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Cancelled / suspended industrial action (non-event) — title-bound.
     if (FP_CANCELLED_ACTION_RE.test(titleHaystack(i)) && !FP_CANCELLED_KEEP_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: cancelled/suspended industrial action (non-event)" };
+    }
+    // "Demonstration" as a product/vehicle/skill DISPLAY, not a protest ("…
+    // demonstration flights of flying car"). Runs before the title-rescue so the
+    // bare word "demonstration" can no longer rescue a showcase headline. Spared
+    // whenever a real protest companion is present.
+    if (FP_DISPLAY_DEMONSTRATION_RE.test(text) && !FP_PROTEST_COMPANION_RE.test(text)) {
+      return { relevant: false, reason: "excluded: product/skill 'demonstration' (display/exhibition, not a protest)" };
     }
     // Travel/safety advisory telling people to AVOID protest areas — guidance,
     // not an event. All three signals required so a real demo never trips it.
