@@ -44,6 +44,7 @@ jest.mock("@workspace/api-client-react", () => ({
   useListMaritimeMovement: () => ({ data: [] }),
   useListMaritimeSecurityEvents: () => ({ data: [] }),
   useListReliefWebReports: () => ({ data: [] }),
+  useListMarketPrices: () => ({ data: [] }),
   useGenerateReportIncidentSummaries: () => ({
     mutate: jest.fn(),
     isPending: false,
@@ -62,6 +63,7 @@ jest.mock("@workspace/api-client-react", () => ({
     isPending: false,
   }),
   getListMaritimeMovementQueryKey: () => ["maritime-movement"],
+  getListMarketPricesQueryKey: (p?: unknown) => ["market-prices", p],
   getListIncidentsQueryKey: (p?: unknown) => ["incidents", p],
   getGetReportQueryKey: () => ["report"],
   getListReportsQueryKey: () => ["reports"],

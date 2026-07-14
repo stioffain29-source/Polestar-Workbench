@@ -145,6 +145,21 @@ const CARGO_EXCLUDE: RegExp[] = [
   /kantin sekolah/i,
 ];
 
+// Livestock scope ruling — mirrors the frontend scope classifier
+// (cargoAnalysis LIVESTOCK_RE / LIVESTOCK_COMMERCIAL_ANCHOR_RE). Routine rural
+// or highway livestock crime (a cattle truck robbed on a back road, a herd
+// rustled) is animal theft, not a commercial cargo incident, and is dropped
+// UNLESS a commercial supply-chain / logistics anchor is present (a named
+// logistics operator, a warehouse / cold store / reefer / container
+// consignment, a port / rail-freight movement, an abattoir supply line or an
+// export consignment). Kept out of CARGO_EXCLUDE because it needs the
+// anchor-exception, which a plain regex list cannot express. "ram", "lamb" and
+// a bare "ox" are omitted (they collide with RAM, a Ram pickup, names, "box").
+const CARGO_LIVESTOCK_RE =
+  /\b(cattle|buffalo|buffaloes|buffalos|cow|cows|bull|bulls|bullock|bullocks|calf|calves|goat|goats|sheep|livestock|poultry|oxen)\b/i;
+const CARGO_LIVESTOCK_COMMERCIAL_ANCHOR_RE =
+  /\b(warehouse|godown|cold storage|cold[- ]?chain|reefer|container|port|terminal|rail freight|railway freight|freight train|distribution (?:centre|center|hub|network)|logistics (?:company|firm|operator|provider|hub|park|centre|center)|abattoir|slaughterhouse|export consignment|export shipment|supply chain)\b/i;
+
 // Fuel-specific exclusions. Pure market speculation, equity/finance news
 // and broad oil-price commentary with no operational signal must never
 // lead a Fuel Watch. These records may mention "oil" or "fuel" but they
@@ -1628,6 +1643,12 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Cargo Watch EVENTS. Shared detector with the frontend scope classifier.
     const slop = firstMatch(text, CARGO_SLOP_EXCLUDE);
     if (slop) return { relevant: false, reason: `excluded: cargo commentary/non-incident (/${slop.source}/)` };
+    // Livestock scope ruling — routine rural/highway animal theft is out unless
+    // a commercial supply-chain anchor is present. Mirrors the frontend scope
+    // classifier so the ingest gate and the report never drift.
+    if (CARGO_LIVESTOCK_RE.test(text) && !CARGO_LIVESTOCK_COMMERCIAL_ANCHOR_RE.test(text)) {
+      return { relevant: false, reason: "excluded: cargo livestock (no commercial supply-chain anchor)" };
+    }
   }
   if (topic === "energy") {
     const m = firstMatch(text, ENERGY_EXCLUDE);

@@ -16,12 +16,14 @@ import {
   parseUsdLoss,
   cargoCountry,
   isCargoRelatedIncident,
+  IN_SCOPE_COUNTRIES,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
 import {
   buildCargoGroupedDataset,
   type CargoClusterInput,
   type CargoIncidentCluster,
+  type CargoSourceLink,
 } from "./cargoGroupedDataset";
 import {
   buildCargoReportExtras,
@@ -581,6 +583,215 @@ function highestSeverity(primaries: CargoClusterInput[]): {
   return { key, label: key ? (SEV_LABEL[key] ?? key) : "—" };
 }
 
+// The first source name that will actually RENDER (contains a Latin letter),
+// paired with its URL, drawn from a cluster's deduped source links. A wholly
+// non-Latin outlet name ("দৈনিক ইনকিলাব") shows on screen but blanks in the
+// Roboto PDF, so preferring a renderable name keeps preview == PDF and never
+// prints an empty "Source:" line. Returns blanks when nothing is renderable —
+// both renderers already skip a falsy source.
+function renderableSourceLink(
+  links: CargoSourceLink[],
+): { source: string; sourceUrl: string } {
+  for (const l of links) {
+    const s = (l.source ?? "").trim();
+    if (/[A-Za-z]/.test(s)) return { source: s, sourceUrl: (l.url ?? "").trim() };
+  }
+  return { source: "", sourceUrl: "" };
+}
+
+// --- Second-pass syndication collapse -------------------------------------
+//
+// buildCargoGroupedDataset already dedupes copies of one event that share a
+// coarse {group, category, country, port} bucket. A residual class survives it:
+// the SAME event reported by outlets that frame it differently enough to land
+// in different category/port buckets (e.g. one headline says "bonded lorry",
+// another "container", a third "warehouse"). This conservative second pass
+// merges clusters that are the same country, within four days, and pass EITHER
+// acceptance path below, so the enforcement panel, Key Incidents and Fast Facts
+// count one event once.
+//
+// Two acceptance paths:
+//  (1) BALANCED — >= two DISTINCTIVE shared tokens at Jaccard >= 0.34. Handles
+//      evenly-worded copies.
+//  (2) CONTAINMENT — heavy syndication: many outlets rewrite ONE bust, and the
+//      longer copies carry attribution/framing tokens ("according to <outlet>",
+//      a force's proper name) that unfairly depress Jaccard even though a
+//      concise copy is near-fully contained in the longer one. This path fires
+//      when >= THREE distinctive tokens are shared AND the smaller token set is
+//      at least half contained (overlap coefficient >= 0.5). The three-token
+//      floor keeps it clear of same-location different-event pairs, which share
+//      only their place/subject tokens (<= two here).
+//
+// A candidate is accepted if it passes EITHER path against ANY cluster already
+// in the group (bounded transitive chaining), not only the seed. One real event
+// draws copies whose framing diverges enough that a terse copy and a
+// heavily-attributed copy under-share DIRECTLY (e.g. one carries "according to
+// <outlet>, Location: <place>", the other a force's proper name), yet both share
+// a strong link with a THIRD copy that names the ringleader/suspect count. The
+// strict per-link thresholds still gate every hop, so unrelated events cannot
+// daisy-chain: two genuinely different crime stories rarely share three
+// DISTINCTIVE (generic- and country-stripped) tokens within four days.
+
+const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
+const COLLAPSE_JACCARD_MIN = 0.34;
+const COLLAPSE_OVERLAP_MIN = 0.5;
+const COLLAPSE_OVERLAP_SHARED_MIN = 3;
+
+// Generic crime/logistics vocabulary carries no discriminating signal for "is
+// this the same event", so it is stripped before the token overlap is measured.
+// Exact forms plus prefixes for the inflected families (arrest/arrested/…).
+const COLLAPSE_GENERIC_EXACT = new Set<string>([
+  "police", "stolen", "stole", "robbed", "cargo", "goods", "over",
+  "including", "busted", "bust",
+  // A shared country is already a merge precondition, so counting the country
+  // name as a shared distinctive token would double-count it.
+  ...IN_SCOPE_COUNTRIES.map((c) => c.toLowerCase()),
+]);
+const COLLAPSE_GENERIC_PREFIXES = [
+  "arrest", "detain", "suspect", "seiz", "recover", "theft", "steal",
+  "robber", "truck", "lorr", "gang", "case", "raid", "loot",
+];
+
+function isGenericCollapseToken(raw: string): boolean {
+  if (COLLAPSE_GENERIC_EXACT.has(raw)) return true;
+  return COLLAPSE_GENERIC_PREFIXES.some((p) => raw.startsWith(p));
+}
+
+// Distinctive stemmed tokens for the collapse overlap test. Lower-cased alpha
+// runs of length >= 4, generic vocabulary removed, then a light stem (ies->y,
+// es/s stripped) so plural/singular framings of one noun match. "syndicate" and
+// "mastermind" are deliberately kept (they discriminate real repeat events).
+function collapseTokens(text: string): Set<string> {
+  const out = new Set<string>();
+  for (const raw of text.toLowerCase().match(/[a-z]+/g) ?? []) {
+    if (raw.length < 4) continue;
+    if (isGenericCollapseToken(raw)) continue;
+    let stem = raw;
+    if (stem.endsWith("ies")) stem = `${stem.slice(0, -3)}y`;
+    else if (stem.endsWith("es")) stem = stem.slice(0, -2);
+    else if (stem.endsWith("s")) stem = stem.slice(0, -1);
+    out.add(stem);
+  }
+  return out;
+}
+
+function intersectionSize(a: Set<string>, b: Set<string>): number {
+  let n = 0;
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  for (const t of small) if (large.has(t)) n++;
+  return n;
+}
+
+function dedupeSourceLinkList(links: CargoSourceLink[]): CargoSourceLink[] {
+  const seen = new Set<string>();
+  const out: CargoSourceLink[] = [];
+  for (const l of links) {
+    const key = `${l.source ?? ""}|${l.url ?? ""}`;
+    if (key === "|" || seen.has(key)) continue;
+    seen.add(key);
+    out.push(l);
+  }
+  return out;
+}
+
+function mergeClusterGroup(group: CargoIncidentCluster[]): CargoIncidentCluster {
+  // Canonical = highest stored primary severity, then most recent, then a
+  // deterministic title/id tie-break (mirrors the dataset's own precedence).
+  const canonical = [...group].sort((a, b) => {
+    const rs = severityRankOf(b.primary) - severityRankOf(a.primary);
+    if (rs !== 0) return rs;
+    const td =
+      new Date(b.primary.occurredAt).getTime() -
+      new Date(a.primary.occurredAt).getTime();
+    if (td !== 0) return td;
+    const tc = (a.primary.title ?? "").localeCompare(b.primary.title ?? "");
+    if (tc !== 0) return tc;
+    return String(a.primary.id ?? "").localeCompare(String(b.primary.id ?? ""));
+  })[0];
+  const supporting: CargoClusterInput[] = [];
+  for (const cl of group) {
+    if (cl !== canonical) supporting.push(cl.primary);
+    supporting.push(...cl.supporting);
+  }
+  return {
+    ...canonical,
+    supporting,
+    sourceLinks: dedupeSourceLinkList(group.flatMap((cl) => cl.sourceLinks)),
+    clusterSize: supporting.length + 1,
+    maxSeverityRank: Math.max(...group.map((cl) => cl.maxSeverityRank)),
+    latestOccurredAt: group
+      .map((cl) => cl.latestOccurredAt)
+      .sort()
+      .slice(-1)[0],
+  };
+}
+
+// Does candidate token set `cand` pass either acceptance path against member
+// token set `member`? (Same country + time window are enforced by the caller.)
+function collapseTokensMatch(member: Set<string>, cand: Set<string>): boolean {
+  const shared = intersectionSize(member, cand);
+  if (shared < 2) return false;
+  const union = member.size + cand.size - shared;
+  const jaccard = union === 0 ? 0 : shared / union;
+  const smaller = Math.min(member.size, cand.size);
+  const overlap = smaller === 0 ? 0 : shared / smaller;
+  const balanced = jaccard >= COLLAPSE_JACCARD_MIN;
+  const contained =
+    shared >= COLLAPSE_OVERLAP_SHARED_MIN && overlap >= COLLAPSE_OVERLAP_MIN;
+  return balanced || contained;
+}
+
+// Greedy conservative merge: clusters arrive sorted by impact, so each seed is
+// the strongest of its group and only later (weaker/equal) clusters are absorbed
+// into it. A candidate is matched against ANY cluster already in the group
+// (bounded transitive chaining) — see the header note — and the group is grown
+// to a fixed point so a linking copy encountered late still pulls in copies that
+// only chain through it. Every hop still passes the strict per-link thresholds,
+// so unrelated events can never daisy-chain together. Same country and a
+// four-day window (seed-relative, so the whole group spans one event) gate every
+// candidate before any token test.
+function collapseSyndicatedClusters(
+  clusters: CargoIncidentCluster[],
+): CargoIncidentCluster[] {
+  const tagged = clusters.map((cl) => ({
+    cl,
+    country: cargoCountry(toIncidentLike(cl.primary)),
+    time: new Date(cl.primary.occurredAt).getTime(),
+    tokens: collapseTokens(primaryText(cl.primary)),
+  }));
+  const used = new Array(tagged.length).fill(false);
+  const out: CargoIncidentCluster[] = [];
+  for (let i = 0; i < tagged.length; i++) {
+    if (used[i]) continue;
+    used[i] = true;
+    const seed = tagged[i];
+    const group = [seed.cl];
+    const groupTokens: Set<string>[] = [seed.tokens];
+    if (seed.country && !Number.isNaN(seed.time)) {
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (let j = i + 1; j < tagged.length; j++) {
+          if (used[j]) continue;
+          const cand = tagged[j];
+          if (!cand.country || cand.country !== seed.country) continue;
+          if (Number.isNaN(cand.time)) continue;
+          if (Math.abs(seed.time - cand.time) > FOUR_DAYS_MS) continue;
+          if (!groupTokens.some((m) => collapseTokensMatch(m, cand.tokens))) {
+            continue;
+          }
+          used[j] = true;
+          group.push(cand.cl);
+          groupTokens.push(cand.tokens);
+          grew = true;
+        }
+      }
+    }
+    out.push(group.length === 1 ? seed.cl : mergeClusterGroup(group));
+  }
+  return out;
+}
+
 function topCountry(primaries: CargoClusterInput[]): string | null {
   const counts = new Map<string, number>();
   for (const p of primaries) {
@@ -661,7 +872,10 @@ export function buildCargoPatternModel(
   const dataset = buildCargoGroupedDataset(windowed, {
     referenceDate: issueDate,
   });
-  const clusters = dataset.clusters;
+  // Second-pass syndication collapse — merge residual cross-bucket copies of one
+  // event so every downstream surface (Fast Facts, enforcement, Key Incidents)
+  // counts it once. Applied to the FULL cluster set before any partition.
+  const clusters = collapseSyndicatedClusters(dataset.clusters);
 
   // 1a. Partition the deduped clusters into OPERATIONAL theft/loss events and
   //     ENFORCEMENT outcomes (arrests, seizures, recoveries). Enforcement is a
@@ -993,8 +1207,7 @@ export function buildCargoPatternModel(
         status: e.status ?? "",
         cargoType: e.cargoType ?? "",
         company: e.company ?? "",
-        source: (d.primary.source ?? "").trim(),
-        sourceUrl: (d.primary.sourceUrl ?? "").trim(),
+        ...renderableSourceLink(d.cluster.sourceLinks),
         operationalRelevance: OPERATIONAL_RELEVANCE_BY_STAGE[d.stage] ?? "",
         clientStatus: deriveClientStatus(primaryText(d.primary)),
       };
@@ -1028,7 +1241,10 @@ export function buildCargoPatternModel(
     })
     .filter((c): c is CargoSelectionCandidate => c !== null)
     .filter((c) => isCargoRelatedIncident(c.signalText))
-    .filter((c) => c.row.confidence !== "Unconfirmed");
+    .filter((c) => c.row.confidence !== "Unconfirmed")
+    // Key Incidents lead the report, so a Low/Insignificant-tier event never
+    // qualifies (spec pt5) — it stays in the full register but not on a card.
+    .filter((c) => (SEV_RANK[c.row.severityKey] ?? 0) >= 3);
   // Every Key Incident must carry a source and date (spec pt5), so prefer
   // sourced candidates. Fall back to the unfiltered set only when nothing has a
   // source, so a source-poor period still fills the section rather than blocking
@@ -1063,8 +1279,7 @@ export function buildCargoPatternModel(
         status: e.status ?? "",
         cargoType: e.cargoType ?? "",
         company: e.company ?? "",
-        source: (p.source ?? "").trim(),
-        sourceUrl: (p.sourceUrl ?? "").trim(),
+        ...renderableSourceLink(ec.cluster.sourceLinks),
         operationalRelevance: "",
         clientStatus: deriveClientStatus(primaryText(p)),
       };

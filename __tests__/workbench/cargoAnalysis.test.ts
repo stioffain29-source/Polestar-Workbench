@@ -465,3 +465,63 @@ describe("classifyScope — trade-press commentary / non-incident slop is exclud
     ).toBe("in_scope");
   });
 });
+
+// Owner scope ruling: livestock / cattle-truck theft is OUT of Cargo Watch
+// UNLESS there is a clear material impact on commercial supply chains,
+// logistics, food distribution or business continuity. Routine rural or
+// isolated livestock crime is excluded entirely.
+describe("classifyScope — livestock scope ruling", () => {
+  it("drops a routine highway cattle-truck robbery (no commercial anchor)", () => {
+    expect(
+      classifyScope(
+        { title: "Robbers steal cattle from a truck on a rural road", country: "Bangladesh" },
+        "APAC",
+      ),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("drops rural cattle rustling reported as a truck theft", () => {
+    expect(
+      classifyScope(
+        { title: "Gang loots buffaloes and goats from a village, flees by lorry", country: "India" },
+        "APAC",
+      ),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("keeps livestock theft with a cold-chain / commercial logistics anchor", () => {
+    expect(
+      classifyScope(
+        { title: "Reefer container of frozen poultry stolen from a logistics hub in Malaysia", country: "Malaysia" },
+        "APAC",
+      ),
+    ).toBe("in_scope");
+  });
+
+  it("keeps a livestock export consignment theft (commercial supply chain)", () => {
+    expect(
+      classifyScope(
+        { title: "Cattle export consignment hijacked from a port terminal", country: "Indonesia" },
+        "APAC",
+      ),
+    ).toBe("in_scope");
+  });
+
+  it("does not let an analyst override re-admit routine livestock theft", () => {
+    expect(
+      classifyScope(
+        { title: "Cows stolen from a farm truck overnight", country: "India", analystInScope: true },
+        "APAC",
+      ),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("leaves non-livestock cargo theft untouched", () => {
+    expect(
+      classifyScope(
+        { title: "Container truck of electronics hijacked on the highway", country: "Thailand" },
+        "APAC",
+      ),
+    ).toBe("in_scope");
+  });
+});

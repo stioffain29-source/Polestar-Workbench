@@ -54,6 +54,127 @@ describe("cargo pattern model — single-source reconciliation", () => {
     expect(m.clusters[0].clusterSize).toBe(2);
   });
 
+  it("keeps the highest severity when it collapses a syndicated cluster", () => {
+    // The same event carried by two outlets at different severities collapses to
+    // ONE canonical row that inherits the WORST tier (spec: canonical = highest).
+    const a = inc({ id: 1, title: "Armed robbers hijack container truck of electronics on the North-South highway in Malaysia", severity: "high", source: "Reuters", sourceUrl: "https://r/1", occurredAt: "2026-06-20" });
+    const b = inc({ id: 2, title: "Robbers hijack container truck of electronics on the North-South highway, Malaysia", severity: "low", source: "Local Daily", sourceUrl: "https://l/2", occurredAt: "2026-06-21" });
+    const m = buildCargoPatternModel([a, b], { issueDate: "2026-06-24" });
+    expect(m.totalUnique).toBe(1);
+    expect(m.clusters[0].clusterSize).toBe(2);
+    // The rendered canonical row (appendix) inherits the worst tier.
+    expect(m.appendix).toHaveLength(1);
+    expect(m.appendix[0].severityKey).toBe("high");
+  });
+
+  it("does not merge same-story headlines from different countries", () => {
+    const a = inc({ id: 1, title: "Robbers hijack container truck of electronics on the highway", country: "Malaysia", severity: "high", occurredAt: "2026-06-20" });
+    const b = inc({ id: 2, title: "Robbers hijack container truck of electronics on the highway", country: "Thailand", severity: "high", occurredAt: "2026-06-20" });
+    const m = buildCargoPatternModel([a, b], { issueDate: "2026-06-24" });
+    expect(m.totalUnique).toBe(2);
+  });
+
+  it("does not merge similar headlines more than four days apart", () => {
+    const a = inc({ id: 1, title: "Robbers hijack container truck of electronics on the North-South highway in Malaysia", severity: "high", occurredAt: "2026-06-10" });
+    const b = inc({ id: 2, title: "Robbers hijack container truck of electronics on the North-South highway in Malaysia", severity: "high", occurredAt: "2026-06-20" });
+    const m = buildCargoPatternModel([a, b], { issueDate: "2026-06-24" });
+    expect(m.totalUnique).toBe(2);
+  });
+
+  it("collapses heavily-syndicated enforcement rewrites that a Jaccard-only gate misses", () => {
+    // Two outlet copies of ONE Malaysia bonded-lorry syndicate bust on the same
+    // day (real report-11 data). Jaccard is only ~0.29 because the longer copy
+    // carries force-name and attribution tokens ("Royal Malaysia Police …
+    // according to Astro Awani"), but the two share four distinctive tokens
+    // (bonded, syndicate, seven, dismantled) and the concise copy is >half
+    // contained (overlap ~0.57), so the containment path must merge them into a
+    // single enforcement row (both are arrests → the enforcement panel, not the
+    // operational totals).
+    const a = inc({
+      id: 1,
+      title: "Royal Malaysia Police dismantle bonded lorry theft syndicate; seven arrested",
+      summary:
+        "Royal Malaysia Police dismantled a syndicate involved in stealing bonded lorries. Seven suspects were arrested, according to Astro Awani.",
+      source: "Astro Awani",
+      sourceUrl: "https://a/1",
+      occurredAt: "2026-07-01",
+    });
+    const b = inc({
+      id: 2,
+      title: "Syndicate Stealing Bonded Lorries Busted, 7 Including Mastermind Detained - JSJ",
+      summary:
+        "Police (JSJ) dismantled a syndicate that stole bonded lorries; seven people detained, including the mastermind.",
+      source: "Bernama",
+      sourceUrl: "https://b/2",
+      occurredAt: "2026-07-01",
+    });
+    const m = buildCargoPatternModel([a, b], { issueDate: "2026-07-05" });
+    expect(m.clusters).toHaveLength(1);
+    expect(m.clusters[0].clusterSize).toBe(2);
+    // Both copies are arrests → one merged row in the enforcement panel.
+    expect(m.enforcement.total).toBe(1);
+  });
+
+  it("containment path leaves a different-facet copy sharing only two tokens separate", () => {
+    // A same-day, same-country copy that emphasises a DIFFERENT facet ("operating
+    // in four states") shares only {bonded, syndicate} with the bust copy — two
+    // distinctive tokens, below the containment path's three-token floor — so it
+    // must NOT be over-merged; the two stay separate clusters.
+    const bust = inc({
+      id: 1,
+      title: "Syndicate Stealing Bonded Lorries Busted, 7 Including Mastermind Detained - JSJ",
+      summary:
+        "Police (JSJ) dismantled a syndicate that stole bonded lorries; seven people detained, including the mastermind.",
+      occurredAt: "2026-07-01",
+    });
+    const facet = inc({
+      id: 2,
+      title: "'Bonded lorry' theft syndicate operating in four states",
+      summary:
+        "A syndicate stealing 'bonded lorries' is operating across four states, report Berita Harian.",
+      occurredAt: "2026-07-01",
+    });
+    const m = buildCargoPatternModel([bust, facet], { issueDate: "2026-07-05" });
+    expect(m.clusters).toHaveLength(2);
+  });
+
+  it("chains a heavily-attributed copy into the event via a strong intermediate", () => {
+    // Real report-11 data: three outlet copies of ONE Selangor bonded-lorry
+    // bust. The concise Astro Awani copy (seed) and the MalaysiaGazette copy
+    // under-share DIRECTLY — the Gazette summary carries "according to …,
+    // Location: Selangor" framing that inflates its token set (overlap ~0.44,
+    // below the containment floor). But the Bernama copy names the mastermind and
+    // suspect count, sharing a STRONG link with both. Bounded transitive chaining
+    // must therefore collapse all three into one enforcement row.
+    const astro = inc({
+      id: 33905,
+      title: "Royal Malaysia Police dismantle bonded lorry theft syndicate; seven arrested",
+      summary:
+        "Royal Malaysia Police dismantled a syndicate involved in stealing bonded lorries. Seven suspects were arrested, according to Astro Awani.",
+      occurredAt: "2026-07-01",
+    });
+    const bernama = inc({
+      id: 33898,
+      title: "Syndicate Stealing Bonded Lorries Busted, 7 Including Mastermind Detained - JSJ",
+      summary:
+        "Police (JSJ) dismantled a syndicate that stole bonded lorries; seven people detained, including the mastermind.",
+      occurredAt: "2026-07-01",
+    });
+    const gazette = inc({
+      id: 33901,
+      title: "Syndicate stealing bonded lorries in Selangor busted, mastermind arrested",
+      summary:
+        "A syndicate that stole bonded lorries in Selangor was dismantled and the ringleader arrested, according to MalaysiaGazette. Location: Selangor.",
+      occurredAt: "2026-07-01",
+    });
+    const m = buildCargoPatternModel([astro, bernama, gazette], {
+      issueDate: "2026-07-05",
+    });
+    expect(m.clusters).toHaveLength(1);
+    expect(m.clusters[0].clusterSize).toBe(3);
+    expect(m.enforcement.total).toBe(1);
+  });
+
   it("stage counts sum to the total unique count", () => {
     const rows = [
       inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high" }),

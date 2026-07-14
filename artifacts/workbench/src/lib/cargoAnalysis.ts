@@ -123,6 +123,25 @@ const CARGO_INCIDENT_RE = /\b(cargo|freight|container|truck|lorry|hijack|warehou
 // freight anchor (container, lorry, cold storage, etc.) rescues them below.
 const NON_CARGO_FISH_RE = /\b(lobsters?|oysters?|prawns?|shrimps?|crabs?|clams?|squids?|salted fish|dried fish|frozen fish|fish)\b/i;
 
+// Livestock commodity words. Routine rural / highway livestock crime (a cattle
+// truck robbed on a back road, a herd rustled) is OUT of Cargo Watch scope: it
+// is animal theft, not a commercial supply-chain incident. "ram", "lamb" and a
+// bare "ox" are deliberately omitted — they collide with RAM (memory), a Ram
+// pickup, personal names and "box"/"fox". Word-bounded so "cowl", "goatee",
+// "bullish", "bulletin" and "sheepish" never match.
+const LIVESTOCK_RE =
+  /\b(cattle|buffalo|buffaloes|buffalos|cow|cows|bull|bulls|bullock|bullocks|calf|calves|goat|goats|sheep|livestock|poultry|oxen)\b/i;
+
+// A commercial supply-chain / logistics anchor that KEEPS a livestock record in
+// scope, per the scope ruling: livestock is only Cargo Watch when there is a
+// clear material impact on commercial freight, cold-chain, distribution or
+// business continuity (a named logistics operator, a warehouse / cold store /
+// reefer / container consignment, a port / rail-freight movement, an abattoir
+// supply line or an export consignment). Generic "truck" / "transport" /
+// "highway" are NOT anchors — a bare cattle truck on a road stays out.
+const LIVESTOCK_COMMERCIAL_ANCHOR_RE =
+  /\b(warehouse|godown|cold storage|cold[- ]?chain|reefer|container|port|terminal|rail freight|railway freight|freight train|distribution (?:centre|center|hub|network)|logistics (?:company|firm|operator|provider|hub|park|centre|center)|abattoir|slaughterhouse|export consignment|export shipment|supply chain)\b/i;
+
 // An official's oversight / follow-up TOUR is a governance-response story, not a
 // fresh cargo incident, even when it recounts a truck robbery in passing (e.g.
 // "'Big Tai' flies urgently south to monitor a bombing and a goods-truck
@@ -515,6 +534,17 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // load-context "kg"/"goods"/"parcel" tokens deliberately do NOT rescue it —
   // only a real freight noun does.
   if (NON_CARGO_FISH_RE.test(text) && !/\b(cargo|freight|container|truck|lorry|warehouse|godown|depot|consignment|shipment|logistic|pallet|reefer|cold storage|hijack)\b/i.test(text)) {
+    return "excluded_non_cargo";
+  }
+  // Livestock / cattle-truck theft is OUT of Cargo Watch scope UNLESS a clear
+  // commercial supply-chain anchor is present (a named logistics operator, a
+  // warehouse / cold store / reefer / container consignment, a port / rail
+  // freight movement, an abattoir supply line or an export consignment).
+  // Routine rural or isolated livestock crime — a highway cattle-truck robbery
+  // with no commercial-logistics dimension — is excluded entirely per the scope
+  // ruling. Placed with the hard non-cargo rejects (ahead of the analyst
+  // override) so a stray "Add to lane" cannot re-admit routine animal theft.
+  if (LIVESTOCK_RE.test(text) && !LIVESTOCK_COMMERCIAL_ANCHOR_RE.test(text)) {
     return "excluded_non_cargo";
   }
   // An official oversight / follow-up tour is a governance-response story, not a
