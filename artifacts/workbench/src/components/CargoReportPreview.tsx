@@ -233,7 +233,16 @@ function placeLine(r: CargoAppendixRow): string {
 // severity, location · type, summary, operational relevance and (only where the
 // source carries an explicit signal) a resolved status. Confidence is
 // deliberately omitted from the cards — it stays in the register and CSV.
-function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
+const SELECTED_INCIDENTS_SUBTITLE =
+  "Incidents that best illustrate the main operational patterns identified during the reporting period.";
+
+function SelectedIncidents({
+  rows,
+  subtitle = SELECTED_INCIDENTS_SUBTITLE,
+}: {
+  rows: CargoAppendixRow[];
+  subtitle?: string | null;
+}) {
   if (rows.length === 0) {
     return (
       <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, margin: 0 }}>
@@ -243,19 +252,20 @@ function SelectedIncidents({ rows }: { rows: CargoAppendixRow[] }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <p
-        style={{
-          fontFamily: "Roboto, sans-serif",
-          fontSize: 11.5,
-          fontStyle: "italic",
-          lineHeight: 1.5,
-          color: DUSK,
-          margin: "0 0 2px",
-        }}
-      >
-        Incidents that best illustrate the main operational patterns identified
-        during the reporting period.
-      </p>
+      {subtitle && (
+        <p
+          style={{
+            fontFamily: "Roboto, sans-serif",
+            fontSize: 11.5,
+            fontStyle: "italic",
+            lineHeight: 1.5,
+            color: DUSK,
+            margin: "0 0 2px",
+          }}
+        >
+          {subtitle}
+        </p>
+      )}
       {rows.map((r) => {
         const chip = sevChipColors(r.severityKey);
         const meta = [placeLine(r), r.category].filter(Boolean).join("  ·  ");
@@ -774,7 +784,7 @@ export default function CargoReportPreview({
             >
               {model.enforcement.statement}
             </p>
-            <SelectedIncidents rows={model.enforcement.rows} />
+            <SelectedIncidents rows={model.enforcement.rows} subtitle={null} />
           </Section>
         )}
 

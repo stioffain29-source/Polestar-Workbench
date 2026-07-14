@@ -464,9 +464,23 @@ function cargoDateStr(iso: string): string {
 // explicit signal) a resolved Status. Confidence is deliberately omitted from
 // the cards — it stays in the register and CSV. Blank fields are omitted (no
 // fabricated placeholders). Mirrors CargoReportPreview's SelectedIncidents.
-function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
+function drawSelectedIncidents(
+  ctx: Ctx,
+  rows: CargoAppendixRow[],
+  opts: { heading?: string | null; subtitle?: string | null } = {},
+) {
   const { pdf, MX, CW } = ctx;
-  drawSectionHeading(ctx, "Key Incidents");
+  // Heading defaults to "Key Incidents"; pass null to render the cards under a
+  // heading already drawn by the caller (the Enforcement Activity panel reuses
+  // this card renderer but must NOT emit a second "Key Incidents" heading).
+  const heading = opts.heading === undefined ? "Key Incidents" : opts.heading;
+  // Subtitle defaults to the pattern-illustration blurb; pass null to omit it
+  // (it is meaningless above enforcement outcomes).
+  const subtitle =
+    opts.subtitle === undefined
+      ? "Incidents that best illustrate the main operational patterns identified during the reporting period."
+      : opts.subtitle;
+  if (heading) drawSectionHeading(ctx, heading);
   if (rows.length === 0) {
     renderProse(ctx, "No cargo-crime incidents were recorded this period.");
     return;
@@ -480,20 +494,20 @@ function drawSelectedIncidents(ctx: Ctx, rows: CargoAppendixRow[]) {
   const lineH = 11;
   const gap = 8;
 
-  // Section subtitle (italic), mirroring the on-screen preview.
-  setRoboto(pdf, "italic");
-  pdf.setFontSize(META_FONT);
-  setText(pdf, DUSK);
-  const subLines: string[] = pdf.splitTextToSize(
-    "Incidents that best illustrate the main operational patterns identified during the reporting period.",
-    CW,
-  );
-  ensureSpace(ctx, subLines.length * lineH + 4);
-  for (const line of subLines) {
-    ctx.y += lineH;
-    pdf.text(line, MX, ctx.y);
+  // Section subtitle (italic), mirroring the on-screen preview. Omitted when
+  // the caller passes subtitle: null (e.g. the Enforcement Activity panel).
+  if (subtitle) {
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(META_FONT);
+    setText(pdf, DUSK);
+    const subLines: string[] = pdf.splitTextToSize(subtitle, CW);
+    ensureSpace(ctx, subLines.length * lineH + 4);
+    for (const line of subLines) {
+      ctx.y += lineH;
+      pdf.text(line, MX, ctx.y);
+    }
+    ctx.y += 6;
   }
-  ctx.y += 6;
 
   for (const r of rows) {
     // Pre-measure the card so it never splits across a page break.
@@ -1178,7 +1192,14 @@ export async function exportTopicReportPdf(
           "Enforcement Activity",
           cargoModel.enforcement.statement,
         );
-        drawSelectedIncidents(ctx, cargoModel.enforcement.rows);
+        // The enforcement outcomes render with the SAME card layout as Key
+        // Incidents but belong under the "Enforcement Activity" heading already
+        // drawn above — so suppress this renderer's own heading + the
+        // pattern-illustration subtitle (mirrors the preview, keeps preview==PDF).
+        drawSelectedIncidents(ctx, cargoModel.enforcement.rows, {
+          heading: null,
+          subtitle: null,
+        });
       }
 
       // Operational assessment. Editor text wins; the deterministic model

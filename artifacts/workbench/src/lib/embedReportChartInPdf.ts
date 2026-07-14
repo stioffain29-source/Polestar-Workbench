@@ -134,6 +134,27 @@ export async function embedChartMarkupInPdf(
       imgH = maxImgH;
     }
 
+    // Bounded shrink-to-fit-remaining: if heading + image would otherwise break
+    // to a fresh page — leaving the current page with a large blank tail — but
+    // they CAN fit in the space left on THIS page at a still-legible scale,
+    // shrink proportionally to pack them here instead. Without this a
+    // medium-tall chart (e.g. the country choropleth ~458pt) orphans onto its
+    // own page, blanking both the tail it left behind and the foot of its own
+    // page. Bounded by MIN_FILL_SCALE so charts are never crushed into slivers;
+    // above the floor it just avoids one page break. PDF-pagination only — the
+    // unpaginated on-screen preview renders the same component unscaled, so
+    // content and section order stay identical (preview==PDF parity preserved).
+    const MIN_FILL_SCALE = 0.75;
+    const remaining = ctx.H - ctx.BOTTOM - ctx.y;
+    const needed = headingReserve + imgH + 8;
+    if (needed > remaining) {
+      const fitH = remaining - headingReserve - 8;
+      if (fitH > 0 && fitH / imgH >= MIN_FILL_SCALE) {
+        imgW = imgW * (fitH / imgH);
+        imgH = fitH;
+      }
+    }
+
     // Reserve heading + image as ONE unit: the break (if needed) happens before
     // the heading, so the heading never orphans and the image never splits.
     ensureSpace(ctx, headingReserve + imgH + 8);
