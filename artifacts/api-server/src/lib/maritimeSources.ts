@@ -7,6 +7,8 @@ import {
 } from "@workspace/db";
 import {
   CENTCOM_HEALTH_NAME,
+  CMF_HEALTH_NAME,
+  JMIC_HEALTH_NAME,
   OFFICIAL_M15_HEALTH_TOPIC,
   UKMTO_HEALTH_NAME,
 } from "../../../../lib/ingest/src/m15/health";
@@ -58,6 +60,22 @@ const OFFICIAL_SOURCES: OfficialSourceDef[] = [
     healthName: UKMTO_HEALTH_NAME,
     healthTopic: OFFICIAL_M15_HEALTH_TOPIC,
     envVar: "UKMTO_INGEST_ENABLED",
+  },
+  {
+    key: "jmic",
+    label: "JMIC (partner advisories)",
+    sourceName: "jmic",
+    healthName: JMIC_HEALTH_NAME,
+    healthTopic: OFFICIAL_M15_HEALTH_TOPIC,
+    envVar: "JMIC_INGEST_ENABLED",
+  },
+  {
+    key: "cmf",
+    label: "CMF (partner threat assessments)",
+    sourceName: "cmf",
+    healthName: CMF_HEALTH_NAME,
+    healthTopic: OFFICIAL_M15_HEALTH_TOPIC,
+    envVar: "CMF_INGEST_ENABLED",
   },
 ];
 
@@ -240,7 +258,9 @@ async function officialSourceStatus(def: OfficialSourceDef): Promise<MaritimeSou
       def.key,
       def.label,
       "stale",
-      "Connector registered (Phase 1 scaffold) — awaiting first official items from the Phase 2 parser.",
+      def.sourceName === "jmic" || def.sourceName === "cmf"
+        ? "Connector registered (Phase 1 scaffold) — partner parser fixtures ready; live ingest pending Phase 4."
+        : "Connector registered (Phase 1 scaffold) — awaiting first official items from the Phase 2 parser.",
       fmt(feed.lastSuccessAt),
       OFFICIAL_M15_GROUP,
     );

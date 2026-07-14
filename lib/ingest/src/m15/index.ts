@@ -24,7 +24,27 @@ export type {
   RouteOfficialSourceResult,
 } from "./routing";
 
-export { OFFICIAL_M15_HEALTH_TOPIC, UKMTO_HEALTH_NAME, UKMTO_SOURCE_URL, CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL } from "./health";
+export {
+  OFFICIAL_M15_HEALTH_TOPIC,
+  UKMTO_HEALTH_NAME,
+  UKMTO_SOURCE_URL,
+  CENTCOM_HEALTH_NAME,
+  CENTCOM_SOURCE_URL,
+  JMIC_HEALTH_NAME,
+  JMIC_SOURCE_URL,
+  CMF_HEALTH_NAME,
+  CMF_SOURCE_URL,
+  PARTNER_SOURCES,
+} from "./health";
+export type { PartnerProviderKey, PartnerSourceDef } from "./health";
+export {
+  partnerSourceByKey,
+  resolvePartnerUrl,
+  JMIC_ADVISORIES_URL,
+  CMF_OVERVIEW_URL,
+  CMF_IRTA_URL,
+  PARTNER_URL_HEALTH_NOTES,
+} from "./partnerSources";
 
 export { assignAnalystFlags, simulateOfficialSourceIngest } from "./flags";
 export type { AssignAnalystFlagsInput, AnalystFlags } from "./flags";

@@ -9,6 +9,9 @@ export const M15_REQUIRED_FIXTURES = [
   "centcom-press-release-4015365.html",
   "ukmto-products-listing.html",
   "ukmto-advisory-003-26-update-002.html",
+  "jmic-products-listing.html",
+  "jmic-advisory-012-26-southern-corridor.html",
+  "jmic-advisory-012-26-southern-corridor.pdf",
 ] as const;
 
 /** Recommended extras — second release shape + warning (not advisory) product type. */
@@ -16,6 +19,8 @@ export const M15_OPTIONAL_FIXTURES = [
   "centcom-press-release-4538814.html",
   "ukmto-warning-038-26-attack.html",
   "ukmto-003-26-update-002.pdf",
+  "cmf-jmic-overview.html",
+  "cmf-threat-assessment-q2-2026.html",
 ] as const;
 
 export type M15FixtureName =

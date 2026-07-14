@@ -326,7 +326,12 @@ async function reliefwebReportsStatus(): Promise<IntegrationStatusItem> {
 }
 
 async function officialMilitaryMaritimeStatus(): Promise<IntegrationStatusItem> {
-  const envVars = ["CENTCOM_INGEST_ENABLED", "UKMTO_INGEST_ENABLED"];
+  const envVars = [
+    "CENTCOM_INGEST_ENABLED",
+    "UKMTO_INGEST_ENABLED",
+    "JMIC_INGEST_ENABLED",
+    "CMF_INGEST_ENABLED",
+  ];
   let centcom = 0;
   let ukmto = 0;
   let partners = 0;

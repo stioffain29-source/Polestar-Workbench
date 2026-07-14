@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   CENTCOM_HEALTH_NAME,
+  CMF_HEALTH_NAME,
+  JMIC_HEALTH_NAME,
   OFFICIAL_M15_HEALTH_TOPIC,
   UKMTO_HEALTH_NAME,
 } from "../../lib/ingest/src/m15/health";
@@ -37,10 +39,14 @@ describe("M1.5 end-to-end smoke + hardening (Step 13)", () => {
     expect(OFFICIAL_M15_GROUP).toBe("Primary Military and Maritime Sources");
     expect(CENTCOM_HEALTH_NAME).toBe("CENTCOM Press Releases");
     expect(UKMTO_HEALTH_NAME).toBe("UKMTO Official Products");
+    expect(JMIC_HEALTH_NAME).toBe("JMIC Official Products");
+    expect(CMF_HEALTH_NAME).toBe("CMF Official Products");
 
     const maritime = readRepoFile("artifacts/api-server/src/lib/maritimeSources.ts");
     expect(maritime).toContain('key: "centcom"');
     expect(maritime).toContain('key: "ukmto"');
+    expect(maritime).toContain('key: "jmic"');
+    expect(maritime).toContain('key: "cmf"');
     expect(maritime).toContain(OFFICIAL_M15_GROUP);
   });
 

@@ -3,6 +3,8 @@ import { join } from "node:path";
 import {
   CENTCOM_SOURCE_URL,
   UKMTO_SOURCE_URL,
+  JMIC_SOURCE_URL,
+  CMF_SOURCE_URL,
 } from "../../lib/ingest/src/m15/health";
 import {
   M15_FIXTURE_DIR,
@@ -30,5 +32,11 @@ describe("M1.5 Phase 0 — prerequisites", () => {
       "https://www.centcom.mil/MEDIA/PRESS-RELEASES/",
     );
     expect(UKMTO_SOURCE_URL).toBe("https://www.ukmto.org/ukmto-products");
+    expect(JMIC_SOURCE_URL).toBe(
+      "https://www.ukmto.org/partner-products/jmic-products",
+    );
+    expect(CMF_SOURCE_URL).toBe(
+      "https://www.ukmto.org/partner-products/cmf-products",
+    );
   });
 });

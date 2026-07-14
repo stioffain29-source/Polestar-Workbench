@@ -7,3 +7,12 @@ export const UKMTO_SOURCE_URL = "https://www.ukmto.org/ukmto-products";
 
 export const CENTCOM_HEALTH_NAME = "CENTCOM Press Releases";
 export const CENTCOM_SOURCE_URL = "https://www.centcom.mil/MEDIA/PRESS-RELEASES/";
+
+export {
+  JMIC_HEALTH_NAME,
+  JMIC_SOURCE_URL,
+  CMF_HEALTH_NAME,
+  CMF_SOURCE_URL,
+  PARTNER_SOURCES,
+} from "./partnerSources";
+export type { PartnerProviderKey, PartnerSourceDef } from "./partnerSources";
