@@ -10,6 +10,7 @@ import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { CorroborationBadge } from "@/components/CorroborationBadge";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
+import { DashboardSkeleton } from "@/components/DashboardSkeleton";
 
 // The "Protests & Civil Unrest" card is backed by the flashpoint data topic.
 function dataTopicFor(topic: string): string {
@@ -77,16 +78,7 @@ export default function Dashboard() {
   }, [allIncidents]);
 
   if (isLoading || incidentsLoading) {
-    return (
-      <div className="w-full h-full flex flex-col gap-6 animate-pulse">
-        <div className="h-24 bg-muted/50 rounded-sm"></div>
-        <div className="grid grid-cols-3 gap-6">
-          <div className="h-40 bg-muted/50 rounded-sm"></div>
-          <div className="h-40 bg-muted/50 rounded-sm"></div>
-          <div className="h-40 bg-muted/50 rounded-sm"></div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (isError || !overview) {
