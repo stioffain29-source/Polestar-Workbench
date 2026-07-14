@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import type Parser from "rss-parser";
 
 const DEFAULT_TIMEOUT_MS = 20000;
+const CURL_BIN = process.platform === "win32" ? "curl.exe" : "curl";
 const DEFAULT_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 2500;
 
@@ -95,6 +97,114 @@ export async function fetchBody(url: string, timeoutMs: number): Promise<string>
 /** Fetch an HTML page (government / maritime sites that reject RSS Accept headers). */
 export async function fetchHtmlBody(url: string, timeoutMs: number): Promise<string> {
   return fetchBodyWithAccept(url, timeoutMs, HTML_ACCEPT);
+}
+
+/**
+ * Fetch a URL body via curl. Node's global fetch is often WAF-blocked (Cloudflare
+ * TLS fingerprint) on UKMTO / Royal Navy endpoints while curl with a browser UA
+ * succeeds — see scripts/src/m15-phase0-check.ts.
+ */
+export function fetchBodyViaCurl(
+  url: string,
+  timeoutMs: number,
+  accept = "*/*",
+): string {
+  const result = spawnSync(
+    CURL_BIN,
+    [
+      "-sS",
+      "-L",
+      "--max-time",
+      String(Math.max(1, Math.ceil(timeoutMs / 1000))),
+      "-A",
+      BROWSER_UA,
+      "-H",
+      `Accept: ${accept}`,
+      "-H",
+      "Accept-Language: en-US,en;q=0.9",
+      url,
+    ],
+    { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
+  );
+
+  if (result.error) {
+    throw new FeedFetchError(`curl failed: ${result.error.message}`, true);
+  }
+  if (result.status !== 0) {
+    const detail = (result.stderr || result.stdout || "").trim().slice(0, 300);
+    throw new FeedFetchError(
+      detail ? `curl exit ${result.status}: ${detail}` : `curl exit ${result.status}`,
+      true,
+    );
+  }
+
+  const body = (result.stdout ?? "").trim();
+  if (!body) {
+    throw new FeedFetchError("curl returned empty body", true);
+  }
+  if (/^\s*</.test(body) && /\b403\b|blocked|cloudflare|attention required/i.test(body)) {
+    throw new FeedFetchError("Status code 403", false);
+  }
+  return body;
+}
+
+/** Binary-safe curl fetch (PDFs and other non-text assets). */
+export function fetchBytesViaCurl(
+  url: string,
+  timeoutMs: number,
+  accept = "*/*",
+): Buffer {
+  const result = spawnSync(CURL_BIN, [
+    "-sS",
+    "-L",
+    "--max-time",
+    String(Math.max(1, Math.ceil(timeoutMs / 1000))),
+    "-A",
+    BROWSER_UA,
+    "-H",
+    `Accept: ${accept}`,
+    "-H",
+    "Accept-Language: en-US,en;q=0.9",
+    url,
+  ], { maxBuffer: 20 * 1024 * 1024 });
+
+  if (result.error) {
+    throw new FeedFetchError(`curl failed: ${result.error.message}`, true);
+  }
+  if (result.status !== 0) {
+    const detail = (result.stderr || "").toString().trim().slice(0, 300);
+    throw new FeedFetchError(
+      detail ? `curl exit ${result.status}: ${detail}` : `curl exit ${result.status}`,
+      true,
+    );
+  }
+
+  const buf = result.stdout;
+  if (!buf || !Buffer.isBuffer(buf) || buf.length === 0) {
+    throw new FeedFetchError("curl returned empty body", true);
+  }
+  const head = buf.subarray(0, 200).toString("latin1");
+  if (/^\s*</.test(head) && /\b403\b|blocked|cloudflare|attention required/i.test(head)) {
+    throw new FeedFetchError("Status code 403", false);
+  }
+  return buf;
+}
+
+/** Parse JSON from a curl-fetched body (throws FeedFetchError on HTML/block pages). */
+export function fetchJsonViaCurl<T>(url: string, timeoutMs: number): T {
+  const body = fetchBodyViaCurl(url, timeoutMs, "application/json");
+  if (/^\s*</.test(body)) {
+    throw new FeedFetchError(
+      `Non-JSON response: ${body.replace(/\s+/g, " ").slice(0, 160)}`,
+      false,
+    );
+  }
+  try {
+    return JSON.parse(body) as T;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new FeedFetchError(`JSON parse failed: ${msg}`, false);
+  }
 }
 
 export interface FetchFeedOptions {

@@ -1,4 +1,4 @@
-import { sleep } from "./feedFetch";
+import { fetchJsonViaCurl, sleep } from "./feedFetch";
 import {
   UKMTO_SITE_ORIGIN,
   type UkmtoDetail,
@@ -66,34 +66,24 @@ async function fetchUkmtoJson<T>(path: string): Promise<T> {
   const url = `${apiOriginFromEnv()}${path.startsWith("/") ? path : `/${path}`}`;
   let lastErr: unknown;
   for (let attempt = 0; attempt < API_ATTEMPTS; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
     try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          Accept: "application/json",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: ctrl.signal,
-        redirect: "follow",
-      });
-      if (!res.ok) {
-        const body = (await res.text()).slice(0, 200);
-        throw new Error(`UKMTO API ${res.status} ${path}: ${body}`);
-      }
-      return (await res.json()) as T;
+      return fetchJsonViaCurl<T>(url, API_TIMEOUT_MS);
     } catch (err) {
       lastErr = err;
-      if (attempt < API_ATTEMPTS - 1) {
+      const retryable =
+        err instanceof Error &&
+        (/curl failed|curl exit|timed out|timeout|empty body/i.test(err.message) ||
+          /curl exit [1-9]\d*/.test(err.message));
+      if (retryable && attempt < API_ATTEMPTS - 1) {
         await sleep(API_BACKOFF_MS * 2 ** attempt + Math.random() * 400);
+        continue;
       }
-    } finally {
-      clearTimeout(timer);
+      break;
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  const msg =
+    lastErr instanceof Error ? lastErr.message : String(lastErr ?? "UKMTO API fetch failed");
+  throw new Error(`UKMTO API ${path}: ${msg}`);
 }
 
 function parseIsoDate(value: string | undefined): Date | null {

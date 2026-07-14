@@ -515,7 +515,7 @@ export async function runUkmtoIngest(
         ],
         {
           sourceType: "html",
-          scrapeMethod: "HTML listing + detail + PDF",
+          scrapeMethod: "Sitecore API (warnings + advisories + PDF)",
           notes: UKMTO_HEALTH_NOTES,
           pending: !feedOk || blockedUpstream,
         },

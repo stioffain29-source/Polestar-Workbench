@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sleep } from "./feedFetch";
+import { fetchBytesViaCurl, sleep } from "./feedFetch";
 import { UKMTO_SITE_ORIGIN } from "./ukmtoParse";
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -105,32 +105,40 @@ export async function extractUkmtoPdfText(
 export async function fetchPdfBytes(url: string): Promise<Buffer> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
     try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          Accept: "application/pdf,*/*",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: ctrl.signal,
-        redirect: "follow",
-      });
-      if (!res.ok) {
-        throw new Error(`PDF fetch HTTP ${res.status}`);
+      try {
+        const buf = fetchBytesViaCurl(url, FETCH_TIMEOUT_MS, "application/pdf,*/*");
+        if (buf.length === 0) throw new Error("empty PDF response");
+        return buf;
+      } catch (curlErr) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+        try {
+          const res = await fetch(url, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+              Accept: "application/pdf,*/*",
+              "Accept-Language": "en-US,en;q=0.9",
+            },
+            signal: ctrl.signal,
+            redirect: "follow",
+          });
+          if (!res.ok) {
+            throw new Error(`PDF fetch HTTP ${res.status}`);
+          }
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length === 0) throw new Error("empty PDF response");
+          return buf;
+        } finally {
+          clearTimeout(timer);
+        }
       }
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length === 0) throw new Error("empty PDF response");
-      return buf;
     } catch (err) {
       lastErr = err;
       if (attempt < FETCH_ATTEMPTS - 1) {
         await sleep(FETCH_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
       }
-    } finally {
-      clearTimeout(timer);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
