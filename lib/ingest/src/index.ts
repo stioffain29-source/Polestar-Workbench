@@ -273,7 +273,6 @@ export {
   sanitiseUrl,
   makeFacebookDedupKey,
   detectKeywords,
-  FACEBOOK_OSINT_HEALTH_NAME,
 } from "./facebookOsint";
 export type {
   FacebookOsintSummary,
