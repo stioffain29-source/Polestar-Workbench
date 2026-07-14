@@ -109,7 +109,15 @@ export default function CargoChoroplethStatic({
   const { width: W, height: H, project } = projection;
 
   return (
-    <div style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}>
+    // paddingBottom reserves whitespace UNDER the legend that is captured as
+    // part of the rasterised image. In the PDF the whole block (title + map +
+    // legend) is one html2canvas image; when the page above it is full the
+    // embed scales the image to fill the remaining space down to the footer
+    // margin, which otherwise jams the legend against the footer (and lets
+    // html2canvas shave the legend's bottom edge). The padding scales with the
+    // image, so the legend keeps clearance from the footer in every case. It is
+    // the shared preview+PDF component, so parity holds.
+    <div style={{ fontFamily: "Roboto, sans-serif", color: DUSK, paddingBottom: 22 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
         <div style={{ fontWeight: 700, color: NAVY, fontSize: 13 }}>
           {title}
@@ -118,11 +126,15 @@ export default function CargoChoroplethStatic({
           {intensity.size} {intensity.size === 1 ? "country" : "countries"} with incidents
         </div>
       </div>
-      {/* Rendered at 88% width (centred) rather than full-bleed so the whole
-          block — title, map, and the legend row below — stays short enough to
-          clear the page footer in the PDF. The block rasterises as one image,
-          so a full-width map pushed the legend into the footer band. Shrinking
-          the SVG here keeps preview==PDF (same shared component). */}
+      {/* Rendered at 88% width (centred) rather than full-bleed to keep the
+          whole block — title, map, legend — a little shorter, so it more often
+          fits the remaining page space naturally instead of being scaled to
+          fill it. NOTE: the shrink alone does NOT guarantee footer clearance —
+          the PDF embed (embedReactChartInPdf) scales the whole rasterised block
+          to fill leftover space down to the footer margin, which overrides the
+          SVG size. The paddingBottom on the root div is what actually keeps the
+          legend clear of the footer under that fill-scaling. Same shared
+          component, so preview==PDF. */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
         width="88%"
