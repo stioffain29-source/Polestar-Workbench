@@ -118,7 +118,16 @@ export default function CargoChoroplethStatic({
           {intensity.size} {intensity.size === 1 ? "country" : "countries"} with incidents
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      {/* Rendered at 88% width (centred) rather than full-bleed so the whole
+          block — title, map, and the legend row below — stays short enough to
+          clear the page footer in the PDF. The block rasterises as one image,
+          so a full-width map pushed the legend into the footer band. Shrinking
+          the SVG here keeps preview==PDF (same shared component). */}
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        width="88%"
+        style={{ display: "block", margin: "0 auto" }}
+      >
         {geo.features.map((f, idx) => {
           const name = featureCountryName(f);
           const count = intensity.get(name)?.count ?? 0;
