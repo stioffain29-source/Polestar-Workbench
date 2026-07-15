@@ -2005,6 +2005,8 @@ export function buildStructuredReportDataset(
       incidentDetailsItems,
       topThree,
       corridorStatuses: statuses,
+      previousWindowItems,
+      hasBaseline: hasPreviousWindow,
     });
     bluf = jakarta.bluf;
     executiveSummary = jakarta.executiveSummary;

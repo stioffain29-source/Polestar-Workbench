@@ -437,17 +437,70 @@ export interface JakartaIncidentTheme {
   paragraph: string;
 }
 
+// Trajectory of a Jakarta theme against the prior-week baseline. Mirrors the
+// shared countryThemeSynthesis logic (severity move dominates; a >=2-item volume
+// swing breaks a severity tie) so Jakarta's assessed themes read the same way as
+// the other five briefs. "new" = present now, absent a week earlier; "nobasis" =
+// no prior window supplied, so no trend is honestly asserted.
+type JakartaThemeTrajectory = "rising" | "easing" | "steady" | "new" | "nobasis";
+
+function jakartaThemeTrajectory(
+  current: PngReportItem[],
+  baseline: PngReportItem[],
+  hasBaseline: boolean,
+): JakartaThemeTrajectory {
+  if (!hasBaseline) return "nobasis";
+  if (baseline.length === 0) return "new";
+  const cw = current.reduce((m, it) => Math.max(m, it.severityRank), 0);
+  const bw = baseline.reduce((m, it) => Math.max(m, it.severityRank), 0);
+  if (cw > bw) return "rising";
+  if (cw < bw) return "easing";
+  if (current.length - baseline.length >= 2) return "rising";
+  if (baseline.length - current.length >= 2) return "easing";
+  return "steady";
+}
+
+// The count-free trajectory clause appended to each theme paragraph. Matches the
+// shared synthesiser's wording so preview == PDF and Jakarta reads in step with
+// the other briefs.
+const JAKARTA_TRAJECTORY_SENTENCE: Record<JakartaThemeTrajectory, string> = {
+  rising: "Against the previous week this theme is rising.",
+  easing: "Against the previous week this theme is easing.",
+  steady: "Against the previous week this theme is broadly steady.",
+  new: "It was not reported a week earlier, so it reads as newly prominent this period.",
+  nobasis: "With no prior-week baseline, no week-on-week trend is asserted.",
+};
+
 // Incident Details theme groups for Jakarta, built from the leftover (non-Top-3)
-// items so a development is never repeated. Present-only; empty input → [].
+// items so a development is never repeated. Present-only; empty input → []. Each
+// present theme now carries an ASSESSED trajectory judgement against the prior
+// week's full window (baselineItems), so Jakarta's per-theme narratives read as
+// assessed themes like the other five briefs while keeping their corridor-
+// specific tactical framing.
 export function buildJakartaIncidentThemes(
   incidentDetailsItems: PngReportItem[],
+  baselineItems: PngReportItem[] = [],
+  hasBaseline = false,
 ): JakartaIncidentTheme[] {
+  const baselineByTheme = new Map<JakartaTheme, PngReportItem[]>();
+  for (const it of baselineItems) {
+    const t = jakartaThemeForCategory(it.category);
+    const arr = baselineByTheme.get(t) ?? [];
+    arr.push(it);
+    baselineByTheme.set(t, arr);
+  }
   const out: JakartaIncidentTheme[] = [];
   for (const p of presentThemes(incidentDetailsItems)) {
     const paragraph = themeParagraph(p);
     // A theme too thin to say anything concrete is dropped, not padded.
     if (!paragraph) continue;
-    out.push({ key: p.theme, heading: JAKARTA_THEME_HEADING[p.theme], paragraph });
+    const trajectory = jakartaThemeTrajectory(
+      p.items,
+      baselineByTheme.get(p.theme) ?? [],
+      hasBaseline,
+    );
+    const full = `${paragraph} ${JAKARTA_TRAJECTORY_SENTENCE[trajectory]}`;
+    out.push({ key: p.theme, heading: JAKARTA_THEME_HEADING[p.theme], paragraph: full });
   }
   return out;
 }
@@ -1141,6 +1194,10 @@ export interface JakartaBriefInput {
   // Per-area corridor statuses for the live-aware tactical sections. Optional so
   // existing callers/tests keep working; absent → standing-only tactical brief.
   corridorStatuses?: JakartaCorridorStatus[];
+  // The prior-week full window, used to assess each incident theme's trajectory.
+  // Optional so existing callers/tests keep working; absent → no trend asserted.
+  previousWindowItems?: PngReportItem[];
+  hasBaseline?: boolean;
 }
 
 export interface JakartaBriefOverrides {
@@ -1168,7 +1225,11 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     recommendedActions: buildJakartaRecommendedActions(),
     operationalImpact: buildJakartaOperationalImpact(),
     escalationIndicators: buildJakartaEscalationIndicators(),
-    incidentThemes: buildJakartaIncidentThemes(input.incidentDetailsItems),
+    incidentThemes: buildJakartaIncidentThemes(
+      input.incidentDetailsItems,
+      input.previousWindowItems ?? [],
+      input.hasBaseline ?? false,
+    ),
     topThree: applyJakartaTopThree(input.topThree),
     tactical: buildJakartaTacticalBrief(
       input.corridorStatuses ?? [],
