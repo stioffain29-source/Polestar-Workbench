@@ -1606,6 +1606,21 @@ export function buildStructuredReportDataset(
     (it) => topThreeMemberIds.has(it.id) && inOther(it),
   );
 
+  // --- Assessed themes (shared lead for the whole brief) --------------------
+  // The Incident Details section and Key Developments lead with two-to-three
+  // ASSESSED themes (selected by assessed value, count-free). Compute them here,
+  // AHEAD of the Executive Summary and BLUF, so those top-of-report paragraphs
+  // open by naming the SAME themes — every brief then reads consistently from
+  // the first line down. Empty window → no themes → no lead sentence (honest
+  // silence, never a fabricated theme).
+  const assessedThemes = synthesiseAssessedThemes(windowItems, previousWindowItems, {
+    hasBaseline: hasPreviousWindow,
+  });
+  const themeLeadFragment = themeLedLead(assessedThemes);
+  const themeLeadSentence = themeLeadFragment
+    ? `${themeLeadFragment.charAt(0).toUpperCase()}${themeLeadFragment.slice(1)}.`
+    : "";
+
   // --- Executive summary (deterministic, event-led, no parenthetical counts) -
   let executiveSummary: string;
   if (windowItems.length === 0) {
@@ -1626,7 +1641,8 @@ export function buildStructuredReportDataset(
         : "";
     const p1 = `The security picture in ${config.countryName} this period was dominated by ${catText}.${provText}${sevText}`;
     const p2 = `The picture is operational rather than a single dramatic event: the priority for business users is movement security, premises protection and continuity at exposed sites while this picture holds.`;
-    executiveSummary = `${p1}\n\n${p2}`;
+    const p1Led = themeLeadSentence ? `${themeLeadSentence} ${p1}` : p1;
+    executiveSummary = `${p1Led}\n\n${p2}`;
   }
 
   // --- Business impact (de-duplicated impact lines for the categories present)-
@@ -1734,7 +1750,8 @@ export function buildStructuredReportDataset(
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    bluf = `The operating picture for ${config.countryName} this period ${trendWord}: the bulk of reporting concerns ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}.`;
+    const blufBody = `The operating picture for ${config.countryName} this period ${trendWord}: the bulk of reporting concerns ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}.`;
+    bluf = themeLeadSentence ? `${themeLeadSentence} ${blufBody}` : blufBody;
   }
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
@@ -1893,6 +1910,10 @@ export function buildStructuredReportDataset(
     };
     bluf = buildOperatingRiskBluf(orInput);
     executiveSummary = buildOperatingRiskExecutiveSummary(orInput);
+    if (!empty && themeLeadSentence) {
+      bluf = `${themeLeadSentence} ${bluf}`;
+      executiveSummary = `${themeLeadSentence} ${executiveSummary}`;
+    }
     if (!empty) {
       const groups = scoredProvinces.map(({ prov, s, score }) => ({
         location: provinceLabel.get(prov) ?? prov,
@@ -2100,13 +2121,11 @@ export function buildStructuredReportDataset(
   // theatre: operatingRiskDisplayCategory maps the granular categories onto the
   // business labels (and passes unmapped labels through unchanged). Each theme
   // keeps the tile/severity cards and closes with a deterministic business line.
-  // Synthesise the two-to-three ASSESSED themes that lead the brief. Each is
-  // selected by assessed value (scoreClusterValue), not raw count, and carries a
-  // concentration phrase, business-exposure sentence and a trajectory judged
-  // against the prior-week baseline. Deterministic, count-free, no LLM.
-  const assessedThemes = synthesiseAssessedThemes(windowItems, previousWindowItems, {
-    hasBaseline: hasPreviousWindow,
-  });
+  // The two-to-three ASSESSED themes are synthesised once, earlier (they also
+  // seed the Executive Summary / BLUF leads). Each is selected by assessed value
+  // (scoreClusterValue), not raw count, and carries a concentration phrase,
+  // business-exposure sentence and a trajectory judged against the prior-week
+  // baseline. Deterministic, count-free, no LLM.
   // Key Developments are the assessed themes themselves — the brief leads with
   // synthesised judgements rather than one group per display category.
   const keyDevelopments: KeyDevelopmentGroup[] = assessedThemes.map((t) => ({
