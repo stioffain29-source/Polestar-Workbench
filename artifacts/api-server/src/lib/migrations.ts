@@ -1381,6 +1381,21 @@ export async function runDataMigrations(): Promise<void> {
     // drizzle push only reaches dev, so add it on boot (idempotent) for prod.
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS analyst_in_scope boolean`);
 
+    // Schema: same-event cluster key (additive, nullable — see @workspace/ingest
+    // conflictEventCluster.ts). A server-side LLM adjudication pass at ingest
+    // stamps conflict incidents that report THE SAME real-world event with a
+    // shared conflict_evt:<min id> key; the monitor + report dedupe by it. NULL
+    // for non-conflict / not-yet-clustered rows (consumers fall back to the
+    // deterministic collapse passes). drizzle push only reaches dev, so add it
+    // on boot (idempotent) for prod. The partial index speeds the display-side
+    // group-by (only stamped rows carry a key).
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS event_cluster_key text`);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS incidents_event_cluster_key_idx
+        ON incidents (event_cluster_key)
+        WHERE event_cluster_key IS NOT NULL
+    `);
+
     // Schema: resolved publisher URL for Google News RSS redirect links
     // (additive — see @workspace/ingest googleNewsUrl.ts). Most flashpoint feeds
     // are Google News aggregators, so source_url is an opaque

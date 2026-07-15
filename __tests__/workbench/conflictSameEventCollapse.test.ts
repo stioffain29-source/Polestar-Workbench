@@ -1,6 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import {
   collapseConflictSameEvent,
+  collapseByEventClusterKey,
   groupConflictSameEvent,
   anchorTokens,
   type ConflictSameEventRow,
@@ -373,3 +374,80 @@ describe("groupConflictSameEvent — complete-linkage clustering", () => {
     expect(groupConflictSameEvent([row(A, "2026-07-12T04:57:00Z")])).toEqual([[0]]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// collapseByEventClusterKey — the authoritative fold on the server-stamped key.
+// ---------------------------------------------------------------------------
+type KeyedRow = {
+  title: string;
+  date: Date;
+  severity: string;
+  eventClusterKey?: string | null;
+};
+function keyed(
+  title: string,
+  isoDate: string,
+  severity: string,
+  eventClusterKey?: string | null,
+): KeyedRow {
+  return { title, date: new Date(isoDate), severity, eventClusterKey };
+}
+
+describe("collapseByEventClusterKey", () => {
+  it("collapses rows sharing a key to one survivor, keyless rows untouched", () => {
+    const rows = [
+      keyed("Washuk blast — early wire", "2026-07-10T06:00:00Z", "moderate", "conflict_evt:100"),
+      keyed("Blast in Washuk kills soldiers", "2026-07-10T09:00:00Z", "high", "conflict_evt:100"),
+      keyed("Unrelated Manipur ambush", "2026-07-10T08:00:00Z", "high", null),
+    ];
+    const out = collapseByEventClusterKey(rows);
+    expect(out).toHaveLength(2);
+    // Survivor is the highest-severity member of the keyed group.
+    expect(out[0]!.title).toBe("Blast in Washuk kills soldiers");
+    // Keyless row is preserved verbatim.
+    expect(out[1]!.title).toBe("Unrelated Manipur ambush");
+  });
+
+  it("breaks a severity tie by newest date", () => {
+    const rows = [
+      keyed("Copy A", "2026-07-10T06:00:00Z", "high", "k1"),
+      keyed("Copy B (newer)", "2026-07-10T20:00:00Z", "high", "k1"),
+    ];
+    const out = collapseByEventClusterKey(rows);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.title).toBe("Copy B (newer)");
+  });
+
+  it("treats empty/whitespace keys as absent and never merges them", () => {
+    const rows = [
+      keyed("No key A", "2026-07-10T06:00:00Z", "high", ""),
+      keyed("No key B", "2026-07-10T07:00:00Z", "high", "  "),
+      keyed("No key C", "2026-07-10T08:00:00Z", "high", null),
+    ];
+    const out = collapseByEventClusterKey(rows);
+    expect(out).toHaveLength(3);
+  });
+
+  it("preserves first-occurrence order of the survivor position", () => {
+    const rows = [
+      keyed("G1 first", "2026-07-10T06:00:00Z", "low", "g1"),
+      keyed("Standalone", "2026-07-10T06:30:00Z", "high", null),
+      keyed("G1 second (higher sev)", "2026-07-10T07:00:00Z", "extreme", "g1"),
+    ];
+    const out = collapseByEventClusterKey(rows);
+    expect(titles2(out)).toEqual(["G1 second (higher sev)", "Standalone"]);
+  });
+
+  it("is a no-op when no row carries a key", () => {
+    const rows = [
+      keyed("A", "2026-07-10T06:00:00Z", "high"),
+      keyed("B", "2026-07-10T07:00:00Z", "low"),
+    ];
+    const out = collapseByEventClusterKey(rows);
+    expect(out).toBe(rows);
+  });
+});
+
+function titles2(rows: KeyedRow[]): string[] {
+  return rows.map((r) => r.title);
+}

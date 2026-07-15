@@ -16,6 +16,8 @@ export interface Incident {
   title: string;
   /** @nullable */
   displayTitle?: string | null;
+  /** @nullable */
+  eventClusterKey?: string | null;
   summary: string;
   country: string;
   /** @nullable */

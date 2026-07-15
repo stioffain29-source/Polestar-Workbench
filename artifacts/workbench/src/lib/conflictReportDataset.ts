@@ -13,7 +13,7 @@ import { splitAttributedCountries, isTopicRelevant } from "./topicRelevance";
 import { selectRelatedIncidents } from "./relatedIncidents";
 import { dedupeMonitorRows } from "./monitorDedupe";
 import { collapseConflictOperations } from "./conflictOperationCollapse";
-import { collapseConflictSameEvent } from "./conflictSameEventCollapse";
+import { collapseConflictSameEvent, collapseByEventClusterKey } from "./conflictSameEventCollapse";
 
 // Single source of truth for the Conflict Watch report's analysed dataset.
 // Mirrors the flashpointReportDataset pattern so the on-screen preview
@@ -43,6 +43,9 @@ export interface ConflictReportIncident {
   sourceUrl?: string | null;
   location?: string | null;
   displayTitle?: string | null;
+  /** Server-stamped same-event cluster key; drives collapseByEventClusterKey so
+   *  monitor and report deflate syndication in lockstep (preview==PDF). */
+  eventClusterKey?: string | null;
 }
 
 export interface ConflictEnrichedIncident extends ConflictReportIncident {
@@ -1257,7 +1260,9 @@ export function buildConflictReportDataset(
     issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
   }));
   const enriched: ConflictEnrichedIncident[] = collapseConflictOperations(
-    collapseConflictSameEvent(dedupeSyndicationByCountry(enrichedRaw)),
+    collapseConflictSameEvent(
+      collapseByEventClusterKey(dedupeSyndicationByCountry(enrichedRaw)),
+    ),
   );
 
   // Group enriched (in-window) incidents by attributed country. Compound
@@ -1304,7 +1309,9 @@ export function buildConflictReportDataset(
       issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
     }));
   const preWindow: ConflictEnrichedIncident[] = collapseConflictOperations(
-    collapseConflictSameEvent(dedupeSyndicationByCountry(preWindowRaw)),
+    collapseConflictSameEvent(
+      collapseByEventClusterKey(dedupeSyndicationByCountry(preWindowRaw)),
+    ),
   );
 
   const byCountryPre = new Map<string, ConflictEnrichedIncident[]>();

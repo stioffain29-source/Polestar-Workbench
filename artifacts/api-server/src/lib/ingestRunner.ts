@@ -8,6 +8,7 @@ import {
   runFuelIngest,
   runDataCentresIngest,
   runConflictIngest,
+  runConflictClustering,
   runIndonesiaLocalIngest,
   runApacLocalIngest,
   runMarketPricesIngest,
@@ -807,6 +808,21 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const conflict = await runIncidentIngest("conflict", () =>
       runConflictIngest({ commit: true }),
     );
+    // Server-side LLM same-event clustering over the conflict window. Stamps
+    // incidents.event_cluster_key so the monitor + report can collapse the same
+    // real event syndicated under different headlines. Idempotent (only fills
+    // NULL keys) and isolated so a failure can never fail the incident ingest.
+    // Kill-switch: CONFLICT_CLUSTER_ENABLED=false (LLM-gated — no-ops when the
+    // AI integration is unset). No incident is ever created, removed or
+    // re-scored by this pass; it only groups existing rows.
+    if (process.env.CONFLICT_CLUSTER_ENABLED !== "false") {
+      try {
+        const cluster = await runConflictClustering({ commit: true });
+        for (const line of cluster.logLines) logger.info({ pass: "conflict-cluster" }, line);
+      } catch (err) {
+        logger.error({ err }, "conflict clustering pass failed (non-fatal)");
+      }
+    }
     // Broad Bahasa-first local coverage for the Indonesia + Jakarta country
     // briefs (unrest, crime, natural hazard, fire, haze, transport, government,
     // labour, terrorism). Runs BEFORE the West Papua extract backfill below so

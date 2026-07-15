@@ -90,6 +90,18 @@ export const incidentsTable = pgTable("incidents", {
   // the source), but never past the hard non-cargo rejects or out of the
   // recognized APAC/Middle East geography. Null/false for scraper rows.
   analystInScope: boolean("analyst_in_scope"),
+  // Same-event cluster key (additive, nullable — see @workspace/ingest
+  // conflictEventCluster.ts). A server-side LLM adjudication pass at ingest
+  // stamps every conflict incident that reports THE SAME real-world event
+  // (synonym/translated/syndicated rewrites, cross-district reports of one
+  // killing, an attack and its manhunt/arrest follow-up, or a running
+  // cumulative tally of one named operation) with a shared
+  // `conflict_evt:<min id>` key. The monitor and report dedupe by this key
+  // (keeping the worst-severity/newest survivor) to collapse duplicates the
+  // deterministic token-overlap passes cannot reach. Null for non-conflict /
+  // not-yet-clustered rows; every consumer falls back to the deterministic
+  // collapse passes when absent. Idempotent: only NULL-key rows are stamped.
+  eventClusterKey: text("event_cluster_key"),
 });
 
 export type Incident = typeof incidentsTable.$inferSelect;

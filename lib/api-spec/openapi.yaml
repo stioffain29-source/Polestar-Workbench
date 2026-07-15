@@ -1862,6 +1862,7 @@ components:
         topic: { $ref: "#/components/schemas/Topic" }
         title: { type: string }
         displayTitle: { type: ["string", "null"] }
+        eventClusterKey: { type: ["string", "null"] }
         summary: { type: string }
         country: { type: string }
         location: { type: ["string", "null"] }

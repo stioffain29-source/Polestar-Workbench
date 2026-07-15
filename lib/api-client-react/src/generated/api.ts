@@ -1325,6 +1325,83 @@ export function useListOfficialMilitaryMaritimeSources<TData = Awaited<ReturnTyp
 
 
 
+export const getGetOfficialMilitaryMaritimeSourceUrl = (id: number,) => {
+
+
+
+
+  return `/api/official-military-maritime-sources/${id}`
+}
+
+/**
+ * @summary Fetch one M1.5 official military or maritime source by id
+ */
+export const getOfficialMilitaryMaritimeSource = async (id: number, options?: RequestInit): Promise<OfficialMilitaryMaritimeSource> => {
+
+  return customFetch<OfficialMilitaryMaritimeSource>(getGetOfficialMilitaryMaritimeSourceUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOfficialMilitaryMaritimeSourceQueryKey = (id: number,) => {
+    return [
+    `/api/official-military-maritime-sources/${id}`
+    ] as const;
+    }
+
+
+export const getGetOfficialMilitaryMaritimeSourceQueryOptions = <TData = Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOfficialMilitaryMaritimeSourceQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>> = ({ signal }) => getOfficialMilitaryMaritimeSource(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOfficialMilitaryMaritimeSourceQueryResult = NonNullable<Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>>
+export type GetOfficialMilitaryMaritimeSourceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Fetch one M1.5 official military or maritime source by id
+ */
+
+export function useGetOfficialMilitaryMaritimeSource<TData = Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOfficialMilitaryMaritimeSource>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOfficialMilitaryMaritimeSourceQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListIncidentsUrl = (params?: ListIncidentsParams,) => {
   const normalizedParams = new URLSearchParams();
 

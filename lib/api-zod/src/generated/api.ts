@@ -46,6 +46,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
+  "eventClusterKey": zod.string().nullish(),
   "summary": zod.string(),
   "country": zod.string(),
   "location": zod.string().nullish(),
@@ -759,6 +760,38 @@ export const ListOfficialMilitaryMaritimeSourcesResponseItem = zod.object({
 export const ListOfficialMilitaryMaritimeSourcesResponse = zod.array(ListOfficialMilitaryMaritimeSourcesResponseItem)
 
 
+/**
+ * @summary Fetch one M1.5 official military or maritime source by id
+ */
+
+
+
+export const GetOfficialMilitaryMaritimeSourceParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const GetOfficialMilitaryMaritimeSourceResponse = zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string(),
+  "externalId": zod.string(),
+  "title": zod.string(),
+  "publishedAt": zod.coerce.date().nullish(),
+  "sourceUrl": zod.string(),
+  "bodyText": zod.string().nullish(),
+  "classification": zod.string(),
+  "flagSignificantIncident": zod.boolean(),
+  "flagEscalationIndicator": zod.boolean(),
+  "flagMaritimeDisruption": zod.boolean(),
+  "flagEvidenceAvailable": zod.boolean(),
+  "flagPossibleSpotReport": zod.boolean(),
+  "primaryWatch": zod.enum(['conflict', 'shipping']).nullish(),
+  "watchTags": zod.array(zod.enum(['conflict', 'shipping'])),
+  "ingestedAt": zod.coerce.date().optional(),
+  "createdAt": zod.coerce.date().optional(),
+  "updatedAt": zod.coerce.date().optional()
+}).describe('An M1.5 official military or maritime source item (CENTCOM, UKMTO, partner product). NOT an incident — stored in its own table with analyst flags and dual-watch routing; never inflates any incident count.')
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 
@@ -777,6 +810,7 @@ export const ListIncidentsResponseItem = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
+  "eventClusterKey": zod.string().nullish(),
   "summary": zod.string(),
   "country": zod.string(),
   "location": zod.string().nullish(),
@@ -843,6 +877,7 @@ export const GetIncidentResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
+  "eventClusterKey": zod.string().nullish(),
   "summary": zod.string(),
   "country": zod.string(),
   "location": zod.string().nullish(),
@@ -905,6 +940,7 @@ export const UpdateIncidentResponse = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
+  "eventClusterKey": zod.string().nullish(),
   "summary": zod.string(),
   "country": zod.string(),
   "location": zod.string().nullish(),
@@ -962,6 +998,7 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
+  "eventClusterKey": zod.string().nullish(),
   "summary": zod.string(),
   "country": zod.string(),
   "location": zod.string().nullish(),

@@ -1186,6 +1186,36 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // ── Censorship / vetting of books, websites or content for separatist /
   // anti-national material (a governance action, not an armed event).
   /\b(pro[- ]?separatis\w*|anti[- ]?(?:national|india)|seditious|objectionable)\b[^.]{0,60}\b(book|books|website|websites|web page|content|curricul\w*|syllab\w*|material)\b[^.]{0,60}\b(examin\w*|scrutin\w*|vet\w*|review|audit|probe|inspect\w*|calls? for|order\w*)\b/i,
+  // ── ASSESSMENT / ACCUSATION of militant CAPABILITY, not a discrete attack.
+  // A state accusing another of BACKING/harbouring militants, an official
+  // WARNING that a group COULD regroup or exploit safe havens, or an
+  // intelligence read on RECRUITMENT/training are diplomatic/analytical items,
+  // not armed-violence incidents — yet they name an actor word and slip past the
+  // conflict REQUIRED gate. Each runs BEFORE the violence override, so a genuine
+  // kinetic event ("militants attack convoy", "Pakistan strikes militant camps")
+  // is still re-admitted; these only bind the accusation/warning/assessment
+  // frame to a NON-kinetic capability noun.
+  // State accuses/alleges/blames another of BACKING militants ("Pakistan Accuses
+  // India of Backing Militant Groups Operating From Afghanistan").
+  /\b(accus\w*|alleg\w*|blam\w*)\b[^.]{0,60}\b(back(?:s|ing|ed)?|support(?:s|ing|ed)?|fund(?:s|ing|ed)?|financ\w*|harbou?r\w*|shelter\w*|abet\w*|sponsor\w*)\b[^.]{0,40}\b(militant|insurgent|terror\w*|rebel|separatis\w*|prox(?:y|ies))\b/i,
+  // Warning that a group COULD/would/might regroup or exploit safe havens
+  // ("Durrani Warns Taliban Could Recreate … Conditions Through Militant Safe
+  // Havens"). Gated on a modal + a capability noun so a warning of an imminent
+  // ATTACK (kinetic) is untouched.
+  /\bwarn\w*\b[^.]{0,90}\b(could|would|may|might|risk\w*|threat\w*|potential\w*)\b[^.]{0,70}\b(safe[- ]?haven\w*|sanctuar\w*|resurgen\w*|comeback|regroup\w*|recruit\w*|foothold|breeding ground|militant (?:presence|network|infrastructure|safe))\b/i,
+  // Intelligence / analytical read on RECRUITMENT or indoctrination via covert
+  // training ("Militant Groups Recruiting Women Through Covert Training, Indian
+  // Intelligence Says"). A capability assessment, not an attack.
+  /\b(recruit\w*|indoctrinat\w*|radicali[sz]\w*)\b[^.]{0,45}\b(?:through|via|using|by|at)\b[^.]{0,45}\b(covert|online|social media|madrass\w*|training|camp\w*|network\w*)\b/i,
+  // Public-service RESTORATION in a formerly insurgency-hit area ("37 Schools
+  // Reopen … Remained Shut For Over A Decade Due To Naxal Influence"). A
+  // development/governance milestone, not an armed event; the insurgency word is
+  // only historical background.
+  /\b(school\w*|college\w*|road\w*|highway\w*|bridge\w*|hospital\w*|clinic\w*|electricity|power supply|mobile tower\w*|telecom|bank branch\w*|market\w*|panchayat|polling (?:booth|station)\w*)\b[^.]{0,50}\b(reopen\w*|re-?open\w*|restor\w*|resum\w*|return\w* to|built|construct\w*|inaugurat\w*|set up|revive[sd]?)\b[^.]{0,110}\b(naxal\w*|maoist|insurgen\w*|militan\w*)\b/i,
+  // Peaceful DISENGAGEMENT / surrender / demobilisation from an armed group
+  // ("37 disengage from rebel-linked groups in Ilocos"). A reintegration
+  // milestone, the OPPOSITE of a kinetic event; bound to the exit verb + actor.
+  /\b(disengage\w*|demobili[sz]\w*|renounc\w* (?:violence|militancy|arms)|gave up (?:arms|militancy)|return\w* to (?:the )?(?:mainstream|fold)|laid? down (?:their )?arms)\b[^.]{0,50}\b(rebel|insurgent|militant|maoist|naxal\w*|\bnpa\b|separatis\w*|armed group)\w*\b/i,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are

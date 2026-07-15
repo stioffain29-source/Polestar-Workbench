@@ -25,7 +25,7 @@ import { isTopicRelevant } from "./topicRelevance";
 import { dedupeByTitle } from "./flashpointReportDataset";
 import { dedupeMonitorRows } from "./monitorDedupe";
 import { collapseConflictOperations } from "./conflictOperationCollapse";
-import { collapseConflictSameEvent } from "./conflictSameEventCollapse";
+import { collapseConflictSameEvent, collapseByEventClusterKey } from "./conflictSameEventCollapse";
 import {
   classifyRegion as classifyShippingRegion,
   isLowCredibilityShippingRecord,
@@ -164,7 +164,9 @@ function resolveGenericTrue<T extends TrueIncidentLike>(
   // Other topics do not exhibit these patterns, so both are scoped to conflict.
   const collapsed =
     topic === "conflict"
-      ? collapseConflictOperations(collapseConflictSameEvent(deduped))
+      ? collapseConflictOperations(
+          collapseConflictSameEvent(collapseByEventClusterKey(deduped)),
+        )
       : deduped;
   return collapsed as unknown as T[];
 }

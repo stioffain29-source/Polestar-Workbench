@@ -437,3 +437,62 @@ export function collapseConflictSameEvent<T extends ConflictSameEventRow>(
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Authoritative same-event collapse by the server-stamped event_cluster_key.
+// ---------------------------------------------------------------------------
+// The conflict ingest runs a server-side LLM same-event pass that stamps
+// incidents.event_cluster_key on rows judged to be the SAME real event
+// syndicated under different headlines (see lib/ingest conflictEventCluster).
+// This runs FIRST in the conflict fold — ahead of the fuzzy title passes — so
+// the authoritative grouping wins and the downstream heuristics only clean up
+// what the LLM could not key. Rows with no key (the common case) pass through
+// untouched and unchanged; only rows sharing a non-empty key collapse to one.
+//
+// Survivor per key: highest severity tier, then newest date — mirroring the
+// generic monitor dedupe. The survivor takes the position of the group's FIRST
+// member so first-occurrence order is preserved.
+export function collapseByEventClusterKey<
+  T extends { eventClusterKey?: string | null; date: Date; severity: string },
+>(rows: T[]): T[] {
+  const groups = new Map<string, number[]>();
+  rows.forEach((r, idx) => {
+    const key = r.eventClusterKey?.trim();
+    if (!key) return;
+    const g = groups.get(key);
+    if (g) g.push(idx);
+    else groups.set(key, [idx]);
+  });
+  if (groups.size === 0) return rows;
+
+  const survivor = new Map<string, number>();
+  for (const [key, idxs] of groups) {
+    let best = idxs[0]!;
+    for (const i of idxs) {
+      const a = rows[i]!;
+      const b = rows[best]!;
+      const sa = SEV_RANK[(a.severity ?? "").toLowerCase()] ?? 0;
+      const sb = SEV_RANK[(b.severity ?? "").toLowerCase()] ?? 0;
+      const ta = a.date instanceof Date ? a.date.getTime() : NaN;
+      const tb = b.date instanceof Date ? b.date.getTime() : NaN;
+      if (sa > sb || (sa === sb && (Number.isNaN(tb) || (!Number.isNaN(ta) && ta > tb)))) {
+        best = i;
+      }
+    }
+    survivor.set(key, best);
+  }
+
+  const out: T[] = [];
+  const emitted = new Set<string>();
+  rows.forEach((r, idx) => {
+    const key = r.eventClusterKey?.trim();
+    if (!key) {
+      out.push(r);
+      return;
+    }
+    if (emitted.has(key)) return;
+    emitted.add(key);
+    out.push(rows[survivor.get(key)!]!);
+  });
+  return out;
+}

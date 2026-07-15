@@ -105,6 +105,20 @@ export { runStrikesBackfill } from "./backfillStrikes";
 export type { StrikesBackfillSummary } from "./backfillStrikes";
 export { runTitleTranslation, needsTitleTranslation } from "./titleTranslate";
 export type { TitleTranslationSummary } from "./titleTranslate";
+export {
+  runConflictClustering,
+  clusterRows,
+  candidatePairs,
+  significantTokens,
+  judgeSamePair,
+} from "./conflictEventCluster";
+export type {
+  ClusterRow,
+  SameEventJudge,
+  ClusterOptions,
+  ClusterResult,
+  ConflictClusterSummary,
+} from "./conflictEventCluster";
 export { translateCaptionToEnglish } from "./captionTranslate";
 export {
   isLlmAvailable,
