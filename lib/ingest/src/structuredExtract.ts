@@ -208,6 +208,29 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
 export const OTHER_SECURITY_IMPACT =
   "Security-relevant development; monitor for operational follow-on in the affected area.";
 
+// Accident / natural-hazard reclassification guard (bilingual). The homicide
+// rule above owns the bare casualty tokens ("killed", "kills", "found dead",
+// "fatality"), so a flood, a snakebite or a bus crash that happens to state a
+// death count is otherwise mis-filed as violent crime. This guard runs AFTER the
+// rulebook and, when an item was classified as Homicide / violent crime PURELY
+// on a casualty word, reroutes it to Natural hazard IF the text names an
+// accidental or natural-hazard cause AND carries no explicit-violence token.
+// Deliberate killings (shootings, stabbings, bombings, ambushes, assaults) keep
+// their violent classification because DELIBERATE_VIOLENCE_RE vetoes the reroute.
+const ACCIDENT_HAZARD_RE =
+  /\b(snake ?bite|bitten by (?:a )?snake|crocodile attack|shark attack|elephant attack|mauled|drown(?:ed|ing|s)?|swept away|struck by lightning|lightning (?:strike|kill\w*)|electrocut(?:ed|ion)|road accident|traffic accident|road crash|car crash|bus crash|truck crash|motorcycle crash|motorbike crash|vehicle (?:crash|collision|overturn\w*)|head[- ]on collision|pile[- ]?up|overturned (?:bus|truck|vehicle|lorry|minibus)|plunged into (?:a )?(?:ravine|river|gorge)|flood(?:s|ing|ed|waters)?|flash flood|landslide|mudslide|earthquake|quake|tremor|tsunami|volcan(?:o|ic|oes)|erupt(?:ion|ed|s|ing)?|lahar|cyclone|typhoon|tornado|kecelakaan (?:lalu lintas|maut|beruntun|kerja|tunggal|bus)|tabrakan(?: beruntun)?|tenggelam|hanyut|tersambar petir|banjir(?: bandang)?|tanah longsor|longsor|gempa(?: bumi)?)\b/i;
+// Narrow accident-only cues (a crash / collision / capsize — NOT a road closure
+// or a bare landslide). Used to reroute a Road/highway classification to Natural
+// hazard for genuine ACCIDENTS while leaving road closures/landslips as
+// transport disruption.
+const ACCIDENT_ONLY_RE =
+  /\b(road accident|traffic accident|road crash|car crash|bus crash|truck crash|motorcycle crash|motorbike crash|vehicle (?:crash|collision|overturn\w*)|head[- ]on collision|pile[- ]?up|overturned (?:bus|truck|vehicle|lorry|minibus)|plunged into (?:a )?(?:ravine|river|gorge)|kecelakaan (?:lalu lintas|maut|beruntun|kerja|tunggal|bus)|tabrakan(?: beruntun)?)\b/i;
+const DELIBERATE_VIOLENCE_RE =
+  /\b(murder\w*|homicide|manslaughter|massacre|shot(?: dead)?|stabb\w*|gunned down|beaten to death|shooting|opened fire|ambush\w*|rape\w*|assault\w*|assassinat\w*|bomb\w*|dibunuh|penembakan|ditembak|penikaman|ditikam|pengeroyokan)\b/i;
+
+const NATURAL_HAZARD_IMPACT =
+  "Disruption to access, infrastructure and operations from the hazard or accident; check site safety, continuity and staff welfare.";
+
 // ---------------------------------------------------------------------------
 // City / suburb / locality -> province gazetteer
 // ---------------------------------------------------------------------------
@@ -304,6 +327,21 @@ export function extractStructuredItem(
       businessImpact = rule.impact;
       break;
     }
+  }
+  // Accident / hazard reroute: a flood, snakebite or vehicle accident that only
+  // states a death count is classified as Homicide / violent crime by the bare
+  // casualty tokens above. Reroute it to Natural hazard when an accidental or
+  // natural-hazard cause is named and no explicit-violence token is present.
+  const rerouteBroad =
+    (category === "Homicide / violent crime" || category === "Other security") &&
+    ACCIDENT_HAZARD_RE.test(text);
+  // A Road/highway ACCIDENT (crash/collision/capsize) is a safety hazard, not a
+  // transport-closure disruption; a bare road closure or landslip stays transport.
+  const rerouteRoadAccident =
+    category === "Road / highway" && ACCIDENT_ONLY_RE.test(text);
+  if ((rerouteBroad || rerouteRoadAccident) && !DELIBERATE_VIOLENCE_RE.test(text)) {
+    category = "Natural hazard";
+    businessImpact = NATURAL_HAZARD_IMPACT;
   }
   return { province, category, businessImpact };
 }

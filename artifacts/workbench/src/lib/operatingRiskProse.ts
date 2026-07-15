@@ -162,7 +162,7 @@ function capitaliseFirst(s: string): string {
 export interface OperatingRiskProseInput {
   countryName: string;
   empty: boolean;
-  trajectory: "worsening" | "easing" | "stable" | "quiet";
+  trajectory: "worsening" | "easing" | "stable" | "quiet" | "nobasis";
   // Lead display-mapped categories (ranked, most prominent first).
   leadDisplayCats: string[];
   // Lead locations as friendly bucket / district labels (ranked, deduplicated).
@@ -212,7 +212,9 @@ export function buildOperatingRiskBluf(i: OperatingRiskProseInput): string {
         : "deteriorated slightly this week"
       : i.trajectory === "easing"
         ? "eased a little this week, though from a high baseline"
-        : "was broadly stable this week";
+        : i.trajectory === "nobasis"
+          ? "cannot be compared with a prior period this week, so no week-on-week trend is asserted"
+          : "was broadly stable this week";
   const cats = i.leadDisplayCats.map(operatingRiskCategoryPhrase);
   const driver = cats.length
     ? `${i.worstRank >= 4 ? "with higher-severity reporting across" : "with reporting concentrated around"} ${joinList(cats)}`
@@ -248,6 +250,9 @@ export function buildOperatingRiskExecutiveSummary(i: OperatingRiskProseInput): 
       : i.leadDisplayCats.length <= 1 && i.leadLocations.length <= 1
         ? "narrow"
         : "mixed";
+  if (i.trajectory === "nobasis") {
+    return `${themes}${geo}. ${impact}. The reporting picture this week reads as ${breadthWord}; with no comparable prior-period reporting, no week-on-week trend is asserted.`;
+  }
   const trajWord =
     i.trajectory === "worsening"
       ? "deteriorating"
@@ -270,7 +275,9 @@ export function buildOperatingRiskPolestarView(i: OperatingRiskPolestarInput): s
       ? `Polestar assesses that operating risk in ${i.countryName} stepped up this week`
       : i.trajectory === "easing"
         ? `Polestar assesses that operating risk in ${i.countryName} eased modestly this week, though from an elevated baseline`
-        : `Polestar assesses that operating risk in ${i.countryName} held to its established pattern this week`;
+        : i.trajectory === "nobasis"
+          ? `Polestar assesses operating risk in ${i.countryName} this week against standing context only, with no comparable prior-period reporting to establish a trend`
+          : `Polestar assesses that operating risk in ${i.countryName} held to its established pattern this week`;
   const driver = cats.length ? `, driven by ${joinList(cats)}` : "";
   const relevance =
     i.worstRank >= 4

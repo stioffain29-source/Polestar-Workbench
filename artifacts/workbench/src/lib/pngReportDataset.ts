@@ -907,14 +907,16 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
     i.category && i.businessImpact
       ? i.businessImpact
       : ext?.businessImpact ?? DEFAULT_BUSINESS_IMPACT;
-  // PNG display-layer severity correction (no-fabrication, demote-only). The
-  // stored severity mis-rates assistance / prevention PR as High; cap those at
-  // Low here so it flows consistently into severityLabel, severityRank, every
-  // sort, both prose severity flags and clustering. Inert unless the config flag
-  // is set (PNG only), so other theatres are byte-identical.
+  // Display-layer severity correction (no-fabrication, demote-only), promoted
+  // from PNG-only to EVERY theatre (opt-out): the stored severity mis-rates
+  // assistance / prevention PR as High; cap those at Low here so it flows
+  // consistently into severityLabel, severityRank, every sort, both prose
+  // severity flags and clustering. STRICT: only ever demotes non-kinetic
+  // assistance/PR (veto-guarded), never up-rates. A theatre can opt out with
+  // demoteNonKineticWire: false.
   const rawSev = (i.severity ?? "").toLowerCase();
   const sev =
-    config.demoteNonKineticWire === true &&
+    config.demoteNonKineticWire !== false &&
     isNonKineticAssistanceItem(i.title, i.summary)
       ? correctSeverity(rawSev)
       : rawSev;
@@ -1433,7 +1435,12 @@ export function buildStructuredReportDataset(
   // Never lets the filter empty a non-empty window, which would falsely trip the
   // "no fresh reporting" branch below.
   const applyWireFilter = (items: PngReportItem[]): PngReportItem[] => {
-    if (config.filterDevelopmentWire !== true) return items;
+    // Promoted from PNG-only to EVERY theatre (opt-out): the filter is
+    // conservative (drops only low-value promotional/development wire copy and
+    // vetoes any crime, fire or hazard item), so all six briefs lead with
+    // genuine security reporting. A theatre can still opt out by setting
+    // filterDevelopmentWire: false explicitly.
+    if (config.filterDevelopmentWire === false) return items;
     const kept = items.filter((it) => !isDevelopmentWireItem(it));
     return kept.length > 0 ? kept : items;
   };
@@ -1678,14 +1685,15 @@ export function buildStructuredReportDataset(
     : [];
 
   // --- Trajectory (shared by BLUF + Polestar View) ---------------------------
-  // Without a previous window there is no honest basis for a trend, so fall back
-  // to "stable" (reads as "holds to the standing pattern") rather than inferring
-  // a move from an absent baseline.
-  const trajectory: "worsening" | "easing" | "stable" | "quiet" =
+  // Without a previous window there is NO honest basis for a trend, so report
+  // "nobasis" and state that explicitly rather than inferring a move (up or
+  // down) from an absent baseline. Improving/deteriorating language is only ever
+  // asserted when a real prior-period comparison exists.
+  const trajectory: "worsening" | "easing" | "stable" | "quiet" | "nobasis" =
     windowItems.length === 0
       ? "quiet"
       : !hasPreviousWindow
-        ? "stable"
+        ? "nobasis"
         : curWorstRank > prevWorstRank && curWorstRank >= 4
           ? "worsening"
           : volumeTrend === "up" && curWorstRank >= prevWorstRank
@@ -1707,7 +1715,9 @@ export function buildStructuredReportDataset(
         ? "looks to be deteriorating"
         : trajectory === "easing"
           ? "looks to be easing, though from a high baseline"
-          : "holds to the standing pattern";
+          : trajectory === "nobasis"
+            ? "cannot be compared with a prior period, so no trend is asserted"
+            : "holds to the standing pattern";
     const bizRisk =
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
@@ -2083,16 +2093,25 @@ export function buildStructuredReportDataset(
     arr.push(it);
     kdGroupMap.set(label, arr);
   }
+  // Rank themes by ASSESSED VALUE (scoreClusterValue: the operational signals a
+  // client acts on — casualties, evacuation, transport/road impact, regulatory
+  // shutdown, commercial proximity — severity-inclusive with a corroboration
+  // bump), NOT by raw incident count. This is the aggregate-then-label → assess
+  // shift: a single consequential development outranks a pile of low-value items.
   const kdScored = Array.from(kdGroupMap.entries()).map(([label, items]) => {
     const worst = items.reduce((m, it) => Math.max(m, it.severityRank), 0);
     return {
       label,
       items: [...items].sort(sortBySeverityThenRecency),
       worst,
-      score: items.length + (worst >= 4 ? 4 : worst >= 3 ? 1 : 0),
+      score: scoreClusterValue(items),
     };
   });
-  kdScored.sort((a, b) => b.score - a.score);
+  // Assessed value first; severity then count only break ties, so a genuinely
+  // consequential theme never sits below a high-volume, low-value one.
+  kdScored.sort(
+    (a, b) => b.score - a.score || b.worst - a.worst || b.items.length - a.items.length,
+  );
   const keyDevelopments: KeyDevelopmentGroup[] = kdScored.slice(0, 5).map((g) => ({
     key: g.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "other",
     heading: g.label,

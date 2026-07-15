@@ -211,7 +211,7 @@ function argsFor(windowIncidents: PngSourceIncident[]): BuildArgs {
   };
 }
 
-describe("filterDevelopmentWire wiring — PNG drops, West Papua unaffected", () => {
+describe("filterDevelopmentWire wiring — promoted to every theatre", () => {
   const devWire = inc({ title: "Road upgrade brings hope to isolated Lumusa communities", severity: "low" });
   const crime = inc({ title: "Man robbed at knifepoint in Port Moresby settlement", severity: "low" });
   const hazard = inc({
@@ -230,9 +230,12 @@ describe("filterDevelopmentWire wiring — PNG drops, West Papua unaffected", ()
     expect(titles.some((t) => /brings hope/i.test(t))).toBe(false);
   });
 
-  it("West Papua retains the identical development wire item (filter inert)", () => {
+  it("West Papua now ALSO drops the development wire item (filter promoted to all theatres)", () => {
     const wp = buildWestPapuaReportDataset(argsFor(window));
-    expect(wp.windowItems.some((i) => /brings hope/i.test(i.title))).toBe(true);
+    const titles = wp.windowItems.map((i) => i.title);
+    expect(titles.some((t) => /robbed at knifepoint/i.test(t))).toBe(true);
+    expect(titles.some((t) => /earthquake/i.test(t))).toBe(true);
+    expect(titles.some((t) => /brings hope/i.test(t))).toBe(false);
   });
 
   it("PNG never empties a window that is all development wire (falls back to unfiltered)", () => {
