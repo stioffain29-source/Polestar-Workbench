@@ -58,6 +58,8 @@ const COUNTRY_VIEW: Record<string, { center: L.LatLngTuple; zoom: number }> = {
   papua: { center: [-4.0, 138.0], zoom: 5 },
   "west papua": { center: [-2.5, 138.0], zoom: 5 },
   indonesia: { center: [-2.5, 118.0], zoom: 4 },
+  thailand: { center: [13.2, 101.0], zoom: 5 },
+  philippines: { center: [12.5, 122.0], zoom: 5 },
 };
 
 function resolveCountryView(name?: string): { center: L.LatLngTuple; zoom: number } | null {

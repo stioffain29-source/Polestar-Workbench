@@ -36,6 +36,8 @@ import {
   buildPngReportDataset,
   buildWestPapuaReportDataset,
   buildIndonesiaReportDataset,
+  buildThailandReportDataset,
+  buildPhilippinesReportDataset,
   buildJakartaReportDataset,
   type PngSourceIncident,
 } from "@/lib/pngReportDataset";
@@ -413,12 +415,14 @@ export default function CountryReport() {
   // dataset; everything below keys off `isStructured` so the West Papua brief
   // reaches parity. Any other country keeps the generic brief.
   const structuredTheatre = useMemo<
-    "png" | "westPapua" | "indonesia" | "jakarta" | null
+    "png" | "westPapua" | "indonesia" | "thailand" | "philippines" | "jakarta" | null
   >(() => {
     const tokens = acceptedCountryTokens(country?.name ?? "");
     if (tokens.includes("papua new guinea")) return "png";
     if (tokens.includes("papua")) return "westPapua";
     if (tokens.includes("indonesia")) return "indonesia";
+    if (tokens.includes("thailand")) return "thailand";
+    if (tokens.includes("philippines")) return "philippines";
     if (tokens.includes("jakarta")) return "jakarta";
     return null;
   }, [country]);
@@ -532,6 +536,10 @@ export default function CountryReport() {
         return buildWestPapuaReportDataset(args);
       case "indonesia":
         return buildIndonesiaReportDataset(args);
+      case "thailand":
+        return buildThailandReportDataset(args);
+      case "philippines":
+        return buildPhilippinesReportDataset(args);
       case "jakarta":
         return buildJakartaReportDataset(args);
       case "png":

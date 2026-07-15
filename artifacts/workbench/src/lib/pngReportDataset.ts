@@ -26,6 +26,8 @@
 import { derivePngProvince, extractPngItem } from "@workspace/ingest/pngExtract";
 import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest/westPapuaExtract";
 import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
+import { deriveThailandProvince, extractThailandItem } from "@workspace/ingest/thailandExtract";
+import { derivePhilippinesProvince, extractPhilippinesItem } from "@workspace/ingest/philippinesExtract";
 import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
 import {
   clusterSameStoryRows,
@@ -418,6 +420,204 @@ export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
   },
   deriveProvince: deriveIndonesiaProvince,
   extractItem: extractIndonesiaItem,
+  proseVariant: "operating-risk",
+  topIncidentsHeading: "Priority Incidents This Week",
+  showUpcomingSignals: true,
+};
+
+export const THAILAND_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "Thailand",
+  buckets: [
+    {
+      key: "bangkokMetro",
+      label: "Bangkok Metropolitan Region",
+      provinces: [
+        "Bangkok",
+        "Nonthaburi",
+        "Pathum Thani",
+        "Samut Prakan",
+        "Nakhon Pathom",
+        "Samut Sakhon",
+      ],
+    },
+    {
+      key: "central",
+      label: "Central Thailand",
+      provinces: [
+        "Phra Nakhon Si Ayutthaya",
+        "Ang Thong",
+        "Lopburi",
+        "Sing Buri",
+        "Chai Nat",
+        "Saraburi",
+        "Nakhon Nayok",
+        "Suphan Buri",
+        "Samut Songkhram",
+        "Kanchanaburi",
+        "Ratchaburi",
+        "Phetchaburi",
+        "Prachuap Khiri Khan",
+      ],
+    },
+    {
+      key: "northern",
+      label: "Northern Thailand",
+      provinces: [
+        "Chiang Mai",
+        "Chiang Rai",
+        "Lamphun",
+        "Lampang",
+        "Uttaradit",
+        "Phrae",
+        "Nan",
+        "Phayao",
+        "Mae Hong Son",
+        "Tak",
+        "Sukhothai",
+        "Phitsanulok",
+        "Phichit",
+        "Kamphaeng Phet",
+        "Phetchabun",
+        "Nakhon Sawan",
+        "Uthai Thani",
+      ],
+    },
+    {
+      key: "northeastern",
+      label: "Northeastern Thailand (Isan)",
+      provinces: [
+        "Nakhon Ratchasima",
+        "Buriram",
+        "Surin",
+        "Sisaket",
+        "Ubon Ratchathani",
+        "Yasothon",
+        "Chaiyaphum",
+        "Amnat Charoen",
+        "Nong Bua Lamphu",
+        "Khon Kaen",
+        "Udon Thani",
+        "Loei",
+        "Nong Khai",
+        "Maha Sarakham",
+        "Roi Et",
+        "Kalasin",
+        "Sakon Nakhon",
+        "Nakhon Phanom",
+        "Mukdahan",
+        "Bueng Kan",
+      ],
+    },
+    {
+      key: "eastern",
+      label: "Eastern Thailand",
+      provinces: [
+        "Chonburi",
+        "Rayong",
+        "Chanthaburi",
+        "Trat",
+        "Chachoengsao",
+        "Prachinburi",
+        "Sa Kaeo",
+      ],
+    },
+    {
+      key: "southern",
+      label: "Southern Thailand",
+      provinces: [
+        "Nakhon Si Thammarat",
+        "Krabi",
+        "Phang Nga",
+        "Phuket",
+        "Surat Thani",
+        "Ranong",
+        "Chumphon",
+        "Songkhla",
+        "Satun",
+        "Trang",
+        "Phatthalung",
+        "Pattani",
+        "Yala",
+        "Narathiwat",
+      ],
+    },
+  ],
+  otherBucketLabel: "Other National Security-Relevant Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — urban and tourist-area crime in the major cities, periodic political demonstrations in Bangkok, the long-running separatist insurgency in the Deep South (Pattani, Yala, Narathiwat), and recurrent natural-hazard disruption (flooding, seasonal storms) — continue to apply.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic and organised urban crime, episodic political protest in the capital, militant violence in the southern border provinces, and natural-hazard disruption to transport and operations. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause:
+    "political mobilisation in Bangkok, southern-border security operations, and seasonal flooding and storm episodes",
+  audienceProfile: {
+    audience:
+      "multi-site operators, logistics teams, manufacturing and industrial-estate sites, tourism operators, field travel, warehousing and staff movement between provinces",
+  },
+  deriveProvince: deriveThailandProvince,
+  extractItem: extractThailandItem,
+  proseVariant: "operating-risk",
+  topIncidentsHeading: "Priority Incidents This Week",
+  showUpcomingSignals: true,
+};
+
+export const PHILIPPINES_REPORT_CONFIG: StructuredTheatreConfig = {
+  countryName: "Philippines",
+  buckets: [
+    {
+      key: "metroManila",
+      label: "Metro Manila (NCR)",
+      provinces: ["Metro Manila"],
+    },
+    {
+      key: "luzon",
+      label: "Luzon (outside Metro Manila)",
+      provinces: [
+        "Cordillera Administrative Region",
+        "Ilocos Region",
+        "Cagayan Valley",
+        "Central Luzon",
+        "Calabarzon",
+        "Mimaropa",
+        "Bicol Region",
+      ],
+    },
+    {
+      key: "visayas",
+      label: "Visayas",
+      provinces: [
+        "Western Visayas",
+        "Central Visayas",
+        "Eastern Visayas",
+      ],
+    },
+    {
+      key: "mindanao",
+      label: "Mindanao",
+      provinces: [
+        "Zamboanga Peninsula",
+        "Northern Mindanao",
+        "Davao Region",
+        "Soccsksargen",
+        "Caraga",
+        "Bangsamoro",
+      ],
+    },
+  ],
+  otherBucketLabel: "Other National Security-Relevant Activity",
+  emptyLocationFallback: PNG_EMPTY_LOCATION_FALLBACK,
+  businessImpactEmptyNote:
+    "No fresh incident-driven business impact was identified this period. Standing exposures — urban crime in Metro Manila and the major cities, periodic political demonstrations, communist (NPA) and Islamist militant activity concentrated in parts of Mindanao and the Bangsamoro region, and recurrent natural-hazard disruption (typhoons, flooding, seismic and volcanic activity) — continue to apply.",
+  emptyOutlook:
+    "With no fresh reporting this period, expect the standing risk pattern to persist: opportunistic and organised urban crime, episodic political protest, localised insurgent and militant violence in Mindanao, and natural-hazard disruption to transport and operations. Maintain current movement and continuity precautions and re-test them as fresh reporting comes through.",
+  outlookVolatilityClause:
+    "political mobilisation, security operations in Mindanao and the Bangsamoro region, and the typhoon and seismic-hazard calendar",
+  audienceProfile: {
+    audience:
+      "multi-site operators, logistics teams, BPO and office sites, manufacturing and export-zone sites, field travel, warehousing and staff movement between islands",
+  },
+  deriveProvince: derivePhilippinesProvince,
+  extractItem: extractPhilippinesItem,
   proseVariant: "operating-risk",
   topIncidentsHeading: "Priority Incidents This Week",
   showUpcomingSignals: true,
@@ -1995,6 +2195,14 @@ export function buildWestPapuaReportDataset(args: BuildArgs): PngReportDataset {
 
 export function buildIndonesiaReportDataset(args: BuildArgs): PngReportDataset {
   return buildStructuredReportDataset(args, INDONESIA_REPORT_CONFIG);
+}
+
+export function buildThailandReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, THAILAND_REPORT_CONFIG);
+}
+
+export function buildPhilippinesReportDataset(args: BuildArgs): PngReportDataset {
+  return buildStructuredReportDataset(args, PHILIPPINES_REPORT_CONFIG);
 }
 
 export function buildJakartaReportDataset(args: BuildArgs): PngReportDataset {

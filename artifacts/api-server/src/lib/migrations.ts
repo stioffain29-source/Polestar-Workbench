@@ -3414,6 +3414,8 @@ export async function runDataMigrations(): Promise<void> {
       region: string;
     }> = [
       { slug: "indonesia", name: "Indonesia", region: "APAC" },
+      { slug: "thailand", name: "Thailand", region: "APAC" },
+      { slug: "philippines", name: "Philippines", region: "APAC" },
       { slug: "jakarta", name: "Jakarta", region: "APAC" },
     ];
     for (const seed of STRUCTURED_COUNTRY_REPORTS) {

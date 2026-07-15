@@ -9,6 +9,8 @@
     "./pngExtract": "./src/pngExtract.ts",
     "./westPapuaExtract": "./src/westPapuaExtract.ts",
     "./indonesiaExtract": "./src/indonesiaExtract.ts",
+    "./thailandExtract": "./src/thailandExtract.ts",
+    "./philippinesExtract": "./src/philippinesExtract.ts",
     "./jakartaExtract": "./src/jakartaExtract.ts",
     "./kammiGeography": "./src/kammiGeography.ts",
     "./optionalIntegrations": "./src/optionalIntegrations.ts"

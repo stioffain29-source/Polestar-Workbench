@@ -69,6 +69,8 @@ import {
   buildPngReportDataset,
   buildWestPapuaReportDataset,
   buildIndonesiaReportDataset,
+  buildThailandReportDataset,
+  buildPhilippinesReportDataset,
   type PngReportDataset,
   type PngReportItem,
   type PngSourceIncident,
@@ -1473,7 +1475,11 @@ export async function exportCountryReportPdf(
       ? buildWestPapuaReportDataset
       : structuredTokens.includes("indonesia")
         ? buildIndonesiaReportDataset
-        : null;
+        : structuredTokens.includes("thailand")
+          ? buildThailandReportDataset
+          : structuredTokens.includes("philippines")
+            ? buildPhilippinesReportDataset
+            : null;
   if (structuredBuilder) {
     const structuredDataset = structuredBuilder({
       windowIncidents: active.incidents as unknown as PngSourceIncident[],
