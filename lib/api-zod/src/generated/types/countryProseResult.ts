@@ -12,6 +12,7 @@ export interface CountryProseResult {
   fingerprint: string;
   sections: CountryProseSections;
   edited?: CountryProseSections | null;
+  stale?: boolean;
   model: string;
   generatedAt: Date;
 }

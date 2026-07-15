@@ -2294,6 +2294,19 @@ export default function ReportEditor() {
           </div>
         )}
 
+        {proseEnabled && proseRes?.stale && (
+          <div
+            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            style={{ borderColor: "#A33232", background: "#fff", color: "#A33232" }}
+          >
+            <span style={{ fontWeight: 700 }}>Saved edit may be out of date.</span>{" "}
+            Your saved narrative edit is being kept, but the underlying data has
+            changed since it was written and it may no longer match the current
+            incidents. Review and re-save, or regenerate to start from the fresh
+            AI draft.
+          </div>
+        )}
+
         <div
           ref={previewRef}
           className="bg-white border border-border rounded-sm overflow-hidden"

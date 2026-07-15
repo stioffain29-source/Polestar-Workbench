@@ -1554,6 +1554,7 @@ export interface CountryProseResult {
   fingerprint: string;
   sections: CountryProseSections;
   edited?: CountryProseSections | null;
+  stale?: boolean;
   model: string;
   generatedAt: string;
 }
@@ -1613,6 +1614,7 @@ export interface ReportProseResult {
   fingerprint: string;
   sections?: TopicProseSections | null;
   edited?: TopicProseSections | null;
+  stale?: boolean;
   model: string;
   generatedAt: string;
 }

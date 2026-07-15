@@ -4711,6 +4711,7 @@ export const GenerateCountryProseResponse = zod.object({
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),zod.null()]).optional(),
+  "stale": zod.boolean().optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
 })
@@ -4766,6 +4767,7 @@ export const EditCountryProseResponse = zod.object({
   "outlook": zod.string().optional(),
   "incidentSummaries": zod.record(zod.string(), zod.string()).optional()
 }),zod.null()]).optional(),
+  "stale": zod.boolean().optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
 })
@@ -4864,6 +4866,7 @@ export const GenerateReportProseResponse = zod.object({
   "watchNext": zod.string(),
   "polestarView": zod.string()
 }),zod.null()]).optional(),
+  "stale": zod.boolean().optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
 })
@@ -4907,6 +4910,7 @@ export const EditReportProseResponse = zod.object({
   "watchNext": zod.string(),
   "polestarView": zod.string()
 }),zod.null()]).optional(),
+  "stale": zod.boolean().optional(),
   "model": zod.string(),
   "generatedAt": zod.coerce.date()
 })

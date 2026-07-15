@@ -45,9 +45,25 @@ function unavailableProse(fingerprint: string) {
     fingerprint,
     sections: EMPTY_PROSE_SECTIONS,
     edited: null,
+    stale: false,
     model: "unavailable",
     generatedAt: new Date().toISOString(),
   };
+}
+
+// An analyst edit is STALE when it is retained but was written against a data
+// basis that has since moved on (its recorded fingerprint differs from the live
+// one). The edit is kept, never discarded — the client surfaces a warning.
+function isProseEditStale(
+  liveFingerprint: string,
+  editedFingerprint: string | null | undefined,
+  edited: unknown,
+): boolean {
+  return (
+    edited != null &&
+    editedFingerprint != null &&
+    editedFingerprint !== liveFingerprint
+  );
 }
 
 // POST /countries/:slug/prose — return cached AI prose for the current incident
@@ -99,6 +115,7 @@ router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promi
       fingerprint,
       sections: existing.sections,
       edited: existing.edited ?? null,
+      stale: isProseEditStale(fingerprint, existing.editedFingerprint, existing.edited),
       model: existing.model,
       generatedAt: existing.generatedAt,
     });
@@ -131,6 +148,13 @@ router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promi
     return;
   }
 
+  // KEEP any existing analyst edit across the regenerate (the fresh AI prose
+  // lands in `sections`, but the override in `edited` is retained rather than
+  // dropped). Its `editedFingerprint` is preserved so the response can flag it
+  // as stale — the edit describes the previous data basis until the analyst
+  // re-saves it against the new one.
+  const keptEdited = existing?.edited ?? null;
+  const keptEditedFingerprint = existing?.editedFingerprint ?? null;
   const now = new Date();
   const [row] = await db
     .insert(countryReportProseTable)
@@ -138,7 +162,8 @@ router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promi
       slug,
       fingerprint,
       sections: outcome.sections,
-      edited: null,
+      edited: keptEdited,
+      editedFingerprint: keptEditedFingerprint,
       model: outcome.model,
       generatedAt: now,
     })
@@ -147,7 +172,8 @@ router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promi
       set: {
         fingerprint,
         sections: outcome.sections,
-        edited: null,
+        edited: keptEdited,
+        editedFingerprint: keptEditedFingerprint,
         model: outcome.model,
         generatedAt: now,
       },
@@ -159,6 +185,7 @@ router.post("/countries/:slug/prose", requireAdminToken, async (req, res): Promi
     fingerprint: row.fingerprint,
     sections: row.sections,
     edited: row.edited ?? null,
+    stale: isProseEditStale(row.fingerprint, row.editedFingerprint, row.edited),
     model: row.model,
     generatedAt: row.generatedAt,
   });
@@ -192,7 +219,9 @@ router.put("/countries/:slug/prose/edit", requireAdminToken, async (req, res): P
 
   const [row] = await db
     .update(countryReportProseTable)
-    .set({ edited: body.sections })
+    // Bind the edit to the fingerprint it was written against so a later
+    // data-basis change can flag it as stale (kept, not dropped).
+    .set({ edited: body.sections, editedFingerprint: existing.fingerprint })
     .where(eq(countryReportProseTable.slug, slug))
     .returning();
 
@@ -201,6 +230,7 @@ router.put("/countries/:slug/prose/edit", requireAdminToken, async (req, res): P
     fingerprint: row.fingerprint,
     sections: row.sections,
     edited: row.edited ?? null,
+    stale: isProseEditStale(row.fingerprint, row.editedFingerprint, row.edited),
     model: row.model,
     generatedAt: row.generatedAt,
   });

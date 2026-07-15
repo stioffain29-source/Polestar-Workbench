@@ -116,6 +116,9 @@ afterAll(
 );
 
 beforeEach(() => {
+  // The global jest.setup clears INGEST_ADMIN_TOKEN in its own beforeEach, so
+  // re-enable it here or requireAdminToken 503s every request.
+  enableTestAdminToken();
   jest.restoreAllMocks();
   (isLlmAvailable as jest.Mock).mockReset();
   (generateReportProse as jest.Mock).mockReset();
@@ -201,6 +204,38 @@ describe("POST /reports/:id/prose — cache hit", () => {
     expect(status).toBe(200);
     expect(json.available).toBe(true);
     expect(json.sections.executiveSummary).toBe("Cached narrative.");
+    expect(json.stale).toBe(false);
+    expect(generateReportProse as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("flags a kept edit as stale when its recorded fingerprint has moved on", async () => {
+    stubSelect(
+      new Map<unknown, Rows>([
+        [reportsTable, [{ id: REPORT_ID }]],
+        [
+          reportProseTable,
+          [
+            {
+              reportId: REPORT_ID,
+              topic: "shipping",
+              fingerprint: FINGERPRINT,
+              sections: { executiveSummary: "Cached narrative." },
+              edited: { executiveSummary: "Analyst edit." },
+              editedFingerprint: "old-fingerprint",
+              model: "gpt-5.4",
+              generatedAt: "2026-06-10T00:00:00.000Z",
+            },
+          ],
+        ],
+      ]),
+    );
+    (isLlmAvailable as jest.Mock).mockReturnValue(false);
+
+    const { status, json } = await postProse();
+
+    expect(status).toBe(200);
+    expect(json.edited.executiveSummary).toBe("Analyst edit.");
+    expect(json.stale).toBe(true);
     expect(generateReportProse as jest.Mock).not.toHaveBeenCalled();
   });
 

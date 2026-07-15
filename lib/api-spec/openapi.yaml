@@ -3323,6 +3323,10 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/CountryProseSections" }
             - { type: "null" }
+        # True when an analyst edit is retained but predates the current data
+        # basis (edited fingerprint differs from the live fingerprint). The edit
+        # is kept, not discarded — the client shows a staleness warning.
+        stale: { type: boolean }
         model: { type: string }
         generatedAt: { type: string, format: date-time }
 
@@ -3409,6 +3413,10 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/TopicProseSections" }
             - { type: "null" }
+        # True when an analyst edit is retained but predates the current data
+        # basis (edited fingerprint differs from the live fingerprint). The edit
+        # is kept, not discarded — the client shows a staleness warning.
+        stale: { type: boolean }
         model: { type: string }
         generatedAt: { type: string, format: date-time }
 

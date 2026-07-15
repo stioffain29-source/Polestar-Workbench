@@ -1171,6 +1171,27 @@ export default function CountryReport() {
         </div>
       )}
 
+      {proseResult?.stale && (
+        <div
+          className="no-print"
+          style={{
+            fontFamily: ROBOTO,
+            fontSize: 12,
+            color: "#A33232",
+            border: "1px solid #A33232",
+            borderRadius: 2,
+            background: "#fff",
+            padding: "6px 10px",
+            marginTop: 8,
+          }}
+        >
+          Your saved narrative edit is being kept, but the underlying data has
+          changed since it was written — it may no longer match the current
+          incidents. Review it and re-save, or use Redraft to start from the
+          fresh AI draft.
+        </div>
+      )}
+
       {/* Polestar header band — matches Watch report cover treatment */}
       <div ref={reportPreviewRef} className="print-report bg-white" style={{ color: NAVY, fontFamily: ROBOTO }}>
         <div className="pdf-cover-page">

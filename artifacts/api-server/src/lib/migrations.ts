@@ -465,6 +465,19 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS report_photos jsonb NOT NULL DEFAULT '[]'::jsonb`,
     );
 
+    // Schema: `edited_fingerprint` on the prose caches. An analyst prose edit is
+    // now KEPT across a data-basis regenerate (instead of being dropped); this
+    // column records the fingerprint the edit was written against so the client
+    // can flag a retained-but-stale edit rather than silently overwriting it.
+    // drizzle push only reaches dev; the writable prod primary gains it on boot.
+    // Nullable/additive — idempotent (IF NOT EXISTS).
+    await db.execute(
+      sql`ALTER TABLE country_report_prose ADD COLUMN IF NOT EXISTS edited_fingerprint text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE report_prose ADD COLUMN IF NOT EXISTS edited_fingerprint text`,
+    );
+
     // 0a) Schema: per-feed consecutive-failure counter on `sources`.
     //     drizzle `push` adds this in dev, but the writable prod DB is reached
     //     only from the deployment runtime, so add it idempotently on boot too.

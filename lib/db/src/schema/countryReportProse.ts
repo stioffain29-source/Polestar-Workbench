@@ -31,17 +31,23 @@ export interface CountryProseSections {
 //
 // `fingerprint` is a hash of the exact window incidents the prose was grounded
 // on (plus the prompt version). When the underlying data changes the
-// fingerprint changes and the prose is regenerated, so the cache can never go
-// stale — the historical reason the overview/trend_summary/implications columns
-// on country_reports were retired. `edited` holds analyst overrides bound to the
-// SAME fingerprint; it is dropped whenever the prose is regenerated, so an edit
-// only ever describes the data snapshot it was written against.
+// fingerprint changes and the prose is regenerated. `edited` holds analyst
+// overrides. Unlike the earlier model — where a regenerate dropped `edited` so
+// an edit could never outlive its data snapshot — an analyst edit is now KEPT
+// across a regenerate: `editedFingerprint` records the fingerprint the edit was
+// written against, so when the data basis moves on the edit is retained and the
+// client surfaces a staleness warning (edit stays, is never silently discarded)
+// rather than being overwritten by fresh AI prose.
 export const countryReportProseTable = pgTable("country_report_prose", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
   fingerprint: text("fingerprint").notNull(),
   sections: jsonb("sections").$type<CountryProseSections>().notNull(),
   edited: jsonb("edited").$type<CountryProseSections | null>(),
+  // The fingerprint the current `edited` override was written against. When it
+  // differs from `fingerprint`, the edit predates the current data basis and is
+  // stale (kept, but flagged to the analyst). NULL when there is no edit.
+  editedFingerprint: text("edited_fingerprint"),
   model: text("model").notNull(),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -12,6 +12,7 @@ export interface ReportProseResult {
   fingerprint: string;
   sections?: TopicProseSections | null;
   edited?: TopicProseSections | null;
+  stale?: boolean;
   model: string;
   generatedAt: Date;
 }
