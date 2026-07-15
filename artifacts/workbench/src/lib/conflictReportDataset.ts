@@ -13,6 +13,7 @@ import { splitAttributedCountries, isTopicRelevant } from "./topicRelevance";
 import { selectRelatedIncidents } from "./relatedIncidents";
 import { dedupeMonitorRows } from "./monitorDedupe";
 import { collapseConflictOperations } from "./conflictOperationCollapse";
+import { collapseConflictSameEvent } from "./conflictSameEventCollapse";
 
 // Single source of truth for the Conflict Watch report's analysed dataset.
 // Mirrors the flashpointReportDataset pattern so the on-screen preview
@@ -1246,16 +1247,17 @@ export function buildConflictReportDataset(
   // only — no syndication or running-tally collapse — so without this the
   // report re-inflates with the same duplicates the monitor already folds. Run
   // the SAME two transforms the monitor uses: dedupeMonitorRows (syndication)
-  // then, for conflict, collapseConflictOperations (running-tally). This keeps
-  // the on-screen preview and the PDF (both read this dataset) deflated in step
-  // with the monitor.
+  // then collapseConflictSameEvent (different-headline copies of one event) and
+  // collapseConflictOperations (running-tally). This keeps the on-screen preview
+  // and the PDF (both read this dataset) deflated in step with the monitor —
+  // the same three transforms in the same order.
   const enrichedRaw: ConflictEnrichedIncident[] = windowRaw.map((i) => ({
     ...i,
     date: toDate(i.occurredAt),
     issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
   }));
   const enriched: ConflictEnrichedIncident[] = collapseConflictOperations(
-    dedupeSyndicationByCountry(enrichedRaw),
+    collapseConflictSameEvent(dedupeSyndicationByCountry(enrichedRaw)),
   );
 
   // Group enriched (in-window) incidents by attributed country. Compound
@@ -1302,7 +1304,7 @@ export function buildConflictReportDataset(
       issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
     }));
   const preWindow: ConflictEnrichedIncident[] = collapseConflictOperations(
-    dedupeSyndicationByCountry(preWindowRaw),
+    collapseConflictSameEvent(dedupeSyndicationByCountry(preWindowRaw)),
   );
 
   const byCountryPre = new Map<string, ConflictEnrichedIncident[]>();

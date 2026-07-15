@@ -25,6 +25,7 @@ import { isTopicRelevant } from "./topicRelevance";
 import { dedupeByTitle } from "./flashpointReportDataset";
 import { dedupeMonitorRows } from "./monitorDedupe";
 import { collapseConflictOperations } from "./conflictOperationCollapse";
+import { collapseConflictSameEvent } from "./conflictSameEventCollapse";
 import {
   classifyRegion as classifyShippingRegion,
   isLowCredibilityShippingRecord,
@@ -154,11 +155,17 @@ function resolveGenericTrue<T extends TrueIncidentLike>(
     return { ...i, date, severity: rec.severity ?? "" };
   });
   const deduped = dedupeMonitorRows(enriched);
-  // Conflict-only: after the generic syndication collapse, fold a single
-  // counter-insurgency operation's running-tally copies down to one row. Other
-  // topics do not exhibit this pattern, so it is scoped to conflict only.
+  // Conflict-only two-stage fold after the generic syndication collapse:
+  //   1. collapseConflictSameEvent — different-headline copies of ONE small
+  //      event (a single killing re-run under wholly different headlines) that
+  //      share no masthead and few title words;
+  //   2. collapseConflictOperations — a single counter-insurgency operation's
+  //      running-tally copies.
+  // Other topics do not exhibit these patterns, so both are scoped to conflict.
   const collapsed =
-    topic === "conflict" ? collapseConflictOperations(deduped) : deduped;
+    topic === "conflict"
+      ? collapseConflictOperations(collapseConflictSameEvent(deduped))
+      : deduped;
   return collapsed as unknown as T[];
 }
 
