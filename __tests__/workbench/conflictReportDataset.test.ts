@@ -273,11 +273,17 @@ describe("buildConflictReportDataset — sub-national honesty", () => {
   // safe. This guards the honesty failure the hotspot work was built to prevent.
   const MANIPUR =
     "Armed clashes between troops and militants reported in Manipur";
+  // id2 and id3 are DISTINCT non-hotspot events, so they must carry distinct
+  // titles — the report now folds syndicated same-country copies of one headline,
+  // and reusing NO_CASUALTY twice would (correctly) collapse to a single incident
+  // and lift Manipur's coverage from 1/3 to 1/2, crossing the ≥50% threshold.
+  const NO_CASUALTY_2 =
+    "Armed clashes between troops and militants at a rural checkpoint";
   const ds = buildConflictReportDataset(
     [
       inc({ id: 1, country: "India", severity: "high", title: MANIPUR }),
       inc({ id: 2, country: "India", severity: "high", title: NO_CASUALTY }),
-      inc({ id: 3, country: "India", severity: "high", title: NO_CASUALTY }),
+      inc({ id: 3, country: "India", severity: "high", title: NO_CASUALTY_2 }),
     ],
     "conflict",
     ISSUE_DATE,
@@ -384,13 +390,17 @@ describe("buildConflictReportDataset — co-leading theatres", () => {
   // Pakistan and India were tied yet India was called "quieter".
   const clash = (country: string) =>
     `Armed clashes between troops and militants reported in ${country}`;
+  // Each incident is a DISTINCT event, so its title must be distinct: the
+  // report now folds syndicated same-country copies of one headline, so reusing
+  // one title per country would (correctly) collapse to a single incident and
+  // erase the volume this test needs.
   const many = (country: string, n: number) =>
     Array.from({ length: n }, (_, i) =>
       inc({
         id: `${country}-${i}`,
         country,
         severity: "high",
-        title: clash(country),
+        title: `${clash(country)} (case ${i + 1})`,
       }),
     );
   const ds = buildConflictReportDataset(

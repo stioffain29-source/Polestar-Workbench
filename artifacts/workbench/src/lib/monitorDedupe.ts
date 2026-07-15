@@ -9,7 +9,7 @@
 // canonical title, so two genuinely different stories that merely share a few
 // words are never merged — only true syndicated copies collapse.
 
-const SEV_RANK: Record<string, number> = {
+export const SEV_RANK: Record<string, number> = {
   insignificant: 1,
   low: 2,
   moderate: 3,

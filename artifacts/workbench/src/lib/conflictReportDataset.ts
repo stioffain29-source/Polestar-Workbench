@@ -11,6 +11,8 @@ import {
 } from "./conflictAnalysis";
 import { splitAttributedCountries, isTopicRelevant } from "./topicRelevance";
 import { selectRelatedIncidents } from "./relatedIncidents";
+import { dedupeMonitorRows } from "./monitorDedupe";
+import { collapseConflictOperations } from "./conflictOperationCollapse";
 
 // Single source of truth for the Conflict Watch report's analysed dataset.
 // Mirrors the flashpointReportDataset pattern so the on-screen preview
@@ -1196,6 +1198,39 @@ function buildPolestarView(
   return `${opening}${pulledSentence}${action}`;
 }
 
+// Country-scoped syndication dedupe. `dedupeMonitorRows` keys on the canonical
+// title ALONE, so two DISTINCT-theatre events that happen to share an identical
+// headline would collapse into one — silently dropping a real theatre. The
+// conflict report is per-theatre, so bucket rows by their raw attributed
+// country FIRST and only fold syndicated copies WITHIN a bucket: two countries
+// never merge (we under-merge rather than risk collateral). The surviving rows
+// are returned in their original first-occurrence order.
+function dedupeSyndicationByCountry<
+  T extends {
+    title: string;
+    date: Date;
+    severity: string;
+    country?: string | null;
+  },
+>(rows: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
+  for (const r of rows) {
+    const key = (r.country ?? "").trim().toLowerCase();
+    let g = groups.get(key);
+    if (!g) {
+      g = [];
+      groups.set(key, g);
+      order.push(key);
+    }
+    g.push(r);
+  }
+  const kept = new Set<T>();
+  for (const key of order)
+    for (const row of dedupeMonitorRows(groups.get(key)!)) kept.add(row);
+  return rows.filter((r) => kept.has(r));
+}
+
 // ---------------------------------------------------------------------------
 // Main builder
 // ---------------------------------------------------------------------------
@@ -1207,11 +1242,21 @@ export function buildConflictReportDataset(
   const win = resolveReportWindow(topic, issueDate);
   const windowRaw = filterTopicReportIncidents(incidents, topic, issueDate);
 
-  const enriched: ConflictEnrichedIncident[] = windowRaw.map((i) => ({
+  // The report path (filterTopicReportIncidents) applies window + relevance
+  // only — no syndication or running-tally collapse — so without this the
+  // report re-inflates with the same duplicates the monitor already folds. Run
+  // the SAME two transforms the monitor uses: dedupeMonitorRows (syndication)
+  // then, for conflict, collapseConflictOperations (running-tally). This keeps
+  // the on-screen preview and the PDF (both read this dataset) deflated in step
+  // with the monitor.
+  const enrichedRaw: ConflictEnrichedIncident[] = windowRaw.map((i) => ({
     ...i,
     date: toDate(i.occurredAt),
     issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
   }));
+  const enriched: ConflictEnrichedIncident[] = collapseConflictOperations(
+    dedupeSyndicationByCountry(enrichedRaw),
+  );
 
   // Group enriched (in-window) incidents by attributed country. Compound
   // attributions ("India; Pakistan") add the incident to BOTH theatres,
@@ -1235,7 +1280,7 @@ export function buildConflictReportDataset(
   // pulled-in theatres are flagged in their paragraph as pre-window and never
   // touch the Fast Facts, related-incidents table or in-week counts.
   const lookbackStart = subDays(win.end, reportWindowMaxDays(topic) - 1);
-  const preWindow: ConflictEnrichedIncident[] = incidents
+  const preWindowRaw: ConflictEnrichedIncident[] = incidents
     .filter((i) => {
       if (i.topic !== topic) return false;
       const d = toDate(i.occurredAt);
@@ -1256,6 +1301,9 @@ export function buildConflictReportDataset(
       date: toDate(i.occurredAt),
       issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
     }));
+  const preWindow: ConflictEnrichedIncident[] = collapseConflictOperations(
+    dedupeSyndicationByCountry(preWindowRaw),
+  );
 
   const byCountryPre = new Map<string, ConflictEnrichedIncident[]>();
   for (const i of preWindow) {

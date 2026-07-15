@@ -1158,8 +1158,13 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // ── Diplomacy / peace-process noise. A negotiation, ceasefire, repatriation
   // or diplomatic appeal is the OPPOSITE of a discrete armed event; each is
   // override-gated so a genuine ambush/strike/bombing during talks is re-admitted.
-  // Diplomatic verb + peace/ceasefire/dialogue/repatriation noun.
-  /\b(seeks?|seeking|sought|propose[sd]?|proposing|pushes|push(?:ed|ing)|resume[sd]?|resuming|hold(?:s|ing)?|held|offer(?:s|ed)?|announce[sd]?|declare[sd]?|declaring|working on|call(?:s|ed)? for|agree[sd]?)\b[^.]{0,45}\b(peace talks?|peace process|peace plan|peace deal|peace accord|cease[- ]?fire|truce|dialogue|negotiation\w*|repatriation|reconciliation)\b/i,
+  // Diplomatic verb + peace/dialogue/repatriation noun. NB cease-fire / truce
+  // are deliberately EXCLUDED from the noun group: a belligerent DECLARING or
+  // announcing its own ceasefire ("insurgents declare Christmas ceasefire") is
+  // a real conflict development, not diplomacy, so stripping it would be
+  // collateral. Pure ceasefire-talks are rare and conflict-relevant enough to
+  // keep rather than risk that loss.
+  /\b(seeks?|seeking|sought|propose[sd]?|proposing|pushes|push(?:ed|ing)|resume[sd]?|resuming|hold(?:s|ing)?|held|offer(?:s|ed)?|announce[sd]?|declare[sd]?|declaring|working on|call(?:s|ed)? for|agree[sd]?)\b[^.]{0,45}\b(peace talks?|peace process|peace plan|peace deal|peace accord|dialogue|negotiation\w*|repatriation|reconciliation)\b/i,
   // Mediated / brokered / fresh round of talks.
   /\b(?:[a-z]{3,}-mediated|brokered|facilitated|back[- ]?channel|round of|fresh|another round of)\s+(?:peace )?talks\b/i,
   // In / for / on / holds talks with (interviews, bilateral negotiating tracks).
@@ -1190,7 +1195,7 @@ const CONFLICT_EXCLUDE: RegExp[] = [
 // (killed/dead/wounded) are excluded because they also describe disaster tolls
 // ("earthquake kills 30"), which would re-open the relief noise this fix closes.
 const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
-  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|encounter (?:underway|under way|breaks? out|broke out|erupt\w*|ensu\w*|rages?|raging)|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(s|ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
+  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|encounter (?:underway|under way|breaks? out|broke out|erupt\w*|ensu\w*|rages?|raging)|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(s|ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|(?:militant|insurgent|separatist|rebel|terrorist|extremist)s?\s+violence|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
 
 // Conflict OP-ED / METAPHOR hard-exclude. Unlike CONFLICT_EXCLUDE, this runs
 // BEFORE the violence override so a kinetic word used as a POLITICAL/ABSTRACT

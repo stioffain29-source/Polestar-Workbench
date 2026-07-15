@@ -24,6 +24,7 @@ import { parseISO } from "date-fns";
 import { isTopicRelevant } from "./topicRelevance";
 import { dedupeByTitle } from "./flashpointReportDataset";
 import { dedupeMonitorRows } from "./monitorDedupe";
+import { collapseConflictOperations } from "./conflictOperationCollapse";
 import {
   classifyRegion as classifyShippingRegion,
   isLowCredibilityShippingRecord,
@@ -152,7 +153,13 @@ function resolveGenericTrue<T extends TrueIncidentLike>(
     }
     return { ...i, date, severity: rec.severity ?? "" };
   });
-  return dedupeMonitorRows(enriched) as unknown as T[];
+  const deduped = dedupeMonitorRows(enriched);
+  // Conflict-only: after the generic syndication collapse, fold a single
+  // counter-insurgency operation's running-tally copies down to one row. Other
+  // topics do not exhibit this pattern, so it is scoped to conflict only.
+  const collapsed =
+    topic === "conflict" ? collapseConflictOperations(deduped) : deduped;
+  return collapsed as unknown as T[];
 }
 
 /** Filter a list down to the topic's true, in-scope events. */
