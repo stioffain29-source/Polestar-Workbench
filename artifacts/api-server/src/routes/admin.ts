@@ -709,6 +709,13 @@ router.post("/admin/cluster-conflict", async (req: Request, res: Response) => {
     1,
     Number(req.query.windowDays ?? req.body?.windowDays ?? 14) || 14,
   );
+  // maxPairs bounds LLM spend (one judge call per candidate pair). Default 2000
+  // suits the recurring recent-window run; raise it for a one-off backlog clear
+  // over a wide window so later countries are not starved by the cap.
+  const maxPairs = Math.max(
+    1,
+    Number(req.query.maxPairs ?? req.body?.maxPairs ?? 2000) || 2000,
+  );
 
   if (conflictClusterRunning) {
     res.status(409).json({ error: "clustering_in_progress" });
@@ -717,8 +724,11 @@ router.post("/admin/cluster-conflict", async (req: Request, res: Response) => {
   conflictClusterRunning = true;
   const startedAt = new Date();
   try {
-    req.log.info({ commit, windowDays }, "admin cluster-conflict started");
-    const summary = await runConflictClustering({ commit, windowDays });
+    req.log.info(
+      { commit, windowDays, maxPairs },
+      "admin cluster-conflict started",
+    );
+    const summary = await runConflictClustering({ commit, windowDays, maxPairs });
     for (const line of summary.logLines)
       req.log.info({ pass: "conflict-cluster" }, line);
     const finishedAt = new Date();
@@ -727,6 +737,7 @@ router.post("/admin/cluster-conflict", async (req: Request, res: Response) => {
         ok: true,
         commit,
         windowDays,
+        maxPairs,
         startedAt: startedAt.toISOString(),
         finishedAt: finishedAt.toISOString(),
         durationMs: finishedAt.getTime() - startedAt.getTime(),

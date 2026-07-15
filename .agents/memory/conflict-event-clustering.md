@@ -69,6 +69,28 @@ Fix = run the pass to backfill:
   (dry-run default), also chained into `scrape:prod` so the scheduled deployment
   clusters after scraping. MUST `await pool.end()` like every sibling CLI.
 
+**A one-off whole-backlog clear needs `maxPairs` raised** (route `?maxPairs=N`,
+CLI `MAX_PAIRS` env; default 2000). `candidatePairs` is built country-by-country
+in time order and sliced at `maxPairs`, so a WIDE window with the default cap
+starves later countries → those rows self-key UN-merged. Size `maxPairs` above
+the real candidate count first (deterministic, LLM-free: import `candidatePairs`,
+read all `topic='conflict'` rows, print `.length` — ~3.3k pairs over a 5-month
+backlog). **Commit is atomic at the very END** (all judgments, THEN the stamp
+loop), so the keyed count stays flat mid-pass and jumps only at completion — do
+NOT read "no DB progress" as a stall; watch the log for the
+`conflict-cluster: committed …` summary line instead. Poll completion via
+`refresh_all_logs` (or an `executeSql` NULL-key count), NEVER a `/tmp/logs/*.log`
+file grepped in a loop — that snapshot is frozen at the last refresh and will
+read "still running" forever.
+
+A whole-history clear is CHEAP to re-run: `candidatePairs` skips any pair where
+BOTH rows are already keyed, so a second pass over a window spanning the OLDEST
+row (e.g. `windowDays=15000` to reach a 1986 row) judges ONLY pairs touching a
+still-NULL row — a 2.4k-row backlog needed just ~270 pair judgments. Rows inserted
+by ingest/seed AFTER a pass's snapshot land NULL and are swept by the next run;
+`occurred_at`-windowed load means old (out-of-window) NULL rows need the wide
+window to settle at all.
+
 Both call the SAME `runConflictClustering` and run OUTSIDE the ingest advisory
 lock; concurrency is safe (per-row `UPDATE ... WHERE key IS NULL`, first writer
 wins). **Why:** deploying the wiring is not enough in a live env with a backlog.

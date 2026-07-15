@@ -19,11 +19,14 @@ import { pool } from "@workspace/db";
 async function main(): Promise<void> {
   const commit = process.argv.includes("--commit");
   const windowDays = Number(process.env.WINDOW_DAYS || "14");
+  // MAX_PAIRS raises the LLM candidate cap (default 2000) for a one-off backlog
+  // clear over a wide window; unset keeps the recurring-run default.
+  const maxPairs = Number(process.env.MAX_PAIRS || "0") || undefined;
   // Runs OUTSIDE the runIngestOnce advisory lock. Safe: the stamp is a per-row
   // UPDATE ... WHERE event_cluster_key IS NULL (first writer wins, settled keys
   // never rewritten), so a concurrent scheduler pass can at worst under-merge
   // (mandated-safe, display-inert) — never corrupt or double-stamp.
-  const summary = await runConflictClustering({ commit, windowDays });
+  const summary = await runConflictClustering({ commit, windowDays, maxPairs });
   for (const line of summary.logLines) console.log(line);
   await pool.end();
 }
