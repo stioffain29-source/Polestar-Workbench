@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
-import { type IngestSummary } from "@workspace/ingest";
+import { type IngestSummary, runConflictClustering } from "@workspace/ingest";
 import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
 import {
   runIngestOnce,
@@ -27,6 +27,10 @@ const router: IRouter = Router();
 let relevanceBackfillRunning = false;
 // Same pool-hygiene guard for the severity re-rate pass.
 let severityBackfillRunning = false;
+// Same in-process guard for the conflict same-event clustering pass. The pass is
+// idempotent (only fills NULL keys), so this is pool-hygiene + a friendly 409,
+// not a correctness lock.
+let conflictClusterRunning = false;
 
 // Protected production ingestion trigger.
 //
@@ -651,6 +655,100 @@ router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }
+  }
+});
+
+// Protected manual trigger for the conflict same-event clustering pass.
+//
+// Runs the EXACT same LLM adjudication the scheduler runs inside runIngestOnce —
+// stamping incidents.event_cluster_key so the Conflict Watch monitor + report
+// collapse one real event syndicated under many headlines — but on demand from
+// inside the running server process, the only place (in the deployment) where
+// DATABASE_URL points at the writable primary. Needed as a one-time backfill for
+// rows that pre-date the clustering wiring, and as an operational re-run.
+//
+// Idempotent: only NULL keys are filled, so re-runs never re-key or duplicate.
+// NEVER creates, removes or re-scores an incident — it only groups existing rows.
+//
+// Long-running (one LLM call per candidate pair): the handler runs to completion
+// in the server process even if the HTTP client disconnects, so a request that
+// times out client-side still commits. Defaults to commit=true (this is an
+// operational write trigger); pass ?commit=false for a dry-run. ?windowDays=N
+// (default 14) bounds the window.
+//
+// Runs OUTSIDE the runIngestOnce advisory lock (guarded only in-process by
+// conflictClusterRunning). Safe alongside the scheduler's own clustering pass:
+// the stamp is per-row UPDATE ... WHERE event_cluster_key IS NULL (first writer
+// wins, settled keys never rewritten), so the worst concurrent case is a
+// mandated-safe, display-inert under-merge — never corruption or a double-stamp.
+router.post("/admin/cluster-conflict", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    req.log.warn(
+      "admin cluster-conflict called but INGEST_ADMIN_TOKEN is not configured",
+    );
+    res.status(503).json({
+      error: "ingestion_disabled",
+      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+    });
+    return;
+  }
+
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+
+  const commit = !(
+    req.query.commit === "false" ||
+    req.query.commit === "0" ||
+    req.body?.commit === false
+  );
+  const windowDays = Math.max(
+    1,
+    Number(req.query.windowDays ?? req.body?.windowDays ?? 14) || 14,
+  );
+
+  if (conflictClusterRunning) {
+    res.status(409).json({ error: "clustering_in_progress" });
+    return;
+  }
+  conflictClusterRunning = true;
+  const startedAt = new Date();
+  try {
+    req.log.info({ commit, windowDays }, "admin cluster-conflict started");
+    const summary = await runConflictClustering({ commit, windowDays });
+    for (const line of summary.logLines)
+      req.log.info({ pass: "conflict-cluster" }, line);
+    const finishedAt = new Date();
+    if (!res.headersSent) {
+      res.json({
+        ok: true,
+        commit,
+        windowDays,
+        startedAt: startedAt.toISOString(),
+        finishedAt: finishedAt.toISOString(),
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+        conflictCluster: {
+          candidates: summary.candidates,
+          pairsConsidered: summary.pairsConsidered,
+          edges: summary.edges,
+          clustersFormed: summary.clustersFormed,
+          stamped: summary.stamped,
+          skipped: summary.skipped,
+          logLines: summary.logLines,
+        },
+      });
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    req.log.error({ err }, "admin cluster-conflict failed");
+    if (!res.headersSent) {
+      res.status(500).json({ ok: false, error: "clustering_failed", message });
+    }
+  } finally {
+    conflictClusterRunning = false;
   }
 });
 

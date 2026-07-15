@@ -53,6 +53,35 @@ survivor = highest SEV_RANK then newest, first-occurrence position. Wired FIRST
 consumers — `trueIncidents.ts` (monitor) and `conflictReportDataset.ts` (report:
 enriched + preWindow) — so monitor and report deflate in lockstep.
 
+## Trigger / backfill (built ≠ ran)
+
+Wiring the pass into `runIngestOnce` only clusters on FUTURE ingest runs. Rows
+that ALREADY exist keep `event_cluster_key = NULL` until a pass actually runs
+over them, and the display fold treats a NULL/absent key as its own group — so
+duplicate rows persist in the monitor even though the fold code is correct.
+Symptom of "built but never ran": every conflict row has a NULL key.
+
+Fix = run the pass to backfill:
+- Token-gated `POST /api/admin/cluster-conflict` (defaults `commit=true`;
+  `?commit=false` dry-run; `?windowDays=N`; in-process 409 guard; survives
+  client disconnect). Long — one LLM call per candidate pair.
+- CLI `pnpm --filter @workspace/scripts run cluster:conflict [-- --commit]`
+  (dry-run default), also chained into `scrape:prod` so the scheduled deployment
+  clusters after scraping. MUST `await pool.end()` like every sibling CLI.
+
+Both call the SAME `runConflictClustering` and run OUTSIDE the ingest advisory
+lock; concurrency is safe (per-row `UPDATE ... WHERE key IS NULL`, first writer
+wins). **Why:** deploying the wiring is not enough in a live env with a backlog.
+
+## Cross-district non-merge is intentional
+
+The LLM keeps two same-country hits in DIFFERENT districts separate even when
+they look alike (verified: Manipur Kangpokpi 53-yo farmer killing 32581/32583
+MERGE, but Tamenglong 32225 stays split). This is the documented zero-collateral
+HARD MANDATE (`conflictSameEventCollapse.ts` names Kangpokpi vs Tamenglong), not
+a coverage gap. Do NOT loosen the judge to force it — a wrong merge would hide a
+distinct killing (under-count a real death), the opposite of the safe direction.
+
 ## Verify
 
 Foreground audit: `SNAPSHOT=<rows.json> WINDOW_DAYS=<n> pnpm --filter
