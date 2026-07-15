@@ -95,6 +95,17 @@ Both call the SAME `runConflictClustering` and run OUTSIDE the ingest advisory
 lock; concurrency is safe (per-row `UPDATE ... WHERE key IS NULL`, first writer
 wins). **Why:** deploying the wiring is not enough in a live env with a backlog.
 
+**Hard OpenAI dependency (the usual real cause of "still duplicating in prod").**
+`runConflictClustering` no-ops and stamps NOTHING when the LLM is unavailable
+(`isLlmAvailable()` gate). With `AI_INTEGRATIONS_OPENAI_*` / `OPENAI_API_KEY`
+UNSET, `scrape:prod` and the admin route both skip clustering, so prod keys stay
+NULL and same-event copies show separately. These copies routinely span
+DIFFERENT event-classes (arrest vs kinetic vs aftermath), which the deterministic
+`collapseConflictSameEvent` fold deliberately keeps apart — so the stamped key is
+the ONLY thing that can fold them. Net: persistent conflict dupes with no keys =
+a CONFIG gap (enable OpenAI + re-run prod ingestion), NOT a code bug; do not
+loosen the deterministic fold to compensate.
+
 ## Cross-district non-merge is intentional
 
 The LLM keeps two same-country hits in DIFFERENT districts separate even when
