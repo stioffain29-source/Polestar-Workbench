@@ -1155,6 +1155,32 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // Suspected Militants"). Bound to that no-contact signature; the violence
   // override re-admits any operation that reports an actual encounter/kill.
   /\b(search operation|combing operation|cordon(?:[- ]and[- ]| )search|area domination)\b[^.]{0,45}\b(cctv|spot(?:s|ted)?|suspected)\b/i,
+  // ── Diplomacy / peace-process noise. A negotiation, ceasefire, repatriation
+  // or diplomatic appeal is the OPPOSITE of a discrete armed event; each is
+  // override-gated so a genuine ambush/strike/bombing during talks is re-admitted.
+  // Diplomatic verb + peace/ceasefire/dialogue/repatriation noun.
+  /\b(seeks?|seeking|sought|propose[sd]?|proposing|pushes|push(?:ed|ing)|resume[sd]?|resuming|hold(?:s|ing)?|held|offer(?:s|ed)?|announce[sd]?|declare[sd]?|declaring|working on|call(?:s|ed)? for|agree[sd]?)\b[^.]{0,45}\b(peace talks?|peace process|peace plan|peace deal|peace accord|cease[- ]?fire|truce|dialogue|negotiation\w*|repatriation|reconciliation)\b/i,
+  // Mediated / brokered / fresh round of talks.
+  /\b(?:[a-z]{3,}-mediated|brokered|facilitated|back[- ]?channel|round of|fresh|another round of)\s+(?:peace )?talks\b/i,
+  // In / for / on / holds talks with (interviews, bilateral negotiating tracks).
+  /\b(?:in|for|on|holds?|held|resumed?|resuming|await\w*)\s+talks with\b/i,
+  // Leader / PM visit whose stated purpose is talks (not a kinetic event).
+  /\b(?:to visit|visits?|visited|arriv\w*|tour\w*)\b[^.]{0,40}\bfor talks\b/i,
+  // Envoy / ambassador / minister urges a state to act against militants.
+  /\b(envoy|ambassador|diplomat|foreign (?:minister|secretary)|delegation|special (?:envoy|representative)|high commissioner|consul)\b[^.]{0,60}\b(urge[sd]?|call(?:s|ed)? on|press(?:es|ed)?|ask(?:s|ed)?|demand(?:s|ed)?|seeks?)\b[^.]{0,40}\b(act against|action against|crack ?down|rein in|curb|address|tackle)\b/i,
+  // "Urge firm action against militants/insurgents" (state-to-state appeal).
+  /\b(urge[sd]?|call(?:s|ed)? for|press(?:es|ed)? for|demand(?:s|ed)?)\b[^.]{0,30}\b(?:firm |strong |joint |decisive |concrete )?(action|steps|measures|crackdown)\b[^.]{0,20}\bagainst\b[^.]{0,30}\b(militant|insurgent|terror\w*|extremis\w*|rebel|separatis\w*)\b/i,
+  // ── Court / legal process (bail, verdict, custody, dismissal, testimony) in a
+  // conflict/terror case. A judicial step is not an armed-violence incident.
+  /\b(supreme court|high court|sessions court|special (?:nia |cbi )?court|tribunal|bench|magistrate|judge|apex court|\bsc\b)\b[^.]{0,80}\b(bail|verdict|acquit\w*|convict\w*|sentenc\w*|charge ?sheet|chargesheet|hearing|custody|remand|dismissal|quash\w*|plea|petition|testimony|witness|trial|framing of charges)\b/i,
+  /\b(testimony|deposition|witness account|statement of witness)\b[^.]{0,80}\b(cannot be|can(?:no|')t be|rejected|reliable|admissible|corroborat\w*|court|trial|acquit\w*|convict\w*)\b/i,
+  // ── PR denial of a CONDUCT allegation (child soldiers, recruitment, bribery,
+  // atrocities). Bound to the conduct noun so a denial of a STRIKE/attack claim
+  // (a real cross-border event) is NOT dropped.
+  /\b(deny|denies|denied|denying|rejects? (?:the )?(?:claim|allegation|accusation)|dismisses? (?:the )?(?:claim|allegation))\b[^.]{0,70}\b(child soldier\w*|child recruit\w*|recruit\w* (?:of )?(?:child|minor|teenager)|bribery|corruption|embezzl\w*|atrocit\w*|human rights (?:abuse|violation)|war crime\w*|rape|sexual (?:abuse|assault|violence)|barbaric|torture)\b/i,
+  // ── Censorship / vetting of books, websites or content for separatist /
+  // anti-national material (a governance action, not an armed event).
+  /\b(pro[- ]?separatis\w*|anti[- ]?(?:national|india)|seditious|objectionable)\b[^.]{0,60}\b(book|books|website|websites|web page|content|curricul\w*|syllab\w*|material)\b[^.]{0,60}\b(examin\w*|scrutin\w*|vet\w*|review|audit|probe|inspect\w*|calls? for|order\w*)\b/i,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are
@@ -1164,7 +1190,7 @@ const CONFLICT_EXCLUDE: RegExp[] = [
 // (killed/dead/wounded) are excluded because they also describe disaster tolls
 // ("earthquake kills 30"), which would re-open the relief noise this fix closes.
 const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
-  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|encounter (?:underway|under way|breaks? out|broke out|erupt\w*|ensu\w*|rages?|raging)|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
+  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|encounter (?:underway|under way|breaks? out|broke out|erupt\w*|ensu\w*|rages?|raging)|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(s|ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
 
 // Conflict OP-ED / METAPHOR hard-exclude. Unlike CONFLICT_EXCLUDE, this runs
 // BEFORE the violence override so a kinetic word used as a POLITICAL/ABSTRACT
@@ -1197,6 +1223,27 @@ const CONFLICT_HARD_EXCLUDE: RegExp[] = [
   // to threat/fear + prevent + return so a real strike ("airstrike kills 10")
   // with no returnee-obstacle framing is never dropped.
   /\b(threat\w*|fear\w*)\b[^.]{0,40}\b(keep\w*|prevent\w*|stop\w*|deter\w*|bar\w*|discourag\w*)\b[^.]{0,40}\b(displaced|residents|returnees?|civilians|villagers|people|families)\b[^.]{0,30}return/i,
+  // Trailing op-ed / commentary label ("… New Phase – OpEd"). The leading
+  // op-ed anchor above only catches a prefix; a dash/pipe + "op-ed" tail marks
+  // the same commentary. Hard so a kinetic word in the piece can't re-admit it.
+  /[–—\-|]\s*op[- ]?ed\b/i,
+  // Encyclopedia / factbox facet list ("… | Leader, Ideology, … Funding, …").
+  /\|[^.]{0,80}\bideolog\w*\b[^.]{0,80}\bfunding\b/i,
+  // Vehicle trim homonym ("Ram Rebel", "Ram RHO", "Ram 1500").
+  /\bram rebel\b|\bram rho\b|\bram (?:1500|2500|3500|trx)\b/i,
+  // Sport "shootout" (golf/tournament entries), not a gun battle.
+  /\b(?:golf|pga|lpga|tournament|entries open|handicap|scramble|birdie|senior shootout|super senior)\b[^.]{0,50}\bshoot[- ]?out\b/i,
+  // US mass-shooting court process / campus threat (domestic crime + homonym).
+  /\bmass shooting\b[^.]{0,60}\b(trial|jurors?|jury|self[- ]defen[cs]e|verdict|sentenc\w*|plea deal)\b/i,
+  /\b(student|teen|man|woman|suspect|resident)\b[^.]{0,40}\bcharged with\b[^.]{0,40}\b(threat|mass shooting|hoax)\b/i,
+  // Business / marketing "insurgent" metaphor (brand, growth, candidate, D2C).
+  /\b(?:incumbent[- ]insurgent|insurgent (?:brand|brands|growth|candidate|candidates|marketing|startup|start[- ]?up|challenger)|d2c insurgent\w*|['’]insurgent['’] brand\w*)\b/i,
+  // Animal-shelter adoption feature (pet often named "Rebel").
+  /\b(?:animal shelter|animal rescue|humane society|pet adoption)\b[^.]{0,60}\b(?:finds? a home|forever home|longest resident|adopt\w*|resident)\b/i,
+  // Arts / theatre review borrowing conflict words for colour.
+  /\bpaint\w*\b[^.]{0,40}\b(?:political landscape|social themes|mature (?:themes|political)|portrait|canvas)\b/i,
+  // Canadian provincial separatism (Alberta/Quebec) — not an APAC theatre.
+  /\b(alberta|quebec|québec)\b[^.]{0,40}\bseparatis\w*/i,
 ];
 
 const REQUIRED: Record<string, RegExp[]> = {
