@@ -117,11 +117,13 @@ function narrativeOf(ds: PngReportDataset): string[] {
 describe("buildCountryOperatingRiskDataset — Key Developments grouping", () => {
   const ds = build(POPULATED);
 
-  it("themes the window into distinct Key Development groups", () => {
-    // Two protests + one labour + one power → three distinct display themes.
-    expect(ds.keyDevelopments).toHaveLength(3);
+  it("leads with the assessed themes, each distinct", () => {
+    // Assessed synthesis buckets into the six fixed themes, not per display
+    // category: two protests + one labour action collapse into the PROTEST
+    // theme, one power/utilities item into OTHER → two assessed themes.
+    expect(ds.keyDevelopments).toHaveLength(2);
     const headings = ds.keyDevelopments.map((g) => g.heading);
-    expect(new Set(headings).size).toBe(3); // all distinct
+    expect(new Set(headings).size).toBe(2); // all distinct
     for (const g of ds.keyDevelopments) {
       expect(g.heading.trim().length).toBeGreaterThan(0);
       expect(g.businessImpact.trim().length).toBeGreaterThan(0);
@@ -129,18 +131,20 @@ describe("buildCountryOperatingRiskDataset — Key Developments grouping", () =>
       expect(g.items.length).toBeGreaterThan(0);
     }
     // Group keys are unique too (renderer uses them as React keys).
-    expect(new Set(ds.keyDevelopments.map((g) => g.key)).size).toBe(3);
+    expect(new Set(ds.keyDevelopments.map((g) => g.key)).size).toBe(2);
   });
 
-  it("co-locates same-theme incidents and partitions the window", () => {
-    // The grouping must not drop or duplicate an incident: the four window
-    // items land across the three groups (the two protests share one group).
-    const total = ds.keyDevelopments.reduce((n, g) => n + g.items.length, 0);
-    expect(total).toBe(POPULATED.length);
-    const twoItemGroups = ds.keyDevelopments.filter((g) => g.items.length === 2);
-    expect(twoItemGroups).toHaveLength(1);
-    const ids = twoItemGroups[0]!.items.map((it) => it.id).sort();
-    expect(ids).toEqual(["p1", "p2"]); // both protests, same theme
+  it("co-locates same-theme incidents without dropping or duplicating any", () => {
+    // The grouping must not duplicate an incident and must be a subset of the
+    // window (the per-theme cap can drop low-value items). Here all four land:
+    // the two protests and the labour action share the protest theme.
+    const ids = ds.keyDevelopments.flatMap((g) => g.items.map((it) => it.id));
+    expect(new Set(ids).size).toBe(ids.length); // no duplicates
+    const populatedIds = new Set(POPULATED.map((i) => i.id));
+    for (const id of ids) expect(populatedIds.has(id)).toBe(true); // subset
+    const protest = ds.keyDevelopments.find((g) => g.key === "protest");
+    expect(protest).toBeDefined();
+    expect(protest!.items.map((it) => it.id).sort()).toEqual(["l1", "p1", "p2"]);
   });
 });
 

@@ -63,6 +63,13 @@ import {
   type CountryIncidentTheme,
 } from "./countryIncidentThemes";
 import {
+  synthesiseAssessedThemes,
+  buildAssessedThemeGroups,
+  buildWhatMattersFromThemes,
+  themeLedLead,
+  type AssessedTheme,
+} from "./countryThemeSynthesis";
+import {
   buildPolestarView,
   type PolestarDirection,
   type PolestarViewParts,
@@ -774,6 +781,11 @@ export interface PngReportDataset {
   // Themed developments (incidents grouped by display category, severity-ranked),
   // each closing with a business-impact line. Drives the operating-risk layout.
   keyDevelopments: KeyDevelopmentGroup[];
+  // The two-to-three ASSESSED themes the brief leads with (each carrying
+  // concentration, business exposure and trajectory-vs-baseline). Selected by
+  // assessed value, deterministic, count-free — drives the BLUF / Executive
+  // Summary lead and the Key Developments section.
+  assessedThemes: AssessedTheme[];
   // "Escalation indicators" for the Outlook: what would raise concern in the
   // coming week. Deterministic, derived from the period's categories/severity.
   escalationIndicators: string[];
@@ -2086,66 +2098,44 @@ export function buildStructuredReportDataset(
   // theatre: operatingRiskDisplayCategory maps the granular categories onto the
   // business labels (and passes unmapped labels through unchanged). Each theme
   // keeps the tile/severity cards and closes with a deterministic business line.
-  const kdGroupMap = new Map<string, PngReportItem[]>();
-  for (const it of windowItems) {
-    const label = operatingRiskDisplayCategory(it.category);
-    const arr = kdGroupMap.get(label) ?? [];
-    arr.push(it);
-    kdGroupMap.set(label, arr);
-  }
-  // Rank themes by ASSESSED VALUE (scoreClusterValue: the operational signals a
-  // client acts on — casualties, evacuation, transport/road impact, regulatory
-  // shutdown, commercial proximity — severity-inclusive with a corroboration
-  // bump), NOT by raw incident count. This is the aggregate-then-label → assess
-  // shift: a single consequential development outranks a pile of low-value items.
-  const kdScored = Array.from(kdGroupMap.entries()).map(([label, items]) => {
-    const worst = items.reduce((m, it) => Math.max(m, it.severityRank), 0);
-    return {
-      label,
-      items: [...items].sort(sortBySeverityThenRecency),
-      worst,
-      score: scoreClusterValue(items),
-    };
+  // Synthesise the two-to-three ASSESSED themes that lead the brief. Each is
+  // selected by assessed value (scoreClusterValue), not raw count, and carries a
+  // concentration phrase, business-exposure sentence and a trajectory judged
+  // against the prior-week baseline. Deterministic, count-free, no LLM.
+  const assessedThemes = synthesiseAssessedThemes(windowItems, previousWindowItems, {
+    hasBaseline: hasPreviousWindow,
   });
-  // Assessed value first; severity then count only break ties, so a genuinely
-  // consequential theme never sits below a high-volume, low-value one.
-  kdScored.sort(
-    (a, b) => b.score - a.score || b.worst - a.worst || b.items.length - a.items.length,
-  );
-  const keyDevelopments: KeyDevelopmentGroup[] = kdScored.slice(0, 5).map((g) => ({
-    key: g.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "other",
-    heading: g.label,
+  // Key Developments are the assessed themes themselves — the brief leads with
+  // synthesised judgements rather than one group per display category.
+  const keyDevelopments: KeyDevelopmentGroup[] = assessedThemes.map((t) => ({
+    key: t.key,
+    heading: t.heading,
     // Cap per theme so the section reads as a brief, not an exhaustive list.
-    items: g.items.slice(0, 4),
-    businessImpact: operatingRiskAction(g.label),
+    items: t.items.slice(0, 4),
+    businessImpact: t.narrative,
   }));
 
-  // --- What Matters This Week (framing bullets) ------------------------------
-  // One short, count-free line per dominant theme: the theme phrase, where it
-  // clustered, and a qualitative severity flag. Empty window → standing caveat.
-  const whatMattersBullets: string[] = [];
-  if (windowItems.length === 0) {
-    whatMattersBullets.push(
-      "No fresh open-source reporting was identified this period; standing exposures continue to apply and the quiet stretch is read as a coverage signal, not an improvement.",
+  // Lead the rendered Incident Details section with the assessed themes drawn
+  // from the REMAINING incidents (those not promoted into the Top 3), so every
+  // theatre reads as two-to-three assessed themes rather than a flat per-category
+  // list. Jakarta keeps its own tactical-brief themes (set above); every other
+  // theatre (PNG, West Papua, Indonesia, Thailand, Philippines) gets the shared
+  // assessed synthesis here.
+  if (!incidentThemesOverride) {
+    incidentThemesOverride = buildAssessedThemeGroups(
+      incidentDetailsItems,
+      previousWindowItems,
+      { hasBaseline: hasPreviousWindow },
     );
-  } else {
-    for (const g of kdScored.slice(0, 4)) {
-      const phrase = capitaliseFirst(operatingRiskCategoryPhrase(g.label));
-      const locs = topLabels(
-        g.items.filter((it) => it.province),
-        (it) => provinceLabel.get(it.province as string) ?? (it.province as string),
-        2,
-      );
-      const locBit = locs.length ? `, concentrated in ${joinList(locs)}` : "";
-      const sevBit =
-        g.worst >= 5
-          ? ", including extreme-severity reporting"
-          : g.worst >= 4
-            ? ", including high-severity reporting"
-            : "";
-      whatMattersBullets.push(`${phrase}${locBit}${sevBit}.`);
-    }
   }
+
+  // --- What Matters This Week (framing bullets) ------------------------------
+  // One short, count-free line per assessed theme: the theme, where it
+  // clustered, and its trajectory. Empty window → standing caveat.
+  const whatMattersBullets: string[] = buildWhatMattersFromThemes(
+    assessedThemes,
+    "No fresh open-source reporting was identified this period; standing exposures continue to apply and the quiet stretch is read as a coverage signal, not an improvement.",
+  );
 
   // --- Escalation indicators (Outlook) ---------------------------------------
   // What would raise concern in the coming week — deterministic, drawn from the
@@ -2184,6 +2174,7 @@ export function buildStructuredReportDataset(
     executiveSummary,
     whatMattersBullets,
     keyDevelopments,
+    assessedThemes,
     escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
     jakartaTacticalBrief,
     whatChanged,

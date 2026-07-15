@@ -139,7 +139,7 @@ const THEME_IMPACT: Record<CountryIncidentTheme, string> = {
 };
 
 // "What happened" stems — the kind of activity each theme covers.
-const THEME_WHAT: Record<CountryIncidentTheme, string> = {
+export const THEME_WHAT: Record<CountryIncidentTheme, string> = {
   protest: "Protest activity and the crowd-control response to it were reported",
   crime: "Crime, theft and violent incidents were reported",
   natural: "Natural-hazard and environmental disruption was reported",
@@ -149,7 +149,7 @@ const THEME_WHAT: Record<CountryIncidentTheme, string> = {
 };
 
 // "Why it matters" — the operational significance of each theme.
-const THEME_SIGNIFICANCE: Record<CountryIncidentTheme, string> = {
+export const THEME_SIGNIFICANCE: Record<CountryIncidentTheme, string> = {
   protest:
     "Gatherings and the response to them can close roads and disrupt access at short notice.",
   crime:
@@ -162,7 +162,7 @@ const THEME_SIGNIFICANCE: Record<CountryIncidentTheme, string> = {
 };
 
 // "What could be affected" — the assets and operations exposed.
-const THEME_AFFECTED: Record<CountryIncidentTheme, string> = {
+export const THEME_AFFECTED: Record<CountryIncidentTheme, string> = {
   protest: "Road movement, site access and staff commuting near affected areas.",
   crime: "Staff safety, premises, vehicles and the secure movement of cash and assets.",
   natural: "Transport links, utilities, site access and the safety of outdoor operations.",
@@ -171,7 +171,7 @@ const THEME_AFFECTED: Record<CountryIncidentTheme, string> = {
   other: "Transport, power, communications and the operations that depend on them.",
 };
 
-function joinList(parts: string[]): string {
+export function joinList(parts: string[]): string {
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0]!;
   if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
@@ -180,7 +180,7 @@ function joinList(parts: string[]): string {
 
 // Distinct provinces present in an item set, ranked by frequency (most-cited
 // first), capped to `max`.
-function topProvinces(items: PngReportItem[], max = 3): string[] {
+export function topProvinces(items: PngReportItem[], max = 3): string[] {
   const counts = new Map<string, number>();
   for (const it of items) {
     const p = it.province?.trim();
@@ -193,7 +193,7 @@ function topProvinces(items: PngReportItem[], max = 3): string[] {
 }
 
 // Distinct client-facing categories present, ranked by frequency, capped to max.
-function topCategories(items: PngReportItem[], max = 3): string[] {
+export function topCategories(items: PngReportItem[], max = 3): string[] {
   const counts = new Map<string, number>();
   for (const it of items) {
     const c = (it.displayCategory?.trim() || it.category) ?? "";
@@ -219,7 +219,7 @@ const CATEGORY_NOUN_OVERRIDE: Record<string, string> = {
   "intelligence / training": "security activity",
   "environmental / haze": "environmental hazards",
 };
-function categoryNoun(label: string): string {
+export function categoryNoun(label: string): string {
   const k = label.trim().toLowerCase();
   if (CATEGORY_NOUN_OVERRIDE[k]) return CATEGORY_NOUN_OVERRIDE[k]!;
   return (k.split("/")[0] ?? k).trim();
@@ -232,7 +232,7 @@ function categoryNoun(label: string): string {
 // ("The most serious reported was …"). No fabrication: title, province and
 // severity label are the incident's own fields. Mirrors watchLine in
 // pngReportDataset (kept local to preserve this module's type-only import).
-function leadIncidentSentence(items: PngReportItem[]): string {
+export function leadIncidentSentence(items: PngReportItem[]): string {
   const ranked = [...items].sort((a, b) => {
     if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
     const ad = a.reportedDate instanceof Date ? a.reportedDate.getTime() : 0;
@@ -255,8 +255,8 @@ function leadIncidentSentence(items: PngReportItem[]): string {
 }
 
 // Highest five-tier severity index present in an item set (-1 when none).
-const SEVERITY_ORDER = ["insignificant", "low", "moderate", "high", "extreme"];
-function worstSeverityIndex(items: PngReportItem[]): number {
+export const SEVERITY_ORDER = ["insignificant", "low", "moderate", "high", "extreme"];
+export function worstSeverityIndex(items: PngReportItem[]): number {
   return items.reduce((m, it) => Math.max(m, SEVERITY_ORDER.indexOf(it.severity)), -1);
 }
 
