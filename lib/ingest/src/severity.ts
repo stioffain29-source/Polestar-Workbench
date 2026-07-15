@@ -146,7 +146,7 @@ const PLURAL_STRIKE_RE = /\b(air ?strikes|drone strikes)\b/i;
 // strikes" are natural, and the military senses ("air strike", "missile
 // strike") are caught by the keep-list below.
 const NATURAL_CAUSE_RE =
-  /\b(lightning|flash flood|floods?|flooding|inundat\w*|landslide|mudslide|mudflow|monsoon|cyclone|typhoon|hurricane|tornado|storm surge|earthquake|quake|aftershock|tremor|avalanche|heat ?wave|heatstroke|sun ?stroke|cold ?wave|drown(s|ed|ing)?|snake ?bite|electrocut\w*)\b/i;
+  /\b(lightning|flash flood|floods?|flooding|inundat\w*|landslide|mudslide|mudflow|monsoon|cyclone|typhoon|hurricane|tornado|storm surge|earthquake|quake|aftershock|tremor|avalanche|heat ?wave|heatstroke|sun ?stroke|cold ?wave|drown(s|ed|ing)?|snake ?bite|electrocut\w*|banjir|longsor|gempa|tsunami|topan|puting beliung|angin ribut|badai|tenggelam|tersambar petir|sambaran petir|letusan|erupsi|gunung (?:api )?meletus)\b/i;
 // Security, violence or crowd-crush signals that mean a fatality is NOT a pure
 // natural disaster. Deliberately broad: the guard errs toward KEEPING Extreme,
 // so any of these present cancels the natural-cause suppression (a missed
@@ -304,6 +304,54 @@ const MASS_COUNT_FATAL_RE = new RegExp(
   "i",
 );
 
+// Bahasa (Indonesian / Malay) approximators, mirroring FATAL_QUALIFIER.
+const ID_FATAL_QUALIFIER =
+  "(?:sedikitnya\\s+|setidaknya\\s+|paling sedikit\\s+|hingga\\s+|sekitar\\s+|lebih dari\\s+|hampir\\s+)?";
+// A Bahasa mass count: the shared MASS_COUNT (>= threshold, year-guarded) or a
+// vague Indonesian large quantity ("puluhan"=dozens, "ratusan"=hundreds).
+const ID_MASS_COUNT = `(?:${MASS_COUNT}|puluhan|ratusan|ribuan)`;
+// Bahasa unit negative-lookahead. The English COUNT_UNIT_GUARD lists no
+// Indonesian units, so "32 juta" (million), "27 tahun" (years old) or "50
+// persen" must never read as a body count.
+const ID_COUNT_UNIT_GUARD =
+  "(?!\\s*-?\\s*(?:juta|ribu|ribuan|miliar|milyar|triliun|persen|per[- ]?sen|tahun|bulan|minggu|hari|jam|rupiah|dolar|km|kg|ton|tonne|hektare?|meter|liter)\\b)";
+// A Bahasa mass-casualty toll: an explicit sudden / violent-death form
+// ("tewas" / "tewaskan" / "menewaskan") bound to a mass count. Indonesian
+// outlets use "tewas" for violent / accident / disaster deaths (illness deaths
+// use "meninggal" / "wafat", deliberately EXCLUDED so an illness toll cannot
+// reach the reserved tier), so a mass "tewas" toll is a genuine mass-casualty
+// event — the Bahasa mirror of MASS_COUNT_FATAL_RE / MASS_FATAL_VERB_COUNT_RE.
+// The Bahasa natural-disaster terms now in NATURAL_CAUSE_RE still suppress a
+// flood / quake toll from Extreme via the natural-cause guard, as in English.
+const ID_MASS_TOLL_RE = new RegExp(
+  // verb -> count: "menewaskan 32 orang", "tewaskan sedikitnya 27"
+  `\\b(?:menewaskan|tewaskan)\\s+${ID_FATAL_QUALIFIER}${ID_MASS_COUNT}\\b${COUNT_UNIT_GUARD}${ID_COUNT_UNIT_GUARD}` +
+    // count -> word: "28 tewas", "27 orang tewas", "puluhan orang tewas"
+    `|\\b${ID_FATAL_QUALIFIER}${ID_MASS_COUNT}\\b${COUNT_UNIT_GUARD}${ID_COUNT_UNIT_GUARD}\\s+(?:orang\\s+)?tewas\\b` +
+    // rising toll: "korban tewas ... (men)jadi / mencapai / bertambah menjadi 32 orang"
+    `|\\bkorban\\s+tewas\\b[\\s\\S]{0,30}?\\b(?:(?:men)?jadi|mencapai|bertambah(?:\\s+menjadi)?|naik(?:\\s+menjadi)?)\\s+${ID_FATAL_QUALIFIER}${ID_MASS_COUNT}\\b${COUNT_UNIT_GUARD}${ID_COUNT_UNIT_GUARD}`,
+  "i",
+);
+
+/**
+ * True if the text carries a MASS-CASUALTY fatality toll (>= MASS_FATALITY_
+ * THRESHOLD): an English "N killed" / "kills N" toll or the Bahasa "N tewas" /
+ * "tewaskan N" / rising "korban tewas ... jadi N" toll. Exported so the one-time
+ * DB heal can scope its UPGRADE strictly to rows carrying a mass toll the
+ * pre-heal classifier under-rated (a bare Bahasa toll had no severity floor).
+ * The heal recomputes classifySeverity and only upgrades when strictly higher,
+ * so a toll that is actually a natural disaster / reaction / obituary — which the
+ * guards keep out of Extreme — is left untouched.
+ */
+export function hasMassCasualtyToll(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return (
+    ID_MASS_TOLL_RE.test(hay) ||
+    MASS_FATAL_VERB_COUNT_RE.test(hay) ||
+    MASS_COUNT_FATAL_RE.test(hay)
+  );
+}
+
 // Mass casualties, massacre, emergency rule. RESERVED tier — drives the
 // subdued-red marker only. A single / low-count confirmed fatality is NOT here:
 // it is a High security event (see FATAL_SIGNAL_RE + the decision in
@@ -335,6 +383,9 @@ const EXTREME: RegExp[] = [
   /\b(mass casualt|multiple (deaths|fatalities|killings)|many (?:killed|dead))\b/i,
   MASS_FATAL_VERB_COUNT_RE,
   MASS_COUNT_FATAL_RE,
+  // Bahasa mass-casualty toll ("32 tewas", "menewaskan 32 orang", "korban
+  // tewas ... jadi 32 orang"). Inert on non-Bahasa text.
+  ID_MASS_TOLL_RE,
 ];
 
 // A confirmed killing (single / unspecified toll). Serious — drives the High

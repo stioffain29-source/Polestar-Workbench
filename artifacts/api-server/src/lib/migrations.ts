@@ -19,6 +19,7 @@ import {
   isBiographicalOrIllnessDeath,
   hasIndonesianViolenceSignal,
   hasConfirmedKillingSignal,
+  hasMassCasualtyToll,
   isMaritimeVesselAttack,
   severityFromFatalities,
   maxSeverity,
@@ -3252,6 +3253,89 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { scanned: candidates.length, upgraded, marker: markerKey },
           "One-time severity heal: confirmed-killing upgrade (Bahasa fatal + victim→verb English + tewas-in-security-context)",
+        );
+      }
+    }
+
+    // 3f-2) One-time UPGRADE of rows carrying a MASS-CASUALTY toll the pre-heal
+    //       classifier under-rated. The reserved Extreme tier floors an English
+    //       mass toll ("32 killed", "kills 28"), but there was NO Bahasa mirror:
+    //       a bare "tewas" toll is homonym-gated (requires a security context),
+    //       so an Indonesian-language mass-casualty headline — reported case: a
+    //       Bangkok bar fire, "Korban Tewas ... Jadi 32 Orang" on
+    //       indonesia_local — collapsed to LOW. classifySeverity now floors a
+    //       Bahasa mass "tewas" toll at Extreme (ID_MASS_TOLL_RE), but the
+    //       scrapers' read-then-insert dedupe never re-touches a stored row, so
+    //       existing machine rows keep the stale chip.
+    //
+    //       This pass re-rates ONLY auto-scraped / legacy rows that match the
+    //       narrow mass-casualty-toll predicate for exactly this change, setting
+    //       each to the current classifySeverity result (never below a structured
+    //       fatality floor) and ONLY when strictly higher (upgrade-only). The
+    //       predicate gate keeps it from touching rows that differ from the
+    //       classifier for unrelated reasons; it never alters analyst severities
+    //       or DOWNGRADES anything. Marker-gated → runs once per environment.
+    {
+      const markerKey = "severity_mass_casualty_toll_heal_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, [
+                "flashpoint",
+                "conflict",
+                "strikes",
+                "indonesia_local",
+                "apac_local",
+              ]),
+              or(
+                like(incidentsTable.analystNotes, "auto-scraped:%"),
+                like(incidentsTable.analystNotes, "legacy:db:%"),
+              ),
+            ),
+          );
+        let upgraded = 0;
+        for (const r of candidates) {
+          if (!hasMassCasualtyToll(r.title, r.summary ?? "")) continue;
+          const topic =
+            r.topic === "conflict" || r.topic === "strikes"
+              ? "conflict"
+              : r.topic === "indonesia_local"
+                ? "indonesia_local"
+                : r.topic === "apac_local"
+                  ? "apac_local"
+                  : "flashpoint";
+          const fromText = classifySeverity(r.title, r.summary ?? "", topic);
+          const floor = severityFromFatalities(r.fatalities);
+          const next = floor ? maxSeverity(fromText, floor) : fromText;
+          const stored = r.severity as Severity;
+          if (SEVERITY_RANK[next] > SEVERITY_RANK[stored]) {
+            await db
+              .update(incidentsTable)
+              .set({ severity: next })
+              .where(eq(incidentsTable.id, r.id));
+            upgraded++;
+          }
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { scanned: candidates.length, upgraded, marker: markerKey },
+          "One-time severity heal: mass-casualty toll upgrade (Bahasa tewas toll + English mass toll)",
         );
       }
     }

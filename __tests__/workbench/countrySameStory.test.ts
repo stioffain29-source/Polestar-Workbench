@@ -328,6 +328,54 @@ describe("storyEntities", () => {
     expect(e.strong.size).toBe(0);
     expect(e.classes.has("fatal")).toBe(true);
   });
+
+  // Event-nature "fire" class + the "kills" fix. Reported defect: a Bangkok bar
+  // fire read as THREE separate Top-3 developments because the Bahasa copy
+  // ("...Kebakaran...") matched no shared class (the fatal class was English-only)
+  // and an English "fire kills N" copy did not match "kills" (the class had bare
+  // "kill" only). Both must now share the "fire" class so the diversity guard
+  // treats them as one story.
+  it("emits a shared 'fire' class for English and Bahasa fire headlines", () => {
+    expect(storyEntities("Bangkok bar fire kills 28").classes.has("fire")).toBe(true);
+    expect(
+      storyEntities("Korban Tewas Kebakaran Bar di Bangkok Jadi 32 Orang").classes.has("fire"),
+    ).toBe(true);
+    expect(storyEntities("Gas explosion levels a market").classes.has("fire")).toBe(true);
+  });
+
+  it("matches the fatal class on 'kills' as well as 'killed'", () => {
+    expect(storyEntities("Fire kills 28 people").classes.has("fatal")).toBe(true);
+    expect(storyEntities("28 people killed in a fire").classes.has("fatal")).toBe(true);
+  });
+});
+
+describe("storySimilarity — fire event-nature (Bangkok bar fire)", () => {
+  // The English and Bahasa copies share the place token "bangkok" and (now) the
+  // "fire" class, within the 3-day window → the same real-world story. Before the
+  // fire class the Bahasa copy carried no shared class, so the two survived as
+  // distinct Top-3 developments.
+  it("treats an English and a Bahasa copy of one fire as the same story", () => {
+    const s = storySimilarity(
+      { title: "Bangkok bar fire kills 28", dateMs: base },
+      {
+        title: "Korban Tewas Kebakaran Bar di Bangkok Jadi 32 Orang",
+        dateMs: base + DAY,
+      },
+    );
+    expect(s.sharedPlaceClass).toBe(true);
+  });
+
+  it("does NOT fold two distinct fires in different cities into one story", () => {
+    const s = storySimilarity(
+      { title: "Bangkok bar fire kills 28", dateMs: base },
+      { title: "Chiang Mai market fire kills 3", dateMs: base + DAY },
+    );
+    // Same "fire" class and both carry the leaked fatal verb "kills", but that
+    // verb is generic vocabulary (not a distinctive place), so with no shared
+    // town the diversity guard keeps them as two separate developments.
+    expect(s.sharedPlaceClass).toBe(false);
+    expect(s.jaccard).toBeLessThan(0.4);
+  });
 });
 
 describe("consolidateCountryStories", () => {

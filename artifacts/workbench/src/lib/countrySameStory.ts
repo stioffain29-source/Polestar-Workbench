@@ -159,7 +159,14 @@ export function incidentTypeKey(
 // a strong anchor — it is a recurring actor across many separate Papua incidents,
 // so it cannot on its own identify a single event.
 const CLASS_PATTERNS: Array<[string, RegExp]> = [
-  ["fatal", /\b(killed|kill|shot\s+dead|gunned\s+down|dead|deaths?|slain|murder\w*|fatal\w*|died|bodies|body)\b/i],
+  ["fatal", /\b(killed|kills?|shot\s+dead|gunned\s+down|dead|deaths?|slain|murder\w*|fatal\w*|died|bodies|body)\b/i],
+  // Event-nature: a fire / blaze / explosion. Two outlets framing the same
+  // fire as "kills 28" and "singer killed" share no other corroborating class,
+  // so without this they read as distinct Top-3 developments. Bahasa
+  // "kebakaran" (fire) is included for the Indonesian-language feeds. This is a
+  // CORROBORATOR only (Top-3 diversity + strong-entity PATH 3); it never folds
+  // buckets on its own, so distinct same-city fires are still shown separately.
+  ["fire", /\b(fire|blaze|inferno|conflagration|kebakaran|razed|gutted|burn\w*|explos\w*|ledakan)\b/i],
   ["evacuation", /\b(evacuat\w*|repatriat\w*|airlift\w*|flown\s+out)\b/i],
   ["abduction", /\b(abduct\w*|kidnap\w*|hostage\w*|held\s+captive|taken\s+captive)\b/i],
   ["injury", /\b(injured|wounded|hurt)\b/i],
@@ -269,7 +276,7 @@ const CLASH_GENERIC_TOKENS = new Set([
   "terror", "gunman", "gunmen", "insurgent", "insurgents", "rebel", "rebels",
   "fighter", "fighters", "let", "linked", "group", "outfit", "cadre", "cadres",
   // outcome / temporal / status filler
-  "kill", "killed", "killing", "killings", "dead", "death", "deaths", "injured",
+  "kill", "kills", "killed", "killing", "killings", "dead", "death", "deaths", "injured",
   "wounded", "hurt", "hiding", "continues", "continue", "continued", "ongoing",
   "underway", "rages", "raging", "tighten", "tightens", "tightened", "hours",
   "hour", "day", "days", "live", "updates", "update", "breaking", "reported",

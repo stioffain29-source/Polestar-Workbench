@@ -1,4 +1,9 @@
-import { classifySeverity, maxSeverity, severityFromFatalities } from "@workspace/ingest";
+import {
+  classifySeverity,
+  maxSeverity,
+  severityFromFatalities,
+  hasMassCasualtyToll,
+} from "@workspace/ingest";
 
 describe("classifySeverity", () => {
   it("rates cargo pilferage as low", () => {
@@ -342,5 +347,77 @@ describe("classifySeverity", () => {
 
   it("does not rate a structural mine collapse death as a security killing", () => {
     expect(classifySeverity("Miners killed in mine collapse", "", "conflict")).not.toBe("high");
+  });
+});
+
+// A Bahasa (Indonesian-language) mass-casualty toll must floor at the reserved
+// Extreme tier exactly like its English equivalent. Reported defect: a Bangkok
+// bar fire filed on indonesia_local ("Korban Tewas ... Jadi 32 Orang") read LOW
+// because the mass-toll classifier only understood English "N killed" / "kills
+// N". The natural-cause + illness guards must still keep a disaster / obituary
+// toll out of the reserved tier, and money / age / year figures must never read
+// as a body count.
+describe("classifySeverity — Bahasa mass-casualty toll", () => {
+  const T = "indonesia_local" as const;
+
+  it("rates a Bahasa rising death toll as extreme (the reported Bangkok bar fire)", () => {
+    expect(
+      classifySeverity("Korban Tewas Kebakaran Bar di Bangkok Jadi 32 Orang", "", T),
+    ).toBe("extreme");
+  });
+
+  it("rates 'menewaskan N orang' as extreme", () => {
+    expect(classifySeverity("Kebakaran bar di Bangkok menewaskan 27 orang", "", T)).toBe(
+      "extreme",
+    );
+  });
+
+  it("rates 'N orang tewas' as extreme", () => {
+    expect(classifySeverity("Kebakaran klub malam, 28 orang tewas", "", T)).toBe("extreme");
+  });
+
+  it("rates a bare 'N tewas' toll as extreme", () => {
+    expect(classifySeverity("Kecelakaan bus di tol, 15 tewas", "", T)).toBe("extreme");
+  });
+
+  it("suppresses a Bahasa NATURAL-disaster toll from the reserved tier", () => {
+    expect(classifySeverity("Banjir bandang di Sumatra, 20 orang tewas", "", T)).not.toBe(
+      "extreme",
+    );
+  });
+
+  it("does NOT escalate an illness / obituary Bahasa death (meninggal)", () => {
+    expect(classifySeverity("Aktor senior meninggal dunia di usia 82", "", T)).not.toBe(
+      "extreme",
+    );
+  });
+
+  it("does NOT read a large Bahasa money / age number as a body count", () => {
+    expect(classifySeverity("Kerugian kebakaran capai 32 miliar rupiah", "", T)).not.toBe(
+      "extreme",
+    );
+    expect(classifySeverity("Pria 27 tahun tewas dalam kecelakaan tunggal", "", T)).not.toBe(
+      "extreme",
+    );
+  });
+
+  it("does NOT read a bare year as a mass toll", () => {
+    expect(classifySeverity("Mengenang tragedi 1998 di Jakarta", "", T)).not.toBe("extreme");
+  });
+});
+
+describe("hasMassCasualtyToll", () => {
+  it("detects English and Bahasa mass tolls", () => {
+    expect(hasMassCasualtyToll("Fire kills 28", "")).toBe(true);
+    expect(hasMassCasualtyToll("Korban tewas kebakaran jadi 32 orang", "")).toBe(true);
+    expect(hasMassCasualtyToll("28 orang tewas", "")).toBe(true);
+    expect(hasMassCasualtyToll("Kebakaran menewaskan 27 orang", "")).toBe(true);
+  });
+
+  it("does not fire on a single death or a year / money figure", () => {
+    expect(hasMassCasualtyToll("One person killed in crash", "")).toBe(false);
+    expect(hasMassCasualtyToll("Satu orang tewas dalam kecelakaan", "")).toBe(false);
+    expect(hasMassCasualtyToll("Kerugian capai 32 miliar rupiah", "")).toBe(false);
+    expect(hasMassCasualtyToll("Mengenang tragedi 1998", "")).toBe(false);
   });
 });
