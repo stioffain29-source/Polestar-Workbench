@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   useListOfficialMilitaryMaritimeSources,
+  getListOfficialMilitaryMaritimeSourcesQueryKey,
   type OfficialMilitaryMaritimeSource,
 } from "@workspace/api-client-react";
 import { ExternalLink } from "lucide-react";
@@ -166,7 +167,15 @@ export default function OfficialSourcesQueuePanel({
   const { data: kpiData = [], isLoading: kpiLoading } =
     useListOfficialMilitaryMaritimeSources(
       { flagged: true, limit: 200 },
-      { query: { enabled: useApi } },
+      {
+        query: {
+          enabled: useApi,
+          queryKey: getListOfficialMilitaryMaritimeSourcesQueryKey({
+            flagged: true,
+            limit: 200,
+          }),
+        },
+      },
     );
 
   const listParams =
@@ -176,7 +185,10 @@ export default function OfficialSourcesQueuePanel({
 
   const { data: tabData = [], isLoading: tabLoading } =
     useListOfficialMilitaryMaritimeSources(listParams, {
-      query: { enabled: useApi },
+      query: {
+        enabled: useApi,
+        queryKey: getListOfficialMilitaryMaritimeSourcesQueryKey(listParams),
+      },
     });
 
   const allItems = itemsOverride ?? kpiData;

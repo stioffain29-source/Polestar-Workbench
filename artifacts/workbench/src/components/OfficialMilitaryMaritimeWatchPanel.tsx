@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   useListOfficialMilitaryMaritimeSources,
+  getListOfficialMilitaryMaritimeSourcesQueryKey,
   type ListOfficialMilitaryMaritimeSourcesParams,
   type OfficialMilitaryMaritimeSource,
 } from "@workspace/api-client-react";
@@ -137,7 +138,12 @@ export default function OfficialMilitaryMaritimeWatchPanel({
   const useApi = itemsOverride === undefined;
   const { data = [], isLoading: apiLoading } = useListOfficialMilitaryMaritimeSources(
     query,
-    { query: { enabled: useApi } },
+    {
+      query: {
+        enabled: useApi,
+        queryKey: getListOfficialMilitaryMaritimeSourcesQueryKey(query),
+      },
+    },
   );
 
   const items = useMemo(() => {
