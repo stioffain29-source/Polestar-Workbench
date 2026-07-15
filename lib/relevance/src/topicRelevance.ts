@@ -1115,7 +1115,7 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // books allegedly glorifying separatists"). A censorship/vetting action, not
   // a live armed event. Tightly bound to a book/curriculum noun so a probe into
   // a genuine attack is never dropped.
-  /\b(orders? (?:a |an )?probe|suspend(?:s|ed))\b[^.]{0,55}\b(?:book|books|textbook|textbooks|curriculum|syllabus)\b[^.]{0,45}\b(?:glorif\w*|separatis\w*|militan\w*|terror\w*|proscrib\w*)\b/,
+  /\b(orders? (?:a |an )?probe|suspend(?:s|ed)|arrest\w*|detain\w*|charge\w*|\bfir\b|book(?:s|ed)|held|action against|seiz\w*)\b[^.]{0,60}\b(?:book|books|textbook|textbooks|publisher|publishers|curriculum|syllabus|pamphlet)\b[^.]{0,45}\b(?:glorif\w*|separatis\w*|militan\w*|terror\w*|proscrib\w*|propaganda)\b/i,
   // Symbolic destruction of a statue / monument / memorial / mural / plaque /
   // bust / effigy ("junta forces destroy two General Aung San bronze statues").
   // Property/heritage vandalism, not a kinetic attack on people. Bound to the
@@ -1123,6 +1123,38 @@ const CONFLICT_EXCLUDE: RegExp[] = [
   // by the violence override) is never dropped.
   /\b(?:destroy\w*|demolish\w*|topple[sd]?|toppling|vandali[sz]\w*|deface[sd]?|defacing|pull(?:s|ed)? down|pulling down|bulldoze[sd]?|tear(?:s|ing)? down|tore down|blow (?:up|n up)|blew up)\b[^.]{0,45}\b(?:statue|statues|monument|monuments|memorial|memorials|mural|murals|plaque|plaques|bust|busts|effig(?:y|ies)|shrine|shrines|signage|billboard|hoarding|portrait|portraits)\b/,
   /\b(?:statue|statues|monument|monuments|memorial|memorials|mural|murals|plaque|plaques|bust|busts|effig(?:y|ies))\b[^.]{0,45}\b(?:destroy\w*|demolish\w*|topple[sd]?|vandali[sz]\w*|deface[sd]?|pull(?:s|ed)? down|bulldoze[sd]?|torn down|blown up)\b/,
+  // Diplomacy: an envoy / mediator / delegation MEETS a rebel / insurgent /
+  // ethnic-armed / resistance group ("Asean envoy meets Myanmar rebel groups
+  // in Thailand"). A negotiation is the OPPOSITE of a kinetic event; the
+  // violence override still re-admits any talks derailed by a real ambush.
+  /\b(envoy|delegation|mediator|diplomat|special representative|foreign minister|peace talks?|holds? talks|held talks)\b[^.]{0,45}\bmeet(s|ing)?\b[^.]{0,45}\b(rebel|insurgent|militant|armed group|ethnic armed|resistance|junta|separatist)s?\b/i,
+  /\b(rebel|insurgent|armed group|ethnic armed|resistance|separatist)s?\b[^.]{0,25}\bmeet(s|ing)?\b[^.]{0,25}\b(envoy|delegation|mediator|diplomat|special representative|foreign minister)\b/i,
+  // Family appeal / political meeting over relatives ARRESTED in insurgency
+  // cases ("'…Please Release Them': Families Of Tribals Arrested In Naxal
+  // Cases Meet Chhattisgarh Deputy CM"). A clemency plea / minister meeting is
+  // a governance story, not an armed event. Bound to a release-appeal or
+  // family+arrest+meet frame; the violence override still protects any story
+  // that also reports a real attack.
+  /\b(please release|release of|demand(?:s|ed|ing)? (?:the )?release|plea for release)\b[^.]{0,70}\b(arrest\w*|detain\w*|jailed|booked|undertrial|held)\b/i,
+  /\b(famil(?:y|ies)|relatives|kin|mothers?|parents)\b[^.]{0,80}\b(arrest\w*|detain\w*|jailed|booked)\b[^.]{0,80}\bmeet(?:s|ing)?\b/i,
+  // Peace/reconciliation OP-ED or interview by a former insurgent
+  // ("Coexistence is the only sustainable path for Manipur, says former
+  // insurgent leader RK Meghen"). A commentary about reconciliation is not a
+  // kinetic event; bound to a peace-vocabulary word adjacent to an ex-actor.
+  /\b(coexistence|reconciliation|sustainable path|only (path|way) (forward|to peace|for)|harmony|lasting peace|dialogue)\b[^.]{0,80}\b(ex|former)[- ]?(insurgent|rebel|militant|separatist|combatant|guerrilla|naxal)\w*\b/i,
+  // Entertainment censorship — a film / documentary / series / song banned,
+  // censored, blocked or certification-refused ("India's bans insurgency film
+  // Satluj claiming propaganda"; "Why is India blocking film on … Punjab
+  // insurgency killings"). A screening ban is a culture story, not an armed
+  // event; bound to the ban verb adjacent to a media-work noun.
+  /\b(ban(?:s|ned|ning)?|censor\w*|block(?:s|ed|ing)?|pull(?:s|ed)?|withdraw\w*|refuse[sd]? (?:certif|clearance|screening)|deny (?:certif|clearance)|stall(?:s|ed)?)\b[^.]{0,45}\b(film|films|movie|movies|cinema|documentar\w*|web[- ]?series|song|songs|trailer|teaser|screening|serial)\b/i,
+  /\b(film|films|movie|documentar\w*|web[- ]?series|song|trailer)\b[^.]{0,30}\b(ban(?:s|ned|ning)?|censor\w*|block(?:s|ed|ing)?|pulled|withdrawn|denied certif)\b/i,
+  // Precautionary cordon-and-search / combing operation with NO contact —
+  // signalled by a CCTV / "suspected" / "spotted" cue rather than any
+  // casualty ("Security Forces Launch Search Operation After CCTV Spots
+  // Suspected Militants"). Bound to that no-contact signature; the violence
+  // override re-admits any operation that reports an actual encounter/kill.
+  /\b(search operation|combing operation|cordon(?:[- ]and[- ]| )search|area domination)\b[^.]{0,45}\b(cctv|spot(?:s|ted)?|suspected)\b/i,
 ];
 
 // Hard ARMED-violence signal. When present, the relief/peace excludes above are
@@ -1132,7 +1164,7 @@ const CONFLICT_EXCLUDE: RegExp[] = [
 // (killed/dead/wounded) are excluded because they also describe disaster tolls
 // ("earthquake kills 30"), which would re-open the relief noise this fix closes.
 const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
-  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
+  /\b(ambush(ed|es)?|firefights?|gun ?battle|gun ?fight|shoot[- ]?out|encounter (?:underway|under way|breaks? out|broke out|erupt\w*|ensu\w*|rages?|raging)|cross[- ]?fire|opened fire|hail of (gunfire|bullets)|shelling|artillery|air ?strike|airstrike|drone strike|missile strike|bomb(ing|ed)|bomb blast|car bomb|truck bomb|suicide bomb(er|ing)?|roadside bomb|land ?mine|\bied\b|improvised explosive|grenade|mass shooting|massacre|gunned down|shot dead|gunm[ae]n|armed assailant|armed (attack|clash|clashes|raid|group)|militants? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?|strike)|insurgents? (attack(ed|s)?|raid(ed)?|kill(ed|s)?|ambush(ed)?)|kidnap(ped|ping)?|abduct(ed|ion)?|hostages?|held captive)\b/;
 
 // Conflict OP-ED / METAPHOR hard-exclude. Unlike CONFLICT_EXCLUDE, this runs
 // BEFORE the violence override so a kinetic word used as a POLITICAL/ABSTRACT
@@ -1145,6 +1177,26 @@ const CONFLICT_HARD_EXCLUDE: RegExp[] = [
   /^\s*(comment|opinion|analysis|editorial|explainer|explained|viewpoint|perspective|column|blog|essay|op[- ]?ed)\b\s*[:|\-–—]/i,
   /\b(ambush|minefield|crossfire|cross[- ]fire|tightrope|powder keg|powder[- ]keg)\b[^.]{0,45}\b(politic\w*|democra\w*|econom\w*|budget|election\w*|elector\w*|diploma\w*|parliament\w*|boardroom|classroom|courtroom|narrative|discourse|debate|identity|ideolog\w*)\b/i,
   /\b(politic\w*|democra\w*|econom\w*|budget|election\w*|elector\w*|diploma\w*|parliament\w*|ideolog\w*)\b[^.]{0,30}\b(ambush|minefield|crossfire|cross[- ]fire|tightrope|powder keg)\b/i,
+  // Food / agriculture / heritage metaphor that borrows a kinetic word for
+  // colour ("Rataul: Legendary UP mango which battled Pakistan's ambush now
+  // facing survival crisis"). A cuisine/fruit/orchard feature is never a
+  // kinetic event; the produce noun is unambiguous, so binding it to the
+  // kinetic word within a short window cannot catch a real ambush report.
+  /\b(mango|litchi|lychee|guava|papaya|cultivar|delicacy|cuisine|orchard|heritage fruit)\b[^.]{0,50}\b(ambush|battl\w*|besieg\w*|siege|survival (crisis|battle))\b/i,
+  /\b(ambush|battl\w*|besieg\w*|siege|survival (crisis|battle))\b[^.]{0,50}\b(mango|litchi|lychee|guava|papaya|cultivar|delicacy|cuisine|orchard)\b/i,
+  // Retrospective explainer whose kinetic word is a HISTORY lesson, not a live
+  // event ("How ambush of church leaders … escalated Naga-Kuki conflict across
+  // Manipur hills"). Bound to an analytical verb (escalated / unravelled /
+  // reshaped) ADJACENT to an abstract conflict-noun, so a real report ("How
+  // militants stormed the base") — no such verb+abstract pair — is untouched.
+  /^\s*(how|why|what)\b[^.]{0,90}\b(escalat\w*|unravel\w*|reshap\w*)\b[^.]{0,40}\b(conflict|crisis|feud|tension|violence|war|divide|rift|strife|unrest)\b/i,
+  // Returnee / displacement STATUS story — a forward-looking humanitarian
+  // frame ("Airstrike Threats Keep Displaced Residents from Returning to Ye
+  // Chaung Phyar"), not a discrete attack. The kinetic word (airstrike) would
+  // otherwise re-admit it via the violence override, so it must be HARD. Bound
+  // to threat/fear + prevent + return so a real strike ("airstrike kills 10")
+  // with no returnee-obstacle framing is never dropped.
+  /\b(threat\w*|fear\w*)\b[^.]{0,40}\b(keep\w*|prevent\w*|stop\w*|deter\w*|bar\w*|discourag\w*)\b[^.]{0,40}\b(displaced|residents|returnees?|civilians|villagers|people|families)\b[^.]{0,30}return/i,
 ];
 
 const REQUIRED: Record<string, RegExp[]> = {

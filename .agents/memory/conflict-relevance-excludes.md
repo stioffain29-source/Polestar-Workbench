@@ -96,3 +96,37 @@ rows. Lock both the drops and the protected keeps into
 - **Why:** a lane proves genuineness, not topical cleanliness; the excludes are the
   reusable "noise" half of the relevance rules, split out so both the text gate and
   the promote pass share ONE definition of slop and can never drift.
+
+## Publishing/censorship & precautionary-search noise classes
+- Conflict Watch recurrently leaks NON-kinetic stories that merely name an armed
+  actor: censorship of an insurgency FILM/book ("India bans insurgency film",
+  "publishers arrested for books glorifying separatists"), symbolic STATUE/monument
+  destruction, "How X escalated conflict" retrospective explainers, "Dear Editor"
+  op-eds, reconciliation/coexistence pieces by EX-combatants, family clemency pleas,
+  and precautionary CORDON-AND-SEARCH after CCTV spots suspects (no contact yet).
+- Handle as override-gated `CONFLICT_EXCLUDE` (relief/peace + op-ed/metaphor arms)
+  so a genuine kinetic event survives via `CONFLICT_VIOLENCE_OVERRIDE`. The search
+  exclude in particular MUST stay override-gated: "search operation; two militants
+  killed in gun battle" and "…encounter underway" must be RE-ADMITTED — so the
+  override includes an `encounter (underway|breaks out|erupts|ensues|rages)` arm.
+- **`magazine` trap:** the book-censorship arm must NOT list `magazine` in its
+  publication-noun set — it collides with a weapons/ammunition MAGAZINE seizure
+  ("seize weapons and magazines from militants"), which is a real armed-recovery
+  event. Keep it to book/textbook/publisher/curriculum/syllabus/pamphlet.
+
+## Cumulative running-tally duplication is NOT deterministically collapsible
+- The other half of "Conflict is over-inflated" is one operation counted several
+  times as its DAILY running total climbs ("102 → 105 → 114 militants killed since
+  5 July"). These are the same campaign, but each day's headline is PARAPHRASED
+  ("counterterror operations" / "air, ground operations" / "security forces
+  killed"), so their canonical keys differ even after stripping the digits.
+- **Consequence:** the "safe" deterministic collapse (same canonical key once
+  digits are removed) catches NONE of the real duplicates. Only a FUZZY same-event
+  merge (shared place + shared "since <date>" anchor) would — and this codebase has
+  repeatedly been burned by fuzzy clustering silently HIDING distinct events, which
+  is unacceptable for a no-fabrication intel product.
+- **Decision:** do not add a fuzzy merge unsolicited. Deliver the relevance
+  noise-strip (the deterministic, safe half) and surface the running-tally
+  duplication to the owner as an explicit keep-all vs collapse-to-latest choice
+  before touching the monitor dedup path (`monitorDedupe.ts` /
+  `resolveGenericTrue`).

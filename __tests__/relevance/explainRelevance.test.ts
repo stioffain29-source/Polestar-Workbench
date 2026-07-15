@@ -510,6 +510,178 @@ describe("explainRelevance", () => {
       );
       expect(result.relevant).toBe(false);
     });
+
+    it("drops a food/heritage metaphor that borrows a kinetic word", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Rataul: Legendary UP mango which battled Pakistan's ambush now facing survival crisis",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("op-ed/metaphor");
+    });
+
+    it("drops a retrospective 'How … escalated conflict' explainer", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "How ambush of church leaders on a forested road escalated Naga-Kuki conflict across Manipur hills",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("op-ed/metaphor");
+    });
+
+    it("drops a returnee-displacement status story despite the airstrike word", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Airstrike Threats Keep Displaced Residents from Returning to Ye Chaung Phyar",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("op-ed/metaphor");
+    });
+
+    it("drops an envoy meeting rebel groups (diplomacy, not a kinetic event)", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Asean envoy meets Myanmar rebel groups in Thailand",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops a family clemency plea over relatives arrested in Naxal cases", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "'They Are Poor, Innocent Peasants, Please Release Them': Families Of Tribals Arrested In Naxal Cases Meet Chhattisgarh Deputy CM",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops a reconciliation op-ed by a former insurgent", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Coexistence is the only sustainable path for Manipur, says former insurgent leader RK Meghen",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops entertainment censorship of an insurgency film", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "India's bans insurgency film Satluj claiming 'propaganda'",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops a publisher-arrest book-censorship story", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "3 publishers arrested in J-K for books that 'glorified separatists, militants'",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("drops a precautionary cordon-and-search after CCTV spots suspects", () => {
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title:
+            "Jammu Kashmir: Security Forces Launch Search Operation After CCTV Spots Suspected Militants",
+        }),
+      );
+      expect(result.relevant).toBe(false);
+      expect(result.reason).toContain("relief/peace");
+    });
+
+    it("keeps a genuine search operation that reports an actual encounter", () => {
+      // The precautionary cordon-and-search exclude is override-gated: a real
+      // encounter with a kinetic verb must still be kept.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Security forces launch search operation; two militants killed in ensuing gun battle",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps a genuine ambush report near a mango-growing district", () => {
+      // Guards the food-metaphor HARD exclude: a literal ambush is kept even
+      // when produce is mentioned, because the metaphor pattern binds the two
+      // within a short window and a real report separates them.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Maoists ambush a security patrol, three troopers killed in Bastar",
+          summary: "The convoy was attacked in a forested stretch during an anti-insurgency operation.",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps a genuine search operation whose 'encounter underway' is the kinetic cue", () => {
+      // The cordon-and-search exclude is override-gated; the violence override
+      // must recognise the standard Indian term 'encounter underway' so a live
+      // contact is re-admitted even without the words gunfight/gun battle.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Search operation in Pulwama after suspected militants spotted; encounter underway",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+
+    it("keeps an ammunition-magazine seizure from a terror hideout (book-censor no longer over-matches)", () => {
+      // The book-censorship exclude dropped 'magazine' from its noun list so a
+      // weapons-magazine recovery is never mistaken for a censored publication.
+      const result = explainRelevance(
+        "conflict",
+        input({
+          topic: "conflict",
+          title: "Security forces seize weapons and magazines from militants in Pulwama",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
   });
 
   describe("shipping", () => {
