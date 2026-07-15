@@ -31,7 +31,6 @@ import { consolidateCountryStories } from "@/lib/countrySameStory";
 import { shouldGenerateProse } from "@/lib/countryProseGate";
 import { isCityReport, reportKindLabel } from "@/lib/reportKind";
 import PngCountryReportBody from "@/components/PngCountryReportBody";
-import JakartaReportBody from "@/components/JakartaReportBody";
 import {
   buildPngReportDataset,
   buildWestPapuaReportDataset,
@@ -1062,11 +1061,27 @@ export default function CountryReport() {
   // City reports (Jakarta today; Manila/Bangkok planned) are framed as CITY, not
   // COUNTRY, reports — driven by the shared reportKind registry.
   const isCity = isCityReport(effective.name);
+  const jakartaAreaSummary = pngEffectiveDataset?.jakartaTacticalBrief?.areaSummary ?? "";
   const mapNode = isJakarta ? (
-    <JakartaCorridorMap
-      incidents={windowIncidents as CountryFastFactsIncident[]}
-      issueDate={issueDate}
-    />
+    // Jakarta's corridor schematic + its operating-zone area summary caption are
+    // one keep-together block so the map, legend and summary never split across a
+    // PDF page. This is the single analyst-placed map slot for the city report.
+    <div data-pdf-keep="true">
+      <JakartaCorridorMap
+        incidents={windowIncidents as CountryFastFactsIncident[]}
+        issueDate={issueDate}
+      />
+      {jakartaAreaSummary
+        ? jakartaAreaSummary.split(/\n+/).map((p, i) => (
+            <p
+              key={i}
+              style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "10px 0 0 0" }}
+            >
+              {p}
+            </p>
+          ))
+        : null}
+    </div>
   ) : (
     <CountryReportMap
       incidents={windowIncidents as CountryFastFactsIncident[]}
@@ -1529,29 +1544,26 @@ export default function CountryReport() {
         </Section>
       )}
 
-      {/* Jakarta renders the dedicated 14-section TACTICAL OPERATING BRIEF; every
-          other theatre — structured or generic — keeps the shared deterministic
-          operating-risk brief from PngCountryReportBody. The Jakarta brief always
-          renders its corridor map inside its own §14 (Operational Map), so
-          the end/inline map-placement controls do not apply to it. */}
-      {pngEffectiveDataset &&
-        (isJakarta ? (
-          <JakartaReportBody dataset={pngEffectiveDataset} mapNode={mapNode} />
-        ) : (
-          <PngCountryReportBody
-            dataset={pngEffectiveDataset}
-            incidentSummaries={incidentSummaries}
-            mapPlacement={mapPlacement}
-            mapNode={mapNode}
-            photoPlacement={photoPlacement}
-            photoNode={photoBlock}
-          />
-        ))}
+      {/* EVERY theatre — structured, generic and Jakarta — renders the shared
+          canonical brief from PngCountryReportBody. Jakarta's tactical evidence
+          tables are folded INSIDE the canonical sections (behind the dataset's
+          jakartaTacticalBrief). Mapping is the only per-theatre variation: the
+          analyst-placed map slot carries Jakarta's corridor schematic and its
+          area summary caption instead of the numbered incident-dot map. */}
+      {pngEffectiveDataset && (
+        <PngCountryReportBody
+          dataset={pngEffectiveDataset}
+          incidentSummaries={incidentSummaries}
+          mapPlacement={mapPlacement}
+          mapNode={mapNode}
+          photoPlacement={photoPlacement}
+          photoNode={photoBlock}
+        />
+      )}
 
       {/* "End" map placement — the incident map renders here, just above the
-          shared analytics block, when the analyst leaves it at the default. For
-          Jakarta the map already lives in §14, so it is suppressed here. */}
-      {!isJakarta && mapPlacement === "end" && mapNode}
+          shared analytics block, when the analyst leaves it at the default. */}
+      {mapPlacement === "end" && mapNode}
 
       {/* Situational Context reference layer — rendered below the written brief
           for EVERY country (structured and generic). Per the reworked country

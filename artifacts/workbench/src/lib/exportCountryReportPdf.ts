@@ -913,127 +913,6 @@ function drawJakartaLabelledBlock(ctx: Ctx, label: string, text: string) {
   ctx.y += bodyLines.length * 13 + 8;
 }
 
-// The Jakarta-only 14-section tactical operating brief, rendered in the exact
-// order the on-screen JakartaReportBody uses. Section titles MUST stay in
-// lockstep with JakartaReportBody and auditJakartaPdf CANONICAL_SECTIONS.
-function renderJakartaBrief(
-  ctx: Ctx,
-  dataset: PngReportDataset,
-  jakartaExposure: JakartaCorridorStatus[],
-) {
-  const d = dataset;
-  const tactical = d.jakartaTacticalBrief;
-
-  // 1. Bottom Line Up Front
-  drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
-
-  // 2. Tactical Operating Picture
-  drawSectionWithProse(
-    ctx,
-    "Tactical Operating Picture",
-    d.executiveSummary || "Not populated.",
-  );
-
-  // 3. Crime Trends and Business Impact — dedicated crime section
-  drawSectionHeading(ctx, "Crime Trends and Business Impact");
-  if (tactical) {
-    renderProse(ctx, tactical.crimeTrends.reportedThisPeriod);
-    renderProse(ctx, tactical.crimeTrends.standingPattern);
-    renderProse(ctx, tactical.crimeTrends.trendRead);
-    drawJakartaCrimeTable(ctx, tactical.crimeTrends.businessImpact);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 4. Priority Areas This Week — ranked, data-driven table
-  drawSectionHeading(ctx, "Priority Areas This Week");
-  if (tactical) {
-    drawJakartaPriorityTable(ctx, tactical.priorityAreas);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 5. Staff Movement Impact — broken out by movement type
-  drawSectionHeading(ctx, "Staff Movement Impact");
-  if (tactical) {
-    const sm = tactical.staffMovement;
-    const fields: Array<[string, keyof JakartaStaffMovementImpact]> = [
-      ["Office access", "officeAccess"],
-      ["Hotel to office movement", "hotelToOffice"],
-      ["Airport transfer", "airportTransfer"],
-      ["Client meeting movement", "clientMeeting"],
-      ["Staff commute", "staffCommute"],
-      ["Driver route planning", "driverRoute"],
-      ["After hours movement", "afterHours"],
-    ];
-    for (const [label, key] of fields) drawJakartaLabelledBlock(ctx, label, sm[key]);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 6. Airport Transfer Impact
-  drawSectionWithProse(
-    ctx,
-    "Airport Transfer Impact",
-    tactical ? tactical.airportTransfer : "Not populated.",
-  );
-
-  // 7. Port and Logistics Impact (intro + 4-col table + port actions)
-  drawSectionHeading(ctx, "Port and Logistics Impact");
-  if (tactical) {
-    renderProse(ctx, tactical.portLogistics.intro);
-    drawJakartaPortTable(ctx, tactical.portLogistics.rows);
-    drawJakartaStrandLabel(ctx, "Port Actions");
-    drawJakartaBulletList(ctx, tactical.portLogistics.actions);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 8. Office, Hotel and Meeting Venue Exposure (intro + standing table)
-  drawSectionHeading(ctx, "Office, Hotel and Meeting Venue Exposure");
-  if (tactical) {
-    renderProse(ctx, tactical.officeHotelVenue.intro);
-    drawJakartaOpsTable(ctx, tactical.officeHotelVenue.rows);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 9. Route and Timing Guidance
-  drawSectionHeading(ctx, "Route and Timing Guidance");
-  if (tactical) drawJakartaBulletList(ctx, tactical.routeTiming);
-  else renderProse(ctx, "Not populated.");
-
-  // 10. Escalation Triggers
-  drawSectionHeading(ctx, "Escalation Triggers");
-  if (d.escalationIndicators.length === 0) {
-    renderProse(ctx, "No specific escalation triggers flagged this period.");
-  } else {
-    drawJakartaBulletList(ctx, d.escalationIndicators);
-  }
-
-  // 11. Recommended Actions — role based
-  drawSectionHeading(ctx, "Recommended Actions");
-  if (tactical && tactical.roleActions.length > 0) {
-    for (const a of tactical.roleActions) drawJakartaLabelledBlock(ctx, a.role, a.guidance);
-  } else {
-    renderProse(ctx, "Not populated.");
-  }
-
-  // 12. Seven Day Outlook
-  drawSectionWithProse(ctx, "Seven Day Outlook", d.outlook || "Not populated.");
-
-  // 13. Polestar View
-  drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
-
-  // 14. Operational Map — the headless counterpart to the seven-zone posture
-  // map: the same zones, ratings and reason/action text the on-screen map shows.
-  drawSectionHeading(ctx, "Operational Map");
-  if (jakartaExposure.length > 0) {
-    drawJakartaPostureTable(ctx, buildJakartaPostureZones(jakartaExposure));
-  }
-  renderProse(ctx, tactical ? tactical.areaSummary : "Not populated.");
-}
-
 // Headless seven-zone movement-posture table — the offline counterpart to the
 // on-screen JakartaCorridorMap posture panel (ZONE | EXPOSURE | REASON | ACTION),
 // built from the SAME buildJakartaPostureZones derivation so both agree.
@@ -1254,8 +1133,16 @@ function drawStructuredItemCard(
 // the script-generated PDF and the on-screen DOM-rasterised PDF stay in
 // lockstep. Reached for those three theatres only; Jakarta has its own
 // renderer and every other theatre keeps the generic country layout below.
-function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
+function renderStructuredBrief(
+  ctx: Ctx,
+  dataset: PngReportDataset,
+  jakartaExposure: JakartaCorridorStatus[] = [],
+) {
   const d = dataset;
+  // Jakarta's tactical brief carries its own evidence tables (crime, priority
+  // areas, staff movement, port, venue, role actions) folded INSIDE the canonical
+  // sections below — mirrors the on-screen PngCountryReportBody fold so screen==PDF.
+  const tactical = d.jakartaTacticalBrief;
 
   // 1. Bottom Line Up Front
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
@@ -1297,6 +1184,15 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
       for (const it of themeItems) drawStructuredItemCard(ctx, it, false, true);
     }
   }
+  if (tactical) {
+    drawJakartaStrandLabel(ctx, "Crime Trends and Business Impact");
+    renderProse(ctx, tactical.crimeTrends.reportedThisPeriod);
+    renderProse(ctx, tactical.crimeTrends.standingPattern);
+    renderProse(ctx, tactical.crimeTrends.trendRead);
+    drawJakartaCrimeTable(ctx, tactical.crimeTrends.businessImpact);
+    drawJakartaStrandLabel(ctx, "Priority Areas This Week");
+    drawJakartaPriorityTable(ctx, tactical.priorityAreas);
+  }
 
   // 4. Current Situation
   drawSectionWithProse(
@@ -1315,11 +1211,44 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
   } else {
     drawJakartaBulletList(ctx, operationalImpact);
   }
+  if (tactical) {
+    const sm = tactical.staffMovement;
+    const fields: Array<[string, keyof JakartaStaffMovementImpact]> = [
+      ["Office access", "officeAccess"],
+      ["Hotel to office movement", "hotelToOffice"],
+      ["Airport transfer", "airportTransfer"],
+      ["Client meeting movement", "clientMeeting"],
+      ["Staff commute", "staffCommute"],
+      ["Driver route planning", "driverRoute"],
+      ["After hours movement", "afterHours"],
+    ];
+    drawJakartaStrandLabel(ctx, "Staff Movement Impact");
+    for (const [label, key] of fields) drawJakartaLabelledBlock(ctx, label, sm[key]);
+    drawJakartaStrandLabel(ctx, "Airport Transfer Impact");
+    renderProse(ctx, tactical.airportTransfer);
+    drawJakartaStrandLabel(ctx, "Port and Logistics Impact");
+    renderProse(ctx, tactical.portLogistics.intro);
+    drawJakartaPortTable(ctx, tactical.portLogistics.rows);
+    drawJakartaStrandLabel(ctx, "Port Actions");
+    drawJakartaBulletList(ctx, tactical.portLogistics.actions);
+    drawJakartaStrandLabel(ctx, "Office, Hotel and Meeting Venue Exposure");
+    renderProse(ctx, tactical.officeHotelVenue.intro);
+    drawJakartaOpsTable(ctx, tactical.officeHotelVenue.rows);
+  }
 
-  // 6. Recommended Actions — operating-risk theatres (Indonesia) render a flat
-  // priorities list; PNG / West Papua render grouped action blocks.
+  // 6. Recommended Actions — Jakarta renders role-based blocks + route/timing;
+  // operating-risk theatres (Indonesia) render a flat priorities list; PNG /
+  // West Papua render grouped action blocks.
   drawSectionHeading(ctx, "Recommended Actions");
-  if (d.proseVariant === "operating-risk") {
+  if (tactical) {
+    if (tactical.roleActions.length > 0) {
+      for (const a of tactical.roleActions) drawJakartaLabelledBlock(ctx, a.role, a.guidance);
+    } else {
+      renderProse(ctx, d.businessImpactEmptyNote);
+    }
+    drawJakartaStrandLabel(ctx, "Route and Timing Guidance");
+    drawJakartaBulletList(ctx, tactical.routeTiming);
+  } else if (d.proseVariant === "operating-risk") {
     if (d.businessImpact.length === 0) renderProse(ctx, d.businessImpactEmptyNote);
     else drawJakartaBulletList(ctx, d.businessImpact);
   } else if (d.recommendedActions.length === 0) {
@@ -1337,7 +1266,9 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     "Outlook: Next Seven Days",
     d.outlook || "Not populated.",
   );
-  const escalationIndicators = d.escalationIndicators.slice(0, 3);
+  const escalationIndicators = tactical
+    ? d.escalationIndicators
+    : d.escalationIndicators.slice(0, 3);
   if (escalationIndicators.length > 0) {
     drawJakartaStrandLabel(ctx, "Escalation Indicators");
     drawJakartaBulletList(ctx, escalationIndicators);
@@ -1360,6 +1291,17 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     "Polestar View",
     d.polestarView || "Not populated.",
   );
+
+  // Analyst-placed map slot — the ONLY per-theatre variation. Jakarta swaps the
+  // numbered incident-dot map (no rasterised graphic available headless) for its
+  // seven-zone movement-posture table + area summary caption, mirroring the
+  // on-screen mapNode rendered at the default "end" placement.
+  if (tactical) {
+    if (jakartaExposure.length > 0) {
+      drawJakartaPostureTable(ctx, buildJakartaPostureZones(jakartaExposure));
+    }
+    renderProse(ctx, tactical.areaSummary);
+  }
 }
 
 function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {
@@ -1432,54 +1374,29 @@ export async function exportCountryReportPdf(
   // Coverage banner — only renders when the weekly window is empty.
   if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
 
-  // Jakarta carries its OWN 14-section tactical operating brief (mirrors the
-  // on-screen JakartaReportBody). Build the same dataset the screen uses and
-  // render those sections, then close the document and return early so the
-  // generic country layout below never runs for Jakarta. Every other theatre
-  // falls through unchanged.
-  if (country.name.trim().toLowerCase() === "jakarta") {
-    const jakartaDataset = buildJakartaReportDataset({
-      windowIncidents: active.incidents as unknown as PngSourceIncident[],
-      previousWindowIncidents: resolvePreviousCountryWindow(
-        layers,
-        todayIso,
-      ) as unknown as PngSourceIncident[],
-      thirtyDay: layers.thirtyDay as unknown as PngSourceIncident[],
-      ninetyDay: layers.ninetyDay as unknown as PngSourceIncident[],
-      baselineWatchlist: (extras.baseline?.locationWatchlist ?? []).map(
-        (w) => w.label,
-      ),
-      periodLabel: active.basisLabel,
-    });
-    const jakartaExposure = buildJakartaCorridorStatuses(
-      active.incidents as unknown as CountryFastFactsIncident[],
-    ).statuses;
-    renderJakartaBrief(ctx, jakartaDataset, jakartaExposure);
-
-    drawDisclaimer(ctx);
-    drawFooters(ctx.pdf);
-    ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
-    return;
-  }
-
-  // PNG / West Papua / Indonesia carry their OWN structured eight-section brief
-  // (mirrors the on-screen PngCountryReportBody). Build the SAME dataset the
-  // screen uses with the matching builder, render those sections in the same
-  // order, then close the document and return early so the generic country
-  // layout below never runs for these theatres. Every other country falls
-  // through unchanged.
+  // PNG / West Papua / Indonesia / Thailand / Philippines / Jakarta all carry
+  // their OWN canonical brief (mirrors the on-screen PngCountryReportBody). Build
+  // the SAME dataset the screen uses with the matching builder, render those
+  // sections in the same order, then close the document and return early so the
+  // generic country layout below never runs for these theatres. Jakarta's tactical
+  // evidence tables are folded INSIDE the canonical sections by renderStructuredBrief
+  // and its posture table + area summary ride the analyst-placed map slot. Every
+  // other country falls through unchanged.
   const structuredTokens = acceptedCountryTokens(country.name ?? "");
-  const structuredBuilder = structuredTokens.includes("papua new guinea")
-    ? buildPngReportDataset
-    : structuredTokens.includes("papua")
-      ? buildWestPapuaReportDataset
-      : structuredTokens.includes("indonesia")
-        ? buildIndonesiaReportDataset
-        : structuredTokens.includes("thailand")
-          ? buildThailandReportDataset
-          : structuredTokens.includes("philippines")
-            ? buildPhilippinesReportDataset
-            : null;
+  const isJakartaBrief = country.name.trim().toLowerCase() === "jakarta";
+  const structuredBuilder = isJakartaBrief
+    ? buildJakartaReportDataset
+    : structuredTokens.includes("papua new guinea")
+      ? buildPngReportDataset
+      : structuredTokens.includes("papua")
+        ? buildWestPapuaReportDataset
+        : structuredTokens.includes("indonesia")
+          ? buildIndonesiaReportDataset
+          : structuredTokens.includes("thailand")
+            ? buildThailandReportDataset
+            : structuredTokens.includes("philippines")
+              ? buildPhilippinesReportDataset
+              : null;
   if (structuredBuilder) {
     const structuredDataset = structuredBuilder({
       windowIncidents: active.incidents as unknown as PngSourceIncident[],
@@ -1494,7 +1411,12 @@ export async function exportCountryReportPdf(
       ),
       periodLabel: active.basisLabel,
     });
-    renderStructuredBrief(ctx, structuredDataset);
+    const jakartaExposure = isJakartaBrief
+      ? buildJakartaCorridorStatuses(
+          active.incidents as unknown as CountryFastFactsIncident[],
+        ).statuses
+      : [];
+    renderStructuredBrief(ctx, structuredDataset, jakartaExposure);
 
     // Situational Context (UN OCHA ReliefWeb) — supporting layer, not counted;
     // mirrors the on-screen CountryReportVisuals below the written brief.

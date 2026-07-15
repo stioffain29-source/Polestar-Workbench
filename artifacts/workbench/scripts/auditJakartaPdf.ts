@@ -2,11 +2,13 @@
 // offline jsPDF brief in lockstep with the on-screen one:
 //
 //   1. SECTION ORDER PARITY — statically parses the section titles, in order,
-//      from BOTH the on-screen JakartaReportBody.tsx (`<Section title="...">`)
-//      and the headless renderJakartaBrief() in exportCountryReportPdf.ts
+//      from BOTH the on-screen PngCountryReportBody.tsx (`<Section title="...">`)
+//      and the headless renderStructuredBrief() in exportCountryReportPdf.ts
 //      (drawSectionWithProse / drawSectionHeading calls), then asserts they
-//      match each other AND the canonical 14-section order. A reorder or rename
-//      on either side fails the check.
+//      match each other AND the canonical 8-section order. Jakarta now shares the
+//      unified canonical body; its tactical evidence tables are folded INSIDE
+//      these sections (as strand labels), so the top-level section list is the
+//      same 8 every theatre uses. A reorder or rename on either side fails.
 //
 //   2. FONT AUDIT — generates a real Jakarta PDF through the same exporter the
 //      app uses and inventories the per-page Tf (font-select) operators,
@@ -34,28 +36,22 @@ const SRC = (p: string) => resolvePath(WORKBENCH, "src", p);
 // "Done looks like" list and the comments in both source files.
 const CANONICAL_SECTIONS = [
   "Bottom Line Up Front",
-  "Tactical Operating Picture",
-  "Crime Trends and Business Impact",
-  "Priority Areas This Week",
-  "Staff Movement Impact",
-  "Airport Transfer Impact",
-  "Port and Logistics Impact",
-  "Office, Hotel and Meeting Venue Exposure",
-  "Route and Timing Guidance",
-  "Escalation Triggers",
+  "Top 3 Developments",
+  "Incident Details",
+  "Current Situation",
+  "Operational Impact",
   "Recommended Actions",
-  "Seven Day Outlook",
+  "Outlook: Next Seven Days",
   "Polestar View",
-  "Operational Map",
 ];
 
 // ---------------------------------------------------------------------------
 // 1. SECTION ORDER PARITY (static source parse)
 // ---------------------------------------------------------------------------
 
-/** On-screen order: every `<Section title="...">` in JakartaReportBody.tsx. */
+/** On-screen order: every `<Section title="...">` in PngCountryReportBody.tsx. */
 function screenSectionOrder(): string[] {
-  const body = readFileSync(SRC("components/JakartaReportBody.tsx"), "utf8");
+  const body = readFileSync(SRC("components/PngCountryReportBody.tsx"), "utf8");
   const out: string[] = [];
   const re = /<Section\s+title="([^"]+)"/g;
   let m: RegExpExecArray | null;
@@ -64,14 +60,14 @@ function screenSectionOrder(): string[] {
 }
 
 /**
- * Offline order: section headings inside the renderJakartaBrief() function in
+ * Offline order: section headings inside the renderStructuredBrief() function in
  * exportCountryReportPdf.ts. Both drawSectionWithProse(ctx, "Title", ...) and
  * drawSectionHeading(ctx, "Title") open a section.
  */
 function pdfSectionOrder(): string[] {
   const src = readFileSync(SRC("lib/exportCountryReportPdf.ts"), "utf8");
-  const start = src.indexOf("function renderJakartaBrief");
-  if (start === -1) throw new Error("renderJakartaBrief() not found");
+  const start = src.indexOf("function renderStructuredBrief");
+  if (start === -1) throw new Error("renderStructuredBrief() not found");
   // Bound to the function body: stop at the next top-level `function ` decl.
   const after = src.indexOf("\nfunction ", start + 1);
   const fnBody = src.slice(start, after === -1 ? undefined : after);
@@ -306,7 +302,7 @@ async function main() {
       "screenshots/font_proof/FONT_AUDIT.txt",
     );
     const existing = readFileSync(auditPath, "utf8");
-    const marker = "==== jakarta_country.pdf (Jakarta 14-section tactical brief) ====";
+    const marker = "==== jakarta_country.pdf (Jakarta unified canonical brief) ====";
     const lines = [
       marker,
       ...perPage.map(
