@@ -2236,8 +2236,15 @@ const COUNTRY_COMMERCE_DEMAND_RE =
 // added because the Indonesia/Jakarta briefs read RAW Bahasa headlines. Still
 // gated on !COUNTRY_HARD_SECURITY_RE below, so a genuine venue incident ("bomb
 // at the stadium", "fans riot, police arrest 40") is always rescued.
+// Rugby-league team names (Townsville Blackhawks, PNG Hunters) and the
+// pre-match "squad/team selection ahead of …" idiom are added because a PNG
+// security brief was polluted by "Consistency in Selection Ahead of Blackhawks
+// Clash". "blackhawks" is the one-word rugby spelling (the two-word "Black Hawk"
+// helicopter keeps its \b so a real "Black Hawk shot down" is untouched and, in
+// any case, carries a HARD_SECURITY word that rescues it). "clash" itself is
+// still NOT a trigger — the team name / selection idiom is what drops the story.
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|badminton|athletics|rugby|netball|cricket|grand final|cup final|league title|test match|friendly match|international friendly|match (?:preview|report|day|recap|highlights?|winner)|matchday|tactical (?:analysis|preview|breakdown|masterclass|battle)|group stage|knockout (?:stage|round)|quarter[- ]?finals?|semi[- ]?finals?|round of \d+|kick[- ]?off|half[- ]?time|full[- ]?time|extra time|stoppage time|man of the match|clean sheet|own goal|penalty shoot[- ]?out|goalkeep\w*|midfield\w*|hat[- ]?trick|top scorer|starting (?:xi|line[- ]?up)|head[- ]?to[- ]?head|\bderby\b|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?|sepak ?bola|futsal|bulu ?tangkis|bola voli|bola basket|\btimnas\b|\bliga\b|\bpiala\b|\bpertandingan\b|laga (?:persahabatan|uji coba|kandang|tandang|perdana|pamungkas|hidup mati)|adu penalti|\bkiper\b|\bgelandang\b|\bwasit\b|babak (?:penyisihan|grup|gugur|kualifikasi|pertama|kedua))\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|badminton|athletics|rugby|netball|cricket|grand final|cup final|league title|test match|friendly match|international friendly|match (?:preview|report|day|recap|highlights?|winner)|matchday|tactical (?:analysis|preview|breakdown|masterclass|battle)|group stage|knockout (?:stage|round)|quarter[- ]?finals?|semi[- ]?finals?|round of \d+|kick[- ]?off|half[- ]?time|full[- ]?time|extra time|stoppage time|man of the match|clean sheet|own goal|penalty shoot[- ]?out|goalkeep\w*|midfield\w*|hat[- ]?trick|top scorer|starting (?:xi|line[- ]?up)|head[- ]?to[- ]?head|\bderby\b|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?|blackhawks|png hunters|(?:squad|team|player|side) selection|selection ahead of|named (?:his|the|their) (?:squad|side|team|line[- ]?up)|sepak ?bola|futsal|bulu ?tangkis|bola voli|bola basket|\btimnas\b|\bliga\b|\bpiala\b|\bpertandingan\b|laga (?:persahabatan|uji coba|kandang|tandang|perdana|pamungkas|hidup mati)|adu penalti|\bkiper\b|\bgelandang\b|\bwasit\b|babak (?:penyisihan|grup|gugur|kualifikasi|pertama|kedua))\b/i;
 
 // Unambiguous sports-SPECTACLE phrases. A country security report never leads on
 // the World Cup or the Olympics, and these mega-events routinely carry
@@ -2262,8 +2269,12 @@ const SPECTACLE_SECURITY_RESCUE_RE =
 // carries a security signal of its own (so "gunmen attack the summit" survives
 // via the soft lexicon). Deliberately omits event words that double as outlet
 // names in a masthead/URL (e.g. "forum") since the haystack includes the source.
+// Awards / nominations / pageants / a groundbreaking (sod-turning) ceremony are
+// added: a PNG brief was polluted by "Pascoe Events founder declines WOW Awards
+// Nomination". Gated on !SECURITY_SIGNAL, so "police bravery awards after the
+// shootout" (carries a security signal) still survives.
 const COUNTRY_PR_EVENT_RE =
-  /\b(breakfast|gala|fundraiser|summit|conference|workshop|seminar|symposium|trade fair|graduation|signing ceremony|ribbon[- ]?cutting|\bmou\b|memorandum of understanding)\b/i;
+  /\b(breakfast|gala|fundraiser|summit|conference|workshop|seminar|symposium|trade fair|graduation|signing ceremony|ribbon[- ]?cutting|groundbreaking ceremony|sod[- ]?turning|awards?|nominations?|nominees?|pageant|red carpet|prize[- ]?giving|\bmou\b|memorandum of understanding)\b/i;
 
 // Non-event editorial classes: explainers, op-eds, "what you need to know"
 // guides and fact-checks. A country SECURITY aggregate lists concrete
@@ -2428,8 +2439,13 @@ const COUNTRY_MOURNING_ANNOUNCEMENT_RE =
 // "drill" homonyms and a bare "exercise" (e.g. "exercise caution") never match.
 // Dropped UNLESS a FRESH attack word is present, so a real ambush/raid that
 // happens DURING an exercise still passes (mirrors the mourning-drop gate).
+// NAMED exercises (e.g. "Tamiok Strike 26", "Exercise Pitch Black") carry no
+// generic "military exercise" qualifier, so the code-name and the diplomatic
+// "reinforcing/strengthening the enduring relationship/partnership" boilerplate
+// that accompanies a joint-drill press release are added explicitly. Still
+// gated on !FRESH_ATTACK, so a real ambush "during Tamiok Strike" is kept.
 const COUNTRY_MILITARY_EXERCISE_RE =
-  /\b(?:military|joint|combined|bilateral|multinational|naval|air|maritime|live[- ]?fire|combat|army|navy|air[- ]?force) (?:exercises?|drills?|manoeuvres?|maneuvers?|war ?games?|training exercises?)\b|\bwar[- ]?games?\b|\b(?:latihan (?:militer|gabungan|tempur|bersama)|latihan perang)\b/i;
+  /\b(?:military|joint|combined|bilateral|multinational|naval|air|maritime|live[- ]?fire|combat|army|navy|air[- ]?force) (?:exercises?|drills?|manoeuvres?|maneuvers?|war ?games?|training exercises?)\b|\bwar[- ]?games?\b|\btamiok strike\b|\bexercise pitch black\b|\b(?:reinforc\w+|strengthen\w+|deepen\w+|celebrat\w+)\b[^.]{0,30}\benduring (?:relationship|partnership|ties|bond)\b|\b(?:latihan (?:militer|gabungan|tempur|bersama)|latihan perang)\b/i;
 
 // THEMATIC OP-ED / EXPLAINER / ESSAY — a labelled opinion/analysis/commentary/
 // explainer piece ("Opinion:", "Analysis:", "Explainer:") or a broad thematic

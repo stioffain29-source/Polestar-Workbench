@@ -91,6 +91,62 @@ describe("isCountryRelevant — thematic op-ed / explainer / essay drop", () => 
   });
 });
 
+describe("isCountryRelevant — sports-coverage drop", () => {
+  it("drops a rugby-league squad-selection story", () => {
+    expect(relevant("PNG Hunters name their squad for round 18")).toBe(false);
+  });
+
+  it("drops a 'selection ahead of' fixture preview", () => {
+    expect(relevant("Consistency in selection ahead of the Blackhawks clash")).toBe(false);
+  });
+
+  it("drops a 'named their side' team-sheet story", () => {
+    expect(relevant("Coach named his side for the grand final")).toBe(false);
+  });
+
+  it("KEEPS a real attack that happens at a sports fixture (hard-security rescue)", () => {
+    expect(relevant("Gunmen open fire at a rugby match in Lae, two killed")).toBe(true);
+  });
+});
+
+describe("isCountryRelevant — public-relations event drop", () => {
+  it("drops a groundbreaking / sod-turning ceremony", () => {
+    expect(relevant("PM leads sod-turning ceremony for new Lae highway")).toBe(false);
+  });
+
+  it("drops an awards-nomination story", () => {
+    expect(relevant("Pascoe Events founder declines WOW awards nomination")).toBe(false);
+  });
+
+  it("drops a beauty-pageant story", () => {
+    expect(relevant("Miss PNG pageant crowns its new queen in Port Moresby")).toBe(false);
+  });
+
+  it("KEEPS a real incident at a ceremony (security-signal rescue)", () => {
+    expect(relevant("Gunmen storm an awards ceremony in Mount Hagen, one shot")).toBe(true);
+  });
+});
+
+describe("isCountryRelevant — exercise / partnership boosterism drop", () => {
+  it("drops a named bilateral exercise (Tamiok Strike)", () => {
+    expect(
+      relevant("US and Papua New Guinea open Tamiok Strike 26 near Port Moresby"),
+    ).toBe(false);
+  });
+
+  it("drops 'reinforcing the enduring relationship' partnership PR", () => {
+    expect(
+      relevant("Australia and PNG deepen ties, reinforcing an enduring partnership"),
+    ).toBe(false);
+  });
+
+  it("KEEPS a fresh attack during a named exercise", () => {
+    expect(
+      relevant("Gunmen ambush troops during Tamiok Strike, three wounded"),
+    ).toBe(true);
+  });
+});
+
 describe("isCountryRelevant — real incidents still pass", () => {
   it("keeps a fresh attack", () => {
     expect(relevant("Gunmen kill three in an ambush near Wabag, Enga")).toBe(true);

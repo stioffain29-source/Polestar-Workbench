@@ -432,12 +432,28 @@ export function clusterSameStoryRows(
       // is a mismatch. PATH 3 above has already run, so a strong-entity event is
       // never blocked here; this gate guards only the weaker PATHS 1/2/4.
       if (!options.crossProvince && (rr.province ?? null) !== (r.province ?? null)) continue;
+      const jac = tokenJaccard(ff.toks, f.toks);
+      // PATH 2: shared named premises within a wider window (the sandal-factory
+      // -fire case), gated by a modest overlap so a fluke shared modifier across
+      // very different headlines cannot merge two distinct events. Evaluated
+      // BEFORE the compatible-type gate (like PATH 3): a distinctive shared
+      // premises identifies ONE event even when outlets file it under different
+      // categories — e.g. a massacre and the ARRESTS over that same massacre are
+      // coded Homicide vs Policing yet are the same story — so a type mismatch
+      // must not block it. The province gate above still applies, and the
+      // shared-premises + jaccard>=0.25 floor keeps two genuinely distinct
+      // events that merely share a common modifier apart.
+      const sharedPrem = [...f.prem].some((p) => ff.prem.has(p));
+      if (dd <= 3 * DAY && sharedPrem && jac >= 0.25) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
       const compatType =
         rr.typeKey === r.typeKey ||
         (!!rr.category && rr.category === r.category) ||
         (!!rr.displayCategory && rr.displayCategory === r.displayCategory);
       if (!compatType) continue;
-      const jac = tokenJaccard(ff.toks, f.toks);
       // PATH 1: strong title overlap, same/adjacent day.
       if (dd <= DAY && ff.toks.size >= 3 && f.toks.size >= 3 && jac >= 0.5) {
         c.members.push(i);
@@ -457,15 +473,6 @@ export function clusterSameStoryRows(
         f.rawToks.size >= 3 &&
         tokenJaccard(ff.rawToks, f.rawToks) >= 0.5
       ) {
-        c.members.push(i);
-        placed = true;
-        break;
-      }
-      // PATH 2: shared named premises within a wider window (the sandal-factory
-      // -fire case), gated by a modest overlap so a fluke shared modifier across
-      // very different headlines cannot merge two distinct events.
-      const sharedPrem = [...f.prem].some((p) => ff.prem.has(p));
-      if (dd <= 3 * DAY && sharedPrem && jac >= 0.25) {
         c.members.push(i);
         placed = true;
         break;

@@ -1505,7 +1505,19 @@ export function buildStructuredReportDataset(
   // location buckets so one real-world event never appears both in Top 3 and
   // lower down (weak-evidence duplicates stay in the buckets, shown once).
   for (const id of topSelection.foldMemberIds) topThreeMemberIds.add(id);
-  const bucketableItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
+  // Collapse same-story SYNDICATION among the remaining (non-Top-3) records so a
+  // single real-world event never appears as two Incident Details cards
+  // (reviewer: "two entries covering the same Sambio massacre arrests"). The
+  // windowItems set ran only EXACT title dedup, so non-exact copies survived — a
+  // massacre and the arrests over it, or the same bust reworded across outlets.
+  // clusterSameStory folds each cluster to ONE representative (English-preferred,
+  // highest severity, then newest); crossProvince follows the theatre config so
+  // multi-city briefs (Jakarta / Indonesia) never merge distinct cities.
+  const nonTopItems = windowItems.filter((it) => !topThreeMemberIds.has(it.id));
+  const bucketableItems = clusterSameStory(
+    nonTopItems,
+    config.crossProvinceDedup ?? false,
+  ).map((cluster) => cluster[0]);
   // Incident Details analyses every remaining (non-Top-3) incident.
   const incidentDetailsItems = bucketableItems;
 

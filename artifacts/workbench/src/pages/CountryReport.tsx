@@ -54,6 +54,7 @@ import {
   isForeignDominantContext,
   isForeignTheatreContext,
   isForeignSubjectForIndonesia,
+  isForeignSubjectNoHomeAnchor,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
@@ -320,6 +321,26 @@ export default function CountryReport() {
       if (
         !isCrossBorderPapuaPng(i.country) &&
         isForeignTheatreContext(narrative, name)
+      ) {
+        return false;
+      }
+      // Generic country briefs (no bespoke branch — Thailand / Philippines):
+      // drop a record whose TITLE names a foreign country / capital / actor as
+      // its subject but carries NO home anchor (no home country / province /
+      // city token in the title or translation, and no resolved local
+      // `location`). Such a record ("US launches new Iran strikes") was filed
+      // here only by a stray country tag; it is not a local incident.
+      if (
+        !isPng &&
+        !isPapua &&
+        !isJakarta &&
+        !isIndonesia &&
+        isForeignSubjectNoHomeAnchor(
+          i.title,
+          (i as { displayTitle?: string | null }).displayTitle,
+          i.location,
+          name,
+        )
       ) {
         return false;
       }

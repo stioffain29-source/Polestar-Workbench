@@ -399,3 +399,70 @@ export function isIndonesianPapuaTheatreContext(
   // "Papuan separatists", "West Papuan rebels").
   return /\bpapuan?s?\b/i.test(t) || PAPUA_STRICT_LOCAL_RE.test(t);
 }
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Foreign countries / capitals / non-state actors that, when named as the
+// SUBJECT of a headline, signal the event happened ABROAD. Deliberately lists
+// COUNTRY / place / actor nouns, NOT bare tourist-nationality adjectives
+// (american / british / chinese / japanese), so a genuine LOCAL incident that
+// merely involves a foreigner ("British tourist robbed") is never dropped. The
+// ambiguous pronoun-like "us"/"usa" tokens are omitted for the same reason —
+// a US-subject story reliably names a second anchor (Iran, Washington, …).
+const FOREIGN_SUBJECT_RE =
+  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
+
+// Per-report HOME anchors: the country name, nationality, provinces and major
+// cities. Their presence in a headline (or its translation) proves the story is
+// domestic even when it also names a foreign country, so the drop is suppressed.
+const LOCAL_ANCHORS: Record<string, RegExp> = {
+  thailand:
+    /\b(?:thailand|thai|bangkok|krung thep|chiang mai|chiang rai|phuket|pattaya|chonburi|nonthaburi|nakhon ratchasima|korat|khon kaen|udon thani|hat yai|songkhla|surat thani|ayutthaya|rayong|samut prakan|pathum thani|nakhon si thammarat|ubon ratchathani|isan|isaan|pattani|yala|narathiwat|hua hin|krabi|koh samui)\b/i,
+  philippines:
+    /\b(?:philippines?|filipin[oa]s?|manila|quezon city|cebu|davao|mindanao|luzon|visayas|makati|taguig|pasig|caloocan|zamboanga|cagayan|iloilo|bacolod|baguio|pampanga|batangas|cavite|laguna|bulacan|palawan|sulu|marawi|cotabato|general santos|tacloban|pangasinan)\b/i,
+};
+
+/**
+ * True when a record should be stripped from a GENERIC country brief (one
+ * without a bespoke branch — currently Thailand / Philippines) because its
+ * TITLE names a foreign country / capital / non-state actor as the SUBJECT yet
+ * the record carries NO home anchor at all: no home country / province / city
+ * token in the title or its English translation, AND no resolved local
+ * `location`. Such a record ("US launches new Iran strikes", "UK announces a
+ * teen social-media curfew") was filed under this country only by a stray
+ * free-text country tag; it is not a local incident. No-fabrication: the strip
+ * fires only when the narrative POSITIVELY names a foreign subject and offers
+ * zero domestic anchor, so a genuine local story is never removed.
+ */
+export function isForeignSubjectNoHomeAnchor(
+  title: string | null | undefined,
+  displayTitle: string | null | undefined,
+  location: string | null | undefined,
+  reportName: string,
+): boolean {
+  const rawTitle = title ?? "";
+  if (!rawTitle.trim()) return false;
+  // A resolved structured location is itself a home anchor: the geocoder fills
+  // `location` only when it matched a place inside the report's own country.
+  if ((location ?? "").trim()) return false;
+  // Only strip when the TITLE positively names a foreign subject.
+  if (!FOREIGN_SUBJECT_RE.test(rawTitle)) return false;
+  const anchorHaystack = `${displayTitle ?? ""} ${rawTitle}`;
+  const anchors = LOCAL_ANCHORS[(reportName ?? "").trim().toLowerCase()];
+  if (anchors) {
+    if (anchors.test(anchorHaystack)) return false;
+  } else {
+    // Generic fallback for any other future country: its own accepted tokens.
+    const own = acceptedCountryTokens(reportName);
+    if (own.length) {
+      const ownRe = new RegExp(
+        `\\b(?:${own.map(escapeRegExp).join("|")})\\b`,
+        "i",
+      );
+      if (ownRe.test(anchorHaystack)) return false;
+    }
+  }
+  return true;
+}

@@ -1,0 +1,25 @@
+eedback for Replit
+
+This version is not yet publishable. It reads like a categorised list of scraped events rather than a credible country risk report.
+
+The main problem is not just the wording. The underlying selection, classification and synthesis are weak:
+
+Irrelevant stories are being promoted as security developments. The Blackhawks selection story appears in the Top 3 and is rated High. Military exercise announcements are listed under civil unrest.
+Duplicate or near duplicate reporting remains, including two entries covering the same Sambío massacre arrests.
+Several events are placed in the wrong categories. The Mulitaka demand for reports appears under natural hazards, while school support, a police rescue and drone warnings appear under operational disruption.
+The prose is formulaic and weak. Phrases such as “activity was reported, including…” and “the most serious reported was…” sound machine generated and do not provide meaningful analysis.
+The BLUF, Current Situation, Outlook and Polestar View largely repeat the same broad points. They do not clearly explain what changed during the reporting period, why it changed, where risk is concentrated, or what this means for business operations.
+The recommendations are generic and could apply to almost any country.
+The map cards continue the event list format rather than adding analytical value, with most entries simply stating that there was no reported commercial impact.
+
+The report needs to be built around assessed themes, not around scraped categories. It should:
+
+Remove duplicates, irrelevant stories and incorrectly classified events before drafting.
+Identify two or three genuine security trends for the period.
+Explain the geographic concentration, direction of travel and business exposure.
+Make the Outlook specific, with likely developments, locations and escalation indicators.
+Make the Polestar View a clear analytical judgement, not another summary.
+Replace template prose with natural, confident and concise writing.
+Reduce the overall length. Six pages is excessive when much of the content is repetitive, and the final page is largely empty.
+
+The required output is an assessed country report supported by events, not an event feed with report headings added.
