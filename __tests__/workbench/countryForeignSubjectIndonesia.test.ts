@@ -178,4 +178,37 @@ describe("isForeignSubjectForIndonesia", () => {
       ),
     ).toBe(false);
   });
+
+  // ---------------------------------------------------------------------------
+  // Gazetteer coverage — small regencies / cities absent from the old list, and
+  // the Indonesian administrative / security-force fallback anchors.
+  // ---------------------------------------------------------------------------
+  // Previously the local-anchor gazetteer listed only major cities, so a genuine
+  // domestic incident in a smaller regency that also named a foreign national was
+  // silently dropped (foreign cue outnumbered zero local cues). These records
+  // must now be RETAINED via the expanded city list or the Bahasa admin anchors.
+
+  const NEWLY_COVERED_LOCAL = [
+    // Named regencies/cities newly added to the gazetteer, each alongside a
+    // foreign nationality that previously won the dominance test 1-vs-0.
+    "Chinese worker injured in factory blast in Cilegon",
+    "Japanese tourist robbed in Banyuwangi guesthouse",
+    "Korean fishing crew detained off Sibolga",
+    "American missionary questioned in Poso over permit dispute",
+    "Australian surfer rescued near Sumbawa",
+    // Administrative / security-force fallback: the dateline city (Dompu,
+    // Ketapang, Sinjai, Enrekang) is NOT in the gazetteer, but the Bahasa admin
+    // or police term anchors the record to Indonesia.
+    "Polres Dompu tangkap warga negara asing terkait narkoba",
+    "Bupati Ketapang temui investor asal Malaysia",
+    "Kapolda gelar operasi di kecamatan terpencil, satu warga China diamankan",
+    "Kodim bantu evakuasi korban banjir di kabupaten terdampak",
+  ];
+
+  it.each(NEWLY_COVERED_LOCAL)(
+    "keeps a domestic story in a smaller/unlisted Indonesian location: %s",
+    (text) => {
+      expect(isForeignSubjectForIndonesia(text)).toBe(false);
+    },
+  );
 });

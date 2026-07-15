@@ -246,8 +246,16 @@ const INDO_FOREIGN_SUBJECT_RE =
 // (e.g. a foreign national involved in an Indonesian incident). Papua-theatre
 // place names are DELIBERATELY absent — those records are routed to the
 // dedicated West Papua brief by isIndonesianPapuaTheatreContext upstream.
+//
+// The gazetteer can never be exhaustive — Indonesia has 500+ regencies and
+// countless kecamatan — so alongside the named cities/provinces/islands we also
+// anchor on Indonesian ADMINISTRATIVE and SECURITY-FORCE terms (kabupaten,
+// kecamatan, bupati, polres, kapolda, kodim, ...). A record datelined in a small
+// regency that is NOT in the city list still carries these Bahasa administrative
+// words, so it is retained rather than silently dropped for lack of an exact
+// city match. These terms are Bahasa and do not collide with English text.
 const INDO_LOCAL_ANCHOR_RE =
-  /\b(indonesia|indonesian|jakarta|surabaya|bandung|medan|semarang|makassar|palembang|depok|tangerang|bekasi|bogor|batam|pekanbaru|padang|malang|denpasar|bali|lombok|sumatra|sumatera|java|jawa|sulawesi|kalimantan|borneo|aceh|riau|lampung|yogyakarta|jogja|maluku|banten|cirebon|surakarta|manado|balikpapan|samarinda|pontianak|banjarmasin|jambi|bengkulu|gorontalo|kupang|labuan bajo|mataram|ambon|ternate)\b/i;
+  /\b(indonesia|indonesian|jakarta|surabaya|bandung|medan|semarang|makassar|palembang|depok|tangerang|bekasi|bogor|batam|pekanbaru|padang|malang|denpasar|bali|lombok|sumbawa|sumatra|sumatera|java|jawa|sulawesi|celebes|kalimantan|borneo|aceh|riau|lampung|yogyakarta|jogja|maluku|banten|cirebon|surakarta|manado|balikpapan|samarinda|pontianak|banjarmasin|jambi|bengkulu|gorontalo|kupang|labuan bajo|mataram|ambon|ternate|tidore|nusa tenggara|bangka|belitung|belitong|madura|flores|sumba|nias|batak|minang|minangkabau|bukittinggi|payakumbuh|solok|tegal|pekalongan|kudus|magelang|salatiga|sukabumi|tasikmalaya|cimahi|garut|sumedang|karawang|purwakarta|serang|cilegon|kediri|blitar|madiun|probolinggo|pasuruan|jember|banyuwangi|mojokerto|sidoarjo|gresik|tuban|lamongan|bojonegoro|jombang|klaten|boyolali|wonogiri|purwokerto|purworejo|kebumen|cilacap|palu|poso|kendari|palopo|parepare|bitung|tomohon|dumai|tanjung pinang|tanjungpinang|bandar lampung|tarakan|bontang|palangka raya|palangkaraya|singkawang|sampit|banjarbaru|martapura|tenggarong|sabang|lhokseumawe|langsa|binjai|pematangsiantar|tebing tinggi|tanjungbalai|sibolga|gunungsitoli|kabupaten|kecamatan|kelurahan|provinsi|bupati|wali kota|walikota|gubernur|polres|polresta|polda|polsek|kapolres|kapolda|kapolsek|kodim|koramil|babinsa|satpol pp|brimob|densus)\b/i;
 
 /**
  * True when an Indonesia-filed record is dominated by a FOREIGN subject and so
