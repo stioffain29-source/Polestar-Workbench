@@ -123,4 +123,59 @@ describe("isForeignSubjectForIndonesia", () => {
     expect(isForeignSubjectForIndonesia(null)).toBe(false);
     expect(isForeignSubjectForIndonesia(undefined)).toBe(false);
   });
+
+  // ---------------------------------------------------------------------------
+  // Dominance boundary — the exact drop cutoff.
+  // ---------------------------------------------------------------------------
+  // The guard drops ONLY when foreign cues strictly OUTNUMBER local cues
+  // (foreignCount > localCount). A tie is NOT dominance, so a domestic story
+  // with a sparse local anchor is retained even against an equal foreign cue
+  // count. These tests pin that boundary so a future refactor to `>=` (which
+  // would silently drop real domestic incidents) fails loudly.
+
+  it("keeps on an exact 1-vs-1 tie: one local anchor, one foreign nationality", () => {
+    // foreign: "chinese" (1); local: "surabaya" (1) → tie → KEEP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Chinese investor robbed at gunpoint in Surabaya hotel",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps on an exact 2-vs-2 tie", () => {
+    // foreign: "japanese", "tokyo" (2); local: "jakarta", "bali" (2) → tie → KEEP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Japanese tourists from Tokyo stranded in Jakarta and Bali after storm",
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps when the local anchor wins by one (2 local vs 1 foreign)", () => {
+    // foreign: "korean" (1); local: "medan", "aceh" (2) → local wins → KEEP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Korean national detained in Medan smuggling case linked to Aceh port",
+      ),
+    ).toBe(false);
+  });
+
+  it("drops only when foreign wins by one (2 foreign vs 1 local)", () => {
+    // foreign: "japan", "korea" (2); local: "jakarta" (1) → foreign wins → DROP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Japan and Korea summit overshadows Jakarta trade talks",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a single-local-anchor domestic story naming one foreign nationality", () => {
+    // The core task edge: exactly ONE local anchor + ONE foreign nationality.
+    // foreign: "australian" (1); local: "lombok" (1) → tie → KEEP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Australian diver missing off Lombok after boat capsizes",
+      ),
+    ).toBe(false);
+  });
 });
