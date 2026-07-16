@@ -1,4 +1,4 @@
-import { fetchJsonViaCurl, sleep } from "./feedFetch";
+import { fetchJsonViaCurl, sleep, type CurlFetchOptions } from "./feedFetch";
 import {
   UKMTO_SITE_ORIGIN,
   type UkmtoDetail,
@@ -58,8 +58,25 @@ const PRODUCT_TYPES: ReadonlyArray<{ productType: UkmtoProductType; typeId: stri
     { productType: "advisory", typeId: UKMTO_ADVISORIES_TYPE_ID },
   ];
 
+/** Headers the UKMTO Next.js SPA sends on cross-origin Sitecore API calls. */
+export const UKMTO_API_CURL_OPTS: CurlFetchOptions = {
+  accept: "application/json",
+  headers: {
+    Referer: `${UKMTO_SITE_ORIGIN}/`,
+    Origin: UKMTO_SITE_ORIGIN,
+    "sec-fetch-site": "cross-site",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-dest": "empty",
+  },
+};
+
 function apiOriginFromEnv(): string {
   return UKMTO_API_ORIGIN.replace(/\/$/, "");
+}
+
+function isUkmtoBlockedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b403\b|forbidden|blocked|cloudflare|attention required/i.test(msg);
 }
 
 async function fetchUkmtoJson<T>(path: string): Promise<T> {
@@ -67,13 +84,15 @@ async function fetchUkmtoJson<T>(path: string): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < API_ATTEMPTS; attempt++) {
     try {
-      return fetchJsonViaCurl<T>(url, API_TIMEOUT_MS);
+      return fetchJsonViaCurl<T>(url, API_TIMEOUT_MS, UKMTO_API_CURL_OPTS);
     } catch (err) {
       lastErr = err;
       const retryable =
         err instanceof Error &&
         (/curl failed|curl exit|timed out|timeout|empty body/i.test(err.message) ||
-          /curl exit [1-9]\d*/.test(err.message));
+          /curl exit [1-9]\d*/.test(err.message) ||
+          /status code 429/i.test(err.message) ||
+          /status code 5\d{2}/i.test(err.message));
       if (retryable && attempt < API_ATTEMPTS - 1) {
         await sleep(API_BACKOFF_MS * 2 ** attempt + Math.random() * 400);
         continue;
@@ -278,11 +297,102 @@ function maxYearsFromEnv(): number {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_MAX_YEARS;
 }
 
+function incidentYear(incident: UkmtoApiIncident): number {
+  const d =
+    parseIsoDate(incident.utcDateOfIncident) ?? parseIsoDate(incident.utcDateCreated);
+  return d ? d.getUTCFullYear() % 100 : new Date().getUTCFullYear() % 100;
+}
+
+function incidentProductNumber(incident: UkmtoApiIncident): string {
+  const yy = String(incidentYear(incident)).padStart(2, "0");
+  const nn = String(incident.incidentNumber).padStart(3, "0");
+  return `${nn}-${yy}`;
+}
+
+function incidentProductType(incident: UkmtoApiIncident): UkmtoProductType {
+  return /advisory/i.test(incident.incidentTypeName) ? "advisory" : "warning";
+}
+
+function incidentExternalId(incident: UkmtoApiIncident): string {
+  const productNumber = incidentProductNumber(incident);
+  const blob = `${incident.otherDetails}\n${incident.incidentTypeName}`;
+  const updateMatch = blob.match(/update[\s_-]*0*(\d{1,3})/i);
+  if (updateMatch) {
+    return `${productNumber}-update-${updateMatch[1].padStart(3, "0")}`;
+  }
+  if (/attack/i.test(blob)) return `${productNumber}-attack`;
+  if (/advisory/i.test(blob)) return `${productNumber}-advisory`;
+  if (/suspicious/i.test(blob)) return `${productNumber}-suspicious-activity`;
+  if (/boarding|hijack/i.test(blob)) {
+    const m = blob.match(/(illegal-boarding|hijack)/i);
+    return `${productNumber}-${slugifySegment(m?.[1] ?? "incident")}`;
+  }
+  return productNumber;
+}
+
+function titleFromIncident(incident: UkmtoApiIncident, productNumber: string): string {
+  const heading = incident.otherDetails
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => /UKMTO/i.test(line));
+  if (heading) return heading.replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  return `${productNumber} - ${incident.incidentTypeName.toUpperCase()}`;
+}
+
+/** Build a listing row from the live `/api/ukmto/all` incident feed. */
+export function incidentToListingItem(incident: UkmtoApiIncident): UkmtoListingItem {
+  const productType = incidentProductType(incident);
+  const productNumber = incidentProductNumber(incident);
+  const externalId = incidentExternalId(incident);
+  return {
+    externalId,
+    productType,
+    productNumber,
+    title: titleFromIncident(incident, productNumber),
+    publishedAt:
+      parseIsoDate(incident.utcDateOfIncident) ?? parseIsoDate(incident.utcDateCreated),
+    sourceUrl: resolveUkmtoUrl(
+      `/ukmto-products/${productPathSegment(productType)}/${externalId}`,
+    ),
+    apiReference: titleFromIncident(incident, productNumber).replace(/\s+/g, "_").toUpperCase(),
+    apiLocation: incident.place?.trim() || undefined,
+  };
+}
+
 /**
- * Pull warnings + advisories from the live Sitecore API (year → month → products).
- * Newest months are scanned first; results are deduped by externalId.
+ * Fallback catalogue when the year/month product tree is WAF-blocked: recent
+ * warnings and advisories are still published on `/api/ukmto/all`.
  */
-export async function fetchUkmtoLiveListing(opts?: {
+export async function fetchUkmtoListingFromIncidents(opts?: {
+  maxProducts?: number;
+}): Promise<UkmtoListingItem[]> {
+  const maxProducts = opts?.maxProducts ?? maxListingProductsFromEnv();
+  const incidents = await fetchUkmtoIncidents();
+  const seen = new Set<string>();
+  const items: UkmtoListingItem[] = [];
+  const sorted = [...incidents].sort((a, b) => {
+    const at =
+      parseIsoDate(a.utcDateOfIncident)?.getTime() ??
+      parseIsoDate(a.utcDateCreated)?.getTime() ??
+      0;
+    const bt =
+      parseIsoDate(b.utcDateOfIncident)?.getTime() ??
+      parseIsoDate(b.utcDateCreated)?.getTime() ??
+      0;
+    return bt - at;
+  });
+  for (const incident of sorted) {
+    const listing = incidentToListingItem(incident);
+    if (seen.has(listing.externalId)) continue;
+    seen.add(listing.externalId);
+    items.push(listing);
+    if (items.length >= maxProducts) break;
+  }
+  return items;
+}
+
+async function fetchUkmtoLiveListingFromCatalog(opts?: {
   maxProducts?: number;
   maxYears?: number;
 }): Promise<UkmtoListingItem[]> {
@@ -327,6 +437,29 @@ export async function fetchUkmtoLiveListing(opts?: {
     const bt = b.publishedAt?.getTime() ?? 0;
     return bt - at;
   });
+}
+
+/**
+ * Pull warnings + advisories from the live Sitecore API (year → month → products).
+ * Newest months are scanned first; results are deduped by externalId.
+ * When the product tree is blocked (403/Cloudflare), falls back to `/api/ukmto/all`.
+ */
+export async function fetchUkmtoLiveListing(opts?: {
+  maxProducts?: number;
+  maxYears?: number;
+}): Promise<UkmtoListingItem[]> {
+  try {
+    return await fetchUkmtoLiveListingFromCatalog(opts);
+  } catch (catalogErr) {
+    if (!isUkmtoBlockedError(catalogErr)) throw catalogErr;
+    try {
+      const fallback = await fetchUkmtoListingFromIncidents(opts);
+      if (fallback.length > 0) return fallback;
+    } catch {
+      // incidents endpoint blocked too — surface the original catalog error
+    }
+    throw catalogErr;
+  }
 }
 
 export function matchIncidentForListingItem(

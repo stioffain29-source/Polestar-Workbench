@@ -99,64 +99,26 @@ export async function fetchHtmlBody(url: string, timeoutMs: number): Promise<str
   return fetchBodyWithAccept(url, timeoutMs, HTML_ACCEPT);
 }
 
-/**
- * Fetch a URL body via curl. Node's global fetch is often WAF-blocked (Cloudflare
- * TLS fingerprint) on UKMTO / Royal Navy endpoints while curl with a browser UA
- * succeeds — see scripts/src/m15-phase0-check.ts.
- */
-export function fetchBodyViaCurl(
-  url: string,
-  timeoutMs: number,
-  accept = "*/*",
-): string {
-  const result = spawnSync(
-    CURL_BIN,
-    [
-      "-sS",
-      "-L",
-      "--max-time",
-      String(Math.max(1, Math.ceil(timeoutMs / 1000))),
-      "-A",
-      BROWSER_UA,
-      "-H",
-      `Accept: ${accept}`,
-      "-H",
-      "Accept-Language: en-US,en;q=0.9",
-      url,
-    ],
-    { encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
-  );
+export type CurlFetchOptions = {
+  accept?: string;
+  headers?: Readonly<Record<string, string>>;
+};
 
-  if (result.error) {
-    throw new FeedFetchError(`curl failed: ${result.error.message}`, true);
-  }
-  if (result.status !== 0) {
-    const detail = (result.stderr || result.stdout || "").trim().slice(0, 300);
-    throw new FeedFetchError(
-      detail ? `curl exit ${result.status}: ${detail}` : `curl exit ${result.status}`,
-      true,
-    );
-  }
-
-  const body = (result.stdout ?? "").trim();
-  if (!body) {
-    throw new FeedFetchError("curl returned empty body", true);
-  }
-  if (/^\s*</.test(body) && /\b403\b|blocked|cloudflare|attention required/i.test(body)) {
-    throw new FeedFetchError("Status code 403", false);
-  }
-  return body;
+function normalizeCurlOpts(acceptOrOpts: string | CurlFetchOptions): CurlFetchOptions {
+  return typeof acceptOrOpts === "string" ? { accept: acceptOrOpts } : acceptOrOpts;
 }
 
-/** Binary-safe curl fetch (PDFs and other non-text assets). */
-export function fetchBytesViaCurl(
+function buildCurlArgs(
   url: string,
   timeoutMs: number,
-  accept = "*/*",
-): Buffer {
-  const result = spawnSync(CURL_BIN, [
+  opts: CurlFetchOptions,
+  appendHttpStatus: boolean,
+): string[] {
+  const accept = opts.accept ?? "*/*";
+  const args = [
     "-sS",
     "-L",
+    "--compressed",
     "--max-time",
     String(Math.max(1, Math.ceil(timeoutMs / 1000))),
     "-A",
@@ -165,19 +127,93 @@ export function fetchBytesViaCurl(
     `Accept: ${accept}`,
     "-H",
     "Accept-Language: en-US,en;q=0.9",
-    url,
-  ], { maxBuffer: 20 * 1024 * 1024 });
+  ];
+  for (const [name, value] of Object.entries(opts.headers ?? {})) {
+    args.push("-H", `${name}: ${value}`);
+  }
+  if (appendHttpStatus) {
+    args.push("-w", `\n%{http_code}`);
+  }
+  args.push(url);
+  return args;
+}
 
+function parseCurlTextResponse(stdout: string): { body: string; httpStatus: number | null } {
+  const raw = stdout ?? "";
+  if (!raw) return { body: "", httpStatus: null };
+  const lastNl = raw.lastIndexOf("\n");
+  if (lastNl < 0) return { body: raw, httpStatus: null };
+  const statusLine = raw.slice(lastNl + 1).trim();
+  const status = Number.parseInt(statusLine, 10);
+  if (!Number.isFinite(status) || status < 100 || status > 599) {
+    return { body: raw, httpStatus: null };
+  }
+  return { body: raw.slice(0, lastNl), httpStatus: status };
+}
+
+function assertCurlHttpOk(httpStatus: number | null, body: string): void {
+  if (httpStatus != null) {
+    if (httpStatus >= 200 && httpStatus < 300) return;
+    const retryable = httpStatus === 429 || httpStatus >= 500;
+    throw new FeedFetchError(`Status code ${httpStatus}`, retryable);
+  }
+  if (/^\s*</.test(body) && /\b403\b|blocked|cloudflare|attention required/i.test(body)) {
+    throw new FeedFetchError("Status code 403", false);
+  }
+}
+
+function assertCurlProcessOk(result: ReturnType<typeof spawnSync>): void {
   if (result.error) {
     throw new FeedFetchError(`curl failed: ${result.error.message}`, true);
   }
   if (result.status !== 0) {
-    const detail = (result.stderr || "").toString().trim().slice(0, 300);
+    const detail = (result.stderr || result.stdout || "").toString().trim().slice(0, 300);
     throw new FeedFetchError(
       detail ? `curl exit ${result.status}: ${detail}` : `curl exit ${result.status}`,
       true,
     );
   }
+}
+
+/**
+ * Fetch a URL body via curl. Node's global fetch is often WAF-blocked (Cloudflare
+ * TLS fingerprint) on UKMTO / Royal Navy endpoints while curl with a browser UA
+ * succeeds — see scripts/src/m15-phase0-check.ts.
+ */
+export function fetchBodyViaCurl(
+  url: string,
+  timeoutMs: number,
+  acceptOrOpts: string | CurlFetchOptions = "*/*",
+): string {
+  const opts = normalizeCurlOpts(acceptOrOpts);
+  const result = spawnSync(CURL_BIN, buildCurlArgs(url, timeoutMs, opts, true), {
+    encoding: "utf8",
+    maxBuffer: 20 * 1024 * 1024,
+  });
+
+  assertCurlProcessOk(result);
+
+  const { body, httpStatus } = parseCurlTextResponse(result.stdout ?? "");
+  const trimmed = body.trim();
+  if (!trimmed) {
+    throw new FeedFetchError("curl returned empty body", true);
+  }
+  assertCurlHttpOk(httpStatus, trimmed);
+  return trimmed;
+}
+
+/** Binary-safe curl fetch (PDFs and other non-text assets). */
+export function fetchBytesViaCurl(
+  url: string,
+  timeoutMs: number,
+  acceptOrOpts: string | CurlFetchOptions = "*/*",
+): Buffer {
+  const opts = normalizeCurlOpts(acceptOrOpts);
+  const result = spawnSync(CURL_BIN, buildCurlArgs(url, timeoutMs, opts, false), {
+    maxBuffer: 20 * 1024 * 1024,
+  });
+
+  assertCurlProcessOk(result);
 
   const buf = result.stdout;
   if (!buf || !Buffer.isBuffer(buf) || buf.length === 0) {
@@ -191,8 +227,15 @@ export function fetchBytesViaCurl(
 }
 
 /** Parse JSON from a curl-fetched body (throws FeedFetchError on HTML/block pages). */
-export function fetchJsonViaCurl<T>(url: string, timeoutMs: number): T {
-  const body = fetchBodyViaCurl(url, timeoutMs, "application/json");
+export function fetchJsonViaCurl<T>(
+  url: string,
+  timeoutMs: number,
+  opts?: CurlFetchOptions,
+): T {
+  const body = fetchBodyViaCurl(url, timeoutMs, {
+    accept: "application/json",
+    ...opts,
+  });
   if (/^\s*</.test(body)) {
     throw new FeedFetchError(
       `Non-JSON response: ${body.replace(/\s+/g, " ").slice(0, 160)}`,

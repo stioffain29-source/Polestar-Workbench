@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fetchBytesViaCurl, sleep } from "./feedFetch";
 import { UKMTO_SITE_ORIGIN } from "./ukmtoParse";
+import { UKMTO_API_CURL_OPTS } from "./ukmtoApi";
 
 const FETCH_TIMEOUT_MS = 30_000;
 const FETCH_ATTEMPTS = 3;
@@ -107,7 +108,10 @@ export async function fetchPdfBytes(url: string): Promise<Buffer> {
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
     try {
       try {
-        const buf = fetchBytesViaCurl(url, FETCH_TIMEOUT_MS, "application/pdf,*/*");
+        const buf = fetchBytesViaCurl(url, FETCH_TIMEOUT_MS, {
+          accept: "application/pdf,*/*",
+          headers: UKMTO_API_CURL_OPTS.headers,
+        });
         if (buf.length === 0) throw new Error("empty PDF response");
         return buf;
       } catch (curlErr) {
