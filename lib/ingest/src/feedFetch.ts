@@ -202,6 +202,15 @@ export function fetchBodyViaCurl(
   return trimmed;
 }
 
+/** HTML fetch via curl — avoids Node fetch TLS fingerprint blocks on .mil / WAF sites. */
+export function fetchHtmlViaCurl(
+  url: string,
+  timeoutMs: number,
+  opts?: Omit<CurlFetchOptions, "accept">,
+): string {
+  return fetchBodyViaCurl(url, timeoutMs, { accept: HTML_ACCEPT, ...opts });
+}
+
 /** Binary-safe curl fetch (PDFs and other non-text assets). */
 export function fetchBytesViaCurl(
   url: string,

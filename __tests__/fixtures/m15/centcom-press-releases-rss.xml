@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>U.S. Central Command Press Releases</title>
+    <link>https://www.centcom.mil</link>
+    <description>U.S. Central Command Press Releases RSS Feed</description>
+    <item>
+      <title>CENTCOM Conducts Airstrikes Against Iran-Backed Houthi Missile Storage and Command/Control Facilities in Yemen</title>
+      <link>https://www.centcom.mil/MEDIA/PRESS-RELEASES/Press-Release-View/Article/4015365/centcom-conducts-airstrikes-against-iran-backed-houthi-missile-storage-and-comm/</link>
+      <description>U.S. Central Command forces conducted precision airstrikes against Houthi facilities in Sana'a, Yemen, and shot down multiple one-way attack UAVs and an anti-ship cruise missile over the Red Sea.</description>
+      <pubDate>Sat, 21 Dec 2024 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>U.S. Forces Complete Another Round of Strikes Against Iran</title>
+      <link>https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/Article/4538814/us-forces-complete-another-round-of-strikes-against-iran/</link>
+      <description>CENTCOM forces completed an additional round of strikes to degrade Iran's ability to attack commercial shipping in the Strait of Hormuz.</description>
+      <pubDate>Tue, 08 Jul 2026 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Commercial Vessels Flow Through Open Strait of Hormuz</title>
+      <link>https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/Article/4538801/commercial-vessels-flow-through-open-strait-of-hormuz/</link>
+      <pubDate>Sat, 05 Jul 2026 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

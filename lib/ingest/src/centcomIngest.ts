@@ -6,16 +6,18 @@ import {
   type InsertOfficialMilitaryMaritimeSource,
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { fetchHtmlBody, sleep } from "./feedFetch";
+import { fetchHtmlViaCurl, fetchBodyViaCurl, sleep } from "./feedFetch";
 import {
   parseCentcomDetail,
   parseCentcomListing,
+  parseCentcomRssListing,
   type CentcomListingItem,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
 import { assignAnalystFlags, routeOfficialSource, partitionOfficialInserts, appendCentcomImageUrls } from "./m15";
 import {
   CENTCOM_HEALTH_NAME,
+  CENTCOM_RSS_URL,
   CENTCOM_SOURCE_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
@@ -28,6 +30,7 @@ import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 export {
   parseCentcomListing,
   parseCentcomDetail,
+  parseCentcomRssListing,
   resolveCentcomUrl,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
@@ -35,7 +38,7 @@ export type { CentcomListingItem, CentcomDetail } from "./centcomParse";
 
 export const CENTCOM_SOURCE = "centcom" as const;
 export const CENTCOM_HEALTH_TOPIC = OFFICIAL_M15_HEALTH_TOPIC;
-export { CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL } from "./m15/health";
+export { CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL, CENTCOM_RSS_URL } from "./m15/health";
 
 const CENTCOM_HEALTH_NOTES =
   "U.S. Central Command (CENTCOM) official press releases ingested as STANDALONE official sources (never as incidents).";
@@ -44,7 +47,34 @@ const FETCH_ATTEMPTS = 3;
 const FETCH_BACKOFF_MS = 2500;
 const DEFAULT_MAX_DETAIL_FETCHES = 10;
 const DEFAULT_FIXTURE_NAME = "centcom-press-releases-listing.html";
+const DEFAULT_RSS_FIXTURE_NAME = "centcom-press-releases-rss.xml";
 
+const CENTCOM_CURL_OPTS = {
+  headers: {
+    Referer: `${CENTCOM_SITE_ORIGIN}/`,
+    Origin: CENTCOM_SITE_ORIGIN,
+  },
+} as const;
+
+const CENTCOM_RSS_CURL_OPTS = {
+  accept: "application/rss+xml, application/xml, text/xml, */*",
+  headers: CENTCOM_CURL_OPTS.headers,
+} as const;
+
+function isCentcomBlockedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b403\b|forbidden|blocked|cloudflare|attention required/i.test(msg);
+}
+
+function isCurlRetryable(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return (
+    /curl failed|curl exit|timed out|timeout|empty body/i.test(err.message) ||
+    /curl exit [1-9]\d*/.test(err.message) ||
+    /status code 429/i.test(err.message) ||
+    /status code 5\d{2}/i.test(err.message)
+  );
+}
 function isDisabled(): boolean {
   const v = process.env.CENTCOM_INGEST_ENABLED?.trim().toLowerCase();
   return v === "false" || v === "0" || v === "off" || v === "no";
@@ -165,24 +195,78 @@ async function fetchHtmlWithRetry(url: string): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
     try {
-      return await fetchHtmlBody(url, FETCH_TIMEOUT_MS);
+      return fetchHtmlViaCurl(url, FETCH_TIMEOUT_MS, CENTCOM_CURL_OPTS);
     } catch (err) {
       lastErr = err;
-      if (attempt < FETCH_ATTEMPTS - 1) {
+      if (isCurlRetryable(err) && attempt < FETCH_ATTEMPTS - 1) {
         await sleep(FETCH_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
+        continue;
       }
+      break;
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-async function loadListingHtml(opts: CentcomIngestOptions): Promise<string> {
-  if (opts.listingHtml) return opts.listingHtml;
+async function fetchCentcomRssWithRetry(): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
+    try {
+      return fetchBodyViaCurl(CENTCOM_RSS_URL, FETCH_TIMEOUT_MS, CENTCOM_RSS_CURL_OPTS);
+    } catch (err) {
+      lastErr = err;
+      if (isCurlRetryable(err) && attempt < FETCH_ATTEMPTS - 1) {
+        await sleep(FETCH_BACKOFF_MS * 2 ** attempt + Math.random() * 600);
+        continue;
+      }
+      break;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+async function loadListingItems(
+  opts: CentcomIngestOptions,
+  log: (s: string) => void,
+): Promise<CentcomListingItem[]> {
+  if (opts.listingHtml) {
+    return parseCentcomListing(opts.listingHtml, CENTCOM_SITE_ORIGIN);
+  }
+
   const fixtureDir = fixtureDirFromEnv();
   if (fixtureDir) {
-    return readFileSync(join(fixtureDir, DEFAULT_FIXTURE_NAME), "utf8");
+    const rssPath = join(fixtureDir, DEFAULT_RSS_FIXTURE_NAME);
+    try {
+      const rssXml = readFileSync(rssPath, "utf8");
+      const fromRss = parseCentcomRssListing(rssXml, CENTCOM_SITE_ORIGIN);
+      if (fromRss.length > 0) return fromRss;
+    } catch {
+      // Fall back to saved HTML listing fixture.
+    }
+    return parseCentcomListing(
+      readFileSync(join(fixtureDir, DEFAULT_FIXTURE_NAME), "utf8"),
+      CENTCOM_SITE_ORIGIN,
+    );
   }
-  return fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
+
+  try {
+    log(`  live fetch — RSS ${CENTCOM_RSS_URL}`);
+    const rssXml = await fetchCentcomRssWithRetry();
+    const fromRss = parseCentcomRssListing(rssXml, CENTCOM_SITE_ORIGIN);
+    if (fromRss.length > 0) {
+      log(`  parsed ${fromRss.length} RSS item(s)`);
+      return fromRss;
+    }
+    log("  RSS feed returned no items — falling back to HTML listing");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(`  RSS fetch failed (${msg}) — falling back to HTML listing`);
+    if (!isCentcomBlockedError(err)) throw err;
+  }
+
+  log(`  live fetch — listing ${CENTCOM_SOURCE_URL}`);
+  const listingHtml = await fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
+  return parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
 }
 
 async function latestCentcomPublishedAt(): Promise<Date | null> {
@@ -306,11 +390,10 @@ export async function runCentcomIngest(
   try {
     const usingFixtures = !!opts.listingHtml || !!fixtureDirFromEnv();
     if (!usingFixtures) {
-      log(`  live fetch — listing ${CENTCOM_SOURCE_URL}`);
+      log(`  live fetch — primary RSS, HTML listing fallback`);
     }
 
-    const listingHtml = await loadListingHtml(opts);
-    const parsedListing = parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
+    const parsedListing = await loadListingItems(opts, log);
     log(`  parsed ${parsedListing.length} listing tile(s)`);
 
     let listing = parsedListing;
@@ -426,7 +509,7 @@ export async function runCentcomIngest(
         ],
         {
           sourceType: "html",
-          scrapeMethod: "HTML listing + detail",
+          scrapeMethod: "RSS listing + HTML detail",
           notes: CENTCOM_HEALTH_NOTES,
           pending: !feedOk || blockedUpstream,
         },

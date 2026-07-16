@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   CENTCOM_SOURCE_URL,
+  CENTCOM_RSS_URL,
   UKMTO_SOURCE_URL,
   JMIC_SOURCE_URL,
   CMF_SOURCE_URL,
@@ -31,6 +32,7 @@ describe("M1.5 Phase 0 — prerequisites", () => {
     expect(CENTCOM_SOURCE_URL).toBe(
       "https://www.centcom.mil/MEDIA/PRESS-RELEASES/",
     );
+    expect(CENTCOM_RSS_URL).toContain("ContentType=2");
     expect(UKMTO_SOURCE_URL).toBe("https://www.ukmto.org/ukmto-products");
     expect(JMIC_SOURCE_URL).toBe(
       "https://www.ukmto.org/partner-products/jmic-products",

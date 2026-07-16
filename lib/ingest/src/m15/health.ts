@@ -7,6 +7,9 @@ export const UKMTO_SOURCE_URL = "https://www.ukmto.org/ukmto-products";
 
 export const CENTCOM_HEALTH_NAME = "CENTCOM Press Releases";
 export const CENTCOM_SOURCE_URL = "https://www.centcom.mil/MEDIA/PRESS-RELEASES/";
+/** Official press-release RSS (less WAF-sensitive than the HTML listing page). */
+export const CENTCOM_RSS_URL =
+  "https://www.centcom.mil/DesktopModules/ArticleCS/RSS.ashx?ContentType=2&Site=808&isdashboardselected=0&max=50";
 
 export {
   JMIC_HEALTH_NAME,

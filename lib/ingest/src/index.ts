@@ -233,6 +233,7 @@ export {
   emptyCentcomIngestSummary,
   parseCentcomListing,
   parseCentcomDetail,
+  parseCentcomRssListing,
   resolveCentcomUrl,
   selectCentcomListingForFetch,
   CENTCOM_SOURCE,
@@ -267,6 +268,7 @@ export {
   UKMTO_SOURCE_URL,
   CENTCOM_HEALTH_NAME,
   CENTCOM_SOURCE_URL,
+  CENTCOM_RSS_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
 export { sanitiseCaption } from "./text";

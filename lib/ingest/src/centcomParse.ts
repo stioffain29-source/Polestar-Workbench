@@ -147,6 +147,56 @@ export function parseCentcomListing(
 }
 
 /**
+ * Parse the official CENTCOM press-release RSS feed (ContentType=2).
+ * Used for live ingest when the HTML listing page is WAF-blocked.
+ */
+export function parseCentcomRssListing(
+  xml: string,
+  baseUrl = CENTCOM_SITE_ORIGIN,
+): CentcomListingItem[] {
+  const items: CentcomListingItem[] = [];
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+
+  for (const block of xml.match(itemRe) ?? []) {
+    const titleRaw =
+      firstMatch(block, /<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i) ?? "";
+    const link =
+      firstMatch(block, /<link>([^<]+)<\/link>/i) ??
+      firstMatch(block, /<guid[^>]*>([^<]+)<\/guid>/i);
+    if (!link?.trim()) continue;
+
+    const externalId =
+      firstMatch(link, /\/Article\/(\d+)\//) ??
+      firstMatch(block, /\/Article\/(\d+)\//);
+    if (!externalId) continue;
+
+    const title = stripTags(titleRaw);
+    if (!title) continue;
+
+    const pubDate =
+      firstMatch(block, /<pubDate>([^<]+)<\/pubDate>/i) ??
+      firstMatch(block, /<dc:date>([^<]+)<\/dc:date>/i);
+    const publishedAt = pubDate ? parseIsoDate(pubDate) ?? new Date(pubDate) : null;
+    if (publishedAt && Number.isNaN(publishedAt.getTime())) continue;
+
+    const summaryRaw = firstMatch(
+      block,
+      /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i,
+    );
+
+    items.push({
+      externalId,
+      title,
+      publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : null,
+      sourceUrl: resolveCentcomUrl(link.trim(), baseUrl),
+      summary: summaryRaw ? stripTags(summaryRaw) : undefined,
+    });
+  }
+
+  return items;
+}
+
+/**
  * Parse a single CENTCOM release detail page.
  */
 export function parseCentcomDetail(

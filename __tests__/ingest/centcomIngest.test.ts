@@ -6,6 +6,7 @@ import {
 import {
   parseCentcomDetail,
   parseCentcomListing,
+  parseCentcomRssListing,
   resolveCentcomUrl,
   runCentcomIngest,
   selectCentcomListingForFetch,
@@ -22,6 +23,29 @@ const FIXTURE_DIR = join(__dirname, "../fixtures/m15");
 function readFixture(name: string): string {
   return readFileSync(join(FIXTURE_DIR, name), "utf8");
 }
+
+describe("CENTCOM RSS listing parser", () => {
+  const rssXml = readFixture("centcom-press-releases-rss.xml");
+
+  it("parses press-release RSS items with ids, titles, dates, and absolute URLs", () => {
+    const items = parseCentcomRssListing(rssXml);
+    expect(items.length).toBeGreaterThanOrEqual(2);
+
+    const strike = items.find((i) => i.externalId === "4015365");
+    expect(strike).toMatchObject({
+      externalId: "4015365",
+      title:
+        "CENTCOM Conducts Airstrikes Against Iran-Backed Houthi Missile Storage and Command/Control Facilities in Yemen",
+      sourceUrl:
+        "https://www.centcom.mil/MEDIA/PRESS-RELEASES/Press-Release-View/Article/4015365/centcom-conducts-airstrikes-against-iran-backed-houthi-missile-storage-and-comm/",
+    });
+    expect(strike?.publishedAt).toEqual(new Date("Sat, 21 Dec 2024 00:00:00 GMT"));
+    expect(strike?.summary).toMatch(/Red Sea/);
+
+    const hormuz = items.find((i) => i.externalId === "4538814");
+    expect(hormuz?.publishedAt).toEqual(new Date("Tue, 08 Jul 2026 00:00:00 GMT"));
+  });
+});
 
 describe("CENTCOM listing parser (Step 1)", () => {
   const listingHtml = readFixture("centcom-press-releases-listing.html");
