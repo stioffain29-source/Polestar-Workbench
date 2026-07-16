@@ -304,6 +304,12 @@ const CLUSTER_STOPWORDS = new Set([
   "la","los","las","del","di","dan","yang","dengan","dekat","tewas","orang",
 ]);
 
+/** Light stemming so "crash"/"crashing" and "collapse"/"collapses" align. */
+function stemToken(raw: string): string {
+  const stem = raw.replace(/(?:ing|ed|es|s)$/, "");
+  return stem.length >= 3 ? stem : raw;
+}
+
 /** Distinctive content tokens of a headline for cross-row similarity. */
 function clusterTokens(text: string | null | undefined): Set<string> {
   const out = new Set<string>();
@@ -316,11 +322,78 @@ function clusterTokens(text: string | null | undefined): Set<string> {
     }
     if (raw.length < 3) continue;
     if (CLUSTER_STOPWORDS.has(raw)) continue;
-    // Light stemming so "crash"/"crashing" and "collapse"/"collapses" align.
-    const stem = raw.replace(/(?:ing|ed|es|s)$/, "");
-    out.add(stem.length >= 3 ? stem : raw);
+    out.add(stemToken(raw));
   }
   return out;
+}
+
+// Accident / disaster event-noun classes. A syndicated foreign catastrophe
+// ("plane crash", "building collapse", "ferry capsize") is reliably identified
+// by the co-occurrence of an accident noun and its incident verb even when the
+// generic filler words differ between two copies. Keys are LIGHTLY STEMMED with
+// the same transform as {@link clusterTokens} so lookups line up with clustered
+// tokens; the map is built once below.
+const EVENT_CLASS_WORDS: Record<string, string[]> = {
+  aviation: [
+    "plane","planes","aircraft","airplane","airliner","jet","jetliner",
+    "helicopter","chopper","flight","crash","crashes","crashing","crashed",
+  ],
+  maritime: [
+    "ferry","boat","ship","vessel","tanker","capsize","capsizes","capsized",
+    "sink","sinks","sinking","sank","sunk","shipwreck","drown","drowns","drowned",
+  ],
+  collapse: [
+    "collapse","collapses","collapsed","building","buildings","bridge","bridges",
+    "tower","overpass","structure",
+  ],
+  fire: ["fire","fires","blaze","blazes","wildfire","inferno"],
+  flood: ["flood","floods","flooding","flooded","deluge","inundation"],
+  quake: [
+    "earthquake","earthquakes","quake","quakes","tremor","temblor","aftershock",
+  ],
+  storm: ["cyclone","typhoon","hurricane","tornado","storm","storms"],
+  explosion: ["explosion","explosions","blast","blasts","detonation"],
+  landslide: ["landslide","landslides","mudslide","avalanche","rockslide"],
+  volcano: ["volcano","eruption","eruptions","lava"],
+  crowd: ["stampede","stampedes","crush"],
+  rail: ["derail","derails","derailment","derailed"],
+};
+
+const EVENT_CLASS_OF: Map<string, string> = (() => {
+  const m = new Map<string, string>();
+  for (const [cls, words] of Object.entries(EVENT_CLASS_WORDS)) {
+    for (const w of words) m.set(stemToken(w), cls);
+  }
+  return m;
+})();
+
+/**
+ * True when the SHARED tokens between two headlines carry a distinctive
+ * accident/disaster event signature — either two tokens from the SAME event
+ * class (e.g. "plane" + "crash"), or one event-class token plus a matching
+ * casualty count (a shared number). This lets the cross-row pass catch a
+ * marker-less foreign syndication whose raw token overlap is otherwise thin
+ * ("Photos of a plane crashing vertically ... fatalities reported" shares only
+ * {plane, crash} with its Missouri sibling) WITHOUT over-firing on two short
+ * headlines that merely share one generic word.
+ */
+function sharedEventSignature(shared: readonly string[]): boolean {
+  const classCounts = new Map<string, number>();
+  let hasNumber = false;
+  let eventTokens = 0;
+  for (const s of shared) {
+    if (/^[0-9]+$/.test(s)) {
+      hasNumber = true;
+      continue;
+    }
+    const cls = EVENT_CLASS_OF.get(s);
+    if (cls) {
+      eventTokens += 1;
+      classCounts.set(cls, (classCounts.get(cls) ?? 0) + 1);
+    }
+  }
+  for (const c of classCounts.values()) if (c >= 2) return true;
+  return eventTokens >= 1 && hasNumber;
 }
 
 /** Overlap coefficient |A∩B| / min(|A|,|B|) plus the shared-token list. */
@@ -379,10 +452,18 @@ export function foreignSyndicationDropIds(
     if (m.toks.size === 0) continue;
     for (const f of foreign) {
       const { shared, coeff } = clusterOverlap(m.toks, f.toks);
-      if (shared.length < 2 || coeff < 0.6) continue;
-      // Require a distinctive shared token (a number or a >=5-char word) so two
-      // short generic headlines cannot cluster on filler alone.
-      if (!shared.some((s) => /^[0-9]+$/.test(s) || s.length >= 5)) continue;
+      if (shared.length < 2) continue;
+      // Two match paths, either of which links the marker-less row to a real
+      // foreign-attributed sibling:
+      //   1. STRONG raw overlap — high overlap coefficient plus a distinctive
+      //      shared token (a number or a >=5-char word) so two short generic
+      //      headlines cannot cluster on filler alone.
+      //   2. EVENT SIGNATURE — a distinctive accident/disaster signature (two
+      //      tokens of one event class, or an event noun plus a matching
+      //      casualty count) survives thin filler overlap.
+      const distinctive = shared.some((s) => /^[0-9]+$/.test(s) || s.length >= 5);
+      const strongOverlap = coeff >= 0.6 && distinctive;
+      if (!strongOverlap && !sharedEventSignature(shared)) continue;
       drop.add(m.id);
       drop.add(f.id);
       break;

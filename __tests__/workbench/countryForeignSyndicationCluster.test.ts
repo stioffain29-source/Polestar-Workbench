@@ -99,6 +99,61 @@ describe("foreignSyndicationDropIds", () => {
     expect(drop.has("sibling")).toBe(true);
   });
 
+  it("drops a marker-less plane-crash row that shares only the event signature with its sibling", () => {
+    // The weaker-but-real case: the marker-less copy shares only {plane, crash}
+    // with its Missouri sibling — thin raw overlap (coeff well below 0.6) — but
+    // both tokens belong to the aviation event class, a distinctive signature.
+    const drop = foreignSyndicationDropIds(
+      build([
+        {
+          id: "markerless",
+          en: "Photos of a plane crashing vertically into a densely populated area, fatalities reported",
+        },
+        {
+          id: "sibling",
+          en: "Plane crash in Missouri, US kills 11 parachutists and 1 pilot",
+        },
+        { id: "domestic", en: "Bentrokan pecah di Jakarta, polisi tembakkan gas" },
+      ]),
+    );
+    expect(drop.has("markerless")).toBe(true);
+    expect(drop.has("sibling")).toBe(true);
+    expect(drop.has("domestic")).toBe(false);
+  });
+
+  it("does NOT drop a domestic accident anchored to an Indonesian place even under the widened matcher", () => {
+    // Shares the full aviation signature AND the casualty count with the foreign
+    // sibling, but the Medan anchor makes it a "local" row, never eligible for
+    // clustering — dominance / no-fabrication preserved.
+    const drop = foreignSyndicationDropIds(
+      build([
+        {
+          id: "domestic",
+          en: "Plane crash near Medan kills 11 in Indonesia",
+        },
+        {
+          id: "foreign",
+          en: "Plane crash in Missouri, US kills 11 parachutists and 1 pilot",
+        },
+      ]),
+    );
+    expect(drop.has("domestic")).toBe(false);
+    expect(drop.size).toBe(0);
+  });
+
+  it("does NOT drop a marker-less row that shares only a single event-class word with the sibling", () => {
+    // "Fire reported downtown" vs a foreign "Fire kills 20 in Dhaka" share only
+    // the stemmed {fire} — one event-class token, no matching casualty number —
+    // which is not a distinctive event signature, so the row is kept.
+    const drop = foreignSyndicationDropIds(
+      build([
+        { id: "markerless", en: "Fire reported downtown overnight" },
+        { id: "foreign", en: "Fire in Dhaka apartment tower leaves several dead" },
+      ]),
+    );
+    expect(drop.has("markerless")).toBe(false);
+  });
+
   it("returns an empty set when no rows are supplied", () => {
     expect(foreignSyndicationDropIds([]).size).toBe(0);
   });
