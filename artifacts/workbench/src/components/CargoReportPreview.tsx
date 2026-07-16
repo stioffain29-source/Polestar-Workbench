@@ -583,6 +583,13 @@ export default function CargoReportPreview({
           polestarView: report.polestarView,
         },
         issueDate,
+        {
+          situation: aiProse?.situation,
+          whatMatters: aiProse?.whatMatters,
+          implications: aiProse?.implications,
+          watchNext: aiProse?.watchNext,
+          polestarView: aiProse?.polestarView,
+        },
       ),
     [
       model,
@@ -592,6 +599,11 @@ export default function CargoReportPreview({
       report.watchNext,
       report.polestarView,
       issueDate,
+      aiProse?.situation,
+      aiProse?.whatMatters,
+      aiProse?.implications,
+      aiProse?.watchNext,
+      aiProse?.polestarView,
     ],
   );
 

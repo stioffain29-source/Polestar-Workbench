@@ -885,6 +885,13 @@ export async function exportTopicReportPdf(
         polestarView: data.polestarView,
       },
       data.issueDate,
+      {
+        situation: aiProse?.situation,
+        whatMatters: aiProse?.whatMatters,
+        implications: aiProse?.implications,
+        watchNext: aiProse?.watchNext,
+        polestarView: aiProse?.polestarView,
+      },
     );
   }
 
