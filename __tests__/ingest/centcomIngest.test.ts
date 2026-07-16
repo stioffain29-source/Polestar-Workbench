@@ -7,7 +7,12 @@ import {
   parseCentcomDetail,
   parseCentcomListing,
   parseCentcomRssListing,
+  filterCentcomPressReleaseItems,
+  isCentcomPressReleaseUrl,
+  bodyTextFromRssDescription,
   resolveCentcomUrl,
+} from "../../lib/ingest/src/centcomParse";
+import {
   runCentcomIngest,
   selectCentcomListingForFetch,
   CENTCOM_SOURCE,
@@ -23,6 +28,53 @@ const FIXTURE_DIR = join(__dirname, "../fixtures/m15");
 function readFixture(name: string): string {
   return readFileSync(join(FIXTURE_DIR, name), "utf8");
 }
+
+describe("CENTCOM press-release URL helpers", () => {
+  it("recognises official press-release paths", () => {
+    expect(
+      isCentcomPressReleaseUrl(
+        "https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/Article/4538814/foo/",
+      ),
+    ).toBe(true);
+    expect(
+      isCentcomPressReleaseUrl(
+        "https://www.centcom.mil/MEDIA/NEWS-ARTICLES/News-Article-View/Article/4398492/foo/",
+      ),
+    ).toBe(false);
+  });
+
+  it("filters news RSS items down to press releases only", () => {
+    const items = [
+      {
+        externalId: "4538814",
+        title: "Strike release",
+        publishedAt: new Date("2026-07-08"),
+        sourceUrl:
+          "https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/Article/4538814/us-forces/",
+        summary: "Hormuz",
+      },
+      {
+        externalId: "4398492",
+        title: "Exercise story",
+        publishedAt: new Date("2026-02-05"),
+        sourceUrl:
+          "https://www.centcom.mil/MEDIA/NEWS-ARTICLES/News-Article-View/Article/4398492/foo/",
+        summary: "NAVCENT",
+      },
+    ];
+    expect(filterCentcomPressReleaseItems(items).map((i) => i.externalId)).toEqual([
+      "4538814",
+    ]);
+  });
+
+  it("builds plain text from RSS description HTML", () => {
+    expect(
+      bodyTextFromRssDescription(
+        "MANAMA, Bahrain – <b>forces</b> conducted strikes.<br />",
+      ),
+    ).toBe("MANAMA, Bahrain – forces conducted strikes.");
+  });
+});
 
 describe("CENTCOM RSS listing parser", () => {
   const rssXml = readFixture("centcom-press-releases-rss.xml");
@@ -316,5 +368,31 @@ describe("CENTCOM persist + routing (Step 3)", () => {
     expect(summary.inserted).toBe(0);
     expect(stored).toHaveLength(0);
     expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("ingests from RSS description when detail pages return 403", async () => {
+    setupDbMock();
+    const rssXml = readFixture("centcom-press-releases-rss.xml");
+    const listingItem = parseCentcomRssListing(rssXml).find(
+      (i) => i.externalId === "4538814",
+    )!;
+    expect(listingItem.rssDescriptionHtml).toBeTruthy();
+
+    const summary = await runCentcomIngest({
+      commit: true,
+      listingItems: [listingItem],
+      fetchDetailHtml: async () => {
+        throw new Error("Status code 403");
+      },
+      sincePublishedAt: null,
+    });
+
+    expect(summary.inserted).toBe(1);
+    expect(summary.errors).toEqual([]);
+    expect(stored[0]).toMatchObject({
+      externalId: "4538814",
+      title: expect.stringContaining("Strikes Against Iran"),
+    });
+    expect(stored[0]?.bodyText).toMatch(/Strait of Hormuz/);
   });
 });

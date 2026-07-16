@@ -12,7 +12,62 @@ export type CentcomListingItem = {
   publishedAt: Date | null;
   sourceUrl: string;
   summary?: string;
+  /** Raw RSS description HTML — used when Akamai blocks detail pages. */
+  rssDescriptionHtml?: string;
 };
+
+const CENTCOM_PRESS_RELEASE_PATH_RE =
+  /centcom\.mil\/media\/(?:public-releases|press-releases)\//i;
+
+/** True when a URL points at an official CENTCOM press / public release article. */
+export function isCentcomPressReleaseUrl(url: string): boolean {
+  return CENTCOM_PRESS_RELEASE_PATH_RE.test(url);
+}
+
+/** Keep only official CENTCOM press-release article URLs. */
+export function filterCentcomPressReleaseItems(
+  items: CentcomListingItem[],
+): CentcomListingItem[] {
+  return items.filter((item) => isCentcomPressReleaseUrl(item.sourceUrl));
+}
+
+/** Dedupe listing rows by article id, keeping the richest record per id. */
+export function dedupeCentcomListingItems(
+  items: CentcomListingItem[],
+): CentcomListingItem[] {
+  const byId = new Map<string, CentcomListingItem>();
+  for (const item of items) {
+    const prev = byId.get(item.externalId);
+    if (!prev) {
+      byId.set(item.externalId, item);
+      continue;
+    }
+    const prevRich = (prev.rssDescriptionHtml?.length ?? 0) + (prev.summary?.length ?? 0);
+    const nextRich = (item.rssDescriptionHtml?.length ?? 0) + (item.summary?.length ?? 0);
+    if (nextRich > prevRich) byId.set(item.externalId, item);
+  }
+  return Array.from(byId.values());
+}
+
+/** Plain-text body from an RSS description block (may contain inline HTML). */
+export function bodyTextFromRssDescription(descriptionHtml: string): string {
+  return stripTags(descriptionHtml);
+}
+
+/** Extract image URLs embedded in RSS description HTML. */
+export function extractCentcomImageUrlsFromHtml(
+  html: string,
+  baseUrl = CENTCOM_SITE_ORIGIN,
+): string[] {
+  return Array.from(
+    new Set(
+      (html.match(/<img\b[^>]*>/gi) ?? [])
+        .map((tag) => attrValue(tag, "src"))
+        .filter((src): src is string => !!src)
+        .map((src) => resolveCentcomUrl(src, baseUrl)),
+    ),
+  );
+}
 
 export type CentcomDetail = {
   externalId: string;
@@ -190,6 +245,7 @@ export function parseCentcomRssListing(
       publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : null,
       sourceUrl: resolveCentcomUrl(link.trim(), baseUrl),
       summary: summaryRaw ? stripTags(summaryRaw) : undefined,
+      rssDescriptionHtml: summaryRaw ?? undefined,
     });
   }
 

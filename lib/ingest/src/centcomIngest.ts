@@ -7,10 +7,16 @@ import {
 } from "@workspace/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { fetchHtmlViaCurl, fetchBodyViaCurl, sleep } from "./feedFetch";
+import { isGoogleNewsRedirect, resolveGoogleNewsUrl } from "./googleNewsUrl";
 import {
   parseCentcomDetail,
   parseCentcomListing,
   parseCentcomRssListing,
+  filterCentcomPressReleaseItems,
+  dedupeCentcomListingItems,
+  bodyTextFromRssDescription,
+  extractCentcomImageUrlsFromHtml,
+  isCentcomPressReleaseUrl,
   type CentcomListingItem,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
@@ -18,6 +24,8 @@ import { assignAnalystFlags, routeOfficialSource, partitionOfficialInserts, appe
 import {
   CENTCOM_HEALTH_NAME,
   CENTCOM_RSS_URL,
+  CENTCOM_NEWS_RSS_URL,
+  CENTCOM_GOOGLE_NEWS_RSS_URL,
   CENTCOM_SOURCE_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
@@ -31,6 +39,9 @@ export {
   parseCentcomListing,
   parseCentcomDetail,
   parseCentcomRssListing,
+  filterCentcomPressReleaseItems,
+  dedupeCentcomListingItems,
+  isCentcomPressReleaseUrl,
   resolveCentcomUrl,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
@@ -38,7 +49,7 @@ export type { CentcomListingItem, CentcomDetail } from "./centcomParse";
 
 export const CENTCOM_SOURCE = "centcom" as const;
 export const CENTCOM_HEALTH_TOPIC = OFFICIAL_M15_HEALTH_TOPIC;
-export { CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL, CENTCOM_RSS_URL } from "./m15/health";
+export { CENTCOM_HEALTH_NAME, CENTCOM_SOURCE_URL, CENTCOM_RSS_URL, CENTCOM_NEWS_RSS_URL, CENTCOM_GOOGLE_NEWS_RSS_URL } from "./m15/health";
 
 const CENTCOM_HEALTH_NOTES =
   "U.S. Central Command (CENTCOM) official press releases ingested as STANDALONE official sources (never as incidents).";
@@ -60,6 +71,14 @@ const CENTCOM_RSS_CURL_OPTS = {
   accept: "application/rss+xml, application/xml, text/xml, */*",
   headers: CENTCOM_CURL_OPTS.headers,
 } as const;
+
+const CENTCOM_GOOGLE_NEWS_CURL_OPTS = {
+  accept: "application/rss+xml, application/xml, text/xml, */*",
+} as const;
+
+function articleIdFromUrl(url: string): string | null {
+  return url.match(/\/Article\/(\d+)\//i)?.[1] ?? null;
+}
 
 function isCentcomBlockedError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -120,6 +139,8 @@ export type CentcomIngestOptions = {
   commit?: boolean;
   /** Pre-loaded listing HTML (fixture tests). */
   listingHtml?: string;
+  /** Pre-parsed listing items (tests — bypasses live fetch). */
+  listingItems?: CentcomListingItem[];
   /** Override detail fetch — return null to skip an item. */
   fetchDetailHtml?: (item: CentcomListingItem) => Promise<string | null>;
   /** Cap detail HTTP fetches (defaults to CENTCOM_INGEST_MAX_DETAIL or 10). */
@@ -189,6 +210,7 @@ type PreparedRelease = {
   sourceUrl: string;
   bodyText: string;
   imageUrls?: string[];
+  ingestedViaRssBody?: boolean;
 };
 
 async function fetchHtmlWithRetry(url: string): Promise<string> {
@@ -208,11 +230,14 @@ async function fetchHtmlWithRetry(url: string): Promise<string> {
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-async function fetchCentcomRssWithRetry(): Promise<string> {
+async function fetchRssXmlWithRetry(
+  url: string,
+  opts: { accept: string; headers?: Readonly<Record<string, string>> },
+): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
     try {
-      return fetchBodyViaCurl(CENTCOM_RSS_URL, FETCH_TIMEOUT_MS, CENTCOM_RSS_CURL_OPTS);
+      return fetchBodyViaCurl(url, FETCH_TIMEOUT_MS, opts);
     } catch (err) {
       lastErr = err;
       if (isCurlRetryable(err) && attempt < FETCH_ATTEMPTS - 1) {
@@ -225,10 +250,108 @@ async function fetchCentcomRssWithRetry(): Promise<string> {
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
+async function fetchOfficialRssListing(
+  url: string,
+  filterPressReleases: boolean,
+): Promise<CentcomListingItem[]> {
+  const xml = await fetchRssXmlWithRetry(url, CENTCOM_RSS_CURL_OPTS);
+  const items = parseCentcomRssListing(xml, CENTCOM_SITE_ORIGIN);
+  return filterPressReleases ? filterCentcomPressReleaseItems(items) : items;
+}
+
+async function fetchGoogleNewsCentcomListing(
+  log: (s: string) => void,
+): Promise<CentcomListingItem[]> {
+  const xml = await fetchRssXmlWithRetry(
+    CENTCOM_GOOGLE_NEWS_RSS_URL,
+    CENTCOM_GOOGLE_NEWS_CURL_OPTS,
+  );
+  const raw = parseCentcomRssListing(xml, CENTCOM_SITE_ORIGIN);
+  const resolved: CentcomListingItem[] = [];
+
+  for (const item of raw) {
+    let sourceUrl = item.sourceUrl;
+    if (isGoogleNewsRedirect(sourceUrl)) {
+      const publisher = await resolveGoogleNewsUrl(sourceUrl);
+      if (!publisher) {
+        log(`  Google News — could not resolve redirect for ${item.title.slice(0, 60)}`);
+        continue;
+      }
+      sourceUrl = publisher;
+    }
+    if (!isCentcomPressReleaseUrl(sourceUrl)) continue;
+
+    const externalId = articleIdFromUrl(sourceUrl) ?? item.externalId;
+    if (!externalId) continue;
+
+    resolved.push({
+      ...item,
+      externalId,
+      sourceUrl,
+    });
+  }
+
+  return dedupeCentcomListingItems(resolved);
+}
+
+function preparedFromRssListingItem(item: CentcomListingItem): PreparedRelease | null {
+  const bodyText = item.rssDescriptionHtml
+    ? bodyTextFromRssDescription(item.rssDescriptionHtml)
+    : item.summary?.trim() ?? "";
+  if (!bodyText) return null;
+
+  const imageUrls = item.rssDescriptionHtml
+    ? extractCentcomImageUrlsFromHtml(item.rssDescriptionHtml, CENTCOM_SITE_ORIGIN)
+    : undefined;
+
+  return {
+    externalId: item.externalId,
+    title: item.title,
+    publishedAt: item.publishedAt,
+    sourceUrl: item.sourceUrl,
+    bodyText,
+    imageUrls: imageUrls?.length ? imageUrls : undefined,
+    ingestedViaRssBody: true,
+  };
+}
+
+async function prepareReleaseFromItem(
+  item: CentcomListingItem,
+  fetchDetail: (item: CentcomListingItem) => Promise<string | null>,
+  log: (s: string) => void,
+): Promise<PreparedRelease | null> {
+  try {
+    const detailHtml = await fetchDetail(item);
+    if (detailHtml) {
+      const detail = parseCentcomDetail(detailHtml, item.sourceUrl);
+      return {
+        externalId: item.externalId,
+        title: detail.title || item.title,
+        publishedAt: detail.publishedAt ?? item.publishedAt,
+        sourceUrl: detail.sourceUrl || item.sourceUrl,
+        bodyText: detail.bodyText,
+        imageUrls: detail.imageUrls,
+      };
+    }
+  } catch (err) {
+    if (!isCentcomBlockedError(err)) throw err;
+    log(`  detail blocked ${item.externalId} — using RSS body fallback`);
+  }
+
+  const fromRss = preparedFromRssListingItem(item);
+  if (fromRss) return fromRss;
+
+  log(`  skip ${item.externalId} — no detail HTML and no RSS body`);
+  return null;
+}
+
 async function loadListingItems(
   opts: CentcomIngestOptions,
   log: (s: string) => void,
 ): Promise<CentcomListingItem[]> {
+  if (opts.listingItems?.length) {
+    return opts.listingItems;
+  }
   if (opts.listingHtml) {
     return parseCentcomListing(opts.listingHtml, CENTCOM_SITE_ORIGIN);
   }
@@ -249,24 +372,58 @@ async function loadListingItems(
     );
   }
 
-  try {
-    log(`  live fetch — RSS ${CENTCOM_RSS_URL}`);
-    const rssXml = await fetchCentcomRssWithRetry();
-    const fromRss = parseCentcomRssListing(rssXml, CENTCOM_SITE_ORIGIN);
-    if (fromRss.length > 0) {
-      log(`  parsed ${fromRss.length} RSS item(s)`);
-      return fromRss;
+  const merged: CentcomListingItem[] = [];
+
+  const trySource = async (
+    label: string,
+    loader: () => Promise<CentcomListingItem[]>,
+  ) => {
+    try {
+      log(`  live fetch — ${label}`);
+      const items = await loader();
+      if (items.length > 0) {
+        log(`  ${label}: ${items.length} press release(s)`);
+        merged.push(...items);
+      } else {
+        log(`  ${label}: no press releases`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log(`  ${label} failed (${msg})`);
     }
-    log("  RSS feed returned no items — falling back to HTML listing");
+  };
+
+  await trySource("official press RSS", () =>
+    fetchOfficialRssListing(CENTCOM_RSS_URL, false),
+  );
+  await trySource("official news RSS (press-release filter)", () =>
+    fetchOfficialRssListing(CENTCOM_NEWS_RSS_URL, true),
+  );
+  await trySource("Google News site-scope RSS", () =>
+    fetchGoogleNewsCentcomListing(log),
+  );
+
+  const listing = dedupeCentcomListingItems(merged);
+  if (listing.length > 0) return listing;
+
+  try {
+    log(`  live fetch — HTML listing ${CENTCOM_SOURCE_URL}`);
+    const listingHtml = await fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
+    const fromHtml = parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
+    if (fromHtml.length > 0) return fromHtml;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    log(`  RSS fetch failed (${msg}) — falling back to HTML listing`);
-    if (!isCentcomBlockedError(err)) throw err;
+    if (isCentcomBlockedError(err)) {
+      throw new Error(
+        `CENTCOM press releases unavailable — official RSS empty and centcom.mil HTML blocked (${msg})`,
+      );
+    }
+    throw err;
   }
 
-  log(`  live fetch — listing ${CENTCOM_SOURCE_URL}`);
-  const listingHtml = await fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
-  return parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
+  throw new Error(
+    "CENTCOM press releases unavailable — all RSS sources returned no items and HTML listing was empty",
+  );
 }
 
 async function latestCentcomPublishedAt(): Promise<Date | null> {
@@ -430,26 +587,17 @@ export async function runCentcomIngest(
 
     for (const item of listing) {
       try {
-        const detailHtml = await fetchDetail(item);
-        if (!detailHtml) {
-          log(`  skip ${item.externalId} — no detail HTML`);
-          continue;
-        }
-        const detail = parseCentcomDetail(detailHtml, item.sourceUrl);
-        prepared.push({
-          externalId: item.externalId,
-          title: detail.title || item.title,
-          publishedAt: detail.publishedAt ?? item.publishedAt,
-          sourceUrl: detail.sourceUrl || item.sourceUrl,
-          bodyText: detail.bodyText,
-          imageUrls: detail.imageUrls,
-        });
+        const release = await prepareReleaseFromItem(item, fetchDetail, log);
+        if (!release) continue;
+        prepared.push(release);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`detail ${item.externalId}: ${msg}`);
         log(`  detail ERROR ${item.externalId}: ${msg}`);
       }
     }
+
+    const usedRssBodyFallback = prepared.some((r) => r.ingestedViaRssBody);
 
     log(`  prepared ${prepared.length} release(s) for persist`);
 
@@ -489,10 +637,18 @@ export async function runCentcomIngest(
     }
 
     if (commit) {
-      const feedOk = errors.length === 0;
-      const rawError = feedOk ? null : errors[0] ?? "CENTCOM ingest completed with errors";
+      const feedOk = errors.length === 0 && prepared.length > 0;
+      const rawError = feedOk
+        ? null
+        : errors[0] ??
+          (prepared.length === 0
+            ? "CENTCOM ingest found no ingestible press releases"
+            : "CENTCOM ingest completed with errors");
       const failureReason = rawError ? categorizeFeedFailure(rawError) : null;
       const blockedUpstream = failureReason === "blocked_upstream";
+      const scrapeMethod = usedRssBodyFallback
+        ? "RSS listing + RSS body (detail pages blocked)"
+        : "RSS listing + HTML detail";
       await recordSourceHealth(
         CENTCOM_HEALTH_TOPIC,
         [
@@ -509,9 +665,9 @@ export async function runCentcomIngest(
         ],
         {
           sourceType: "html",
-          scrapeMethod: "RSS listing + HTML detail",
+          scrapeMethod,
           notes: CENTCOM_HEALTH_NOTES,
-          pending: !feedOk || blockedUpstream,
+          pending: !feedOk && (blockedUpstream || prepared.length === 0),
         },
       );
     }

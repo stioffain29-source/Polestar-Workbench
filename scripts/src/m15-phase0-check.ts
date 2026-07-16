@@ -4,6 +4,8 @@ import { spawnSync } from "node:child_process";
 import {
   CENTCOM_SOURCE_URL,
   CENTCOM_RSS_URL,
+  CENTCOM_NEWS_RSS_URL,
+  CENTCOM_GOOGLE_NEWS_RSS_URL,
   UKMTO_SOURCE_URL,
 } from "../../lib/ingest/src/m15/health.js";
 import {
@@ -109,7 +111,9 @@ async function main(): Promise<number> {
   } else {
     console.log("\nLive URL checks (curl + browser User-Agent):");
     const results = [
-      probeUrlWithCurl("CENTCOM RSS", CENTCOM_RSS_URL),
+      probeUrlWithCurl("CENTCOM press RSS", CENTCOM_RSS_URL),
+      probeUrlWithCurl("CENTCOM news RSS", CENTCOM_NEWS_RSS_URL),
+      probeUrlWithCurl("CENTCOM Google News RSS", CENTCOM_GOOGLE_NEWS_RSS_URL),
       probeUrlWithCurl("CENTCOM", CENTCOM_SOURCE_URL),
       probeUrlWithCurl("UKMTO", UKMTO_SOURCE_URL),
       probeUrlWithCurl("UKMTO warnings", `${UKMTO_SOURCE_URL}/warnings`),
