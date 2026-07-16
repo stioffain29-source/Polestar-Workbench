@@ -346,8 +346,19 @@ export function buildFuelGulfChokepointWatch(opts: {
   //    an SPR-withdrawal note or a fuel-levy debate merely MENTIONS Hormuz as
   //    background market colour in its body. Title-matching keeps the section
   //    precision-first so those passing mentions never masquerade as anchors.
+  //    A genuine Gulf/Hormuz chokepoint event (a tanker struck in the strait, a
+  //    crude reroute) is often filed by ingestion under the `shipping` topic
+  //    rather than `fuel`, and those rows already surface in the Fuel Watch
+  //    Producer/Buyer Actions table via the cross-read. Admit shipping-topic
+  //    rows here too — gated on the SAME fuel-market signal the cross-read uses
+  //    — so a current-week chokepoint item shown elsewhere in the report can
+  //    never be contradicted by a stale "no fresh reporting" line here.
   const matched = opts.incidents
-    .filter((i) => i.topic === "fuel")
+    .filter(
+      (i) =>
+        i.topic === "fuel" ||
+        (i.topic === "shipping" && FUEL_ACTION_TOPICAL_RE.test(haystack(i))),
+    )
     .map((i) => ({ i, key: gulfDayKey(i.occurredAt) }))
     .filter(
       (x): x is { i: TopicFastFactsIncident; key: string } =>

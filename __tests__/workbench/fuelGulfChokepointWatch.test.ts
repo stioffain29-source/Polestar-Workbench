@@ -113,6 +113,42 @@ describe("buildFuelGulfChokepointWatch — current vs standing context", () => {
     expect(standingTitles).toMatch(/closure halts tanker traffic/i);
   });
 
+  it("admits shipping-topic chokepoint items (they appear in the Producer/Buyer table) so it never contradicts them", () => {
+    const shippingHormuz: TopicFastFactsIncident = {
+      id: 99,
+      // Filed under `shipping` by ingestion, but a genuine fuel-route chokepoint
+      // event with a fuel-market signal ("oil tankers") — cross-read into the
+      // Fuel Watch Producer/Buyer table. It must lead the chokepoint watch too.
+      topic: "shipping",
+      title: "Iranian missiles struck oil tankers in Strait of Hormuz, one sailor killed",
+      severity: "high",
+      occurredAt: "2026-07-13T12:00:00+00:00",
+      sourceUrl: "https://example.test/99",
+    };
+    const built = buildFuelGulfChokepointWatch({
+      issueDate: ISSUE_DATE,
+      incidents: [shippingHormuz],
+    });
+    expect(built).not.toBeNull();
+    expect(built!.read).not.toMatch(/no fresh/i);
+    expect(built!.currentItems.length).toBeGreaterThan(0);
+    expect(built!.currentItemLines.join(" ")).toMatch(/struck oil tankers in Strait of Hormuz/i);
+  });
+
+  it("ignores shipping-topic rows with no fuel-market signal", () => {
+    const containerShip: TopicFastFactsIncident = {
+      id: 98,
+      topic: "shipping",
+      title: "Container ship grounded in Strait of Hormuz after steering failure",
+      severity: "moderate",
+      occurredAt: "2026-07-13T12:00:00+00:00",
+      sourceUrl: "https://example.test/98",
+    };
+    expect(
+      buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents: [containerShip] }),
+    ).toBeNull();
+  });
+
   it("states plainly there is no current reporting when only older material exists", () => {
     const incidents = [
       mk(1, "Strait of Hormuz closure halts tanker traffic", "2026-05-20", "high"),

@@ -10,4 +10,6 @@ Fuel Watch "Gulf and Hormuz Chokepoint Watch" (`buildFuelGulfChokepointWatch`) i
 
 **How to apply:** Interface exposes `currentItems/currentItemLines` + `standingItems/standingItemLines/standingNote`. BOTH ReportPreview.tsx and exportTopicReportPdf.ts render current block then (if standingNote) the standing block — keep them in lockstep for screen==PDF parity.
 
+**Cross-read parity trap:** genuine Gulf/Hormuz chokepoint events (tanker struck in the strait, crude reroute) are frequently filed by ingestion under `topic=shipping`, not `fuel`, and already surface in the Fuel Watch Producer/Buyer Actions table via the cross-read. The chokepoint watch must therefore admit `shipping`-topic rows too, gated on the SAME `FUEL_ACTION_TOPICAL_RE` fuel-market signal the cross-read uses — otherwise it prints a stale "No fresh reporting" line while July Strait-of-Hormuz items sit in the table on the same page. A pure fuel-topic filter reproduces exactly that contradiction on live data.
+
 Also: Regional Highlights `COUNTRY_OVERLAY` now has distinct russia/ukraine entries (export/sanctions vs physical-supply framing) so they no longer share the generic `crude` family boilerplate.
