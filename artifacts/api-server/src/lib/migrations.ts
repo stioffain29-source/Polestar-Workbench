@@ -464,6 +464,14 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(
       sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS report_photos jsonb NOT NULL DEFAULT '[]'::jsonb`,
     );
+    // Schema: durable analyst curation of the rendered brief — hidden canonical
+    // sections, excluded relevance-passing window incidents, and demote-only
+    // Fast Facts severity corrections. Nullable/additive; OUTSIDE the prose
+    // fingerprint cache. drizzle push only reaches dev; prod gains it here on
+    // boot. Idempotent.
+    await db.execute(
+      sql`ALTER TABLE country_reports ADD COLUMN IF NOT EXISTS section_overrides jsonb`,
+    );
 
     // Schema: `edited_fingerprint` on the prose caches. An analyst prose edit is
     // now KEPT across a data-basis regenerate (instead of being dropped); this

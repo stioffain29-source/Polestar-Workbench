@@ -17,6 +17,18 @@ export interface CountryReportPhoto {
   context?: string;
 }
 
+/**
+ * Durable analyst curation of the rendered brief — hide canonical sections,
+ * exclude relevance-passing window incidents, and DEMOTE-ONLY Fast Facts
+ * severity corrections. Persisted alongside the report row; deliberately NOT
+ * part of the AI prose fingerprint cache key.
+ */
+export interface CountryReportSectionOverrides {
+  hiddenSections?: string[];
+  excludedIncidentIds?: string[];
+  severityDemotions?: Record<string, string>;
+}
+
 export const countryReportsTable = pgTable("country_reports", {
   id: serial("id").primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -38,6 +50,9 @@ export const countryReportsTable = pgTable("country_reports", {
     .$type<CountryReportPhoto[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
+  // Durable analyst curation (hidden sections, excluded window incidents,
+  // demote-only severity corrections). Nullable/additive.
+  sectionOverrides: jsonb("section_overrides").$type<CountryReportSectionOverrides>(),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

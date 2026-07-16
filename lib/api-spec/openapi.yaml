@@ -3120,7 +3120,24 @@ components:
         reportPhotos:
           type: array
           items: { $ref: "#/components/schemas/CountryReportPhoto" }
+        sectionOverrides:
+          oneOf:
+            - $ref: "#/components/schemas/CountryReportSectionOverrides"
+            - type: "null"
         createdAt: { type: string, format: date-time }
+
+    CountryReportSectionOverrides:
+      type: object
+      properties:
+        hiddenSections:
+          type: array
+          items: { type: string }
+        excludedIncidentIds:
+          type: array
+          items: { type: string }
+        severityDemotions:
+          type: object
+          additionalProperties: { type: string }
 
     CountryReportPhoto:
       type: object
@@ -3162,6 +3179,8 @@ components:
         reportPhotos:
           type: array
           items: { $ref: "#/components/schemas/CountryReportPhoto" }
+        sectionOverrides:
+          $ref: "#/components/schemas/CountryReportSectionOverrides"
 
     CountryBaselineWatchlistItem:
       type: object

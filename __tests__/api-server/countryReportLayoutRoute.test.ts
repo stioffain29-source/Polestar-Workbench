@@ -34,6 +34,7 @@ function seedRow(): Row {
     mapPlacement: null,
     photoPlacement: null,
     reportPhotos: [],
+    sectionOverrides: null,
     createdAt: "2026-06-01T00:00:00.000Z",
   };
 }
@@ -167,6 +168,22 @@ describe("PATCH /countries/:slug — analyst layout persistence", () => {
     expect(reloadedPhoto.source).toBe(photo.source);
     expect(reloadedPhoto.credit).toBe(photo.credit);
     expect(reloadedPhoto.context).toBe(photo.context);
+  });
+
+  it("round-trips sectionOverrides (hidden sections, excluded incidents, demotions)", async () => {
+    const overrides = {
+      hiddenSections: ["polestar-view", "outlook"],
+      excludedIncidentIds: ["12", "45"],
+      severityDemotions: { "7": "low", "9": "moderate" },
+    };
+
+    const patched = await patch({ sectionOverrides: overrides });
+    expect(patched.status).toBe(200);
+    expect(patched.json.sectionOverrides).toEqual(overrides);
+
+    const reloaded = await get();
+    expect(reloaded.status).toBe(200);
+    expect(reloaded.json.sectionOverrides).toEqual(overrides);
   });
 
   it("does not write the narrative columns while still saving layout fields", async () => {

@@ -137,6 +137,27 @@ describe("PngCountryReportBody — country brief render", () => {
     expect(ats).toEqual(sorted); // strictly in order, none reordered
   });
 
+  it("drops a canonical section from the rendered brief when hidden", () => {
+    // Analyst hides Polestar View and Outlook — both must vanish from the
+    // rendered markup (preview AND PDF, same component) while every other
+    // section stays. No other section title is affected.
+    const hiddenHtml = renderToStaticMarkup(
+      <PngCountryReportBody
+        dataset={build(POPULATED)}
+        hiddenSections={["polestar-view", "outlook"]}
+      />,
+    );
+    expect(hiddenHtml).not.toContain("Polestar View");
+    expect(hiddenHtml).not.toContain("Outlook: Next Seven Days");
+    expect(hiddenHtml).toContain("Bottom Line Up Front");
+    expect(hiddenHtml).toContain("Top 3 Developments");
+    expect(hiddenHtml).toContain("Incident Details");
+    // The unhidden default render still carries them, proving the gate is what
+    // removed them (not a build/data issue).
+    expect(html).toContain("Polestar View");
+    expect(html).toContain("Outlook: Next Seven Days");
+  });
+
   it("renders only the present Incident Details themes, in fixed order", () => {
     // The body builds its themed groups from the SAME dataset field the render
     // uses (d.incidentDetailsItems), so derive the expected present themes the

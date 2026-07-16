@@ -63,6 +63,13 @@ import type {
   CountryPhotoPlacement,
 } from "@/components/PngCountryReportBody";
 import type { CountryReportPhoto } from "@workspace/api-client-react";
+import {
+  COUNTRY_SECTION_KEYS,
+  COUNTRY_SECTION_LABELS,
+  applyIncidentCurations,
+  type CountrySectionKey,
+  type CountrySectionOverrides,
+} from "../lib/countrySectionOverrides";
 import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
@@ -73,6 +80,19 @@ const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
+const MIDNIGHT = "#0B0B3D";
+
+// Severity rank + the demote-only option list for the incident-curation editor.
+// Fixed five-tier vocabulary; the picker only ever offers tiers BELOW the
+// incident's stored severity (never an up-rate).
+const SEVERITY_ORDER: Record<string, number> = {
+  insignificant: 0,
+  low: 1,
+  moderate: 2,
+  high: 3,
+  extreme: 4,
+};
+const SEVERITY_DEMOTE_OPTIONS = ["insignificant", "low", "moderate", "high"] as const;
 const ROBOTO = "Roboto, sans-serif";
 const BRAND_GRADIENT = "linear-gradient(to right, #0b0a3d 0%, #465bff 100%)";
 
@@ -366,6 +386,9 @@ export default function CountryReport() {
   const [mapPlacement, setMapPlacement] = useState<CountryMapPlacement>("end");
   const [photoPlacement, setPhotoPlacement] = useState<CountryPhotoPlacement>("none");
   const [reportPhotos, setReportPhotos] = useState<CountryReportPhoto[]>([]);
+  // Durable analyst curation of the rendered brief — hidden canonical sections,
+  // excluded relevance-passing window incidents, demote-only severity fixes.
+  const [sectionOverrides, setSectionOverrides] = useState<CountrySectionOverrides>({});
   const [baselineDraft, setBaselineDraft] = useState<CountryBaseline>(EMPTY_BASELINE);
   const [baselineDirty, setBaselineDirty] = useState(false);
   const seededForSlug = useRef<string | null>(null);
@@ -465,6 +488,16 @@ export default function CountryReport() {
     [layers, issueDate],
   );
 
+  // Apply the analyst's durable curation to the relevance-passing window pool:
+  // drop excluded incidents and apply demote-only severity corrections. Every
+  // downstream surface (Fast Facts, map, charts, cards, prose) derives from this
+  // curated set so the brief stays internally consistent. STRICT no-fabrication:
+  // curation can only remove/demote what already passed relevance — never add.
+  const curatedWindowIncidents = useMemo(
+    () => applyIncidentCurations(active.incidents, sectionOverrides),
+    [active, sectionOverrides],
+  );
+
   // Coverage status for an empty WEEKLY (7-day) window. Drives the printable
   // coverage banner; "active" (week has records) renders nothing.
   const coverage = useMemo(
@@ -497,7 +530,24 @@ export default function CountryReport() {
   // never shows or counts twice. Shares the exact clustering authority the
   // structured report builder uses, so the page and the brief agree.
   const dedupedWindowIncidents = useMemo(
-    () => consolidateCountryStories(active.incidents),
+    () => consolidateCountryStories(curatedWindowIncidents),
+    [curatedWindowIncidents],
+  );
+
+  // The UNCURATED relevance-passing window pool the analyst picks from in the
+  // editor (so an excluded incident can be re-included). Consolidated to one row
+  // per distinct event, matching what the brief would show.
+  const curationPool = useMemo(
+    () =>
+      consolidateCountryStories(active.incidents).filter(
+        (i) => i.id != null,
+      ) as Array<{
+        id: number | string;
+        title: string;
+        displayTitle?: string | null;
+        severity: string;
+        location?: string | null;
+      }>,
     [active],
   );
 
@@ -544,7 +594,7 @@ export default function CountryReport() {
   const pngDataset = useMemo(() => {
     if (!country) return null;
     const args = {
-      windowIncidents: active.incidents as PngSourceIncident[],
+      windowIncidents: curatedWindowIncidents as PngSourceIncident[],
       previousWindowIncidents: resolvePreviousCountryWindow(layers, issueDate) as PngSourceIncident[],
       thirtyDay: layers.thirtyDay as PngSourceIncident[],
       ninetyDay: layers.ninetyDay as PngSourceIncident[],
@@ -570,7 +620,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, active, layers, baseline, issueDate, country]);
+  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -625,13 +675,13 @@ export default function CountryReport() {
     // a non-deterministic representative per cluster and would flip the
     // fingerprint every load (regeneration loop). Every deduped table row's id is
     // a subset of this set, so each shown row still resolves a summary.
-    return active.incidents.map((i) => ({
+    return curatedWindowIncidents.map((i) => ({
       id: i.id != null ? String(i.id) : undefined,
       topic: i.topic, title: i.title, summary: i.summary,
       location: i.location, country: i.country,
       severity: i.severity, occurredAt: i.occurredAt, source: i.source,
     }));
-  }, [isStructured, pngDataset, active, country]);
+  }, [isStructured, pngDataset, curatedWindowIncidents, country]);
 
   const periodWord = useMemo(
     () =>
@@ -863,6 +913,7 @@ export default function CountryReport() {
     setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
     setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
     setReportPhotos(country.reportPhotos ?? []);
+    setSectionOverrides((country.sectionOverrides as CountrySectionOverrides | null) ?? {});
   }, [country, incidentsData, slug, draftedProse]);
 
   useEffect(() => {
@@ -965,6 +1016,7 @@ export default function CountryReport() {
           mapPlacement,
           photoPlacement,
           reportPhotos,
+          sectionOverrides,
         },
       });
       // Only touch the baseline row if the editor actually changed
@@ -1023,6 +1075,7 @@ export default function CountryReport() {
       setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
       setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
       setReportPhotos(country.reportPhotos ?? []);
+      setSectionOverrides((country.sectionOverrides as CountrySectionOverrides | null) ?? {});
     }
     setBaselineDraft(persistedBaseline ?? EMPTY_BASELINE);
     setBaselineDirty(false);
@@ -1516,6 +1569,110 @@ export default function CountryReport() {
               ))}
             </div>
           )}
+
+          {/* Section visibility — hide a canonical brief section from BOTH the
+              preview and the PDF (same component). Data is untouched; a hidden
+              section can be shown again by re-ticking it. */}
+          <div style={{ marginTop: 16, borderTop: `1px solid ${POLAR}`, paddingTop: 12 }}>
+            <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontWeight: 600, marginBottom: 8 }}>
+              Section visibility
+            </div>
+            <div className="grid md:grid-cols-2 gap-2">
+              {COUNTRY_SECTION_KEYS.map((key) => {
+                const hidden = (sectionOverrides.hiddenSections ?? []).includes(key);
+                return (
+                  <label
+                    key={key}
+                    style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "flex", gap: 8, alignItems: "center" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!hidden}
+                      onChange={(e) => {
+                        setSectionOverrides((ov) => {
+                          const set = new Set(ov.hiddenSections ?? []);
+                          if (e.target.checked) set.delete(key);
+                          else set.add(key);
+                          return { ...ov, hiddenSections: Array.from(set) };
+                        });
+                      }}
+                    />
+                    {COUNTRY_SECTION_LABELS[key]}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Incident curation — include / exclude and demote-only severity for
+              each relevance-passing window incident. STRICT no-fabrication: the
+              analyst chooses only from this pool; nothing can be added or
+              up-rated. */}
+          {curationPool.length > 0 && (
+            <div style={{ marginTop: 16, borderTop: `1px solid ${POLAR}`, paddingTop: 12 }}>
+              <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontWeight: 600, marginBottom: 8 }}>
+                Incident selection &amp; severity ({curationPool.length} this week)
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {curationPool.map((inc) => {
+                  const id = String(inc.id);
+                  const excluded = (sectionOverrides.excludedIncidentIds ?? []).includes(id);
+                  const stored = (inc.severity ?? "").trim().toLowerCase();
+                  const demoteTo = sectionOverrides.severityDemotions?.[id] ?? "";
+                  return (
+                    <div
+                      key={id}
+                      style={{ border: `1px solid ${POLAR}`, padding: 8, borderRadius: 2, display: "flex", gap: 10, alignItems: "flex-start", opacity: excluded ? 0.5 : 1 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!excluded}
+                        onChange={(e) => {
+                          setSectionOverrides((ov) => {
+                            const set = new Set(ov.excludedIncidentIds ?? []);
+                            if (e.target.checked) set.delete(id);
+                            else set.add(id);
+                            return { ...ov, excludedIncidentIds: Array.from(set) };
+                          });
+                        }}
+                        style={{ marginTop: 3 }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontFamily: ROBOTO, fontSize: 12, color: MIDNIGHT }}>
+                          {inc.displayTitle ?? inc.title}
+                        </div>
+                        <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 2 }}>
+                          Stored severity: {stored || "—"}
+                          {inc.location ? ` · ${inc.location}` : ""}
+                        </div>
+                      </div>
+                      <select
+                        value={demoteTo}
+                        disabled={excluded}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSectionOverrides((ov) => {
+                            const next = { ...(ov.severityDemotions ?? {}) };
+                            if (v) next[id] = v;
+                            else delete next[id];
+                            return { ...ov, severityDemotions: next };
+                          });
+                        }}
+                        style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: 4, color: DUSK }}
+                      >
+                        <option value="">Keep severity</option>
+                        {SEVERITY_DEMOTE_OPTIONS.filter((o) => SEVERITY_ORDER[o] < (SEVERITY_ORDER[stored] ?? 4)).map((o) => (
+                          <option key={o} value={o}>
+                            Demote to {o}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </Section>
       )}
 
@@ -1579,6 +1736,7 @@ export default function CountryReport() {
           mapNode={mapNode}
           photoPlacement={photoPlacement}
           photoNode={photoBlock}
+          hiddenSections={sectionOverrides.hiddenSections ?? []}
         />
       )}
 

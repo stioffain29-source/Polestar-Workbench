@@ -4475,6 +4475,11 @@ export const ListCountryReportsResponseItem = zod.object({
   "credit": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })
 export const ListCountryReportsResponse = zod.array(ListCountryReportsResponseItem)
@@ -4590,6 +4595,11 @@ export const GetCountryReportResponse = zod.object({
   "credit": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })
 
@@ -4618,7 +4628,12 @@ export const UpdateCountryReportBody = zod.object({
   "source": zod.string().optional(),
   "credit": zod.string().optional(),
   "context": zod.string().optional()
-})).optional()
+})).optional(),
+  "sectionOverrides": zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}).optional()
 })
 
 export const UpdateCountryReportResponse = zod.object({
@@ -4644,6 +4659,11 @@ export const UpdateCountryReportResponse = zod.object({
   "credit": zod.string().optional(),
   "context": zod.string().optional()
 })).optional(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })
 

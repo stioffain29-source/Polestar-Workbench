@@ -470,6 +470,7 @@ export default function PngCountryReportBody({
   mapNode = null,
   photoPlacement = "none",
   photoNode = null,
+  hiddenSections = [],
 }: {
   dataset: PngReportDataset;
   incidentSummaries?: Record<string, string>;
@@ -477,8 +478,14 @@ export default function PngCountryReportBody({
   mapNode?: ReactNode;
   photoPlacement?: CountryPhotoPlacement;
   photoNode?: ReactNode;
+  // Canonical section keys the analyst has hidden. A hidden section drops from
+  // BOTH the on-screen preview and the DOM-rasterised PDF (same component, so
+  // they can never disagree). See countrySectionOverrides.ts for the key list.
+  hiddenSections?: string[];
 }) {
   const d = dataset;
+  const hidden = new Set(hiddenSections);
+  const show = (key: string): boolean => !hidden.has(key);
 
   // Top 3 Developments — at most three tiles. The Incident Details themes below
   // analyse d.incidentDetailsItems: every window incident NOT promoted into the
@@ -508,24 +515,28 @@ export default function PngCountryReportBody({
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
       {/* 1. Bottom Line Up Front */}
-      <Section title="Bottom Line Up Front">
-        <Prose text={d.bluf} />
-      </Section>
+      {show("bottom-line") && (
+        <Section title="Bottom Line Up Front">
+          <Prose text={d.bluf} />
+        </Section>
+      )}
       {mapAt("after-bluf")}
       {photoAt("after-bluf")}
 
       {/* 2. Top 3 Developments — at most three tiles */}
-      <Section title="Top 3 Developments">
-        {topThree.length === 0 ? (
-          <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-        ) : (
-          <div>
-            {topThree.map((it) => (
-              <ItemCard key={it.id} item={it} suppressEmptyLocation />
-            ))}
-          </div>
-        )}
-      </Section>
+      {show("top-3") && (
+        <Section title="Top 3 Developments">
+          {topThree.length === 0 ? (
+            <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
+          ) : (
+            <div>
+              {topThree.map((it) => (
+                <ItemCard key={it.id} item={it} suppressEmptyLocation />
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
       {mapAt("after-top3")}
       {photoAt("after-top3")}
 
@@ -537,6 +548,7 @@ export default function PngCountryReportBody({
           is no-fabrication-safe: it only claims "no further reporting" when there
           truly are no leftover incidents; when leftover incidents existed but all
           fell below the meaningfulness gate it says so honestly instead. */}
+      {show("incident-details") && (
       <Section title="Incident Details">
         {incidentThemes.length === 0 ? (
           <EmptyNote>
@@ -578,15 +590,19 @@ export default function PngCountryReportBody({
         ) : null}
         {photoAt("inside-incident-details")}
       </Section>
+      )}
       {mapAt("after-incident-details")}
 
       {/* 4. Current Situation — concise framing, two short paragraphs maximum. */}
-      <Section title="Current Situation">
-        <Prose text={d.executiveSummary} />
-      </Section>
+      {show("current-situation") && (
+        <Section title="Current Situation">
+          <Prose text={d.executiveSummary} />
+        </Section>
+      )}
 
       {/* 5. Operational Impact — per-theme impact lines for the themes present
           this period. */}
+      {show("operational-impact") && (
       <Section title="Operational Impact">
         {operationalImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
@@ -612,11 +628,13 @@ export default function PngCountryReportBody({
           </>
         ) : null}
       </Section>
+      )}
 
       {/* 6. Recommended Actions — grouped client priorities (Movement security,
           Site security, …), emitting only the groups this period's incident mix
           and watchlist support. The operating-risk theatres (Indonesia /
           Jakarta) keep their own flat priorities list unchanged. */}
+      {show("recommended-actions") && (
       <Section title="Recommended Actions">
         {tactical ? (
           <>
@@ -644,10 +662,12 @@ export default function PngCountryReportBody({
           ))
         )}
       </Section>
+      )}
       {mapAt("before-outlook")}
 
       {/* 7. Outlook: Next Seven Days — most-likely scenario + escalation
           indicators */}
+      {show("outlook") && (
       <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
         {escalationIndicators.length > 0 ? (
@@ -676,13 +696,16 @@ export default function PngCountryReportBody({
           </div>
         ) : null}
       </Section>
+      )}
       {mapAt("before-polestar")}
       {photoAt("before-polestar")}
 
       {/* 8. Polestar View — closes the written brief */}
-      <Section title="Polestar View">
-        <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
-      </Section>
+      {show("polestar-view") && (
+        <Section title="Polestar View">
+          <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
+        </Section>
+      )}
     </IncidentSummaryContext.Provider>
   );
 }

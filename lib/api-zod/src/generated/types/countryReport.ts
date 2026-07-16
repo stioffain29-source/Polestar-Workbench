@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CountryReportPhoto } from './countryReportPhoto';
+import type { CountryReportSectionOverrides } from './countryReportSectionOverrides';
 import type { KpiCard } from './kpiCard';
 
 export interface CountryReport {
@@ -26,5 +27,6 @@ export interface CountryReport {
   /** @nullable */
   photoPlacement?: string | null;
   reportPhotos?: CountryReportPhoto[];
+  sectionOverrides?: CountryReportSectionOverrides | null;
   createdAt: Date;
 }

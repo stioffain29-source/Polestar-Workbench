@@ -1394,6 +1394,14 @@ export interface CountryReportPhoto {
   context?: string;
 }
 
+export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: string};
+
+export interface CountryReportSectionOverrides {
+  hiddenSections?: string[];
+  excludedIncidentIds?: string[];
+  severityDemotions?: CountryReportSectionOverridesSeverityDemotions;
+}
+
 export interface CountryReport {
   id: number;
   slug: string;
@@ -1412,6 +1420,7 @@ export interface CountryReport {
   /** @nullable */
   photoPlacement?: string | null;
   reportPhotos?: CountryReportPhoto[];
+  sectionOverrides?: CountryReportSectionOverrides | null;
   createdAt: string;
 }
 
@@ -1435,6 +1444,7 @@ export interface CountryReportUpdate {
   mapPlacement?: string;
   photoPlacement?: string;
   reportPhotos?: CountryReportPhoto[];
+  sectionOverrides?: CountryReportSectionOverrides;
 }
 
 export interface CountryBaselineWatchlistItem {
