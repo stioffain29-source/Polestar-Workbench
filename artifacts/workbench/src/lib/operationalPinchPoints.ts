@@ -136,7 +136,7 @@ const DIRECT_UTILITY_EFFECT: RegExp[] = [
 const SITE_HAZARD_SIGNALS: RegExp[] = [
   /\b(fire|blaze|wildfire|explos|blast|detonat)\w*\b[^.]{0,45}\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b/,
   /\b(factory|factories|warehouse|plant|refiner|market|mall|terminal|port|depot|industrial|commercial|office|complex|building|store|shop|hotel|station|facility|estate|mill|godown)\b[^.]{0,25}\b(fire|blaze|caught fire|on fire|explos|blast|razed|gutted|burn)/,
-  /\b(power\s*(cut|outage|failure|blackout)|blackout|electricity\s*(cut|outage|down|failure)|grid\s*(fail|down|collaps)|water\s*(supply\s*)?(cut|disrupt|shortage|crisis)|fuel\s*shortage)\w*/,
+  /\b(power\s*(cut|outage|failure|blackout)|blackout|\boutage\b|electricity\s*(cut|outage|down|failure)|grid\s*(fail|down|collaps)|water\s*(supply\s*)?(cut|disrupt|shortage|crisis)|fuel\s*shortage)\w*/,
 ];
 
 // Background / administrative activity: preparedness meetings, drills, planning

@@ -59,6 +59,7 @@ import {
 } from "./operatingRiskProse";
 import {
   COUNTRY_INCIDENT_THEMES,
+  buildCountryIncidentThemes,
   themeForCategory,
   type CountryIncidentTheme,
 } from "./countryIncidentThemes";
@@ -2173,7 +2174,16 @@ export function buildStructuredReportDataset(
   // list. Jakarta keeps its own tactical-brief themes (set above); every other
   // theatre (PNG, West Papua, Indonesia, Thailand, Philippines) gets the shared
   // assessed synthesis here.
-  if (!incidentThemesOverride) {
+  // Gate the assessed-theme override on the same meaningfulness threshold the
+  // fallback theme builder applies: when the only leftover reporting is a lone,
+  // lower-severity incident that clears no meaningful theme, leave the override
+  // undefined so both consumers fall through to the honest "did not warrant
+  // separate detail" empty-note (no-fabrication) rather than manufacturing a
+  // theme paragraph from an immaterial break-in.
+  if (
+    !incidentThemesOverride &&
+    buildCountryIncidentThemes(incidentDetailsItems).length > 0
+  ) {
     incidentThemesOverride = buildAssessedThemeGroups(
       incidentDetailsItems,
       previousWindowItems,
