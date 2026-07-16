@@ -20,6 +20,14 @@ export const CENTCOM_GOOGLE_NEWS_RSS_URL =
     "site:centcom.mil (inurl:PUBLIC-RELEASES OR inurl:PRESS-RELEASES) when:180d",
   ) +
   "&hl=en-US&gl=US&ceid=US:en";
+/** Broader Google News fallback — datacenter egress often gets zero items on the narrow inurl query. */
+export const CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL =
+  "https://news.google.com/rss/search?q=" +
+  encodeURIComponent("site:centcom.mil when:90d") +
+  "&hl=en-US&gl=US&ceid=US:en";
+/** DoD news releases RSS — some CENTCOM products are syndicated here with centcom.mil links. */
+export const DOD_NEWS_RELEASES_RSS_URL =
+  "https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?max=50&ContentType=9&Site=945";
 
 export {
   JMIC_HEALTH_NAME,

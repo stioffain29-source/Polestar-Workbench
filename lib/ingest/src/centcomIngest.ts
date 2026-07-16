@@ -13,10 +13,12 @@ import {
   parseCentcomListing,
   parseCentcomRssListing,
   filterCentcomPressReleaseItems,
+  filterCentcomOfficialArticleItems,
   dedupeCentcomListingItems,
   bodyTextFromRssDescription,
   extractCentcomImageUrlsFromHtml,
   isCentcomPressReleaseUrl,
+  isCentcomOfficialArticleUrl,
   type CentcomListingItem,
   CENTCOM_SITE_ORIGIN,
 } from "./centcomParse";
@@ -26,6 +28,8 @@ import {
   CENTCOM_RSS_URL,
   CENTCOM_NEWS_RSS_URL,
   CENTCOM_GOOGLE_NEWS_RSS_URL,
+  CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
+  DOD_NEWS_RELEASES_RSS_URL,
   CENTCOM_SOURCE_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
@@ -260,12 +264,11 @@ async function fetchOfficialRssListing(
 }
 
 async function fetchGoogleNewsCentcomListing(
+  rssUrl: string,
   log: (s: string) => void,
+  acceptCentcomArticle: (url: string) => boolean,
 ): Promise<CentcomListingItem[]> {
-  const xml = await fetchRssXmlWithRetry(
-    CENTCOM_GOOGLE_NEWS_RSS_URL,
-    CENTCOM_GOOGLE_NEWS_CURL_OPTS,
-  );
+  const xml = await fetchRssXmlWithRetry(rssUrl, CENTCOM_GOOGLE_NEWS_CURL_OPTS);
   const raw = parseCentcomRssListing(xml, CENTCOM_SITE_ORIGIN);
   const resolved: CentcomListingItem[] = [];
 
@@ -279,7 +282,7 @@ async function fetchGoogleNewsCentcomListing(
       }
       sourceUrl = publisher;
     }
-    if (!isCentcomPressReleaseUrl(sourceUrl)) continue;
+    if (!acceptCentcomArticle(sourceUrl)) continue;
 
     const externalId = articleIdFromUrl(sourceUrl) ?? item.externalId;
     if (!externalId) continue;
@@ -292,6 +295,34 @@ async function fetchGoogleNewsCentcomListing(
   }
 
   return dedupeCentcomListingItems(resolved);
+}
+
+async function fetchDodCentcomListing(log: (s: string) => void): Promise<CentcomListingItem[]> {
+  const xml = await fetchRssXmlWithRetry(DOD_NEWS_RELEASES_RSS_URL, CENTCOM_RSS_CURL_OPTS);
+  const raw = parseCentcomRssListing(xml, "https://www.defense.gov");
+  const centcomItems: CentcomListingItem[] = [];
+
+  for (const item of raw) {
+    const blob = `${item.sourceUrl} ${item.title} ${item.summary ?? ""} ${item.rssDescriptionHtml ?? ""}`;
+    const centcomUrl =
+      blob.match(/https?:\/\/www\.centcom\.mil\/[^\s"'<>]+/i)?.[0] ??
+      (isCentcomOfficialArticleUrl(item.sourceUrl) ? item.sourceUrl : null);
+    if (!centcomUrl || !isCentcomOfficialArticleUrl(centcomUrl)) continue;
+
+    const externalId = articleIdFromUrl(centcomUrl);
+    if (!externalId) continue;
+
+    centcomItems.push({
+      ...item,
+      externalId,
+      sourceUrl: centcomUrl,
+    });
+  }
+
+  if (centcomItems.length > 0) {
+    log(`  DoD RSS — ${centcomItems.length} CENTCOM-linked release(s)`);
+  }
+  return dedupeCentcomListingItems(centcomItems);
 }
 
 function preparedFromRssListingItem(item: CentcomListingItem): PreparedRelease | null {
@@ -399,8 +430,27 @@ async function loadListingItems(
   await trySource("official news RSS (press-release filter)", () =>
     fetchOfficialRssListing(CENTCOM_NEWS_RSS_URL, true),
   );
-  await trySource("Google News site-scope RSS", () =>
-    fetchGoogleNewsCentcomListing(log),
+  await trySource("official news RSS (all centcom.mil articles)", () =>
+    fetchOfficialRssListing(CENTCOM_NEWS_RSS_URL, false).then((items) =>
+      filterCentcomOfficialArticleItems(items),
+    ),
+  );
+  await trySource("Google News narrow (press-release paths)", () =>
+    fetchGoogleNewsCentcomListing(
+      CENTCOM_GOOGLE_NEWS_RSS_URL,
+      log,
+      isCentcomPressReleaseUrl,
+    ),
+  );
+  await trySource("Google News broad (site:centcom.mil)", () =>
+    fetchGoogleNewsCentcomListing(
+      CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
+      log,
+      isCentcomOfficialArticleUrl,
+    ),
+  );
+  await trySource("DoD news releases RSS (CENTCOM links)", () =>
+    fetchDodCentcomListing(log),
   );
 
   const listing = dedupeCentcomListingItems(merged);

@@ -24,6 +24,18 @@ export function isCentcomPressReleaseUrl(url: string): boolean {
   return CENTCOM_PRESS_RELEASE_PATH_RE.test(url);
 }
 
+/** True for any official centcom.mil media article (press release or news article). */
+export function isCentcomOfficialArticleUrl(url: string): boolean {
+  return /centcom\.mil\/media\//i.test(url) && /\/article\/\d+\//i.test(url);
+}
+
+/** Keep only official centcom.mil media articles. */
+export function filterCentcomOfficialArticleItems(
+  items: CentcomListingItem[],
+): CentcomListingItem[] {
+  return items.filter((item) => isCentcomOfficialArticleUrl(item.sourceUrl));
+}
+
 /** Keep only official CENTCOM press-release article URLs. */
 export function filterCentcomPressReleaseItems(
   items: CentcomListingItem[],
