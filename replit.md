@@ -5,7 +5,7 @@ An owner-private, browser-based geopolitical-risk intelligence workbench: live i
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run typecheck` — full typecheck across all packages (builds composite lib `.d.ts` first). Per-artifact `pnpm --filter @workspace/<artifact> run typecheck` also rebuilds libs via a `pretypecheck` hook, so it never reports phantom errors from stale codegen. Prefer these over raw `tsc -p` for the same reason.
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
