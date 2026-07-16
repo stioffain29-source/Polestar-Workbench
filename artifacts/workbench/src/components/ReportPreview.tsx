@@ -975,18 +975,39 @@ export default function ReportPreview({
             {fuelData.incidentData.gulfChokepointWatch && (
               <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
                 <Paragraphs text={fuelData.incidentData.gulfChokepointWatch.read} />
-                {fuelData.incidentData.gulfChokepointWatch.itemLines.length > 0 && (
+                {fuelData.incidentData.gulfChokepointWatch.currentItemLines.length > 0 && (
                   <ul
                     className="list-disc pl-5 space-y-1.5"
                     style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
                   >
-                    {fuelData.incidentData.gulfChokepointWatch.itemLines.map((line, i) => (
+                    {fuelData.incidentData.gulfChokepointWatch.currentItemLines.map((line, i) => (
                       <li key={i} className="text-[14px] leading-[1.6] font-light">
                         {line}
                       </li>
                     ))}
                   </ul>
                 )}
+                {fuelData.incidentData.gulfChokepointWatch.standingNote &&
+                  fuelData.incidentData.gulfChokepointWatch.standingItemLines.length > 0 && (
+                    <>
+                      <div
+                        className="text-[13px] leading-[1.5] font-medium mt-3 mb-1"
+                        style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+                      >
+                        {fuelData.incidentData.gulfChokepointWatch.standingNote}
+                      </div>
+                      <ul
+                        className="list-disc pl-5 space-y-1.5"
+                        style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+                      >
+                        {fuelData.incidentData.gulfChokepointWatch.standingItemLines.map((line, i) => (
+                          <li key={i} className="text-[14px] leading-[1.6] font-light">
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
               </Section>
             )}
             {fuelData.incidentData.producerBuyerActions.length > 0 && (

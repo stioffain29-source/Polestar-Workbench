@@ -48,6 +48,18 @@ jest.mock("@workspace/api-client-react", () => ({
     Moderate: "Moderate",
     High: "High",
   },
+  DataCentreType: {
+    Hyperscale: "Hyperscale",
+    Colocation: "Colocation",
+    Enterprise: "Enterprise",
+    Edge: "Edge",
+    Cloud_region: "Cloud region",
+    Carrier_hotel: "Carrier hotel",
+    "Unknown_/_not_reported": "Unknown / not reported",
+  },
+  useListDataCentreEnrichmentProviders: () => ({ data: [], isLoading: false }),
+  usePreviewDataCentreEnrichment: () => ({ mutate: jest.fn(), isPending: false }),
+  useCommitDataCentreEnrichment: () => ({ mutate: jest.fn(), isPending: false }),
 }));
 
 import DataCentreRegistry from "@/pages/DataCentreRegistry";
