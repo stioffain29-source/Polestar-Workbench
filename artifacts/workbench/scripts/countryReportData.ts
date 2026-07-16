@@ -69,7 +69,7 @@ const iso = (d: Date | string | null | undefined): string | null => {
   return d instanceof Date ? d.toISOString() : new Date(d).toISOString();
 };
 
-async function loadIncidents(): Promise<CountryIncident[]> {
+export async function loadIncidents(): Promise<CountryIncident[]> {
   // 90-day backstop, all relevance (the page fetches includeIrrelevant=true and
   // applies its own country gate — see CountryReport.tsx).
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
@@ -105,7 +105,7 @@ async function loadIncidents(): Promise<CountryIncident[]> {
 // Mirrors the client-side filter in CountryReport.tsx for the three structured
 // theatres (png / papua / indonesia). Jakarta and the generic country layout
 // are out of scope for this loader.
-function filterForCountry(
+export function filterForCountry(
   all: CountryIncident[],
   name: string,
 ): CountryIncident[] {

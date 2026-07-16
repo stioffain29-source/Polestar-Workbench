@@ -43,6 +43,11 @@ const PH_KEEP = [
 const PH_DROP = [
   "China launches largest military drill near Taiwan",
   "US and Japan sign new defence pact in Tokyo",
+  // A Japanese-island typhoon (Okinawa / Naha / the Ryukyus) filed under the
+  // Philippines only by a stray country tag. Okinawa was previously absent from
+  // FOREIGN_SUBJECT_RE, so this overseas story leaked into the Philippine brief.
+  "Typhoon Bavi passes over Okinawa, injuring 5",
+  "Naha braces as Typhoon Bavi strikes the Ryukyu Islands",
 ];
 
 describe("isForeignSubjectNoHomeAnchor", () => {

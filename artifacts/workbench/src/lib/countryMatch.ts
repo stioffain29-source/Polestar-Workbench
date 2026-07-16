@@ -239,7 +239,7 @@ export function isForeignDominantContext(
 // translation (`ln`); the stored Bahasa title hides the foreign subject from
 // the English excludes that run upstream.
 const INDO_FOREIGN_SUBJECT_RE =
-  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|jerman|france|french|spain|spanish|italy|italian|portugal|netherlands|belanda|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|missouri|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|yaman|houthi|houthis|hodeidah|hudaydah|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|congo|kongo|drc|kinshasa|brazzaville|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland|ubisoft|assassin'?s creed)\b/i;
+  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|jerman|france|french|spain|spanish|italy|italian|portugal|netherlands|belanda|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|missouri|canada|canadian|toronto|montreal|vancouver|ottawa|calgary|edmonton|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|yaman|houthi|houthis|hodeidah|hudaydah|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|congo|kongo|drc|kinshasa|brazzaville|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|okinawa|naha|ryukyu|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland|ubisoft|assassin'?s creed)\b/i;
 
 // Indonesian domestic geography / nationality anchors. Their presence shows the
 // record is genuinely about Indonesia even when a foreign country is also named
@@ -610,7 +610,7 @@ function escapeRegExp(s: string): string {
 // ambiguous pronoun-like "us"/"usa" tokens are omitted for the same reason —
 // a US-subject story reliably names a second anchor (Iran, Washington, …).
 const FOREIGN_SUBJECT_RE =
-  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|shanghai|taiwan|taipei|kaohsiung|guam|saipan|mariana islands|northern mariana|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|bangladesh|dhaka|chittagong|nepal|kathmandu|sri lanka|colombo|bhutan|maldives|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
+  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|shanghai|taiwan|taipei|kaohsiung|guam|saipan|mariana islands|northern mariana|north korea|pyongyang|south korea|seoul|japan|tokyo|okinawa|naha|ryukyu|india|new delhi|pakistan|islamabad|bangladesh|dhaka|chittagong|nepal|kathmandu|sri lanka|colombo|bhutan|maldives|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|canada|canadian|toronto|montreal|vancouver|ottawa|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
 
 // Per-report HOME anchors: the country name, nationality, provinces and major
 // cities. Their presence in a headline (or its translation) proves the story is
@@ -623,77 +623,52 @@ const LOCAL_ANCHORS: Record<string, RegExp> = {
 };
 
 /**
- * A resolved `location` is a TRUSTWORTHY home anchor only when it is (a) present,
- * (b) not itself a recognised foreign place, AND (c) corroborated by appearing
- * verbatim in the title or its English translation. The geocoder derives
- * `location` from the story text, so a location that appears NOWHERE in the
- * headline is a spurious default — an outlet's own home city ("Jakarta") stamped
- * on a foreign wire story ("...mass shooting in Toronto") — and must never
- * rescue a foreign record. The summary is excluded on purpose: it carries the
- * appended outlet masthead, itself a false anchor ("Jakarta Post", "CNN
- * Indonesia").
+ * True when a record should be stripped from a GENERIC country brief (one
+ * without a bespoke branch — currently Thailand / Philippines) because its
+ * TITLE names a foreign country / capital / non-state actor as the SUBJECT yet
+ * the record carries NO home anchor at all: no home country / province / city
+ * token in the title or its English translation, AND no resolved local
+ * `location`. Such a record ("US launches new Iran strikes", "UK announces a
+ * teen social-media curfew", "Typhoon Bavi passes over Okinawa") was filed under
+ * this country only by a stray free-text country tag; it is not a local
+ * incident. No-fabrication: the strip fires only when the narrative POSITIVELY
+ * names a foreign subject and offers zero domestic anchor, so a genuine local
+ * story is never removed. Precision-first: an unlisted foreign place is closed
+ * by adding it to FOREIGN_SUBJECT_RE, never by dropping every anchor-less row.
  */
-function corroboratedHomeLocation(
-  location: string | null | undefined,
-  title: string | null | undefined,
-  displayTitle: string | null | undefined,
-): boolean {
-  const loc = (location ?? "").trim().toLowerCase();
-  if (!loc) return false;
-  if (FOREIGN_SUBJECT_RE.test(loc)) return false;
-  const hay = `${displayTitle ?? ""} ${title ?? ""}`.toLowerCase();
-  return hay.includes(loc);
-}
-
-/**
- * True when a record carries NO positive home anchor and so must NOT populate
- * country X's brief. This is an ALLOWLIST: a story is retained ONLY when it
- * demonstrably concerns the report country — a home country / nationality /
- * province / city token (for Indonesia also an administrative or police term) in
- * the TITLE or its English translation, OR a corroborated home `location`.
- * Otherwise it is dropped.
- *
- * This deliberately replaces an earlier BLOCKLIST that dropped a record only
- * when it happened to NAME a recognised foreign place. Every unlisted foreign
- * city ("Toronto", "Okinawa") slipped straight through that gate and surfaced
- * under the wrong country's report. Presenting a foreign story AS a domestic
- * incident is itself a false attribution, so requiring a positive home anchor is
- * the STRICT no-fabrication position: the report asserts a country only when the
- * evidence in the story supports it, and never rescues a record on the strength
- * of a geocoder default the headline does not corroborate.
- */
-export function lacksHomeAnchor(
+export function isForeignSubjectNoHomeAnchor(
   title: string | null | undefined,
   displayTitle: string | null | undefined,
   location: string | null | undefined,
   reportName: string,
 ): boolean {
-  const raw = title ?? "";
-  const disp = displayTitle ?? "";
-  if (!raw.trim() && !disp.trim()) return false;
-  const hay = `${disp} ${raw}`;
-  const key = (reportName ?? "").trim().toLowerCase();
-  // Indonesia and its Jakarta city sub-view share the broad Bahasa gazetteer,
-  // which also anchors on administrative / security-force terms (kabupaten,
-  // polres, ...) so a genuine domestic story in an unlisted regency still holds.
-  const anchor =
-    key.includes("indonesia") || key.includes("jakarta")
-      ? INDO_LOCAL_ANCHOR_RE
-      : LOCAL_ANCHORS[key];
-  if (anchor) {
-    if (anchor.test(hay)) return false;
+  const rawTitle = title ?? "";
+  if (!rawTitle.trim()) return false;
+  // A resolved structured location is USUALLY a home anchor: the geocoder fills
+  // `location` when it matched a place. But it can MIS-RESOLVE a foreign city
+  // onto a domestically-tagged record (e.g. "Taipei" onto a Thailand-filed row),
+  // so a set location counts as a home anchor ONLY when it does not itself name
+  // a foreign subject — otherwise the mis-resolved foreign city would shield the
+  // record from this guard.
+  const loc = (location ?? "").trim();
+  if (loc && !FOREIGN_SUBJECT_RE.test(loc)) return false;
+  // Only strip when the TITLE positively names a foreign subject.
+  if (!FOREIGN_SUBJECT_RE.test(rawTitle)) return false;
+  const anchorHaystack = `${displayTitle ?? ""} ${rawTitle}`;
+  const anchors = LOCAL_ANCHORS[(reportName ?? "").trim().toLowerCase()];
+  if (anchors) {
+    if (anchors.test(anchorHaystack)) return false;
   } else {
-    // Generic fallback for any other country: its own accepted tokens.
+    // Generic fallback for any other future country: its own accepted tokens.
     const own = acceptedCountryTokens(reportName);
     if (own.length) {
       const ownRe = new RegExp(
         `\\b(?:${own.map(escapeRegExp).join("|")})\\b`,
         "i",
       );
-      if (ownRe.test(hay)) return false;
+      if (ownRe.test(anchorHaystack)) return false;
     }
   }
-  if (corroboratedHomeLocation(location, title, displayTitle)) return false;
   return true;
 }
 

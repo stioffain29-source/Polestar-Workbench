@@ -15,6 +15,12 @@ const SLOP = [
   "Magnitude 7.2 earthquake shakes northern Japan, injures eleven people",
   "Knicks victory celebration in New York turns into riot, dozens arrested",
   "Shooting in Montreal, Canada leaves three dead",
+  // A Toronto street-festival shooting syndicated by Bahasa-first outlets under a
+  // domestic country tag. The Canadian CITY names (Toronto, Montreal, Vancouver,
+  // Ottawa) were absent from the foreign-cue list, so these leaked into the
+  // Indonesia / Jakarta brief even though "canada" was already listed.
+  "Penembakan di Festival Jalanan Toronto, Dua Orang Tewas",
+  "Festival Salsa Toronto Diwarnai Penembakan",
   "Strong earthquake hits Venezuela, buildings damaged in Caracas",
   "Wildfires spread across California as thousands evacuate",
   "Nepal protests turn violent in Kathmandu",

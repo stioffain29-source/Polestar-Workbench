@@ -83,3 +83,26 @@ Surabaya" — Surabaya anchors it).
   once drifted to include `i.summary`, so the masthead false-anchor leaked back on
   the PDF only and page/PDF disagreed on borderline rows. Any change to one path's
   guard input must be mirrored in the other, or preview≠PDF.
+- **REJECTED: the "require a home anchor, drop otherwise" ALLOWLIST.** When a leak
+  slips past the dominance/blocklist guards (a foreign CITY the token list omits,
+  e.g. "Toronto"), the fix is to ADD the missing place to `INDO_FOREIGN_SUBJECT_RE`
+  (and `FOREIGN_SUBJECT_RE` for the generic Thailand/Philippines
+  `isForeignSubjectNoHomeAnchor` path) — NOT to require a positive home anchor.
+  **Why:** an allowlist was built and MEASURED against live prod (proveGeoGuard.ts):
+  it dropped Indonesia 51% / Philippines 47% / Thailand 37% of GENUINE local rows
+  (Surabaya corruption, Davao floods, Trat boat) because real local stories often
+  carry no listed city token. Gutting genuine rows is a WORSE no-fabrication breach
+  than the residual leak. The precision-first token additions cut collateral to
+  Indonesia 9.4% / Philippines 4.9% / Thailand 11.1% while dropping all confirmed
+  leaks. Do NOT re-attempt the allowlist.
+- **Escalation path for a NEW leak:** add the exact foreign token, re-run
+  `proveGeoGuard.ts`, confirm collateral stays low. The residual leak class that
+  remains BY DESIGN: an overseas story naming ONLY an unlisted foreign place with
+  NO country word ("Winnipeg", "Marseille"). Cross-row syndication clustering
+  (`foreignSyndicationDropIds`) partially mitigates it when a foreign-attributed
+  sibling names the place.
+- **Naha/Ryukyu homonym:** `naha` (added for Okinawa) is also Naha, Sangihe Islands,
+  North Sulawesi (Naha Airport). Inside `\b…\b` it counts as ONE foreign cue, so a
+  genuine Sangihe story survives only if a local anchor ties it (dominance is strict
+  `>`, and such stories normally also name Sangihe/Sulawesi). Low probability;
+  watch for it if a Sangihe row goes missing.
