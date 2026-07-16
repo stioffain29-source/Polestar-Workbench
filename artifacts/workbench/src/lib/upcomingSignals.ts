@@ -35,7 +35,7 @@ export interface UpcomingSignalInput {
 // marches/rallies ("farmers to march on parliament on Friday") still qualify
 // via the temporal+object path, keeping detection precision-first.
 const FUTURE_STRONG_RE =
-  /\b(planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally)|(to|will) (stage|hold|launch|begin|commence|call)(?: (?:a|an|the))? (protest|sit[- ]in|march|rally|strike|walkout|demonstration|blockade|shutdown|boycott|mobilisation|mobilization)|will (protest|march|rally|strike|walkout|demonstrate)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (of|protest|march|rally)|upcoming (protest|strike|rally|march|hearing|vote))\b/i;
+  /\b(planned (protest|strike|rally|march|blockade|mobilisation|mobilization|walkout|shutdown)|announced (protest|strike|rally|march|mobilisation|mobilization)|to (protest|march|rally)|(to|will) (stage|hold|launch|begin|commence|call)(?: (?:a|an|the))? (protest|sit[- ]in|march|rally|strike|walkout|demonstration|blockade|shutdown|boycott|mobilisation|mobilization)|will (protest|march|rally|strike|walkout|demonstrate)|call(ed|s)? for (a )?(protest|strike|rally|march|sit[- ]in|shutdown|boycott|walkout)|union calls|students? to (protest|march|rally)|scheduled (hearing|sitting|vote|session)|court date|anniversary (protest|march|rally)|upcoming (protest|strike|rally|march|hearing|vote))\b/i;
 
 // Bare temporal / open-ended cues that carry NO protest object of their own.
 // They only qualify when a protest object co-occurs elsewhere in the text, so
@@ -50,7 +50,7 @@ const PROTEST_OBJECT_RE =
 
 // Already-happened markers — an account of a past event is not forewarning.
 const PAST_EVENT_RE =
-  /\b(yesterday|last (week|month|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|has ended|had ended|ended|ends|concluded|wrapped up|dispersed|took place|was held|were held|over the weekend)\b/i;
+  /\b(yesterday|last (week|month|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|has ended|had ended|ended|ends|concluded|wrapped up|dispersed|gathered|took place|was held|were held|over the weekend)\b/i;
 
 // Sports / competition homonyms ("team-mates rally", "faces ex-world champ",
 // "set for the semis"). Treated as noise UNLESS a genuine protest object is

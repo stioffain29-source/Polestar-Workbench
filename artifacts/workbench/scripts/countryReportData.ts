@@ -22,6 +22,7 @@ import {
   isPapuaNewGuineaDominantContext,
   isForeignDominantContext,
   isForeignSubjectForIndonesia,
+  isForeignSubjectNoHomeAnchor,
   isForeignTheatreContext,
   isCrossBorderPapuaPng,
   isIndonesianPapuaTheatreContext,
@@ -42,6 +43,8 @@ const SLUG_TO_NAME: Record<string, { name: string; region: string }> = {
   "papua-new-guinea": { name: "Papua New Guinea", region: "Pacific" },
   papua: { name: "Papua", region: "Asia-Pacific" },
   indonesia: { name: "Indonesia", region: "Asia-Pacific" },
+  thailand: { name: "Thailand", region: "Asia-Pacific" },
+  philippines: { name: "Philippines", region: "Asia-Pacific" },
 };
 
 // The structured builders read these fields off each incident; build the full
@@ -140,6 +143,20 @@ function filterForCountry(
     if (isForeignDominantContext(i.title, fullText, i.country, name)) return false;
     const narrative = `${i.title ?? ""} ${i.summary ?? ""}`;
     if (!isCrossBorderPapuaPng(i.country) && isForeignTheatreContext(narrative, name)) {
+      return false;
+    }
+    // Generic country briefs (no bespoke theatre branch — Thailand / Philippines):
+    // mirror CountryReport.tsx and drop a record whose TITLE names a foreign
+    // country/capital/actor as its subject with NO home anchor and no resolved
+    // local `location`. Structured-theatre countries (png/papua/indonesia, and
+    // jakarta which this loader does not serve) are excluded from this gate.
+    if (
+      !isPng &&
+      !isPapua &&
+      !isIndonesia &&
+      !tokens.includes("jakarta") &&
+      isForeignSubjectNoHomeAnchor(i.title, i.displayTitle ?? null, i.location, name)
+    ) {
       return false;
     }
     return true;

@@ -47,6 +47,21 @@ geology/weather is dropped. `magnitude` is scoped to `magnitude[- ]?\d` so figur
 "magnitude" doesn't false-veto. This is a frontend display detector — recomputes at
 render, NO `RELEVANCE_RULE_VERSION` bump.
 
+**Retrospective/commemoration false-positive gates (precision-first).** Two classes of
+PAST item leaked into the "Reported Upcoming Activity" section of country briefs: (a) a civic
+anniversary CEREMONY ("attends 103rd anniversary of …") qualified because `FUTURE_STRONG_RE`
+had a bare `anniversary (of|…)` alternative — narrowed to `anniversary (protest|march|rally)`
+so only an announced anniversary PROTEST fires, not a commemoration; (b) a completed vigil
+("Hundreds gathered … on Monday … for a candlelight vigil") qualified via the temporal+object
+path ("on Monday" + `vigil`) because `PAST_EVENT_RE` didn't catch `gathered` — added it.
+**Why:** an "Upcoming Activity" heading must never show a past/commemorative event. **How to
+apply:** `gathered` is past-tense only (won't touch "gathering"/"to gather"); prefer adding
+past-tense verbs to `PAST_EVENT_RE` over loosening the future cues. Frontend display detector —
+NO `RELEVANCE_RULE_VERSION` bump. Also: the headless country loader
+(`scripts/countryReportData.ts`) must mirror the page's `isForeignSubjectNoHomeAnchor` filter
+(same arg order, gated `!png&&!papua&&!indonesia&&!jakarta`) or headless PDFs render foreign
+mis-tagged items the on-screen page already drops.
+
 **Parity plumbing.** The Indonesia brief field `upcomingSignals` is gated on
 `StructuredTheatreConfig.showUpcomingSignals` (true only on `INDONESIA_REPORT_CONFIG`) —
 every other structured theatre stays byte-identical (`[]`). Screen (`PngCountryReportBody`)
