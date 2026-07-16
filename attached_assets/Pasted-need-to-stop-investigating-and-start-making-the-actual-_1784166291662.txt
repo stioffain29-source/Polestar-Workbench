@@ -1,0 +1,19 @@
+need to stop investigating and start making the actual code changes. I've gathered enough data to identify the issue—there's a row about Bangladesh in Thailand that should be filtered out by the isForeignSubjectNoHomeAnchor logic, but the regex pattern isn't catching it properly.
+
+The fix is to add Bangladesh and other South Asian countries (Nepal, Kathmandu, Sri Lanka, Colombo, Dhaka, Bhutan, Maldives) to the FOREIGN_SUBJECT_RE pattern. I also spotted a Thai pub fire that's actually about Thailand and should stay in the dataset, so this addition is safe.
+
+There's also a West Papua anniversary piece that's being treated as a current event when it's really a retrospective reflection—I need to add a retrospective title filter to catch those. And I'm seeing duplicate rows for the PNG Sambio massacre that need to be consolidated.
+
+Now I'm checking why the clustering algorithm didn't merge these two Sambio massacre articles. Both are from PNG, both mention "Sambio massacre" and "twenty-seven," and they occurred on the same day, so they should have matched. Looking at the clustering paths: the canonical titles differ after stripping mastheads, so they don't match on identical title. For the province-based path, I need to check whether the province field is actually populated for flashpoint-type entries in PNG.
+
+Calculating the Jaccard similarity on the tokenized titles: "twenty seven locked second sambio massacre arrest" versus "twenty seven arrested charged sambio massacre" gives 4 shared tokens out of 9 total unique tokens, which is 0.44—below the 0.5 threshold. So that path fails. The third path would require "sambio" to be recognized as a strong distinctive entity like an armed group or foreign national, but it's a place name, so it probably isn't extracted as such.
+
+The fourth path needs armed-clash language like gunfight or firefight, which neither headline has. So the merge fails across all paths, even though this is genuinely the same event. The real issue is that "sambio" is a distinctive proper noun marking the incident, but the current extraction doesn't capture massacre names as anchors. I could add a path that treats shared distinctive place or incident names plus matching event class within 3 days as a merge signal, but that requires extracting the massacre name itself—the word before "massacre"—which is riskier and could cause over-merging.
+
+I need to stop deliberating and implement the safe, verified fixes now. I need to read through the countrySameStory.ts file around lines 300-470 to understand the entity extraction logic and PATH 3, which will let me implement the anchor correctly for the third screenshot defect. Asian countries that are clearly foreign subjects. But I need to verify that adding Bangladesh won't accidentally filter out legitimate Thai or Philippine matches.
+
+The regex only triggers when there's no location tag, the title matches the foreign subject pattern, and there's no local anchor — so a Thai story mentioning Bangladesh but with a Thai anchor would still pass through. That Bangladesh rain story with no Thai anchor and no location gets dropped as expected. There's also that pub-fire row which is Indonesian-language content about Bangkok, but that's a separate issue about whether it should appear in the Thailand brief at all.
+
+Now I'm thinking through the anniversary/retrospective filter in the dataset code. I need to add a predicate that catches these items and drops them from the entire brief, not just the lead section. The tricky part is that this filter needs to run regardless of severity level — retrospective pieces are often high-severity events, so they'd normally pass through the severity gate. I can't just fold this into the existing development wire item check since that's already gated by severity rank.
+
+My

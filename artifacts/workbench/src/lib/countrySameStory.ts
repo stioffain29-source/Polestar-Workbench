@@ -449,6 +449,26 @@ export function clusterSameStoryRows(
         placed = true;
         break;
       }
+      // PATH 2b: a shared DISTINCTIVE incident / place NAME (a longer proper-noun
+      // token, not generic clash / security / geography vocabulary) plus a modest
+      // overlap on the same or adjacent day. Merges ONE named event re-reported so
+      // differently that Jaccard sits just below the PATH-1 floor — e.g.
+      // "Twenty-seven locked-up from second 'Sambio massacre' arrest" vs
+      // "TWENTY-SEVEN ARRESTED AND CHARGED OVER SAMBIO MASSACRE" (shared "sambio",
+      // jac 0.44). Evaluated BEFORE the compatible-type gate (like PATH 2/3) so a
+      // massacre and the ARRESTS over it — coded Homicide vs Policing — still
+      // merge. The distinctive shared token (>= 5 chars, so short place stems like
+      // "enga" never anchor) plus the tight same/adjacent-day window keeps two
+      // genuinely distinct events that share only generic vocabulary apart, so
+      // formulaic tribal-clash headlines never over-merge.
+      const sharedDistinctiveName = [...f.placeToks].some(
+        (t) => t.length >= 5 && ff.placeToks.has(t),
+      );
+      if (dd <= DAY && sharedDistinctiveName && jac >= 0.35) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
       const compatType =
         rr.typeKey === r.typeKey ||
         (!!rr.category && rr.category === r.category) ||

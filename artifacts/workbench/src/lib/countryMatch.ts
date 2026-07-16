@@ -610,7 +610,7 @@ function escapeRegExp(s: string): string {
 // ambiguous pronoun-like "us"/"usa" tokens are omitted for the same reason —
 // a US-subject story reliably names a second anchor (Iran, Washington, …).
 const FOREIGN_SUBJECT_RE =
-  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
+  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|bangladesh|dhaka|chittagong|nepal|kathmandu|sri lanka|colombo|bhutan|maldives|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
 
 // Per-report HOME anchors: the country name, nationality, provinces and major
 // cities. Their presence in a headline (or its translation) proves the story is

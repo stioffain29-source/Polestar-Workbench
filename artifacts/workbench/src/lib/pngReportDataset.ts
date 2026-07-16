@@ -1013,6 +1013,25 @@ export function isDevelopmentWireItem(item: PngReportItem): boolean {
   return DEVELOPMENT_WIRE_RE.test(hay);
 }
 
+// Retrospective / anniversary REFLECTION headlines ("28 years since the Biak
+// massacre, conflict in West Papua escalates"; "on this day"; "decades later").
+// A look-back piece is never a CURRENT development, yet it routinely carries a
+// high stored severity (the historical event it commemorates), so the
+// severity-gated development-wire filter above cannot remove it and it wrongly
+// leads the Top 3. Digit-anchored ("28 years since/after/ago/on") plus a short
+// list of unambiguous retrospective phrases. Deliberately does NOT match a bare
+// "anniversary": a protest or ceremony held ON an anniversary date is a genuine
+// current event and must stay. Exported for unit tests.
+const RETROSPECTIVE_TITLE_RE =
+  /(\b\d{1,3}\s+years?\s+(since|after|ago|on)\b|\bdecades?\s+(since|ago|later|on)\b|\ba\s+(year|decade)\s+(on|since|ago|later)\b|\bon this day\b|\blooking back\b|\bflashback\b|\bin memoriam\b|\blest we forget\b|\byears\s+later\b)/i;
+
+export function isRetrospectiveItem(item: PngReportItem): boolean {
+  return (
+    RETROSPECTIVE_TITLE_RE.test(item.title) ||
+    RETROSPECTIVE_TITLE_RE.test(item.rawTitle ?? "")
+  );
+}
+
 function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
   const da = (a.incidentDate ?? a.reportedDate).getTime();
@@ -1457,15 +1476,26 @@ export function buildStructuredReportDataset(
     const kept = items.filter((it) => !isDevelopmentWireItem(it));
     return kept.length > 0 ? kept : items;
   };
+  // Drop retrospective / anniversary reflection pieces from EVERY narrative
+  // surface (Top 3, Executive Summary, BLUF, Outlook, location sections). A
+  // look-back article is never a current development; removal-only, applied to
+  // all theatres regardless of the wire opt-out, and never empties a non-empty
+  // window (which would falsely trip the "no fresh reporting" branch below).
+  const applyRetrospectiveFilter = (items: PngReportItem[]): PngReportItem[] => {
+    const kept = items.filter((it) => !isRetrospectiveItem(it));
+    return kept.length > 0 ? kept : items;
+  };
   // Deduped-but-unfiltered window, kept so the syndication (dedup-strength)
   // signal below measures collapse only — never conflating the wire filter with
   // syndication.
   const dedupedWindowItems = dedupeByTitle(windowIncidents.map((i) => toItem(i, config)));
-  const windowItems = applyWireFilter(dedupedWindowItems);
+  const windowItems = applyRetrospectiveFilter(applyWireFilter(dedupedWindowItems));
   // Prior 7-day window, deduped the same way, for the week-on-week delta. Empty
   // when the caller supplies none (delta degrades to a "limited history" note).
-  const previousWindowItems = applyWireFilter(
-    dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config))),
+  const previousWindowItems = applyRetrospectiveFilter(
+    applyWireFilter(
+      dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config))),
+    ),
   );
   // Distinguish "no previous window supplied at all" (week-on-week comparison
   // impossible — never assert a trend) from "previous window supplied but quiet"
