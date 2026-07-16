@@ -970,8 +970,22 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
 // (infrastructure ribbon-cutting, aviation partnerships, scholarships, "brings
 // hope/joy" community items, "tidbits" round-ups). Substring match; the strict
 // severity + security gating below is the real safety net.
+//
+// Two homonym-driven PR classes were leaking into the PNG "Protest & civil
+// unrest" theme and are added here (both Low, both carry no security term, so the
+// severity + veto gating below keeps every genuine event):
+//   * AWARDS / RECOGNITION human-interest ("declines WOW Awards Nomination…",
+//     summarised as "a powerful demonstration of selfless leadership") — the
+//     bare metaphor "demonstration of <virtue>" is deliberately spared upstream
+//     so genuine "demonstration of people power" survives, so it must be caught
+//     here as PR, not as a protest.
+//   * JOINT MILITARY EXERCISE PR ("U.S., Papua New Guinea launch Tamiok Strike
+//     26", "Exercise Tamiok Strike 2026", "Exercise Pitch Black") — the exercise
+//     name "…Strike…" is a labour-strike homonym; a friendly readiness exercise
+//     is not a security incident. Named-exercise anchors (tamiok strike / exercise
+//     pitch black) are used so the darkness metaphor "pitch black" cannot match.
 const DEVELOPMENT_WIRE_RE =
-  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade|groundbreaking|ceremony|renovat|classroom|farewell|new era|inflation|bursar|\b5g\b|designer|new collection|enduring relationship|strengthen(s|ing)? (its |the )?(relationship|partnership|ties|bond))/i;
+  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade|groundbreaking|ceremony|renovat|classroom|farewell|new era|inflation|bursar|\b5g\b|designer|new collection|enduring relationship|strengthen(s|ing)? (its |the )?(relationship|partnership|ties|bond)|\baward(s|ed|ing)?\b|\bnominat(e|es|ed|ion|ions|ing)?\b|\baccolade|\bprize\b|pageant|tamiok strike|exercise pitch black|(joint|bilateral|combined|multinational|military) (military )?exercise|war ?games)/i;
 // A security / risk / hazard term anywhere in the text VETOES the drop, even
 // when the promotional lexicon also matches, so a genuine low-severity crime,
 // court, unrest or natural-hazard item is never removed. A veto only ever KEEPS

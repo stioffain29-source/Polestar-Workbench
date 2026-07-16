@@ -104,6 +104,56 @@ describe("isDevelopmentWireItem — guardrails (strict under-filter bias)", () =
     ).toBe(true);
   });
 
+  it("drops low-severity awards / recognition human-interest PR", () => {
+    const drops = [
+      // The live PNG leak: an abstract "demonstration of leadership" metaphor
+      // that evaded the protest-demonstration homonym guard upstream.
+      "‘Leadership means stepping aside’: Pascoe Events founder declines WOW Awards Nomination to make space for rising leaders",
+      "K92 student wins national science prize",
+      "Local designer crowned at Miss PNG pageant",
+      "Governor hands accolade to retiring headmaster",
+      "Nurse nominated for regional excellence award",
+    ];
+    for (const title of drops) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(true);
+    }
+  });
+
+  it("does NOT treat 'reward' / 'denomination' as awards PR (word-boundary anchors)", () => {
+    const keeps = [
+      "Reward offered for information on Lae store robbery", // 'reward' != \baward
+      "Church denomination opens new Goroka mission", // 'denomination' != \bnominat
+    ];
+    for (const title of keeps) {
+      // 'robbery' vetoes the first; the second has no wire token at all.
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
+
+  it("drops low-severity joint-military-exercise PR (labour-strike homonym)", () => {
+    const drops = [
+      "U.S., Papua New Guinea launch Tamiok Strike 26 [Image 5 of 8] - DVIDS",
+      "U.S. Embassy Port Moresby announces Exercise Tamiok Strike 2026",
+      "US, Papua New Guinea launch Tamiok Strike 26 - army.mil",
+      "PNGDF take flight for Exercise Pitch Black",
+      "PNG joins Australia for bilateral military exercise",
+    ];
+    for (const title of drops) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(true);
+    }
+  });
+
+  it("keeps genuine security items that carry a new PR word (awards/exercise veto)", () => {
+    const keeps = [
+      "Award-winning officer shot dead at ceremony", // award + ceremony PR, 'shot' vetoes
+      "Two soldiers killed during joint military exercise", // exercise PR, 'killed' vetoes
+      "Rioters clash with police at beauty pageant", // pageant PR, 'riot'/'police' veto
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
+
   it("NEVER drops a Moderate+ item, even with promotional wording", () => {
     expect(
       isDevelopmentWireItem(
