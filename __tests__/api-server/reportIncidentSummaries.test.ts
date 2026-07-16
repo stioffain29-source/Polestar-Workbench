@@ -143,6 +143,13 @@ afterAll((done) => {
   server.close(() => done());
 });
 
+beforeEach(() => {
+  // The global jest.setup.ts beforeEach runs clearIntegrationEnv() (which
+  // deletes INGEST_ADMIN_TOKEN) BEFORE this hook, so the beforeAll token would
+  // otherwise be wiped for every test after the first — defeating the gate.
+  enableTestAdminToken();
+});
+
 afterEach(() => {
   jest.restoreAllMocks();
   (isLlmAvailable as jest.Mock).mockReset();
