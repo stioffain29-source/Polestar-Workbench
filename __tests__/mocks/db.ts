@@ -11,6 +11,7 @@ export const pool = {
 const chain = () => ({
   from: () => chain(),
   where: () => chain(),
+  limit: () => chain(),
   set: () => chain(),
   values: () => chain(),
   returning: () => Promise.resolve([]),
