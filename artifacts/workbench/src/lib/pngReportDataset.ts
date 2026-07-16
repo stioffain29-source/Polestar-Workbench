@@ -870,8 +870,9 @@ export interface PngReportDataset {
   keepPolestarTogether?: boolean;
   // Jakarta-only tactical operating brief (Movement & Access Impact, Business
   // District / Port exposure tables, Airport-Hotel-Office, Route & Timing, and
-  // the map area summary). Consumed ONLY by JakartaReportBody; unset for every
-  // other theatre, leaving their rendering byte-identical.
+  // the map area summary). Consumed ONLY by the canonical Jakarta brief
+  // (PngCountryReportBody + renderStructuredBrief, gated on this field); unset
+  // for every other theatre, leaving their rendering byte-identical.
   jakartaTacticalBrief?: JakartaTacticalBrief;
 }
 

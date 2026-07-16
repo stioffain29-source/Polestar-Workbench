@@ -8,7 +8,7 @@
 // numbered operating zones (fixed order 1–7), FOUR route corridors, a
 // right-hand "Movement posture this period" panel and a shaded-zone map.
 // Rendered by JakartaCorridorMap (screen + in-app PDF) and, as a headless
-// posture table, by renderJakartaBrief in exportCountryReportPdf.
+// posture table, by renderStructuredBrief in exportCountryReportPdf.
 //
 // Nothing here changes relevance rules, ingestion, or any other report code.
 

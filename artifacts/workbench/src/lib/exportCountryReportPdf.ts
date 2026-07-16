@@ -705,11 +705,11 @@ function drawCoverageBanner(ctx: Ctx, coverage: CountryCoverageStatus) {
 }
 
 // --- Jakarta tactical-brief renderers --------------------------------------
-// The Jakarta city report carries its OWN 14-section structure (mirrors the
-// on-screen JakartaReportBody). These headless renderers reuse the same
-// jakartaBrief.ts builders the screen uses, so the script-generated PDF and the
-// on-screen DOM-rasterised PDF stay in lockstep. Reached for Jakarta only;
-// every other theatre keeps the generic country layout below.
+// Jakarta shares the canonical structured brief (renderStructuredBrief +
+// PngCountryReportBody); its tactical tables fold in as strand labels. These
+// helpers reuse the same jakartaBrief.ts builders the screen uses, so the
+// script-generated PDF and the on-screen DOM-rasterised PDF stay in lockstep.
+// Reached for Jakarta only; every other theatre keeps the generic layout below.
 
 function jakartaDateLine(item: PngReportItem): string {
   const reported = format(item.reportedDate, "dd MMM yyyy");
