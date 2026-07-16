@@ -20,6 +20,7 @@ import {
   getGetDashboardOverviewQueryKey,
   type ReportIncidentSummariesResult,
   type ReportProseResult,
+  type ReportUpdate,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -56,6 +57,12 @@ import {
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { filterTopicReportIncidents } from "@/lib/topicFastFacts";
+import {
+  applyIncidentCurations,
+  makeSectionGate,
+  topicSectionKeys,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
@@ -193,6 +200,15 @@ const EMPTY: FormState = {
   author: "",
 };
 
+const SEVERITY_ORDER: Record<string, number> = {
+  insignificant: 0,
+  low: 1,
+  moderate: 2,
+  high: 3,
+  extreme: 4,
+};
+const SEVERITY_DEMOTE_OPTIONS = ["insignificant", "low", "moderate", "high"] as const;
+
 export default function ReportEditor() {
   const qc = useQueryClient();
   const [, params] = useRoute("/reports/:id");
@@ -327,7 +343,33 @@ export default function ReportEditor() {
   // Polestar View → Disclaimer; the full register lives in the Workbench + CSV.
   const [includeFullAnnex, setIncludeFullAnnex] = useState(false);
 
-  const incidentsForExport = incidents ?? [];
+  // Durable analyst layout controls (hidden sections, excluded window
+  // incidents, demote-only severity corrections). Mirrors the country brief.
+  // Seeded from report.sectionOverrides; persisted verbatim on save.
+  const [sectionOverrides, setSectionOverrides] = useState<TopicSectionOverrides>(
+    {},
+  );
+
+  // Curation propagates through the SINGLE incident pool feeding every topic
+  // dataset builder → both previews AND PDFs. Applying it here (exclude +
+  // demote-only) covers cargoRegisterRows, relatedForSummaries, all previews
+  // and all PDF exporters uniformly. STRICT: exclude/demote only, never add.
+  const incidentsForExport = useMemo(
+    () => applyIncidentCurations(incidents ?? [], sectionOverrides),
+    [incidents, sectionOverrides],
+  );
+
+  // The relevance-passing window pool the analyst can curate from. Windowed by
+  // topic + issue date (a superset of what any single section renders), so an
+  // exclusion never fabricates and only ever removes a real, in-window row.
+  const curationPool = useMemo(() => {
+    const src = incidents ?? [];
+    if (!form.topic || !form.issueDate) return [] as typeof src;
+    return filterTopicReportIncidents(src, form.topic, form.issueDate).slice(0, 60);
+  }, [incidents, form.topic, form.issueDate]);
+
+  const sectionGate = makeSectionGate(sectionOverrides.hiddenSections);
+  const hiddenSections = sectionOverrides.hiddenSections ?? [];
 
   // Full deduplicated cargo register (the Workbench-only companion to the PDF's
   // curated Selected Incidents), exported to CSV on demand. Built from the SAME
@@ -712,6 +754,7 @@ export default function ReportEditor() {
           incidentsForExport,
           filename,
           aiProseSections,
+          hiddenSections,
         );
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(
@@ -723,6 +766,7 @@ export default function ReportEditor() {
           effectiveSummaries,
           redSeaFlow,
           aiProseSections,
+          hiddenSections,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -732,6 +776,7 @@ export default function ReportEditor() {
           situationalReports,
           effectiveSummaries,
           aiProseSections,
+          hiddenSections,
         );
       } else {
         const { exportTopicReportPdf } = await import("@/lib/exportTopicReportPdf");
@@ -749,6 +794,7 @@ export default function ReportEditor() {
             aiProse: aiProseSections,
             marketPrices: energyMarketPrices,
             includeFullAnnex,
+            hiddenSections,
           },
         );
       }
@@ -921,6 +967,9 @@ export default function ReportEditor() {
       conflictAreaReads: proseIsStale ? {} : (report.conflictAreaReads ?? {}),
       author: report.author ?? "",
     });
+    setSectionOverrides(
+      (report.sectionOverrides as TopicSectionOverrides | null) ?? {},
+    );
   }, [report, incidents]);
 
   // Reset the seed guard if the route id changes.
@@ -1107,6 +1156,22 @@ export default function ReportEditor() {
     // Empty override → clear the stored rating (card pull falls back to the
     // computed/auto value). A set value persists the analyst's choice.
     payload.riskRating = form.riskRating ? form.riskRating : null;
+    // Durable layout controls persist verbatim (null when empty so the column
+    // clears). form has no override keys, so this is additive to {...form}.
+    {
+      const hs = sectionOverrides.hiddenSections ?? [];
+      const ex = sectionOverrides.excludedIncidentIds ?? [];
+      const dm = sectionOverrides.severityDemotions ?? {};
+      const empty =
+        hs.length === 0 && ex.length === 0 && Object.keys(dm).length === 0;
+      payload.sectionOverrides = empty
+        ? null
+        : ({
+            ...(hs.length ? { hiddenSections: hs } : {}),
+            ...(ex.length ? { excludedIncidentIds: ex } : {}),
+            ...(Object.keys(dm).length ? { severityDemotions: dm } : {}),
+          } as NonNullable<ReportUpdate["sectionOverrides"]>);
+    }
     if (form.topic === "fuel") {
       if (showFuelJson) {
         if (!hardNumbersText.trim()) {
@@ -1516,6 +1581,114 @@ export default function ReportEditor() {
                   : "Left on Auto: rating is computed from incidents when pulled into a card."}
             </p>
           </Field>
+
+          {/* Section visibility + incident curation — mirrors the country
+              brief. Hides canonical sections from BOTH preview and PDF (same
+              section keys), and excludes / demote-only-rerates relevance-passing
+              window incidents. STRICT no-fabrication: curate only from the
+              in-window pool; nothing can be added or up-rated. */}
+          <div className="border-t border-border pt-3 mt-1">
+            <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
+              Section visibility
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {topicSectionKeys(form.topic).map(({ key, label }) => {
+                const hidden = hiddenSections.includes(key);
+                return (
+                  <label
+                    key={key}
+                    className="flex items-center gap-2 text-[12px] text-foreground cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!hidden}
+                      onChange={(e) => {
+                        setSectionOverrides((ov) => {
+                          const s = new Set(ov.hiddenSections ?? []);
+                          if (e.target.checked) s.delete(key);
+                          else s.add(key);
+                          return { ...ov, hiddenSections: Array.from(s) };
+                        });
+                      }}
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {curationPool.length > 0 && (
+            <div className="border-t border-border pt-3 mt-1">
+              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
+                Incident selection &amp; severity ({curationPool.length} in window)
+              </div>
+              <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
+                {curationPool.map((inc) => {
+                  const incId = String(inc.id);
+                  const excluded = (
+                    sectionOverrides.excludedIncidentIds ?? []
+                  ).includes(incId);
+                  const stored = (inc.severity ?? "").trim().toLowerCase();
+                  const demoteTo = sectionOverrides.severityDemotions?.[incId] ?? "";
+                  return (
+                    <div
+                      key={incId}
+                      className="border border-border rounded-sm p-2 flex gap-2.5 items-start"
+                      style={{ opacity: excluded ? 0.5 : 1 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!excluded}
+                        className="mt-1"
+                        onChange={(e) => {
+                          setSectionOverrides((ov) => {
+                            const s = new Set(ov.excludedIncidentIds ?? []);
+                            if (e.target.checked) s.delete(incId);
+                            else s.add(incId);
+                            return { ...ov, excludedIncidentIds: Array.from(s) };
+                          });
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12px] text-foreground">
+                          {inc.displayTitle ?? inc.title}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          Stored severity: {stored || "—"}
+                          {inc.location ? ` · ${inc.location}` : ""}
+                        </div>
+                      </div>
+                      <select
+                        value={demoteTo}
+                        disabled={excluded}
+                        className="text-[11px] border border-border rounded-sm p-1 text-muted-foreground"
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSectionOverrides((ov) => {
+                            const next = { ...(ov.severityDemotions ?? {}) };
+                            if (v) next[incId] = v;
+                            else delete next[incId];
+                            return { ...ov, severityDemotions: next };
+                          });
+                        }}
+                      >
+                        <option value="">Keep severity</option>
+                        {SEVERITY_DEMOTE_OPTIONS.filter(
+                          (o) => SEVERITY_ORDER[o] < (SEVERITY_ORDER[stored] ?? 4),
+                        ).map((o) => (
+                          <option key={o} value={o}>
+                            Demote to {o}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Conflict Watch is location-led: Situation leads and the
               Executive Summary section is dropped entirely. */}
           {form.topic !== "conflict" && (
@@ -2320,12 +2493,14 @@ export default function ReportEditor() {
               maritimeSecurityEvents={maritimeSecurityEvents}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
+              hiddenSections={hiddenSections}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
               report={form}
               incidents={incidentsForExport}
               aiProse={aiProseSections}
+              hiddenSections={hiddenSections}
             />
           ) : form.topic === "conflict" ? (
             <ConflictReportPreview
@@ -2334,6 +2509,7 @@ export default function ReportEditor() {
               situationalReports={situationalReports}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
+              hiddenSections={hiddenSections}
             />
           ) : form.topic === "cargo_watch" ? (
             <CargoReportPreview
@@ -2345,6 +2521,7 @@ export default function ReportEditor() {
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
               includeFullAnnex={includeFullAnnex}
+              hiddenSections={hiddenSections}
             />
           ) : (
             <ReportPreview
@@ -2356,6 +2533,7 @@ export default function ReportEditor() {
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
               marketPrices={energyMarketPrices}
+              hiddenSections={hiddenSections}
             />
           )}
         </div>

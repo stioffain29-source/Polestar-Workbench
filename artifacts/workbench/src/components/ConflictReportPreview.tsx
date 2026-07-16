@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { makeSectionGate } from "@/lib/topicSectionOverrides";
 import { pickRead } from "@/lib/pickRead";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
@@ -146,10 +147,13 @@ function Bullets({ text, max = 7 }: { text?: string | null; max?: number }) {
 function Section({
   title,
   children,
+  hidden,
 }: {
   title: string;
   children: React.ReactNode;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <div className="report-section mb-8">
       <h2
@@ -385,13 +389,16 @@ export default function ConflictReportPreview({
   situationalReports,
   incidentSummaries = {},
   aiProse,
+  hiddenSections,
 }: {
   report: ConflictPreviewReport;
   incidents: ConflictReportIncident[];
   situationalReports?: ReliefWebReport[] | null;
   incidentSummaries?: Record<string, string>;
   aiProse?: ConflictAiProse | null;
+  hiddenSections?: string[];
 }) {
+  const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
@@ -516,15 +523,15 @@ export default function ConflictReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <Section title="Situation">
+        <Section hidden={!show("situation")} title="Situation">
           <Paragraphs text={pickProse(report.situation, aiOr(aiProse?.situation, ds.autoSituation))} />
         </Section>
 
-        <Section title="Fast Facts">
+        <Section hidden={!show("fast-facts")} title="Fast Facts">
           <KpiGrid cards={ds.fastFacts} />
         </Section>
 
-        <Section title="Top Activity Areas">
+        <Section hidden={!show("top-activity-areas")} title="Top Activity Areas">
           {ds.topActivityAreas.length === 0 ? (
             <p
               style={{
@@ -544,25 +551,25 @@ export default function ConflictReportPreview({
           )}
         </Section>
 
-        <Section title="Other Watched Theatres">
+        <Section hidden={!show("other-watched")} title="Other Watched Theatres">
           <Paragraphs text={pickRead(report.conflictOtherWatchedRead, ds.autoOtherWatched)} />
         </Section>
 
-        <Section title="What Matters for Business">
+        <Section hidden={!show("what-matters")} title="What Matters for Business">
           <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
         </Section>
 
-        <Section title="Watch Next">
+        <Section hidden={!show("watch-next")} title="Watch Next">
           <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
         </Section>
 
-        <Section title="Polestar View">
+        <Section hidden={!show("polestar-view")} title="Polestar View">
           <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
         </Section>
 
         <SituationalContextSection reports={situationalReports} max={6} />
 
-        <Section title="Related Incidents">
+        <Section hidden={!show("related-incidents")} title="Related Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
         </Section>
 

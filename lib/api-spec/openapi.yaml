@@ -2204,6 +2204,10 @@ components:
         fuelRegionalHighlights: { type: ["string", "null"] }
         conflictOtherWatchedRead: { type: ["string", "null"] }
         conflictAreaReads: { type: ["object", "null"], additionalProperties: { type: string } }
+        sectionOverrides:
+          oneOf:
+            - $ref: "#/components/schemas/CountryReportSectionOverrides"
+            - type: "null"
         author: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
 
@@ -2389,6 +2393,10 @@ components:
         fuelRegionalHighlights: { type: string }
         conflictOtherWatchedRead: { type: string }
         conflictAreaReads: { type: object, additionalProperties: { type: string } }
+        sectionOverrides:
+          oneOf:
+            - $ref: "#/components/schemas/CountryReportSectionOverrides"
+            - type: "null"
         author: { type: string }
 
     SpotReportExportEntry:

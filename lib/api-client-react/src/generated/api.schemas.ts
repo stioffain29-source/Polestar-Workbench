@@ -510,6 +510,14 @@ export interface FuelHardNumbers {
   jetFuel?: JetFuelSnapshot;
 }
 
+export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: string};
+
+export interface CountryReportSectionOverrides {
+  hiddenSections?: string[];
+  excludedIncidentIds?: string[];
+  severityDemotions?: CountryReportSectionOverridesSeverityDemotions;
+}
+
 export interface Report {
   id: number;
   title: string;
@@ -565,6 +573,7 @@ export interface Report {
   conflictOtherWatchedRead?: string | null;
   /** @nullable */
   conflictAreaReads?: ReportConflictAreaReads;
+  sectionOverrides?: CountryReportSectionOverrides | null;
   /** @nullable */
   author?: string | null;
   createdAt: string;
@@ -667,6 +676,7 @@ export interface ReportUpdate {
   fuelRegionalHighlights?: string;
   conflictOtherWatchedRead?: string;
   conflictAreaReads?: ReportUpdateConflictAreaReads;
+  sectionOverrides?: CountryReportSectionOverrides | null;
   author?: string;
 }
 
@@ -1392,14 +1402,6 @@ export interface CountryReportPhoto {
   source?: string;
   credit?: string;
   context?: string;
-}
-
-export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: string};
-
-export interface CountryReportSectionOverrides {
-  hiddenSections?: string[];
-  excludedIncidentIds?: string[];
-  severityDemotions?: CountryReportSectionOverridesSeverityDemotions;
 }
 
 export interface CountryReport {

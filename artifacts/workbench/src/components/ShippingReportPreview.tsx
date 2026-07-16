@@ -1,3 +1,4 @@
+import { makeSectionGate } from "@/lib/topicSectionOverrides";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
@@ -144,7 +145,8 @@ function Paragraphs({ text }: { text?: string | null }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, hidden }: { title: string; children: React.ReactNode; hidden?: boolean }) {
+  if (hidden) return null;
   return (
     <div className="report-section mb-8">
       <h2
@@ -659,6 +661,7 @@ export default function ShippingReportPreview({
   maritimeSecurityEvents = [],
   incidentSummaries = {},
   aiProse,
+  hiddenSections,
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
@@ -667,7 +670,9 @@ export default function ShippingReportPreview({
   maritimeSecurityEvents?: MaritimeSecurityEvent[];
   incidentSummaries?: Record<string, string>;
   aiProse?: TopicAiProse | null;
+  hiddenSections?: string[];
 }) {
+  const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
@@ -804,29 +809,31 @@ export default function ShippingReportPreview({
 
       <div className="px-10 py-10">
         {execText.trim() && (
-          <Section title="Executive Summary">
+          <Section hidden={!show("executive-summary")} title="Executive Summary">
             <Paragraphs text={execText} />
           </Section>
         )}
 
-        <MaritimeIntelligenceReportSection board={maritimeBoard} />
+        {show("maritime-intelligence") && (
+          <MaritimeIntelligenceReportSection board={maritimeBoard} />
+        )}
 
-        <Section title="Red Sea Directional Flow">
+        <Section hidden={!show("red-sea-flow")} title="Red Sea Directional Flow">
           <RedSeaDirectionalFlowPanel gateways={gateways} />
         </Section>
 
-        <Section title="Fast Facts">
+        <Section hidden={!show("fast-facts")} title="Fast Facts">
           <KpiGrid cards={ds.fastFacts} />
         </Section>
 
-        <Section title="Chokepoint / Route Read">
+        <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">
           <Paragraphs text={pickRead(report.chokepointRouteRead, ds.chokepointRouteRead)} />
           <div className="mt-4">
             <ChokepointTable rows={ds.chokepointRows} />
           </div>
         </Section>
 
-        <Section title="Vessel Threat and Piracy Read">
+        <Section hidden={!show("vessel-piracy")} title="Vessel Threat and Piracy Read">
           <Paragraphs text={pickRead(report.vesselPiracyRead, ds.vesselPiracyRead)} />
           <div
             className="uppercase mb-2 mt-4"
@@ -854,7 +861,7 @@ export default function ShippingReportPreview({
           />
         </Section>
 
-        <Section title="Maritime Security (ICC CCS / IMB)">
+        <Section hidden={!show("maritime-security")} title="Maritime Security (ICC CCS / IMB)">
           <Paragraphs text={pickRead(report.maritimeSecurityRead, ds.maritimeSecurity.read)} />
           {ds.maritimeSecurity.byType.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4 mb-3">
@@ -927,7 +934,7 @@ export default function ShippingReportPreview({
           )}
         </Section>
 
-        <Section title="Commercial Impact on Shipping">
+        <Section hidden={!show("commercial-impact")} title="Commercial Impact on Shipping">
           <Paragraphs text={pickRead(report.commercialImpactRead, ds.commercialImpactRead)} />
           <div className="mt-4">
             <IncidentTable
@@ -939,7 +946,7 @@ export default function ShippingReportPreview({
           </div>
         </Section>
 
-        <Section title="Regional and Country View">
+        <Section hidden={!show("regional")} title="Regional and Country View">
           <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
           <div className="mt-4 mb-5">
             <div
@@ -959,21 +966,21 @@ export default function ShippingReportPreview({
           <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries reported this week." />
         </Section>
 
-        <Section title="What Matters">
+        <Section hidden={!show("what-matters")} title="What Matters">
           <Paragraphs text={resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters)} />
         </Section>
-        <Section title="Implications for Business">
+        <Section hidden={!show("implications")} title="Implications for Business">
           <Bullets text={resolveSimpleProse(report.implications, aiProse?.implications, ds.autoImplications)} />
         </Section>
-        <Section title="Watch Next">
+        <Section hidden={!show("watch-next")} title="Watch Next">
           <Bullets text={resolveSimpleProse(report.watchNext, aiProse?.watchNext, ds.autoWatchNext)} max={8} />
         </Section>
-        <Section title="Polestar View">
+        <Section hidden={!show("polestar-view")} title="Polestar View">
           <Paragraphs text={resolveSimpleProse(report.polestarView, aiProse?.polestarView, ds.autoPolestarView)} />
         </Section>
 
         {ds.relatedIncidents.length > 0 && (
-          <Section title="Related Incidents">
+          <Section hidden={!show("related-incidents")} title="Related Incidents">
             <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
           </Section>
         )}

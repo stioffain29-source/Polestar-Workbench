@@ -35,6 +35,7 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { makeSectionGate } from "./topicSectionOverrides";
 import { pickRead } from "./pickRead";
 import {
   buildConflictReportDataset,
@@ -276,7 +277,9 @@ export async function exportConflictReportPdf(
   situationalReports?: ReliefWebReport[] | null,
   incidentSummaries: Record<string, string> = {},
   aiProse?: ConflictAiProse | null,
+  hiddenSections?: string[],
 ): Promise<void> {
+  const show = makeSectionGate(hiddenSections);
   // AI replaces the deterministic auto-prose as the fallback layer; a genuine
   // analyst edit (via pickProse) still wins over both.
   const aiOr = (ai: string | null | undefined, det: string): string => {
@@ -321,51 +324,67 @@ export async function exportConflictReportPdf(
   const ds = buildConflictReportDataset(incidents, data.topic, data.issueDate);
 
   // 1. Situation (leads — Executive Summary dropped).
-  drawSectionWithProse(
-    ctx,
-    "Situation",
-    pickProse(data.situation, aiOr(aiProse?.situation, ds.autoSituation)),
-  );
+  if (show("situation")) {
+    drawSectionWithProse(
+      ctx,
+      "Situation",
+      pickProse(data.situation, aiOr(aiProse?.situation, ds.autoSituation)),
+    );
+  }
 
   // 2. Fast Facts.
-  drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, ds.fastFacts);
+  if (show("fast-facts")) {
+    drawSectionHeading(ctx, "Fast Facts");
+    drawFastFactsKpiCards(ctx, ds.fastFacts);
+  }
 
   // 3. Top Activity Areas (dynamic top-3 theatres, country heading + para).
-  drawTopActivityAreas(ctx, ds.topActivityAreas, data.conflictAreaReads);
+  if (show("top-activity-areas")) {
+    drawTopActivityAreas(ctx, ds.topActivityAreas, data.conflictAreaReads);
+  }
 
   // 4. Other Watched Theatres.
-  drawSectionWithProse(
-    ctx,
-    "Other Watched Theatres",
-    pickRead(data.conflictOtherWatchedRead, ds.autoOtherWatched),
-  );
+  if (show("other-watched")) {
+    drawSectionWithProse(
+      ctx,
+      "Other Watched Theatres",
+      pickRead(data.conflictOtherWatchedRead, ds.autoOtherWatched),
+    );
+  }
 
   // 5. What Matters for Business.
-  drawSectionWithProse(
-    ctx,
-    "What Matters for Business",
-    pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
-  );
+  if (show("what-matters")) {
+    drawSectionWithProse(
+      ctx,
+      "What Matters for Business",
+      pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
+    );
+  }
 
   // 6. Watch Next.
-  drawBulletSection(
-    ctx,
-    "Watch Next",
-    pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
-    8,
-  );
+  if (show("watch-next")) {
+    drawBulletSection(
+      ctx,
+      "Watch Next",
+      pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
+      8,
+    );
+  }
 
   // 7. Polestar View.
-  drawSectionWithProse(
-    ctx,
-    "Polestar View",
-    pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
-  );
+  if (show("polestar-view")) {
+    drawSectionWithProse(
+      ctx,
+      "Polestar View",
+      pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
+    );
+  }
 
   drawSituationalContextPdf(ctx, buildSituationalContext(situationalReports, { max: 6 }));
 
-  drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
+  if (show("related-incidents")) {
+    drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
+  }
 
   drawDisclaimer(ctx);
 

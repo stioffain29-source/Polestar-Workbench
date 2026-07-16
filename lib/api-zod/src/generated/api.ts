@@ -259,6 +259,11 @@ export const GetDashboardOverviewResponse = zod.object({
   "fuelRegionalHighlights": zod.string().nullish(),
   "conflictOtherWatchedRead": zod.string().nullish(),
   "conflictAreaReads": zod.record(zod.string(), zod.string()).nullish(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 }))
@@ -1563,6 +1568,11 @@ export const ListReportsResponseItem = zod.object({
   "fuelRegionalHighlights": zod.string().nullish(),
   "conflictOtherWatchedRead": zod.string().nullish(),
   "conflictAreaReads": zod.record(zod.string(), zod.string()).nullish(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -1882,6 +1892,11 @@ export const GetReportResponse = zod.object({
   "fuelRegionalHighlights": zod.string().nullish(),
   "conflictOtherWatchedRead": zod.string().nullish(),
   "conflictAreaReads": zod.record(zod.string(), zod.string()).nullish(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })
@@ -2043,6 +2058,11 @@ export const UpdateReportBody = zod.object({
   "fuelRegionalHighlights": zod.string().optional(),
   "conflictOtherWatchedRead": zod.string().optional(),
   "conflictAreaReads": zod.record(zod.string(), zod.string()).optional(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "author": zod.string().optional()
 })
 
@@ -2199,6 +2219,11 @@ export const UpdateReportResponse = zod.object({
   "fuelRegionalHighlights": zod.string().nullish(),
   "conflictOtherWatchedRead": zod.string().nullish(),
   "conflictAreaReads": zod.record(zod.string(), zod.string()).nullish(),
+  "sectionOverrides": zod.union([zod.object({
+  "hiddenSections": zod.array(zod.string()).optional(),
+  "excludedIncidentIds": zod.array(zod.string()).optional(),
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+}),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
 })

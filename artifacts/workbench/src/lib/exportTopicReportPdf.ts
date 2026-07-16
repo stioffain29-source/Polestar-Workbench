@@ -58,6 +58,7 @@ import { selectRelatedIncidents } from "./relatedIncidents";
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { makeSectionGate } from "./topicSectionOverrides";
 import {
   resolveSimpleProse,
   stableDraftTopicReportProse,
@@ -121,6 +122,10 @@ export interface ExportTopicReportPdfOptions {
    *  validation gate (spec pt7) and lets the caller surface the failures.
    *  Defaults to false (fail closed) so a failing report can never be shipped. */
   allowValidationFailures?: boolean;
+  /** Canonical section keys hidden by the analyst. Gated in lockstep with the
+   *  on-screen preview so preview == PDF. Cover and Disclaimer are never
+   *  hideable. */
+  hiddenSections?: string[];
 }
 
 export interface TopicReportData {
@@ -771,6 +776,7 @@ export async function exportTopicReportPdf(
   filename: string,
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
+  const show = makeSectionGate(options.hiddenSections);
   const topicLabel = topicLabels[data.topic] ?? data.topic;
   // Canonical naming: cover title, running header and subtitle use the
   // canonical topic name. Regional words live in scope, not the title.
@@ -894,7 +900,7 @@ export async function exportTopicReportPdf(
           aiProse?.executiveSummary,
           proseDraft.executiveSummary,
         );
-  if (execText.trim()) {
+  if (show("executive-summary") && execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, execText);
   }
@@ -955,42 +961,46 @@ export async function exportTopicReportPdf(
       );
     }
 
-    drawSectionHeading(ctx, "Fast Facts");
-    if (!fuelData.validation.hasRequiredFuelWatchData) {
-      // Override path: render a visible warning at the top of Fast Facts.
-      renderProse(
-        ctx,
-        `${FUEL_MISSING_REQUIRED_NOTE} Missing: ${fuelData.validation.missingRequired.join(", ")}.`,
-      );
-    }
-    if (fuelData.marketData.fastFactsCards.length === 0) {
-      // No marketData at all but the user overrode — emit warnings only.
-      for (const w of fuelData.validation.warnings) renderProse(ctx, w);
-    } else {
-      const kpis: KpiCardData[] =
-        fuelData.marketData.fastFactsCards.map(toRenderableCard);
-      drawFastFactsKpiCards(ctx, kpis);
-      for (const w of fuelData.validation.warnings) renderProse(ctx, w);
+    if (show("fast-facts")) {
+      drawSectionHeading(ctx, "Fast Facts");
+      if (!fuelData.validation.hasRequiredFuelWatchData) {
+        // Override path: render a visible warning at the top of Fast Facts.
+        renderProse(
+          ctx,
+          `${FUEL_MISSING_REQUIRED_NOTE} Missing: ${fuelData.validation.missingRequired.join(", ")}.`,
+        );
+      }
+      if (fuelData.marketData.fastFactsCards.length === 0) {
+        // No marketData at all but the user overrode — emit warnings only.
+        for (const w of fuelData.validation.warnings) renderProse(ctx, w);
+      } else {
+        const kpis: KpiCardData[] =
+          fuelData.marketData.fastFactsCards.map(toRenderableCard);
+        drawFastFactsKpiCards(ctx, kpis);
+        for (const w of fuelData.validation.warnings) renderProse(ctx, w);
+      }
     }
 
     // Jet Fuel Price Trajectory — rasterise the same React chart the preview
     // uses so chart styling cannot drift from a hand-ported jsPDF replica.
-    await embedReactChartInPdf(
-      ctx,
-      createElement(JetFuelTrajectoryChart, {
-        data:
-          fuelData.marketData.jetFuelTrajectory.length >= 2
-            ? fuelData.marketData.jetFuelTrajectory
-            : null,
-        benchmarkLabel: fuelData.marketData.jetFuelBenchmarkLabel,
-      }),
-      { heading: "Jet Fuel Price Trajectory" },
-    );
-    // Jet-fuel lag note — mirror the preview (ReportPreview.tsx) so the PDF
-    // also explains why the jet "as of" date trails the daily Brent/WTI close
-    // (EIA U.S. Gulf Coast jet fuel publishes weekly). Keeps screen == PDF.
-    if (fuelData.marketData.jetDataNote) {
-      renderProse(ctx, fuelData.marketData.jetDataNote);
+    if (show("jet-fuel-trajectory")) {
+      await embedReactChartInPdf(
+        ctx,
+        createElement(JetFuelTrajectoryChart, {
+          data:
+            fuelData.marketData.jetFuelTrajectory.length >= 2
+              ? fuelData.marketData.jetFuelTrajectory
+              : null,
+          benchmarkLabel: fuelData.marketData.jetFuelBenchmarkLabel,
+        }),
+        { heading: "Jet Fuel Price Trajectory" },
+      );
+      // Jet-fuel lag note — mirror the preview (ReportPreview.tsx) so the PDF
+      // also explains why the jet "as of" date trails the daily Brent/WTI close
+      // (EIA U.S. Gulf Coast jet fuel publishes weekly). Keeps screen == PDF.
+      if (fuelData.marketData.jetDataNote) {
+        renderProse(ctx, fuelData.marketData.jetDataNote);
+      }
     }
 
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
@@ -1007,44 +1017,54 @@ export async function exportTopicReportPdf(
       if (body && body.trim()) drawSectionWithProse(ctx, label, body);
     };
 
-    renderProseSection(
-      "Market Read",
-      pickRead(data.fuelMarketRead, fuelData.marketData.marketRead),
-    );
-    renderProseSection(
-      "Situation",
-      resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
-    );
-    renderProseSection(
-      "What Happened",
-      resolveSimpleProse(
-        data.whatHappened,
-        aiProse?.whatHappened,
-        proseDraft.whatHappened,
-      ),
-    );
-    renderProseSection(
-      "Operational Read",
-      pickRead(data.fuelOperationalRead, fuelData.incidentData.operationalRead),
-    );
-    renderProseSection(
-      "Regional Highlights",
-      pickRead(
-        data.fuelRegionalHighlights,
-        fuelData.incidentData.regionalHighlights,
-      ),
-    );
+    if (show("market-read")) {
+      renderProseSection(
+        "Market Read",
+        pickRead(data.fuelMarketRead, fuelData.marketData.marketRead),
+      );
+    }
+    if (show("situation")) {
+      renderProseSection(
+        "Situation",
+        resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
+      );
+    }
+    if (show("what-happened")) {
+      renderProseSection(
+        "What Happened",
+        resolveSimpleProse(
+          data.whatHappened,
+          aiProse?.whatHappened,
+          proseDraft.whatHappened,
+        ),
+      );
+    }
+    if (show("operational-read")) {
+      renderProseSection(
+        "Operational Read",
+        pickRead(data.fuelOperationalRead, fuelData.incidentData.operationalRead),
+      );
+    }
+    if (show("regional-highlights")) {
+      renderProseSection(
+        "Regional Highlights",
+        pickRead(
+          data.fuelRegionalHighlights,
+          fuelData.incidentData.regionalHighlights,
+        ),
+      );
+    }
     // Gulf and Hormuz Chokepoint Watch — heading + prose (atomic) then the
     // dated anchor lines as bullets. Mirrors the on-screen preview exactly, so
     // screen == in-app PDF.
-    if (fuelData.incidentData.gulfChokepointWatch) {
+    if (show("gulf-hormuz") && fuelData.incidentData.gulfChokepointWatch) {
       const gulf = fuelData.incidentData.gulfChokepointWatch;
       drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.read);
       if (gulf.itemLines.length > 0) {
         renderProse(ctx, gulf.itemLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
     }
-    if (fuelData.incidentData.producerBuyerActions.length > 0) {
+    if (show("producer-buyer") && fuelData.incidentData.producerBuyerActions.length > 0) {
       // Guard against an orphaned section heading: if there isn't room
       // for the heading + table header + a couple of rows, push the
       // whole block to the next page before drawing the heading.
@@ -1055,49 +1075,59 @@ export async function exportTopicReportPdf(
         fuelData.incidentData.producerBuyerActions,
       );
     }
-    renderProseSection(
-      "What Matters",
-      resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters),
-    );
+    if (show("what-matters")) {
+      renderProseSection(
+        "What Matters",
+        resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters),
+      );
+    }
     // Render from the canonical fuel narrative payload (analyst edit -> AI ->
     // deterministic top-up), identical to the on-screen preview, so screen ==
     // in-app PDF for these two bullet sections.
-    drawBulletSection(
-      ctx,
-      "Implications for Business",
-      fuelData.narrativeData.implications ?? "",
-    );
-    drawBulletSection(
-      ctx,
-      "Watch Next",
-      fuelData.narrativeData.watchNext ?? "",
-      8,
-    );
-    renderProseSection(
-      "Polestar View",
-      resolveSimpleProse(
-        data.polestarView,
-        aiProse?.polestarView,
-        proseDraft.polestarView,
-      ),
-    );
+    if (show("implications")) {
+      drawBulletSection(
+        ctx,
+        "Implications for Business",
+        fuelData.narrativeData.implications ?? "",
+      );
+    }
+    if (show("watch-next")) {
+      drawBulletSection(
+        ctx,
+        "Watch Next",
+        fuelData.narrativeData.watchNext ?? "",
+        8,
+      );
+    }
+    if (show("polestar-view")) {
+      renderProseSection(
+        "Polestar View",
+        resolveSimpleProse(
+          data.polestarView,
+          aiProse?.polestarView,
+          proseDraft.polestarView,
+        ),
+      );
+    }
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
     // read the model's deterministic executive summary.
-    drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(
-      ctx,
-      (cargoModel
-        ? cargoModel.fastFacts
-        : computeTopicFastFacts({
-            topic: data.topic,
-            issueDate: data.issueDate,
-            incidents,
-            topicLabel: topicLabels[data.topic] ?? data.topic,
-          })) as KpiCardData[],
-    );
+    if (show("fast-facts")) {
+      drawSectionHeading(ctx, "Fast Facts");
+      drawFastFactsKpiCards(
+        ctx,
+        (cargoModel
+          ? cargoModel.fastFacts
+          : computeTopicFastFacts({
+              topic: data.topic,
+              issueDate: data.issueDate,
+              incidents,
+              topicLabel: topicLabels[data.topic] ?? data.topic,
+            })) as KpiCardData[],
+      );
+    }
 
-    if (data.topic === "energy") {
+    if (data.topic === "energy" && show("market-prices")) {
       const rows = options.marketPrices ?? [];
       if (rows.length === 0) {
         drawSectionHeading(ctx, "Market Prices");
@@ -1116,7 +1146,7 @@ export async function exportTopicReportPdf(
       // predicate (spec pt3); the same title is passed into the component so the
       // external heading and the internal chart title agree. Caption strings are
       // data-derived in the model, so they render identically on screen and PDF.
-      if (cargoModel.intensity.size > 0) {
+      if (show("map") && cargoModel.intensity.size > 0) {
         await embedReactChartInPdf(
           ctx,
           createElement(CargoChoroplethStatic, {
@@ -1130,7 +1160,7 @@ export async function exportTopicReportPdf(
 
       // Weekly trend AND activity table combined under ONE heading (spec pt6) so
       // the PDF does not spend two near-duplicate pages on the same dataset.
-      if (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0) {
+      if (show("weekly-trend") && (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0)) {
         if (cargoModel.extras.trend.length >= 2) {
           await embedReactChartInPdf(
             ctx,
@@ -1186,7 +1216,7 @@ export async function exportTopicReportPdf(
       // Enforcement outcomes — arrests, seizures and recoveries in their OWN
       // panel, EXCLUDED from every operational total above (spec pt1). The
       // statement is data-derived and never a "media coverage" claim.
-      if (cargoModel.enforcement.total > 0) {
+      if (show("enforcement") && cargoModel.enforcement.total > 0) {
         drawSectionWithProse(
           ctx,
           "Enforcement Activity",
@@ -1206,36 +1236,50 @@ export async function exportTopicReportPdf(
       // assessment fills any blank field so the report reads with substance
       // out of the box. Bullet lists join on newlines for drawBulletSection.
       const a = cargoModel.assessment;
-      const sit = pickRead(data.situation, a.situation);
-      if (sit.trim()) drawSectionWithProse(ctx, "Situation", sit);
-      const wm = pickRead(data.whatMatters, a.whatMatters.join("\n"));
-      if (wm.trim()) drawBulletSection(ctx, "What Matters", wm, 3);
-      const bp = pickRead(data.implications, a.implications.join("\n"));
-      if (bp.trim()) drawBulletSection(ctx, "Implications", bp, 3);
-      const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
-      if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 4);
+      if (show("situation")) {
+        const sit = pickRead(data.situation, a.situation);
+        if (sit.trim()) drawSectionWithProse(ctx, "Situation", sit);
+      }
+      if (show("what-matters")) {
+        const wm = pickRead(data.whatMatters, a.whatMatters.join("\n"));
+        if (wm.trim()) drawBulletSection(ctx, "What Matters", wm, 3);
+      }
+      if (show("implications")) {
+        const bp = pickRead(data.implications, a.implications.join("\n"));
+        if (bp.trim()) drawBulletSection(ctx, "Implications", bp, 3);
+      }
+      if (show("watch-next")) {
+        const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
+        if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 4);
+      }
 
       // Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards that best
       // illustrate the period's operational patterns (NOT the most recent). The
       // full deduplicated register lives in the Workbench and the CSV export; it
       // only appears in the PDF when the author opts into the annex below.
-      drawSelectedIncidents(ctx, cargoModel.selected);
+      if (show("key-incidents")) {
+        drawSelectedIncidents(ctx, cargoModel.selected);
+      }
 
-      const pv = pickRead(data.polestarView, a.polestarView);
-      if (pv.trim()) drawSectionWithProse(ctx, "Polestar View", pv);
+      if (show("polestar-view")) {
+        const pv = pickRead(data.polestarView, a.polestarView);
+        if (pv.trim()) drawSectionWithProse(ctx, "Polestar View", pv);
+      }
 
       // Optional full incident annex — off by default. When enabled it is the
       // last thing before the disclaimer, on its own fresh page.
-      if (options.includeFullAnnex) {
+      if (show("incident-annex") && options.includeFullAnnex) {
         drawFullAnnex(ctx, cargoModel.appendix);
       }
     } else {
-      const proseSections: [string, string][] = [
+      const proseSections: [string, string, string][] = [
         [
+          "situation",
           "Situation",
           resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
         ],
         [
+          "what-happened",
           "What Happened",
           resolveSimpleProse(
             data.whatHappened,
@@ -1244,6 +1288,7 @@ export async function exportTopicReportPdf(
           ),
         ],
         [
+          "what-matters",
           "What Matters",
           resolveSimpleProse(
             data.whatMatters,
@@ -1252,32 +1297,38 @@ export async function exportTopicReportPdf(
           ),
         ],
       ];
-      for (const [label, body] of proseSections) {
-        if (body && body.trim()) drawSectionWithProse(ctx, label, body);
+      for (const [key, label, body] of proseSections) {
+        if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
-      const implBody = resolveSimpleProse(
-        data.implications,
-        aiProse?.implications,
-        proseDraft.implications,
-      );
-      if (implBody.trim()) {
-        drawBulletSection(ctx, "Implications for Business", implBody);
+      if (show("implications")) {
+        const implBody = resolveSimpleProse(
+          data.implications,
+          aiProse?.implications,
+          proseDraft.implications,
+        );
+        if (implBody.trim()) {
+          drawBulletSection(ctx, "Implications for Business", implBody);
+        }
       }
-      const wnBody = resolveSimpleProse(
-        data.watchNext,
-        aiProse?.watchNext,
-        proseDraft.watchNext,
-      );
-      if (wnBody.trim()) {
-        drawBulletSection(ctx, "Watch Next", wnBody, 8);
+      if (show("watch-next")) {
+        const wnBody = resolveSimpleProse(
+          data.watchNext,
+          aiProse?.watchNext,
+          proseDraft.watchNext,
+        );
+        if (wnBody.trim()) {
+          drawBulletSection(ctx, "Watch Next", wnBody, 8);
+        }
       }
-      const psBody = resolveSimpleProse(
-        data.polestarView,
-        aiProse?.polestarView,
-        proseDraft.polestarView,
-      );
-      if (psBody.trim()) {
-        drawSectionWithProse(ctx, "Polestar View", psBody);
+      if (show("polestar-view")) {
+        const psBody = resolveSimpleProse(
+          data.polestarView,
+          aiProse?.polestarView,
+          proseDraft.polestarView,
+        );
+        if (psBody.trim()) {
+          drawSectionWithProse(ctx, "Polestar View", psBody);
+        }
       }
     }
   }
@@ -1290,7 +1341,11 @@ export async function exportTopicReportPdf(
   // is a pattern report — it renders its own condensed appendix (one row per
   // unique incident) inside its branch above, so it omits both the Cargo
   // Incident Clusters and Related Incidents sections here.
-  if (data.topic !== "fuel" && data.topic !== "cargo_watch") {
+  if (
+    data.topic !== "fuel" &&
+    data.topic !== "cargo_watch" &&
+    show("related-incidents")
+  ) {
     drawRelatedIncidents(
       ctx,
       filterTopicReportIncidents(incidents, data.topic, data.issueDate),

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { makeSectionGate } from "@/lib/topicSectionOverrides";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { pickRead } from "@/lib/pickRead";
 import { validateCargoReport } from "@/lib/cargoReportValidation";
@@ -49,10 +50,13 @@ function toBullets(text: string, max = 8): string[] {
 function Section({
   title,
   children,
+  hidden,
 }: {
   title: string;
   children: React.ReactNode;
+  hidden?: boolean;
 }) {
+  if (hidden) return null;
   return (
     <section className="mb-8" style={{ breakInside: "avoid" }}>
       <h2
@@ -479,6 +483,7 @@ export default function CargoReportPreview({
   incidents = [],
   aiProse,
   includeFullAnnex = false,
+  hiddenSections,
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
@@ -487,7 +492,9 @@ export default function CargoReportPreview({
   /** Mirror of the PDF option: when true, append the full incident register as
    *  an annex after Polestar View. Off by default. */
   includeFullAnnex?: boolean;
+  hiddenSections?: string[];
 }) {
+  const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "cargo_watch";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
@@ -724,19 +731,19 @@ export default function CargoReportPreview({
       <div className="px-10 py-10">
         {/* PAGE 1 — Executive Summary + Fast Facts */}
         {execText.trim() && (
-          <Section title="Executive Summary">
+          <Section hidden={!show("executive-summary")} title="Executive Summary">
             <Paragraphs text={execText} />
           </Section>
         )}
 
-        <Section title="Fast Facts">
+        <Section hidden={!show("fast-facts")} title="Fast Facts">
           <FastFactsGrid cards={model.fastFacts} />
         </Section>
 
         {/* PAGE 2 — Geographic distribution. Map title reflects the theft-only
             predicate (spec pt3). */}
         {model.intensity.size > 0 && (
-          <Section title={model.mapTitle}>
+          <Section hidden={!show("map")} title={model.mapTitle}>
             <CargoChoroplethStatic intensity={model.intensity} title={model.mapTitle} />
             <GraphicCaption text={model.mapCaption} />
           </Section>
@@ -746,7 +753,7 @@ export default function CargoReportPreview({
             the report answers "how did the week move?" once, not across two
             near-duplicate pages (spec pt6). */}
         {(model.extras.trend.length >= 2 || model.activity.total > 0) && (
-          <Section title="Weekly Trend and Activity">
+          <Section hidden={!show("weekly-trend")} title="Weekly Trend and Activity">
             {model.extras.trend.length >= 2 && (
               <>
                 <CargoTrendChart data={model.extras.trend} />
@@ -778,7 +785,7 @@ export default function CargoReportPreview({
         {/* Enforcement outcomes — arrests, seizures and recoveries shown in their
             OWN panel and EXCLUDED from every operational total above (spec pt1). */}
         {model.enforcement.total > 0 && (
-          <Section title="Enforcement Activity">
+          <Section hidden={!show("enforcement")} title="Enforcement Activity">
             <p
               className="text-[12px] leading-[1.6] mb-3"
               style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
@@ -791,40 +798,40 @@ export default function CargoReportPreview({
 
         {/* Operational assessment */}
         {situationText.trim() && (
-          <Section title="Situation">
+          <Section hidden={!show("situation")} title="Situation">
             <Paragraphs text={situationText} />
           </Section>
         )}
         {whatMattersText.trim() && (
-          <Section title="What Matters">
+          <Section hidden={!show("what-matters")} title="What Matters">
             <Bullets text={whatMattersText} max={3} />
           </Section>
         )}
         {implicationsText.trim() && (
-          <Section title="Implications">
+          <Section hidden={!show("implications")} title="Implications">
             <Bullets text={implicationsText} max={3} />
           </Section>
         )}
         {watchNextText.trim() && (
-          <Section title="Watch Next">
+          <Section hidden={!show("watch-next")} title="Watch Next">
             <Bullets text={watchNextText} max={4} />
           </Section>
         )}
         {/* Curated "Key Incidents" — up to MAX_SELECTED_INCIDENTS cards, before
             Polestar View. The full register lives in the Workbench + CSV. */}
-        <Section title="Key Incidents">
+        <Section hidden={!show("key-incidents")} title="Key Incidents">
           <SelectedIncidents rows={model.selected} />
         </Section>
 
         {polestarViewText.trim() && (
-          <Section title="Polestar View">
+          <Section hidden={!show("polestar-view")} title="Polestar View">
             <Paragraphs text={polestarViewText} />
           </Section>
         )}
 
         {/* Optional full incident annex — off by default, after Polestar View. */}
         {includeFullAnnex && (
-          <Section title="Incident Annex">
+          <Section hidden={!show("incident-annex")} title="Incident Annex">
             <FullAnnexTable rows={model.appendix} />
           </Section>
         )}

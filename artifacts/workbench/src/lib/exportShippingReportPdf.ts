@@ -37,6 +37,7 @@ import {
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { makeSectionGate } from "./topicSectionOverrides";
 import {
   resolveSimpleProse,
   stableDraftTopicReportProse,
@@ -1094,7 +1095,9 @@ export async function exportShippingReportPdf(
   incidentSummaries: Record<string, string> = {},
   redSeaFlow?: GatewayFlowSeries[],
   aiProse?: TopicAiProse | null,
+  hiddenSections?: string[],
 ): Promise<void> {
+  const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
@@ -1144,7 +1147,7 @@ export async function exportShippingReportPdf(
     aiProse?.executiveSummary,
     proseDraft.executiveSummary,
   );
-  if (execText.trim()) {
+  if (show("executive-summary") && execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, execText);
   }
@@ -1158,14 +1161,18 @@ export async function exportShippingReportPdf(
     windowStart: win.start,
     windowEnd: win.end,
   });
-  drawMaritimeIntelligence(ctx, maritimeBoard);
+  if (show("maritime-intelligence")) {
+    drawMaritimeIntelligence(ctx, maritimeBoard);
+  }
 
   // Red Sea Directional Flow — drawn immediately after Maritime Intelligence in
   // the SAME order ShippingReportPreview renders it (preview == PDF). The series
   // is built upstream by the editor from the identical per-gateway movement rows;
   // if a caller omits it we fall back to building from the movement pool so the
   // section is never silently empty when data exists.
-  drawDirectionalFlow(ctx, redSeaFlow ?? buildRedSeaDirectionalFlow(movement));
+  if (show("red-sea-flow")) {
+    drawDirectionalFlow(ctx, redSeaFlow ?? buildRedSeaDirectionalFlow(movement));
+  }
 
   const ds = buildShippingReportDataset(
     incidents,
@@ -1174,124 +1181,146 @@ export async function exportShippingReportPdf(
     maritimeSecurityEvents,
   );
 
-  drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, ds.fastFacts);
+  if (show("fast-facts")) {
+    drawSectionHeading(ctx, "Fast Facts");
+    drawFastFactsKpiCards(ctx, ds.fastFacts);
+  }
 
   // Chokepoint / Route Read — prose leads the chokepoint table.
-  drawSectionWithProse(
-    ctx,
-    "Chokepoint / Route Read",
-    pickRead(data.chokepointRouteRead, ds.chokepointRouteRead),
-  );
-  drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
+  if (show("chokepoint-route")) {
+    drawSectionWithProse(
+      ctx,
+      "Chokepoint / Route Read",
+      pickRead(data.chokepointRouteRead, ds.chokepointRouteRead),
+    );
+    drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
+  }
 
   // Vessel Threat and Piracy Read — prose leads both window tables.
-  drawSectionWithProse(
-    ctx,
-    "Vessel Threat and Piracy Read",
-    pickRead(data.vesselPiracyRead, ds.vesselPiracyRead),
-  );
-  drawIncidentTable<VesselRow>(
-    ctx,
-    `Vessel Attacks (${ds.thirtyDayShortLabel})`,
-    ds.vesselRows,
-    {
-      showActColumn: true,
-      actFor: (r) => r.vesselType,
-      emptyMessage: "No hostile vessel incidents reported this week.",
-    },
-  );
-  drawIncidentTable<PiracyRow>(
-    ctx,
-    `Piracy and Armed Robbery (${ds.thirtyDayShortLabel})`,
-    ds.piracyRows,
-    {
-      showActColumn: true,
-      actFor: (r) => r.act,
-      emptyMessage: "No piracy or armed-robbery reports this week.",
-    },
-  );
+  if (show("vessel-piracy")) {
+    drawSectionWithProse(
+      ctx,
+      "Vessel Threat and Piracy Read",
+      pickRead(data.vesselPiracyRead, ds.vesselPiracyRead),
+    );
+    drawIncidentTable<VesselRow>(
+      ctx,
+      `Vessel Attacks (${ds.thirtyDayShortLabel})`,
+      ds.vesselRows,
+      {
+        showActColumn: true,
+        actFor: (r) => r.vesselType,
+        emptyMessage: "No hostile vessel incidents reported this week.",
+      },
+    );
+    drawIncidentTable<PiracyRow>(
+      ctx,
+      `Piracy and Armed Robbery (${ds.thirtyDayShortLabel})`,
+      ds.piracyRows,
+      {
+        showActColumn: true,
+        actFor: (r) => r.act,
+        emptyMessage: "No piracy or armed-robbery reports this week.",
+      },
+    );
+  }
 
   // Maritime Security (ICC CCS / IMB) — standalone source, drawn in the SAME
   // order ShippingReportPreview renders it (preview == PDF). These events are
   // never part of any incident count above.
-  drawMaritimeSecurity(
-    ctx,
-    ds.maritimeSecurity,
-    pickRead(data.maritimeSecurityRead, ds.maritimeSecurity.read),
-  );
+  if (show("maritime-security")) {
+    drawMaritimeSecurity(
+      ctx,
+      ds.maritimeSecurity,
+      pickRead(data.maritimeSecurityRead, ds.maritimeSecurity.read),
+    );
+  }
 
   // Commercial Impact on Shipping — prose leads the operational
   // commercial-pressure table; pure market commentary is filtered out
   // upstream in the dataset.
-  drawSectionWithProse(
-    ctx,
-    "Commercial Impact on Shipping",
-    pickRead(data.commercialImpactRead, ds.commercialImpactRead),
-  );
-  drawIncidentTable<EnrichedIncident>(ctx, null, ds.commercialRows, {
-    showActColumn: true,
-    actFor: (r) => r.issue,
-    emptyMessage:
-      "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
-  });
+  if (show("commercial-impact")) {
+    drawSectionWithProse(
+      ctx,
+      "Commercial Impact on Shipping",
+      pickRead(data.commercialImpactRead, ds.commercialImpactRead),
+    );
+    drawIncidentTable<EnrichedIncident>(ctx, null, ds.commercialRows, {
+      showActColumn: true,
+      actFor: (r) => r.issue,
+      emptyMessage:
+        "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
+    });
+  }
 
   // Regional and Country View — prose leads the region and country bars.
-  drawSectionWithProse(
-    ctx,
-    "Regional and Country View",
-    pickRead(data.regionalCountryRead, ds.regionalCountryRead),
-  );
-  drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
-    labelW: 160,
-    emptyMessage: "No regional classifications reported this week.",
-  });
-  drawHorizontalBarChart(
-    ctx,
-    ds.countryRows.length >= 12
-      ? "Records by Country (Top 12)"
-      : "Records by Country",
-    ds.countryRows,
-    {
+  if (show("regional")) {
+    drawSectionWithProse(
+      ctx,
+      "Regional and Country View",
+      pickRead(data.regionalCountryRead, ds.regionalCountryRead),
+    );
+    drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
       labelW: 160,
-      emptyMessage: "No identified incident countries reported this week.",
-    },
-  );
+      emptyMessage: "No regional classifications reported this week.",
+    });
+    drawHorizontalBarChart(
+      ctx,
+      ds.countryRows.length >= 12
+        ? "Records by Country (Top 12)"
+        : "Records by Country",
+      ds.countryRows,
+      {
+        labelW: 160,
+        emptyMessage: "No identified incident countries reported this week.",
+      },
+    );
+  }
 
   // Narrative sections resolve through the SHARED resolver so the PDF and the
   // on-screen preview can never disagree: a genuine analyst edit wins, else the
   // cached AI narrative, else the deterministic dataset auto-prose.
-  drawSectionWithProse(
-    ctx,
-    "What Matters",
-    resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
-  );
-  drawBulletSection(
-    ctx,
-    "Implications for Business",
-    resolveSimpleProse(
-      data.implications,
-      aiProse?.implications,
-      ds.autoImplications,
-    ),
-  );
-  drawBulletSection(
-    ctx,
-    "Watch Next",
-    resolveSimpleProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
-    8,
-  );
-  drawSectionWithProse(
-    ctx,
-    "Polestar View",
-    resolveSimpleProse(
-      data.polestarView,
-      aiProse?.polestarView,
-      ds.autoPolestarView,
-    ),
-  );
+  if (show("what-matters")) {
+    drawSectionWithProse(
+      ctx,
+      "What Matters",
+      resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
+    );
+  }
+  if (show("implications")) {
+    drawBulletSection(
+      ctx,
+      "Implications for Business",
+      resolveSimpleProse(
+        data.implications,
+        aiProse?.implications,
+        ds.autoImplications,
+      ),
+    );
+  }
+  if (show("watch-next")) {
+    drawBulletSection(
+      ctx,
+      "Watch Next",
+      resolveSimpleProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
+      8,
+    );
+  }
+  if (show("polestar-view")) {
+    drawSectionWithProse(
+      ctx,
+      "Polestar View",
+      resolveSimpleProse(
+        data.polestarView,
+        aiProse?.polestarView,
+        ds.autoPolestarView,
+      ),
+    );
+  }
 
-  drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
+  if (show("related-incidents")) {
+    drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
+  }
 
   drawDisclaimer(ctx);
 

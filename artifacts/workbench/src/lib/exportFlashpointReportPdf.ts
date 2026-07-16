@@ -35,6 +35,7 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
+import { makeSectionGate } from "./topicSectionOverrides";
 import { aiOr, type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
@@ -534,7 +535,9 @@ export async function exportFlashpointReportPdf(
   incidents: FlashpointReportIncident[],
   filename: string,
   aiProse?: TopicAiProse | null,
+  hiddenSections?: string[],
 ): Promise<void> {
+  const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
@@ -577,70 +580,82 @@ export async function exportFlashpointReportPdf(
     data.issueDate,
   );
 
-  drawSectionHeading(ctx, "Executive Summary");
-  const execText = (data.executiveSummary ?? "").trim();
-  renderProse(
-    ctx,
-    execText || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
-  );
+  if (show("executive-summary")) {
+    drawSectionHeading(ctx, "Executive Summary");
+    const execText = (data.executiveSummary ?? "").trim();
+    renderProse(
+      ctx,
+      execText || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
+    );
+  }
 
-  drawSectionHeading(ctx, "Fast Facts");
-  drawFastFactsKpiCards(ctx, ds.fastFacts);
+  if (show("fast-facts")) {
+    drawSectionHeading(ctx, "Fast Facts");
+    drawFastFactsKpiCards(ctx, ds.fastFacts);
+  }
 
   // Activism and Protest Read — prose leads the activism table.
-  drawSectionWithProse(
-    ctx,
-    "Activism and Protest Read",
-    pickRead(data.activismRead, ds.activismRead),
-  );
-  drawIncidentTable(
-    ctx,
-    null,
-    ds.activismRows,
-    "No activism reporting this week.",
-  );
+  if (show("activism")) {
+    drawSectionWithProse(
+      ctx,
+      "Activism and Protest Read",
+      pickRead(data.activismRead, ds.activismRead),
+    );
+    drawIncidentTable(
+      ctx,
+      null,
+      ds.activismRows,
+      "No activism reporting this week.",
+    );
+  }
 
   // Civil Unrest and Public Order Read — prose leads the unrest table.
-  drawSectionWithProse(
-    ctx,
-    "Civil Unrest and Public Order Read",
-    pickRead(data.civilUnrestRead, ds.civilUnrestRead),
-  );
-  drawIncidentTable(
-    ctx,
-    null,
-    ds.unrestRows,
-    "No civil-unrest reporting this week.",
-  );
+  if (show("civil-unrest")) {
+    drawSectionWithProse(
+      ctx,
+      "Civil Unrest and Public Order Read",
+      pickRead(data.civilUnrestRead, ds.civilUnrestRead),
+    );
+    drawIncidentTable(
+      ctx,
+      null,
+      ds.unrestRows,
+      "No civil-unrest reporting this week.",
+    );
+  }
 
   // Forecast — structured Country / Signal / Operational meaning table
   // (when future-dated items are present) followed by analyst
   // trajectory prose with cautious vocabulary.
-  drawSectionHeading(ctx, "Forecast: Next 7\u201314 Days");
-  if (ds.forecastFuture.length > 0) {
-    drawForecastFutureTable(ctx, ds.forecastFuture);
+  if (show("forecast")) {
+    drawSectionHeading(ctx, "Forecast: Next 7\u201314 Days");
+    if (ds.forecastFuture.length > 0) {
+      drawForecastFutureTable(ctx, ds.forecastFuture);
+    }
+    renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
   }
-  renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
 
   // Regional and Country View — prose leads the country bar chart.
-  drawSectionWithProse(
-    ctx,
-    "Regional and Country View",
-    pickRead(data.regionalCountryRead, ds.regionalCountryRead),
-  );
-  drawHorizontalBarChart(
-    ctx,
-    ds.countryRows.length >= 12
-      ? "Incidents by Country (Top 12)"
-      : "Incidents by Country",
-    ds.countryRows,
-    {
-      labelW: 160,
-      emptyMessage: "No identified incident countries reported this week.",
-      caption:
-        "Bar length shows incident count; colour shows the highest severity reported in each country.",
-    },
-  );
+  if (show("regional")) {
+    drawSectionWithProse(
+      ctx,
+      "Regional and Country View",
+      pickRead(data.regionalCountryRead, ds.regionalCountryRead),
+    );
+    drawHorizontalBarChart(
+      ctx,
+      ds.countryRows.length >= 12
+        ? "Incidents by Country (Top 12)"
+        : "Incidents by Country",
+      ds.countryRows,
+      {
+        labelW: 160,
+        emptyMessage: "No identified incident countries reported this week.",
+        caption:
+          "Bar length shows incident count; colour shows the highest severity reported in each country.",
+      },
+    );
+  }
 
   // Editor-authored analyst sections. Editor text wins only when it
   // carries substance; thin stubs get the auto-prose appended.
@@ -653,29 +668,39 @@ export async function exportFlashpointReportPdf(
     if (t.length === 0) return auto;
     return `${t}\n\n${auto}`;
   };
-  drawSectionWithProse(
-    ctx,
-    "What Matters",
-    pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
-  );
-  drawBulletSection(
-    ctx,
-    "Implications for Business",
-    pickProse(data.implications, aiOr(aiProse?.implications, ds.autoImplications)),
-  );
-  drawBulletSection(
-    ctx,
-    "Watch Next",
-    pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
-    8,
-  );
-  drawSectionWithProse(
-    ctx,
-    "Polestar View",
-    pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
-  );
+  if (show("what-matters")) {
+    drawSectionWithProse(
+      ctx,
+      "What Matters",
+      pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
+    );
+  }
+  if (show("implications")) {
+    drawBulletSection(
+      ctx,
+      "Implications for Business",
+      pickProse(data.implications, aiOr(aiProse?.implications, ds.autoImplications)),
+    );
+  }
+  if (show("watch-next")) {
+    drawBulletSection(
+      ctx,
+      "Watch Next",
+      pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
+      8,
+    );
+  }
+  if (show("polestar-view")) {
+    drawSectionWithProse(
+      ctx,
+      "Polestar View",
+      pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
+    );
+  }
 
-  drawRelatedIncidents(ctx, ds.relatedIncidents);
+  if (show("related-incidents")) {
+    drawRelatedIncidents(ctx, ds.relatedIncidents);
+  }
 
   // Source Notes / Data Notes removed per editorial direction — internal
   // methodology must not appear in client-facing Flashpoint exports.

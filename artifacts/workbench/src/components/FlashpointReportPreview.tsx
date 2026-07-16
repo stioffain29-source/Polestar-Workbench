@@ -2,6 +2,7 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import { makeSectionGate } from "@/lib/topicSectionOverrides";
 import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
@@ -137,7 +138,8 @@ function Bullets({ text, max = 7 }: { text?: string | null; max?: number }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, hidden }: { title: string; children: React.ReactNode; hidden?: boolean }) {
+  if (hidden) return null;
   return (
     <div className="report-section mb-8">
       <h2
@@ -382,11 +384,14 @@ export default function FlashpointReportPreview({
   report,
   incidents,
   aiProse,
+  hiddenSections,
 }: {
   report: FlashpointPreviewReport;
   incidents: FlashpointReportIncident[];
   aiProse?: TopicAiProse | null;
+  hiddenSections?: string[];
 }) {
+  const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "flashpoint";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
@@ -449,15 +454,15 @@ export default function FlashpointReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <Section title="Executive Summary">
+        <Section hidden={!show("executive-summary")} title="Executive Summary">
           <Paragraphs text={execText} />
         </Section>
 
-        <Section title="Fast Facts">
+        <Section hidden={!show("fast-facts")} title="Fast Facts">
           <KpiGrid cards={ds.fastFacts} />
         </Section>
 
-        <Section title="Activism and Protest Read">
+        <Section hidden={!show("activism")} title="Activism and Protest Read">
           <Paragraphs text={pickRead(report.activismRead, ds.activismRead)} />
           <div className="mt-4">
             <IncidentTable
@@ -467,7 +472,7 @@ export default function FlashpointReportPreview({
           </div>
         </Section>
 
-        <Section title="Civil Unrest and Public Order Read">
+        <Section hidden={!show("civil-unrest")} title="Civil Unrest and Public Order Read">
           <Paragraphs text={pickRead(report.civilUnrestRead, ds.civilUnrestRead)} />
           <div className="mt-4">
             <IncidentTable
@@ -477,7 +482,7 @@ export default function FlashpointReportPreview({
           </div>
         </Section>
 
-        <Section title={"Forecast: Next 7\u201314 Days"}>
+        <Section hidden={!show("forecast")} title={"Forecast: Next 7\u201314 Days"}>
           {ds.forecastFuture.length > 0 && (
             <div className="mb-4 overflow-hidden" style={{ border: `1px solid ${POLAR}` }}>
               <table className="w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12 }}>
@@ -503,7 +508,7 @@ export default function FlashpointReportPreview({
           <Paragraphs text={pickRead(report.forecastRead, ds.forecastRead)} />
         </Section>
 
-        <Section title="Regional and Country View">
+        <Section hidden={!show("regional")} title="Regional and Country View">
           <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
           <div className="mt-4">
             <div
@@ -524,20 +529,20 @@ export default function FlashpointReportPreview({
           </div>
         </Section>
 
-        <Section title="What Matters">
+        <Section hidden={!show("what-matters")} title="What Matters">
           <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
         </Section>
-        <Section title="Implications for Business">
+        <Section hidden={!show("implications")} title="Implications for Business">
           <Bullets text={pickProse(report.implications, aiOr(aiProse?.implications, ds.autoImplications))} />
         </Section>
-        <Section title="Watch Next">
+        <Section hidden={!show("watch-next")} title="Watch Next">
           <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
         </Section>
-        <Section title="Polestar View">
+        <Section hidden={!show("polestar-view")} title="Polestar View">
           <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
         </Section>
 
-        <Section title="Related Incidents">
+        <Section hidden={!show("related-incidents")} title="Related Incidents">
           <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 

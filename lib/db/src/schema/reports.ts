@@ -1,5 +1,18 @@
 import { pgTable, serial, text, timestamp, jsonb, date } from "drizzle-orm/pg-core";
 
+/**
+ * Durable analyst curation of a topic report — hide canonical sections,
+ * exclude relevance-passing window incidents, and DEMOTE-ONLY severity
+ * corrections. Same shape and semantics as the country brief's
+ * CountryReportSectionOverrides. Nullable/additive; NOT part of any prose
+ * cache key.
+ */
+export interface ReportSectionOverrides {
+  hiddenSections?: string[];
+  excludedIncidentIds?: string[];
+  severityDemotions?: Record<string, string>;
+}
+
 export type KpiCard = {
   label: string;
   value: string;
@@ -130,6 +143,9 @@ export const reportsTable = pgTable("reports", {
   // the activity-area theatre name (Record<theatre, override>).
   conflictOtherWatchedRead: text("conflict_other_watched_read"),
   conflictAreaReads: jsonb("conflict_area_reads").$type<Record<string, string>>(),
+  // Durable analyst curation (hidden sections, excluded window incidents,
+  // demote-only severity corrections). Nullable/additive.
+  sectionOverrides: jsonb("section_overrides").$type<ReportSectionOverrides>(),
   author: text("author"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

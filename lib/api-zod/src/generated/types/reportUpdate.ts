@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryReportSectionOverrides } from './countryReportSectionOverrides';
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
 import type { ReportStatus } from './reportStatus';
@@ -43,5 +44,6 @@ export interface ReportUpdate {
   fuelRegionalHighlights?: string;
   conflictOtherWatchedRead?: string;
   conflictAreaReads?: ReportUpdateConflictAreaReads;
+  sectionOverrides?: CountryReportSectionOverrides | null;
   author?: string;
 }
