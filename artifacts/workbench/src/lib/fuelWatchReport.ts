@@ -307,12 +307,13 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     incidents,
   });
-  // Gulf/Hormuz chokepoint watch anchors on the MARKET period end (not the
-  // stored draft date) and looks back ~60 days, so a Gulf escalation that fell
-  // just outside the 7-day report window is still surfaced. fuelMarketLatestDate
-  // is the report's true market close; fall back to the issue date if absent.
+  // Gulf/Hormuz chokepoint watch is anchored on the report ISSUE DATE (the same
+  // window as the rest of the report), splitting current-period activity from
+  // older standing context. fuelMarketLatestDate is passed only to extend the
+  // current end when the market close lands a day or two after the issue date.
   const gulfChokepointWatch = buildFuelGulfChokepointWatch({
-    periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? report.issueDate,
+    issueDate: report.issueDate,
+    periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? undefined,
     incidents,
   });
 

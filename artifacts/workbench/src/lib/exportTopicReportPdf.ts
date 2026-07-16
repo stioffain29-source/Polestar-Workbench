@@ -1060,8 +1060,12 @@ export async function exportTopicReportPdf(
     if (show("gulf-hormuz") && fuelData.incidentData.gulfChokepointWatch) {
       const gulf = fuelData.incidentData.gulfChokepointWatch;
       drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.read);
-      if (gulf.itemLines.length > 0) {
-        renderProse(ctx, gulf.itemLines.map((l) => `\u2022  ${l}`).join("\n"));
+      if (gulf.currentItemLines.length > 0) {
+        renderProse(ctx, gulf.currentItemLines.map((l) => `\u2022  ${l}`).join("\n"));
+      }
+      if (gulf.standingNote && gulf.standingItemLines.length > 0) {
+        renderProse(ctx, gulf.standingNote);
+        renderProse(ctx, gulf.standingItemLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
     }
     if (show("producer-buyer") && fuelData.incidentData.producerBuyerActions.length > 0) {
