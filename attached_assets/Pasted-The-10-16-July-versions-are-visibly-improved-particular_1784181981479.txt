@@ -1,0 +1,91 @@
+The 10–16 July versions are visibly improved, particularly Thailand, the Philippines and PNG. The covers, branding, headers, typography and general report structure now look professional. However, the reports are still not publishable without manual checking. The principal problem is now the content selection and analysis pipeline, not the basic PDF design.
+
+Critical content problems
+
+1. Irrelevant stories are still entering reports
+
+The earlier Thailand report placed two Iran war stories in Thailand’s Top 3 and treated a stock-market article as protest activity. The revised version removes these, but now rates enforcement against illegal jet skis as a High security development.
+
+The earlier PNG report included a sports-selection story in the Top 3, an awards nomination as civil unrest, and the same military exercise several times under civil unrest. The revised version removes some of this, but the awards story remains classified as protest and civil unrest.
+
+2. Classification remains unreliable
+
+Examples include:
+
+A landslide and flooding originally classified as armed robbery or violent crime in the Philippines.
+A personal snake-attack story treated as operational disruption.
+A road collision placed under natural hazards in Indonesia.
+Commentary asking whether rainfall causes tribal violence treated as an actual violent incident in PNG.
+
+The system appears to be classifying from keywords rather than understanding what actually happened.
+
+3. Severity scoring is inconsistent
+
+A magnitude 2.4 earthquake causing no damage is rated High in Thailand, while flooding causing two deaths is rated Low in the Philippines. Illegal jet-ski enforcement is also rated High. These ratings cannot all be produced by the same defensible severity model.
+
+Severity must reflect:
+
+Casualties
+Operational disruption
+Geographic extent
+Duration
+Direct exposure to businesses
+Credibility and confidence
+
+It should not be driven by dramatic wording in a headline.
+
+4. Deduplication is still not functioning properly
+
+The PNG prison escape appears repeatedly as separate stories, including the escape itself, deaths during the escape, infrastructure blamed for the escape and people remaining at large. The same underlying incident is given different severities in different sections.
+
+Events need to be clustered by location, date, actors and incident narrative. Source updates should enrich one incident record rather than create another event.
+
+5. Major claims require stronger validation
+
+The Indonesia report includes a headline claiming a massive southern Java earthquake destroyed temples and killed thousands. A claim of that scale should never pass automatically from one source into Top 3 Developments. It requires corroboration from at least two credible independent sources before publication.
+
+Fuel Watch
+
+Fuel Watch is visually strong, but the time-window logic is contradictory.
+
+The report covers 9–15 July, yet the Gulf and Hormuz section is built around stories from 20–26 May and states that no fresh Gulf chokepoint reporting has appeared since May. The next page then lists Hormuz-related actions dated 9, 12 and 14 July.
+
+That must be corrected:
+
+Current-period incidents belong in the main analysis.
+Older material belongs under clearly labelled standing context.
+The report must not claim there is no fresh reporting when it displays fresh reporting on the next page.
+Russia and Ukraine currently receive almost identical boilerplate paragraphs, which reads as automated padding rather than analysis.
+Layout and report length
+
+Jakarta is the strongest report in terms of practical business content. The named corridors, airport-transfer risks, port access, meeting districts and specific actions are exactly the direction the country reports should take.
+
+However:
+
+Eight content pages is excessive for a weekly city report.
+“Priority Areas This Week” is stranded at the bottom of one page, with its table on the next.
+The movement-posture map has overlapping labels and text.
+The final page contains only the disclaimer and large amounts of empty space.
+
+Indonesia and the Philippines also produce mostly empty final pages.
+
+Papua handles the lack of reporting honestly, which is good, but repeats essentially the same “no fresh reporting” statement across several sections and then produces an empty operational map. This should be a single-page coverage-gap brief, not a padded report.
+
+Required acceptance criteria
+
+Before these can be considered stable:
+
+Reject stories outside the target geography and reporting period.
+Reject sport, opinion, awards, donations, awareness campaigns and human-interest features unless they have a clear operational impact.
+Require corroboration for major casualty or nationally significant events.
+Deduplicate updates about the same incident.
+Apply one consistent severity methodology across every report.
+Flag category and headline mismatches before export.
+Exclude “location not specified” stories from maps.
+Do not include Top 3 items assessed as having no commercial impact.
+Separate current-period reporting from historical context.
+Prevent orphan headings, overlapping map labels and disclaimer-only pages.
+Cap standard country reports at approximately three or four content pages.
+Preserve the deeper, location-specific operational analysis demonstrated in the Jakarta report.
+
+Overall: the visual product is now credible, and the revised versions demonstrate progress. The remaining blocker is analytical reliability. The application is still allowing irrelevant, duplicated, misclassified and inconsistently scored material into client-facing reports.
