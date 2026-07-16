@@ -71,6 +71,8 @@ jest.mock("@workspace/api-client-react", () => ({
     isPending: false,
   }),
   getListMaritimeMovementQueryKey: () => ["maritime-movement"],
+  useListMarketPrices: () => ({ data: [] }),
+  getListMarketPricesQueryKey: (p?: unknown) => ["market-prices", p],
   getListIncidentsQueryKey: (p?: unknown) => ["incidents", p],
   getGetReportQueryKey: () => ["report"],
   getListReportsQueryKey: () => ["reports"],

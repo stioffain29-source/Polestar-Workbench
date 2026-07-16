@@ -58,6 +58,8 @@ jest.mock("@workspace/api-client-react", () => ({
   }),
   useGenerateReportProse: () => ({ mutate: jest.fn(), isPending: false }),
   getListMaritimeMovementQueryKey: () => ["maritime-movement"],
+  useListMarketPrices: () => ({ data: [] }),
+  getListMarketPricesQueryKey: (p?: unknown) => ["market-prices", p],
   getListIncidentsQueryKey: (p?: unknown) => ["incidents", p],
   getGetReportQueryKey: () => ["report"],
   getListReportsQueryKey: () => ["reports"],
@@ -107,7 +109,20 @@ jest.mock("@/components/ReportPreview", () => ({
   default: () => null,
 }));
 
-import ReportEditor from "@/pages/ReportEditor";
+// `ReportPreview` transitively imports jsPDF (via pdfChrome), whose Node build
+// touches TextEncoder/TextDecoder at module load — absent in this jsdom env.
+// Polyfill BEFORE the editor module is required, then load it lazily so the
+// polyfill is in place first.
+let ReportEditor: React.ComponentType;
+
+beforeAll(() => {
+  if (typeof (globalThis as Record<string, unknown>).TextEncoder === "undefined") {
+    const { TextEncoder, TextDecoder } = require("util");
+    (globalThis as Record<string, unknown>).TextEncoder = TextEncoder;
+    (globalThis as Record<string, unknown>).TextDecoder = TextDecoder;
+  }
+  ReportEditor = require("@/pages/ReportEditor").default;
+});
 
 beforeAll(() => {
   // jsdom is missing a few DOM APIs that Radix primitives touch on mount.
