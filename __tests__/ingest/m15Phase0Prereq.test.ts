@@ -10,7 +10,7 @@ import {
   M15_FIXTURE_DIR,
   M15_OPTIONAL_FIXTURES,
   M15_REQUIRED_FIXTURES,
-} from "../fixtures/m15/manifest";
+} from "../../scripts/src/m15/fixtures-manifest";
 
 describe("M1.5 Phase 0 — prerequisites", () => {
   it("has required CENTCOM and UKMTO HTML fixtures", () => {

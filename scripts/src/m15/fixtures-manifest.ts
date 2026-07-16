@@ -1,7 +1,15 @@
 import { join } from "node:path";
 
 /** Directory for M1.5 Phase 2 HTML fixtures (listing + detail pages). */
-export const M15_FIXTURE_DIR = join(__dirname);
+export const M15_FIXTURE_DIR = join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "__tests__",
+  "fixtures",
+  "m15",
+);
 
 /** Minimum fixtures before CENTCOM/UKMTO parser work (Step 0). */
 export const M15_REQUIRED_FIXTURES = [

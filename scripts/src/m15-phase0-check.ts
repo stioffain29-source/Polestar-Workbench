@@ -9,7 +9,7 @@ import {
   M15_FIXTURE_DIR,
   M15_OPTIONAL_FIXTURES,
   M15_REQUIRED_FIXTURES,
-} from "../../__tests__/fixtures/m15/manifest.js";
+} from "./m15/fixtures-manifest.js";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
