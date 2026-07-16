@@ -54,6 +54,7 @@ import {
   isForeignTheatreContext,
   isForeignSubjectForIndonesia,
   isForeignSubjectNoHomeAnchor,
+  foreignSyndicationDropIds,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
@@ -265,6 +266,23 @@ export default function CountryReport() {
     // mis-tag files it under "Indonesia".
     const isIndonesia =
       !isPng && !isPapua && !isJakarta && tokens.includes("indonesia");
+    // Cross-row foreign-syndication clustering (Indonesia/Jakarta only): a
+    // marker-less syndicated foreign accident ("Plane crash kills 11") that the
+    // single-string guard cannot judge is dropped when a foreign-attributed
+    // SIBLING row names the place. Built once over the same en text the guard
+    // reads, then consulted per-row below.
+    const syndicationDrop =
+      isIndonesia || isJakarta
+        ? foreignSyndicationDropIds(
+            (incidentsData ?? []).map((i) => {
+              const tr = i as { ln?: string | null; displayTitle?: string | null };
+              return {
+                id: String(i.id),
+                en: `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""}`,
+              };
+            }),
+          )
+        : new Set<string>();
     return (incidentsData ?? []).filter((i) => {
       if (isJakarta) {
         if (!incidentMatchesCountry(i.country, "Indonesia")) return false;
@@ -277,6 +295,9 @@ export default function CountryReport() {
         const tr = i as { ln?: string | null; displayTitle?: string | null };
         const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""}`;
         if (isForeignSubjectForIndonesia(en)) return false;
+        // A marker-less foreign syndication the single-string guard cannot judge
+        // is dropped when a foreign-attributed sibling row names the place.
+        if (syndicationDrop.has(String(i.id))) return false;
         return true;
       }
       if (!incidentMatchesCountry(i.country, name)) return false;
@@ -319,6 +340,9 @@ export default function CountryReport() {
         // masthead ("CNN Indonesia" etc.), a false Indonesian anchor.
         const en = `${tr.ln ?? tr.displayTitle ?? ""} ${i.title ?? ""}`;
         if (isForeignSubjectForIndonesia(en)) return false;
+        // A marker-less foreign syndication the single-string guard cannot judge
+        // is dropped when a foreign-attributed sibling row names the place.
+        if (syndicationDrop.has(String(i.id))) return false;
       }
       // Drop geocoder mis-tags: a record whose TITLE is about a distant
       // foreign country (e.g. "Myanmar clashes ... near Thai border") with no

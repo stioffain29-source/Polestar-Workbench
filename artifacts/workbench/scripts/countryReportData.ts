@@ -25,6 +25,7 @@ import {
   isForeignTheatreContext,
   isCrossBorderPapuaPng,
   isIndonesianPapuaTheatreContext,
+  foreignSyndicationDropIds,
 } from "../src/lib/countryMatch";
 import type {
   PdfCountry,
@@ -107,6 +108,18 @@ function filterForCountry(
   const isPapua = !isPng && tokens.includes("papua");
   const isIndonesia =
     !isPng && !isPapua && !tokens.includes("jakarta") && tokens.includes("indonesia");
+  // Cross-row foreign-syndication clustering (Indonesia only here — Jakarta is
+  // out of this loader's scope): drop a marker-less foreign syndication when a
+  // foreign-attributed sibling row names the place. Built over the same en text
+  // the single-string guard reads (title + Bahasa title, no summary masthead).
+  const syndicationDrop = isIndonesia
+    ? foreignSyndicationDropIds(
+        all.map((i) => ({
+          id: String(i.id),
+          en: `${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""}`,
+        })),
+      )
+    : new Set<string>();
   return all.filter((i) => {
     if (!incidentMatchesCountry(i.country, name)) return false;
     if (isPng && !isCrossBorderPapuaPng(i.country)) {
@@ -121,6 +134,7 @@ function filterForCountry(
     if (isIndonesia) {
       const en = `${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
       if (isForeignSubjectForIndonesia(en)) return false;
+      if (syndicationDrop.has(String(i.id))) return false;
     }
     const fullText = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
     if (isForeignDominantContext(i.title, fullText, i.country, name)) return false;

@@ -283,6 +283,115 @@ export function isForeignSubjectForIndonesia(
 }
 
 // ---------------------------------------------------------------------------
+// Cross-row foreign-syndication clustering (Indonesia / Jakarta brief)
+// ---------------------------------------------------------------------------
+// The single-string {@link isForeignSubjectForIndonesia} guard deliberately
+// CANNOT drop a syndicated foreign accident/disaster whose translated title
+// names no country, city, or foreign entity ("Plane crash kills 11") — the
+// no-fabrication rule forbids inventing a foreign tag from zero evidence. But
+// the same event is usually syndicated across several rows, and at least one
+// SIBLING copy DOES name the foreign place ("Plane crash in Missouri, US kills
+// 11 parachutists and 1 pilot"). This cross-row pass links a marker-less row to
+// such a foreign-attributed sibling by headline similarity and drops it too —
+// the attribution comes from a real sibling record, not fabrication.
+
+const CLUSTER_STOPWORDS = new Set([
+  "the","a","an","in","on","of","at","to","and","or","as","after","near","into",
+  "over","from","for","with","by","amid","during","following","killed","kills",
+  "dead","death","deaths","leaves","leave","left","injured","injures","injury",
+  "injuries","hurt","people","person","persons","several","dozens","many","some",
+  "one","two","reported","report","reports","say","says","said","al","el","de",
+  "la","los","las","del","di","dan","yang","dengan","dekat","tewas","orang",
+]);
+
+/** Distinctive content tokens of a headline for cross-row similarity. */
+function clusterTokens(text: string | null | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const raw of (text ?? "").toLowerCase().split(/[^a-z0-9]+/)) {
+    if (!raw) continue;
+    // Numbers are strong event signatures (toll, flight number).
+    if (/^[0-9]+$/.test(raw)) {
+      out.add(raw);
+      continue;
+    }
+    if (raw.length < 3) continue;
+    if (CLUSTER_STOPWORDS.has(raw)) continue;
+    // Light stemming so "crash"/"crashing" and "collapse"/"collapses" align.
+    const stem = raw.replace(/(?:ing|ed|es|s)$/, "");
+    out.add(stem.length >= 3 ? stem : raw);
+  }
+  return out;
+}
+
+/** Overlap coefficient |A∩B| / min(|A|,|B|) plus the shared-token list. */
+function clusterOverlap(
+  a: Set<string>,
+  b: Set<string>,
+): { shared: string[]; coeff: number } {
+  const [small, big] = a.size <= b.size ? [a, b] : [b, a];
+  const shared: string[] = [];
+  for (const tok of small) if (big.has(tok)) shared.push(tok);
+  const min = Math.min(a.size, b.size);
+  return { shared, coeff: min === 0 ? 0 : shared.length / min };
+}
+
+/**
+ * A record participates in clustering with one of three roles:
+ *   - "foreign": foreign cues strictly dominate (already dropped by the
+ *     single-string guard) — the ATTRIBUTED sibling that can lend a place name.
+ *   - "markerless": names no foreign cue AND no Indonesian anchor — a candidate
+ *     syndication the single-string guard cannot judge on its own.
+ *   - "local": carries an Indonesian anchor — a genuine domestic story that must
+ *     never be dropped by clustering.
+ */
+function foreignRole(text: string): "foreign" | "markerless" | "local" {
+  const foreign = countMatches(INDO_FOREIGN_SUBJECT_RE, text);
+  const local = countMatches(INDO_LOCAL_ANCHOR_RE, text);
+  if (foreign > 0 && foreign > local) return "foreign";
+  if (foreign === 0 && local === 0) return "markerless";
+  return "local";
+}
+
+/**
+ * Given the Indonesia/Jakarta candidate rows (each `en` = translated title +
+ * Bahasa title, the SAME text fed to {@link isForeignSubjectForIndonesia}),
+ * return the set of ids to drop as foreign syndication. A marker-less row is
+ * dropped ONLY when a foreign-attributed SIBLING row is the same event (strong
+ * headline overlap); the attributed sibling is included in the drop set too, so
+ * the whole cluster leaves the brief. A marker-less row with no such sibling is
+ * never dropped — matching the no-fabrication rule the single-string guard keeps.
+ */
+export function foreignSyndicationDropIds(
+  records: ReadonlyArray<{ id: string; en: string | null | undefined }>,
+): Set<string> {
+  const drop = new Set<string>();
+  const foreign: { id: string; toks: Set<string> }[] = [];
+  const markerless: { id: string; toks: Set<string> }[] = [];
+  for (const r of records) {
+    const en = r.en ?? "";
+    const role = foreignRole(en);
+    if (role === "foreign") foreign.push({ id: r.id, toks: clusterTokens(en) });
+    else if (role === "markerless")
+      markerless.push({ id: r.id, toks: clusterTokens(en) });
+  }
+  if (foreign.length === 0) return drop;
+  for (const m of markerless) {
+    if (m.toks.size === 0) continue;
+    for (const f of foreign) {
+      const { shared, coeff } = clusterOverlap(m.toks, f.toks);
+      if (shared.length < 2 || coeff < 0.6) continue;
+      // Require a distinctive shared token (a number or a >=5-char word) so two
+      // short generic headlines cannot cluster on filler alone.
+      if (!shared.some((s) => /^[0-9]+$/.test(s) || s.length >= 5)) continue;
+      drop.add(m.id);
+      drop.add(f.id);
+      break;
+    }
+  }
+  return drop;
+}
+
+// ---------------------------------------------------------------------------
 // Foreign maritime / conflict theatre guard
 // ---------------------------------------------------------------------------
 //
