@@ -143,6 +143,37 @@ describe("isDevelopmentWireItem — guardrails (strict under-filter bias)", () =
     }
   });
 
+  it("drops mis-rated High non-event editorial (analysis blogs, sports fixtures, awareness campaigns)", () => {
+    // These arrive rated High and each carries security vocabulary, so BOTH the
+    // severityRank>=3 backstop AND the security-term veto would keep them — the
+    // NON_EVENT_TITLE_RE path deliberately bypasses both. Anchors empirically
+    // verified against the live PNG corpus to match only these non-events.
+    const drops = [
+      // Analysis / opinion think-pieces (stored 'Tribal violence', High).
+      "Does extreme rainfall trigger tribal violence in PNG? - Devpolicy Blog from the Development Policy Centre",
+      "Beyond tribal violence: everyday crime and insecurity in PNG - The National | Your Number One Daily!",
+      // Sports fixtures — the rugby-league 'clash' is a security-veto homonym.
+      "Consistency in Selection Ahead of Blackhawks Clash",
+      "Flying Fijians name powerful side for Wales opener",
+      // Public-awareness campaign (stored 'Homicide', High).
+      "Kokopau Community Rallies Against Violence: Robust Awareness Initiative Transforms Local Wards",
+    ];
+    for (const title of drops) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 4 }))).toBe(true);
+    }
+  });
+
+  it("keeps genuine events that only share a homonym / team name with a non-event class", () => {
+    const keeps = [
+      "Tribal clash leaves three dead in Enga", // real 'clash', no selection anchor
+      "Former Vipers captain convicted of attempted murder", // rugby team name, real crime
+      "Gunmen open fire at community awareness meeting, two dead", // 'awareness' but not a campaign noun
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 4 }))).toBe(false);
+    }
+  });
+
   it("keeps genuine security items that carry a new PR word (awards/exercise veto)", () => {
     const keeps = [
       "Award-winning officer shot dead at ceremony", // award + ceremony PR, 'shot' vetoes
@@ -286,6 +317,22 @@ describe("filterDevelopmentWire wiring — promoted to every theatre", () => {
     expect(titles.some((t) => /robbed at knifepoint/i.test(t))).toBe(true);
     expect(titles.some((t) => /earthquake/i.test(t))).toBe(true);
     expect(titles.some((t) => /brings hope/i.test(t))).toBe(false);
+  });
+
+  it("PNG window drops mis-rated High non-event editorial but keeps the real crime", () => {
+    const editorialWindow = [
+      inc({ title: "Consistency in Selection Ahead of Blackhawks Clash", severity: "high" }),
+      inc({
+        title: "Beyond tribal violence: everyday crime and insecurity in PNG - The National",
+        severity: "high",
+      }),
+      inc({ title: "Kokopau Community: Robust Awareness Initiative Transforms Local Wards", severity: "high" }),
+      inc({ title: "Three shot dead in Baisu prison escape", severity: "high", location: "Baisu" }),
+    ];
+    const png = buildPngReportDataset(argsFor(editorialWindow));
+    const titles = png.windowItems.map((i) => i.title);
+    expect(titles.some((t) => /prison escape/i.test(t))).toBe(true);
+    expect(titles.some((t) => /Blackhawks|everyday crime and insecurity|Awareness Initiative/i.test(t))).toBe(false);
   });
 
   it("PNG never empties a window that is all development wire (falls back to unfiltered)", () => {

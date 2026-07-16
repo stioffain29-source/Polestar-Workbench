@@ -1004,11 +1004,41 @@ const SECURITY_TERM_RE =
 // do NOT grow it into a second general lexicon.
 const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 
+// NON-EVENT editorial classes that carry security vocabulary BY THEIR NATURE, so
+// the SECURITY_TERM_RE veto below would keep them forever and the severityRank
+// backstop cannot help (they arrive mis-rated High). Each is an editorial /
+// promotional artefact, never a discrete security event:
+//   * ANALYSIS / OPINION think-pieces ("Beyond tribal violence: everyday crime
+//     and insecurity in PNG — Devpolicy Blog") — a Development Policy Centre essay
+//     ABOUT violence, not a violence report.
+//   * SPORTS FIXTURES ("Consistency in Selection Ahead of Blackhawks Clash",
+//     "Flying Fijians name powerful side for Wales opener") — the rugby-league
+//     "clash" is a homonym that trips SECURITY_TERM_RE; a team-selection preview
+//     is not an incident. Anchored on non-event ACTIONS (team selection), never
+//     team names — "Vipers" appears in a genuine attempted-murder conviction.
+//   * PUBLIC-AWARENESS CAMPAIGNS ("…Robust Awareness Initiative Transforms Local
+//     Wards") — an advocacy drive against violence, not a violent event.
+// These anchors are EMPIRICALLY precision-gated: verified against the full live
+// PNG corpus (2.5 months) to match ONLY these non-event rows and zero genuine
+// incidents, which is why they may safely bypass the security-term veto. Keep any
+// addition to that same standard (confirm it hits no real event before adding).
+// Deliberately EXCLUDES the "community leaders trained to stop violence" training
+// class: "trained to stop" can co-occur with a real casualty ("officer trained to
+// stop riots shot dead"), so it stays veto-protected — the durable fix for those
+// is upstream severity/category reclassification, not a veto bypass here.
+const NON_EVENT_TITLE_RE =
+  /(\bdevpolicy\b|development policy centre|everyday crime and insecurity|\bname[sd]?\s+(?:a\s+)?(?:powerful\s+)?side\b|consistency in selection|selection ahead of|\bawareness\s+(?:initiative|campaign|programme|program|drive|week|month)\b)/i;
+
 // Pure predicate: is this a low-value development / promotional wire item that a
 // security brief should exclude? Exported for unit tests. Strict under-filter
 // bias — a security / hazard term always vetoes the drop.
 //
-// Two paths:
+// Three paths:
+//  0. NON-EVENT editorial classes (NON_EVENT_TITLE_RE) are dropped at any severity
+//     WITHOUT the security-term veto, because they inherently name security topics
+//     (analysis of violence, a rugby "clash", an anti-violence campaign) yet carry
+//     no discrete event. Safe only because each anchor is empirically verified to
+//     match no genuine incident in the live corpus.
 //  1. STRUCTURAL round-up columns (HARD_NON_INCIDENT_TITLE_RE) are dropped at any
 //     severity. The security-term veto here is TITLE-ONLY, matching the carve-out
 //     "a 'Tidbits: gunmen raid store' edition stays": these columns are always
@@ -1019,10 +1049,11 @@ const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 //     and a security / hazard term ANYWHERE (title or summary) vetoes the drop, so
 //     a genuine low-severity crime, court, unrest or natural-hazard item stays.
 export function isDevelopmentWireItem(item: PngReportItem): boolean {
+  const hay = `${item.title} ${item.summary}`.toLowerCase();
+  if (NON_EVENT_TITLE_RE.test(hay)) return true;
   if (HARD_NON_INCIDENT_TITLE_RE.test(item.title)) {
     return !SECURITY_TERM_RE.test(item.title.toLowerCase());
   }
-  const hay = `${item.title} ${item.summary}`.toLowerCase();
   if (SECURITY_TERM_RE.test(hay)) return false;
   if (item.severityRank >= 3) return false;
   return DEVELOPMENT_WIRE_RE.test(hay);
