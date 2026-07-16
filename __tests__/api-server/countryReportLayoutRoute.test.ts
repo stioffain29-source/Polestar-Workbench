@@ -114,6 +114,11 @@ afterAll(
 );
 
 beforeEach(() => {
+  // The global jest.setup.ts beforeEach clears INGEST_ADMIN_TOKEN (along with
+  // every integration secret) before each test; re-enable it here so the
+  // admin-token gate is configured and the route can return 200/401 rather
+  // than the unconfigured 503.
+  enableTestAdminToken();
   jest.restoreAllMocks();
   store = seedRow();
   stubDb();
