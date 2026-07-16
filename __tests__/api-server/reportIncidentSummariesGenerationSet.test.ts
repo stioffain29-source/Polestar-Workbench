@@ -43,7 +43,7 @@ import {
 import reportIncidentSummariesRouter from "../../artifacts/api-server/src/routes/reportIncidentSummaries";
 import {
   adminAuthHeaders,
-  enableTestAdminToken,
+  installAdminTokenBeforeEach,
 } from "./adminAuthTestHelpers";
 import {
   selectRelatedIncidents,
@@ -215,8 +215,9 @@ let app: Express;
 let server: Server;
 let baseUrl: string;
 
+installAdminTokenBeforeEach();
+
 beforeAll((done) => {
-  enableTestAdminToken();
   app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
@@ -235,12 +236,10 @@ afterAll((done) => {
   server.close(() => done());
 });
 
-beforeEach(() => {
-  // The global jest.setup.ts beforeEach runs clearIntegrationEnv() (which
-  // deletes INGEST_ADMIN_TOKEN) BEFORE this hook, so the beforeAll token would
-  // otherwise be wiped for every test after the first — defeating the gate.
-  enableTestAdminToken();
-});
+// The admin token is re-installed per test by installAdminTokenBeforeEach()
+// above (the global jest.setup deletes INGEST_ADMIN_TOKEN before each test, so
+// a beforeAll-only token would be wiped for every test after the first —
+// defeating the gate).
 
 afterEach(() => {
   jest.restoreAllMocks();

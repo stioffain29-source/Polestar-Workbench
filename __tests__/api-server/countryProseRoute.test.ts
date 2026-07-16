@@ -25,7 +25,7 @@ import {
 import proseRouter from "../../artifacts/api-server/src/routes/prose";
 import {
   adminAuthHeaders,
-  enableTestAdminToken,
+  installAdminTokenBeforeEach,
 } from "./adminAuthTestHelpers";
 
 type Rows = Record<string, unknown>[];
@@ -90,8 +90,9 @@ let app: Express;
 let server: Server;
 let baseUrl: string;
 
+installAdminTokenBeforeEach();
+
 beforeAll(async () => {
-  enableTestAdminToken();
   app = express();
   app.use(express.json());
   // The real api-server attaches `req.log` via pino-http; this bare test app
@@ -120,9 +121,8 @@ afterAll(
 );
 
 beforeEach(() => {
-  // The global jest.setup clears INGEST_ADMIN_TOKEN in its own beforeEach, so
-  // re-enable it here or requireAdminToken 503s every request.
-  enableTestAdminToken();
+  // The admin token is re-installed per test by installAdminTokenBeforeEach()
+  // above (the global jest.setup clears INGEST_ADMIN_TOKEN before each test).
   jest.restoreAllMocks();
   (isLlmAvailable as jest.Mock).mockReset();
   (generateCountryProse as jest.Mock).mockReset();

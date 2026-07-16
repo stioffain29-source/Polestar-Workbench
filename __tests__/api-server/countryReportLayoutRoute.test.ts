@@ -14,7 +14,7 @@ import { db, countryReportsTable } from "@workspace/db";
 import countriesRouter from "../../artifacts/api-server/src/routes/countries";
 import {
   adminAuthHeaders,
-  enableTestAdminToken,
+  installAdminTokenBeforeEach,
 } from "./adminAuthTestHelpers";
 
 type Row = Record<string, unknown>;
@@ -85,8 +85,9 @@ let app: Express;
 let server: Server;
 let baseUrl: string;
 
+installAdminTokenBeforeEach();
+
 beforeAll(() => {
-  enableTestAdminToken();
   app = express();
   app.use(express.json());
   // The real api-server attaches `req.log` via pino-http; this bare test app
@@ -114,11 +115,9 @@ afterAll(
 );
 
 beforeEach(() => {
-  // The global jest.setup.ts beforeEach clears INGEST_ADMIN_TOKEN (along with
-  // every integration secret) before each test; re-enable it here so the
-  // admin-token gate is configured and the route can return 200/401 rather
-  // than the unconfigured 503.
-  enableTestAdminToken();
+  // The admin token is re-installed per test by installAdminTokenBeforeEach()
+  // above (the global jest.setup clears INGEST_ADMIN_TOKEN before each test) so
+  // the gate is configured and the route returns 200/401, never a bogus 503.
   jest.restoreAllMocks();
   store = seedRow();
   stubDb();

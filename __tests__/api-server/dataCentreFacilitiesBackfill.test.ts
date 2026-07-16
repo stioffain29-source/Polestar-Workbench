@@ -13,6 +13,10 @@ import type { Server } from "node:http";
 
 import { db } from "@workspace/db";
 import backfillRouter from "../../artifacts/api-server/src/routes/backfill";
+import {
+  TEST_ADMIN_TOKEN,
+  installAdminTokenBeforeEach,
+} from "./adminAuthTestHelpers";
 
 type Rows = Record<string, unknown>[];
 
@@ -77,6 +81,8 @@ let app: Express;
 let server: Server;
 let baseUrl: string;
 
+installAdminTokenBeforeEach();
+
 beforeAll(async () => {
   app = express();
   app.use(express.json({ limit: "8mb" }));
@@ -107,9 +113,9 @@ beforeEach(() => {
   jest.restoreAllMocks();
   capturedInsertValues = undefined;
   capturedWhere = [];
-  // The global jest.setup clears integration env before each test; set the
-  // admin token AFTER that so requireAdminToken sees it (503 -> 401/200).
-  process.env["INGEST_ADMIN_TOKEN"] = "test-token";
+  // The admin token is re-installed per test by installAdminTokenBeforeEach()
+  // above (the global jest.setup clears integration env before each test), so
+  // requireAdminToken sees a configured token: 503 -> 401/200.
 });
 
 async function post(body: unknown, token?: string) {
@@ -136,12 +142,12 @@ describe("Data Centre facility backfill — auth & validation", () => {
   });
 
   it("400s on a non-array body", async () => {
-    const { status } = await post({ facilities: {} }, "test-token");
+    const { status } = await post({ facilities: {} }, TEST_ADMIN_TOKEN);
     expect(status).toBe(400);
   });
 
   it("400s when a row is missing name", async () => {
-    const { status } = await post({ facilities: [{ country: "Malaysia" }] }, "test-token");
+    const { status } = await post({ facilities: [{ country: "Malaysia" }] }, TEST_ADMIN_TOKEN);
     expect(status).toBe(400);
   });
 });
@@ -163,7 +169,7 @@ describe("Data Centre facility backfill — insert & idempotency", () => {
           },
         ],
       },
-      "test-token",
+      TEST_ADMIN_TOKEN,
     );
 
     expect(status).toBe(200);
@@ -191,7 +197,7 @@ describe("Data Centre facility backfill — insert & idempotency", () => {
           },
         ],
       },
-      "test-token",
+      TEST_ADMIN_TOKEN,
     );
 
     expect(status).toBe(200);
@@ -227,7 +233,7 @@ describe("Data Centre facility backfill — insert & idempotency", () => {
           },
         ],
       },
-      "test-token",
+      TEST_ADMIN_TOKEN,
     );
 
     expect(status).toBe(200);
