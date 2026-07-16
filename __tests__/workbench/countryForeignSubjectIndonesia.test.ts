@@ -211,4 +211,58 @@ describe("isForeignSubjectForIndonesia", () => {
       expect(isForeignSubjectForIndonesia(text)).toBe(false);
     },
   );
+
+  // ---------------------------------------------------------------------------
+  // Foreign-dominant stories that name ONE Indonesian place in passing.
+  // ---------------------------------------------------------------------------
+  // With the local-anchor gazetteer now much larger, a foreign story that also
+  // mentions a single Indonesian place in passing (e.g. aid dispatched FROM
+  // Indonesia to a foreign disaster) must still be dropped: the foreign cues
+  // outnumber the lone local anchor, so dominance still resolves to DROP. These
+  // pin that direction so a widened gazetteer can never tip a clearly-foreign
+  // story into being retained on the strength of one incidental Indonesian word.
+
+  const FOREIGN_DOMINANT_WITH_ONE_LOCAL = [
+    // Aid dispatched from Indonesia to a foreign disaster: 1 local vs many foreign.
+    "Indonesia sends aid to earthquake victims in Beijing, Shanghai and Chengdu",
+    "Jakarta pledges relief as Tokyo and Osaka reel from twin quakes in Japan",
+    "Indonesian rescuers join search after building collapse in Manila and Cebu",
+    // Foreign cities only (no country word) beating one Indonesian anchor.
+    "Bandung team flies to Bangkok as floods swamp Chiang Mai and Phuket",
+    "Surabaya envoy visits Saigon and Hanoi after deadly Vietnam storm",
+  ];
+
+  it.each(FOREIGN_DOMINANT_WITH_ONE_LOCAL)(
+    "drops a foreign-dominant story that names one Indonesian place in passing: %s",
+    (text) => {
+      expect(isForeignSubjectForIndonesia(text)).toBe(true);
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Dominance boundary against the newly added admin / police anchors.
+  // ---------------------------------------------------------------------------
+  // The Bahasa administrative / security-force anchors (polres, kapolda, bupati,
+  // kodim, ...) must count as EXACTLY ONE local cue each, no more. A single such
+  // anchor therefore cannot rescue a foreign-dominant story, but it must still
+  // hold a genuine domestic story on a tie. These pin both sides of that line so
+  // the enlarged anchor set never over- or under-fires.
+
+  it("drops a foreign-dominant story that happens to quote one Indonesian official/agency", () => {
+    // foreign: tokyo, osaka, japan (3); local: kapolda (1) → foreign wins → DROP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Kapolda comments as earthquake devastates Tokyo and Osaka in Japan",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a domestic story anchored only by an admin term on a 1-vs-1 tie", () => {
+    // foreign: chinese (1); local: polres (1) → tie → KEEP.
+    expect(
+      isForeignSubjectForIndonesia(
+        "Polres tangkap warga negara China terkait kasus narkoba",
+      ),
+    ).toBe(false);
+  });
 });
