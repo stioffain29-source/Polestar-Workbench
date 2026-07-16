@@ -27,6 +27,7 @@ import {
   isCrossBorderPapuaPng,
   isIndonesianPapuaTheatreContext,
   foreignSyndicationDropIds,
+  isPreparednessDrill,
 } from "../src/lib/countryMatch";
 import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import type {
@@ -129,6 +130,12 @@ function filterForCountry(
       )
     : new Set<string>();
   return all.filter((i) => {
+    // Preparedness drills / exercises / simulations are non-events; drop them
+    // from EVERY brief before any theme is built so an "active shooter drill"
+    // never surfaces as the "most serious reported" incident.
+    if (isPreparednessDrill(`${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""}`)) {
+      return false;
+    }
     // Jakarta city brief: match Indonesia, keep only Jakarta-scoped items, drop
     // foreign-subject slop and syndicated foreign accidents (mirrors the page).
     if (isJakarta) {
@@ -150,7 +157,10 @@ function filterForCountry(
     }
     if (isIndonesia && isIndonesianPapuaTheatreContext(i.title)) return false;
     if (isIndonesia) {
-      const en = `${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`;
+      // Translated title + Bahasa title only — the summary carries the appended
+      // outlet masthead ("CNN Indonesia" etc.), a false Indonesian anchor that
+      // would defeat the dominance test. Mirrors CountryReport.tsx exactly.
+      const en = `${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""}`;
       if (isForeignSubjectForIndonesia(en)) return false;
       if (syndicationDrop.has(String(i.id))) return false;
     }

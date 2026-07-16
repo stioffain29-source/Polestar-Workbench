@@ -55,6 +55,7 @@ import {
   isForeignSubjectForIndonesia,
   isForeignSubjectNoHomeAnchor,
   foreignSyndicationDropIds,
+  isPreparednessDrill,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
@@ -284,6 +285,15 @@ export default function CountryReport() {
           )
         : new Set<string>();
     return (incidentsData ?? []).filter((i) => {
+      // Preparedness drills / exercises / simulations are non-events; drop them
+      // from EVERY brief before any theme is built (mirrors countryReportData.ts)
+      // so an "active shooter drill" never surfaces as the "most serious" item.
+      const dr = i as { ln?: string | null; displayTitle?: string | null };
+      if (
+        isPreparednessDrill(`${dr.ln ?? dr.displayTitle ?? ""} ${i.title ?? ""}`)
+      ) {
+        return false;
+      }
       if (isJakarta) {
         if (!incidentMatchesCountry(i.country, "Indonesia")) return false;
         if (!isJakartaScoped(i.title, i.summary, i.location)) return false;

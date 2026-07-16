@@ -239,7 +239,7 @@ export function isForeignDominantContext(
 // translation (`ln`); the stored Bahasa title hides the foreign subject from
 // the English excludes that run upstream.
 const INDO_FOREIGN_SUBJECT_RE =
-  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|jerman|france|french|spain|spanish|italy|italian|portugal|netherlands|belanda|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|missouri|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|yaman|houthi|houthis|hodeidah|hudaydah|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland|ubisoft|assassin'?s creed)\b/i;
+  /\b(japan|japanese|jepang|honshu|china|chinese|tiongkok|korea|korean|taiwan|hong kong|thailand|thai|vietnam|vietnamese|cambodia|laos|myanmar|burma|burmese|philippine|philippines|filipino|singapore|singapura|malaysia|malaysian|brunei|india|indian|pakistan|pakistani|bangladesh|nepal|sri lanka|sweden|swedish|swedia|norway|finland|denmark|germany|german|jerman|france|french|spain|spanish|italy|italian|portugal|netherlands|belanda|england|britain|british|united states|usa|america|american|amerika|new york|california|texas|florida|missouri|canada|canadian|mexico|brazil|argentina|venezuela|chile|peru|colombia|bolivia|australia|australian|new zealand|russia|russian|ukraine|israel|israeli|gaza|iran|iranian|iraq|syria|syrian|saudi|yemen|yaman|houthi|houthis|hodeidah|hudaydah|lebanon|egypt|turkey|nigeria|ethiopia|somalia|sudan|south africa|congo|kongo|drc|kinshasa|brazzaville|haiti|beijing|shanghai|guangzhou|shenzhen|chengdu|chongqing|wuhan|tianjin|macau|macao|saigon|ho chi minh|hanoi|da nang|bangkok|phuket|pattaya|chiang mai|manila|cebu|davao|quezon city|tokyo|osaka|kyoto|nagoya|yokohama|sapporo|fukuoka|seoul|busan|incheon|pyongyang|taipei|kaohsiung|mumbai|new delhi|delhi|kolkata|chennai|bengaluru|bangalore|hyderabad|ahmedabad|pune|karachi|lahore|islamabad|rawalpindi|dhaka|chittagong|kathmandu|colombo|phnom penh|vientiane|yangon|naypyidaw|mandalay|kuala lumpur|johor bahru|penang|moscow|kyiv|kiev|london|paris|berlin|madrid|rome|tehran|baghdad|jerusalem|tel aviv|riyadh|jeddah|dubai|abu dhabi|doha|istanbul|ankara|cairo|lagos|nairobi|johannesburg|cape town|sydney|melbourne|brisbane|perth|auckland|ubisoft|assassin'?s creed)\b/i;
 
 // Indonesian domestic geography / nationality anchors. Their presence shows the
 // record is genuinely about Indonesia even when a foreign country is also named
@@ -610,7 +610,7 @@ function escapeRegExp(s: string): string {
 // ambiguous pronoun-like "us"/"usa" tokens are omitted for the same reason —
 // a US-subject story reliably names a second anchor (Iran, Washington, …).
 const FOREIGN_SUBJECT_RE =
-  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|bangladesh|dhaka|chittagong|nepal|kathmandu|sri lanka|colombo|bhutan|maldives|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
+  /\b(?:united states|u\.s\.a?\.|washington|iran|tehran|israel|gaza|west bank|hamas|hezbollah|hizbollah|houthi|ukraine|kyiv|kiev|russia|kremlin|moscow|china|beijing|shanghai|taiwan|taipei|kaohsiung|guam|saipan|mariana islands|northern mariana|north korea|pyongyang|south korea|seoul|japan|tokyo|india|new delhi|pakistan|islamabad|bangladesh|dhaka|chittagong|nepal|kathmandu|sri lanka|colombo|bhutan|maldives|afghanistan|kabul|taliban|syria|iraq|baghdad|yemen|lebanon|beirut|egypt|cairo|turkey|t\u00fcrkiye|myanmar|burma|cambodia|phnom penh|laos|vientiane|vietnam|hanoi|malaysia|kuala lumpur|singapore|united kingdom|\buk\b|britain|london|france|paris|germany|berlin|venezuela|sudan|khartoum|nigeria|somalia|ethiopia)\b/i;
 
 // Per-report HOME anchors: the country name, nationality, provinces and major
 // cities. Their presence in a headline (or its translation) proves the story is
@@ -642,9 +642,14 @@ export function isForeignSubjectNoHomeAnchor(
 ): boolean {
   const rawTitle = title ?? "";
   if (!rawTitle.trim()) return false;
-  // A resolved structured location is itself a home anchor: the geocoder fills
-  // `location` only when it matched a place inside the report's own country.
-  if ((location ?? "").trim()) return false;
+  // A resolved structured location is USUALLY a home anchor: the geocoder fills
+  // `location` when it matched a place. But it can MIS-RESOLVE a foreign city
+  // onto a domestically-tagged record (e.g. "Taipei" onto a Thailand-filed row),
+  // so a set location counts as a home anchor ONLY when it does not itself name
+  // a foreign subject — otherwise the mis-resolved foreign city would shield the
+  // record from this guard.
+  const loc = (location ?? "").trim();
+  if (loc && !FOREIGN_SUBJECT_RE.test(loc)) return false;
   // Only strip when the TITLE positively names a foreign subject.
   if (!FOREIGN_SUBJECT_RE.test(rawTitle)) return false;
   const anchorHaystack = `${displayTitle ?? ""} ${rawTitle}`;
@@ -662,5 +667,37 @@ export function isForeignSubjectNoHomeAnchor(
       if (ownRe.test(anchorHaystack)) return false;
     }
   }
+  return true;
+}
+
+// A hazard / security cue immediately followed by a "drill", "exercise" or
+// "simulation" noun — an "active shooter" drill, a fire / earthquake / evacuation
+// drill, a disaster simulation. Such records are PREPAREDNESS events, not real
+// incidents, but the hazard word drives severity so they leak into a brief's
+// crime / hazard themes and surface as the "most serious reported" event though
+// nothing happened. Bounded to the cue-then-noun pair so it never touches oil /
+// gas "drilling" or a bare military "exercise".
+const PREPAREDNESS_DRILL_RE =
+  /\b(?:active[ -]?shooter|shooter|fire|earthquake|quake|evacuation|lockdown|security|disaster|tsunami|typhoon|flood|volcano|eruption|bomb|terror|emergency|preparedness|safety)['"\u2018\u2019\s.,-]{0,3}(?:drills?|exercises?|simulations?)\b/i;
+
+// A real casualty / violence signal: if present the record describes an ACTUAL
+// event that merely mentions a drill ("gunman opens fire during fire drill, 3
+// killed"), so the drill drop is vetoed and the record is kept.
+const DRILL_VIOLENCE_VETO_RE =
+  /\b(?:kill(?:ed|s|ing)?|dead|death|deaths|die[ds]?|injur(?:ed|es|y|ies)|wounded|shot|shooting|casualt\w*|fatal\w*|hurt|stabbed|explos\w*|blast)\b/i;
+
+/**
+ * True when a record describes a PREPAREDNESS DRILL / exercise / simulation
+ * rather than a real security or hazard incident. Applied display-side to every
+ * country / city brief so a non-event ("DepEd pilots 'active shooter' drill")
+ * never populates a theme or surfaces as the "most serious reported" incident.
+ * A casualty / violence signal vetoes the drop. No-fabrication: this only
+ * removes non-events, it never invents or up-rates anything.
+ */
+export function isPreparednessDrill(text: string | null | undefined): boolean {
+  const t = text ?? "";
+  if (!t.trim()) return false;
+  if (!PREPAREDNESS_DRILL_RE.test(t)) return false;
+  if (DRILL_VIOLENCE_VETO_RE.test(t)) return false;
   return true;
 }

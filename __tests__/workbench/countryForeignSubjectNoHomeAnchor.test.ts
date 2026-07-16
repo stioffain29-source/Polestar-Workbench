@@ -16,6 +16,9 @@ const THAI_DROP = [
   "Russia advances in eastern Ukraine",
   "Israel and Hamas trade fire as Gaza truce collapses",
   "Myanmar junta airstrikes kill 20 in Sagaing",
+  // Pacific-typhoon syndication filed under Thailand by a stray country tag.
+  "Taiwan prepares for heavy rain as Typhoon Bavi approaches",
+  "Typhoon Bavi lashes Guam and the Northern Mariana Islands",
 ];
 
 // Genuine Thai incidents (location assumed unresolved) that MUST be retained:
@@ -68,8 +71,8 @@ describe("isForeignSubjectNoHomeAnchor", () => {
   });
 
   it("keeps a foreign-subject title once a local `location` is resolved", () => {
-    // The geocoder only fills `location` with a place inside the report country,
-    // so a resolved location is itself a home anchor.
+    // The geocoder normally fills `location` with a place inside the report
+    // country, so a resolved DOMESTIC location is itself a home anchor.
     expect(
       isForeignSubjectNoHomeAnchor(
         "US launches new Iran strikes",
@@ -78,6 +81,20 @@ describe("isForeignSubjectNoHomeAnchor", () => {
         "Thailand",
       ),
     ).toBe(false);
+  });
+
+  it("still drops when the resolved `location` is itself a FOREIGN place", () => {
+    // The geocoder can MIS-RESOLVE a foreign city (e.g. "Taipei") onto a
+    // Thailand-tagged record; that must not shield the foreign record from the
+    // guard. A set location is a home anchor only when it is not foreign.
+    expect(
+      isForeignSubjectNoHomeAnchor(
+        "Taiwan prepares for heavy rain as Typhoon Bavi approaches",
+        null,
+        "Taipei",
+        "Thailand",
+      ),
+    ).toBe(true);
   });
 
   it("keeps a foreign-subject title anchored by its English translation", () => {

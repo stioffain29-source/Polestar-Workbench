@@ -23,6 +23,10 @@ const SLOP = [
   "Pilot killed and several injured in a plane crash near Beijing",
   "Building collapse in Saigon traps construction workers",
   "Deadly bus crash on a motorway outside Bangkok",
+  // African outbreak/unrest syndicated under a domestic country tag: an Ebola
+  // story about the Congo (DRC) that surfaced as a top EXTREME "protest" item.
+  "Ebola cases in Congo reach 2,011 with 754 deaths as health workers strike",
+  "Clashes in Kinshasa as DRC opposition rallies against the government",
   // Bahasa-first outlets syndicating FOREIGN accidents/disasters under a domestic
   // country tag: the France skydiving-plane crash, the Ubisoft founder killed in
   // that crash, a US (Missouri) crash and French wildfires. Detectable via the

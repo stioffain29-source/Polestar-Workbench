@@ -77,3 +77,9 @@ Surabaya" — Surabaya anchors it).
   have `display_title` populated (the English translation). NULL `display_title`
   → the guard is blind. See `incident-title-translation.md` /
   `title-translation-markers.md` (prod backfill via `INGEST_FORCE_VERSION` bump).
+- **BOTH render paths must feed the guard the SAME haystack (`displayTitle+title`,
+  never summary).** The filter is duplicated in `CountryReport.tsx` (live page) AND
+  `scripts/countryReportData.ts` (headless PDF/audit). The headless Indonesia branch
+  once drifted to include `i.summary`, so the masthead false-anchor leaked back on
+  the PDF only and page/PDF disagreed on borderline rows. Any change to one path's
+  guard input must be mirrored in the other, or preview≠PDF.
