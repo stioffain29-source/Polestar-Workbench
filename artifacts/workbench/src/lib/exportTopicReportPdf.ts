@@ -1240,20 +1240,23 @@ export async function exportTopicReportPdf(
       // assessment fills any blank field so the report reads with substance
       // out of the box. Bullet lists join on newlines for drawBulletSection.
       const a = cargoModel.assessment;
+      // Editor override wins; otherwise the AI narrative (when configured) fills
+      // the section, falling back to the deterministic model assessment. Mirrors
+      // CargoReportPreview exactly so the on-screen preview == this PDF.
       if (show("situation")) {
-        const sit = pickRead(data.situation, a.situation);
+        const sit = resolveSimpleProse(data.situation, aiProse?.situation, a.situation);
         if (sit.trim()) drawSectionWithProse(ctx, "Situation", sit);
       }
       if (show("what-matters")) {
-        const wm = pickRead(data.whatMatters, a.whatMatters.join("\n"));
+        const wm = resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, a.whatMatters.join("\n"));
         if (wm.trim()) drawBulletSection(ctx, "What Matters", wm, 3);
       }
       if (show("implications")) {
-        const bp = pickRead(data.implications, a.implications.join("\n"));
+        const bp = resolveSimpleProse(data.implications, aiProse?.implications, a.implications.join("\n"));
         if (bp.trim()) drawBulletSection(ctx, "Implications", bp, 3);
       }
       if (show("watch-next")) {
-        const wn = pickRead(data.watchNext, a.watchNext.join("\n"));
+        const wn = resolveSimpleProse(data.watchNext, aiProse?.watchNext, a.watchNext.join("\n"));
         if (wn.trim()) drawBulletSection(ctx, "Watch Next", wn, 4);
       }
 
@@ -1266,7 +1269,7 @@ export async function exportTopicReportPdf(
       }
 
       if (show("polestar-view")) {
-        const pv = pickRead(data.polestarView, a.polestarView);
+        const pv = resolveSimpleProse(data.polestarView, aiProse?.polestarView, a.polestarView);
         if (pv.trim()) drawSectionWithProse(ctx, "Polestar View", pv);
       }
 
