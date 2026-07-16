@@ -199,6 +199,21 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     impact: "Property and asset-security risk; review premises security in the affected area.",
   },
   {
+    // NEW (bilingual). Vehicle road-collision cues the transport rule above
+    // misses: the bare Bahasa root "tabrak" (and menabrak/ditabrak/tabrak
+    // lari/beruntun) in a VEHICLE context. Placed AFTER the crime rules (armed
+    // robbery, homicide, theft) so a robbery/theft that merely uses "tabrak" as
+    // a method ("begal ... pepet dan tabrak", "pencurian ... ditabrak pikap")
+    // keeps its crime classification; only a primary vehicle collision resolves
+    // here. A collision with no crime context is a road-safety / traffic event,
+    // not crime. The narrower ACCIDENT_ONLY_RE reroute below deliberately does
+    // NOT list bare "tabrak", so these stay a transport-disruption row rather
+    // than rerouting to Natural hazard.
+    re: /\b(tabrak lari|tabrak beruntun|(?:mobil|motor|truk|truck|bus|pikap|pick-?up|angkot|angkutan|kendaraan|sepeda motor|ojol|ojek|kereta|minibus|bajaj|metromini|transjakarta|ambulans|sopir|pemotor|pengendara)[^.\n]{0,30}?(?:tabrak|menabrak|ditabrak|nabrak)|(?:menabrak|ditabrak|nabrak|tabrak)[^.\n]{0,30}?(?:mobil|motor|truk|bus|pikap|kaca|gedung|pohon|tiang|pembatas|trotoar|pejalan|orang|warga|pengendara|pemotor))\b/i,
+    category: "Road / highway",
+    impact: "Overland freight and personnel-movement disruption on the affected corridor.",
+  },
+  {
     re: /\b(police (?:operation|raid|swoop|patrol|deployment|crackdown)|joint (?:operation|patrol|task ?force)|raid(?:ed|s)?|swoop|manhunt|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|wanted (?:man|men|criminal|suspect|fugitive)|penggerebekan|digerebek|razia|penangkapan|ditangkap|diamankan polisi|\bburon\b)\b/i,
     category: "Policing operation",
     impact: "Localised disruption and checkpoints; short-term access constraints possible.",

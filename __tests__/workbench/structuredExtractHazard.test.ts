@@ -72,3 +72,32 @@ describe("structuredExtract accident/hazard reroute", () => {
     );
   });
 });
+
+// Locks the bare-verb "tabrak" (vehicle collision) rule so a Bahasa road
+// accident is classified as Road / highway rather than falling through to
+// "Other security" (which the Jakarta brief maps to the crime theme). The
+// rule must sit after the crime rules and must not match metaphorical uses
+// ("tabrak aturan" = flout the rules).
+describe("structuredExtract bare-tabrak vehicle rule", () => {
+  it("classifies a bare-tabrak vehicle collision as Road / highway", () => {
+    expect(
+      categoryOf("Mobil Tabrak 4 Motor di Cipayung Jaktim, 2 Pemotor Terluka"),
+    ).toBe("Road / highway");
+    expect(categoryOf("Truk tabrak pemotor di jalan tol")).toBe("Road / highway");
+  });
+
+  it("does NOT match a metaphorical tabrak (flout rules / constitution)", () => {
+    expect(categoryOf("Kebijakan baru tabrak aturan yang berlaku")).toBe(
+      "Other security",
+    );
+    expect(categoryOf("Langkah pemerintah tabrak konstitusi")).toBe(
+      "Other security",
+    );
+  });
+
+  it("keeps a crime-primary tabrak headline classified as crime", () => {
+    expect(categoryOf("Begal tabrak korban lalu rampas motor")).toBe(
+      "Armed robbery / hold-up",
+    );
+  });
+});

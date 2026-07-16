@@ -28,6 +28,7 @@ import {
   isIndonesianPapuaTheatreContext,
   foreignSyndicationDropIds,
 } from "../src/lib/countryMatch";
+import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import type {
   PdfCountry,
   PdfIncident,
@@ -45,6 +46,7 @@ const SLUG_TO_NAME: Record<string, { name: string; region: string }> = {
   indonesia: { name: "Indonesia", region: "Asia-Pacific" },
   thailand: { name: "Thailand", region: "Asia-Pacific" },
   philippines: { name: "Philippines", region: "Asia-Pacific" },
+  jakarta: { name: "Jakarta", region: "Asia-Pacific" },
 };
 
 // The structured builders read these fields off each incident; build the full
@@ -109,13 +111,16 @@ function filterForCountry(
   const tokens = acceptedCountryTokens(name);
   const isPng = tokens.includes("papua new guinea");
   const isPapua = !isPng && tokens.includes("papua");
+  // The Jakarta city brief is a sub-view of Indonesia-tagged records: match on
+  // Indonesia, then keep only Jakarta-scoped items (mirrors CountryReport.tsx).
+  const isJakarta = tokens.includes("jakarta");
   const isIndonesia =
     !isPng && !isPapua && !tokens.includes("jakarta") && tokens.includes("indonesia");
-  // Cross-row foreign-syndication clustering (Indonesia only here — Jakarta is
-  // out of this loader's scope): drop a marker-less foreign syndication when a
+  // Cross-row foreign-syndication clustering (Indonesia + Jakarta): drop a
+  // marker-less foreign syndication when a
   // foreign-attributed sibling row names the place. Built over the same en text
   // the single-string guard reads (title + Bahasa title, no summary masthead).
-  const syndicationDrop = isIndonesia
+  const syndicationDrop = isIndonesia || isJakarta
     ? foreignSyndicationDropIds(
         all.map((i) => ({
           id: String(i.id),
@@ -124,6 +129,16 @@ function filterForCountry(
       )
     : new Set<string>();
   return all.filter((i) => {
+    // Jakarta city brief: match Indonesia, keep only Jakarta-scoped items, drop
+    // foreign-subject slop and syndicated foreign accidents (mirrors the page).
+    if (isJakarta) {
+      if (!incidentMatchesCountry(i.country, "Indonesia")) return false;
+      if (!isJakartaScoped(i.title, i.summary, i.location)) return false;
+      const en = `${i.ln ?? i.displayTitle ?? ""} ${i.title ?? ""}`;
+      if (isForeignSubjectForIndonesia(en)) return false;
+      if (syndicationDrop.has(String(i.id))) return false;
+      return true;
+    }
     if (!incidentMatchesCountry(i.country, name)) return false;
     if (isPng && !isCrossBorderPapuaPng(i.country)) {
       const text = `${i.title ?? ""} ${i.summary ?? ""} ${i.source ?? ""} ${(i.sourceUrl ?? "").replace(/[-_/]/g, " ")}`;
