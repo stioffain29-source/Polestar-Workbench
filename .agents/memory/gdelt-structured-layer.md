@@ -126,6 +126,34 @@ it against MAX_CALLS; a "just fetch each category separately" refactor would
 multiply QU spend. The broad per-country call (NO category) returns all
 categories — bucket locally, don't fan out.
 
+## Freeze signature: free-tier QU exhaustion (429 QUOTA_EXCEEDED)
+
+If the layer's "LATEST SOURCE DATE" (`max(source_date)`) AND `max(fetched_at)`
+both freeze on ONE date while every OTHER topic stays fresh, the free-plan
+monthly Query-Unit budget is spent. `gdeltcloud.com` then returns HTTP 429
+`{code:"QUOTA_EXCEEDED", used>limit, resets_at:<1st of next calendar month>}` on
+every call. It is NOT a missing key / broken wiring — confirm with a keyed
+`curl .../api/v2/events` (the host root still 200s). It AUTO-recovers at the
+month reset; no code change unsticks it earlier (only a paid plan upgrade would).
+**Why it freezes rather than errors visibly:** the pass runs LAST, isolated in
+its own try, so a budget cap can never fail the wider ingest — the surface just
+stops advancing.
+
+- **`fetched_at` is a per-ROW insert default**, so `max(fetched_at)` only moves
+  on a NON-ZERO insert. A run that inserts 0 (all-429, OR a genuinely quiet news
+  window) does NOT advance it, so the cadence gate (keyed on `max(fetched_at)`)
+  fails to throttle and the pass re-attempts on EVERY ingest — burning 429-retry
+  latency and, in a quiet-but-working window, re-spending QU faster than the 24h
+  cadence intends (a contributing cause of blowing the ~100 QU/mo ceiling). A run
+  heartbeat (`sources.last_success_at`, like Facebook OSINT's cadence clock)
+  would throttle correctly regardless of insert count.
+- **Post-reset gap is permanent by default:** once the table is seeded the window
+  is `RECENT_LOOKBACK_DAYS` (3d), so the first run after the reset only pulls the
+  last 3 days — the exhausted period never backfills unless a one-off wider
+  `GDELT_STRUCTURED_RECENT_DAYS`/seed run is done.
+- **Prevention:** raise `GDELT_STRUCTURED_INTERVAL_HOURS` (72h ≈ 80/mo) — the
+  broad daily 4-country×(events+stories) pull sits right at/over the free budget.
+
 **Wiring touch-points (so a future change doesn't half-wire it).** Like every
 other live source, it must thread through: ingest module export → `runIngestOnce`
 + standalone runner → boot freshness gate (gated on its OWN configured+enabled
