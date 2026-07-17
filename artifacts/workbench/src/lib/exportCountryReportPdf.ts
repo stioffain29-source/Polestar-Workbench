@@ -53,6 +53,8 @@ import {
 } from "./countryReportLayers";
 import { buildSituationalContext } from "./situationalContext";
 import { drawSituationalContextPdf } from "./situationalContextPdf";
+import { buildGdeltContext } from "./gdeltContext";
+import { drawGdeltContextPdf } from "./gdeltContextPdf";
 import {
   buildJakartaCorridorStatuses,
   hazardSummaryLabel,
@@ -88,7 +90,7 @@ import type {
   JakartaRoleAction,
   JakartaCrimeBusinessRow,
 } from "./jakartaBrief";
-import type { ReliefWebReport } from "@workspace/api-client-react";
+import type { GdeltStructuredItem, ReliefWebReport } from "@workspace/api-client-react";
 
 export interface PdfIncident {
   id: number | string;
@@ -128,6 +130,11 @@ export interface CountryPdfExtras {
   /** Supporting UN OCHA ReliefWeb situational reports. Rendered as a context
    *  layer (never counted as incidents); the section is skipped when empty. */
   situationalReports?: ReliefWebReport[] | null;
+  /** GDELT Cloud structured Events + Stories for GDELT-monitored theatres.
+   *  Promoted events are omitted (they appear in the incident picture). */
+  gdeltItems?: GdeltStructuredItem[] | null;
+  /** External ids of GDELT events already promoted into incidents. */
+  promotedGdeltExternalIds?: Set<string>;
   /** PNG data-URL of the rendered preview map. Optional. */
   mapImage?: string;
   /** Curated country baseline (operating environment, security context,
@@ -1427,6 +1434,14 @@ export async function exportCountryReportPdf(
         max: 6,
       }),
     );
+    drawGdeltContextPdf(
+      ctx,
+      buildGdeltContext(extras.gdeltItems ?? [], {
+        country: country.name,
+        max: 12,
+        promotedExternalIds: extras.promotedGdeltExternalIds,
+      }),
+    );
 
     drawDisclaimer(ctx);
     drawFooters(ctx.pdf);
@@ -1534,6 +1549,14 @@ export async function exportCountryReportPdf(
     buildSituationalContext(extras.situationalReports ?? [], {
       country: country.name,
       max: 6,
+    }),
+  );
+  drawGdeltContextPdf(
+    ctx,
+    buildGdeltContext(extras.gdeltItems ?? [], {
+      country: country.name,
+      max: 12,
+      promotedExternalIds: extras.promotedGdeltExternalIds,
     }),
   );
 

@@ -13,14 +13,11 @@ import {
 
 // GDELT Cloud structured event layer — a pilot ADDITIVE structured-source.
 //
-// This stores GDELT Cloud v2 "events" and "stories" as STANDALONE structured
-// context in their OWN table, mirroring reliefweb_reports / maritime_movement.
-// It is DELIBERATELY isolated from the incidents pipeline:
-//
-//   CRITICAL PRODUCT RULE: these rows are NEVER incidents. They live in their
-//   own table precisely so a GDELT event can never inflate any incident count,
-//   never reach a report/PDF, and never touch the report editor. No incident-
-//   counting surface reads this table. It is a read-only intelligence layer.
+// Stores GDELT Cloud v2 events and stories in gdelt_structured_items first.
+// Lane-bearing EVENTS are promoted into incidents (gdeltPromote.ts) so they
+// feed the flashpoint/conflict monitors and country geography reports. STORIES
+// (lane=null) never promote; they surface in the GDELT Open-Source Context
+// section of GDELT-monitored country reports.
 //
 // `kind` is the row discriminator:
 //   'event'  — an AI-coded event GDELT clustered. Events DRIVE the lanes.

@@ -14,6 +14,7 @@ import {
   incidentsTable,
   countryBaselinesTable,
   reliefwebReportsTable,
+  gdeltStructuredItemsTable,
 } from "@workspace/db";
 import {
   acceptedCountryTokens,
@@ -36,7 +37,8 @@ import type {
   CountryPdfExtras,
 } from "../src/lib/exportCountryReportPdf";
 import type { CountryBaseline } from "../src/lib/countryBaselines";
-import type { ReliefWebReport } from "@workspace/api-client-react";
+import type { ReliefWebReport, GdeltStructuredItem } from "@workspace/api-client-react";
+import { markerExternalId } from "@workspace/ingest";
 
 // Canonical slug -> report name. These are the names `acceptedCountryTokens`
 // resolves into the structured-brief token sets (papua new guinea / papua /
@@ -62,6 +64,7 @@ type CountryIncident = PdfIncident & {
   category?: string | null;
   businessImpact?: string | null;
   incidentDate?: string | null;
+  analystNotes?: string | null;
 };
 
 const iso = (d: Date | string | null | undefined): string | null => {
@@ -99,6 +102,7 @@ export async function loadIncidents(): Promise<CountryIncident[]> {
     province: r.province,
     category: r.category,
     businessImpact: r.businessImpact,
+    analystNotes: r.analystNotes,
   }));
 }
 
@@ -243,6 +247,67 @@ async function loadSituationalReports(name: string): Promise<ReliefWebReport[]> 
   );
 }
 
+async function loadGdeltItems(): Promise<GdeltStructuredItem[]> {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const rows = await db
+    .select()
+    .from(gdeltStructuredItemsTable)
+    .where(gte(gdeltStructuredItemsTable.sourceDate, cutoff))
+    .orderBy(desc(gdeltStructuredItemsTable.sourceDate))
+    .limit(200);
+  return rows.map(
+    (r) =>
+      ({
+        id: r.id,
+        sourceName: r.sourceName,
+        kind: r.kind,
+        externalId: r.externalId,
+        title: r.title,
+        summary: r.summary,
+        url: r.url,
+        primaryStoryUrl: r.primaryStoryUrl,
+        sourceDate: r.sourceDate,
+        codedAt: r.codedAt,
+        upstreamUpdatedAt: r.upstreamUpdatedAt,
+        country: r.country,
+        region: r.region,
+        continent: r.continent,
+        admin1: r.admin1,
+        location: r.location,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        family: r.family,
+        category: r.category,
+        subcategory: r.subcategory,
+        domain: r.domain,
+        eventCode: r.eventCode,
+        lane: r.lane,
+        subBucket: r.subBucket,
+        hasFatalities: r.hasFatalities,
+        fatalities: r.fatalities,
+        imageUrl: r.imageUrl,
+        topLanguage: r.topLanguage,
+        actors: r.actors ?? [],
+        metrics: r.metrics,
+        topArticles: r.topArticles ?? [],
+        linkedEvents: r.linkedEvents ?? [],
+        storyRefs: r.storyRefs ?? [],
+        extras: r.extras,
+        fetchedAt: r.fetchedAt,
+        createdAt: r.createdAt,
+      }) as unknown as GdeltStructuredItem,
+  );
+}
+
+function promotedGdeltExternalIds(incidents: CountryIncident[]): Set<string> {
+  const ids = new Set<string>();
+  for (const i of incidents) {
+    const eid = markerExternalId(i.analystNotes);
+    if (eid) ids.add(eid);
+  }
+  return ids;
+}
+
 export async function fetchCountryReportData(slug: string): Promise<{
   country: PdfCountry;
   incidents: PdfIncident[];
@@ -254,16 +319,22 @@ export async function fetchCountryReportData(slug: string): Promise<{
       `Unknown country slug "${slug}". Supported: ${Object.keys(SLUG_TO_NAME).join(", ")}`,
     );
   }
-  const [all, baseline, situationalReports] = await Promise.all([
+  const [all, baseline, situationalReports, gdeltItems] = await Promise.all([
     loadIncidents(),
     loadBaseline(slug),
     loadSituationalReports(meta.name),
+    loadGdeltItems(),
   ]);
   const incidents = filterForCountry(all, meta.name);
   const country: PdfCountry = { name: meta.name, region: meta.region };
   return {
     country,
     incidents: incidents as unknown as PdfIncident[],
-    extras: { baseline, situationalReports },
+    extras: {
+      baseline,
+      situationalReports,
+      gdeltItems,
+      promotedGdeltExternalIds: promotedGdeltExternalIds(incidents),
+    },
   };
 }

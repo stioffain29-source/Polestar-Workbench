@@ -7,12 +7,9 @@ import { format, parseISO } from "date-fns";
 import { ExternalLink } from "lucide-react";
 
 // GDELT Cloud structured event layer — a READ-ONLY surface over the standalone
-// gdelt_structured_items table. These rows are STRUCTURED CONTEXT, never
-// incidents: nothing here feeds an incident count, a report, or a PDF. The page
-// mirrors the collector's bucketing exactly — Events grouped into the five
-// verbatim-derived lanes, Stories shown separately with no lane (no
-// fabrication) — and tags the two tracked Indonesian sub-buckets. Missing
-// fields read "not reported" rather than being guessed.
+// gdelt_structured_items table. Lane-bearing events promote into incidents and
+// feed the country geography reports; stories and unpromoted events surface in
+// the GDELT Open-Source Context section of GDELT-monitored country reports.
 
 // Fixed lane order — must match the collector's lane taxonomy verbatim.
 const LANES = [
@@ -239,12 +236,13 @@ export default function GdeltStructured() {
           GDELT Cloud structured event layer
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5 leading-snug max-w-3xl">
-          A pilot STRUCTURED CONTEXT source: daily GDELT Cloud Events &amp;
-          Stories for Indonesia, the Philippines, Thailand and Papua New Guinea.
-          Stored in its own table — these rows are never incidents and never feed
-          a report or PDF. Events are bucketed into lanes from GDELT&apos;s
-          verbatim taxonomy; Stories carry no lane. Indonesian items are tagged
-          Jakarta or Indonesian Papua where the geography matches.
+          Daily GDELT Cloud Events &amp; Stories for Indonesia, the Philippines,
+          Thailand and Papua New Guinea. Lane-bearing events promote into
+          incidents and feed the country geography reports; stories and
+          unpromoted events appear in the GDELT Open-Source Context section of
+          those reports. Events are bucketed into lanes from GDELT&apos;s verbatim
+          taxonomy; stories carry no lane. Indonesian items are tagged Jakarta or
+          Indonesian Papua where the geography matches.
         </p>
       </div>
 

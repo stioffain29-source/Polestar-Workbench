@@ -5,6 +5,7 @@ import {
   useListIncidents,
   useListSources,
   useListReliefWebReports,
+  useListGdeltStructuredItems,
   useUpdateCountryReport,
   useGetCountryBaseline,
   useUpsertCountryBaseline,
@@ -76,6 +77,8 @@ import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
+import { isGdeltMonitoredReport } from "@/lib/gdeltContext";
+import { markerExternalId } from "@workspace/ingest";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -249,6 +252,21 @@ export default function CountryReport() {
     country ? { country: country.name ?? undefined, limit: 40 } : {},
     { query: { enabled: !!country } } as never,
   );
+  const gdeltMonitored = !!country && isGdeltMonitoredReport(country.name ?? "");
+  const { data: gdeltItems } = useListGdeltStructuredItems(
+    { days: 30, limit: 200 },
+    { query: { enabled: gdeltMonitored } } as never,
+  );
+  const promotedGdeltExternalIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const i of incidentsData ?? []) {
+      const eid = markerExternalId(
+        (i as { analystNotes?: string | null }).analystNotes,
+      );
+      if (eid) ids.add(eid);
+    }
+    return ids;
+  }, [incidentsData]);
   const incidents = useMemo(() => {
     if (!country) return [];
     const name = country.name ?? "";
@@ -1785,6 +1803,8 @@ export default function CountryReport() {
       <CountryReportVisuals
         countryName={effective.name}
         situationalReports={situationalReports}
+        gdeltItems={gdeltItems}
+        promotedGdeltExternalIds={promotedGdeltExternalIds}
       />
 
       {/* Internal Source Coverage — screen-only, never in the PDF.
