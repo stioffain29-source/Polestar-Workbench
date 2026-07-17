@@ -22,8 +22,24 @@ export interface CargoReportOverrides {
   polestarView?: string | null;
 }
 
+/** Cached AI narrative for the five editable assessment sections. When the
+ *  prose engine is configured this text renders (below an analyst edit, above
+ *  the deterministic model), so the gate must see it — an AI narrative is NOT
+ *  self-gating the way the deterministic builder is. */
+export interface CargoReportAiProse {
+  situation?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
+  watchNext?: string | null;
+  polestarView?: string | null;
+}
+
 export interface CargoResolvedSection {
   text: string;
+  /** True when the rendered text is authored (an analyst edit OR the AI
+   *  narrative) rather than the self-gating deterministic model. Authored text
+   *  is subject to the evidence checks; deterministic text passes them by
+   *  construction. */
   ownerEdited: boolean;
 }
 
@@ -64,26 +80,49 @@ export class CargoReportValidationError extends Error {
 
 function resolveSection(
   override: string | null | undefined,
+  ai: string | null | undefined,
   auto: string,
 ): CargoResolvedSection {
-  const t = (override ?? "").trim();
-  return t ? { text: t, ownerEdited: true } : { text: auto ?? "", ownerEdited: false };
+  const o = (override ?? "").trim();
+  if (o) return { text: o, ownerEdited: true };
+  const i = (ai ?? "").trim();
+  if (i) return { text: i, ownerEdited: true };
+  return { text: auto ?? "", ownerEdited: false };
 }
 
 /** Resolve the five editable assessment sections exactly as the preview and PDF
- *  do (editor override wins when non-blank, otherwise the deterministic model
- *  assessment). ONE authority so the gate can never disagree with what renders. */
+ *  do: editor override wins when non-blank, otherwise the cached AI narrative
+ *  (when present), otherwise the deterministic model assessment. ONE authority
+ *  so the gate can never disagree with what renders — and so AI prose is held to
+ *  the same checks as an analyst edit. */
 export function resolveCargoReportText(
   model: CargoPatternModel,
   overrides: CargoReportOverrides,
+  ai: CargoReportAiProse = {},
 ): CargoResolvedText {
   const a = model.assessment;
   return {
-    situation: resolveSection(overrides.situation, a.situation),
-    whatMatters: resolveSection(overrides.whatMatters, a.whatMatters.join("\n")),
-    implications: resolveSection(overrides.implications, a.implications.join("\n")),
-    watchNext: resolveSection(overrides.watchNext, a.watchNext.join("\n")),
-    polestarView: resolveSection(overrides.polestarView, a.polestarView),
+    situation: resolveSection(overrides.situation, ai.situation, a.situation),
+    whatMatters: resolveSection(
+      overrides.whatMatters,
+      ai.whatMatters,
+      a.whatMatters.join("\n"),
+    ),
+    implications: resolveSection(
+      overrides.implications,
+      ai.implications,
+      a.implications.join("\n"),
+    ),
+    watchNext: resolveSection(
+      overrides.watchNext,
+      ai.watchNext,
+      a.watchNext.join("\n"),
+    ),
+    polestarView: resolveSection(
+      overrides.polestarView,
+      ai.polestarView,
+      a.polestarView,
+    ),
   };
 }
 
@@ -163,12 +202,13 @@ export function validateCargoReport(
   model: CargoPatternModel,
   overrides: CargoReportOverrides,
   issueDate: string,
+  ai: CargoReportAiProse = {},
 ): CargoReportValidationIssue[] {
   const issues: CargoReportValidationIssue[] = [];
   // An empty report renders its explicit no-data state; nothing to validate.
   if (model.isEmpty || model.totalUnique === 0) return issues;
 
-  const text = resolveCargoReportText(model, overrides);
+  const text = resolveCargoReportText(model, overrides, ai);
   const total = model.totalUnique;
 
   // 1. Totals reconcile — the register, supply-chain exposure, weekly table and
@@ -398,7 +438,8 @@ export function assertCargoReportValid(
   model: CargoPatternModel,
   overrides: CargoReportOverrides,
   issueDate: string,
+  ai: CargoReportAiProse = {},
 ): void {
-  const issues = validateCargoReport(model, overrides, issueDate);
+  const issues = validateCargoReport(model, overrides, issueDate, ai);
   if (issues.length) throw new CargoReportValidationError(issues);
 }

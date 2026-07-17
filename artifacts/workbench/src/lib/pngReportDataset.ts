@@ -59,6 +59,7 @@ import {
 } from "./operatingRiskProse";
 import {
   COUNTRY_INCIDENT_THEMES,
+  buildCountryIncidentThemes,
   themeForCategory,
   type CountryIncidentTheme,
 } from "./countryIncidentThemes";
@@ -969,8 +970,22 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
 // (infrastructure ribbon-cutting, aviation partnerships, scholarships, "brings
 // hope/joy" community items, "tidbits" round-ups). Substring match; the strict
 // severity + security gating below is the real safety net.
+//
+// Two homonym-driven PR classes were leaking into the PNG "Protest & civil
+// unrest" theme and are added here (both Low, both carry no security term, so the
+// severity + veto gating below keeps every genuine event):
+//   * AWARDS / RECOGNITION human-interest ("declines WOW Awards Nomination…",
+//     summarised as "a powerful demonstration of selfless leadership") — the
+//     bare metaphor "demonstration of <virtue>" is deliberately spared upstream
+//     so genuine "demonstration of people power" survives, so it must be caught
+//     here as PR, not as a protest.
+//   * JOINT MILITARY EXERCISE PR ("U.S., Papua New Guinea launch Tamiok Strike
+//     26", "Exercise Tamiok Strike 2026", "Exercise Pitch Black") — the exercise
+//     name "…Strike…" is a labour-strike homonym; a friendly readiness exercise
+//     is not a security incident. Named-exercise anchors (tamiok strike / exercise
+//     pitch black) are used so the darkness metaphor "pitch black" cannot match.
 const DEVELOPMENT_WIRE_RE =
-  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade|groundbreaking|ceremony|renovat|classroom|farewell|new era|inflation|bursar|\b5g\b|designer|new collection|enduring relationship|strengthen(s|ing)? (its |the )?(relationship|partnership|ties|bond))/i;
+  /(brings hope|brings joy|tidbits|partnership|inaugural|scholarship|cadet program|flight subsid|aviation network|expansion project|moves forward|contract signing|countdown begins|in the air|links communities|connect isolated|community engagement|memorandum of understanding|invests in|investment|benefit from|celebrat|upgrade|groundbreaking|ceremony|renovat|classroom|farewell|new era|inflation|bursar|\b5g\b|designer|new collection|enduring relationship|strengthen(s|ing)? (its |the )?(relationship|partnership|ties|bond)|\baward(s|ed|ing)?\b|\bnominat(e|es|ed|ion|ions|ing)?\b|\baccolade|\bprize\b|pageant|tamiok strike|exercise pitch black|(joint|bilateral|combined|multinational|military) (military )?exercise|war ?games)/i;
 // A security / risk / hazard term anywhere in the text VETOES the drop, even
 // when the promotional lexicon also matches, so a genuine low-severity crime,
 // court, unrest or natural-hazard item is never removed. A veto only ever KEEPS
@@ -989,11 +1004,41 @@ const SECURITY_TERM_RE =
 // do NOT grow it into a second general lexicon.
 const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 
+// NON-EVENT editorial classes that carry security vocabulary BY THEIR NATURE, so
+// the SECURITY_TERM_RE veto below would keep them forever and the severityRank
+// backstop cannot help (they arrive mis-rated High). Each is an editorial /
+// promotional artefact, never a discrete security event:
+//   * ANALYSIS / OPINION think-pieces ("Beyond tribal violence: everyday crime
+//     and insecurity in PNG — Devpolicy Blog") — a Development Policy Centre essay
+//     ABOUT violence, not a violence report.
+//   * SPORTS FIXTURES ("Consistency in Selection Ahead of Blackhawks Clash",
+//     "Flying Fijians name powerful side for Wales opener") — the rugby-league
+//     "clash" is a homonym that trips SECURITY_TERM_RE; a team-selection preview
+//     is not an incident. Anchored on non-event ACTIONS (team selection), never
+//     team names — "Vipers" appears in a genuine attempted-murder conviction.
+//   * PUBLIC-AWARENESS CAMPAIGNS ("…Robust Awareness Initiative Transforms Local
+//     Wards") — an advocacy drive against violence, not a violent event.
+// These anchors are EMPIRICALLY precision-gated: verified against the full live
+// PNG corpus (2.5 months) to match ONLY these non-event rows and zero genuine
+// incidents, which is why they may safely bypass the security-term veto. Keep any
+// addition to that same standard (confirm it hits no real event before adding).
+// Deliberately EXCLUDES the "community leaders trained to stop violence" training
+// class: "trained to stop" can co-occur with a real casualty ("officer trained to
+// stop riots shot dead"), so it stays veto-protected — the durable fix for those
+// is upstream severity/category reclassification, not a veto bypass here.
+const NON_EVENT_TITLE_RE =
+  /(\bdevpolicy\b|development policy centre|everyday crime and insecurity|\bname[sd]?\s+(?:a\s+)?(?:powerful\s+)?side\b|consistency in selection|selection ahead of|\bawareness\s+(?:initiative|campaign|programme|program|drive|week|month)\b)/i;
+
 // Pure predicate: is this a low-value development / promotional wire item that a
 // security brief should exclude? Exported for unit tests. Strict under-filter
 // bias — a security / hazard term always vetoes the drop.
 //
-// Two paths:
+// Three paths:
+//  0. NON-EVENT editorial classes (NON_EVENT_TITLE_RE) are dropped at any severity
+//     WITHOUT the security-term veto, because they inherently name security topics
+//     (analysis of violence, a rugby "clash", an anti-violence campaign) yet carry
+//     no discrete event. Safe only because each anchor is empirically verified to
+//     match no genuine incident in the live corpus.
 //  1. STRUCTURAL round-up columns (HARD_NON_INCIDENT_TITLE_RE) are dropped at any
 //     severity. The security-term veto here is TITLE-ONLY, matching the carve-out
 //     "a 'Tidbits: gunmen raid store' edition stays": these columns are always
@@ -1004,10 +1049,11 @@ const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 //     and a security / hazard term ANYWHERE (title or summary) vetoes the drop, so
 //     a genuine low-severity crime, court, unrest or natural-hazard item stays.
 export function isDevelopmentWireItem(item: PngReportItem): boolean {
+  const hay = `${item.title} ${item.summary}`.toLowerCase();
+  if (NON_EVENT_TITLE_RE.test(hay)) return true;
   if (HARD_NON_INCIDENT_TITLE_RE.test(item.title)) {
     return !SECURITY_TERM_RE.test(item.title.toLowerCase());
   }
-  const hay = `${item.title} ${item.summary}`.toLowerCase();
   if (SECURITY_TERM_RE.test(hay)) return false;
   if (item.severityRank >= 3) return false;
   return DEVELOPMENT_WIRE_RE.test(hay);
@@ -2173,7 +2219,16 @@ export function buildStructuredReportDataset(
   // list. Jakarta keeps its own tactical-brief themes (set above); every other
   // theatre (PNG, West Papua, Indonesia, Thailand, Philippines) gets the shared
   // assessed synthesis here.
-  if (!incidentThemesOverride) {
+  // Gate the assessed-theme override on the same meaningfulness threshold the
+  // fallback theme builder applies: when the only leftover reporting is a lone,
+  // lower-severity incident that clears no meaningful theme, leave the override
+  // undefined so both consumers fall through to the honest "did not warrant
+  // separate detail" empty-note (no-fabrication) rather than manufacturing a
+  // theme paragraph from an immaterial break-in.
+  if (
+    !incidentThemesOverride &&
+    buildCountryIncidentThemes(incidentDetailsItems).length > 0
+  ) {
     incidentThemesOverride = buildAssessedThemeGroups(
       incidentDetailsItems,
       previousWindowItems,

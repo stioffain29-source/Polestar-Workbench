@@ -536,14 +536,36 @@ export default function CargoReportPreview({
   );
 
   const a = model.assessment;
-  const situationText = pickRead(report.situation, a.situation);
-  const whatMattersText = pickRead(report.whatMatters, a.whatMatters.join("\n"));
-  const implicationsText = pickRead(
+  // Editor override wins; otherwise the AI narrative (when the prose engine is
+  // configured) fills the section, falling back to the deterministic model
+  // assessment. Mirrors every other topic preview so the cargo report surfaces
+  // the AI whatMatters / polestarView narrative instead of only the template.
+  // The cargo PDF exporter applies the identical resolution so screen == PDF.
+  const situationText = resolveSimpleProse(
+    report.situation,
+    aiProse?.situation,
+    a.situation,
+  );
+  const whatMattersText = resolveSimpleProse(
+    report.whatMatters,
+    aiProse?.whatMatters,
+    a.whatMatters.join("\n"),
+  );
+  const implicationsText = resolveSimpleProse(
     report.implications,
+    aiProse?.implications,
     a.implications.join("\n"),
   );
-  const watchNextText = pickRead(report.watchNext, a.watchNext.join("\n"));
-  const polestarViewText = pickRead(report.polestarView, a.polestarView);
+  const watchNextText = resolveSimpleProse(
+    report.watchNext,
+    aiProse?.watchNext,
+    a.watchNext.join("\n"),
+  );
+  const polestarViewText = resolveSimpleProse(
+    report.polestarView,
+    aiProse?.polestarView,
+    a.polestarView,
+  );
 
   // HARD validation gate (spec pt7). Runs the ten checks over the SAME model +
   // resolved section text this preview renders (and the PDF exporter throws on),
@@ -561,6 +583,13 @@ export default function CargoReportPreview({
           polestarView: report.polestarView,
         },
         issueDate,
+        {
+          situation: aiProse?.situation,
+          whatMatters: aiProse?.whatMatters,
+          implications: aiProse?.implications,
+          watchNext: aiProse?.watchNext,
+          polestarView: aiProse?.polestarView,
+        },
       ),
     [
       model,
@@ -570,6 +599,11 @@ export default function CargoReportPreview({
       report.watchNext,
       report.polestarView,
       issueDate,
+      aiProse?.situation,
+      aiProse?.whatMatters,
+      aiProse?.implications,
+      aiProse?.watchNext,
+      aiProse?.polestarView,
     ],
   );
 
