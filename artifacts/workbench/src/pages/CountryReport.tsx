@@ -78,7 +78,7 @@ import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 import { isGdeltMonitoredReport } from "@/lib/gdeltContext";
-import { markerExternalId } from "@workspace/ingest";
+import { markerExternalId } from "@workspace/ingest/markers";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";

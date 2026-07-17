@@ -13,7 +13,8 @@
     "./philippinesExtract": "./src/philippinesExtract.ts",
     "./jakartaExtract": "./src/jakartaExtract.ts",
     "./kammiGeography": "./src/kammiGeography.ts",
-    "./optionalIntegrations": "./src/optionalIntegrations.ts"
+    "./optionalIntegrations": "./src/optionalIntegrations.ts",
+    "./markers": "./src/markers.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",

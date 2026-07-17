@@ -14,6 +14,7 @@ import {
   type RelevanceStatus,
 } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
+import { PROMOTE_MARKER_PREFIX, promoteMarker, markerExternalId } from "./markers";
 
 // GDELT Cloud structured-event → incident PROMOTE pass.
 //
@@ -86,20 +87,12 @@ export function resolvePromoteCountry(
   return c;
 }
 
-// Idempotency marker written to analyst_notes so re-runs recognise an already-
-// promoted event and never insert it twice.
-export const PROMOTE_MARKER_PREFIX = "gdelt_cloud:";
-
-export function promoteMarker(externalId: string): string {
-  return `${PROMOTE_MARKER_PREFIX}${externalId}`;
-}
-
-/** The GDELT externalId encoded in an analyst_notes marker, or null. */
-export function markerExternalId(analystNotes: string | null | undefined): string | null {
-  if (!analystNotes || !analystNotes.startsWith(PROMOTE_MARKER_PREFIX)) return null;
-  const id = analystNotes.slice(PROMOTE_MARKER_PREFIX.length).trim();
-  return id || null;
-}
+// Idempotency-marker helpers now live in the pure, dependency-free ./markers
+// module so browser/client code can import markerExternalId without pulling the
+// db/drizzle ingest barrel into the client bundle ("Buffer is not defined").
+// Re-exported here so existing consumers and the @workspace/ingest barrel keep
+// working unchanged.
+export { PROMOTE_MARKER_PREFIX, promoteMarker, markerExternalId };
 
 // Same fuzzy dedupe key the news-topic ingest uses, so a GDELT event that
 // duplicates an already-scraped news incident (same headline, day, country,

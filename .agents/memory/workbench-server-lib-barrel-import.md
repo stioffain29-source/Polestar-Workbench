@@ -22,7 +22,18 @@ warnings). A production Rollup build might tree-shake it away, but dev crashes.
 **How to apply:** when the client needs a helper that lives in a server lib,
 add a leaf/subpath entry to that lib's `package.json` `exports` map pointing at
 a self-contained PURE module (mirror the existing `./pngExtract`,
-`./westPapuaExtract`, `./structuredExtract`, `./optionalIntegrations` entries),
-then import via the subpath. Never add the symbol to a client file via the root
-barrel. The comment atop `artifacts/workbench/src/lib/incidentTitle.ts` already
-warns that `@workspace/db` cannot be pulled into the client — the same hazard.
+`./westPapuaExtract`, `./structuredExtract`, `./optionalIntegrations`,
+`./markers` entries), then import via the subpath. Never add the symbol to a
+client file via the root barrel. The comment atop
+`artifacts/workbench/src/lib/incidentTitle.ts` already warns that `@workspace/db`
+cannot be pulled into the client — the same hazard.
+
+**Recurrence:** the GDELT idempotency-marker helpers (`markerExternalId`,
+`promoteMarker`, `PROMOTE_MARKER_PREFIX`) are pure strings but originally lived
+in the db-heavy `gdeltPromote.ts`, so a client `import { markerExternalId } from
+"@workspace/ingest"` in `CountryReport.tsx` re-crashed the app. They now live in
+the dependency-free `lib/ingest/src/markers.ts` (subpath `@workspace/ingest/markers`),
+re-exported from `gdeltPromote.ts` for server consumers. Client code needing any
+marker helper MUST import from `@workspace/ingest/markers`, never the root.
+Symptom that it regressed: Vite dev-log "optimized dependencies" line lists
+`pg`/`drizzle-orm`/`postgres` — those must never appear for the client.
