@@ -68,6 +68,7 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Publication Calendar", href: "/calendar", icon: CalendarDays },
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
+        { label: "Special Reports", href: "/special-reports", icon: FileText },
         { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
         { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
       ]

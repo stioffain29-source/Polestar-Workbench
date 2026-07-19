@@ -78,6 +78,7 @@ import type {
   ListReportsParams,
   ListSocialRawItemsParams,
   ListSourcesParams,
+  ListSpecialReportsParams,
   ListSpotReportsParams,
   ListStrikesParams,
   LiveuamapEventsResponse,
@@ -101,6 +102,9 @@ import type {
   SourceHealth,
   SourceInput,
   SourceUpdate,
+  SpecialReport,
+  SpecialReportInput,
+  SpecialReportUpdate,
   SpotReport,
   SpotReportExportInput,
   SpotReportInput,
@@ -3523,6 +3527,416 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getAppendSpotReportExportMutationOptions(options));
+    }
+
+export const getListSpecialReportsUrl = (params?: ListSpecialReportsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/special-reports?${stringifiedParams}` : `/api/special-reports`
+}
+
+export const listSpecialReports = async (params?: ListSpecialReportsParams, options?: RequestInit): Promise<SpecialReport[]> => {
+
+  return customFetch<SpecialReport[]>(getListSpecialReportsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSpecialReportsQueryKey = (params?: ListSpecialReportsParams,) => {
+    return [
+    `/api/special-reports`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSpecialReportsQueryOptions = <TData = Awaited<ReturnType<typeof listSpecialReports>>, TError = ErrorType<unknown>>(params?: ListSpecialReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpecialReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSpecialReportsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSpecialReports>>> = ({ signal }) => listSpecialReports(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSpecialReports>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSpecialReportsQueryResult = NonNullable<Awaited<ReturnType<typeof listSpecialReports>>>
+export type ListSpecialReportsQueryError = ErrorType<unknown>
+
+
+
+export function useListSpecialReports<TData = Awaited<ReturnType<typeof listSpecialReports>>, TError = ErrorType<unknown>>(
+ params?: ListSpecialReportsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSpecialReports>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSpecialReportsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateSpecialReportUrl = () => {
+
+
+
+
+  return `/api/special-reports`
+}
+
+export const createSpecialReport = async (specialReportInput: SpecialReportInput, options?: RequestInit): Promise<SpecialReport> => {
+
+  return customFetch<SpecialReport>(getCreateSpecialReportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      specialReportInput,)
+  }
+);}
+
+
+
+
+export const getCreateSpecialReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpecialReport>>, TError,{data: BodyType<SpecialReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSpecialReport>>, TError,{data: BodyType<SpecialReportInput>}, TContext> => {
+
+const mutationKey = ['createSpecialReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSpecialReport>>, {data: BodyType<SpecialReportInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSpecialReport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSpecialReportMutationResult = NonNullable<Awaited<ReturnType<typeof createSpecialReport>>>
+    export type CreateSpecialReportMutationBody = BodyType<SpecialReportInput>
+    export type CreateSpecialReportMutationError = ErrorType<unknown>
+
+    export const useCreateSpecialReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSpecialReport>>, TError,{data: BodyType<SpecialReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSpecialReport>>,
+        TError,
+        {data: BodyType<SpecialReportInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSpecialReportMutationOptions(options));
+    }
+
+export const getGetSpecialReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/special-reports/${id}`
+}
+
+export const getSpecialReport = async (id: number, options?: RequestInit): Promise<SpecialReport> => {
+
+  return customFetch<SpecialReport>(getGetSpecialReportUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSpecialReportQueryKey = (id: number,) => {
+    return [
+    `/api/special-reports/${id}`
+    ] as const;
+    }
+
+
+export const getGetSpecialReportQueryOptions = <TData = Awaited<ReturnType<typeof getSpecialReport>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpecialReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSpecialReportQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSpecialReport>>> = ({ signal }) => getSpecialReport(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSpecialReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSpecialReportQueryResult = NonNullable<Awaited<ReturnType<typeof getSpecialReport>>>
+export type GetSpecialReportQueryError = ErrorType<unknown>
+
+
+
+export function useGetSpecialReport<TData = Awaited<ReturnType<typeof getSpecialReport>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSpecialReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSpecialReportQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateSpecialReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/special-reports/${id}`
+}
+
+export const updateSpecialReport = async (id: number,
+    specialReportUpdate: SpecialReportUpdate, options?: RequestInit): Promise<SpecialReport> => {
+
+  return customFetch<SpecialReport>(getUpdateSpecialReportUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      specialReportUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateSpecialReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpecialReport>>, TError,{id: number;data: BodyType<SpecialReportUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSpecialReport>>, TError,{id: number;data: BodyType<SpecialReportUpdate>}, TContext> => {
+
+const mutationKey = ['updateSpecialReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSpecialReport>>, {id: number;data: BodyType<SpecialReportUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSpecialReport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSpecialReportMutationResult = NonNullable<Awaited<ReturnType<typeof updateSpecialReport>>>
+    export type UpdateSpecialReportMutationBody = BodyType<SpecialReportUpdate>
+    export type UpdateSpecialReportMutationError = ErrorType<unknown>
+
+    export const useUpdateSpecialReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSpecialReport>>, TError,{id: number;data: BodyType<SpecialReportUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSpecialReport>>,
+        TError,
+        {id: number;data: BodyType<SpecialReportUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSpecialReportMutationOptions(options));
+    }
+
+export const getDeleteSpecialReportUrl = (id: number,) => {
+
+
+
+
+  return `/api/special-reports/${id}`
+}
+
+export const deleteSpecialReport = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteSpecialReportUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSpecialReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialReport>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialReport>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSpecialReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSpecialReport>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSpecialReport(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSpecialReportMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSpecialReport>>>
+
+    export type DeleteSpecialReportMutationError = ErrorType<unknown>
+
+    export const useDeleteSpecialReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSpecialReport>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSpecialReport>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSpecialReportMutationOptions(options));
+    }
+
+export const getAppendSpecialReportExportUrl = (id: number,) => {
+
+
+
+
+  return `/api/special-reports/${id}/exports`
+}
+
+export const appendSpecialReportExport = async (id: number,
+    spotReportExportInput: SpotReportExportInput, options?: RequestInit): Promise<SpecialReport> => {
+
+  return customFetch<SpecialReport>(getAppendSpecialReportExportUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      spotReportExportInput,)
+  }
+);}
+
+
+
+
+export const getAppendSpecialReportExportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof appendSpecialReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof appendSpecialReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext> => {
+
+const mutationKey = ['appendSpecialReportExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof appendSpecialReportExport>>, {id: number;data: BodyType<SpotReportExportInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  appendSpecialReportExport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AppendSpecialReportExportMutationResult = NonNullable<Awaited<ReturnType<typeof appendSpecialReportExport>>>
+    export type AppendSpecialReportExportMutationBody = BodyType<SpotReportExportInput>
+    export type AppendSpecialReportExportMutationError = ErrorType<unknown>
+
+    export const useAppendSpecialReportExport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof appendSpecialReportExport>>, TError,{id: number;data: BodyType<SpotReportExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof appendSpecialReportExport>>,
+        TError,
+        {id: number;data: BodyType<SpotReportExportInput>},
+        TContext
+      > => {
+      return useMutation(getAppendSpecialReportExportMutationOptions(options));
     }
 
 export const getListDataCentreFacilitiesUrl = (params?: ListDataCentreFacilitiesParams,) => {

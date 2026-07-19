@@ -61,3 +61,33 @@ export function validateSpotReportPhotos(photos: unknown): string | null {
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Special-report front cover ceiling — shared by the workbench cover picker's
+// client-side guard AND the api-server route's server-side validation, so a
+// custom-uploaded cover can never be accepted by one and rejected by the other.
+// Library covers travel as a small key string and need no size check; only the
+// custom-uploaded data URL is bounded here.
+// ---------------------------------------------------------------------------
+
+/** Maximum size of a custom-uploaded cover's base64 data URL. */
+export const MAX_COVER_DATAURL_BYTES = 5 * 1024 * 1024;
+/** Accepted cover image data-URL prefixes (stored in a text column). */
+export const COVER_DATAURL_RE = /^data:image\/(jpeg|png|webp);base64,/;
+
+/**
+ * Validate a custom cover data URL against the shared ceiling. Returns an error
+ * message string, or null when the value is valid or absent (a report may have
+ * no custom cover, or use a library key instead). Both the client guard and the
+ * server route call this so the accepted type and size can never disagree.
+ */
+export function validateCoverDataUrl(dataUrl: unknown): string | null {
+  if (dataUrl === undefined || dataUrl === null || dataUrl === "") return null;
+  if (typeof dataUrl !== "string" || !COVER_DATAURL_RE.test(dataUrl)) {
+    return "The cover must be an image data URL (jpeg, png or webp).";
+  }
+  if (dataUrl.length > MAX_COVER_DATAURL_BYTES) {
+    return "The cover image is too large; please use a smaller image.";
+  }
+  return null;
+}

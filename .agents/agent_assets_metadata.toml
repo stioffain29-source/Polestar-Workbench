@@ -6,6 +6,30 @@ uri = "file://attached_assets/conflict_watch_cover.png"
 type = "image"
 title = "conflict watch cover"
 
+[[generated]]
+id = "Drd5It1rKpr5Nmmt8eYFR"
+uri = "file://attached_assets/generated_images/special_cover_world.png"
+type = "image"
+title = "special cover world map"
+
+[[generated]]
+id = "DYVQWmcRlmoynGZjua5Sc"
+uri = "file://attached_assets/generated_images/special_cover_maritime.png"
+type = "image"
+title = "special cover maritime"
+
+[[generated]]
+id = "u6qYTloyrM1N01zfrzetD"
+uri = "file://attached_assets/generated_images/special_cover_terrain.png"
+type = "image"
+title = "special cover terrain"
+
+[[generated]]
+id = "RqAeugeXuhMevttT-Z1x7"
+uri = "file://attached_assets/generated_images/special_cover_network.png"
+type = "image"
+title = "special cover network"
+
 [[outputs]]
 id = "aG0_NFVvJ-AacOw78yV51"
 uri = "file://screenshots/flashpoint_preview_final.jpg"

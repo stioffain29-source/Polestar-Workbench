@@ -1186,6 +1186,53 @@ export async function runDataMigrations(): Promise<void> {
         ON official_military_maritime_sources (flag_possible_spot_report)
     `);
 
+    // Schema: Special Reports — a lean, analyst-led, multi-domain one-off product
+    // built on the Spot Report foundation but kept in its OWN table, with a chosen
+    // front cover, manually-entered charts, and the same photos/map. The Drizzle
+    // schema (lib/db/src/schema/specialReports.ts) drives dev via `push`; this is
+    // the ONLY path that reaches the writable production primary, so a fresh prod
+    // database self-provisions the table on boot. All IF NOT EXISTS — safe to
+    // re-run. Columns mirror the Drizzle schema column-for-column.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS special_reports (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        status text NOT NULL DEFAULT 'draft',
+        report_date timestamptz NOT NULL DEFAULT now(),
+        incident_date timestamptz,
+        country text,
+        province text,
+        city text,
+        latitude double precision,
+        longitude double precision,
+        category text,
+        severity text,
+        cover_image_key text,
+        cover_image_data_url text,
+        bluf text,
+        incident_details text,
+        current_situation text,
+        operational_impact text,
+        assessment text,
+        outlook text,
+        recommended_actions text,
+        analyst_notes text,
+        confidence_level text,
+        internal_source_notes text,
+        show_sources_in_export boolean NOT NULL DEFAULT false,
+        linked_incident_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        map_enabled boolean NOT NULL DEFAULT false,
+        affected_radius_km double precision,
+        map_points jsonb NOT NULL DEFAULT '[]'::jsonb,
+        charts jsonb NOT NULL DEFAULT '[]'::jsonb,
+        photos jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_by text,
+        export_history jsonb NOT NULL DEFAULT '[]'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        last_edited_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
     // Schema: AI-generated country-report narratives + sibling tables that the
     // country/PNG report builder relies on. These were previously created only by
     // the dev-only drizzle `push`, so a fresh production database never had them.
