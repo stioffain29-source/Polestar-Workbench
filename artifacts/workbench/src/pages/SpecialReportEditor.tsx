@@ -45,19 +45,23 @@ import { SEVERITY_LEVELS, CONFIDENCE_LEVELS } from "@/lib/topics";
 import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
 import {
   checkSpecialReportQuality,
+  resolveSpecialReportBlocks,
   specialReportSaveErrorMessage,
   SPECIAL_STATUSES,
   type QualityResult,
+  type SpecialReportBlock,
 } from "@/lib/specialReport";
 import { COVER_LIBRARY, resolveCoverUrl } from "@/lib/coverImages";
-// Photo/cover ceilings come from the SHARED module the api-server route also
-// uses, so the client pre-save guard and server validation can never drift.
+// Photo/cover ceilings and the block-list validator come from the SHARED module
+// the api-server route also uses, so the client pre-save guard and server
+// validation can never drift.
 import {
   MAX_PHOTOS,
   MAX_PHOTO_DATAURL_BYTES,
   MAX_PHOTOS_TOTAL_BYTES,
   MAX_COVER_DATAURL_BYTES,
-  validateSpotReportPhotos,
+  SPECIAL_REPORT_BLOCK_TYPES,
+  validateSpecialReportBlocks,
   validateCoverDataUrl,
 } from "@workspace/db/spot-report-limits";
 import SpecialReportPreview from "@/components/SpecialReportPreview";
@@ -68,11 +72,6 @@ interface MapPointForm {
   lng: string;
   label: string;
   severity: string;
-}
-
-interface PhotoForm {
-  dataUrl: string;
-  caption: string;
 }
 
 interface ChartPointForm {
@@ -87,6 +86,140 @@ interface ChartForm {
   points: ChartPointForm[];
 }
 
+// The free-form body is an ordered list of blocks the analyst composes in any
+// order. Each block carries only the fields its type uses; unused fields stay
+// blank. Chart and image DATA live INLINE on the block so a block is
+// self-contained. map/incidents blocks are singleton references that render
+// from the report-level coordinates / linked incidents at draw time.
+type SpecialReportBlockType = (typeof SPECIAL_REPORT_BLOCK_TYPES)[number];
+
+interface BlockForm {
+  id: string;
+  type: SpecialReportBlockType;
+  text: string;
+  body: string;
+  dataUrl: string;
+  caption: string;
+  chart: ChartForm;
+}
+
+const BLOCK_LABELS: Record<SpecialReportBlockType, string> = {
+  heading: "Heading",
+  text: "Paragraph",
+  bullets: "Bullet list",
+  chart: "Chart",
+  image: "Image",
+  map: "Incident map",
+  incidents: "Reference incidents",
+};
+
+function makeBlockId(): string {
+  return `b-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function emptyChartForm(): ChartForm {
+  return { title: "", unit: "", points: [{ label: "", value: "", color: "" }] };
+}
+
+function newBlock(type: SpecialReportBlockType): BlockForm {
+  return {
+    id: makeBlockId(),
+    type,
+    text: "",
+    body: "",
+    dataUrl: "",
+    caption: "",
+    chart: emptyChartForm(),
+  };
+}
+
+function newImageBlock(dataUrl: string): BlockForm {
+  return { ...newBlock("image"), dataUrl };
+}
+
+/** Rehydrate a saved chart into the editable string-based form shape. */
+function chartFormFromChart(
+  c: NonNullable<SpecialReportBlock["chart"]>,
+): ChartForm {
+  const points = (c.points ?? []).map((p) => ({
+    label: p.label ?? "",
+    value: p.value != null ? String(p.value) : "",
+    color: p.color ?? "",
+  }));
+  return {
+    title: c.title ?? "",
+    unit: c.unit ?? "",
+    points: points.length > 0 ? points : [{ label: "", value: "", color: "" }],
+  };
+}
+
+/** Rehydrate a resolved block (saved OR synthesised from a legacy row) into the
+ * editable form shape, so opening any report loads its body as editable blocks. */
+function blockFormFromBlock(b: SpecialReportBlock): BlockForm {
+  return {
+    id: b.id || makeBlockId(),
+    type: b.type as SpecialReportBlockType,
+    text: b.text ?? "",
+    body: b.body ?? "",
+    dataUrl: b.dataUrl ?? "",
+    caption: b.caption ?? "",
+    chart: b.chart ? chartFormFromChart(b.chart) : emptyChartForm(),
+  };
+}
+
+/** Coerce an editable chart into the stored shape, or null when it has no
+ * labelled points (an empty chart renders nothing and is not worth storing). */
+function toApiChart(
+  c: ChartForm,
+): NonNullable<SpecialReportBlock["chart"]> | null {
+  const points = c.points
+    .map((p) => {
+      const n = parseFloat(p.value);
+      return {
+        label: p.label.trim(),
+        value: Number.isFinite(n) ? n : 0,
+        color: p.color.trim(),
+      };
+    })
+    .filter((p) => p.label);
+  if (points.length === 0) return null;
+  const title = c.title.trim();
+  const unit = c.unit.trim();
+  return {
+    ...(title ? { title } : {}),
+    ...(unit ? { unit } : {}),
+    points: points.map((p) => ({
+      label: p.label,
+      value: p.value,
+      ...(p.color ? { color: p.color } : {}),
+    })),
+  };
+}
+
+/** Coerce the ordered editable blocks into the stored block list. Order is
+ * preserved verbatim; each block keeps only the fields its type uses. Empty
+ * blocks are kept (the renderer skips them) so editing continuity is preserved
+ * and the on-screen preview stays byte-identical to the export. */
+function toApiBlocks(blocks: BlockForm[]): SpecialReportBlock[] {
+  return blocks.map((b) => {
+    const base: SpecialReportBlock = { id: b.id, type: b.type };
+    if (b.type === "heading") {
+      const t = b.text.trim();
+      if (t) base.text = t;
+    } else if (b.type === "text" || b.type === "bullets") {
+      base.body = b.body;
+    } else if (b.type === "image") {
+      if (b.dataUrl) base.dataUrl = b.dataUrl;
+      const cap = b.caption.trim();
+      if (cap) base.caption = cap;
+    } else if (b.type === "chart") {
+      const chart = toApiChart(b.chart);
+      if (chart) base.chart = chart;
+    }
+    return base;
+  });
+}
+
 interface FormState {
   title: string;
   status: string;
@@ -99,25 +232,16 @@ interface FormState {
   longitude: string;
   category: string;
   severity: string;
-  bluf: string;
-  incidentDetails: string;
-  currentSituation: string;
-  operationalImpact: string;
-  assessment: string;
-  outlook: string;
-  recommendedActions: string;
   analystNotes: string;
   confidenceLevel: string;
   internalSourceNotes: string;
   showSourcesInExport: boolean;
   linkedIncidentIds: number[];
-  mapEnabled: boolean;
   affectedRadiusKm: string;
   mapPoints: MapPointForm[];
-  photos: PhotoForm[];
   coverImageKey: string;
   coverImageDataUrl: string;
-  charts: ChartForm[];
+  blocks: BlockForm[];
   createdBy: string;
 }
 
@@ -244,25 +368,16 @@ function emptyForm(): FormState {
     longitude: "",
     category: "",
     severity: "",
-    bluf: "",
-    incidentDetails: "",
-    currentSituation: "",
-    operationalImpact: "",
-    assessment: "",
-    outlook: "",
-    recommendedActions: "",
     analystNotes: "",
     confidenceLevel: "",
     internalSourceNotes: "",
     showSourcesInExport: false,
     linkedIncidentIds: [],
-    mapEnabled: false,
     affectedRadiusKm: "",
     mapPoints: [],
-    photos: [],
     coverImageKey: "",
     coverImageDataUrl: "",
-    charts: [],
+    blocks: [],
     createdBy: "",
   };
 }
@@ -273,7 +388,7 @@ function emptyForm(): FormState {
 // recover it on load, so a draft survives navigation, a crash, a closed tab, or
 // a failed save. Its own key prefix keeps it isolated from Spot Report drafts.
 // ---------------------------------------------------------------------------
-const DRAFT_PREFIX = "polestar:special-report-draft:";
+const DRAFT_PREFIX = "polestar:special-report-draft:v2:";
 
 function draftKey(idOrNew: number | string): string {
   return `${DRAFT_PREFIX}${idOrNew}`;
@@ -293,8 +408,7 @@ function loadDraft(key: string): FormState | null {
       ? merged.linkedIncidentIds
       : [];
     merged.mapPoints = Array.isArray(merged.mapPoints) ? merged.mapPoints : [];
-    merged.photos = Array.isArray(merged.photos) ? merged.photos : [];
-    merged.charts = Array.isArray(merged.charts) ? merged.charts : [];
+    merged.blocks = Array.isArray(merged.blocks) ? merged.blocks : [];
     return merged;
   } catch {
     return null;
@@ -307,10 +421,16 @@ function saveDraft(key: string, form: FormState): void {
   try {
     write(form);
   } catch {
-    // localStorage quota (photo/cover data URLs are large) — retry without the
-    // heavy image payloads so the analyst's typed prose still survives.
+    // localStorage quota (image/cover data URLs are large) — retry without the
+    // heavy image payloads so the analyst's typed prose still survives. Drop
+    // image blocks entirely rather than emptying them: a dataUrl-less image
+    // block would fail validateSpecialReportBlocks on restore.
     try {
-      write({ ...form, photos: [], coverImageDataUrl: "" });
+      write({
+        ...form,
+        blocks: form.blocks.filter((b) => b.type !== "image"),
+        coverImageDataUrl: "",
+      });
     } catch {
       // Best-effort only; never let autosave throw into the render path.
     }
@@ -338,13 +458,6 @@ function isFormEmpty(f: FormState): boolean {
     f.longitude,
     f.category,
     f.severity,
-    f.bluf,
-    f.incidentDetails,
-    f.currentSituation,
-    f.operationalImpact,
-    f.assessment,
-    f.outlook,
-    f.recommendedActions,
     f.analystNotes,
     f.confidenceLevel,
     f.internalSourceNotes,
@@ -357,8 +470,7 @@ function isFormEmpty(f: FormState): boolean {
     !text &&
     f.linkedIncidentIds.length === 0 &&
     f.mapPoints.length === 0 &&
-    f.photos.length === 0 &&
-    f.charts.length === 0
+    f.blocks.length === 0
   );
 }
 
@@ -375,19 +487,11 @@ function formFromReport(r: SpecialReport): FormState {
     longitude: r.longitude != null ? String(r.longitude) : "",
     category: r.category ?? "",
     severity: r.severity ?? "",
-    bluf: r.bluf ?? "",
-    incidentDetails: r.incidentDetails ?? "",
-    currentSituation: r.currentSituation ?? "",
-    operationalImpact: r.operationalImpact ?? "",
-    assessment: r.assessment ?? "",
-    outlook: r.outlook ?? "",
-    recommendedActions: r.recommendedActions ?? "",
     analystNotes: r.analystNotes ?? "",
     confidenceLevel: r.confidenceLevel ?? "",
     internalSourceNotes: r.internalSourceNotes ?? "",
     showSourcesInExport: r.showSourcesInExport ?? false,
     linkedIncidentIds: r.linkedIncidentIds ?? [],
-    mapEnabled: r.mapEnabled ?? false,
     affectedRadiusKm: r.affectedRadiusKm != null ? String(r.affectedRadiusKm) : "",
     mapPoints: (r.mapPoints ?? []).map((m) => ({
       lat: m.lat != null ? String(m.lat) : "",
@@ -395,21 +499,12 @@ function formFromReport(r: SpecialReport): FormState {
       label: m.label ?? "",
       severity: m.severity ?? "",
     })),
-    photos: (r.photos ?? []).map((p) => ({
-      dataUrl: p.dataUrl,
-      caption: p.caption ?? "",
-    })),
     coverImageKey: r.coverImageKey ?? "",
     coverImageDataUrl: r.coverImageDataUrl ?? "",
-    charts: (r.charts ?? []).map((c) => ({
-      title: c.title ?? "",
-      unit: c.unit ?? "",
-      points: (c.points ?? []).map((p) => ({
-        label: p.label ?? "",
-        value: p.value != null ? String(p.value) : "",
-        color: p.color ?? "",
-      })),
-    })),
+    // Body loads as editable blocks: saved blocks win, else a legacy row is
+    // synthesised into equivalent blocks so opening any report is editable and
+    // re-saving migrates it to the block model.
+    blocks: resolveSpecialReportBlocks(r).map(blockFormFromBlock),
     createdBy: r.createdBy ?? "",
   };
 }
@@ -543,19 +638,22 @@ export default function SpecialReportEditor() {
       longitude: num(form.longitude),
       category: form.category || null,
       severity: (form.severity || null) as SpecialReport["severity"],
-      bluf: form.bluf || null,
-      incidentDetails: form.incidentDetails || null,
-      currentSituation: form.currentSituation || null,
-      operationalImpact: form.operationalImpact || null,
-      assessment: form.assessment || null,
-      outlook: form.outlook || null,
-      recommendedActions: form.recommendedActions || null,
+      // The fixed narrative columns and top-level photo/chart arrays are legacy;
+      // the free-form body is the `blocks` list. The renderer reads blocks and
+      // skips empty ones, so preview stays byte-identical to the export.
+      bluf: null,
+      incidentDetails: null,
+      currentSituation: null,
+      operationalImpact: null,
+      assessment: null,
+      outlook: null,
+      recommendedActions: null,
       analystNotes: form.analystNotes || null,
       confidenceLevel: (form.confidenceLevel || null) as SpecialReport["confidenceLevel"],
       internalSourceNotes: form.internalSourceNotes || null,
       showSourcesInExport: form.showSourcesInExport,
       linkedIncidentIds: form.linkedIncidentIds,
-      mapEnabled: form.mapEnabled,
+      mapEnabled: form.blocks.some((b) => b.type === "map"),
       affectedRadiusKm: num(form.affectedRadiusKm),
       mapPoints: form.mapPoints
         .map((m) => ({
@@ -571,29 +669,11 @@ export default function SpecialReportEditor() {
           ...(m.label ? { label: m.label } : {}),
           ...(m.severity ? { severity: m.severity } : {}),
         })),
-      photos: form.photos
-        .filter((p) => p.dataUrl)
-        .map((p) => ({
-          dataUrl: p.dataUrl,
-          ...(p.caption.trim() ? { caption: p.caption.trim() } : {}),
-        })),
+      photos: [],
       coverImageKey: form.coverImageKey || null,
       coverImageDataUrl: form.coverImageDataUrl || null,
-      charts: form.charts.map((c) => ({
-        ...(c.title.trim() ? { title: c.title.trim() } : {}),
-        ...(c.unit.trim() ? { unit: c.unit.trim() } : {}),
-        points: c.points
-          .map((p) => ({
-            label: p.label.trim(),
-            value: num(p.value) ?? 0,
-            color: p.color.trim(),
-          }))
-          .map((p) => ({
-            label: p.label,
-            value: p.value,
-            ...(p.color ? { color: p.color } : {}),
-          })),
-      })),
+      charts: [],
+      blocks: toApiBlocks(form.blocks),
       createdBy: form.createdBy || null,
       exportHistory: report?.exportHistory ?? [],
       createdAt: report?.createdAt ?? new Date().toISOString(),
@@ -601,16 +681,19 @@ export default function SpecialReportEditor() {
     };
   }, [form, report]);
 
-  const photoUsage = useMemo(() => {
-    const count = form.photos.length;
-    const bytes = form.photos.reduce((n, p) => n + (p.dataUrl?.length ?? 0), 0);
+  // Image budget across all image blocks — mirrors the shared photo ceilings so
+  // the pre-save guard and server validation stay in lockstep.
+  const imageUsage = useMemo(() => {
+    const imgs = form.blocks.filter((b) => b.type === "image" && b.dataUrl);
+    const count = imgs.length;
+    const bytes = imgs.reduce((n, b) => n + b.dataUrl.length, 0);
     const countRatio = MAX_PHOTOS > 0 ? count / MAX_PHOTOS : 0;
     const byteRatio =
       MAX_PHOTOS_TOTAL_BYTES > 0 ? bytes / MAX_PHOTOS_TOTAL_BYTES : 0;
     const ratio = Math.max(countRatio, byteRatio);
     const over = count > MAX_PHOTOS || bytes > MAX_PHOTOS_TOTAL_BYTES;
     return { count, bytes, ratio, over, warn: !over && ratio >= 0.8 };
-  }, [form.photos]);
+  }, [form.blocks]);
 
   const coverPreviewUrl = useMemo(
     () =>
@@ -673,107 +756,261 @@ export default function SpecialReportEditor() {
     setForm((f) => ({ ...f, mapPoints: f.mapPoints.filter((_, i) => i !== idx) }));
   }
 
-  // --- Charts ----------------------------------------------------------------
-  function addChart() {
+  // --- Body blocks -----------------------------------------------------------
+  function addBlock(type: SpecialReportBlockType) {
+    setForm((f) => ({ ...f, blocks: [...f.blocks, newBlock(type)] }));
+  }
+  function removeBlock(id: string) {
+    setForm((f) => ({ ...f, blocks: f.blocks.filter((b) => b.id !== id) }));
+  }
+  function moveBlock(id: string, dir: -1 | 1) {
+    setForm((f) => {
+      const idx = f.blocks.findIndex((b) => b.id === id);
+      if (idx < 0) return f;
+      const j = idx + dir;
+      if (j < 0 || j >= f.blocks.length) return f;
+      const next = [...f.blocks];
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return { ...f, blocks: next };
+    });
+  }
+  function updateBlock(id: string, patch: Partial<BlockForm>) {
     setForm((f) => ({
       ...f,
-      charts: [...f.charts, { title: "", unit: "", points: [{ label: "", value: "", color: "" }] }],
+      blocks: f.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
     }));
   }
-  function removeChart(idx: number) {
-    setForm((f) => ({ ...f, charts: f.charts.filter((_, i) => i !== idx) }));
-  }
-  function updateChart(idx: number, key: "title" | "unit", value: string) {
+  function updateBlockChart(id: string, key: "title" | "unit", value: string) {
     setForm((f) => ({
       ...f,
-      charts: f.charts.map((c, i) => (i === idx ? { ...c, [key]: value } : c)),
-    }));
-  }
-  function addChartPoint(ci: number) {
-    setForm((f) => ({
-      ...f,
-      charts: f.charts.map((c, i) =>
-        i === ci ? { ...c, points: [...c.points, { label: "", value: "", color: "" }] } : c,
+      blocks: f.blocks.map((b) =>
+        b.id === id ? { ...b, chart: { ...b.chart, [key]: value } } : b,
       ),
     }));
   }
-  function updateChartPoint(ci: number, pi: number, key: keyof ChartPointForm, value: string) {
+  function addBlockChartPoint(id: string) {
     setForm((f) => ({
       ...f,
-      charts: f.charts.map((c, i) =>
-        i === ci
-          ? { ...c, points: c.points.map((p, j) => (j === pi ? { ...p, [key]: value } : p)) }
-          : c,
+      blocks: f.blocks.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              chart: {
+                ...b.chart,
+                points: [...b.chart.points, { label: "", value: "", color: "" }],
+              },
+            }
+          : b,
       ),
     }));
   }
-  function removeChartPoint(ci: number, pi: number) {
+  function updateBlockChartPoint(
+    id: string,
+    pi: number,
+    key: keyof ChartPointForm,
+    value: string,
+  ) {
     setForm((f) => ({
       ...f,
-      charts: f.charts.map((c, i) =>
-        i === ci ? { ...c, points: c.points.filter((_, j) => j !== pi) } : c,
+      blocks: f.blocks.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              chart: {
+                ...b.chart,
+                points: b.chart.points.map((p, j) =>
+                  j === pi ? { ...p, [key]: value } : p,
+                ),
+              },
+            }
+          : b,
       ),
     }));
   }
-
-  // --- Photos ----------------------------------------------------------------
-  async function addPhotos(files: FileList | null) {
+  function removeBlockChartPoint(id: string, pi: number) {
+    setForm((f) => ({
+      ...f,
+      blocks: f.blocks.map((b) =>
+        b.id === id
+          ? { ...b, chart: { ...b.chart, points: b.chart.points.filter((_, j) => j !== pi) } }
+          : b,
+      ),
+    }));
+  }
+  async function addImageBlocks(files: FileList | null) {
     const list = files
       ? Array.from(files).filter((f) => f.type.startsWith("image/"))
       : [];
     if (list.length === 0) return;
-    if (form.photos.length + list.length > MAX_PHOTOS) {
+    const existing = form.blocks.filter((b) => b.type === "image" && b.dataUrl).length;
+    if (existing + list.length > MAX_PHOTOS) {
       toast({
-        title: "Too many photos",
-        description: `A special report can hold at most ${MAX_PHOTOS} photos.`,
+        title: "Too many images",
+        description: `A special report can hold at most ${MAX_PHOTOS} images.`,
         variant: "destructive",
       });
       return;
     }
     try {
       const dataUrls = await Promise.all(list.map((f) => fileToImageDataUrl(f)));
-      const existingBytes = form.photos.reduce((n, p) => n + p.dataUrl.length, 0);
+      const existingBytes = form.blocks
+        .filter((b) => b.type === "image")
+        .reduce((n, b) => n + b.dataUrl.length, 0);
       const addedBytes = dataUrls.reduce((n, d) => n + d.length, 0);
       if (
         dataUrls.some((d) => d.length > MAX_PHOTO_DATAURL_BYTES) ||
         existingBytes + addedBytes > MAX_PHOTOS_TOTAL_BYTES
       ) {
         toast({
-          title: "Photo too large",
-          description: "Please use smaller images or remove some photos.",
+          title: "Image too large",
+          description: "Please use smaller images or remove some.",
           variant: "destructive",
         });
         return;
       }
       setForm((f) => ({
         ...f,
-        photos: [...f.photos, ...dataUrls.map((dataUrl) => ({ dataUrl, caption: "" }))],
+        blocks: [...f.blocks, ...dataUrls.map((d) => newImageBlock(d))],
       }));
     } catch {
       toast({
-        title: "Could not add photo",
+        title: "Could not add image",
         description: "One of the selected files could not be read as an image.",
         variant: "destructive",
       });
     }
   }
-  function updatePhotoCaption(idx: number, caption: string) {
-    setForm((f) => ({
-      ...f,
-      photos: f.photos.map((p, i) => (i === idx ? { ...p, caption } : p)),
-    }));
-  }
-  function movePhoto(idx: number, dir: -1 | 1) {
-    setForm((f) => {
-      const next = [...f.photos];
-      const j = idx + dir;
-      if (j < 0 || j >= next.length) return f;
-      [next[idx], next[j]] = [next[j], next[idx]];
-      return { ...f, photos: next };
-    });
-  }
-  function removePhoto(idx: number) {
-    setForm((f) => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
+
+  // Renders the type-specific editor body for one block. The surrounding card
+  // (label + move/delete controls) is drawn by the caller; this fills the body.
+  function renderBlockEditor(b: BlockForm) {
+    const t = b.type as SpecialReportBlockType;
+    if (t === "heading") {
+      return (
+        <Input
+          value={b.text}
+          onChange={(e) => updateBlock(b.id, { text: e.target.value })}
+          placeholder="Heading text"
+          className="rounded-sm"
+        />
+      );
+    }
+    if (t === "text") {
+      return (
+        <Textarea
+          value={b.body}
+          onChange={(e) => updateBlock(b.id, { body: e.target.value })}
+          rows={4}
+          placeholder="Paragraph text"
+          className="rounded-sm"
+        />
+      );
+    }
+    if (t === "bullets") {
+      return (
+        <Textarea
+          value={b.body}
+          onChange={(e) => updateBlock(b.id, { body: e.target.value })}
+          rows={4}
+          placeholder="One bullet per line"
+          className="rounded-sm"
+        />
+      );
+    }
+    if (t === "image") {
+      return (
+        <div className="flex gap-3 items-start">
+          {b.dataUrl ? (
+            <img
+              src={b.dataUrl}
+              alt=""
+              className="w-24 h-24 object-cover rounded-sm border border-border shrink-0"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-sm border border-dashed border-border shrink-0" />
+          )}
+          <Input
+            value={b.caption}
+            onChange={(e) => updateBlock(b.id, { caption: e.target.value })}
+            placeholder="Caption (optional)"
+            className="rounded-sm flex-1"
+          />
+        </div>
+      );
+    }
+    if (t === "chart") {
+      return (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Input
+              value={b.chart.title}
+              onChange={(e) => updateBlockChart(b.id, "title", e.target.value)}
+              placeholder="Chart title"
+              className="rounded-sm"
+            />
+            <Input
+              value={b.chart.unit}
+              onChange={(e) => updateBlockChart(b.id, "unit", e.target.value)}
+              placeholder="Unit (optional)"
+              className="rounded-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            {b.chart.points.map((p, pi) => (
+              <div key={pi} className="grid grid-cols-[1.6fr_1fr_auto_auto] gap-2 items-center">
+                <Input
+                  value={p.label}
+                  onChange={(e) => updateBlockChartPoint(b.id, pi, "label", e.target.value)}
+                  placeholder="Label"
+                  className="rounded-sm"
+                />
+                <Input
+                  value={p.value}
+                  onChange={(e) => updateBlockChartPoint(b.id, pi, "value", e.target.value)}
+                  placeholder="Value"
+                  inputMode="decimal"
+                  className="rounded-sm"
+                />
+                <input
+                  type="color"
+                  value={/^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : "#465bff"}
+                  onChange={(e) => updateBlockChartPoint(b.id, pi, "color", e.target.value)}
+                  aria-label="Bar colour"
+                  className="h-9 w-10 rounded-sm border border-border bg-transparent p-0.5 cursor-pointer"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => removeBlockChartPoint(b.id, pi)}
+                  className="rounded-sm text-muted-foreground hover:text-destructive h-9 px-2"
+                  aria-label="Remove point"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button type="button" variant="outline" onClick={() => addBlockChartPoint(b.id)} className="rounded-sm h-8">
+            Add point
+          </Button>
+        </div>
+      );
+    }
+    if (t === "map") {
+      return (
+        <p className="text-xs text-muted-foreground">
+          Renders the incident map here — the primary location, any linked
+          incidents, and the extra map points. Set coordinates in the Location
+          and Additional Map Points cards.
+        </p>
+      );
+    }
+    return (
+      <p className="text-xs text-muted-foreground">
+        Renders a reference table of the linked incidents here. Choose incidents
+        in the Linked Incidents card.
+      </p>
+    );
   }
 
   function buildData(forCreate: boolean): Record<string, unknown> {
@@ -786,7 +1023,9 @@ export default function SpecialReportEditor() {
       status: form.status,
       reportDate: toIsoOrNull(form.reportDate) ?? new Date().toISOString(),
       showSourcesInExport: form.showSourcesInExport,
-      mapEnabled: form.mapEnabled,
+      // mapEnabled is DERIVED from the body: it is true iff the analyst placed a
+      // map block. The old standalone checkbox is gone.
+      mapEnabled: form.blocks.some((b) => b.type === "map"),
       linkedIncidentIds: form.linkedIncidentIds,
     };
 
@@ -795,13 +1034,6 @@ export default function SpecialReportEditor() {
       ["province", form.province],
       ["city", form.city],
       ["category", form.category],
-      ["bluf", form.bluf],
-      ["incidentDetails", form.incidentDetails],
-      ["currentSituation", form.currentSituation],
-      ["operationalImpact", form.operationalImpact],
-      ["assessment", form.assessment],
-      ["outlook", form.outlook],
-      ["recommendedActions", form.recommendedActions],
       ["analystNotes", form.analystNotes],
       ["internalSourceNotes", form.internalSourceNotes],
       ["createdBy", form.createdBy],
@@ -869,39 +1101,28 @@ export default function SpecialReportEditor() {
         ...(m.severity ? { severity: m.severity } : {}),
       }));
 
-    // Photos always travel as a (possibly empty) array; blank captions omitted.
-    out.photos = form.photos
-      .filter((p) => p.dataUrl)
-      .map((p) => ({
-        dataUrl: p.dataUrl,
-        ...(p.caption.trim() ? { caption: p.caption.trim() } : {}),
-      }));
+    // The free-form body always travels as a (possibly empty) block array in
+    // analyst order; chart/image data live inline on each block.
+    out.blocks = toApiBlocks(form.blocks);
 
-    // Charts always travel as a (possibly empty) array; a chart is kept only if
-    // it has at least one labelled point. Blank titles/units/colours are omitted
-    // so the stored shape stays clean.
-    out.charts = form.charts
-      .map((c) => ({
-        title: c.title.trim(),
-        unit: c.unit.trim(),
-        points: c.points
-          .map((p) => ({
-            label: p.label.trim(),
-            value: num(p.value) ?? 0,
-            color: p.color.trim(),
-          }))
-          .filter((p) => p.label),
-      }))
-      .filter((c) => c.points.length > 0)
-      .map((c) => ({
-        ...(c.title ? { title: c.title } : {}),
-        ...(c.unit ? { unit: c.unit } : {}),
-        points: c.points.map((p) => ({
-          label: p.label,
-          value: p.value,
-          ...(p.color ? { color: p.color } : {}),
-        })),
-      }));
+    // Blocks are the single source of truth for the body. On UPDATE, clear the
+    // legacy fixed-narrative columns and the old top-level photo/chart arrays so
+    // a migrated report never carries stale duplicate content. On CREATE they
+    // simply default empty, so nothing to send.
+    if (!forCreate) {
+      const legacyProse = [
+        "bluf",
+        "incidentDetails",
+        "currentSituation",
+        "operationalImpact",
+        "assessment",
+        "outlook",
+        "recommendedActions",
+      ] as const;
+      for (const k of legacyProse) out[k] = null;
+      out.photos = [];
+      out.charts = [];
+    }
 
     return out;
   }
@@ -911,13 +1132,11 @@ export default function SpecialReportEditor() {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
-    const photoError = validateSpotReportPhotos(
-      form.photos.filter((p) => p.dataUrl).map((p) => ({ dataUrl: p.dataUrl })),
-    );
-    if (photoError) {
+    const blockError = validateSpecialReportBlocks(toApiBlocks(form.blocks));
+    if (blockError) {
       toast({
-        title: "Photos exceed the limit",
-        description: photoError,
+        title: "Report body is invalid",
+        description: blockError,
         variant: "destructive",
       });
       return;
@@ -1279,22 +1498,14 @@ export default function SpecialReportEditor() {
                 <Input value={form.affectedRadiusKm} onChange={(e) => set("affectedRadiusKm", e.target.value)} className="rounded-sm" />
               </Field>
             </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none mt-1">
-              <input
-                type="checkbox"
-                checked={form.mapEnabled}
-                onChange={(e) => set("mapEnabled", e.target.checked)}
-                className="h-4 w-4 accent-accent"
-              />
-              <span>Include incident map in the report</span>
-            </label>
           </Card>
 
           <Card title="Additional Map Points">
             <p className="text-xs text-muted-foreground mb-3">
               Plot extra coordinate markers on the report map — one row per point.
               Each appears as a dot (coloured by its severity) alongside the
-              primary location and any linked incidents.
+              primary location and any linked incidents, shown wherever you add
+              an Incident map block to the body below.
             </p>
             {form.mapPoints.length > 0 && (
               <div className="space-y-2 mb-3">
@@ -1329,183 +1540,6 @@ export default function SpecialReportEditor() {
             )}
             <Button type="button" variant="outline" onClick={addMapPoint} className="rounded-sm">
               Add point
-            </Button>
-          </Card>
-
-          <Card title="Charts">
-            <p className="text-xs text-muted-foreground mb-3">
-              Build simple bar charts by hand — one chart per topic, each with a
-              title, an optional unit, and labelled data points. They render as
-              horizontal bars on screen and in the PDF.
-            </p>
-            {form.charts.length > 0 && (
-              <div className="space-y-4 mb-3">
-                {form.charts.map((c, ci) => (
-                  <div key={ci} className="border border-border rounded-sm p-3 space-y-3">
-                    <div className="grid grid-cols-[1.6fr_1fr_auto] gap-2 items-center">
-                      <Input
-                        value={c.title}
-                        onChange={(e) => updateChart(ci, "title", e.target.value)}
-                        placeholder="Chart title"
-                        className="rounded-sm"
-                      />
-                      <Input
-                        value={c.unit}
-                        onChange={(e) => updateChart(ci, "unit", e.target.value)}
-                        placeholder="Unit (optional)"
-                        className="rounded-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => removeChart(ci)}
-                        className="rounded-sm text-muted-foreground hover:text-destructive h-9 px-2"
-                        aria-label="Remove chart"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {c.points.map((p, pi) => (
-                        <div key={pi} className="grid grid-cols-[1.6fr_1fr_auto_auto] gap-2 items-center">
-                          <Input
-                            value={p.label}
-                            onChange={(e) => updateChartPoint(ci, pi, "label", e.target.value)}
-                            placeholder="Label"
-                            className="rounded-sm"
-                          />
-                          <Input
-                            value={p.value}
-                            onChange={(e) => updateChartPoint(ci, pi, "value", e.target.value)}
-                            placeholder="Value"
-                            inputMode="decimal"
-                            className="rounded-sm"
-                          />
-                          <input
-                            type="color"
-                            value={/^#[0-9a-fA-F]{6}$/.test(p.color) ? p.color : "#465bff"}
-                            onChange={(e) => updateChartPoint(ci, pi, "color", e.target.value)}
-                            aria-label="Bar colour"
-                            className="h-9 w-10 rounded-sm border border-border bg-transparent p-0.5 cursor-pointer"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => removeChartPoint(ci, pi)}
-                            className="rounded-sm text-muted-foreground hover:text-destructive h-9 px-2"
-                            aria-label="Remove point"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                    <Button type="button" variant="outline" onClick={() => addChartPoint(ci)} className="rounded-sm h-8">
-                      Add point
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <Button type="button" variant="outline" onClick={addChart} className="rounded-sm">
-              Add chart
-            </Button>
-          </Card>
-
-          <Card title="Photos / Imagery">
-            <p className="text-xs text-muted-foreground mb-3">
-              Attach photographs — they appear after Incident Details on screen
-              and in the PDF. Add several, reorder them, and give each an optional
-              caption.
-            </p>
-            <p
-              className={`text-xs mb-3 ${
-                photoUsage.over
-                  ? "text-destructive font-medium"
-                  : photoUsage.warn
-                    ? "text-amber-600 font-medium"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {photoUsage.count} / {MAX_PHOTOS} photos ·{" "}
-              {(photoUsage.bytes / (1024 * 1024)).toFixed(1)} MB /{" "}
-              {Math.round(MAX_PHOTOS_TOTAL_BYTES / (1024 * 1024))} MB
-              {photoUsage.over
-                ? " — over the limit; remove or shrink some before saving"
-                : photoUsage.warn
-                  ? " — approaching the limit"
-                  : ""}
-            </p>
-            {form.photos.length > 0 && (
-              <div className="space-y-3 mb-3">
-                {form.photos.map((p, idx) => (
-                  <div key={idx} className="flex gap-3 items-start border border-border rounded-sm p-2">
-                    <img
-                      src={p.dataUrl}
-                      alt=""
-                      className="w-24 h-24 object-cover rounded-sm border border-border shrink-0"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <Input
-                        value={p.caption}
-                        onChange={(e) => updatePhotoCaption(idx, e.target.value)}
-                        placeholder="Caption (optional)"
-                        className="rounded-sm"
-                      />
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => movePhoto(idx, -1)}
-                          disabled={idx === 0}
-                          className="rounded-sm h-8 px-2"
-                          aria-label="Move photo up"
-                        >
-                          <ArrowUp className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => movePhoto(idx, 1)}
-                          disabled={idx === form.photos.length - 1}
-                          className="rounded-sm h-8 px-2"
-                          aria-label="Move photo down"
-                        >
-                          <ArrowDown className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => removePhoto(idx)}
-                          className="rounded-sm h-8 px-2 text-muted-foreground hover:text-destructive"
-                          aria-label="Remove photo"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                void addPhotos(e.target.files);
-                e.target.value = "";
-              }}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => photoInputRef.current?.click()}
-              className="rounded-sm"
-            >
-              <ImagePlus className="w-4 h-4 mr-2" /> Add photos
             </Button>
           </Card>
 
@@ -1552,28 +1586,133 @@ export default function SpecialReportEditor() {
             </div>
           </Card>
 
-          <Card title="Narrative">
-            <Field label="Bottom Line Up Front (BLUF)">
-              <Textarea value={form.bluf} onChange={(e) => set("bluf", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Incident Details">
-              <Textarea value={form.incidentDetails} onChange={(e) => set("incidentDetails", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Current Situation">
-              <Textarea value={form.currentSituation} onChange={(e) => set("currentSituation", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Operational Impact">
-              <Textarea value={form.operationalImpact} onChange={(e) => set("operationalImpact", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Polestar View">
-              <Textarea value={form.assessment} onChange={(e) => set("assessment", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Outlook (24–72h)">
-              <Textarea value={form.outlook} onChange={(e) => set("outlook", e.target.value)} rows={3} className="rounded-sm" />
-            </Field>
-            <Field label="Recommended Actions (one per line)">
-              <Textarea value={form.recommendedActions} onChange={(e) => set("recommendedActions", e.target.value)} rows={4} className="rounded-sm" />
-            </Field>
+          <Card title="Report Body">
+            <p className="text-xs text-muted-foreground mb-3">
+              Build the report from blocks in any order — add headings,
+              paragraphs, bullet lists, hand-built charts, images, an incident
+              map, and a reference-incidents table. Reorder or remove any block;
+              empty blocks are skipped in the preview and export.
+            </p>
+            <p
+              className={`text-xs mb-3 ${
+                imageUsage.over
+                  ? "text-destructive font-medium"
+                  : imageUsage.warn
+                    ? "text-amber-600 font-medium"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {imageUsage.count} / {MAX_PHOTOS} images ·{" "}
+              {(imageUsage.bytes / (1024 * 1024)).toFixed(1)} MB /{" "}
+              {Math.round(MAX_PHOTOS_TOTAL_BYTES / (1024 * 1024))} MB
+              {imageUsage.over
+                ? " — over the limit; remove or shrink some before saving"
+                : imageUsage.warn
+                  ? " — approaching the limit"
+                  : ""}
+            </p>
+
+            {form.blocks.length === 0 ? (
+              <p className="text-xs text-muted-foreground border border-dashed border-border rounded-sm p-4 mb-3">
+                No blocks yet. Use the buttons below to build the report body.
+              </p>
+            ) : (
+              <div className="space-y-3 mb-3">
+                {form.blocks.map((b, idx) => (
+                  <div key={b.id} className="border border-border rounded-sm p-3 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {BLOCK_LABELS[b.type]}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => moveBlock(b.id, -1)}
+                          disabled={idx === 0}
+                          className="rounded-sm h-8 px-2"
+                          aria-label="Move block up"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => moveBlock(b.id, 1)}
+                          disabled={idx === form.blocks.length - 1}
+                          className="rounded-sm h-8 px-2"
+                          aria-label="Move block down"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => removeBlock(b.id)}
+                          className="rounded-sm h-8 px-2 text-muted-foreground hover:text-destructive"
+                          aria-label="Remove block"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {renderBlockEditor(b)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void addImageBlocks(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => addBlock("heading")} className="rounded-sm h-8">
+                Heading
+              </Button>
+              <Button type="button" variant="outline" onClick={() => addBlock("text")} className="rounded-sm h-8">
+                Paragraph
+              </Button>
+              <Button type="button" variant="outline" onClick={() => addBlock("bullets")} className="rounded-sm h-8">
+                Bullets
+              </Button>
+              <Button type="button" variant="outline" onClick={() => addBlock("chart")} className="rounded-sm h-8">
+                Chart
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => photoInputRef.current?.click()}
+                className="rounded-sm h-8"
+              >
+                <ImagePlus className="w-4 h-4 mr-2" /> Image
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addBlock("map")}
+                disabled={form.blocks.some((b) => b.type === "map")}
+                className="rounded-sm h-8"
+              >
+                Incident map
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => addBlock("incidents")}
+                disabled={form.blocks.some((b) => b.type === "incidents")}
+                className="rounded-sm h-8"
+              >
+                Reference incidents
+              </Button>
+            </div>
           </Card>
 
           <Card title="Internal (not exported unless enabled)">

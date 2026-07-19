@@ -2590,6 +2590,23 @@ export const ListSpecialReportsResponseItem = zod.object({
   "dataUrl": zod.string(),
   "caption": zod.string().optional()
 })).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
+  "caption": zod.string().optional()
+})),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -2652,6 +2669,23 @@ export const CreateSpecialReportBody = zod.object({
   "dataUrl": zod.string(),
   "caption": zod.string().optional()
 })).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
+  "caption": zod.string().optional()
+})).optional(),
   "createdBy": zod.string().optional()
 })
 
@@ -2708,6 +2742,23 @@ export const GetSpecialReportResponse = zod.object({
   "dataUrl": zod.string(),
   "caption": zod.string().optional()
 })).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
+  "caption": zod.string().optional()
+})),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -2740,13 +2791,13 @@ export const UpdateSpecialReportBody = zod.object({
   "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullish(),
   "coverImageKey": zod.string().nullish(),
   "coverImageDataUrl": zod.string().nullish(),
-  "bluf": zod.string().optional(),
-  "incidentDetails": zod.string().optional(),
-  "currentSituation": zod.string().optional(),
-  "operationalImpact": zod.string().optional(),
-  "assessment": zod.string().optional(),
-  "outlook": zod.string().optional(),
-  "recommendedActions": zod.string().optional(),
+  "bluf": zod.string().nullish(),
+  "incidentDetails": zod.string().nullish(),
+  "currentSituation": zod.string().nullish(),
+  "operationalImpact": zod.string().nullish(),
+  "assessment": zod.string().nullish(),
+  "outlook": zod.string().nullish(),
+  "recommendedActions": zod.string().nullish(),
   "analystNotes": zod.string().optional(),
   "confidenceLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal(null)]).nullish(),
   "internalSourceNotes": zod.string().optional(),
@@ -2771,6 +2822,23 @@ export const UpdateSpecialReportBody = zod.object({
 })).optional(),
   "photos": zod.array(zod.object({
   "dataUrl": zod.string(),
+  "caption": zod.string().optional()
+})).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
   "caption": zod.string().optional()
 })).optional(),
   "createdBy": zod.string().optional()
@@ -2824,6 +2892,23 @@ export const UpdateSpecialReportResponse = zod.object({
   "dataUrl": zod.string(),
   "caption": zod.string().optional()
 })).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
+  "caption": zod.string().optional()
+})),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),
@@ -2897,6 +2982,23 @@ export const AppendSpecialReportExportResponse = zod.object({
   "dataUrl": zod.string(),
   "caption": zod.string().optional()
 })).optional(),
+  "blocks": zod.array(zod.object({
+  "id": zod.string(),
+  "type": zod.enum(['heading', 'text', 'bullets', 'chart', 'image', 'map', 'incidents']),
+  "text": zod.string().optional(),
+  "body": zod.string().optional(),
+  "chart": zod.object({
+  "title": zod.string().optional(),
+  "unit": zod.string().optional(),
+  "points": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.number(),
+  "color": zod.string().optional()
+}))
+}).optional(),
+  "dataUrl": zod.string().optional(),
+  "caption": zod.string().optional()
+})),
   "createdBy": zod.string().nullish(),
   "exportHistory": zod.array(zod.object({
   "format": zod.enum(['pdf', 'docx', 'text']),

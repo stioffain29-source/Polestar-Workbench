@@ -1,10 +1,16 @@
-import type { Incident, SpecialReport } from "@workspace/api-client-react";
+import type {
+  Incident,
+  SpecialReport,
+  SpecialReportBlock,
+} from "@workspace/api-client-react";
 import {
   spotSevKey,
   spotLocationLabel,
   toBullets,
   type SpotMapPoint,
 } from "./spotReport";
+
+export type { SpecialReportBlock } from "@workspace/api-client-react";
 
 // Special Reports share the Spot Report brand palette, severity ramp, disclaimer
 // and pure text helpers — re-exported here so the Special Report components have
@@ -109,16 +115,92 @@ export function specialReportSections(report: SpecialReport): SpecialSection[] {
     .map((d) => ({ heading: d.heading, body: (d.body ?? "").trim(), bullets: d.bullets }));
 }
 
+/**
+ * The single authority that turns a report into the ordered block list every
+ * surface renders. Saved blocks win; a never-migrated (legacy) row is
+ * synthesised from its fixed narrative/map/chart/photo/incident fields in the
+ * exact order the pre-block preview used, so old rows look unchanged and there
+ * is only ever ONE renderer (preview == PDF). Pure — no data is duplicated:
+ * the map and incidents blocks are singleton references that render from the
+ * report-level coordinates / linkedIncidentIds at draw time.
+ */
+export function resolveSpecialReportBlocks(
+  report: SpecialReport,
+): SpecialReportBlock[] {
+  const saved = report.blocks ?? [];
+  if (saved.length > 0) return saved;
+
+  const blocks: SpecialReportBlock[] = [];
+  const sections = specialReportSections(report);
+  const bluf = sections.find((s) => s.heading === "Bottom Line Up Front");
+  const others = sections.filter((s) => s !== bluf);
+  const photos = (report.photos ?? []).filter((p) => p && p.dataUrl);
+  const charts = (report.charts ?? []).filter((c) =>
+    (c.points ?? []).some((p) => (p.label ?? "").trim().length > 0),
+  );
+
+  let n = 0;
+  const pushSection = (s: SpecialSection) => {
+    blocks.push({ id: `legacy-h-${n}`, type: "heading", text: s.heading });
+    blocks.push({
+      id: `legacy-b-${n}`,
+      type: s.bullets ? "bullets" : "text",
+      body: s.body,
+    });
+    n += 1;
+  };
+  const pushImagery = () => {
+    if (photos.length === 0) return;
+    blocks.push({ id: "legacy-h-img", type: "heading", text: "Imagery" });
+    photos.forEach((p, i) =>
+      blocks.push({
+        id: `legacy-img-${i}`,
+        type: "image",
+        dataUrl: p.dataUrl,
+        caption: (p.caption ?? "").trim() || undefined,
+      }),
+    );
+  };
+
+  if (bluf) pushSection(bluf);
+  if (report.mapEnabled) {
+    blocks.push({ id: "legacy-h-map", type: "heading", text: "Incident Map" });
+    blocks.push({ id: "legacy-map", type: "map" });
+  }
+  const hasIncidentDetails = others.some((s) => s.heading === "Incident Details");
+  if (!hasIncidentDetails) pushImagery();
+  for (const s of others) {
+    pushSection(s);
+    if (s.heading === "Incident Details") pushImagery();
+  }
+  if (charts.length > 0) {
+    blocks.push({ id: "legacy-h-charts", type: "heading", text: "Charts" });
+    charts.forEach((c, i) =>
+      blocks.push({ id: `legacy-chart-${i}`, type: "chart", chart: c }),
+    );
+  }
+  if ((report.linkedIncidentIds ?? []).length > 0) {
+    blocks.push({
+      id: "legacy-h-inc",
+      type: "heading",
+      text: "Reference Incidents",
+    });
+    blocks.push({ id: "legacy-inc", type: "incidents" });
+  }
+  return blocks;
+}
+
 export interface QualityResult {
   errors: string[];
   warnings: string[];
 }
 
 /**
- * Pre-export quality check. ERRORS block a client-facing export (critical fields
- * missing); WARNINGS are advisory (non-blocking) and can be overridden. Mirrors
- * the Spot Report gate, plus a check that every manually-entered chart has a
- * title and at least one point.
+ * Pre-export quality check. Special Reports are FREE-FORM: the analyst composes
+ * the body from whatever blocks they choose, so the ONLY hard requirement is a
+ * title (it names the report in lists and the export filename). A map block with
+ * no plottable coordinates stays an ERROR because it exports a broken-looking
+ * empty base map. Everything else is an advisory WARNING (non-blocking).
  */
 export function checkSpecialReportQuality(
   report: SpecialReport,
@@ -126,38 +208,35 @@ export function checkSpecialReportQuality(
 ): QualityResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const blocks = resolveSpecialReportBlocks(report);
 
   if (!report.title?.trim()) errors.push("Title is required.");
-  if (!report.bluf?.trim()) errors.push("Bottom Line Up Front (BLUF) is required.");
-  if (!spotLocationLabel(report)) {
-    errors.push("A location (country, province, or town) is required.");
-  }
-  if (!report.severity) errors.push("A severity rating is required.");
-  if (!report.assessment?.trim()) errors.push("Polestar View is required.");
-  if (!report.recommendedActions?.trim()) {
-    errors.push("Recommended actions are required.");
-  }
 
-  if (report.mapEnabled) {
+  const hasMapBlock = blocks.some((b) => b.type === "map");
+  if (hasMapBlock) {
     const hasReportCoords =
       typeof report.latitude === "number" && typeof report.longitude === "number";
     const hasIncidentCoords = incidents.some(
       (i) => typeof i.latitude === "number" && typeof i.longitude === "number",
     );
-    if (!hasReportCoords && !hasIncidentCoords) {
+    const hasManualPoints = (report.mapPoints ?? []).some(
+      (m) => typeof m.lat === "number" && typeof m.lng === "number",
+    );
+    if (!hasReportCoords && !hasIncidentCoords && !hasManualPoints) {
       errors.push(
-        "The incident map is enabled but no coordinates are available to plot. Add coordinates or turn the map off before exporting.",
+        "A map block is present but no coordinates are available to plot. Add coordinates or remove the map block before exporting.",
       );
     }
   }
 
-  const charts = report.charts ?? [];
-  charts.forEach((c, idx) => {
-    const points = (c.points ?? []).filter((p) => (p.label ?? "").trim());
-    if (points.length === 0) {
-      warnings.push(
-        `Chart ${idx + 1}${c.title ? ` (“${c.title}”)` : ""} has no data points and will not render.`,
-      );
+  blocks.forEach((b, idx) => {
+    if (b.type === "chart") {
+      const points = (b.chart?.points ?? []).filter((p) => (p.label ?? "").trim());
+      if (points.length === 0) {
+        warnings.push(
+          `Chart block ${idx + 1}${b.chart?.title ? ` (“${b.chart.title}”)` : ""} has no data points and will not render.`,
+        );
+      }
     }
   });
 
@@ -170,8 +249,9 @@ export function checkSpecialReportQuality(
     warnings.push("A linked incident could not be found and may have been deleted.");
   }
 
-  if (!report.currentSituation?.trim()) warnings.push("Current Situation is empty.");
-  if (!report.outlook?.trim()) warnings.push("Outlook (24\u201372h) is empty.");
+  if (blocks.length === 0) {
+    warnings.push("The report has no content blocks yet.");
+  }
 
   return { errors, warnings };
 }

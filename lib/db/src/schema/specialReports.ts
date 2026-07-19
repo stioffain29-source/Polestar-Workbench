@@ -39,6 +39,40 @@ export interface SpecialReportChart {
 }
 
 /**
+ * One block in a Special Report's free-form BODY. The analyst composes the body
+ * from an ordered list of these — adding, removing and reordering freely — so
+ * nothing about the layout is fixed. A flat optional shape (rather than a
+ * discriminated union) keeps the OpenAPI/Orval/zod codegen simple; the `type`
+ * field selects which optional fields are meaningful:
+ *  - "heading"   → `text` (a section title)
+ *  - "text"      → `body`  (free prose; blank lines split paragraphs)
+ *  - "bullets"   → `body`  (one bullet per line)
+ *  - "chart"     → `chart` (a manually-entered HTML/div bar chart)
+ *  - "image"     → `dataUrl` + optional `caption` (an inline figure)
+ *  - "map"       → singleton reference; draws the report's incident map + points
+ *  - "incidents" → singleton reference; the linked Reference Incidents table
+ */
+export type SpecialReportBlockType =
+  | "heading"
+  | "text"
+  | "bullets"
+  | "chart"
+  | "image"
+  | "map"
+  | "incidents";
+
+export interface SpecialReportBlock {
+  /** Stable client-generated id — react keys and reorder identity. */
+  id: string;
+  type: SpecialReportBlockType;
+  text?: string;
+  body?: string;
+  chart?: SpecialReportChart;
+  dataUrl?: string;
+  caption?: string;
+}
+
+/**
  * Standalone, analyst-led, multi-domain Special Report. A lean one-off product
  * built on the same foundation as the Spot Report (kept in its OWN table so the
  * two never entangle), with three additions: a CHOSEN FRONT COVER (a library
@@ -121,6 +155,18 @@ export const specialReportsTable = pgTable("special_reports", {
   // rendered after the Incident Details section on screen and in the PDF.
   photos: jsonb("photos")
     .$type<SpotReportPhoto[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+
+  // Free-form ordered report BODY. When non-empty, the preview + PDF render
+  // these blocks in order (headings, prose, bullets, charts, inline images,
+  // plus singleton map / reference-incidents blocks drawn from the report-level
+  // fields). When empty (legacy rows saved before the block model), the renderer
+  // synthesises a default block list from the fixed narrative columns below, so
+  // old reports render unchanged. New saves write blocks and null the legacy
+  // narrative columns.
+  blocks: jsonb("blocks")
+    .$type<SpecialReportBlock[]>()
     .notNull()
     .default(sql`'[]'::jsonb`),
 

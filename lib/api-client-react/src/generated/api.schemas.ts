@@ -891,6 +891,29 @@ export interface SpecialReportChart {
   points: SpecialReportChartPoint[];
 }
 
+export type SpecialReportBlockType = typeof SpecialReportBlockType[keyof typeof SpecialReportBlockType];
+
+
+export const SpecialReportBlockType = {
+  heading: 'heading',
+  text: 'text',
+  bullets: 'bullets',
+  chart: 'chart',
+  image: 'image',
+  map: 'map',
+  incidents: 'incidents',
+} as const;
+
+export interface SpecialReportBlock {
+  id: string;
+  type: SpecialReportBlockType;
+  text?: string;
+  body?: string;
+  chart?: SpecialReportChart;
+  dataUrl?: string;
+  caption?: string;
+}
+
 export interface SpecialReport {
   id: number;
   title: string;
@@ -942,6 +965,7 @@ export interface SpecialReport {
   mapPoints?: SpotMapPoint[];
   charts: SpecialReportChart[];
   photos?: SpotReportPhoto[];
+  blocks: SpecialReportBlock[];
   /** @nullable */
   createdBy?: string | null;
   exportHistory: SpotReportExportEntry[];
@@ -981,6 +1005,7 @@ export interface SpecialReportInput {
   mapPoints?: SpotMapPoint[];
   charts?: SpecialReportChart[];
   photos?: SpotReportPhoto[];
+  blocks?: SpecialReportBlock[];
   createdBy?: string;
 }
 
@@ -1031,13 +1056,20 @@ export interface SpecialReportUpdate {
   coverImageKey?: string | null;
   /** @nullable */
   coverImageDataUrl?: string | null;
-  bluf?: string;
-  incidentDetails?: string;
-  currentSituation?: string;
-  operationalImpact?: string;
-  assessment?: string;
-  outlook?: string;
-  recommendedActions?: string;
+  /** @nullable */
+  bluf?: string | null;
+  /** @nullable */
+  incidentDetails?: string | null;
+  /** @nullable */
+  currentSituation?: string | null;
+  /** @nullable */
+  operationalImpact?: string | null;
+  /** @nullable */
+  assessment?: string | null;
+  /** @nullable */
+  outlook?: string | null;
+  /** @nullable */
+  recommendedActions?: string | null;
   analystNotes?: string;
   /** @nullable */
   confidenceLevel?: SpecialReportUpdateConfidenceLevel;
@@ -1050,6 +1082,7 @@ export interface SpecialReportUpdate {
   mapPoints?: SpotMapPoint[];
   charts?: SpecialReportChart[];
   photos?: SpotReportPhoto[];
+  blocks?: SpecialReportBlock[];
   createdBy?: string;
 }
 

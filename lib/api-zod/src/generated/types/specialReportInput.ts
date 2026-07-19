@@ -7,6 +7,7 @@
  */
 import type { Confidence } from './confidence';
 import type { Severity } from './severity';
+import type { SpecialReportBlock } from './specialReportBlock';
 import type { SpecialReportChart } from './specialReportChart';
 import type { SpecialReportStatus } from './specialReportStatus';
 import type { SpotMapPoint } from './spotMapPoint';
@@ -44,5 +45,6 @@ export interface SpecialReportInput {
   mapPoints?: SpotMapPoint[];
   charts?: SpecialReportChart[];
   photos?: SpotReportPhoto[];
+  blocks?: SpecialReportBlock[];
   createdBy?: string;
 }

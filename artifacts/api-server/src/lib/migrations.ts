@@ -1226,11 +1226,20 @@ export async function runDataMigrations(): Promise<void> {
         map_points jsonb NOT NULL DEFAULT '[]'::jsonb,
         charts jsonb NOT NULL DEFAULT '[]'::jsonb,
         photos jsonb NOT NULL DEFAULT '[]'::jsonb,
+        blocks jsonb NOT NULL DEFAULT '[]'::jsonb,
         created_by text,
         export_history jsonb NOT NULL DEFAULT '[]'::jsonb,
         created_at timestamptz NOT NULL DEFAULT now(),
         last_edited_at timestamptz NOT NULL DEFAULT now()
       )
+    `);
+    // The free-form BODY `blocks` column arrived AFTER special_reports was first
+    // published, so on the already-existing prod table the CREATE TABLE IF NOT
+    // EXISTS above is a no-op and never adds it. Add it explicitly. Idempotent —
+    // safe to re-run; fresh installs get it from the CREATE and skip here.
+    await db.execute(sql`
+      ALTER TABLE special_reports
+        ADD COLUMN IF NOT EXISTS blocks jsonb NOT NULL DEFAULT '[]'::jsonb
     `);
 
     // Schema: AI-generated country-report narratives + sibling tables that the

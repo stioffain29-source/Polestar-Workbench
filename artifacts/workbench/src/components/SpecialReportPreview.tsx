@@ -1,6 +1,9 @@
-import { Fragment } from "react";
 import { format } from "date-fns";
-import type { Incident, SpecialReport } from "@workspace/api-client-react";
+import type {
+  Incident,
+  SpecialReport,
+  SpecialReportBlock,
+} from "@workspace/api-client-react";
 import IncidentMap from "@/components/IncidentMap";
 import { resolveCoverUrl } from "@/lib/coverImages";
 import {
@@ -12,7 +15,7 @@ import {
   SEV_LABEL,
   sevKey,
   specialLocationLabel,
-  specialReportSections,
+  resolveSpecialReportBlocks,
   buildSpecialMapPoints,
   toBullets,
   DISCLAIMER_TEXT,
@@ -175,6 +178,158 @@ function ChartBlock({ chart }: { chart: SpecialReport["charts"][number] }) {
   );
 }
 
+/**
+ * A free-form heading block. Its own `.report-section` (a page-break candidate)
+ * plus `data-pdf-keep-with-next` so the DOM-rasterise PDF never orphans it at
+ * the foot of a page, split from the block it introduces.
+ */
+function BlockHeading({ text }: { text: string }) {
+  return (
+    <div
+      className="report-section"
+      data-pdf-keep-with-next="true"
+      style={{ marginBottom: 12 }}
+    >
+      <h2
+        className="uppercase pb-2 tracking-wide"
+        style={{
+          color: NAVY,
+          fontFamily: ROBOTO,
+          fontWeight: 700,
+          fontSize: 18,
+          borderBottom: `2px solid ${ELECTRIC}`,
+        }}
+      >
+        {text}
+      </h2>
+    </div>
+  );
+}
+
+/** A single free-form image, placeable anywhere in the block list. */
+function ImageBlock({ dataUrl, caption }: { dataUrl: string; caption?: string | null }) {
+  return (
+    <div className="report-section mb-6" style={{ breakInside: "avoid" }}>
+      <figure style={{ margin: 0 }}>
+        <img
+          src={dataUrl}
+          alt={caption || "Figure"}
+          style={{
+            maxWidth: "100%",
+            maxHeight: 420,
+            width: "auto",
+            height: "auto",
+            display: "block",
+            margin: "0 auto",
+            border: `1px solid ${POLAR}`,
+          }}
+        />
+        {caption ? (
+          <figcaption
+            style={{
+              marginTop: 6,
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: DUSK,
+              fontFamily: ROBOTO,
+              fontWeight: 300,
+              textAlign: "center",
+            }}
+          >
+            {caption}
+          </figcaption>
+        ) : null}
+      </figure>
+    </div>
+  );
+}
+
+/** The Reference Incidents table — a singleton block rendering the report's
+ * resolved linked incidents. Renders nothing when none resolve. */
+function IncidentTable({ incidents }: { incidents: Incident[] }) {
+  if (incidents.length === 0) return null;
+  return (
+    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+      <div
+        className="grid uppercase tracking-widest"
+        style={{
+          gridTemplateColumns: "2fr 1fr 1.4fr 0.9fr",
+          background: NAVY,
+          color: "#fff",
+          fontFamily: ROBOTO,
+          fontWeight: 700,
+          fontSize: 10,
+          padding: "8px 10px",
+          gap: 10,
+        }}
+      >
+        <div>Incident</div>
+        <div>Date</div>
+        <div>Location</div>
+        <div>Severity</div>
+      </div>
+      {incidents.map((i, idx) => (
+        <div
+          key={i.id}
+          className="grid"
+          style={{
+            gridTemplateColumns: "2fr 1fr 1.4fr 0.9fr",
+            padding: "8px 10px",
+            gap: 10,
+            borderTop: idx === 0 ? "none" : `1px solid ${POLAR}`,
+            fontFamily: ROBOTO,
+            fontSize: 12,
+            color: DUSK,
+            alignItems: "center",
+          }}
+        >
+          <div style={{ color: NAVY, fontWeight: 700 }}>
+            {(i.displayTitle?.trim() || i.title || "Incident").trim()}
+          </div>
+          <div>{format(new Date(i.occurredAt), "dd MMM yyyy")}</div>
+          <div>{[i.location, i.country].filter(Boolean).join(", ") || "\u2014"}</div>
+          <div>
+            <SeverityChip severity={i.severity} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Whether a block produces visible content. Drives (a) skipping empty blocks and
+ * (b) dropping a heading whose entire following run (up to the next heading) is
+ * empty, so a lone heading never floats above nothing.
+ */
+function blockRenders(
+  b: SpecialReportBlock,
+  mapPointCount: number,
+  incidentCount: number,
+): boolean {
+  switch (b.type) {
+    case "heading":
+      return (b.text ?? "").trim().length > 0;
+    case "text":
+      return (b.body ?? "").trim().length > 0;
+    case "bullets":
+      return toBullets(b.body ?? "").length > 0;
+    case "chart":
+      return (b.chart?.points ?? []).some((p) => (p.label ?? "").trim().length > 0);
+    case "image":
+      return !!(b.dataUrl ?? "").trim();
+    case "map":
+      // A map block is an explicit analyst choice — always render it (an empty
+      // base map is preferable to silently dropping a requested map, and the
+      // no-coordinates case is an export-blocking error in the quality gate).
+      return true;
+    case "incidents":
+      return incidentCount > 0;
+    default:
+      return false;
+  }
+}
+
 export interface SpecialReportPreviewProps {
   report: SpecialReport;
   incidents: Incident[];
@@ -188,65 +343,25 @@ export interface SpecialReportPreviewProps {
  * showSourcesInExport is on.
  */
 export default function SpecialReportPreview({ report, incidents }: SpecialReportPreviewProps) {
-  const sections = specialReportSections(report);
+  const blocks = resolveSpecialReportBlocks(report);
   const mapPoints = buildSpecialMapPoints(report, incidents);
   const location = specialLocationLabel(report);
   const reportDate = report.reportDate ? new Date(report.reportDate) : null;
   const incidentDate = report.incidentDate ? new Date(report.incidentDate) : null;
   const coverUrl = resolveCoverUrl(report);
-  // Incident Map renders immediately after Bottom Line Up Front and before
-  // Incident Details, so split BLUF from the remaining sections.
-  const blufSection = sections.find((s) => s.heading === "Bottom Line Up Front");
-  const otherSections = sections.filter((s) => s !== blufSection);
-  const photos = (report.photos ?? []).filter((p) => p && p.dataUrl);
-  const charts = (report.charts ?? []).filter(
-    (c) => (c.points ?? []).some((p) => (p.label ?? "").trim()),
-  );
-  const hasIncidentDetails = otherSections.some((s) => s.heading === "Incident Details");
-  const imagery =
-    photos.length > 0 ? (
-      <Section title="Imagery">
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: photos.length > 1 ? "1fr 1fr" : "1fr",
-            gap: 16,
-          }}
-        >
-          {photos.map((p, i) => (
-            <figure key={i} style={{ margin: 0 }}>
-              <img
-                src={p.dataUrl}
-                alt={p.caption || `Figure ${i + 1}`}
-                style={{
-                  maxWidth: "100%",
-                  maxHeight: photos.length > 1 ? 240 : 360,
-                  width: "auto",
-                  height: "auto",
-                  display: "block",
-                  margin: "0 auto",
-                  border: `1px solid ${POLAR}`,
-                }}
-              />
-              {p.caption ? (
-                <figcaption
-                  style={{
-                    marginTop: 6,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    color: DUSK,
-                    fontFamily: ROBOTO,
-                    fontWeight: 300,
-                  }}
-                >
-                  {p.caption}
-                </figcaption>
-              ) : null}
-            </figure>
-          ))}
-        </div>
-      </Section>
-    ) : null;
+
+  // Per-block visibility: drop empty blocks, and drop a heading whose whole
+  // following run (up to the next heading) renders nothing — so no lone heading
+  // ever floats above empty space.
+  const renders = blocks.map((b) => blockRenders(b, mapPoints.length, incidents.length));
+  const visible = blocks.map((b, i) => {
+    if (!renders[i]) return false;
+    if (b.type !== "heading") return true;
+    for (let j = i + 1; j < blocks.length && blocks[j].type !== "heading"; j += 1) {
+      if (renders[j]) return true;
+    }
+    return false;
+  });
 
   return (
     <div
@@ -363,98 +478,58 @@ export default function SpecialReportPreview({ report, incidents }: SpecialRepor
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body — a free-form ordered list of analyst-composed blocks. Order,
+          presence, and mix are entirely the analyst's; nothing is forced. */}
       <div style={{ padding: "28px" }}>
-        {blufSection && (
-          <Section title={blufSection.heading}>
-            {blufSection.bullets ? (
-              <Bullets text={blufSection.body} />
-            ) : (
-              <Paragraphs text={blufSection.body} />
-            )}
-          </Section>
-        )}
-
-        {report.mapEnabled && (
-          <Section title="Incident Map">
-            <IncidentMap
-              domId="spot-report-map"
-              points={mapPoints}
-              affectedRadiusKm={report.affectedRadiusKm}
-              showLabels
-              height={420}
-            />
-          </Section>
-        )}
-
-        {!hasIncidentDetails && imagery}
-
-        {otherSections.map((s) => (
-          <Fragment key={s.heading}>
-            <Section title={s.heading}>
-              {s.bullets ? <Bullets text={s.body} /> : <Paragraphs text={s.body} />}
-            </Section>
-            {s.heading === "Incident Details" && imagery}
-          </Fragment>
-        ))}
-
-        {charts.length > 0 && (
-          <Section title="Charts">
-            {charts.map((c, i) => (
-              <ChartBlock key={i} chart={c} />
-            ))}
-          </Section>
-        )}
-
-        {incidents.length > 0 && (
-          <Section title="Reference Incidents">
-            <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
-              <div
-                className="grid uppercase tracking-widest"
-                style={{
-                  gridTemplateColumns: "2fr 1fr 1.4fr 0.9fr",
-                  background: NAVY,
-                  color: "#fff",
-                  fontFamily: ROBOTO,
-                  fontWeight: 700,
-                  fontSize: 10,
-                  padding: "8px 10px",
-                  gap: 10,
-                }}
-              >
-                <div>Incident</div>
-                <div>Date</div>
-                <div>Location</div>
-                <div>Severity</div>
-              </div>
-              {incidents.map((i, idx) => (
-                <div
-                  key={i.id}
-                  className="grid"
-                  style={{
-                    gridTemplateColumns: "2fr 1fr 1.4fr 0.9fr",
-                    padding: "8px 10px",
-                    gap: 10,
-                    borderTop: idx === 0 ? "none" : `1px solid ${POLAR}`,
-                    fontFamily: ROBOTO,
-                    fontSize: 12,
-                    color: DUSK,
-                    alignItems: "center",
-                  }}
-                >
-                  <div style={{ color: NAVY, fontWeight: 700 }}>
-                    {(i.displayTitle?.trim() || i.title || "Incident").trim()}
-                  </div>
-                  <div>{format(new Date(i.occurredAt), "dd MMM yyyy")}</div>
-                  <div>{[i.location, i.country].filter(Boolean).join(", ") || "\u2014"}</div>
-                  <div>
-                    <SeverityChip severity={i.severity} />
-                  </div>
+        {blocks.map((b, i) => {
+          if (!visible[i]) return null;
+          switch (b.type) {
+            case "heading":
+              return <BlockHeading key={b.id} text={(b.text ?? "").trim()} />;
+            case "text":
+              return (
+                <div key={b.id} className="report-section mb-6">
+                  <Paragraphs text={b.body ?? ""} />
                 </div>
-              ))}
-            </div>
-          </Section>
-        )}
+              );
+            case "bullets":
+              return (
+                <div key={b.id} className="report-section mb-6">
+                  <Bullets text={b.body ?? ""} />
+                </div>
+              );
+            case "chart":
+              return b.chart ? (
+                <div key={b.id} className="report-section">
+                  <ChartBlock chart={b.chart} />
+                </div>
+              ) : null;
+            case "image":
+              return b.dataUrl ? (
+                <ImageBlock key={b.id} dataUrl={b.dataUrl} caption={b.caption} />
+              ) : null;
+            case "map":
+              return (
+                <div key={b.id} className="report-section mb-6">
+                  <IncidentMap
+                    domId="special-report-map"
+                    points={mapPoints}
+                    affectedRadiusKm={report.affectedRadiusKm}
+                    showLabels
+                    height={420}
+                  />
+                </div>
+              );
+            case "incidents":
+              return (
+                <div key={b.id} className="report-section mb-6">
+                  <IncidentTable incidents={incidents} />
+                </div>
+              );
+            default:
+              return null;
+          }
+        })}
 
         {report.showSourcesInExport && (report.confidenceLevel || report.internalSourceNotes) && (
           <Section title="Sources & Confidence">

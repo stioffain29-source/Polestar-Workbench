@@ -91,3 +91,61 @@ export function validateCoverDataUrl(dataUrl: unknown): string | null {
   }
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Special-report BODY blocks — the free-form ordered block list. Only inline
+// image blocks carry a heavy payload, so this reuses the photo data-URL
+// ceilings above to bound them (an image block IS a photo, byte-for-byte).
+// Shared by the client editor's pre-save guard AND the api-server route so the
+// accepted block types, image types, count and sizes can never disagree.
+// ---------------------------------------------------------------------------
+
+/** The seven recognised block types. Kept in lockstep with SpecialReportBlockType. */
+export const SPECIAL_REPORT_BLOCK_TYPES = [
+  "heading",
+  "text",
+  "bullets",
+  "chart",
+  "image",
+  "map",
+  "incidents",
+] as const;
+
+const SPECIAL_BLOCK_TYPE_SET = new Set<string>(SPECIAL_REPORT_BLOCK_TYPES);
+
+type BlockLike = { id?: unknown; type?: unknown; dataUrl?: unknown };
+
+/**
+ * Validate a Special Report blocks payload. Returns an error message string, or
+ * null when the payload is valid or absent (a PATCH may omit blocks). Image
+ * blocks are bounded by the same per-image and total ceilings as photos.
+ */
+export function validateSpecialReportBlocks(blocks: unknown): string | null {
+  if (blocks === undefined) return null;
+  if (!Array.isArray(blocks)) return "blocks must be an array";
+  let imageCount = 0;
+  let total = 0;
+  for (const b of blocks as BlockLike[]) {
+    if (!b || typeof b !== "object") return "Each block must be an object.";
+    if (typeof b.id !== "string" || !b.id) return "Each block needs an id.";
+    if (typeof b.type !== "string" || !SPECIAL_BLOCK_TYPE_SET.has(b.type)) {
+      return "A block has an unrecognised type.";
+    }
+    if (b.type === "image") {
+      const dataUrl = b.dataUrl;
+      if (typeof dataUrl !== "string" || !PHOTO_DATAURL_RE.test(dataUrl)) {
+        return "Each image block must be an image data URL (jpeg, png, webp or gif).";
+      }
+      if (dataUrl.length > MAX_PHOTO_DATAURL_BYTES) {
+        return "An image is too large; please use a smaller image.";
+      }
+      imageCount += 1;
+      total += dataUrl.length;
+    }
+  }
+  if (imageCount > MAX_PHOTOS) return `Too many images (max ${MAX_PHOTOS}).`;
+  if (total > MAX_PHOTOS_TOTAL_BYTES) {
+    return "Images exceed the total size limit; please remove or shrink some.";
+  }
+  return null;
+}

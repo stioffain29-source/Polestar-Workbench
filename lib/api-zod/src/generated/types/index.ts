@@ -174,6 +174,8 @@ export * from './sourceStatus';
 export * from './sourceType';
 export * from './sourceUpdate';
 export * from './specialReport';
+export * from './specialReportBlock';
+export * from './specialReportBlockType';
 export * from './specialReportChart';
 export * from './specialReportChartPoint';
 export * from './specialReportInput';

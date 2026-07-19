@@ -13,6 +13,7 @@ import {
 import {
   validateSpotReportPhotos,
   validateCoverDataUrl,
+  validateSpecialReportBlocks,
 } from "@workspace/db/spot-report-limits";
 
 const router: IRouter = Router();
@@ -73,6 +74,13 @@ router.post("/special-reports", async (req, res): Promise<void> => {
     res.status(400).json({ error: coverError });
     return;
   }
+  const blocksError = validateSpecialReportBlocks(
+    (parsed.data as { blocks?: unknown }).blocks,
+  );
+  if (blocksError) {
+    res.status(400).json({ error: blocksError });
+    return;
+  }
   // reportDate/incidentDate arrive as Date instances (orval `useDates`); the
   // Drizzle timestamp columns accept Date directly. Undefined fields are
   // skipped by Drizzle, so column defaults (status, reportDate, [] arrays)
@@ -104,6 +112,13 @@ router.patch("/special-reports/:id", async (req, res): Promise<void> => {
   );
   if (coverError) {
     res.status(400).json({ error: coverError });
+    return;
+  }
+  const blocksError = validateSpecialReportBlocks(
+    (parsed.data as { blocks?: unknown }).blocks,
+  );
+  if (blocksError) {
+    res.status(400).json({ error: blocksError });
     return;
   }
   const updateData = {

@@ -2688,6 +2688,20 @@ components:
           type: array
           items: { $ref: "#/components/schemas/SpecialReportChartPoint" }
 
+    SpecialReportBlock:
+      type: object
+      required: [id, type]
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum: [heading, text, bullets, chart, image, map, incidents]
+        text: { type: string }
+        body: { type: string }
+        chart: { $ref: "#/components/schemas/SpecialReportChart" }
+        dataUrl: { type: string }
+        caption: { type: string }
+
     SpecialReport:
       type: object
       required:
@@ -2699,6 +2713,7 @@ components:
         - linkedIncidentIds
         - mapEnabled
         - charts
+        - blocks
         - exportHistory
         - createdAt
         - lastEditedAt
@@ -2748,6 +2763,9 @@ components:
         photos:
           type: array
           items: { $ref: "#/components/schemas/SpotReportPhoto" }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/SpecialReportBlock" }
         createdBy: { type: ["string", "null"] }
         exportHistory:
           type: array
@@ -2797,6 +2815,9 @@ components:
         photos:
           type: array
           items: { $ref: "#/components/schemas/SpotReportPhoto" }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/SpecialReportBlock" }
         createdBy: { type: string }
 
     SpecialReportUpdate:
@@ -2815,13 +2836,13 @@ components:
         severity: { type: ["string", "null"], enum: [insignificant, low, moderate, high, extreme, null] }
         coverImageKey: { type: ["string", "null"] }
         coverImageDataUrl: { type: ["string", "null"] }
-        bluf: { type: string }
-        incidentDetails: { type: string }
-        currentSituation: { type: string }
-        operationalImpact: { type: string }
-        assessment: { type: string }
-        outlook: { type: string }
-        recommendedActions: { type: string }
+        bluf: { type: ["string", "null"] }
+        incidentDetails: { type: ["string", "null"] }
+        currentSituation: { type: ["string", "null"] }
+        operationalImpact: { type: ["string", "null"] }
+        assessment: { type: ["string", "null"] }
+        outlook: { type: ["string", "null"] }
+        recommendedActions: { type: ["string", "null"] }
         analystNotes: { type: string }
         confidenceLevel: { type: ["string", "null"], enum: [low, medium, high, null] }
         internalSourceNotes: { type: string }
@@ -2840,6 +2861,9 @@ components:
         photos:
           type: array
           items: { $ref: "#/components/schemas/SpotReportPhoto" }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/SpecialReportBlock" }
         createdBy: { type: string }
 
     DataCentreStatus:

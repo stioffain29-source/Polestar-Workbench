@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { SpecialReportBlock } from './specialReportBlock';
 import type { SpecialReportChart } from './specialReportChart';
 import type { SpecialReportStatus } from './specialReportStatus';
 import type { SpecialReportUpdateConfidenceLevel } from './specialReportUpdateConfidenceLevel';
@@ -33,13 +34,20 @@ export interface SpecialReportUpdate {
   coverImageKey?: string | null;
   /** @nullable */
   coverImageDataUrl?: string | null;
-  bluf?: string;
-  incidentDetails?: string;
-  currentSituation?: string;
-  operationalImpact?: string;
-  assessment?: string;
-  outlook?: string;
-  recommendedActions?: string;
+  /** @nullable */
+  bluf?: string | null;
+  /** @nullable */
+  incidentDetails?: string | null;
+  /** @nullable */
+  currentSituation?: string | null;
+  /** @nullable */
+  operationalImpact?: string | null;
+  /** @nullable */
+  assessment?: string | null;
+  /** @nullable */
+  outlook?: string | null;
+  /** @nullable */
+  recommendedActions?: string | null;
   analystNotes?: string;
   /** @nullable */
   confidenceLevel?: SpecialReportUpdateConfidenceLevel;
@@ -52,5 +60,6 @@ export interface SpecialReportUpdate {
   mapPoints?: SpotMapPoint[];
   charts?: SpecialReportChart[];
   photos?: SpotReportPhoto[];
+  blocks?: SpecialReportBlock[];
   createdBy?: string;
 }

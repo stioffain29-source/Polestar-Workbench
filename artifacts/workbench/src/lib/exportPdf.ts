@@ -92,6 +92,7 @@ function applyExportOnlyLayout(root: HTMLElement): void {
   // it is identical on screen and in the PDF, so the export must NOT append a
   // second one.
   applyMapExportLayout(root, "spot-report-map", undefined, false);
+  applyMapExportLayout(root, "special-report-map", undefined, false);
   applySeverityBadgeExportLayout(root);
   applyCountryTableExportLayout(root);
   applyBarChartExportLayout(root);
