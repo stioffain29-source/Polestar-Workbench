@@ -217,18 +217,67 @@ export default function ReportEditor() {
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [exporting, setExporting] = useState(false);
-  const { data: rawIncidents } = useListIncidents({});
-  // Cargo Watch's authoritative scope gate is isCargoInScope (APAC/ME cargo
-  // crime) — NOT the server's general text-relevance gate, which wrongly marks
-  // most genuine cargo theft "irrelevant". The cargo monitor and CountryReport
-  // both fetch includeIrrelevant for exactly this reason; the generic report
-  // fetch above is relevance-gated, so those rows never reached the cargo report
-  // and its record count collapsed to the handful the general gate let through.
-  // Fetch the raw cargo set (only while editing a cargo report) and splice it in
-  // over the gated cargo subset. Every downstream builder re-applies
-  // filterTopicReportIncidents → isCargoInScope, so this admits exactly the rows
-  // the monitor shows and leaves all other topics byte-identical.
-  const isEnergyReport = form.topic === "energy";
+  // Id of the report whose data the seed effect below has populated into `form`.
+  // Drives `activeTopic`: before the CURRENT report is seeded we scope the
+  // incident fetch off the report's own topic; after it we follow the editable
+  // dropdown. Keyed by id (not a bare boolean) so navigating between reports
+  // never seeds the new report from the previous one's still-loaded topic set.
+  const [seededId, setSeededId] = useState<number | null>(null);
+
+  // The builder only ever renders ONE topic's report, but a naive
+  // useListIncidents({}) fetches EVERY relevance-passing incident (tens of
+  // thousands of rows, ~26 MB, once high-volume topics like indonesia_local
+  // landed). That payload is heavy enough that the seed effect below — gated on
+  // the fetch resolving — could stall, leaving `form` at its EMPTY default
+  // (topic "fuel"), so every report rendered as Fuel Watch. Scope the fetch to
+  // exactly the topic(s) the active report needs. Before the form seeds we key
+  // off the loaded report.topic (report resolves independently of incidents,
+  // avoiding a chicken-and-egg); after seeding we follow the topic dropdown.
+  const activeTopic: string | undefined =
+    report && seededId === report.id
+      ? form.topic
+      : report
+        ? report.topic ?? "fuel"
+        : undefined;
+  // Window builders read these buckets: a fuel report also cross-reads shipping
+  // (producer/operational actions); a flashpoint/protests report draws from
+  // BOTH the live flashpoint bucket and the legacy protests bucket. Every other
+  // topic reads only its own rows (cargo adds a raw includeIrrelevant fetch
+  // below and discards the gated primary set).
+  const primaryTopic = activeTopic === "protests" ? "flashpoint" : activeTopic;
+  const secondaryTopic =
+    activeTopic === "fuel"
+      ? "shipping"
+      : activeTopic === "flashpoint" || activeTopic === "protests"
+        ? "protests"
+        : undefined;
+  const primaryParams = { topic: primaryTopic };
+  const { data: primaryIncidents } = useListIncidents(primaryParams as never, {
+    query: {
+      enabled: !!primaryTopic,
+      queryKey: getListIncidentsQueryKey(primaryParams as never),
+    },
+  });
+  const secondaryParams = { topic: secondaryTopic };
+  const { data: secondaryIncidents } = useListIncidents(secondaryParams as never, {
+    query: {
+      enabled: !!secondaryTopic,
+      queryKey: getListIncidentsQueryKey(secondaryParams as never),
+    },
+  });
+  // Merge the scoped buckets (disjoint topics → plain concat). Return undefined
+  // until every query the active topic needs has resolved so the one-shot seed
+  // never fires against a partial window (e.g. fuel without its shipping
+  // cross-read) — which would freeze incomplete prose into the draft.
+  const rawIncidents = useMemo(() => {
+    if (!primaryTopic || !primaryIncidents) return undefined;
+    if (secondaryTopic && !secondaryIncidents) return undefined;
+    return secondaryTopic
+      ? [...primaryIncidents, ...(secondaryIncidents ?? [])]
+      : primaryIncidents;
+  }, [primaryTopic, secondaryTopic, primaryIncidents, secondaryIncidents]);
+
+  const isEnergyReport = activeTopic === "energy";
   const energyMarketParams = { group: "energy" };
   const { data: energyMarketPrices = [] } = useListMarketPrices(energyMarketParams, {
     query: {
@@ -237,7 +286,17 @@ export default function ReportEditor() {
     },
   });
 
-  const isCargoReport = form.topic === "cargo_watch";
+  // Cargo Watch's authoritative scope gate is isCargoInScope (APAC/ME cargo
+  // crime) — NOT the server's general text-relevance gate, which wrongly marks
+  // most genuine cargo theft "irrelevant". The cargo monitor and CountryReport
+  // both fetch includeIrrelevant for exactly this reason; the scoped fetch above
+  // is relevance-gated, so those rows never reached the cargo report and its
+  // record count collapsed to the handful the general gate let through. Fetch
+  // the raw cargo set (only while editing a cargo report) and splice it in over
+  // the gated cargo subset. Every downstream builder re-applies
+  // filterTopicReportIncidents → isCargoInScope, so this admits exactly the rows
+  // the monitor shows and leaves all other topics byte-identical.
+  const isCargoReport = activeTopic === "cargo_watch";
   const cargoRawParams = { topic: "cargo_watch", includeIrrelevant: true };
   const { data: rawCargoIncidents } = useListIncidents(cargoRawParams as never, {
     query: {
@@ -246,8 +305,9 @@ export default function ReportEditor() {
     },
   });
   const incidents = useMemo(() => {
-    if (!isCargoReport || !rawIncidents) return rawIncidents;
-    if (!rawCargoIncidents) return rawIncidents;
+    if (!rawIncidents) return undefined;
+    if (!isCargoReport) return rawIncidents;
+    if (!rawCargoIncidents) return undefined;
     const nonCargo = rawIncidents.filter((i) => i.topic !== "cargo_watch");
     return [...nonCargo, ...rawCargoIncidents];
   }, [isCargoReport, rawIncidents, rawCargoIncidents]);
@@ -970,6 +1030,7 @@ export default function ReportEditor() {
     setSectionOverrides(
       (report.sectionOverrides as TopicSectionOverrides | null) ?? {},
     );
+    setSeededId(report.id);
   }, [report, incidents]);
 
   // Reset the seed guard if the route id changes.
