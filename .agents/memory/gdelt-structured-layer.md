@@ -27,6 +27,23 @@ section). Stories remain context-only.
 - **Sub-bucket (Indonesia only).** Jakarta if admin1/location ~ /jakarta/i;
   Indonesian Papua if ~ /papua/i. Geography metadata, NOT a severity tier.
 
+## Country-brief "GDELT Open-Source Context" box: REMOVED (owner)
+
+The display-only "GDELT Open-Source Context" section that used to render on the
+country briefs (on-screen preview AND PDF, for GDELT-monitored theatres) was
+REMOVED at the owner's explicit request ("they don't belong there"). It
+duplicated already-promoted events, fragmented one event into ~6 rows, and had
+no date-window filter. **Do NOT re-add a GDELT context display to country
+briefs.** The deleted surface was: `GdeltContextSection.tsx`, `gdeltContext.ts`,
+`gdeltContextPdf.ts`, the `CountryReportVisuals` GDELT props, the two
+`drawGdeltContextPdf` blocks in `exportCountryReportPdf.ts`, and the headless
+`loadGdeltItems`/extras feed in `countryReportData.ts`.
+**Why:** display-only noise the owner rejected — this is a UI decision, NOT a
+data-pipeline change. The PROMOTE pass below (events → real incidents) is
+SEPARATE and stays; promoted GDELT events still appear in the incident picture.
+**How to apply:** GDELT still promotes into incidents and still shows on the
+owner-gated `/gdelt-structured` page; only the country-brief context BOX is gone.
+
 ## The promote pass (structured EVENT → incident)
 
 `gdeltPromote.ts` (`runGdeltPromote`, pure helper `decidePromotion`). A DB→DB
