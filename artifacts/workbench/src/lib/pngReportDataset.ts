@@ -134,12 +134,36 @@ function cleanTitle(title: string | null | undefined, source: string | null | un
       const suffix = `${sep}${src}`;
       if (t.toLowerCase().endsWith(suffix.toLowerCase())) return t.slice(0, t.length - suffix.length).trim();
     }
+    // Source-anchored strip for a trailing " - <tail>" that is the publisher name
+    // stored WITH a domain/suffix ("AsiaNews.it" source vs "AsiaNews" tail, or
+    // "Xinhua Net" vs "Xinhua"): the tail's alphanumerics are wholly CONTAINED by
+    // the source's. One-directional on purpose — the reverse (tail contains
+    // source) would let a short source like "Jubi" strip a real "- Jubilee ..."
+    // tail. The >=4-char gate avoids short-substring collisions.
+    const normSrc = src.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const mSrc = t.match(/^(.*\S)\s[-–—|]\s([^-–—|]{2,40})$/);
+    if (mSrc && normSrc) {
+      const normTail = mSrc[2].trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (normTail.length >= 4 && normSrc.includes(normTail)) return mSrc[1].trim();
+    }
   }
   const m = t.match(/^(.*\S)\s[-–—|]\s([^-–—|]{2,40})$/);
   if (m) {
     const tail = m[2].trim();
     const wordCount = tail.split(/\s+/).length;
-    const looksLikeMasthead = /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media|emtv|national|jubi|antara|kompas|detik|tempo|tribun|suara|cendrawasih|tabloid)\b/i.test(tail);
+    const MASTHEAD_RE =
+      /\b(news|times|post|herald|guardian|reuters|bloomberg|daily|tribune|gazette|journal|chronicle|observer|telegraph|press|wire|report|today|mail|express|standard|abc|bbc|cnn|afp|rnz|pngfm|loop|bulletin|review|insider|monitor|dispatch|courier|sun|star|globe|record|digest|radio|tv|online|media|emtv|national|jubi|antara|kompas|detik|tempo|tribun|suara|cendrawasih|tabloid)\b/i;
+    // A masthead-type word anywhere in the raw tail, OR — for a camel-case
+    // publisher glued together ("AsiaNews", "BenarNews") — as the FINAL token once
+    // split. Requiring it LAST avoids stripping a name-prefixed token such as
+    // "StarLink" (begins with a listed word but is not a masthead). Google News
+    // RSS appends the original publisher ("- AsiaNews") while the stored source is
+    // the feed name, so the source-anchored strip above cannot catch it.
+    let looksLikeMasthead = MASTHEAD_RE.test(tail);
+    if (!looksLikeMasthead) {
+      const parts = tail.replace(/([a-z])([A-Z])/g, "$1 $2").split(/\s+/);
+      if (parts.length >= 2 && MASTHEAD_RE.test(parts[parts.length - 1] ?? "")) looksLikeMasthead = true;
+    }
     if (wordCount <= 6 && !/\d/.test(tail) && looksLikeMasthead) return m[1].trim();
   }
   return t;
@@ -1001,7 +1025,9 @@ function toItem(
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
   const title = stripGalleryFraming(
     stripWireCruft(
-      i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source),
+      i.displayTitle && i.displayTitle.trim()
+        ? cleanTitle(i.displayTitle.trim(), i.source)
+        : cleanTitle(i.title, i.source),
     ),
   );
   // Original-language headline: same cleaning as `title` but WITHOUT the
@@ -1738,6 +1764,39 @@ export function buildStructuredReportDataset(
   const topProvs = topLabels(aggregateItems.filter((it) => it.province), (it) => it.province as string, 3);
   const prevTopProv = topLabels(prevAggregateItems.filter((it) => it.province), (it) => it.province as string, 1)[0] ?? null;
   const prevTopCat = (topLabels(prevAggregateItems, (it) => it.category, 1)[0] ?? "").toLowerCase() || null;
+
+  // Categories / provinces ranked by ASSESSED SIGNIFICANCE — the worst severity
+  // each carries this period, then volume as a tie-break — rather than by raw
+  // volume. Routine governance, political and hazard items can dominate a feed by
+  // count without being the period's most serious reporting, so the TOP-OF-REPORT
+  // framing (BLUF, Current Situation, Outlook) leads with the significant security
+  // themes instead of whatever simply appears most often. This is a severity-
+  // derived significance claim, never a proportion/volume claim, so it stays
+  // faithful to the no-fabrication rule; the per-theme Incident Details sections
+  // keep their own item-driven descriptions unchanged.
+  const rankBySignificance = (
+    keyOf: (it: (typeof aggregateItems)[number]) => string | null | undefined,
+  ): string[] => {
+    const m = new Map<string, { worst: number; count: number }>();
+    for (const it of aggregateItems) {
+      const k = keyOf(it);
+      if (!k) continue;
+      const s = m.get(k) ?? { worst: 0, count: 0 };
+      s.worst = Math.max(s.worst, it.severityRank);
+      s.count += 1;
+      m.set(k, s);
+    }
+    return Array.from(m.entries())
+      .sort((a, b) => b[1].worst - a[1].worst || b[1].count - a[1].count)
+      .slice(0, 3)
+      .map(([k]) => k);
+  };
+  const sigCats = rankBySignificance((it) => it.category.toLowerCase());
+  const sigCatPhrases = sigCats.map(categoryPhrase);
+  const sigProvs = rankBySignificance((it) => it.province);
+  const sigLeadCatPhrase = sigCatPhrases[0] ?? "security-relevant incidents";
+  const sigProvClause = sigProvs.length ? ` concentrated around ${joinList(sigProvs.slice(0, 2))}` : "";
+
   // Volume trajectory bucket: "up" / "down" / "level" (>=2-incident swing to
   // register as a move; otherwise level), and "nohistory" when the prior week
   // has no comparable reporting.
@@ -1881,27 +1940,24 @@ export function buildStructuredReportDataset(
   if (windowItems.length === 0) {
     executiveSummary = `${config.emptyLocationFallback} The standing operating picture for ${config.countryName} carries over from the preceding period; treat the absence of fresh reporting as a coverage signal, not as an improvement in conditions.`;
   } else {
-    const cats = topLabels(aggregateItems, (it) => it.category, 3).map((c) => c.toLowerCase());
-    const provs = topLabels(
-      aggregateItems.filter((it) => it.province),
-      (it) => it.province as string,
-      3,
-    );
     const worst = [...aggregateItems].sort((a, b) => b.severityRank - a.severityRank)[0];
-    const catText = cats.length ? joinList(cats.map(categoryPhrase)) : "security-relevant activity";
-    const provText = provs.length ? ` Reporting clustered around ${joinList(provs)}.` : "";
+    const catText = sigCatPhrases.length ? joinList(sigCatPhrases) : "security-relevant activity";
+    const provText = sigProvs.length ? ` Reporting concentrated around ${joinList(sigProvs)}.` : "";
     const sevText =
       worst && worst.severityRank >= 4
         ? ` The most serious entry reached ${worst.severityLabel} severity.`
         : "";
-    const p1 = `The security picture in ${config.countryName} this period was dominated by ${catText}.${provText}${sevText}`;
+    // Lead with the period's most operationally significant reporting (severity-
+    // ranked), NOT the highest-volume category — routine governance/hazard items
+    // can outnumber the security events without being the story. The principal
+    // development is named once in the BLUF above, so the Current Situation opens
+    // on the security concentration rather than repeating that sentence verbatim.
+    const p1 = `The most operationally significant reporting in ${config.countryName} this period concerned ${catText}.${provText}${sevText}`;
     // Business-guidance close. The old "operational rather than a single dramatic
     // event" framing was banned by the spec (generic, dismissive); state the
     // practical priority directly instead.
     const p2 = `For business users the priority is movement security, premises protection and continuity at exposed sites while this picture holds.`;
-    const lead = eventLeadSentence || themeLeadSentence;
-    const p1Led = lead ? `${lead} ${p1}` : p1;
-    executiveSummary = `${p1Led}\n\n${p2}`;
+    executiveSummary = `${p1}\n\n${p2}`;
   }
 
   // --- Business impact (de-duplicated impact lines for the categories present)-
@@ -1925,8 +1981,8 @@ export function buildStructuredReportDataset(
   if (windowItems.length === 0) {
     outlook = config.emptyOutlook;
   } else {
-    const recurringProv = topProvs.slice(0, 2);
-    const recurringCat = topCatPhrases.slice(0, 2);
+    const recurringProv = sigProvs.slice(0, 2);
+    const recurringCat = sigCatPhrases.slice(0, 2);
     const keyLocs = recurringProv.length
       ? joinList(recurringProv)
       : baselineWatchlist.length
@@ -1990,7 +2046,6 @@ export function buildStructuredReportDataset(
               : "stable";
   const leadCat = topCats[0] ?? "security-relevant activity";
   const leadCatPhrase = topCatPhrases[0] ?? "security-relevant incidents";
-  const leadProvClause = topProvs.length ? ` concentrated around ${joinList(topProvs.slice(0, 2))}` : "";
 
   // --- BLUF (Bottom Line Up Front) ------------------------------------------
   let bluf: string;
@@ -2009,7 +2064,7 @@ export function buildStructuredReportDataset(
       curWorstRank >= 4
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    const blufBody = `The operating picture for ${config.countryName} this period ${trendWord}: the bulk of reporting concerns ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}.`;
+    const blufBody = `The operating picture for ${config.countryName} this period ${trendWord}: the most operationally significant reporting concerned ${sigLeadCatPhrase}${sigProvClause}. For business users, ${bizRisk}.`;
     const blufLead = eventLeadSentence || themeLeadSentence;
     bluf = blufLead ? `${blufLead} ${blufBody}` : blufBody;
   }
@@ -2204,13 +2259,21 @@ export function buildStructuredReportDataset(
   {
     const empty = windowItems.length === 0;
     const themeCounts = new Map<CountryIncidentTheme, number>();
+    const themeWorst = new Map<CountryIncidentTheme, number>();
     for (const it of windowItems) {
       const k = themeForCategory(it.category);
       themeCounts.set(k, (themeCounts.get(k) ?? 0) + 1);
+      themeWorst.set(k, Math.max(themeWorst.get(k) ?? 0, it.severityRank));
     }
+    // Drivers lead with the most SIGNIFICANT present themes (worst severity, then
+    // volume), so the Polestar View is security-led rather than volume-led.
     const presentThemeKeys = COUNTRY_INCIDENT_THEMES.map((d) => d.key)
       .filter((k) => (themeCounts.get(k) ?? 0) > 0)
-      .sort((a, b) => (themeCounts.get(b) ?? 0) - (themeCounts.get(a) ?? 0));
+      .sort(
+        (a, b) =>
+          (themeWorst.get(b) ?? 0) - (themeWorst.get(a) ?? 0) ||
+          (themeCounts.get(b) ?? 0) - (themeCounts.get(a) ?? 0),
+      );
 
     // Lead locations as friendly bucket labels (raw province fallback for
     // generic countries with no buckets), deduplicated, capped to three.
