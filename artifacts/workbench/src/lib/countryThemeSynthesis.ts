@@ -107,15 +107,17 @@ const TRAJECTORY_PHRASE: Record<ThemeTrajectory, string> = {
   nobasis: "with no prior-week baseline to compare against",
 };
 
-// A count-free trajectory clause for the narrative paragraph.
+// A count-free trajectory clause for the narrative paragraph. Names the activity
+// rather than asserting a bare "the theme is rising" — the spec bans generic,
+// un-anchored trend language, so each clause is tied to the reported activity.
 function trajectorySentence(t: ThemeTrajectory): string {
   switch (t) {
     case "rising":
-      return "Against the previous week the theme is rising.";
+      return "This activity was more prominent than in the previous week.";
     case "easing":
-      return "Against the previous week the theme is easing.";
+      return "This activity was less prominent than in the previous week.";
     case "steady":
-      return "Against the previous week the theme is broadly steady.";
+      return "This activity held broadly at the previous week's level.";
     case "new":
       return "It was not reported a week earlier, so it reads as newly prominent this period.";
     case "nobasis":

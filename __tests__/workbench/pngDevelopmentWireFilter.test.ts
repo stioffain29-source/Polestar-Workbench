@@ -265,6 +265,33 @@ describe("isDevelopmentWireItem — guardrails (strict under-filter bias)", () =
       ),
     ).toBe(false);
   });
+
+  it("drops victim-photo publication rows at ANY severity, bypassing the casualty veto (photo-publication path)", () => {
+    // These name casualties ("korban"/"victims"), which would normally VETO the
+    // drop, but a victim-photo gallery is a publication, not a fresh development.
+    const drops = [
+      "Foto-foto korban penembakan di Yahukimo",
+      "Foto korban banjir bandang Sentani",
+      "Foto para korban kecelakaan di Jayapura",
+      "Photos of victims of the Wamena clash",
+      "More photos of the victims released by police",
+    ];
+    for (const title of drops) {
+      // High severity — proves the photo path bypasses both the severity gate
+      // and the security-term veto.
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 4 }))).toBe(true);
+    }
+  });
+
+  it("keeps a genuine victim/korban development that is NOT a photo gallery", () => {
+    const keeps = [
+      "Korban penembakan Yahukimo dievakuasi ke Jayapura", // victims evacuated — real update
+      "Victims of the Wamena clash identified by police", // 'photos of' absent
+    ];
+    for (const title of keeps) {
+      expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(false);
+    }
+  });
 });
 
 const DAY = 86_400_000;

@@ -21,6 +21,7 @@ const DISPLAY_CATEGORY_MAP: Record<string, string> = {
   "armed robbery / hold-up": "Armed robbery / violent crime",
   "homicide / violent crime": "Armed robbery / violent crime",
   fire: "Fire / explosion",
+  "explosive remnants of war / accidental explosion": "Fire / explosion",
   "natural hazard": "Natural hazard",
   "environmental / haze": "Natural hazard",
   "aviation / airport": "Transport disruption",

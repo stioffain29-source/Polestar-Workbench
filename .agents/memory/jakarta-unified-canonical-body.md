@@ -35,3 +35,16 @@ dedicated `JakartaReportBody.tsx` (deleted) + `renderJakartaBrief` (deleted).
   body, so don't assert the map inside the body render.
 - Adding/reordering a fold = update body TSX + `renderStructuredBrief` in lockstep
   or the audit fails.
+
+## Obsolete jakarta PDF test suites (superseded by unified body)
+
+`__tests__/workbench/jakartaBriefEmptyPdf.test.ts` and
+`__tests__/workbench/jakartaBriefProsePdf.test.ts` (6 tests) exercise the DELETED
+`renderJakartaBrief` / `JakartaReportBody` path. They fail on import now and are
+NOT a regression — they are superseded by `jakartaReportRender.test.tsx` +
+`auditJakartaPdf.ts` which cover the shared `PngCountryReportBody` /
+`renderStructuredBrief`. Leave them or delete them, but do not "fix" them by
+resurrecting the old body.
+
+**How to apply:** if these two suites fail, confirm they still import the deleted
+symbols before treating the failure as yours.

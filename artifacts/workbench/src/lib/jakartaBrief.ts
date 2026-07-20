@@ -123,6 +123,7 @@ const CATEGORY_JAKARTA_THEME: Record<PngCategory, JakartaTheme> = {
   "Natural hazard": "flooding",
   "Environmental / haze": "flooding",
   Fire: "fire",
+  "Explosive remnants of war / accidental explosion": "fire",
   "Other security": "crime",
 };
 

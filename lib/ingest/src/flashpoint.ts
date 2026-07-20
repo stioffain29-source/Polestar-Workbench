@@ -81,21 +81,30 @@ const KINETIC_DENY_GLOBAL: RegExp =
 const KINETIC_DENY_NONPACIFIC: RegExp =
   /\b(gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|raid|strike|fire)|insurgents? (kill|attack|target|ambush)|\bambush\b|armed group (attack|kill|raid)|terrorists? killed|wanted (commander|terrorist|ringleader))\b/i;
 
+// WWII / wartime unexploded-ordnance events. An 80-year-old munition that is
+// merely found and defused is an accident, not a security/conflict event, and
+// used to leak into the country report via the bare "killed" cue. It is gated to
+// require a WWII reference CO-OCCURRING with ordnance/explosion semantics so a
+// present-day event that merely mentions WWII (a memorial protest, an
+// anniversary rally) is NOT caught. This is applied CONDITIONALLY in classify()
+// (not the unconditional FLASHPOINT_DENY loop) so it can be gated on the ABSENCE
+// of a casualty signal: a legacy-ordnance detonation that kills or injures IS a
+// real, if localised, security-relevant event and is kept — the structured
+// extractor then classifies it as "Explosive remnants of war / accidental
+// explosion". Only the non-casualty "UXO found and defused" class is denied.
+const WWII_ORDNANCE_DENY_RE =
+  /(?:\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b[\s\S]{0,40}\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo))|(?:\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo)\b[\s\S]{0,40}\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b)|\bwartime (?:bomb|ordnance|munition|ammunition)\b|\bunexploded ordnance\b/i;
+
+// Bilingual casualty signal for the ERW deny gate above (English + Bahasa).
+const ERW_CASUALTY_SIGNAL =
+  /\b(killed|kills|dead|deaths?|wounded|injured|casualt(?:y|ies)|fatalit(?:y|ies)|tewas|meninggal|luka(?:-luka)?|terluka|korban)\b/i;
+
 const FLASHPOINT_DENY: RegExp[] = [
   // Kinetic armed conflict — foreign signatures only (insurgent/armed-group
   // kinetic is handled conditionally in classify() so Pacific stays in scope).
   KINETIC_DENY_GLOBAL,
-  // WWII / wartime unexploded-ordnance accidents are tragedies but NOT
-  // security/conflict events. In the Papua theatre a cluster of "WWII bomb
-  // explodes, five dead" wire stories was leaking into the country report via
-  // the bare "killed" cue and misrepresenting the genuine security picture
-  // (insurgency). An 80-year-old munition detonating is an accident, not an
-  // armed-conflict incident, so it is denied from this tracker. Gated to require
-  // a WWII reference CO-OCCURRING with ordnance/explosion semantics so a genuine
-  // present-day security event that merely mentions WWII (a protest at a WWII
-  // memorial, a war anniversary rally) is NOT dropped — only the bomb-accident
-  // class is.
-  /(?:\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b[\s\S]{0,40}\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo))|(?:\b(?:bomb|ordnance|munition|ammunition|shell|grenade|explo\w*|blast|unexploded|uxo)\b[\s\S]{0,40}\b(?:world war (?:ii|2|two)|wwii|ww2|second world war)\b)|\bwartime (?:bomb|ordnance|munition|ammunition)\b|\bunexploded ordnance\b/i,
+  // (WWII / wartime unexploded-ordnance is denied conditionally in classify()
+  // via WWII_ORDNANCE_DENY_RE — kept when casualty-bearing, dropped when not.)
   // Cargo / freight noise (handled by cargo_watch)
   /\b(cargo theft|truck hijack|warehouse theft|container theft|freight theft|depot theft|cargo robbery|seal tamper)\b/i,
   // Commercial / market commentary
@@ -431,6 +440,13 @@ function classify(title: string, summary: string, feedCountry?: string | null): 
 
   for (const re of FLASHPOINT_DENY) {
     if (re.test(hay)) return { kept: false, reason: `deny:${re.source.slice(0, 30)}`, country: null };
+  }
+
+  // Legacy WWII / wartime ordnance: a non-casualty "UXO found and defused" item
+  // is an accident, not a security event, so it is dropped. A casualty-bearing
+  // detonation is KEPT (the structured extractor categorises it as ERW).
+  if (WWII_ORDNANCE_DENY_RE.test(hay) && !ERW_CASUALTY_SIGNAL.test(hay)) {
+    return { kept: false, reason: "deny:wwii-ordnance-nocasualty", country: null };
   }
 
   // Scraped Google-News SECTION / topic-page heading ("<Place> Massacre News")

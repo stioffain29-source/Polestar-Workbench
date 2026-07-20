@@ -77,6 +77,8 @@ import { countryCoverUrl } from "@/lib/coverImages";
 import type { CountryBaseline } from "@/lib/countryBaselines";
 import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, resolveActiveCountryWindow, resolvePreviousCountryWindow, computeCountryCoverageStatus, computeCountrySourceSignals, type CountryLayerBuckets, type CoverageSourceLike } from "@/lib/countryReportLayers";
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
+import { runCountryReportQc, type CountryReportQcMapIncident } from "@/lib/countryReportQc";
+import { parseISO, subDays, startOfDay } from "date-fns";
 import { isGdeltMonitoredReport } from "@/lib/gdeltContext";
 import { markerExternalId } from "@workspace/ingest/markers";
 
@@ -652,6 +654,20 @@ export default function CountryReport() {
       ninetyDay: layers.ninetyDay as PngSourceIncident[],
       baselineWatchlist: (baseline?.locationWatchlist ?? []).map((w) => w.label),
       periodLabel: active.basisLabel,
+      // Start of the rolling 7-day window (issueDate-6, start-of-day). Lets the
+      // builder flag rows whose OWN event date predates the window (an older
+      // incident resurfacing in this week's reporting) so they never inflate the
+      // period's trend/severity aggregates while still appearing in the cards.
+      windowStart: (() => {
+        let end: Date;
+        try {
+          end = parseISO(issueDate);
+        } catch {
+          end = new Date();
+        }
+        if (isNaN(end.getTime())) end = new Date();
+        return startOfDay(subDays(end, 6));
+      })(),
     };
     switch (structuredTheatre) {
       case "westPapua":
@@ -1159,6 +1175,23 @@ export default function CountryReport() {
 
   const windowIncidents = facts.windowIncidents;
 
+  // Non-blocking §13 quality-control pass over the built structured brief. Pure
+  // and never throws; a non-empty result renders as a subdued-red, no-print
+  // banner (below) so the analyst sees a consistency problem without the report
+  // silently shipping wrong. Uses the SAME window incidents the map plots from.
+  const qcWarnings = pngDataset
+    ? (() => {
+        try {
+          return runCountryReportQc(
+            pngDataset,
+            windowIncidents as CountryReportQcMapIncident[],
+          );
+        } catch {
+          return [];
+        }
+      })()
+    : [];
+
   // Analyst-placed incident map node, rendered at the chosen placement slot.
   // Jakarta uses a corridor & access schematic (operating-exposure graphic)
   // instead of the numbered incident-dot map; all other theatres are unchanged.
@@ -1294,6 +1327,33 @@ export default function CountryReport() {
           changed since it was written — it may no longer match the current
           incidents. Review it and re-save, or use Redraft to start from the
           fresh AI draft.
+        </div>
+      )}
+
+      {qcWarnings.length > 0 && (
+        <div
+          className="no-print"
+          style={{
+            fontFamily: ROBOTO,
+            fontSize: 12,
+            color: "#A33232",
+            border: "1px solid #A33232",
+            borderRadius: 2,
+            background: "#fff",
+            padding: "6px 10px",
+            marginTop: 8,
+          }}
+        >
+          <strong>Report quality checks</strong> flagged {qcWarnings.length}{" "}
+          {qcWarnings.length === 1 ? "item" : "items"}. This is advisory only —
+          the report still exports.
+          <ul style={{ margin: "4px 0 0 0", paddingLeft: 18 }}>
+            {qcWarnings.map((w, i) => (
+              <li key={i} style={{ marginTop: 2 }}>
+                {w}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

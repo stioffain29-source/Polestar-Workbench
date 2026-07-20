@@ -963,7 +963,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       if (latLngs.length === 1) {
         map.setView(latLngs[0] as L.LatLngTuple, 6);
       } else {
-        map.fitBounds(L.latLngBounds(latLngs), { padding: [36, 36], maxZoom: 7 });
+        map.fitBounds(L.latLngBounds(latLngs), { padding: [48, 52], maxZoom: 7 });
       }
       positionDots();
       map.off("move zoom resize viewreset zoomanim", positionDots);
@@ -1041,7 +1041,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     if (latLngs.length === 1) {
       map.setView(latLngs[0] as L.LatLngTuple, 8);
     } else {
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [24, 24], maxZoom: 9 });
+      map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 44], maxZoom: 9 });
     }
 
     positionDots();

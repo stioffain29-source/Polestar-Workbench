@@ -37,6 +37,7 @@ import {
   type SameStoryRow,
   type StorySimInput,
 } from "./countrySameStory";
+import { subDays, format as formatDate } from "date-fns";
 import { isLikelyNonEnglish, stripWireCruft } from "./incidentTitle";
 import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
@@ -703,6 +704,14 @@ export interface PngReportItem {
   reportedDate: Date;
   incidentDate: Date | null;
   occurredEarlier: boolean;
+  // True when the incident's OWN event date fell BEFORE the current reporting
+  // window even though it was REPORTED inside it (an older event resurfacing
+  // with fresh findings). Such rows still appear in the cards + Top 3 (with both
+  // dates stated) but are EXCLUDED from the period's trend / severity aggregates
+  // so a week-old killing reported today never inflates this week's picture.
+  // Requires BuildArgs.windowStart; false for every theatre that omits it
+  // (byte-identical render) and for any row without an extracted incidentDate.
+  occurredOutOfWindow: boolean;
   source: string;
   url: string | null;
   confidence: string;
@@ -887,6 +896,11 @@ export interface BuildArgs {
   ninetyDay: PngSourceIncident[];
   baselineWatchlist: string[];
   periodLabel: string;
+  // Start instant of the current reporting window (startOfDay of issueDate-6).
+  // OPTIONAL: when supplied, a row whose extracted incidentDate falls before it
+  // is flagged occurredOutOfWindow and dropped from the period's trend/severity
+  // aggregates. Omitted → occurredOutOfWindow is always false (render unchanged).
+  windowStart?: Date;
 }
 
 // Rulebook "Other security" default — used ONLY for a residual row that somehow
@@ -899,7 +913,11 @@ const DEFAULT_CATEGORY: PngCategory = "Other security";
 const DEFAULT_BUSINESS_IMPACT =
   "Security-relevant development; monitor for operational follow-on in the affected area.";
 
-function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngReportItem {
+function toItem(
+  i: PngSourceIncident,
+  config: StructuredTheatreConfig,
+  windowStart?: Date,
+): PngReportItem {
   // Read the per-incident enrichment STRAIGHT from the incidents API. The
   // columns are populated server-side (ingest + backfill + onlyNull enrichment
   // pass) for every PNG / West Papua tagged row, so the client does not
@@ -960,6 +978,8 @@ function toItem(i: PngSourceIncident, config: StructuredTheatreConfig): PngRepor
     reportedDate,
     incidentDate,
     occurredEarlier: incidentDate != null,
+    occurredOutOfWindow:
+      incidentDate != null && windowStart != null && incidentDate < windowStart,
     source: (i.source ?? "").trim(),
     url: (i.resolvedUrl ?? i.sourceUrl ?? null) || null,
     confidence: (i.confidence ?? "").trim().toLowerCase() || "unrated",
@@ -1029,6 +1049,16 @@ const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 const NON_EVENT_TITLE_RE =
   /(\bdevpolicy\b|development policy centre|everyday crime and insecurity|\bname[sd]?\s+(?:a\s+)?(?:powerful\s+)?side\b|consistency in selection|selection ahead of|\bawareness\s+(?:initiative|campaign|programme|program|drive|week|month)\b)/i;
 
+// Photo-PUBLICATION headlines ("More photos of victims"; Bahasa "Foto korban" /
+// "Foto-foto para korban"). Per spec: the publication of photographs is NOT a
+// security development, so such a headline must never lead as an incident. Like
+// NON_EVENT it is dropped WITHOUT the security-term veto — "victims"/"korban"
+// inherently names casualties, which would otherwise veto the drop. TITLE-ONLY
+// and deliberately NARROW: it does NOT match "korban … diidentifikasi" (victims
+// identified — a genuine investigative development). Exported for unit tests.
+const PHOTO_PUBLICATION_TITLE_RE =
+  /(\bfoto(?:-foto)?\s+(?:para\s+)?korban\b|\b(?:more\s+)?photos?\s+of\s+(?:the\s+)?victims\b)/i;
+
 // Pure predicate: is this a low-value development / promotional wire item that a
 // security brief should exclude? Exported for unit tests. Strict under-filter
 // bias — a security / hazard term always vetoes the drop.
@@ -1051,6 +1081,7 @@ const NON_EVENT_TITLE_RE =
 export function isDevelopmentWireItem(item: PngReportItem): boolean {
   const hay = `${item.title} ${item.summary}`.toLowerCase();
   if (NON_EVENT_TITLE_RE.test(hay)) return true;
+  if (PHOTO_PUBLICATION_TITLE_RE.test(item.title)) return true;
   if (HARD_NON_INCIDENT_TITLE_RE.test(item.title)) {
     return !SECURITY_TERM_RE.test(item.title.toLowerCase());
   }
@@ -1346,15 +1377,46 @@ const CATEGORY_PHRASE: Record<string, string> = {
   "road / highway": "road and highway disruption",
   "natural hazard": "natural hazards",
   fire: "fires",
+  "explosive remnants of war / accidental explosion": "wartime-ordnance explosions",
   "environmental / haze": "haze and environmental incidents",
   "power / utilities": "power and utility disruption",
   "telecoms / connectivity": "telecoms and connectivity disruption",
-  "government stability": "government-stability concerns",
+  "government stability": "governance and political developments",
   "other security": "other security-relevant incidents",
 };
 function categoryPhrase(label: string): string {
   const k = label.toLowerCase();
   return CATEGORY_PHRASE[k] ?? k.replace(/\s*\/\s*/g, " and ");
+}
+
+// British-style short date for prose ("2 Jul 2026"). Kept deterministic (no
+// locale/timezone drift) so headless-PDF and screen renders match byte-for-byte.
+function formatBriefDate(d: Date): string {
+  return formatDate(d, "d MMM yyyy");
+}
+
+// Event-led opening clause naming the period's PRINCIPAL development — the lead
+// Top-3 story — instead of an abstract theme. The spec requires the brief to
+// open on what actually happened. When the lead item's own event date fell
+// before the reporting window (occurredOutOfWindow) it is framed as fresh
+// findings on an EARLIER incident, stating BOTH the occurrence and report dates
+// so an old event is never presented as new. Returns "" when there is no lead
+// (caller then falls back to the theme sentence). Never fabricates.
+function eventLedLeadSentence(lead: PngReportItem | undefined): string {
+  if (!lead) return "";
+  const head = stripWireCruft(lead.title)
+    .replace(/\s+/g, " ")
+    .replace(/[.;,]+\s*$/, "")
+    .trim();
+  if (!head) return "";
+  const place = (lead.location || lead.province || "").trim();
+  const placeClause =
+    place && !head.toLowerCase().includes(place.toLowerCase()) ? ` in ${place}` : "";
+  if (lead.occurredOutOfWindow && lead.incidentDate) {
+    return `This period's lead item was fresh reporting on an earlier development${placeClause}: ${head} (occurred ${formatBriefDate(lead.incidentDate)}, reported ${formatBriefDate(lead.reportedDate)}).`;
+  }
+  const phrase = categoryPhrase(lead.category);
+  return `This period's lead development was ${phrase}${placeClause}: ${head}.`;
 }
 
 // Map a curated category (matched on keywords, mirroring strandForItem) to a
@@ -1534,13 +1596,21 @@ export function buildStructuredReportDataset(
   // Deduped-but-unfiltered window, kept so the syndication (dedup-strength)
   // signal below measures collapse only — never conflating the wire filter with
   // syndication.
-  const dedupedWindowItems = dedupeByTitle(windowIncidents.map((i) => toItem(i, config)));
+  // Previous window starts a further 7 days back; when no windowStart is
+  // supplied both stay undefined so occurredOutOfWindow is universally false.
+  const prevWindowStart =
+    args.windowStart != null ? subDays(args.windowStart, 7) : undefined;
+  const dedupedWindowItems = dedupeByTitle(
+    windowIncidents.map((i) => toItem(i, config, args.windowStart)),
+  );
   const windowItems = applyRetrospectiveFilter(applyWireFilter(dedupedWindowItems));
   // Prior 7-day window, deduped the same way, for the week-on-week delta. Empty
   // when the caller supplies none (delta degrades to a "limited history" note).
   const previousWindowItems = applyRetrospectiveFilter(
     applyWireFilter(
-      dedupeByTitle((previousWindowIncidents ?? []).map((i) => toItem(i, config))),
+      dedupeByTitle(
+        (previousWindowIncidents ?? []).map((i) => toItem(i, config, prevWindowStart)),
+      ),
     ),
   );
   // Distinguish "no previous window supplied at all" (week-on-week comparison
@@ -1548,26 +1618,39 @@ export function buildStructuredReportDataset(
   // (a valid comparison against a calm prior week).
   const hasPreviousWindow = previousWindowIncidents !== undefined;
 
+  // Trend / severity AGGREGATES read the in-window subset only: a row REPORTED
+  // this period but whose own event date fell before the window (occurredOutOfWindow)
+  // must not inflate this week's volume or worst-severity picture. Such rows are
+  // still shown in the cards + Top 3 (with both dates). GUARD: if every window
+  // row is out-of-window the aggregates would go empty and falsely read as "no
+  // fresh reporting", so fall back to the full set (windowItems.length === 0 stays
+  // the sole genuine-empty gate below). Inert for theatres without windowStart
+  // (occurredOutOfWindow is universally false → aggregateItems === windowItems).
+  const inWindow = windowItems.filter((it) => !it.occurredOutOfWindow);
+  const aggregateItems = inWindow.length > 0 ? inWindow : windowItems;
+  const prevInWindow = previousWindowItems.filter((it) => !it.occurredOutOfWindow);
+  const prevAggregateItems = prevInWindow.length > 0 ? prevInWindow : previousWindowItems;
+
   // Shared week-on-week signals (qualitative — counts never reach the prose).
-  const curWorstRank = windowItems.reduce((m, it) => Math.max(m, it.severityRank), 0);
-  const prevWorstRank = previousWindowItems.reduce((m, it) => Math.max(m, it.severityRank), 0);
+  const curWorstRank = aggregateItems.reduce((m, it) => Math.max(m, it.severityRank), 0);
+  const prevWorstRank = prevAggregateItems.reduce((m, it) => Math.max(m, it.severityRank), 0);
   const curWorstLabel = SEV_LABEL[Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === curWorstRank) ?? ""] ?? "";
   const prevWorstLabel = SEV_LABEL[Object.keys(SEV_RANK).find((k) => SEV_RANK[k] === prevWorstRank) ?? ""] ?? "";
-  const topCats = topLabels(windowItems, (it) => it.category, 3).map((c) => c.toLowerCase());
+  const topCats = topLabels(aggregateItems, (it) => it.category, 3).map((c) => c.toLowerCase());
   // Natural-prose forms of the same categories. Raw bucket labels read as word
   // salad in a sentence, so every narrative section uses these instead.
   const topCatPhrases = topCats.map(categoryPhrase);
-  const topProvs = topLabels(windowItems.filter((it) => it.province), (it) => it.province as string, 3);
-  const prevTopProv = topLabels(previousWindowItems.filter((it) => it.province), (it) => it.province as string, 1)[0] ?? null;
-  const prevTopCat = (topLabels(previousWindowItems, (it) => it.category, 1)[0] ?? "").toLowerCase() || null;
+  const topProvs = topLabels(aggregateItems.filter((it) => it.province), (it) => it.province as string, 3);
+  const prevTopProv = topLabels(prevAggregateItems.filter((it) => it.province), (it) => it.province as string, 1)[0] ?? null;
+  const prevTopCat = (topLabels(prevAggregateItems, (it) => it.category, 1)[0] ?? "").toLowerCase() || null;
   // Volume trajectory bucket: "up" / "down" / "level" (>=2-incident swing to
   // register as a move; otherwise level), and "nohistory" when the prior week
   // has no comparable reporting.
   const volumeTrend: "up" | "down" | "level" | "nohistory" = !hasPreviousWindow
     ? "nohistory"
-    : windowItems.length - previousWindowItems.length >= 2
+    : aggregateItems.length - prevAggregateItems.length >= 2
       ? "up"
-      : previousWindowItems.length - windowItems.length >= 2
+      : prevAggregateItems.length - aggregateItems.length >= 2
         ? "down"
         : "level";
 
@@ -1697,19 +1780,24 @@ export function buildStructuredReportDataset(
   const themeLeadSentence = themeLeadFragment
     ? `${themeLeadFragment.charAt(0).toUpperCase()}${themeLeadFragment.slice(1)}.`
     : "";
+  // Event-led opening sentence naming the period's PRINCIPAL development (the
+  // lead Top-3 story). Preferred over the abstract theme sentence at the top of
+  // the Executive Summary and BLUF; the theme sentence stays only as a fallback
+  // when there is no lead item. Empty ("") when the window is empty.
+  const eventLeadSentence = eventLedLeadSentence(topThree[0]);
 
   // --- Executive summary (deterministic, event-led, no parenthetical counts) -
   let executiveSummary: string;
   if (windowItems.length === 0) {
     executiveSummary = `${config.emptyLocationFallback} The standing operating picture for ${config.countryName} carries over from the preceding period; treat the absence of fresh reporting as a coverage signal, not as an improvement in conditions.`;
   } else {
-    const cats = topLabels(windowItems, (it) => it.category, 3).map((c) => c.toLowerCase());
+    const cats = topLabels(aggregateItems, (it) => it.category, 3).map((c) => c.toLowerCase());
     const provs = topLabels(
-      windowItems.filter((it) => it.province),
+      aggregateItems.filter((it) => it.province),
       (it) => it.province as string,
       3,
     );
-    const worst = [...windowItems].sort((a, b) => b.severityRank - a.severityRank)[0];
+    const worst = [...aggregateItems].sort((a, b) => b.severityRank - a.severityRank)[0];
     const catText = cats.length ? joinList(cats.map(categoryPhrase)) : "security-relevant activity";
     const provText = provs.length ? ` Reporting clustered around ${joinList(provs)}.` : "";
     const sevText =
@@ -1717,8 +1805,12 @@ export function buildStructuredReportDataset(
         ? ` The most serious entry reached ${worst.severityLabel} severity.`
         : "";
     const p1 = `The security picture in ${config.countryName} this period was dominated by ${catText}.${provText}${sevText}`;
-    const p2 = `The picture is operational rather than a single dramatic event: the priority for business users is movement security, premises protection and continuity at exposed sites while this picture holds.`;
-    const p1Led = themeLeadSentence ? `${themeLeadSentence} ${p1}` : p1;
+    // Business-guidance close. The old "operational rather than a single dramatic
+    // event" framing was banned by the spec (generic, dismissive); state the
+    // practical priority directly instead.
+    const p2 = `For business users the priority is movement security, premises protection and continuity at exposed sites while this picture holds.`;
+    const lead = eventLeadSentence || themeLeadSentence;
+    const p1Led = lead ? `${lead} ${p1}` : p1;
     executiveSummary = `${p1Led}\n\n${p2}`;
   }
 
@@ -1756,7 +1848,7 @@ export function buildStructuredReportDataset(
         : "any move to high-severity or casualty-bearing incidents, or a spread to new districts";
     const mostLikely =
       recurringCat.length >= 2
-        ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]}, with ${recurringCat[1]} also likely to recur.`
+        ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]} and ${recurringCat[1]}.`
         : recurringCat.length === 1
           ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]}.`
           : "The coming week most likely follows the established pattern.";
@@ -1828,7 +1920,8 @@ export function buildStructuredReportDataset(
         ? "the principal business risk is direct exposure to violence and disruption at affected sites"
         : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
     const blufBody = `The operating picture for ${config.countryName} this period ${trendWord}: the bulk of reporting concerns ${leadCatPhrase}${leadProvClause}. For business users, ${bizRisk}.`;
-    bluf = themeLeadSentence ? `${themeLeadSentence} ${blufBody}` : blufBody;
+    const blufLead = eventLeadSentence || themeLeadSentence;
+    bluf = blufLead ? `${blufLead} ${blufBody}` : blufBody;
   }
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
@@ -1868,11 +1961,11 @@ export function buildStructuredReportDataset(
         ? ` ${capitaliseFirst(leadCatPhrase)} featured more prominently than in the previous week.`
         : "";
     const prevProvs = topLabels(
-      previousWindowItems.filter((it) => it.province),
+      prevAggregateItems.filter((it) => it.province),
       (it) => it.province as string,
       3,
     );
-    const wentQuiet = prevProvs.filter((p) => !windowItems.some((it) => it.province === p));
+    const wentQuiet = prevProvs.filter((p) => !aggregateItems.some((it) => it.province === p));
     const quietClause = wentQuiet.length
       ? ` No fresh reporting came through from ${joinList(wentQuiet)} this period, which may reflect a coverage gap rather than confirmed calm.`
       : "";

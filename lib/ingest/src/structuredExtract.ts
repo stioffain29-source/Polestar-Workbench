@@ -35,6 +35,7 @@ export type IncidentCategory =
   | "Road / highway"
   | "Natural hazard"
   | "Fire"
+  | "Explosive remnants of war / accidental explosion"
   | "Environmental / haze"
   | "Power / utilities"
   | "Telecoms / connectivity"
@@ -44,10 +45,24 @@ export type IncidentCategory =
 // Ordered most-specific-first. The first regex to match wins.
 const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: string }> = [
   {
-    // Bilingual (English + Bahasa Indonesia). Placed first so a lethal terror
-    // event ("bom bunuh diri tewaskan ...") classifies as terrorism, not as a
-    // generic homicide. PNG/WP English text rarely carries this vocab, so the
-    // existing Pacific-brief classification is unaffected.
+    // Explosive remnants of war (ERW) / accidental legacy-ordnance explosions.
+    // Placed BEFORE terrorism so a Bahasa "Ledakan Bom Sisa Perang Dunia II"
+    // (an 80-year-old munition detonating) classifies here, NOT as terrorism
+    // (the terrorism rule below owns "ledakan bom"). Requires a HERITAGE /
+    // wartime cue CO-OCCURRING with explosion / ordnance vocab (within ~40
+    // chars, either order) so a present-day bombing or a WWII-memorial protest
+    // is NOT caught — only the legacy-ordnance class. A casualty-bearing ERW
+    // detonation is a real, if localised, security-relevant event.
+    re: /(?:\b(?:world war (?:ii|2|two)|wwii|ww2|second world war|wartime|perang dunia|sisa perang|peninggalan (?:perang|jepang|belanda|sekutu)|historic ordnance|legacy ordnance)\b[\s\S]{0,40}\b(?:bomb|ordnance|munition|ammunition|shell|grenade|mortar|explo\w*|blast|unexploded|uxo|ledakan|bom|amunisi|mortir|granat|peluru|meledak)\b)|(?:\b(?:bomb|ordnance|munition|ammunition|shell|grenade|mortar|explo\w*|blast|unexploded|uxo|ledakan|bom|amunisi|mortir|granat|peluru|meledak)\b[\s\S]{0,40}\b(?:world war (?:ii|2|two)|wwii|ww2|second world war|wartime|perang dunia|sisa perang|peninggalan (?:perang|jepang|belanda|sekutu)|historic ordnance|legacy ordnance)\b)|\b(?:bom|amunisi|mortir|ranjau) (?:sisa|peninggalan)(?: perang)?\b|\bunexploded ordnance\b|\bwartime (?:bomb|ordnance|munition|ammunition|shell)\b/i,
+    category: "Explosive remnants of war / accidental explosion",
+    impact:
+      "Casualty risk from legacy wartime ordnance; keep the area cordoned, avoid disturbing suspected munitions and defer works near the site until it is cleared.",
+  },
+  {
+    // Bilingual (English + Bahasa Indonesia). Placed after ERW so a lethal
+    // terror event ("bom bunuh diri tewaskan ...") classifies as terrorism, not
+    // as a generic homicide. PNG/WP English text rarely carries this vocab, so
+    // the existing Pacific-brief classification is unaffected.
     re: /\b(terroris\w*|terror (?:attack|cell|plot|suspect|network)|suicide bomb\w*|bomb blast|car bomb|truck bomb|letter bomb|pipe bomb|improvised explosive(?: device)?|roadside bomb|jihadist|extremist (?:attack|cell|network)|teroris\w*|bom bunuh diri|ledakan bom|serangan bom|bom rakitan|densus 88|jaringan teroris)\b/i,
     category: "Terrorism / militancy",
     impact: "Terrorism-related security threat; review physical security, access control and emergency procedures at exposed sites.",
@@ -365,22 +380,25 @@ export function extractStructuredItem(
 // Occurred-vs-reported date parser (generic)
 // ---------------------------------------------------------------------------
 const MONTHS: Record<string, number> = {
-  jan: 0, january: 0,
-  feb: 1, february: 1,
-  mar: 2, march: 2,
+  jan: 0, january: 0, januari: 0,
+  feb: 1, february: 1, februari: 1,
+  mar: 2, march: 2, maret: 2,
   apr: 3, april: 3,
-  may: 4,
-  jun: 5, june: 5,
-  jul: 6, july: 6,
-  aug: 7, august: 7,
+  may: 4, mei: 4,
+  jun: 5, june: 5, juni: 5,
+  jul: 6, july: 6, juli: 6,
+  aug: 7, august: 7, agustus: 7,
   sep: 8, sept: 8, september: 8,
-  oct: 9, october: 9,
-  nov: 10, november: 10,
-  dec: 11, december: 11,
+  oct: 9, october: 9, oktober: 9,
+  nov: 10, november: 10, nopember: 10,
+  dec: 11, december: 11, desember: 11,
 };
 
+// English + Bahasa Indonesia month names. Bahasa dates ("17 Juli 2026") are
+// day-month-year, so DMY_RE below carries them; every alternative here has a
+// matching key in MONTHS above.
 const MONTH_ALT =
-  "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+  "jan(?:uary|uari)?|feb(?:ruary|ruari)?|mar(?:ch|et)?|apr(?:il)?|may|mei|jun(?:e|i)?|jul(?:y|i)?|aug(?:ust)?|agustus|sep(?:t(?:ember)?)?|oct(?:ober)?|oktober|nov(?:ember)?|nopember|dec(?:ember)?|desember";
 
 // "26 May", "26th of May 2025", "on 9 June"
 const DMY_RE = new RegExp(
@@ -400,7 +418,7 @@ function monthIndex(token: string): number | undefined {
 /**
  * Parse an explicit incident-occurrence date from the article text, distinct
  * from the publication date. Returns a Date only when the text names a date
- * that is clearly EARLIER than the publication date (more than two days before)
+ * that is clearly EARLIER than the publication date (at least one day before)
  * and within the previous ~200 days — the signal that an item "reported this
  * week occurred earlier". Returns null when no such earlier date is stated, in
  * which case consumers treat occurredAt (the publication date) as the incident
@@ -409,7 +427,7 @@ function monthIndex(token: string): number | undefined {
 export function deriveIncidentDate(text: string, pubDate: Date): Date | null {
   const pubMs = pubDate.getTime();
   const minMs = pubMs - 200 * 24 * 60 * 60 * 1000;
-  const distinctMs = pubMs - 2 * 24 * 60 * 60 * 1000;
+  const distinctMs = pubMs - 1 * 24 * 60 * 60 * 1000;
   const pubYear = pubDate.getUTCFullYear();
   const candidates: number[] = [];
 

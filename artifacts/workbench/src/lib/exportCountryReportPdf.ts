@@ -82,6 +82,7 @@ import {
   buildOperationalImpactBullets,
 } from "./countryIncidentThemes";
 import { acceptedCountryTokens } from "./countryMatch";
+import { runCountryReportQc } from "./countryReportQc";
 import type {
   JakartaTableRow,
   JakartaPriorityAreaRow,
@@ -1417,6 +1418,21 @@ export async function exportCountryReportPdf(
         (w) => w.label,
       ),
       periodLabel: active.basisLabel,
+      // Mirror the on-screen CountryReport window start (issueDate-6, start of
+      // day) so the headless PDF's out-of-window flagging matches the in-app
+      // DOM-rasterised export. See PngReportItem.occurredOutOfWindow.
+      windowStart: (() => {
+        let end: Date;
+        try {
+          end = parseISO(todayIso);
+        } catch {
+          end = new Date();
+        }
+        if (isNaN(end.getTime())) end = new Date();
+        end.setHours(0, 0, 0, 0);
+        end.setDate(end.getDate() - 6);
+        return end;
+      })(),
     });
     const jakartaExposure = isJakartaBrief
       ? buildJakartaCorridorStatuses(
@@ -1424,6 +1440,24 @@ export async function exportCountryReportPdf(
         ).statuses
       : [];
     renderStructuredBrief(ctx, structuredDataset, jakartaExposure);
+
+    // Non-blocking §13 quality-control pass (mirrors the on-screen advisory
+    // banner). Logged only — the headless export never blocks — using the SAME
+    // window incidents the map plots from.
+    try {
+      const qcWarnings = runCountryReportQc(
+        structuredDataset,
+        active.incidents as unknown as CountryFastFactsIncident[],
+      );
+      if (qcWarnings.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[countryReportQc] ${country.name}: ${qcWarnings.length} advisory finding(s)\n  - ${qcWarnings.join("\n  - ")}`,
+        );
+      }
+    } catch {
+      // QC is best-effort; never let it break the export.
+    }
 
     // Situational Context (UN OCHA ReliefWeb) — supporting layer, not counted;
     // mirrors the on-screen CountryReportVisuals below the written brief.

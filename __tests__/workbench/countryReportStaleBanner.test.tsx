@@ -74,6 +74,7 @@ jest.mock("@workspace/api-client-react", () => ({
   }),
   useListSources: () => ({ data: [] }),
   useListReliefWebReports: () => ({ data: [] }),
+  useListGdeltStructuredItems: () => ({ data: [] }),
   useUpdateCountryReport: () => ({ mutate: jest.fn(), isPending: false }),
   useGetCountryBaseline: () => ({ data: null }),
   useUpsertCountryBaseline: () => ({ mutate: jest.fn(), isPending: false }),

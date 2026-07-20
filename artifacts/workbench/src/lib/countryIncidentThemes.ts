@@ -59,6 +59,7 @@ const CATEGORY_THEME: Record<PngCategory, CountryIncidentTheme> = {
   "Road / highway": "other",
   "Natural hazard": "natural",
   Fire: "fire",
+  "Explosive remnants of war / accidental explosion": "fire",
   "Environmental / haze": "natural",
   "Power / utilities": "other",
   "Telecoms / connectivity": "other",
@@ -143,7 +144,7 @@ export const THEME_WHAT: Record<CountryIncidentTheme, string> = {
   protest: "Protest activity and the crowd-control response to it were reported",
   crime: "Crime, theft and violent incidents were reported",
   natural: "Natural-hazard and environmental disruption was reported",
-  governance: "Policing, regulatory and political-stability activity was reported",
+  governance: "Policing, regulatory and governance-related activity was reported",
   fire: "Fire and explosion incidents were reported",
   other: "Operational disruption to transport, utilities or connectivity was reported",
 };
@@ -156,7 +157,7 @@ export const THEME_SIGNIFICANCE: Record<CountryIncidentTheme, string> = {
     "Incidents of this kind threaten staff, premises and the movement of cash and assets.",
   natural: "Hazards of this kind can interrupt transport, utilities and site access.",
   governance:
-    "Regulatory, policing and political-stability friction can affect compliance, permits and freedom of movement.",
+    "Regulatory, policing and governance friction can affect compliance, permits and freedom of movement.",
   fire: "Fires and explosions cause localised damage and can force evacuation around affected sites.",
   other: "Disruption of this kind can interrupt operations, logistics and connectivity.",
 };
