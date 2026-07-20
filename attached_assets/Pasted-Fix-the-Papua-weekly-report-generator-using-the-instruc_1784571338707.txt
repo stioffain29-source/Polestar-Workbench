@@ -1,0 +1,181 @@
+Fix the Papua weekly report generator using the instructions below. Do not change the existing Polestar branding, fonts, colours, cover design, header, footer or overall four-page structure.
+
+1. INCIDENT DATE CONTROL
+
+The system is currently treating article publication dates as incident dates. Add separate fields for:
+
+incident_date
+reported_date
+source
+
+Rank incidents by incident_date and operational significance, not publication date.
+
+Where an article reports new findings about an older incident, state both dates clearly. Do not present an older incident as though it occurred during the current reporting period.
+
+2. CORRECT THE YAHUKIMO INCIDENT
+
+Replace the current headline:
+
+“KKB member killed in Yahukimo identified as killer of seven gold panners”
+
+with:
+
+“Three suspected KKB members killed during police operation in Yahukimo”
+
+Use this incident summary:
+
+“On 17 July 2026, joint police units conducting an Operation Damai Cartenz operation exchanged fire with suspected KKB members at KM 4 Logpon, Dekai District, Yahukimo Regency. Police reported that three suspected separatist fighters were killed and that three firearms and ammunition were recovered. The incident increases the short-term risk of retaliatory violence, additional security operations and movement disruption around Dekai.”
+
+Set:
+
+Incident date: 17 July 2026
+Reported date: 18 July 2026
+Category: Armed conflict / separatist activity
+Severity: High
+Province: Highland Papua
+Location: Dekai District, Yahukimo Regency
+
+This should be the leading conflict and security development in the report.
+
+3. CORRECT THE INTAN JAYA INCIDENT
+
+The pregnant woman was killed on 2 July 2026. The human rights findings were reported on 17 July 2026.
+
+Present it as:
+
+“Human rights findings link fatal Intan Jaya shooting to security-force position”
+
+Summary:
+
+“Indonesia’s national human rights commission reported new findings concerning the 2 July killing of a pregnant woman in Intan Jaya. Investigators identified bullet damage to the victim’s home and assessed that the fatal projectile may have originated from the direction of a security-force post. The findings are likely to increase community tension and scrutiny of security-force operations.”
+
+Do not imply that the shooting occurred during the 12–18 July reporting period.
+
+4. CORRECT THE BIAK INCIDENT
+
+Do not categorise the Biak explosion as terrorism.
+
+Use:
+
+Category: Explosive remnants of war / accidental explosion
+Severity: Extreme due to casualties
+Operational relevance: Localised
+
+Headline:
+
+“Historic ordnance explosion in Biak leaves nine dead and six injured”
+
+Do not use “More photos of victims” as the incident headline. Publication of photographs is not a security development.
+
+5. REPLACE THE BLUF
+
+Use the following text:
+
+“The security environment in Indonesian Papua remained locally volatile during the reporting period. The principal development was a police operation in Yahukimo in which three suspected KKB members were killed, increasing the risk of retaliatory violence and further security-force activity around Dekai. New human rights findings concerning the earlier killing of a pregnant woman in Intan Jaya may also increase community tension and scrutiny of security operations. The principal business risks remain disruption to aviation and road movement, exposure to armed violence near active operations and reduced access to remote sites.”
+
+6. REPLACE CURRENT SITUATION
+
+Use:
+
+“Security reporting during the period was concentrated in Yahukimo and Intan Jaya. The Yahukimo clash demonstrates that armed separatist groups retain the capability to engage security forces near populated and commercially important areas. Further operations, checkpoints and temporary movement restrictions are possible around Dekai. In Intan Jaya, allegations that security-force fire caused civilian deaths may deepen local hostility and increase the risk of demonstrations or confrontation near police and military positions. These developments do not indicate instability across Papua as a whole, but they reinforce the elevated operating risk in the Central Highlands.”
+
+7. REPLACE OPERATIONAL IMPACT
+
+Use:
+
+“Operations in Yahukimo and Intan Jaya face the greatest exposure. Security-force deployments may result in road closures, checkpoints, flight delays and restricted access to remote communities. Retaliatory KKB activity could target security personnel, aircraft, contractors or transport routes. Personnel travelling near active operations also face a risk of becoming caught between security forces and armed groups. Businesses outside the affected districts are unlikely to experience direct disruption, although aviation and supply-chain delays may have wider secondary effects.”
+
+8. REPLACE RECOMMENDED ACTIONS
+
+Use the following actions:
+
+Movement Security
+
+Restrict non-essential travel around Dekai and locations affected by active security-force operations.
+
+Confirm road, airstrip and flight status immediately before movement.
+
+Avoid predictable travel patterns and maintain alternate routes and extraction options.
+
+Do not approach active checkpoints, military posts or police operations without prior coordination.
+
+Staff Security
+
+Brief personnel and contractors on the Yahukimo clash and the possibility of retaliatory incidents.
+
+Require immediate reporting of unusual security-force movements, roadblocks, gunfire or aviation restrictions.
+
+Ensure remote personnel have working communications and established check-in procedures.
+
+Site Security
+
+Review access control, guard procedures and emergency communications at exposed locations.
+
+Confirm shelter, evacuation and medical arrangements for personnel operating in remote districts.
+
+Increase monitoring around airstrips, accommodation and transport staging areas.
+
+Escalation Triggers
+
+Suspend movement if additional casualty-bearing incidents occur near operating locations.
+
+Escalate if security operations spread beyond Dekai or if KKB groups announce retaliatory action.
+
+Activate contingency arrangements if commercial flights or road access are suspended.
+
+9. REPLACE THE OUTLOOK
+
+Use:
+
+“Further security-force operations are likely in Yahukimo following the 17 July clash. Retaliatory action by KKB elements is possible, particularly against security personnel, aircraft and transport routes around Dekai. Intan Jaya is also likely to remain tense as human rights findings attract further attention. Wider deterioration across Papua is not currently assessed as likely, but localised disruption in the Central Highlands may occur with little warning.”
+
+10. REPLACE POLESTAR VIEW
+
+Use:
+
+“Polestar assesses that operating risk in Indonesian Papua remains elevated but geographically concentrated. Yahukimo and Intan Jaya present the most immediate concerns due to active security operations, separatist violence and allegations of civilian harm. The principal commercial exposure is to personnel movement, aviation access and remote-site continuity rather than a wider threat to government stability. Operators should tighten journey controls, maintain flexible routing and be prepared to suspend movement where security operations or retaliatory violence occur.”
+
+11. REMOVE GENERIC OR MISLEADING LANGUAGE
+
+Remove or rewrite phrases including:
+
+“Government-stability concerns are rising”
+“The picture is operational rather than a single dramatic event”
+“Against the previous week the theme is rising”
+“Government-stability concerns are likely to recur”
+
+Do not use “government stability” unless there is credible evidence of a threat to the stability of the Indonesian government.
+
+12. MAP AND PDF LAYOUT
+
+Ensure the Yahukimo marker is fully visible within the map boundary.
+
+Automatically resize or reposition map markers and labels so none are clipped.
+
+Do not split incident cards between pages.
+
+Do not leave partial cards or clipped text at the top of the following page.
+
+Prevent body text from appearing beneath or behind page headers.
+
+Keep each section heading with at least the first two lines of its content.
+
+13. QUALITY CONTROL
+
+Before generating the PDF, validate that:
+
+Every incident has a separate incident date and reported date.
+
+No publication date is presented as the incident date.
+
+Every severity rating matches the operational impact.
+
+Every category matches the incident type.
+
+All top developments appear in the narrative assessment.
+
+All recommended actions relate directly to incidents in the reporting period.
+
+The map contains every location referenced as a top development.
+
+No map marker, card, heading or paragraph is clipped or split incorrectly.
