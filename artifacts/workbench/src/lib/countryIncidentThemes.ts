@@ -219,6 +219,9 @@ const CATEGORY_NOUN_OVERRIDE: Record<string, string> = {
   "homicide / violent crime": "violent crime",
   "intelligence / training": "security activity",
   "environmental / haze": "environmental hazards",
+  // Spec §11: never surface the bare "government stability" label as a theme —
+  // a routine anti-corruption or policy item is not a stability threat.
+  "government stability": "governance and political matters",
 };
 export function categoryNoun(label: string): string {
   const k = label.trim().toLowerCase();

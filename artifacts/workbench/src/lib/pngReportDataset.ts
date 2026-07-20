@@ -145,6 +145,37 @@ function cleanTitle(title: string | null | undefined, source: string | null | un
   return t;
 }
 
+// Photo-GALLERY framing on a headline ("More photos of …", "Photos of …",
+// "In pictures: …", "Gallery: …"). Publishing photographs is not itself a
+// security development, so a brief must never headline on the gallery (spec §4).
+// Strip the framing so the underlying event is described; display-only, never
+// drops the row. If nothing distinct survives, the original is kept unchanged.
+function stripGalleryFraming(title: string): string {
+  const cleaned = title
+    .replace(/^\s*(?:more\s+)?photos?\s+of\s+(?:the\s+)?/i, "")
+    .replace(/^\s*(?:in\s+(?:pictures|photos|images)|photo\s+gallery|gallery)\s*[:\-–—]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned || cleaned === title.trim()) return title;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+// A headline that plainly describes a LEGACY wartime / unexploded-ordnance
+// ACCIDENTAL blast (e.g. "World War II bomb remnant explosion"). Such an event
+// is not an attack, so it must not be filed — or read — as terrorism (spec §4).
+// Guarded by a deliberate-attack veto so a genuine bombing is never rewritten.
+const LEGACY_ORDNANCE_RE =
+  /\b(?:world war|wwii|ww2|second world war|wartime|war-era|colonial-era|japanese-era|unexploded|leftover|legacy)\b[^.]*\b(?:bomb|ordnance|shell|munition|mortar|grenade|explosiv|device|remnant)\b|\b(?:uxo|erw|unexploded ordnance|explosive remnants? of war|bomb remnant|ordnance remnant)\b/i;
+const DELIBERATE_ATTACK_RE =
+  /\b(?:attack|detonat|planted|ied|improvised explosive|suicide|bomber|militant|terror|insurgent|rebel|separatist|assault|ambush)\b/i;
+function isLegacyOrdnanceExplosion(
+  title: string | null | undefined,
+  summary: string | null | undefined,
+): boolean {
+  const hay = `${title ?? ""} ${summary ?? ""}`;
+  return LEGACY_ORDNANCE_RE.test(hay) && !DELIBERATE_ATTACK_RE.test(hay);
+}
+
 // ---------------------------------------------------------------------------
 // Severity
 // ---------------------------------------------------------------------------
@@ -931,14 +962,28 @@ function toItem(
       ? config.extractItem(i.title ?? "", i.summary ?? "", i.location)
       : null;
   const province = i.province ?? ext?.province ?? null;
-  const category: PngCategory =
+  let category: PngCategory =
     i.category && i.businessImpact
       ? (i.category as PngCategory)
       : ext?.category ?? DEFAULT_CATEGORY;
-  const impact =
+  let impact =
     i.category && i.businessImpact
       ? i.businessImpact
       : ext?.businessImpact ?? DEFAULT_BUSINESS_IMPACT;
+  // Display-layer category correction (no-fabrication): the keyword classifier
+  // sometimes files a plainly ACCIDENTAL legacy-ordnance blast (a "World War II
+  // bomb remnant explosion") as "Terrorism / militancy". Re-file it as an
+  // accidental explosion so it never reads as an attack, never carries a
+  // terrorism recommendation, and — being an incidental hazard — never leads the
+  // brief (spec §4). Veto-guarded so a genuine bombing is untouched.
+  if (
+    category === "Terrorism / militancy" &&
+    isLegacyOrdnanceExplosion(`${i.displayTitle ?? ""} ${i.title ?? ""}`, i.summary)
+  ) {
+    category = "Explosive remnants of war / accidental explosion";
+    impact =
+      "Localised blast damage and casualties from accidental wartime ordnance, not an attack; cordon the area, heed official guidance and confirm site safety before approach.";
+  }
   // Display-layer severity correction (no-fabrication, demote-only), promoted
   // from PNG-only to EVERY theatre (opt-out): the stored severity mis-rates
   // assistance / prevention PR as High; cap those at Low here so it flows
@@ -954,13 +999,15 @@ function toItem(
       : rawSev;
   const reportedDate = new Date(i.occurredAt);
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
-  const title = stripWireCruft(
-    i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source),
+  const title = stripGalleryFraming(
+    stripWireCruft(
+      i.displayTitle && i.displayTitle.trim() ? i.displayTitle.trim() : cleanTitle(i.title, i.source),
+    ),
   );
   // Original-language headline: same cleaning as `title` but WITHOUT the
   // display_title substitution, so cross-language duplicates of one story share
   // it (see PngReportItem.rawTitle / clusterSameStory).
-  const rawTitle = stripWireCruft(cleanTitle(i.title, i.source));
+  const rawTitle = stripGalleryFraming(stripWireCruft(cleanTitle(i.title, i.source)));
   return {
     id: String(i.id ?? `${i.title}-${i.occurredAt}`),
     title,
@@ -1116,6 +1163,37 @@ function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
   return db - da;
 }
 
+// Categories that are NOT a conflict/security development: accidental blasts,
+// fires, natural hazards and environmental incidents. However many casualties
+// such an event carries, a security brief must NOT lead on it ahead of genuine
+// armed-conflict, violent-crime or unrest reporting (spec §2/§4: the Yahukimo
+// separatist clash must lead; the accidental Biak wartime-ordnance blast, though
+// Extreme by casualties, is localised and must never lead). This is demote-only
+// — it re-orders the lead, it never drops the item, which still appears in a
+// lower Top-3 slot or in the Fire/explosion Incident Details theme.
+const NON_SECURITY_LEAD_CATEGORIES: ReadonlySet<string> = new Set([
+  "Explosive remnants of war / accidental explosion",
+  "Fire",
+  "Natural hazard",
+  "Environmental / haze",
+]);
+function leadSecurityTier(it: PngReportItem): number {
+  return NON_SECURITY_LEAD_CATEGORIES.has(it.category) ? 0 : 1;
+}
+
+// Rank clusters by ANALYST VALUE (casualties, disruption, deployment) with
+// severity-then-recency as the tie-break. This decides WHICH stories make the
+// Top-3 — the most significant distinct events, incidental hazards included — so
+// a deadly accidental blast is still SHOWN. It deliberately does NOT weigh
+// security-vs-hazard here; that governs only the #1 LEAD slot and is enforced
+// separately at display time (see selectTopStoryClusters), so the hazard is never
+// dropped, it simply never leads.
+function compareClusterByValue(a: PngReportItem[], b: PngReportItem[]): number {
+  const valueDelta = scoreClusterValue(b) - scoreClusterValue(a);
+  if (valueDelta !== 0) return valueDelta;
+  return sortBySeverityThenRecency(a[0], b[0]);
+}
+
 // A cluster's representative headline + date, for selection-time story matching.
 function clusterStoryInput(c: PngReportItem[]): StorySimInput {
   const it = c[0];
@@ -1224,13 +1302,24 @@ export function selectTopStoryClusters(
       for (const it of c) foldMemberIds.add(it.id);
     }
   }
-  // Display strongest analyst value first (severity-then-recency breaks ties),
-  // matching the generic path's ordering intent.
-  const top = picked.sort((a, b) => {
-    const v = scoreClusterValue(b) - scoreClusterValue(a);
-    if (v !== 0) return v;
-    return sortBySeverityThenRecency(a[0], b[0]);
-  });
+  // Display order: analyst value, then severity-then-recency, so the most
+  // significant development shows first — WITH a lead-only security guard. The
+  // #1 slot must be a genuine security / conflict story: an incidental hazard
+  // (accidental blast, fire, natural hazard) must never LEAD a security brief
+  // even when its casualty count is higher (spec §2/§4). If the top slot is a
+  // non-security category, promote the best-ranked security cluster to the front;
+  // the hazard keeps its value-ranked place immediately below and is never
+  // dropped (e.g. the deadly-but-accidental Biak wartime-ordnance blast sits at
+  // #2 while the Yahukimo separatist clash leads).
+  const ordered = picked.slice().sort(compareClusterByValue);
+  if (ordered.length > 1 && leadSecurityTier(ordered[0]![0]) === 0) {
+    const securityIdx = ordered.findIndex((c) => leadSecurityTier(c[0]) === 1);
+    if (securityIdx > 0) {
+      const [security] = ordered.splice(securityIdx, 1);
+      ordered.unshift(security!);
+    }
+  }
+  const top = ordered;
   return { top, foldMemberIds };
 }
 
@@ -1416,6 +1505,12 @@ function eventLedLeadSentence(lead: PngReportItem | undefined): string {
     return `This period's lead item was fresh reporting on an earlier development${placeClause}: ${head} (occurred ${formatBriefDate(lead.incidentDate)}, reported ${formatBriefDate(lead.reportedDate)}).`;
   }
   const phrase = categoryPhrase(lead.category);
+  // The generic "other security-relevant incidents" bucket adds no information
+  // in front of a specific headline and reads as filler, so drop it and state
+  // the development directly (spec §11: no generic, un-anchored commentary).
+  if (phrase === "other security-relevant incidents") {
+    return `This period's lead development${placeClause} was: ${head}.`;
+  }
   return `This period's lead development was ${phrase}${placeClause}: ${head}.`;
 }
 
@@ -1668,12 +1763,7 @@ export function buildStructuredReportDataset(
   // action with business impact, commercial proximity) rather than by the bare
   // worst severity rating, so the three developments shown are the ones a client
   // would actually act on. Severity-then-recency only breaks value ties.
-  storyClusters.sort((a, b) => {
-    const va = scoreClusterValue(a);
-    const vb = scoreClusterValue(b);
-    if (vb !== va) return vb - va;
-    return sortBySeverityThenRecency(a[0], b[0]);
-  });
+  storyClusters.sort(compareClusterByValue);
   const topSelection = selectTopStoryClusters(storyClusters, {
     jakarta: config.jakartaProse ?? false,
   });
