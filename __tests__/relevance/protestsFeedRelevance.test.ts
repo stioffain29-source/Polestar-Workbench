@@ -862,6 +862,70 @@ const FIXTURES: Fixture[] = [
     title: "Police crackdown on protesters intensifies as clashes spread in Jakarta",
     verdict: "KEEP",
   },
+
+  // ---- Militant / counter-insurgency "crackdown" homonym: DROP ---------
+  // A security-force crackdown on an armed group (Abu Sayyaf / BIFF / NPA /
+  // Naxal…) is kinetic counter-insurgency, not civil unrest. Routed through
+  // the negative-sense crackdown gate; no protest/unrest companion present.
+  {
+    title: "AFP begins crackdown on Abu Sayyaf remnants, BIFF in southern Philippines",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  {
+    title: "Security forces launch crackdown on Naxal maoist insurgents in eastern belt",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  // Plural named-group variant must also DROP (the trailing-\\b plural trap).
+  {
+    title: "Army intensifies crackdown on Moro rebels after ambush",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  // A crackdown ON Baloch PROTESTERS is genuine unrest — must SURVIVE.
+  {
+    title: "Police crackdown on Baloch protesters sparks clashes in Quetta",
+    verdict: "KEEP",
+  },
+
+  // ---- Child-protection / law-enforcement "crackdown" homonym: DROP ----
+  // A crackdown protecting children (paedophilia / child-begging / minors) is
+  // law-enforcement, not civil unrest. Dropped only with no unrest companion.
+  {
+    title: "China's growing influence calls for a measured crackdown on cases involving children",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  {
+    title: "Cambodian beggars detained in Pattaya crackdown after viral child-begging video",
+    verdict: "DROP",
+    reason: "non-civil-unrest",
+  },
+  // A police crackdown on students PROTESTING still keeps (unrest companion).
+  {
+    title: "Police crackdown on protesting students over school fees turns violent",
+    verdict: "KEEP",
+  },
+
+  // ---- Retrospective "lessons (not) learnt" think-piece: DROP ----------
+  // An editorial-format retrospective ("lessons not learnt from …") is
+  // commentary, not a live public-order event — even when it names a past riot.
+  {
+    title: "Negombo prison riots: Lessons not learnt from Mahara jail violence",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+  {
+    title: "Nepal unrest: lessons learned for the region's fragile democracies",
+    verdict: "DROP",
+    reason: "editorial format",
+  },
+  // A live event that merely contains the word "lessons" mid-sentence keeps.
+  {
+    title: "Students learn hard lessons as police fire tear gas at Dhaka protest",
+    verdict: "KEEP",
+  },
 ];
 
 describe("Protests-feed relevance rules", () => {

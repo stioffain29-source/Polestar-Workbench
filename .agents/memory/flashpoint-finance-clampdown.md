@@ -43,6 +43,43 @@ e-commerce/streaming/fake-site/scam-site/phishing vocab so a "fake site
 crackdown" / "crackdown on scam domains" routes to the non-civil-unrest verdict.
 A crackdown ON PROTESTERS still keeps (unrest companion present).
 
+## Crackdown ALSO covers militant counter-insurgency + child-protection LE
+
+`FP_NEG_CRACKDOWN` (both arms) also drops two more non-unrest crackdown senses:
+- **Militant / counter-insurgency** — a security-force crackdown ON an armed
+  group is kinetic COIN, not civil unrest: `militant|insurgent|separatist|
+  guerrilla|jihad` + named groups (abu sayyaf, biff/bifm, bangsamoro, moro
+  rebels/fighters/fronts, npa/new people's army, tpnpb/opm, ttp/tehrik, baloch,
+  naxal, maoist, arakan army, ethnic armed). Example dropped: "AFP begins
+  crackdown on Abu Sayyaf remnants, BIFF".
+- **Child-protection LE** — `child|minors|paedophil|pedophil`. Example: an op-ed
+  kept via body "crackdown on cases involving children"; also child-begging LE.
+
+Both stay gated on `!FP_UNREST_COMPANION`, so "police crackdown on Baloch
+PROTESTERS / protesting students" keeps.
+
+**Protest-branch-first invariant (why these are safe):** any record carrying a
+bare protest/rally/march/demonstrat/riot/student/activist/curfew/tear-gas token
+takes the PROTEST branch first and NEVER reaches `FP_NEG_CRACKDOWN`. So a drop
+requires crackdown + militant/child vocab within ~30 chars AND zero unrest
+companion anywhere — a very narrow footprint. `FP_NEG_CRACKDOWN` is NOT in
+`hitsSlopExclude` (only FLASHPOINT_EXCLUDE + TITLE_HARD_EXCLUDE are), so promoted
+gdelt/tapa/social rows are untouched by it.
+
+**Caveats:** (1) named-group plurals hit the trailing-`\b` trap — use `\w*`
+(`moro (rebel\w*|front\w*|fighter\w*|militant\w*)`), which was applied; but
+`militant|insurgent` already catch most so it is belt-and-suspenders. (2)
+`baloch\w*` won't catch "crackdown on Baloch DISSIDENTS" (dissidents ≠ companion
+`\bdissent\b`) — acceptable under precision-first (real BYC headlines carry
+march/sit-in/activist and keep). Also `FP_EDITORIAL_FORMAT_RE` "lessons" widened
+to `lessons (?:\w+ ){0,2}(from|of|for|learnt|learned)` so a retrospective
+"lessons not learnt from … riots" think-piece drops (title-only gate, before
+REQUIRED, so it beats a REQUIRED "riot" hook). Bump `RELEVANCE_RULE_VERSION` for
+any of these; a code-only change (no bump) rides the SAME version into prod
+because prod rows are still on the OLD version and backfill re-evaluates them all
+on first post-deploy boot — but dev rows already at the new version won't
+re-clean without a further bump or `INGEST_FORCE_VERSION`.
+
 ## Product/tech "demonstration", fandom, and investor-glitch homonyms (title hard-exclude)
 
 Three homonym classes that TITLE-RESCUE into KEEP are dropped by
