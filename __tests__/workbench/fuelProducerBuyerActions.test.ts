@@ -71,3 +71,74 @@ describe("Fuel Watch Producer/Buyer Actions cross-read", () => {
     expect(rows.some((r) => /palm oil/i.test(r.action))).toBe(false);
   });
 });
+
+describe("Buyer supplier-pivot classification and story-key collapse", () => {
+  // Two syndicated rewrites of ONE pivot (same buyer, same product) share
+  // too few distinctive tokens for the near-duplicate guard — the pivot
+  // story key (buyer subject + product) must collapse them to one row.
+  const pivotCopies: TopicFastFactsIncident[] = [
+    mk(10, "fuel", "Russia Turns To India For Gasoline As Refinery Damage Deepens Fuel Crisis"),
+    mk(11, "fuel", "Russia seeking extra gasoline from one of its top oil buyers amid fuel crisis"),
+  ];
+
+  it("classifies a supplier pivot as a Buyer action", () => {
+    const rows = buildFuelProducerBuyerActions({ issueDate: ISSUE_DATE, incidents: pivotCopies });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Buyer action");
+    expect(rows[0].action).toMatch(/turns to india/i);
+  });
+
+  it("keeps two DIFFERENT buyers' pivots as separate rows", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(12, "fuel", "Russia turns to India for gasoline amid refinery outages"),
+        mk(13, "fuel", "Pakistan turns to Kuwait for diesel as fuel crisis deepens"),
+      ],
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.category === "Buyer action")).toBe(true);
+  });
+
+  it("does not match a pivot on food oils (no bare-oil token)", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(14, "fuel", "Indonesia turns to Malaysia for palm oil as cooking oil prices climb"),
+      ],
+    });
+    expect(rows.some((r) => /palm oil/i.test(r.action))).toBe(false);
+  });
+});
+
+describe("Market / supply signal wording variants", () => {
+  it("classifies 'refiner margins' wire styling as a Market signal", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(20, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Market / supply signal");
+  });
+
+  it("classifies a refinery fire as a Market supply signal, never a Producer action", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [mk(21, "fuel", "Oil refinery ablaze in Cuba as fuel crisis deepens")],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Market / supply signal");
+  });
+
+  it("still refuses market signals via the shipping cross-read", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(22, "shipping", "Oil terminal fire disrupts crude loading at Gulf port"),
+      ],
+    });
+    expect(rows).toHaveLength(0);
+  });
+});

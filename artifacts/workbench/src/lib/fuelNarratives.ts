@@ -538,6 +538,21 @@ interface CategoryRule {
   test: RegExp[];
 }
 
+// Buyer supplier-pivot patterns ("Russia Turns To India For Gasoline",
+// "Russia seeking extra gasoline from one of its top oil buyers"). Both are
+// anchored on a named refined product (never bare "oil" — the food-oil
+// guard exists for a reason) plus the sourcing preposition. Named as a
+// const because the table builder also uses them for story-key dedupe:
+// syndicated rewrites of one pivot share too few distinctive tokens for
+// the near-duplicate guard, but one buyer pivoting on one product in one
+// window is ONE action.
+const SUPPLIER_PIVOT_RES: RegExp[] = [
+  /\bturn(?:s|ed|ing)? to\b.{0,50}\bfor (?:gasoline|petrol|gasoil|diesel|jet fuel|kerosene|lpg|naphtha|fuel|crude)\b/,
+  /\bseek(?:s|ing)?\b.{0,40}\b(?:gasoline|petrol|gasoil|diesel|jet fuel|kerosene|lpg|naphtha|fuel|crude)\b.{0,50}\bfrom\b/,
+];
+const PIVOT_PRODUCT_RE =
+  /\b(gasoline|petrol|gasoil|diesel|jet fuel|kerosene|lpg|naphtha|fuel|crude)\b/;
+
 const CATEGORY_RULES: CategoryRule[] = [
   {
     category: "Government / policy action",
@@ -582,6 +597,11 @@ const CATEGORY_RULES: CategoryRule[] = [
       /\b(buyer|importer|trading house|trader|refiner) .{0,30}(switch|diversif|cancel|defer|stockpile|spot purchase|tender)/,
       /\b(strategic reserve|spr) (release|draw|tap)/,
       /\b(fuel hedging|jet fuel hedging|bunker hedging)/,
+      // Supplier pivot: a country or company turning to a new source for
+      // refined product ("Russia Turns To India For Gasoline", "Russia
+      // seeking extra gasoline from one of its top oil buyers") is a core
+      // buyer-side procurement action during a supply crisis.
+      ...SUPPLIER_PIVOT_RES,
     ],
   },
   {
@@ -599,7 +619,17 @@ const CATEGORY_RULES: CategoryRule[] = [
       /\b(brent|wti|crude|oil) (price|prices) (rise|fall|climb|drop|surge|slide|jump|plunge|hit|reach|break)/,
       /\b(jet fuel|diesel|petrol|gasoline|kerosene) (price|prices) (rise|fall|climb|drop|surge|slide|hit|break)/,
       /\b(supply (tighten|tightens|squeeze)|demand (jump|rise|fall|drop)|inventory (build|draw))/,
-      /\b(refinery margin|crack spread)/,
+      // "refiner margins" / "refining margins" are the same signal as
+      // "refinery margin" — wire-service styling varies word by word.
+      /\b(refin(?:ery|er|ing) margins?|crack spreads?)/,
+      // A refinery / fuel-depot fire or blast is an involuntary supply
+      // signal (capacity loss), not an actor's action — it belongs under
+      // Market / supply signal. NOTE: CATEGORY_RULES is first-match, so a
+      // fire headline that NAMES a national oil company still classifies
+      // Producer via the earlier bare-NOC rule (load-bearing; see
+      // fuel-producer-buyer-table.md watch-points). This rule catches the
+      // no-NOC case (e.g. "Oil refinery ablaze in Cuba").
+      /\b(refinery|fuel depot|oil depot|oil terminal) .{0,30}(ablaze|on fire|blaze|fire|explosion|blast)/,
       // Supply resuming / arriving / shortage easing is a genuine availability
       // signal (bearish for local pump prices), not a policy action.
       /\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/,
@@ -840,6 +870,21 @@ export function buildFuelProducerBuyerActions(opts: {
     const action = i.title.trim().replace(/\.$/, "");
     const dedupeKey = action.toLowerCase();
     if (seen.has(dedupeKey)) continue;
+    // Supplier-pivot story-key collapse: syndicated rewrites of one buyer
+    // pivot ("Russia Turns To India For Gasoline" vs "Russia seeking extra
+    // gasoline from one of its top oil buyers") share too few distinctive
+    // tokens for the near-duplicate guard, but one buyer pivoting on one
+    // product in one window is ONE action — keep the first copy only.
+    if (
+      category === "Buyer action" &&
+      SUPPLIER_PIVOT_RES.some((re) => re.test(t))
+    ) {
+      const subject = sigTokens(action).values().next().value ?? "";
+      const product = PIVOT_PRODUCT_RE.exec(t)?.[1] ?? "";
+      const pivotKey = `pivot:${subject}:${product}`;
+      if (seen.has(pivotKey)) continue;
+      seen.add(pivotKey);
+    }
     // Near-duplicate guard: collapse syndicated re-writes of the same
     // story within a category (e.g. the ADNOC / UAE Hormuz-bypass
     // pipeline reported under several different headlines) so the table
@@ -861,9 +906,9 @@ export function buildFuelProducerBuyerActions(opts: {
   if (raw.length === 0) return [];
 
   // Group by category in the priority order so the strongest signals
-  // (Producer / Buyer / Government) lead the table. Cap to 2 rows per
-  // category and 6 rows overall — fewer, better rows beat a long list
-  // padded with generic entries.
+  // (Producer / Buyer / Government) lead the table. Cap to PER_CATEGORY
+  // rows per category and TOTAL_CAP rows overall — fewer, better rows
+  // beat a long list padded with generic entries.
   const ORDER: FuelActionCategory[] = [
     "Producer action",
     "Buyer action",

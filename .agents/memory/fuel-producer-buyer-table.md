@@ -85,6 +85,36 @@ company name as sufficient. This is *load-bearing* — it's why the Pertamina
 tanker (an operational supply move, no action verb) surfaces. It could over-
 admit a future bare "OPEC meeting" mention; owner prose review is the backstop.
 Tightening to require an action verb would regress the current fix, so don't.
+**Shadow of the same rule:** CATEGORY_RULES is first-match, so an NOC-named
+refinery fire ("Pertamina refinery ablaze") classifies **Producer** (an
+involuntary event shown as an "action") — the fire→Market rule only catches
+the no-NOC case. Accepted, same backstop; don't "fix" by reordering rules.
+
+## Fourth cause: classifier vocabulary gaps (display-side, no version bump)
+
+A crisis week's genuine rows matched NO CATEGORY_RULE and were silently
+dropped by the builder. Fixed in `fuelNarratives.ts` (builder-only — no
+relevance change, no RELEVANCE_RULE_VERSION bump):
+- **Buyer supplier-pivot:** `SUPPLIER_PIVOT_RES` — "turns to X for <product>" /
+  "seeks <product> from X", NAMED products only (gasoline/diesel/jet fuel/
+  fuel/crude), never bare "oil" (palm-oil guard). Speculative "could turn to"
+  commentary can match — accepted, owner prose review backstop.
+- **Market:** `refin(ery|er|ing) margins?`/`crack spreads?`; refinery/depot/
+  terminal fire → Market (see NOC shadow above).
+- **Pivot story-key dedupe:** two syndicated rewrites of one pivot share too
+  few tokens for nearDuplicate (jaccard 0.267 < the load-bearing 0.4 floor —
+  NEVER lower it), so the builder loop also dedupes on
+  `pivot:${firstSigToken}:${product}`. Coarse-key caveats: subject = FIRST
+  sig token (two buyers sharing a leading token could false-merge) and
+  product = first PIVOT_PRODUCT_RE hit; harden only if a real false-merge
+  appears.
+
+**Verification pattern (owner-gated app, no live screenshot):** replay prod
+rows through the real builder AND assert rendered markup via
+`renderToStaticMarkup(<ProducerActionsTable rows/>)` (component exported from
+`ReportPreview.tsx` for this) — `fuelProducerActionsRender.test.tsx`.
 
 Unit tests live in `__tests__/workbench/fuelProducerBuyerActions.test.ts`
-(Pertamina inclusion, oil-price/reliance/palm-oil exclusion).
+(Pertamina inclusion, oil-price/reliance/palm-oil exclusion, pivot
+classify+collapse, different-buyers separate, refiner margins, refinery fire,
+cross-read Market refusal).

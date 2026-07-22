@@ -229,7 +229,9 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
   );
 }
 
-function ProducerActionsTable({ rows }: { rows: ProducerBuyerActionRow[] }) {
+// Exported for the rendered-markup parity test (fuelProducerActionsRender):
+// the app is owner-gated, so rendered verification runs through jest.
+export function ProducerActionsTable({ rows }: { rows: ProducerBuyerActionRow[] }) {
   const th: React.CSSProperties = {
     background: NAVY,
     color: "#fff",
