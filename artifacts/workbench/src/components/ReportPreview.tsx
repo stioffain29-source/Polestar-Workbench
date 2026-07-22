@@ -788,6 +788,10 @@ export default function ReportPreview({
         ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
         : incidents,
     ),
+    // Fuel: the Gulf & Hormuz Chokepoint Watch from the SAME payload the
+    // preview renders below, so the lead narrative can name a live Gulf story
+    // (Hormuz rows are topic=shipping and never survive the fuel filter).
+    fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
   const execText = resolveSimpleProse(
     report.executiveSummary,

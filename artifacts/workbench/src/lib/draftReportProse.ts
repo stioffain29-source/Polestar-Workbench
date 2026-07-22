@@ -27,6 +27,7 @@ import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
 import { selectFlashpointUsable } from "./flashpointReportDataset";
 import { buildShippingReportDataset, type ShippingReportIncident } from "./shippingReportDataset";
 import { buildConflictReportDataset, type ConflictReportIncident } from "./conflictReportDataset";
+import type { FuelGulfChokepointWatch } from "./fuelNarratives";
 
 export interface DraftableIncident extends ClassifiableIncident {
   id?: number | string;
@@ -232,6 +233,15 @@ interface BuildCtx {
   // a Strait-of-Hormuz reopening). When supplied, the Executive Summary leads
   // with it by name so the report can never omit the story driving the window.
   leadDevelopment?: string;
+  // Fuel only: current-period Gulf/Hormuz chokepoint activity, derived from the
+  // SAME Gulf & Hormuz Chokepoint Watch object the report renders further down.
+  // When present, the lead narrative (Executive Summary, Situation, What
+  // Happened, What Matters, Polestar View) names the Gulf story instead of
+  // describing the week as routine cost-and-continuity pressure — a live
+  // chokepoint escalation must never be invisible at the top of the report.
+  // `severe` is true only when a current-period item reached High or Extreme,
+  // gating the word "escalation" so a Moderate-only week never overstates.
+  gulf?: { headline: string; severe: boolean };
 }
 
 type SectionBuilder = (ctx: BuildCtx) => string;
@@ -285,28 +295,54 @@ function fuelPressureTail(sev: string): string {
 const FUEL: ReportPack = {
   // Executive Summary: 3 short paragraphs covering the headline judgement,
   // what the incident reporting adds, and the business meaning.
-  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
+  exec: ({ types, lead, countries, sev, thin, total, cadence, gulf }) => {
+    const period = cadence === "monthly" ? "month" : "week";
     const driver = types || "price movement, shortage reporting and transport disruption";
     const geo = lead
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with more reported from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : "";
-    const para1 = `Fuel risk this ${cadence === "monthly" ? "month" : "week"} is mainly about cost and continuity rather than a single dramatic event. The pressure came from ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total, cadence)}`;
+    if (gulf) {
+      const opener = gulf.severe
+        ? `Escalation in the Gulf and the Strait of Hormuz dominates the fuel-risk picture this ${period}`
+        : `Fresh chokepoint reporting on the Gulf and the Strait of Hormuz leads the fuel-risk picture this ${period}`;
+      // Zero-safe: only claim wider incident pressure when the fuel window
+      // actually holds records; otherwise say plainly that it was quiet.
+      const away = types
+        ? ` Away from the Gulf, pressure came from ${driver}.${geo}`
+        : ` Away from the Gulf, fuel-specific reporting was quiet this ${period}.`;
+      const para1 = `${opener}, headed by the report that "${gulf.headline}". Route pressure of that kind feeds straight into crude pricing, war-risk premium and tanker routing.${away}${fuelPressureTail(gulf.severe ? "high" : sev)}${thinTail(thin, total, cadence)}`;
+      const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — route pressure, shortages, forecourt disruption and subsidy moves where they appear — rather than relief.`;
+      const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks, and treat Gulf routing exposure as a live mitigation question rather than background risk. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
+      return `${para1}\n\n${para2}\n\n${para3}`;
+    }
+    const para1 = `Fuel risk this ${period} is mainly about cost and continuity rather than a single dramatic event. The pressure came from ${driver}.${geo}${fuelPressureTail(sev)}${thinTail(thin, total, cadence)}`;
     const para2 = `Cost indicators are holding above easy-budget levels, and the incident picture adds operational stress — shortages, forecourt disruption, subsidy moves and route pressure where they appear — rather than relief.`;
     const para3 = `For business users, the headline is straightforward: protect fuel-dependent operations from short-notice price or availability shocks. That means live attention to fuel stock cover, generator runtime, road transport exposure and supplier resilience while this picture holds.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
   // Situation: short — current operating picture, why the cycle
   // matters. No section cross-references, no meta-report wording.
-  situation: ({ lead }) => {
+  situation: ({ lead, gulf }) => {
+    if (gulf) {
+      const where = lead ? ` Away from the route story, ${lead} is the country carrying the most weight.` : "";
+      const kind = gulf.severe
+        ? "Escalation in the Gulf and the Strait of Hormuz is the live route risk right now"
+        : "Fresh Gulf and Strait of Hormuz chokepoint reporting is the live route risk right now";
+      return `${kind}, and it lands on the cost side first — war-risk premium, rerouting and tanker availability. Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream, which is when contract economics and operational continuity stop being separate concerns.${where}`;
+    }
     const where = lead ? ` ${lead} is the country carrying the most weight.` : "";
     return `Fuel cost is holding above easy-budget levels while availability and policy pressure remain live downstream. This matters because cost pressure and availability pressure are showing up together right now, which is when contract economics and operational continuity stop being separate concerns.${where}`;
   },
   // What Happened: short — what changed or was reported. No
   // cross-references to Market Read / Operational Read, no "table
   // below" language.
-  whatHappened: ({ types, countries, sev, lead }) => {
+  whatHappened: ({ types, countries, sev, lead, gulf }) => {
+    const gulfLine = gulf
+      ? `Chokepoint reporting on the Gulf and the Strait of Hormuz led the period, headed by the report that "${gulf.headline}". `
+      : "";
+    const pressure = fuelPressureTail(gulf?.severe ? "high" : sev);
     if (!types) {
-      return `Fuel reporting was light recently, with no single pattern standing out.${fuelPressureTail(sev)}`;
+      return `${gulfLine}Fuel reporting was light recently, with no single pattern standing out.${pressure}`;
     }
     const secondaries = countries && countries !== lead
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
@@ -314,14 +350,16 @@ const FUEL: ReportPack = {
     const geo = lead
       ? ` concentrated on ${lead}${secondaries ? `, with secondary reporting from ${secondaries}` : ""}`
       : "";
-    return `Reporting was led by ${types}${geo}.${fuelPressureTail(sev)}`;
+    return `${gulfLine}${gulf ? "Beyond the route story, reporting" : "Reporting"} was led by ${types}${geo}.${pressure}`;
   },
   // What Matters: two analytical paragraphs connecting prices, jet movement,
   // shortage / route pressure and business continuity.
-  whatMatters: ({ lead }) => {
+  whatMatters: ({ lead, gulf }) => {
     const where = lead ? ` Exposure to ${lead} is the live pressure point for fleet, generator and field operations.` : "";
     const para1 = `Elevated crude and a jet fuel series that is not retreating tell the cost side of the story: fuel-linked invoices stay heavy. The incident picture then tells the availability side: shortages, rationing and route pressure are the points where price stops being the only problem and physical access becomes the issue.${where}`;
-    const para2 = `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against now.`;
+    const para2 = gulf
+      ? `Chokepoint disruption in the Gulf and the Strait of Hormuz is where that reinforcement is live right now: route pressure lifts freight rates, fires surcharge clauses and pushes war-risk premium into landed cost. Generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against now.`
+      : `Where the two reinforce each other — high prices meeting tight supply or chokepoint disruption — the operational impact compounds. Freight rates lift, surcharge clauses fire, generator runtime decisions get made on tighter stocks, and supplier conversations turn into renegotiations rather than confirmations. That is the picture worth planning against now.`;
     return `${para1}\n\n${para2}`;
   },
   // Implications for Business: practical and client-useful, one distinct
@@ -350,7 +388,17 @@ const FUEL: ReportPack = {
     return lines.join("\n");
   },
   // Polestar View: the clearest "so what" judgement in the report.
-  polestarView: ({ lead, countries }) => {
+  polestarView: ({ lead, countries, gulf }) => {
+    if (gulf) {
+      const kind = gulf.severe ? "Escalation" : "Fresh chokepoint reporting";
+      const rest = countries && countries !== lead
+        ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}`
+        : "";
+      const pressure = lead
+        ? ` In the wider incident picture, ${lead} carries the most weight${rest}.`
+        : "";
+      return `Fuel Watch is flagging a route-driven risk alongside the standing cost-and-continuity picture. ${kind} in the Gulf and the Strait of Hormuz is the clearest pressure point right now, feeding crude pricing, war-risk premium and tanker routing directly. For business users, the priority is to protect movement, backup power and fuel-dependent operations from short-notice price or availability shocks, and to treat Gulf routing exposure as a live mitigation question rather than background risk.${pressure}`;
+    }
     const pressure = lead
       ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : " No single country stands out right now.";
@@ -809,6 +857,13 @@ export function draftTopicReportProse(opts: {
   topic: string;
   issueDate: string;
   incidents: DraftableIncident[];
+  // Fuel only: the Gulf & Hormuz Chokepoint Watch the report renders. The fuel
+  // incident window is topic-filtered (Hormuz rows live under `shipping`), so
+  // without this the lead narrative cannot see a live Gulf escalation. Passed
+  // from the SAME buildFuelWatchReportData payload the preview/PDF draw the
+  // chokepoint section from, so the headline named in the prose is always a
+  // row the report itself lists.
+  fuelGulf?: FuelGulfChokepointWatch | null;
 }): TopicReportProse {
   const { topic, issueDate, incidents } = opts;
   // Shipping reports seed their prose directly from the Shipping report
@@ -937,6 +992,21 @@ export function draftTopicReportProse(opts: {
   }
   const pack = packFor(topic);
   const total = inWindow.length;
+  // Fuel only: current-period Gulf/Hormuz chokepoint activity. Derived from
+  // the SAME watch object the report's chokepoint section renders, so the
+  // headline quoted in the lead narrative is always a listed row. `severe`
+  // (any current item at High/Extreme) gates the word "escalation".
+  const gulfWatch = topic === "fuel" ? (opts.fuelGulf ?? null) : null;
+  const gulf =
+    gulfWatch && gulfWatch.currentItems.length > 0
+      ? {
+          headline: gulfWatch.currentItems[0].title,
+          severe: gulfWatch.currentItems.some((it) => {
+            const s = (it.severity ?? "").toLowerCase();
+            return s === "high" || s === "extreme";
+          }),
+        }
+      : undefined;
   const ctx: BuildCtx = {
     total,
     countries: topCountriesPlain(inWindow),
@@ -946,17 +1016,23 @@ export function draftTopicReportProse(opts: {
     period: periodPhrase(topic, issueDate),
     cadence: cadenceWord(topic),
     thin: total > 0 && total < 3,
+    gulf,
   };
 
-  const executiveSummary = total === 0 ? pack.zeroExec : pack.exec(ctx);
+  // A live Gulf chokepoint story must never be invisible: even in a week with
+  // zero fuel-topic incidents, the gulf-aware builders run (they are zero-safe
+  // when `types` is empty) instead of the quiet-week boilerplate.
+  const hasContent = total > 0 || gulf != null;
 
-  const polestarView = total === 0 ? pack.zeroPolestar : pack.polestarView(ctx);
+  const executiveSummary = hasContent ? pack.exec(ctx) : pack.zeroExec;
+
+  const polestarView = hasContent ? pack.polestarView(ctx) : pack.zeroPolestar;
 
   return {
     executiveSummary,
-    situation: total === 0 ? pack.zeroSituation : pack.situation(ctx),
-    whatHappened: total === 0 ? pack.zeroWhatHappened : pack.whatHappened(ctx),
-    whatMatters: total === 0 ? pack.zeroWhatMatters : pack.whatMatters(ctx),
+    situation: hasContent ? pack.situation(ctx) : pack.zeroSituation,
+    whatHappened: hasContent ? pack.whatHappened(ctx) : pack.zeroWhatHappened,
+    whatMatters: hasContent ? pack.whatMatters(ctx) : pack.zeroWhatMatters,
     implications: pack.implications(ctx),
     watchNext: pack.watchNext(ctx),
     polestarView,

@@ -21,6 +21,7 @@ import {
   type DraftableIncident,
   type TopicReportProse,
 } from "./draftReportProse";
+import type { FuelGulfChokepointWatch } from "./fuelNarratives";
 
 // Cached AI narrative sections. Mirrors the server TopicProseSections shape;
 // every field optional/nullable so a partial or absent payload degrades safely.
@@ -94,6 +95,11 @@ export function stableDraftTopicReportProse(opts: {
   topic: string;
   issueDate: string;
   incidents: DraftableIncident[];
+  // Fuel only: the Gulf & Hormuz Chokepoint Watch the report renders, so the
+  // lead narrative can name a live Gulf story (Hormuz rows are topic=shipping
+  // and never survive the fuel topic filter). Both the preview and the PDF
+  // pass the watch from the SAME buildFuelWatchReportData payload → parity.
+  fuelGulf?: FuelGulfChokepointWatch | null;
 }): TopicReportProse {
   const incidents = [...opts.incidents].sort((a, b) => {
     const ad = a.occurredAt ?? "";
@@ -107,5 +113,6 @@ export function stableDraftTopicReportProse(opts: {
     topic: opts.topic,
     issueDate: opts.issueDate,
     incidents,
+    fuelGulf: opts.fuelGulf ?? null,
   });
 }

@@ -830,6 +830,33 @@ export async function exportTopicReportPdf(
   beginBodyPages(ctx);
 
   const aiProse = options.aiProse ?? null;
+  const isFuel = data.topic === "fuel";
+  // Canonical Fuel Watch payload — shared by preview/PDF/editor. Hoisted above
+  // the deterministic prose draft so the Gulf & Hormuz Chokepoint Watch it
+  // carries can drive the lead narrative (Hormuz rows are topic=shipping and
+  // never survive the fuel topic filter below).
+  const fuelData = isFuel
+    ? buildFuelWatchReportData(
+        {
+          title: data.title,
+          issueDate: data.issueDate,
+          author: data.author,
+          executiveSummary: data.executiveSummary,
+          situation: data.situation,
+          whatHappened: data.whatHappened,
+          whatMatters: data.whatMatters,
+          implications: resolveSimpleProse(
+            data.implications,
+            aiProse?.implications,
+            "",
+          ),
+          polestarView: data.polestarView,
+          watchNext: resolveSimpleProse(data.watchNext, aiProse?.watchNext, ""),
+          hardNumbers: data.hardNumbers,
+        },
+        incidents,
+      )
+    : null;
   // Deterministic per-topic draft — the labelled fallback beneath the AI
   // narrative and any analyst edit. Built from the SAME windowed incident
   // set the on-screen preview uses so screen and PDF agree.
@@ -839,6 +866,7 @@ export async function exportTopicReportPdf(
     incidents: toDraftableIncidents(
       filterTopicReportIncidents(incidents, data.topic, data.issueDate),
     ),
+    fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
 
   const isCargo = data.topic === "cargo_watch";
@@ -933,30 +961,7 @@ export async function exportTopicReportPdf(
       location: i.location ?? null,
     }),
   );
-  const isFuel = data.topic === "fuel";
-  if (isFuel) {
-    // Canonical Fuel Watch payload — shared by preview/PDF/editor.
-    const fuelData = buildFuelWatchReportData(
-      {
-        title: data.title,
-        issueDate: data.issueDate,
-        author: data.author,
-        executiveSummary: data.executiveSummary,
-        situation: data.situation,
-        whatHappened: data.whatHappened,
-        whatMatters: data.whatMatters,
-        implications: resolveSimpleProse(
-          data.implications,
-          aiProse?.implications,
-          "",
-        ),
-        polestarView: data.polestarView,
-        watchNext: resolveSimpleProse(data.watchNext, aiProse?.watchNext, ""),
-        hardNumbers: data.hardNumbers,
-      },
-      incidents,
-    );
-
+  if (isFuel && fuelData) {
     // Fail closed: refuse to export a polished but hollow report unless
     // the caller explicitly opted in via options.allowMissingMarketData.
     if (
