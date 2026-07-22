@@ -956,5 +956,20 @@ export function startIngestScheduler(): void {
   );
   timer.unref();
 
+  // HOURLY price-only refresh for warm processes. The full ingest above runs
+  // every INGEST_INTERVAL_HOURS (default 12), which left the live Fuel Watch
+  // report serving a stale jet-fuel close for hours after FRED's weekly EIA
+  // bulk publication landed (observed: crude "as of" today while jet sat a
+  // week behind all day — the data was on FRED, nothing re-fetched it). The
+  // price fetch is cheap (a few small CSVs, ~0.5s) and runMarketPricesOnce
+  // shares the ingest advisory lock, so an hourly tick is safe and keeps the
+  // live report within an hour of any new FRED/Yahoo close.
+  const PRICE_REFRESH_INTERVAL_MS = 1 * MS_PER_HOUR;
+  const priceTimer = setInterval(
+    () => void priceTick("interval-prices"),
+    PRICE_REFRESH_INTERVAL_MS,
+  );
+  priceTimer.unref();
+
   logger.info({ intervalHours: hours }, "ingest scheduler started");
 }

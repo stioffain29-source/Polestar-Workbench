@@ -203,10 +203,21 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   // So when crude is degraded we DRY-RUN only (compute + log, never write); the
   // existing good data is preserved and the next cold start retries the fetch.
   const crudeDegraded = brent.points.length === 0 || wti.points.length === 0;
-  const writesEnabled = commit && !crudeDegraded;
+  // Same guard for jet: the whole hardNumbers payload is REPLACED per run, so
+  // committing with jet.points=[] silently DROPS the jet card (and its
+  // trajectory) until the next successful fetch. With the hourly price tick a
+  // skipped run retries within the hour, so preserving the last good payload
+  // beats writing a payload with the jet series missing.
+  const jetDegraded = jet.points.length === 0;
+  const writesEnabled = commit && !crudeDegraded && !jetDegraded;
   if (commit && crudeDegraded) {
     log(
       `  CRUDE DEGRADED (Brent points=${brent.points.length}, WTI points=${wti.points.length}) — both Yahoo and FRED failed for a crude benchmark; SKIPPING all writes to avoid clobbering valid prices with a blank.`,
+    );
+  }
+  if (commit && !crudeDegraded && jetDegraded) {
+    log(
+      `  JET DEGRADED (jet points=0) — FRED DJFUELUSGULF failed; SKIPPING all writes to avoid dropping the jet card from otherwise-valid payloads. Next run retries.`,
     );
   }
 
@@ -273,8 +284,8 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
 
   if (writesEnabled) {
     log(`\nUpdated ${reportsUpdated} fuel report(s) with live market prices.`);
-  } else if (commit && crudeDegraded) {
-    log(`\nNO ROWS WRITTEN — crude degraded; existing prices preserved. Next run will retry.`);
+  } else if (commit && (crudeDegraded || jetDegraded)) {
+    log(`\nNO ROWS WRITTEN — ${crudeDegraded ? "crude" : "jet"} degraded; existing prices preserved. Next run will retry.`);
   } else {
     log(`\nDRY-RUN — no rows written. Re-run with --commit to write live prices.`);
   }

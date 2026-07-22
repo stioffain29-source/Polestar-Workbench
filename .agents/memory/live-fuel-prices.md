@@ -104,11 +104,19 @@ incident-only, so there was nothing fabricated to replace there.
   key anything on report status. FRED/Yahoo lag means the anchored close may be a
   couple of days before the window end (latest observation ≤ anchor); that is the
   freshest published on or before the window end, not a bug.
-- PRICE REFRESH IS UNGATED ON BOOT: prices are cheap (a few small FRED CSVs,
-  ~0.1-0.6s) so the scheduler boot ALWAYS refreshes them when incidents are fresh
-  (not only when missing). The expensive INCIDENT scrape keeps its 6h freshness
-  gate. This guarantees every cold start shows the latest prices and removes the
-  whole class of "prices are stale" complaints.
+- PRICE REFRESH IS UNGATED ON BOOT + HOURLY ON WARM PROCESSES: prices are cheap
+  (a few small FRED CSVs, ~0.1-0.6s) so the scheduler boot ALWAYS refreshes them
+  when incidents are fresh (not only when missing), AND a dedicated hourly
+  price-only setInterval in `startIngestScheduler` re-runs `priceTick` on warm
+  processes. **Why:** FRED's DJFUELUSGULF is published in a WEEKLY EIA BULK DROP
+  (e.g. 14-20 Jul all appeared at once on 22 Jul, with the 13 Jul value REVISED
+  3.379→3.351) — a warm server that refreshed before the drop kept serving the
+  week-old jet close all day because nothing re-fetched until the 12h full tick
+  (owner: "should happen automatically"). Do not diagnose this as an ingest/UA
+  bug: curl from the workspace gets connection-reset (HTTP 000) on any
+  Mozilla-prefixed UA (curl TLS fingerprint), but Node fetch — the actual ingest
+  path — succeeds with the same UA. Manual dev refresh:
+  `pnpm --filter @workspace/scripts run scrape:prices --commit`.
 - HORIZON TRAP: the FRED fetch window must reach back to the OLDEST fuel
   report's issue date (with buffer for the prior-week change line + the weekly
   jet trajectory), NOT a fixed recent window — a fixed window silently skips

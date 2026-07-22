@@ -59,7 +59,13 @@ export async function fetchFredSeries(id: string, source: string, startDate: str
       });
       if (!res.ok) throw new Error(`FRED ${id} HTTP ${res.status}`);
       const text = await res.text();
-      return { id, source, points: parseFredCsv(text) };
+      const points = parseFredCsv(text);
+      // A 200 with an empty/truncated body parses to zero points. Treat that
+      // as a failure (retry, then throw) — returning an empty series here used
+      // to count as "success" and let the caller commit a payload with the
+      // series silently missing.
+      if (!points.length) throw new Error(`FRED ${id}: empty series body`);
+      return { id, source, points };
     } catch (err) {
       lastErr = err;
       if (attempt < FETCH_ATTEMPTS) {
