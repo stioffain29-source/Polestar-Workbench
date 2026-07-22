@@ -738,6 +738,84 @@ function coverBreakOffset(root: HTMLElement): number {
   return Math.round(coverRect.bottom - rootRect.top);
 }
 
+// html2canvas rasterises text a few pixels LOWER than the live DOM's Range
+// rects report (its own baseline arithmetic), so a page cut computed as the
+// midpoint of a DOM line gap can still land on glyph ink in the raster —
+// slicing a line of prose across the page seam. The DOM-measured cut is
+// therefore only a first approximation: after rasterising, snap each interior
+// body cut to the MIDDLE of the widest fully-blank pixel-row band within
+// ±SNAP_WINDOW_CSS_PX of the planned cut in the ACTUAL canvas. A blank raster
+// row is glyph-safe by construction, whatever the drift. If no blank band
+// exists in the window (cut inside an image / filled table), keep the
+// original cut.
+const SNAP_WINDOW_CSS_PX = 12;
+
+function snapCutToBlankRasterRows(
+  canvas: HTMLCanvasElement,
+  canvasScale: number,
+  cutCss: number,
+  keepRanges: KeepRange[] = [],
+): number {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return cutCss;
+  const centre = Math.round(cutCss * canvasScale);
+  const win = Math.round(SNAP_WINDOW_CSS_PX * canvasScale);
+  const y0 = Math.max(0, centre - win);
+  const y1 = Math.min(canvas.height - 1, centre + win);
+  if (y1 <= y0) return cutCss;
+
+  const data = ctx.getImageData(0, y0, canvas.width, y1 - y0 + 1).data;
+  const rowIsBlank = (row: number): boolean => {
+    const off = row * canvas.width * 4;
+    for (let x = 0; x < canvas.width; x += 2) {
+      const o = off + x * 4;
+      // Ink = any noticeably non-white pixel (catches faint antialiased
+      // glyph edges, rules, chart fills).
+      if (data[o] < 245 || data[o + 1] < 245 || data[o + 2] < 245) return false;
+    }
+    return true;
+  };
+
+  // Collect maximal blank runs; pick the widest (tie → nearest the planned
+  // cut) and cut at its midpoint for maximum clearance either side.
+  let best: { start: number; end: number } | null = null;
+  let runStart = -1;
+  const rows = y1 - y0 + 1;
+  for (let r = 0; r <= rows; r++) {
+    const blank = r < rows && rowIsBlank(r);
+    if (blank && runStart < 0) runStart = r;
+    if (!blank && runStart >= 0) {
+      const run = { start: runStart, end: r - 1 };
+      runStart = -1;
+      if (!best) {
+        best = run;
+      } else {
+        const runLen = run.end - run.start;
+        const bestLen = best.end - best.start;
+        const runMid = y0 + (run.start + run.end) / 2;
+        const bestMid = y0 + (best.start + best.end) / 2;
+        if (
+          runLen > bestLen ||
+          (runLen === bestLen &&
+            Math.abs(runMid - centre) < Math.abs(bestMid - centre))
+        ) {
+          best = run;
+        }
+      }
+    }
+  }
+  if (!best) return cutCss;
+  const snapped = (y0 + (best.start + best.end) / 2) / canvasScale;
+  // Never drift into a keep-together block: the original cut was placed at or
+  // outside every keepRange by buildPageSlices, so if the snap would land
+  // strictly inside one (it can only cross blank padding rows, but keep the
+  // invariant strict), fall back to the original cut.
+  if (keepRanges.some((r) => snapped > r.top && snapped < r.bottom)) {
+    return cutCss;
+  }
+  return snapped;
+}
+
 export async function exportElementToPdf(element: HTMLElement, filename: string): Promise<void> {
   const clone = cloneForExport(element);
   document.body.appendChild(clone);
@@ -779,6 +857,22 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
     });
 
     const canvasScale = canvas.width / sourceWidth;
+
+    // Snap each interior body cut to a blank raster row band (see
+    // snapCutToBlankRasterRows) so the DOM→raster text drift can never slice
+    // a line of prose across a page seam. Structural boundaries (document
+    // start/end, cover break) are left untouched.
+    for (let i = 0; i < bodySlices.length - 1; i++) {
+      const snapped = snapCutToBlankRasterRows(
+        canvas,
+        canvasScale,
+        bodySlices[i].end,
+        keepRanges,
+      );
+      bodySlices[i] = { ...bodySlices[i], end: snapped };
+      bodySlices[i + 1] = { ...bodySlices[i + 1], start: snapped };
+    }
+
     const bodyPageCount = bodySlices.length;
 
     [...coverSlices, ...bodySlices].forEach((slice, index) => {

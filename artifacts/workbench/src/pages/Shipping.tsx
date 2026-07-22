@@ -508,7 +508,8 @@ export default function Shipping() {
       {/* 1a. Maritime Intelligence board — shared with the Shipping Watch report */}
       <MaritimeIntelligenceBoard board={maritimeBoard} />
 
-      {/* 1a-ii. Red Sea directional flow — shared with the Shipping Watch report */}
+      {/* 1a-ii. Red Sea directional flow — MONITOR-ONLY (removed from the
+          Shipping Watch report at the owner's request; the panel stays here). */}
       <Section title="Red Sea Directional Flow — Gateway Movement (AIS)">
         <RedSeaDirectionalFlowPanel gateways={redSeaFlow} />
       </Section>
