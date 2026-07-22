@@ -35,6 +35,27 @@ at a time, the in-app dedupe is safe again without needing a new DB unique index
 **How to apply:** any manually-triggered, expensive, non-idempotent server route in this
 autoscale app should use the advisory-lock pattern, not a module-level flag.
 
+## Trap 3 — autoscale gives CPU only during in-flight requests: HOLD the trigger request open
+On an autoscale (Cloud Run) deployment the process gets CPU **only while a request is in
+flight**. A fire-and-forget trigger (boot catch-up task, `setInterval` price tick, short
+healthz pings) stalls the moment the last request completes — timers never fire, and a
+multi-minute ingest chain freezes mid-scrape for hours. Repeated short pings do NOT
+unstall it; the request must stay OPEN.
+**Fix:** the admin ingest route runs `runIngestOnce` SYNCHRONOUSLY, so trigger prod with a
+curl that HOLDS the connection for the whole run: `curl -m 7200 -X POST -H "Authorization:
+Bearer $INGEST_ADMIN_TOKEN" <prod>/api/admin/ingest` (background it with nohup; a 30-min
+`-m 1800` cap was too short — throttled Google-News feeds stretch the scrape well past it,
+and when curl times out the run re-freezes). A stalled earlier run RESUMES when CPU
+returns and may finish first — that is fine, both are idempotent.
+**Also:** the advisory-lock client can be killed mid-run ("terminating connection due to
+administrator command") — the lock auto-releases and `fn()` keeps running, so a second
+trigger will NOT 409 even though the first run is still alive; expect and tolerate the
+overlap. Boot's stale path (`tick("boot")`) never reaches the price pass when it stalls,
+so "prices refresh on every boot" only holds for the fresh path — an hourly price
+`setInterval` is dead weight on autoscale without traffic.
+**Verify** via `executeSql(environment:"production")` — but note it is a READ REPLICA
+(`pg_is_in_recovery()=t`): primary advisory locks and activity are invisible from it.
+
 ## Root cause of "data is stale everywhere": nothing TRIGGERED ingestion
 The pipeline was never broken — the live RSS feeds return current items (a dry-run
 `scrape:flashpoint` with no `--commit` shows dozens of "New to insert"). Data froze because
