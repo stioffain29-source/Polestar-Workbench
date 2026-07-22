@@ -63,7 +63,7 @@ function Bullets({ text }: { text: string }) {
   return (
     <ul className="list-disc pl-5 space-y-1.5" style={{ color: DUSK, fontFamily: ROBOTO }}>
       {items.map((it, i) => (
-        <li key={i} className="text-[14px] leading-[1.6] font-light">
+        <li key={i} data-pdf-flow="true" className="text-[14px] leading-[1.6] font-light">
           {it}
         </li>
       ))}

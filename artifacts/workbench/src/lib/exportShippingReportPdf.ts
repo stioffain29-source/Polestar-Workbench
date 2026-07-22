@@ -57,18 +57,6 @@ import {
 } from "./shippingReportDataset";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
-  type GatewayFlowSeries,
-  DIRECTIONAL_FLOW_TITLE,
-  DIRECTIONAL_FLOW_CAPTION,
-  DIRECTIONAL_FLOW_DISCLAIMER,
-  INBOUND_LABEL,
-  OUTBOUND_LABEL,
-  gatewayEmptyState,
-  sharedFlowMax,
-  hasAnyFlow,
-  buildRedSeaDirectionalFlow,
-} from "./maritimeDirectionalFlow";
-import {
   buildMaritimeIntelligence,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
@@ -923,167 +911,6 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   drawMiniBullets(ctx, watchNext);
 }
 
-// Red Sea Directional Flow ---------------------------------------------------
-
-// One gateway column: title, gate sublabel, vertical grouped bars (inbound vs
-// outbound per AIS sample) or an honest empty state. Mirrors the on-screen
-// RedSeaDirectionalFlowPanel so screen == preview == PDF.
-function drawGatewayColumn(
-  ctx: Ctx,
-  g: GatewayFlowSeries,
-  xLeft: number,
-  topY: number,
-  colW: number,
-  plotH: number,
-  max: number,
-) {
-  const { pdf } = ctx;
-
-  // Gateway title + gate sublabel.
-  setText(pdf, NAVY);
-  setRoboto(pdf, "bold");
-  pdf.setFontSize(10.5);
-  pdf.text(sanitize(g.theatre), xLeft, topY + 10);
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(7.5);
-  pdf.text(sanitize(g.gate.toUpperCase()), xLeft + colW, topY + 10, {
-    align: "right",
-  });
-
-  const plotTop = topY + 16;
-  const baseline = plotTop + plotH;
-
-  if (!g.hasData) {
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(8);
-    const lines: string[] = pdf.splitTextToSize(
-      sanitize(gatewayEmptyState(g.gate)),
-      colW - 4,
-    );
-    pdf.text(lines, xLeft, plotTop + 12);
-    setRoboto(pdf, "regular");
-    return;
-  }
-
-  const n = g.points.length;
-  const groupW = colW / n;
-  const barGap = 2;
-  const groupPad = Math.min(8, groupW * 0.2);
-  const barW = Math.max(3, Math.min(12, (groupW - groupPad * 2 - barGap) / 2));
-  const usable = plotH - 12; // reserve headroom for the value labels
-
-  for (let idx = 0; idx < g.points.length; idx++) {
-    const p = g.points[idx];
-    const gx = xLeft + idx * groupW;
-    const inX = gx + (groupW - barGap - barW * 2) / 2;
-    const outX = inX + barW + barGap;
-    const inH = p.inbound > 0 ? Math.max(1.5, (p.inbound / max) * usable) : 0;
-    const outH = p.outbound > 0 ? Math.max(1.5, (p.outbound / max) * usable) : 0;
-
-    // Inbound = Electric Blue, Outbound = Navy. Flat fills (brand: no gradients).
-    if (inH > 0) {
-      setFill(pdf, ELECTRIC);
-      pdf.rect(inX, baseline - inH, barW, inH, "F");
-    }
-    if (outH > 0) {
-      setFill(pdf, NAVY);
-      pdf.rect(outX, baseline - outH, barW, outH, "F");
-    }
-
-    // Value labels above each bar.
-    setText(pdf, NAVY);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(6.5);
-    pdf.text(String(p.inbound), inX + barW / 2, baseline - inH - 2, {
-      align: "center",
-    });
-    pdf.text(String(p.outbound), outX + barW / 2, baseline - outH - 2, {
-      align: "center",
-    });
-
-    // Sample label beneath the baseline.
-    setText(pdf, DUSK);
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(6.5);
-    pdf.text(sanitize(p.label), gx + groupW / 2, baseline + 8, {
-      align: "center",
-      maxWidth: groupW - 1,
-    });
-  }
-
-  // Baseline rule.
-  setStroke(pdf, POLAR);
-  pdf.setLineWidth(0.6);
-  pdf.line(xLeft, baseline, xLeft + colW, baseline);
-
-  // Totals context line.
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(7.5);
-  const sampleWord = g.points.length === 1 ? "sample" : "samples";
-  pdf.text(
-    sanitize(
-      `${g.totalInbound} inbound, ${g.totalOutbound} outbound observations across ${g.points.length} AIS ${sampleWord}`,
-    ),
-    xLeft,
-    baseline + 20,
-  );
-  setRoboto(pdf, "regular");
-}
-
-// The Red Sea Directional Flow section: heading, caption, legend, the two
-// gateway columns side by side on a shared y-scale, and the honesty disclaimer.
-function drawDirectionalFlow(ctx: Ctx, gateways: GatewayFlowSeries[]) {
-  const { pdf, MX, CW } = ctx;
-  drawSectionHeading(ctx, DIRECTIONAL_FLOW_TITLE);
-  renderProse(ctx, DIRECTIONAL_FLOW_CAPTION);
-
-  // Legend: Inbound (Electric) and Outbound (Navy) swatches.
-  ensureSpace(ctx, 16);
-  const sw = 8;
-  setFill(pdf, ELECTRIC);
-  pdf.rect(MX, ctx.y, sw, sw, "F");
-  setText(pdf, DUSK);
-  setRoboto(pdf, "regular");
-  pdf.setFontSize(8.5);
-  pdf.text(sanitize(INBOUND_LABEL), MX + sw + 4, ctx.y + sw - 1);
-  setFill(pdf, NAVY);
-  pdf.rect(MX + 110, ctx.y, sw, sw, "F");
-  pdf.text(sanitize(OUTBOUND_LABEL), MX + 110 + sw + 4, ctx.y + sw - 1);
-  ctx.y += 18;
-
-  const colGap = 16;
-  const colW = (CW - colGap) / 2;
-  const PLOT_H = 84;
-  const blockH = 16 + PLOT_H + 12 + 16; // title + plot + label row + totals
-  ensureSpace(ctx, blockH);
-  const topY = ctx.y;
-  const max = sharedFlowMax(gateways);
-
-  for (let i = 0; i < gateways.length; i++) {
-    const xLeft = MX + i * (colW + colGap);
-    drawGatewayColumn(ctx, gateways[i], xLeft, topY, colW, PLOT_H, max);
-  }
-  ctx.y = topY + blockH;
-
-  // Honesty disclaimer only when at least one gateway has drawable data; an
-  // all-empty pair already explains itself via the per-gateway empty states.
-  if (hasAnyFlow(gateways)) {
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(8);
-    const lines: string[] = pdf.splitTextToSize(
-      sanitize(DIRECTIONAL_FLOW_DISCLAIMER),
-      CW,
-    );
-    pdf.text(lines, MX, ctx.y + 8);
-    ctx.y += 8 + lines.length * 10 + 4;
-    setRoboto(pdf, "regular");
-  }
-}
-
 // Exporter ------------------------------------------------------------------
 
 export async function exportShippingReportPdf(
@@ -1093,7 +920,6 @@ export async function exportShippingReportPdf(
   movement: MaritimeMovement[] = [],
   maritimeSecurityEvents: MaritimeSecurityEvent[] = [],
   incidentSummaries: Record<string, string> = {},
-  redSeaFlow?: GatewayFlowSeries[],
   aiProse?: TopicAiProse | null,
   hiddenSections?: string[],
 ): Promise<void> {
@@ -1163,15 +989,6 @@ export async function exportShippingReportPdf(
   });
   if (show("maritime-intelligence")) {
     drawMaritimeIntelligence(ctx, maritimeBoard);
-  }
-
-  // Red Sea Directional Flow — drawn immediately after Maritime Intelligence in
-  // the SAME order ShippingReportPreview renders it (preview == PDF). The series
-  // is built upstream by the editor from the identical per-gateway movement rows;
-  // if a caller omits it we fall back to building from the movement pool so the
-  // section is never silently empty when data exists.
-  if (show("red-sea-flow")) {
-    drawDirectionalFlow(ctx, redSeaFlow ?? buildRedSeaDirectionalFlow(movement));
   }
 
   const ds = buildShippingReportDataset(

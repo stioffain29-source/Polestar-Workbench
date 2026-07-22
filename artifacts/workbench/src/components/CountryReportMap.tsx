@@ -500,7 +500,7 @@ export function aggregateZones(
 // ---------------------------------------------------------------------------
 
 // The single reporting-driven marker/card unit for both modes.
-interface ImpactPoint {
+export interface ImpactPoint {
   key: string;
   // Numbered cross-reference to the on-map marker (zone mode); null in dot mode,
   // where markers are located by name rather than numbered.
@@ -691,11 +691,11 @@ function ImpactCard({ point }: { point: ImpactPoint }) {
         />
       )}
       <div style={{ fontFamily: "Roboto, sans-serif", minWidth: 0, flex: "1 1 auto" }}>
-        <div
-          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}
-        >
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: NAVY }}>{point.location}</span>
+        <div style={{ marginBottom: 6 }}>
           <ImpactChip impact={point.impact} />
+        </div>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: NAVY, lineHeight: 1.25 }}>
+          {point.location}
         </div>
         <div style={{ fontSize: 11.5, color: DUSK, marginTop: 4 }}>
           <span style={{ fontWeight: 600 }}>What happened this period: </span>
@@ -710,7 +710,7 @@ function ImpactCard({ point }: { point: ImpactPoint }) {
   );
 }
 
-function ImpactCardGrid({ points }: { points: ImpactPoint[] }) {
+export function ImpactCardGrid({ points }: { points: ImpactPoint[] }) {
   return (
     <div
       className="mt-3"

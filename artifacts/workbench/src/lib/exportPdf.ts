@@ -532,25 +532,56 @@ function applyBarChartExportLayout(root: HTMLElement): void {
   });
 }
 
-// Per-line top offsets (relative to rootTop) for every wrapped text line inside
-// an element, via Range rects. Used to let a tall prose paragraph split across a
-// page boundary instead of being pushed whole.
-function lineBreakTops(el: HTMLElement, rootTop: number): number[] {
-  const tops: number[] = [];
+// Interior line-break candidates (relative to rootTop) inside an element: just
+// inside the NEXT wrapped line's rect top, via Range rects grouped into line
+// boxes. html2canvas systematically paints text a few pixels LOWER than the
+// DOM line rects report (the same quirk that mis-centres chip text), so a cut
+// at the mid-gap midpoint can still catch the dropped bottom of the previous
+// line. Cutting at next.top + 1 instead means downward raster drift moves ink
+// AWAY from the seam on both sides: the previous line's dropped ink stays
+// above the cut (the full leading gap is its buffer) and the next line's ink —
+// which starts a few px below its rect top and also drifts down — stays below
+// it. Used to let a tall prose paragraph split across a page boundary instead
+// of being pushed whole.
+function interiorLineBreaks(el: HTMLElement, rootTop: number): number[] {
+  const rects: Array<{ top: number; bottom: number }> = [];
   const range = document.createRange();
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let node: Node | null = walker.nextNode();
   while (node) {
     if (node.textContent && node.textContent.trim()) {
       range.selectNodeContents(node);
-      const rects = range.getClientRects();
-      for (let i = 0; i < rects.length; i++) {
-        tops.push(Math.round(rects[i].top - rootTop));
+      const list = range.getClientRects();
+      for (let i = 0; i < list.length; i++) {
+        rects.push({
+          top: list[i].top - rootTop,
+          bottom: list[i].bottom - rootTop,
+        });
       }
     }
     node = walker.nextNode();
   }
-  return tops.sort((a, b) => a - b);
+  if (rects.length < 2) return [];
+
+  // Merge rects that vertically overlap into single line boxes — one wrapped
+  // line may carry several text nodes (inline spans, links).
+  rects.sort((a, b) => a.top - b.top);
+  const lines: Array<{ top: number; bottom: number }> = [];
+  for (const r of rects) {
+    const last = lines[lines.length - 1];
+    if (last && r.top < last.bottom - 1) {
+      last.top = Math.min(last.top, r.top);
+      last.bottom = Math.max(last.bottom, r.bottom);
+    } else {
+      lines.push({ ...r });
+    }
+  }
+
+  const breaks: number[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    breaks.push(Math.round((lines[i - 1].bottom + lines[i].top) / 2));
+  }
+  return breaks;
 }
 
 // Measure the live DOM for legal break offsets (section / card / table / row
@@ -558,7 +589,7 @@ function lineBreakTops(el: HTMLElement, rootTop: number): number[] {
 // the raw tops to the pure `refineBreakCandidates` for de-duping/filtering. The
 // refinement + slicing geometry lives in `pdfPageBreaks.ts` so it is unit-tested
 // without a DOM.
-function collectBreakCandidates(
+export function collectBreakCandidates(
   root: HTMLElement,
   pageCssHeight: number,
 ): { candidates: number[]; keepRanges: KeepRange[] } {
@@ -577,14 +608,25 @@ function collectBreakCandidates(
     rawTops.push(Math.round(node.getBoundingClientRect().top - rootRect.top));
   });
 
-  // Line-level break points inside opted-in prose (data-pdf-flow). Without these
-  // a paragraph taller than the page remainder is shoved whole onto the next
-  // page, leaving a half-empty page. Skip each element's first line so the
-  // preceding heading keeps at least its first line of body text.
+  // Line-level break points inside opted-in prose (data-pdf-flow): the
+  // midpoints of the gaps between wrapped lines. Without these a paragraph
+  // taller than the page remainder is shoved whole onto the next page, leaving
+  // a half-empty page.
+  //
+  // ALSO make each flow element's own top a candidate — a page may always
+  // break cleanly BEFORE a paragraph — EXCEPT when the element directly
+  // follows a heading, so a section heading is never orphaned at the foot of a
+  // page. Runs of short one-line paragraphs (e.g. a Spot Report's list-style
+  // OPERATIONAL IMPACT lines) contribute no INTERIOR candidates at all, so
+  // without their element tops the pager hits a candidate desert, breaks far
+  // too early and leaves the page half empty.
+  const HEADING_TAG = /^H[1-6]$/;
   root.querySelectorAll<HTMLElement>("[data-pdf-flow]").forEach((el) => {
-    lineBreakTops(el, rootRect.top)
-      .slice(1)
-      .forEach((top) => rawTops.push(top));
+    interiorLineBreaks(el, rootRect.top).forEach((top) => rawTops.push(top));
+    const prev = el.previousElementSibling;
+    if (prev && !HEADING_TAG.test(prev.tagName)) {
+      rawTops.push(Math.round(el.getBoundingClientRect().top - rootRect.top));
+    }
   });
 
   // Atomic keep-together blocks (data-pdf-keep) — e.g. the Jakarta operational

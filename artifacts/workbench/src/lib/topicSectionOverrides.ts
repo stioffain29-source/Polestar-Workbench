@@ -50,7 +50,6 @@ export const TOPIC_SECTION_KEYS: Record<
   shipping: [
     { key: "maritime-intelligence", label: "Maritime Intelligence" },
     { key: "executive-summary", label: "Executive Summary" },
-    { key: "red-sea-flow", label: "Red Sea Directional Flow" },
     { key: "fast-facts", label: "Fast Facts" },
     { key: "chokepoint-route", label: "Chokepoint / Route Read" },
     { key: "vessel-piracy", label: "Vessel Threat and Piracy Read" },
