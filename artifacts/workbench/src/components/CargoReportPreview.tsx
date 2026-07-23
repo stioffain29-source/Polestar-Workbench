@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
-import { makeSectionGate } from "@/lib/topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { pickRead } from "@/lib/pickRead";
 import { validateCargoReport } from "@/lib/cargoReportValidation";
@@ -484,6 +488,7 @@ export default function CargoReportPreview({
   aiProse,
   includeFullAnnex = false,
   hiddenSections,
+  sectionOverrides,
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
@@ -493,6 +498,7 @@ export default function CargoReportPreview({
    *  an annex after Polestar View. Off by default. */
   includeFullAnnex?: boolean;
   hiddenSections?: string[];
+  sectionOverrides?: TopicSectionOverrides | null;
 }) {
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "cargo_watch";
@@ -771,7 +777,7 @@ export default function CargoReportPreview({
         )}
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <FastFactsGrid cards={model.fastFacts} />
+          <FastFactsGrid cards={applyFastFactOverrides(model.fastFacts, sectionOverrides?.fastFactOverrides)} />
         </Section>
 
         {/* PAGE 2 — Geographic distribution. Map title reflects the theft-only

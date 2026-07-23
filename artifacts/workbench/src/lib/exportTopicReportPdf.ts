@@ -58,7 +58,13 @@ import { selectRelatedIncidents } from "./relatedIncidents";
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { isTopicRelevant } from "./topicRelevance";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
-import { makeSectionGate } from "./topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  applyMarketPriceOverrides,
+  PANEL_READ_GULF_HORMUZ,
+  type TopicSectionOverrides,
+} from "./topicSectionOverrides";
 import {
   resolveSimpleProse,
   stableDraftTopicReportProse,
@@ -126,6 +132,10 @@ export interface ExportTopicReportPdfOptions {
    *  on-screen preview so preview == PDF. Cover and Disclaimer are never
    *  hideable. */
   hiddenSections?: string[];
+  /** Analyst overrides persisted in reports.section_overrides — Fast Facts
+   *  tiles, panel reads (gulf-hormuz) and Market Prices rows. Applied here in
+   *  lockstep with the on-screen preview so preview == PDF. */
+  sectionOverrides?: TopicSectionOverrides | null;
 }
 
 export interface TopicReportData {
@@ -777,6 +787,8 @@ export async function exportTopicReportPdf(
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
   const show = makeSectionGate(options.hiddenSections);
+  const ffOverrides = options.sectionOverrides?.fastFactOverrides;
+  const panelReads = options.sectionOverrides?.panelReads ?? {};
   const topicLabel = topicLabels[data.topic] ?? data.topic;
   // Canonical naming: cover title, running header and subtitle use the
   // canonical topic name. Regional words live in scope, not the title.
@@ -986,8 +998,10 @@ export async function exportTopicReportPdf(
         // No marketData at all but the user overrode — emit warnings only.
         for (const w of fuelData.validation.warnings) renderProse(ctx, w);
       } else {
-        const kpis: KpiCardData[] =
-          fuelData.marketData.fastFactsCards.map(toRenderableCard);
+        const kpis: KpiCardData[] = applyFastFactOverrides(
+          fuelData.marketData.fastFactsCards.map(toRenderableCard),
+          ffOverrides,
+        );
         drawFastFactsKpiCards(ctx, kpis);
         for (const w of fuelData.validation.warnings) renderProse(ctx, w);
       }
@@ -1071,7 +1085,11 @@ export async function exportTopicReportPdf(
     // screen == in-app PDF.
     if (show("gulf-hormuz") && fuelData.incidentData.gulfChokepointWatch) {
       const gulf = fuelData.incidentData.gulfChokepointWatch;
-      drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.read);
+      drawSectionWithProse(
+        ctx,
+        "Gulf and Hormuz Chokepoint Watch",
+        pickRead(panelReads[PANEL_READ_GULF_HORMUZ], gulf.read),
+      );
       if (gulf.currentItemLines.length > 0) {
         renderProse(ctx, gulf.currentItemLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
@@ -1132,19 +1150,28 @@ export async function exportTopicReportPdf(
       drawSectionHeading(ctx, "Fast Facts");
       drawFastFactsKpiCards(
         ctx,
-        (cargoModel
-          ? cargoModel.fastFacts
-          : computeTopicFastFacts({
-              topic: data.topic,
-              issueDate: data.issueDate,
-              incidents,
-              topicLabel: topicLabels[data.topic] ?? data.topic,
-            })) as KpiCardData[],
+        applyFastFactOverrides(
+          (cargoModel
+            ? cargoModel.fastFacts
+            : computeTopicFastFacts({
+                topic: data.topic,
+                issueDate: data.issueDate,
+                incidents,
+                topicLabel: topicLabels[data.topic] ?? data.topic,
+              })) as KpiCardData[],
+          ffOverrides,
+        ),
       );
     }
 
-    if (data.topic === "energy" && show("market-prices")) {
-      const rows = options.marketPrices ?? [];
+    if (
+      (data.topic === "energy" || data.topic === "fertiliser") &&
+      show("market-prices")
+    ) {
+      const rows = applyMarketPriceOverrides(
+        options.marketPrices ?? [],
+        options.sectionOverrides?.marketPriceOverrides,
+      );
       if (rows.length === 0) {
         drawSectionHeading(ctx, "Market Prices");
         renderProse(ctx, MARKET_PRICES_REPORT_EMPTY_TEXT);

@@ -35,7 +35,11 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
-import { makeSectionGate } from "./topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "./topicSectionOverrides";
 import { pickRead } from "./pickRead";
 import {
   buildConflictReportDataset,
@@ -278,6 +282,7 @@ export async function exportConflictReportPdf(
   incidentSummaries: Record<string, string> = {},
   aiProse?: ConflictAiProse | null,
   hiddenSections?: string[],
+  sectionOverrides?: TopicSectionOverrides | null,
 ): Promise<void> {
   const show = makeSectionGate(hiddenSections);
   // AI replaces the deterministic auto-prose as the fallback layer; a genuine
@@ -335,7 +340,10 @@ export async function exportConflictReportPdf(
   // 2. Fast Facts.
   if (show("fast-facts")) {
     drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(ctx, ds.fastFacts);
+    drawFastFactsKpiCards(
+      ctx,
+      applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+    );
   }
 
   // 3. Top Activity Areas (dynamic top-3 theatres, country heading + para).

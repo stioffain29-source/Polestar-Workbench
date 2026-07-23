@@ -262,7 +262,17 @@ export const GetDashboardOverviewResponse = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -1571,7 +1581,17 @@ export const ListReportsResponseItem = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -1895,7 +1915,17 @@ export const GetReportResponse = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -2061,7 +2091,17 @@ export const UpdateReportBody = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "author": zod.string().optional()
 })
@@ -2222,7 +2262,17 @@ export const UpdateReportResponse = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
   "createdAt": zod.coerce.date()
@@ -4975,7 +5025,17 @@ export const ListCountryReportsResponseItem = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })
@@ -5095,7 +5155,17 @@ export const GetCountryReportResponse = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })
@@ -5129,7 +5199,17 @@ export const UpdateCountryReportBody = zod.object({
   "sectionOverrides": zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }).optional()
 })
 
@@ -5159,7 +5239,17 @@ export const UpdateCountryReportResponse = zod.object({
   "sectionOverrides": zod.union([zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
-  "severityDemotions": zod.record(zod.string(), zod.string()).optional()
+  "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "fastFactOverrides": zod.record(zod.string(), zod.object({
+  "label": zod.string().optional(),
+  "value": zod.string().optional(),
+  "note": zod.string().optional()
+})).optional(),
+  "panelReads": zod.record(zod.string(), zod.string()).optional(),
+  "marketPriceOverrides": zod.record(zod.string(), zod.object({
+  "value": zod.string().optional(),
+  "change": zod.string().optional()
+})).optional()
 }),zod.null()]).optional(),
   "createdAt": zod.coerce.date()
 })

@@ -3444,6 +3444,30 @@ components:
         severityDemotions:
           type: object
           additionalProperties: { type: string }
+        # Topic-report analyst overrides (unused by country briefs).
+        # fastFactOverrides is keyed by the AUTO tile label; a non-blank
+        # label/value/note replaces the computed one, blank/absent = auto.
+        fastFactOverrides:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              label: { type: string }
+              value: { type: string }
+              note: { type: string }
+        # Free-text overrides for hard-wired report panels, keyed by the
+        # panel's stable section key (e.g. "gulf-hormuz"). Blank = auto.
+        panelReads:
+          type: object
+          additionalProperties: { type: string }
+        # Per-row overrides for the Market Prices table, keyed "group:key".
+        marketPriceOverrides:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              value: { type: string }
+              change: { type: string }
 
     CountryReportPhoto:
       type: object

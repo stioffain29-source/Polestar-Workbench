@@ -20,10 +20,139 @@
 
 // The incident-curation helpers are identical to the country brief's, so we
 // re-export them rather than duplicate the demote-guard logic.
-export {
-  applyIncidentCurations,
-  type CountrySectionOverrides as TopicSectionOverrides,
-} from "./countrySectionOverrides";
+export { applyIncidentCurations } from "./countrySectionOverrides";
+import type { CountrySectionOverrides } from "./countrySectionOverrides";
+
+// Per-tile Fast Facts override. Keyed by the tile's AUTO label (stable per
+// topic — e.g. "Total Records", "Highest Severity"), so a saved override
+// re-attaches to the same tile even as the computed value changes week to
+// week. Blank/absent fields fall back to the computed auto value — clearing
+// an override always reverts to auto (STRICT no-fabrication: overrides only
+// replace displayed text the owner typed, they never invent tiles).
+export interface FastFactOverride {
+  label?: string;
+  value?: string;
+  note?: string;
+}
+
+// Per-row Market Prices override, keyed "group:key" (e.g. "energy:brent").
+export interface MarketPriceOverride {
+  value?: string;
+  change?: string;
+}
+
+export interface TopicSectionOverrides extends CountrySectionOverrides {
+  /** Fast Facts tile overrides keyed by the tile's AUTO label. */
+  fastFactOverrides?: Record<string, FastFactOverride>;
+  /** Free-text overrides for hard-wired panels, keyed by the panel's stable
+   *  section key (currently: "gulf-hormuz" — the Fuel Watch Gulf and Hormuz
+   *  Chokepoint Watch read). Blank/absent = live auto text (pickRead). */
+  panelReads?: Record<string, string>;
+  /** Market Prices table row overrides keyed "group:key". */
+  marketPriceOverrides?: Record<string, MarketPriceOverride>;
+}
+
+/** Stable panel key for the Fuel Watch Gulf & Hormuz Chokepoint Watch read. */
+export const PANEL_READ_GULF_HORMUZ = "gulf-hormuz";
+
+/**
+ * Apply Fast Facts overrides to a computed card list. Works on every card
+ * shape in the codebase ({label, value, note?, ...extras}) — extras such as
+ * severity/accent pass through untouched so the accent strip still reflects
+ * the underlying data. Match is by AUTO label; a non-blank override field
+ * replaces the computed one, blank fields keep the auto text.
+ */
+export function applyFastFactOverrides<
+  T extends { label: string; value: string; note?: string },
+>(
+  cards: T[],
+  overrides: Record<string, FastFactOverride> | null | undefined,
+): T[] {
+  if (!overrides || Object.keys(overrides).length === 0) return cards;
+  return cards.map((c) => {
+    const ov = overrides[c.label];
+    if (!ov) return c;
+    const label = (ov.label ?? "").trim();
+    const value = (ov.value ?? "").trim();
+    const note = (ov.note ?? "").trim();
+    if (!label && !value && !note) return c;
+    return {
+      ...c,
+      label: label || c.label,
+      value: value || c.value,
+      ...(note ? { note } : {}),
+    };
+  });
+}
+
+/**
+ * Apply Market Prices row overrides. Row identity is "group:key". The value
+ * override must parse as a finite number (the card formats numerics); a
+ * non-numeric value override is ignored rather than rendering garbage.
+ */
+export function applyMarketPriceOverrides<
+  T extends { group: string; key: string; value: number; change?: string | null },
+>(
+  rows: T[],
+  overrides: Record<string, MarketPriceOverride> | null | undefined,
+): T[] {
+  if (!overrides || Object.keys(overrides).length === 0) return rows;
+  return rows.map((r) => {
+    const ov = overrides[`${r.group}:${r.key}`];
+    if (!ov) return r;
+    const out = { ...r };
+    const v = (ov.value ?? "").trim();
+    if (v) {
+      const n = Number(v);
+      if (Number.isFinite(n)) out.value = n;
+    }
+    const ch = (ov.change ?? "").trim();
+    if (ch) out.change = ch;
+    return out;
+  });
+}
+
+/**
+ * Drop blank entries so the persisted jsonb holds only genuine overrides —
+ * an all-blank tile/row entry is removed entirely (clearing = revert to auto).
+ */
+export function pruneTopicSectionOverrides(
+  ov: TopicSectionOverrides,
+): TopicSectionOverrides {
+  const out: TopicSectionOverrides = {};
+  if (ov.hiddenSections?.length) out.hiddenSections = ov.hiddenSections;
+  if (ov.excludedIncidentIds?.length)
+    out.excludedIncidentIds = ov.excludedIncidentIds;
+  if (ov.severityDemotions && Object.keys(ov.severityDemotions).length)
+    out.severityDemotions = ov.severityDemotions;
+  const ff: Record<string, FastFactOverride> = {};
+  for (const [k, v] of Object.entries(ov.fastFactOverrides ?? {})) {
+    const label = (v.label ?? "").trim();
+    const value = (v.value ?? "").trim();
+    const note = (v.note ?? "").trim();
+    if (!label && !value && !note) continue;
+    ff[k] = {
+      ...(label ? { label } : {}),
+      ...(value ? { value } : {}),
+      ...(note ? { note } : {}),
+    };
+  }
+  if (Object.keys(ff).length) out.fastFactOverrides = ff;
+  const pr: Record<string, string> = {};
+  for (const [k, v] of Object.entries(ov.panelReads ?? {})) {
+    if ((v ?? "").trim()) pr[k] = v;
+  }
+  if (Object.keys(pr).length) out.panelReads = pr;
+  const mp: Record<string, MarketPriceOverride> = {};
+  for (const [k, v] of Object.entries(ov.marketPriceOverrides ?? {})) {
+    const value = (v.value ?? "").trim();
+    const change = (v.change ?? "").trim();
+    if (!value && !change) continue;
+    mp[k] = { ...(value ? { value } : {}), ...(change ? { change } : {}) };
+  }
+  if (Object.keys(mp).length) out.marketPriceOverrides = mp;
+  return out;
+}
 
 // The hideable canonical sections per topic, in render order. Keys are stable
 // identifiers decoupled from the display title (so re-titling never orphans a

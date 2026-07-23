@@ -19,6 +19,7 @@ import {
   incidentsTable,
   incidentCorroborationsTable,
   maritimeMovementTable,
+  marketPricesTable,
 } from "@workspace/db";
 
 // JSON-roundtrip a Drizzle row set so Date columns become ISO strings exactly
@@ -140,4 +141,16 @@ export async function fetchMaritimeMovement(
 // this returns the full relevance-filtered set ordered by occurredAt desc).
 export async function fetchTopicIncidents(): Promise<unknown[]> {
   return loadIncidents();
+}
+
+// Mirror of GET /api/market-prices?group=… (routes/marketPrices.ts): the
+// energy/fertiliser reports render a Market Prices grid from these rows, so
+// the headless export must feed the same rows for preview==PDF parity.
+export async function fetchTopicMarketPrices(group: string): Promise<unknown[]> {
+  const rows = await db
+    .select()
+    .from(marketPricesTable)
+    .where(eq(marketPricesTable.group, group))
+    .orderBy(desc(marketPricesTable.group));
+  return asJson<unknown[]>(rows);
 }

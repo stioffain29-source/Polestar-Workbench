@@ -53,12 +53,15 @@ import {
 } from "@/lib/draftReportProse";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
-import { filterTopicReportIncidents } from "@/lib/topicFastFacts";
+import { computeTopicFastFacts, filterTopicReportIncidents } from "@/lib/topicFastFacts";
 import {
   applyIncidentCurations,
   makeSectionGate,
   topicSectionKeys,
+  pruneTopicSectionOverrides,
+  PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
+  type FastFactOverride,
 } from "@/lib/topicSectionOverrides";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
@@ -73,6 +76,7 @@ import {
   FUEL_MARKET_DATA_SAMPLE,
   validateFuelHardNumbersJson,
   buildFuelWatchReportData,
+  toRenderableCard,
   buildHardNumbersFromForm,
   fuelMarketFormFromData,
   fuelMarketLatestDate,
@@ -274,12 +278,17 @@ export default function ReportEditor() {
       : primaryIncidents;
   }, [primaryTopic, secondaryTopic, primaryIncidents, secondaryIncidents]);
 
-  const isEnergyReport = activeTopic === "energy";
-  const energyMarketParams = { group: "energy" };
-  const { data: energyMarketPrices = [] } = useListMarketPrices(energyMarketParams, {
+  // Market Prices rows render on energy AND fertiliser reports; fetch the
+  // matching commodity group so the override UI and preview/PDF share rows.
+  const marketPriceGroup =
+    activeTopic === "energy" || activeTopic === "fertiliser"
+      ? activeTopic
+      : undefined;
+  const marketPriceParams = { group: marketPriceGroup ?? "energy" };
+  const { data: marketPriceRows = [] } = useListMarketPrices(marketPriceParams, {
     query: {
-      enabled: isEnergyReport,
-      queryKey: getListMarketPricesQueryKey(energyMarketParams),
+      enabled: !!marketPriceGroup,
+      queryKey: getListMarketPricesQueryKey(marketPriceParams),
     },
   });
 
@@ -409,6 +418,83 @@ export default function ReportEditor() {
 
   const sectionGate = makeSectionGate(sectionOverrides.hiddenSections);
   const hiddenSections = sectionOverrides.hiddenSections ?? [];
+
+  // The AUTO Fast Facts tiles for the current topic, computed from the SAME
+  // builders the preview/PDF use, so the override editor lists exactly the
+  // tiles that render (matched by auto label). Empty when the report has no
+  // topic/date yet.
+  const autoFastFacts = useMemo<
+    Array<{ label: string; value: string; note?: string }>
+  >(() => {
+    if (!form.topic || !form.issueDate) return [];
+    try {
+      if (form.topic === "fuel") {
+        return buildFuelWatchReportData(
+          {
+            issueDate: form.issueDate,
+            hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+          },
+          incidentsForExport,
+        ).marketData.fastFactsCards.map(toRenderableCard);
+      }
+      if (form.topic === "cargo_watch") {
+        return buildCargoPatternModel(
+          incidentsForExport.map(
+            (i): CargoPatternModelInput => ({
+              id: i.id,
+              topic: i.topic,
+              title: i.title,
+              summary: i.summary ?? null,
+              source: i.source ?? null,
+              sourceUrl: i.sourceUrl ?? null,
+              location: i.location ?? null,
+              country: i.country ?? null,
+              severity: i.severity ?? null,
+              occurredAt: i.occurredAt,
+            }),
+          ),
+          { issueDate: form.issueDate },
+        ).fastFacts;
+      }
+      if (form.topic === "shipping") {
+        return buildShippingReportDataset(
+          incidentsForExport,
+          form.topic,
+          form.issueDate,
+          maritimeSecurityEvents,
+        ).fastFacts;
+      }
+      if (form.topic === "flashpoint" || form.topic === "protests") {
+        return buildFlashpointReportDataset(
+          incidentsForExport,
+          form.topic,
+          form.issueDate,
+        ).fastFacts;
+      }
+      if (form.topic === "conflict") {
+        return buildConflictReportDataset(
+          incidentsForExport,
+          form.topic,
+          form.issueDate,
+        ).fastFacts;
+      }
+      return computeTopicFastFacts({
+        topic: form.topic,
+        issueDate: form.issueDate,
+        incidents: incidentsForExport,
+        topicLabel: TOPIC_LABELS[form.topic] ?? form.topic,
+      });
+    } catch {
+      return [];
+    }
+  }, [
+    form.topic,
+    form.issueDate,
+    incidentsForExport,
+    maritimeSecurityEvents,
+    hardNumbersEdited,
+    report,
+  ]);
 
   // Full deduplicated cargo register (the Workbench-only companion to the PDF's
   // curated Selected Incidents), exported to CSV on demand. Built from the SAME
@@ -794,6 +880,7 @@ export default function ReportEditor() {
           filename,
           aiProseSections,
           hiddenSections,
+          sectionOverrides,
         );
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(
@@ -805,6 +892,7 @@ export default function ReportEditor() {
           effectiveSummaries,
           aiProseSections,
           hiddenSections,
+          sectionOverrides,
         );
       } else if (form.topic === "conflict") {
         await exportConflictReportPdf(
@@ -815,6 +903,7 @@ export default function ReportEditor() {
           effectiveSummaries,
           aiProseSections,
           hiddenSections,
+          sectionOverrides,
         );
       } else {
         const { exportTopicReportPdf } = await import("@/lib/exportTopicReportPdf");
@@ -830,9 +919,10 @@ export default function ReportEditor() {
             allowMissingMarketData: allow,
             incidentSummaries: effectiveSummaries,
             aiProse: aiProseSections,
-            marketPrices: energyMarketPrices,
+            marketPrices: marketPriceRows,
             includeFullAnnex,
             hiddenSections,
+            sectionOverrides,
           },
         );
       }
@@ -1198,18 +1288,13 @@ export default function ReportEditor() {
     // Durable layout controls persist verbatim (null when empty so the column
     // clears). form has no override keys, so this is additive to {...form}.
     {
-      const hs = sectionOverrides.hiddenSections ?? [];
-      const ex = sectionOverrides.excludedIncidentIds ?? [];
-      const dm = sectionOverrides.severityDemotions ?? {};
-      const empty =
-        hs.length === 0 && ex.length === 0 && Object.keys(dm).length === 0;
-      payload.sectionOverrides = empty
-        ? null
-        : ({
-            ...(hs.length ? { hiddenSections: hs } : {}),
-            ...(ex.length ? { excludedIncidentIds: ex } : {}),
-            ...(Object.keys(dm).length ? { severityDemotions: dm } : {}),
-          } as NonNullable<ReportUpdate["sectionOverrides"]>);
+      // Prune blank entries (a cleared override reverts to auto and is not
+      // persisted) so the stored jsonb holds only genuine overrides.
+      const pruned = pruneTopicSectionOverrides(sectionOverrides);
+      payload.sectionOverrides =
+        Object.keys(pruned).length === 0
+          ? null
+          : (pruned as NonNullable<ReportUpdate["sectionOverrides"]>);
     }
     if (form.topic === "fuel") {
       if (showFuelJson) {
@@ -1656,6 +1741,155 @@ export default function ReportEditor() {
               })}
             </div>
           </div>
+
+          {/* Per-tile Fast Facts overrides. Keyed by the tile's AUTO label so
+              a saved override re-attaches to the same tile as its computed
+              value changes week to week. Blank field = keep the auto text;
+              clearing every field reverts the tile fully to auto. Applied
+              identically in the preview AND the PDF exporters. */}
+          {autoFastFacts.length > 0 && (
+            <div className="border-t border-border pt-3 mt-1">
+              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
+                Fast Facts overrides
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Blank fields keep the computed value. Clear all three to revert
+                a tile to auto.
+              </p>
+              <div className="flex flex-col gap-2">
+                {autoFastFacts.map((card) => {
+                  const ov: FastFactOverride =
+                    sectionOverrides.fastFactOverrides?.[card.label] ?? {};
+                  const setF = (field: keyof FastFactOverride, v: string) =>
+                    setSectionOverrides((prev) => ({
+                      ...prev,
+                      fastFactOverrides: {
+                        ...(prev.fastFactOverrides ?? {}),
+                        [card.label]: {
+                          ...(prev.fastFactOverrides?.[card.label] ?? {}),
+                          [field]: v,
+                        },
+                      },
+                    }));
+                  return (
+                    <div
+                      key={card.label}
+                      className="border border-border rounded-sm p-2"
+                    >
+                      <div className="text-[11px] text-muted-foreground mb-1.5">
+                        {card.label} — auto: {card.value}
+                        {card.note ? ` · ${card.note}` : ""}
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <Input
+                          placeholder="Label"
+                          value={ov.label ?? ""}
+                          onChange={(e) => setF("label", e.target.value)}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Value"
+                          value={ov.value ?? ""}
+                          onChange={(e) => setF("value", e.target.value)}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Note"
+                          value={ov.note ?? ""}
+                          onChange={(e) => setF("note", e.target.value)}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fuel Watch: the Gulf & Hormuz Chokepoint Watch "read" paragraph
+              is owner-editable (blank = live auto text). Preview and PDF pick
+              the override through the same pickRead call. */}
+          {form.topic === "fuel" && (
+            <Field label="Gulf & Hormuz Chokepoint Watch — Read (blank = auto)">
+              <Textarea
+                rows={3}
+                value={sectionOverrides.panelReads?.[PANEL_READ_GULF_HORMUZ] ?? ""}
+                onChange={(e) =>
+                  setSectionOverrides((prev) => ({
+                    ...prev,
+                    panelReads: {
+                      ...(prev.panelReads ?? {}),
+                      [PANEL_READ_GULF_HORMUZ]: e.target.value,
+                    },
+                  }))
+                }
+                className="rounded-sm"
+              />
+            </Field>
+          )}
+
+          {/* Energy/fertiliser: Market Prices row overrides. Value must be numeric (the
+              card formats numbers); a non-numeric value is ignored at render.
+              Blank = live FRED value. */}
+          {(form.topic === "energy" || form.topic === "fertiliser") &&
+            marketPriceRows.length > 0 && (
+            <div className="border-t border-border pt-3 mt-1">
+              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
+                Market Prices overrides
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Blank keeps the live value. Value must be a number; the change
+                text is free-form.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {[...marketPriceRows]
+                  .sort((a, b) => a.label.localeCompare(b.label))
+                  .map((r) => {
+                    const k = `${r.group}:${r.key}`;
+                    const ov = sectionOverrides.marketPriceOverrides?.[k] ?? {};
+                    const setM = (field: "value" | "change", v: string) =>
+                      setSectionOverrides((prev) => ({
+                        ...prev,
+                        marketPriceOverrides: {
+                          ...(prev.marketPriceOverrides ?? {}),
+                          [k]: {
+                            ...(prev.marketPriceOverrides?.[k] ?? {}),
+                            [field]: v,
+                          },
+                        },
+                      }));
+                    return (
+                      <div
+                        key={k}
+                        className="grid grid-cols-[1fr_110px_110px] gap-1.5 items-center"
+                      >
+                        <div className="text-[12px] text-foreground min-w-0 truncate">
+                          {r.label}
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · auto {r.value}
+                            {r.change ? ` (${r.change})` : ""}
+                          </span>
+                        </div>
+                        <Input
+                          placeholder="Value"
+                          value={ov.value ?? ""}
+                          onChange={(e) => setM("value", e.target.value)}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Change"
+                          value={ov.change ?? ""}
+                          onChange={(e) => setM("change", e.target.value)}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           {curationPool.length > 0 && (
             <div className="border-t border-border pt-3 mt-1">
@@ -2532,6 +2766,7 @@ export default function ReportEditor() {
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
               hiddenSections={hiddenSections}
+              sectionOverrides={sectionOverrides}
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
@@ -2539,6 +2774,7 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               aiProse={aiProseSections}
               hiddenSections={hiddenSections}
+              sectionOverrides={sectionOverrides}
             />
           ) : form.topic === "conflict" ? (
             <ConflictReportPreview
@@ -2548,6 +2784,7 @@ export default function ReportEditor() {
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
               hiddenSections={hiddenSections}
+              sectionOverrides={sectionOverrides}
             />
           ) : form.topic === "cargo_watch" ? (
             <CargoReportPreview
@@ -2560,6 +2797,7 @@ export default function ReportEditor() {
               aiProse={aiProseSections}
               includeFullAnnex={includeFullAnnex}
               hiddenSections={hiddenSections}
+              sectionOverrides={sectionOverrides}
             />
           ) : (
             <ReportPreview
@@ -2570,8 +2808,9 @@ export default function ReportEditor() {
               incidents={incidentsForExport}
               incidentSummaries={effectiveSummaries}
               aiProse={aiProseSections}
-              marketPrices={energyMarketPrices}
+              marketPrices={marketPriceRows}
               hiddenSections={hiddenSections}
+              sectionOverrides={sectionOverrides}
             />
           )}
         </div>

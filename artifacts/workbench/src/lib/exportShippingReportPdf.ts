@@ -37,7 +37,11 @@ import {
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
-import { makeSectionGate } from "./topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "./topicSectionOverrides";
 import {
   resolveSimpleProse,
   stableDraftTopicReportProse,
@@ -922,6 +926,7 @@ export async function exportShippingReportPdf(
   incidentSummaries: Record<string, string> = {},
   aiProse?: TopicAiProse | null,
   hiddenSections?: string[],
+  sectionOverrides?: TopicSectionOverrides | null,
 ): Promise<void> {
   const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
@@ -1000,7 +1005,10 @@ export async function exportShippingReportPdf(
 
   if (show("fast-facts")) {
     drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(ctx, ds.fastFacts);
+    drawFastFactsKpiCards(
+      ctx,
+      applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+    );
   }
 
   // Chokepoint / Route Read — prose leads the chokepoint table.

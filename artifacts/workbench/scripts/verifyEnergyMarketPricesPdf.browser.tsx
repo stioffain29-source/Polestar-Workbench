@@ -29,6 +29,7 @@ interface VerifyData {
   };
   incidents: unknown[];
   marketPrices: unknown[];
+  sectionOverrides?: unknown;
 }
 
 declare global {
@@ -53,15 +54,19 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
   (jsPDF as unknown as { API: { save: (f: string) => jsPDF } }).API.save =
     capture;
 
-  const { report, incidents, marketPrices } = window.__VERIFY_DATA__;
+  const { report, incidents, marketPrices, sectionOverrides } =
+    window.__VERIFY_DATA__;
   let err: string | null = null;
   try {
     await exportTopicReportPdf(
       report as Parameters<typeof exportTopicReportPdf>[0],
       incidents as Parameters<typeof exportTopicReportPdf>[1],
       TOPIC_LABELS,
-      "energy_market_prices_verify.pdf",
-      { marketPrices: marketPrices as Parameters<typeof exportTopicReportPdf>[4]["marketPrices"] },
+      "market_prices_verify.pdf",
+      {
+        marketPrices: marketPrices as Parameters<typeof exportTopicReportPdf>[4]["marketPrices"],
+        sectionOverrides: sectionOverrides as Parameters<typeof exportTopicReportPdf>[4]["sectionOverrides"],
+      },
     );
   } catch (e) {
     err = (e as Error)?.stack || String(e);

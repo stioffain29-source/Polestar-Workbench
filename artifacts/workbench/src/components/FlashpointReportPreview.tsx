@@ -2,7 +2,11 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
-import { makeSectionGate } from "@/lib/topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
@@ -385,11 +389,13 @@ export default function FlashpointReportPreview({
   incidents,
   aiProse,
   hiddenSections,
+  sectionOverrides,
 }: {
   report: FlashpointPreviewReport;
   incidents: FlashpointReportIncident[];
   aiProse?: TopicAiProse | null;
   hiddenSections?: string[];
+  sectionOverrides?: TopicSectionOverrides | null;
 }) {
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "flashpoint";
@@ -459,7 +465,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={ds.fastFacts} />
+          <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
         </Section>
 
         <Section hidden={!show("activism")} title="Activism and Protest Read">

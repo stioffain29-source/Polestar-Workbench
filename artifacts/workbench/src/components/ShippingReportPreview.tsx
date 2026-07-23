@@ -1,4 +1,8 @@
-import { makeSectionGate } from "@/lib/topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
@@ -656,6 +660,7 @@ export default function ShippingReportPreview({
   incidentSummaries = {},
   aiProse,
   hiddenSections,
+  sectionOverrides,
 }: {
   report: ShippingPreviewReport;
   incidents: ShippingReportIncident[];
@@ -664,6 +669,7 @@ export default function ShippingReportPreview({
   incidentSummaries?: Record<string, string>;
   aiProse?: TopicAiProse | null;
   hiddenSections?: string[];
+  sectionOverrides?: TopicSectionOverrides | null;
 }) {
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "shipping";
@@ -807,7 +813,7 @@ export default function ShippingReportPreview({
         )}
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={ds.fastFacts} />
+          <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
         </Section>
 
         <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">

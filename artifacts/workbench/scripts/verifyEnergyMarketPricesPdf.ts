@@ -26,22 +26,28 @@ const WORKBENCH = resolve(HERE, "..");
 const SRC = resolve(WORKBENCH, "src");
 const ASSETS = resolve(WORKBENCH, "..", "..", "attached_assets");
 
-async function fetchEnergyReportId(): Promise<number> {
+// Topic under test — energy by default; fertiliser shares the exact same
+// Market Prices branch (grid + overrides), so the harness covers both.
+const TOPIC = (process.env.TOPIC ?? "energy").toLowerCase();
+// Optional analyst overrides to exercise (JSON TopicSectionOverrides).
+const OVERRIDES = process.env.OVERRIDES ? JSON.parse(process.env.OVERRIDES) : undefined;
+
+async function fetchLatestReportId(): Promise<number> {
   const [row] = await db
     .select({ id: reportsTable.id })
     .from(reportsTable)
-    .where(eq(reportsTable.topic, "energy"))
+    .where(eq(reportsTable.topic, TOPIC))
     .orderBy(desc(reportsTable.id))
     .limit(1);
-  if (!row) throw new Error("No energy report found in the database.");
+  if (!row) throw new Error(`No ${TOPIC} report found in the database.`);
   return row.id;
 }
 
-async function fetchEnergyMarketPrices(): Promise<unknown[]> {
+async function fetchGroupMarketPrices(): Promise<unknown[]> {
   const rows = await db
     .select()
     .from(marketPricesTable)
-    .where(eq(marketPricesTable.group, "energy"))
+    .where(eq(marketPricesTable.group, TOPIC))
     .orderBy(asc(marketPricesTable.group), asc(marketPricesTable.key));
   return JSON.parse(JSON.stringify(rows));
 }
@@ -115,16 +121,17 @@ async function bundleBrowser(): Promise<string> {
 }
 
 async function main() {
-  const reportId = await fetchEnergyReportId();
+  const reportId = await fetchLatestReportId();
   const report = await fetchTopicReport(reportId);
   const incidents = await fetchTopicIncidents();
-  const marketPrices = await fetchEnergyMarketPrices();
+  const marketPrices = await fetchGroupMarketPrices();
   console.log(
-    `Energy report ${reportId}; incidents=${incidents.length}; energy market prices=${marketPrices.length}`,
+    `${TOPIC} report ${reportId}; incidents=${incidents.length}; ${TOPIC} market prices=${marketPrices.length}`,
   );
   if (marketPrices.length === 0) {
-    throw new Error("No energy market prices — cannot verify card rendering.");
+    throw new Error(`No ${TOPIC} market prices — cannot verify card rendering.`);
   }
+  if (OVERRIDES) console.log(`Applying overrides: ${JSON.stringify(OVERRIDES)}`);
 
   const bundle = await bundleBrowser();
   console.log(`Bundled browser harness (${(bundle.length / 1024).toFixed(0)} KB).`);
@@ -146,7 +153,7 @@ async function main() {
         (window as unknown as { __VERIFY_DATA__: unknown }).__VERIFY_DATA__ = data;
         return await (window as unknown as { __runVerify__: () => Promise<string> }).__runVerify__();
       },
-      [{ report, incidents, marketPrices }] as const,
+      [{ report, incidents, marketPrices, sectionOverrides: OVERRIDES }] as const,
     );
     const result = JSON.parse(resultJson) as {
       saveCalls: number;
@@ -156,7 +163,11 @@ async function main() {
     console.log(`saveCalls=${result.saveCalls}`);
     if (result.err) console.log("export error:\n" + result.err);
     if (!result.base64) throw new Error("export produced no PDF bytes");
-    const out = resolve(WORKBENCH, "screenshots", "EnergyWatch_MarketPrices_verify.pdf");
+    const out = resolve(
+      WORKBENCH,
+      "screenshots",
+      `${TOPIC === "energy" ? "EnergyWatch" : "FertiliserWatch"}_MarketPrices_verify.pdf`,
+    );
     writeFileSync(out, Buffer.from(result.base64, "base64"));
     console.log(`Wrote ${out} (${(result.base64.length * 0.75 / 1024).toFixed(0)} KB)`);
   } finally {

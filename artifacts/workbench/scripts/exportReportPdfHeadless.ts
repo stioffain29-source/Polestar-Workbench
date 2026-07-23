@@ -106,6 +106,13 @@ async function main() {
   // to today and clamps to the latest record, so a verification run that wants
   // numeric parity with the on-screen board passes the editor's effective date.
   const issueDateOverride = process.env.ISSUE_DATE?.trim();
+  // Analyst overrides persisted on the report (hidden sections, Fast Facts
+  // tile overrides, panel reads, market-price rows) — passed through so the
+  // headless export mirrors the saved report exactly (preview == PDF).
+  const sectionOverrides =
+    (report as { sectionOverrides?: import("../src/lib/topicSectionOverrides").TopicSectionOverrides | null })
+      .sectionOverrides ?? null;
+  const hiddenSections = sectionOverrides?.hiddenSections ?? undefined;
   const data = {
     title: report.title,
     topic: report.topic,
@@ -123,38 +130,12 @@ async function main() {
 
   if (TOPIC === "shipping") {
     const { exportShippingReportPdf } = await import("../src/lib/exportShippingReportPdf");
-    const { buildGatewayFlow, RED_SEA_GATEWAYS } = await import(
-      "../src/lib/maritimeDirectionalFlow"
-    );
     // Load live movement so the headless PDF faithfully reproduces the in-app
     // shipping export. The Maritime Intelligence board reads the global movement
     // pool (latest snapshot per theatre), so keep the broad load for it.
     const movement = (await fetchMaritimeMovement(undefined, 200).catch(
       () => [],
     )) as Parameters<typeof exportShippingReportPdf>[3];
-    // The directional-flow panel reads PER-GATEWAY histories with the SAME params
-    // the monitor + report editor use (theatre-scoped, limit 40) so the headless
-    // PDF cannot diverge from the verified on-screen surfaces in a populated DB.
-    const fetchGatewayRows = async (theatre: string) =>
-      (await fetchMaritimeMovement(theatre, 40).catch(() => [])) as Parameters<
-        typeof buildGatewayFlow
-      >[0];
-    const [babRows, suezRows] = await Promise.all([
-      fetchGatewayRows(RED_SEA_GATEWAYS[0].theatre),
-      fetchGatewayRows(RED_SEA_GATEWAYS[1].theatre),
-    ]);
-    const redSeaFlow = [
-      buildGatewayFlow(
-        babRows,
-        RED_SEA_GATEWAYS[0].theatre,
-        RED_SEA_GATEWAYS[0].gate,
-      ),
-      buildGatewayFlow(
-        suezRows,
-        RED_SEA_GATEWAYS[1].theatre,
-        RED_SEA_GATEWAYS[1].gate,
-      ),
-    ];
     await exportShippingReportPdf(
       data as Parameters<typeof exportShippingReportPdf>[0],
       incidents as Parameters<typeof exportShippingReportPdf>[1],
@@ -162,20 +143,41 @@ async function main() {
       movement ?? [],
       [],
       {},
-      redSeaFlow,
+      undefined,
+      hiddenSections,
+      sectionOverrides,
     );
   } else if (TOPIC === "flashpoint" || TOPIC === "protests") {
     const { exportFlashpointReportPdf } = await import("../src/lib/exportFlashpointReportPdf");
-    await exportFlashpointReportPdf(data as Parameters<typeof exportFlashpointReportPdf>[0], incidents as Parameters<typeof exportFlashpointReportPdf>[1], OUT);
+    await exportFlashpointReportPdf(
+      data as Parameters<typeof exportFlashpointReportPdf>[0],
+      incidents as Parameters<typeof exportFlashpointReportPdf>[1],
+      OUT,
+      undefined,
+      hiddenSections,
+      sectionOverrides,
+    );
   } else {
     const { exportTopicReportPdf } = await import("../src/lib/exportTopicReportPdf");
     const { TOPIC_LABELS } = await import("../src/lib/topics");
+    // Energy/fertiliser reports render a Market Prices grid; feed it the same
+    // rows the API serves so market-price overrides are exercised headlessly.
+    let marketPrices: unknown[] | undefined;
+    if (TOPIC === "energy" || TOPIC === "fertiliser") {
+      const { fetchTopicMarketPrices } = await import("./topicReportData");
+      marketPrices = await fetchTopicMarketPrices(TOPIC);
+    }
     await exportTopicReportPdf(
       data as Parameters<typeof exportTopicReportPdf>[0],
       incidents as Parameters<typeof exportTopicReportPdf>[1],
       TOPIC_LABELS,
       OUT,
-      { allowMissingMarketData: true },
+      {
+        allowMissingMarketData: true,
+        hiddenSections,
+        sectionOverrides,
+        marketPrices: marketPrices as never,
+      },
     );
   }
   console.log(`Wrote ${OUT}`);

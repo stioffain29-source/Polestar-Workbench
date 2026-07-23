@@ -512,10 +512,26 @@ export interface FuelHardNumbers {
 
 export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: string};
 
+export type CountryReportSectionOverridesFastFactOverrides = {[key: string]: {
+  label?: string;
+  value?: string;
+  note?: string;
+}};
+
+export type CountryReportSectionOverridesPanelReads = {[key: string]: string};
+
+export type CountryReportSectionOverridesMarketPriceOverrides = {[key: string]: {
+  value?: string;
+  change?: string;
+}};
+
 export interface CountryReportSectionOverrides {
   hiddenSections?: string[];
   excludedIncidentIds?: string[];
   severityDemotions?: CountryReportSectionOverridesSeverityDemotions;
+  fastFactOverrides?: CountryReportSectionOverridesFastFactOverrides;
+  panelReads?: CountryReportSectionOverridesPanelReads;
+  marketPriceOverrides?: CountryReportSectionOverridesMarketPriceOverrides;
 }
 
 export interface Report {

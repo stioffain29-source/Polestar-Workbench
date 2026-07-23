@@ -5,10 +5,16 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryReportSectionOverridesFastFactOverrides } from './countryReportSectionOverridesFastFactOverrides';
+import type { CountryReportSectionOverridesMarketPriceOverrides } from './countryReportSectionOverridesMarketPriceOverrides';
+import type { CountryReportSectionOverridesPanelReads } from './countryReportSectionOverridesPanelReads';
 import type { CountryReportSectionOverridesSeverityDemotions } from './countryReportSectionOverridesSeverityDemotions';
 
 export interface CountryReportSectionOverrides {
   hiddenSections?: string[];
   excludedIncidentIds?: string[];
   severityDemotions?: CountryReportSectionOverridesSeverityDemotions;
+  fastFactOverrides?: CountryReportSectionOverridesFastFactOverrides;
+  panelReads?: CountryReportSectionOverridesPanelReads;
+  marketPriceOverrides?: CountryReportSectionOverridesMarketPriceOverrides;
 }

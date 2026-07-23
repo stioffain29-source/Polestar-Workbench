@@ -2,7 +2,11 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
-import { makeSectionGate } from "@/lib/topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { pickRead } from "@/lib/pickRead";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
@@ -390,6 +394,7 @@ export default function ConflictReportPreview({
   incidentSummaries = {},
   aiProse,
   hiddenSections,
+  sectionOverrides,
 }: {
   report: ConflictPreviewReport;
   incidents: ConflictReportIncident[];
@@ -397,6 +402,7 @@ export default function ConflictReportPreview({
   incidentSummaries?: Record<string, string>;
   aiProse?: ConflictAiProse | null;
   hiddenSections?: string[];
+  sectionOverrides?: TopicSectionOverrides | null;
 }) {
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "conflict";
@@ -528,7 +534,7 @@ export default function ConflictReportPreview({
         </Section>
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={ds.fastFacts} />
+          <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
         </Section>
 
         <Section hidden={!show("top-activity-areas")} title="Top Activity Areas">

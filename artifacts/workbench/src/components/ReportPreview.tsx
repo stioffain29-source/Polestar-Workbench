@@ -1,4 +1,10 @@
-import { makeSectionGate } from "@/lib/topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  applyMarketPriceOverrides,
+  PANEL_READ_GULF_HORMUZ,
+  type TopicSectionOverrides,
+} from "@/lib/topicSectionOverrides";
 import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
@@ -650,6 +656,7 @@ export default function ReportPreview({
   aiProse,
   marketPrices,
   hiddenSections,
+  sectionOverrides,
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
@@ -657,8 +664,11 @@ export default function ReportPreview({
   aiProse?: TopicAiProse | null;
   marketPrices?: MarketPrice[];
   hiddenSections?: string[];
+  sectionOverrides?: TopicSectionOverrides | null;
 }) {
   const show = makeSectionGate(hiddenSections);
+  const ffOverrides = sectionOverrides?.fastFactOverrides;
+  const panelReads = sectionOverrides?.panelReads ?? {};
   void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
     ? resolveReportTitle(report.topic, report.title)
@@ -941,7 +951,7 @@ export default function ReportPreview({
                 </div>
               )}
               {fuelData.marketData.fastFactsCards.length > 0 && (
-                <FastFactsGrid cards={fuelData.marketData.fastFactsCards.map(toRenderableCard)} />
+                <FastFactsGrid cards={applyFastFactOverrides(fuelData.marketData.fastFactsCards.map(toRenderableCard), ffOverrides)} />
               )}
               {fuelData.validation.warnings.map((w, i) => (
                 <p
@@ -980,7 +990,7 @@ export default function ReportPreview({
             <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={pickRead(report.fuelRegionalHighlights, fuelData.incidentData.regionalHighlights)} />
             {fuelData.incidentData.gulfChokepointWatch && (
               <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
-                <Paragraphs text={fuelData.incidentData.gulfChokepointWatch.read} />
+                <Paragraphs text={pickRead(panelReads[PANEL_READ_GULF_HORMUZ], fuelData.incidentData.gulfChokepointWatch.read)} />
                 {fuelData.incidentData.gulfChokepointWatch.currentItemLines.length > 0 && (
                   <ul
                     className="list-disc pl-5 space-y-1.5"
@@ -1029,12 +1039,12 @@ export default function ReportPreview({
         ) : (
           <>
             <Section hidden={!show("fast-facts")} title="Fast Facts">
-              <FastFactsGrid cards={fastFacts} />
+              <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} />
             </Section>
 
-            {report.topic === "energy" && (
+            {(report.topic === "energy" || report.topic === "fertiliser") && (
               <Section hidden={!show("market-prices")} title="Market Prices">
-                <MarketPricesReportSection rows={marketPrices ?? []} />
+                <MarketPricesReportSection rows={applyMarketPriceOverrides(marketPrices ?? [], sectionOverrides?.marketPriceOverrides)} />
               </Section>
             )}
 

@@ -35,7 +35,11 @@ import {
 import { TOPIC_COVER_URLS } from "./coverImages";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
-import { makeSectionGate } from "./topicSectionOverrides";
+import {
+  makeSectionGate,
+  applyFastFactOverrides,
+  type TopicSectionOverrides,
+} from "./topicSectionOverrides";
 import { aiOr, type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
@@ -536,6 +540,7 @@ export async function exportFlashpointReportPdf(
   filename: string,
   aiProse?: TopicAiProse | null,
   hiddenSections?: string[],
+  sectionOverrides?: TopicSectionOverrides | null,
 ): Promise<void> {
   const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
@@ -591,7 +596,10 @@ export async function exportFlashpointReportPdf(
 
   if (show("fast-facts")) {
     drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(ctx, ds.fastFacts);
+    drawFastFactsKpiCards(
+      ctx,
+      applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+    );
   }
 
   // Activism and Protest Read — prose leads the activism table.

@@ -268,7 +268,6 @@ describe("topic report — hidden sections & curated incidents disappear from th
         [],
         {},
         undefined,
-        null,
         hidden,
       );
 
