@@ -68,9 +68,17 @@ import {
   type GulfBulletOverride,
   type MarketOperatorRowOverride,
   orphanedFastFactOverrideKeys,
+  reattachGulfBulletOverride,
+  clearGulfBulletOverride,
+  reattachMarketOperatorOverride,
+  clearMarketOperatorOverride,
 } from "@/lib/topicSectionOverrides";
 import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
 import { OrphanSaveWarning } from "@/components/OrphanSaveWarning";
+import {
+  OrphanedGulfBulletsPanel,
+  OrphanedMarketOperatorPanel,
+} from "@/components/OrphanedFuelOverridesPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
@@ -1996,6 +2004,38 @@ export default function ReportEditor() {
             </div>
           )}
 
+          {/* Orphaned Gulf/Hormuz bullet overrides: saved edits keyed to an
+              auto line that no longer renders (the underlying incident title,
+              date wording or classification changed on a refresh). They no
+              longer apply anywhere; surface them so the owner can re-attach
+              the edit to a current bullet or clear it. Nothing is migrated
+              silently. */}
+          {form.topic === "fuel" && (
+            <OrphanedGulfBulletsPanel
+              autoLines={fuelOverridePanels?.gulfLines ?? []}
+              overrides={sectionOverrides.gulfBulletOverrides}
+              onReattach={(from, to) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  gulfBulletOverrides: reattachGulfBulletOverride(
+                    prev.gulfBulletOverrides,
+                    from,
+                    to,
+                  ),
+                }))
+              }
+              onClear={(key) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  gulfBulletOverrides: clearGulfBulletOverride(
+                    prev.gulfBulletOverrides,
+                    key,
+                  ),
+                }))
+              }
+            />
+          )}
+
           {/* Fuel Watch: per-row overrides for the Market and Operator
               Responses table. Keyed by the AUTO row's date|actor|action so a
               saved override re-attaches to the same row. Uncheck to suppress;
@@ -2085,6 +2125,37 @@ export default function ReportEditor() {
                 })}
               </div>
             </div>
+          )}
+
+          {/* Orphaned Market and Operator Responses overrides: saved edits
+              keyed to a row whose date|actor|action key no longer matches any
+              current auto row. They no longer apply anywhere; surface them so
+              the owner can re-attach the edit to a current row or clear it.
+              Nothing is migrated silently. */}
+          {form.topic === "fuel" && (
+            <OrphanedMarketOperatorPanel
+              autoRows={fuelOverridePanels?.producerRows ?? []}
+              overrides={sectionOverrides.marketOperatorOverrides}
+              onReattach={(from, to) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  marketOperatorOverrides: reattachMarketOperatorOverride(
+                    prev.marketOperatorOverrides,
+                    from,
+                    to,
+                  ),
+                }))
+              }
+              onClear={(key) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  marketOperatorOverrides: clearMarketOperatorOverride(
+                    prev.marketOperatorOverrides,
+                    key,
+                  ),
+                }))
+              }
+            />
           )}
 
           {/* Energy/fertiliser: Market Prices row overrides. Value must be numeric (the

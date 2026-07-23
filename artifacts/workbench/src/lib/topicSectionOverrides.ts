@@ -196,6 +196,64 @@ export function clearFastFactOverride(
 }
 
 /**
+ * Find Gulf/Hormuz bullet override keys that no longer match any current AUTO
+ * line. Happens when the underlying incident title, date wording or
+ * classification changes on a data refresh: the saved override is still
+ * persisted but silently stops applying (applyGulfBulletOverrides matches by
+ * exact auto line). The editor surfaces these so the owner can re-attach the
+ * edit to a current bullet or clear it — nothing is migrated silently.
+ */
+export function orphanedGulfBulletOverrideKeys(
+  lines: ReadonlyArray<string>,
+  overrides: Record<string, GulfBulletOverride> | null | undefined,
+): string[] {
+  if (!overrides) return [];
+  const live = new Set(lines);
+  return Object.keys(overrides).filter((k) => !live.has(k));
+}
+
+/**
+ * Re-key a Gulf/Hormuz bullet override from an orphaned auto-line key to a
+ * current bullet's auto line. Pure/immutable. If the target bullet already
+ * has an override, the orphan's non-blank fields fill only the target's blank
+ * fields (existing owner edits on the target are never overwritten). Returns
+ * the input unchanged if the orphan key is absent or from === to.
+ */
+export function reattachGulfBulletOverride(
+  overrides: Record<string, GulfBulletOverride> | null | undefined,
+  from: string,
+  to: string,
+): Record<string, GulfBulletOverride> {
+  const src = overrides ?? {};
+  const orphan = src[from];
+  if (!orphan || from === to) return src;
+  const out: Record<string, GulfBulletOverride> = { ...src };
+  delete out[from];
+  const existing = out[to] ?? {};
+  out[to] = {
+    ...(existing.text?.trim()
+      ? { text: existing.text }
+      : orphan.text?.trim()
+        ? { text: orphan.text }
+        : {}),
+    ...(existing.suppressed || orphan.suppressed ? { suppressed: true } : {}),
+  };
+  return out;
+}
+
+/** Remove a Gulf/Hormuz bullet override entry entirely (clear an orphan). Pure. */
+export function clearGulfBulletOverride(
+  overrides: Record<string, GulfBulletOverride> | null | undefined,
+  key: string,
+): Record<string, GulfBulletOverride> {
+  const src = overrides ?? {};
+  if (!(key in src)) return src;
+  const out = { ...src };
+  delete out[key];
+  return out;
+}
+
+/**
  * Stable identity for a "Market and Operator Responses" row — derived from
  * the AUTO row's date, actor and action so a saved override re-attaches to
  * the same row even after the owner rewrites the displayed cells.
@@ -206,6 +264,71 @@ export function marketOperatorRowKey(row: {
   action: string;
 }): string {
   return `${row.date}|${row.actor}|${row.action}`;
+}
+
+/**
+ * Find Market and Operator Responses override keys that no longer match any
+ * current AUTO row (marketOperatorRowKey of date|actor|action). Happens when
+ * the underlying incident title, date wording or classification changes on a
+ * data refresh. The editor surfaces these so the owner can re-attach the edit
+ * to a current row or clear it — nothing is migrated silently.
+ */
+export function orphanedMarketOperatorOverrideKeys(
+  rows: ReadonlyArray<{ date: string; actor: string; action: string }>,
+  overrides: Record<string, MarketOperatorRowOverride> | null | undefined,
+): string[] {
+  if (!overrides) return [];
+  const live = new Set(rows.map((r) => marketOperatorRowKey(r)));
+  return Object.keys(overrides).filter((k) => !live.has(k));
+}
+
+/**
+ * Re-key a Market and Operator Responses override from an orphaned row key to
+ * a current row's marketOperatorRowKey. Pure/immutable. If the target row
+ * already has an override, the orphan's non-blank fields fill only the
+ * target's blank fields (existing owner edits on the target are never
+ * overwritten). Returns the input unchanged if the orphan key is absent or
+ * from === to.
+ */
+export function reattachMarketOperatorOverride(
+  overrides: Record<string, MarketOperatorRowOverride> | null | undefined,
+  from: string,
+  to: string,
+): Record<string, MarketOperatorRowOverride> {
+  const src = overrides ?? {};
+  const orphan = src[from];
+  if (!orphan || from === to) return src;
+  const out: Record<string, MarketOperatorRowOverride> = { ...src };
+  delete out[from];
+  const existing = out[to] ?? {};
+  const pick = (a?: string, b?: string) =>
+    a?.trim() ? a : b?.trim() ? b : undefined;
+  const actor = pick(existing.actor, orphan.actor);
+  const category = pick(existing.category, orphan.category);
+  const action = pick(existing.action, orphan.action);
+  const read = pick(existing.read, orphan.read);
+  const date = pick(existing.date, orphan.date);
+  out[to] = {
+    ...(actor ? { actor } : {}),
+    ...(category ? { category } : {}),
+    ...(action ? { action } : {}),
+    ...(read ? { read } : {}),
+    ...(date ? { date } : {}),
+    ...(existing.suppressed || orphan.suppressed ? { suppressed: true } : {}),
+  };
+  return out;
+}
+
+/** Remove a Market and Operator Responses override entry entirely. Pure. */
+export function clearMarketOperatorOverride(
+  overrides: Record<string, MarketOperatorRowOverride> | null | undefined,
+  key: string,
+): Record<string, MarketOperatorRowOverride> {
+  const src = overrides ?? {};
+  if (!(key in src)) return src;
+  const out = { ...src };
+  delete out[key];
+  return out;
 }
 
 /**
