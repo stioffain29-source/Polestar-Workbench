@@ -62,6 +62,8 @@ import {
   makeSectionGate,
   applyFastFactOverrides,
   applyMarketPriceOverrides,
+  applyGulfBulletOverrides,
+  applyMarketOperatorOverrides,
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
@@ -1085,29 +1087,38 @@ export async function exportTopicReportPdf(
     // screen == in-app PDF.
     if (show("gulf-hormuz") && fuelData.incidentData.gulfChokepointWatch) {
       const gulf = fuelData.incidentData.gulfChokepointWatch;
+      // Owner per-bullet overrides (rewrite/suppress; blank = auto) — the
+      // SAME applyGulfBulletOverrides call the preview uses, so screen == PDF.
+      const gbOverrides = options.sectionOverrides?.gulfBulletOverrides;
+      const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
+      const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
       drawSectionWithProse(
         ctx,
         "Gulf and Hormuz Chokepoint Watch",
         pickRead(panelReads[PANEL_READ_GULF_HORMUZ], gulf.read),
       );
-      if (gulf.currentItemLines.length > 0) {
-        renderProse(ctx, gulf.currentItemLines.map((l) => `\u2022  ${l}`).join("\n"));
+      if (currentLines.length > 0) {
+        renderProse(ctx, currentLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
-      if (gulf.standingNote && gulf.standingItemLines.length > 0) {
+      if (gulf.standingNote && standingLines.length > 0) {
         renderProse(ctx, gulf.standingNote);
-        renderProse(ctx, gulf.standingItemLines.map((l) => `\u2022  ${l}`).join("\n"));
+        renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
     }
-    if (show("producer-buyer") && fuelData.incidentData.producerBuyerActions.length > 0) {
+    // Owner per-row overrides (rewrite cells / suppress rows) — same
+    // applyMarketOperatorOverrides call as the preview, so screen == PDF.
+    // The section is omitted entirely when every row is suppressed.
+    const producerRows = applyMarketOperatorOverrides(
+      fuelData.incidentData.producerBuyerActions,
+      options.sectionOverrides?.marketOperatorOverrides,
+    );
+    if (show("producer-buyer") && producerRows.length > 0) {
       // Guard against an orphaned section heading: if there isn't room
       // for the heading + table header + a couple of rows, push the
       // whole block to the next page before drawing the heading.
       ensureSpace(ctx, 24 + 18 + 60);
       drawSectionHeading(ctx, "Market and Operator Responses");
-      drawProducerBuyerActionsTable(
-        ctx,
-        fuelData.incidentData.producerBuyerActions,
-      );
+      drawProducerBuyerActionsTable(ctx, producerRows);
     }
     if (show("what-matters")) {
       renderProseSection(

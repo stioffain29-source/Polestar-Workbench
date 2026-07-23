@@ -2,6 +2,8 @@ import {
   makeSectionGate,
   applyFastFactOverrides,
   applyMarketPriceOverrides,
+  applyGulfBulletOverrides,
+  applyMarketOperatorOverrides,
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
@@ -988,35 +990,41 @@ export default function ReportPreview({
             <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)} />
             <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={pickRead(report.fuelOperationalRead, fuelData.incidentData.operationalRead)} />
             <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={pickRead(report.fuelRegionalHighlights, fuelData.incidentData.regionalHighlights)} />
-            {fuelData.incidentData.gulfChokepointWatch && (
-              <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
-                <Paragraphs text={pickRead(panelReads[PANEL_READ_GULF_HORMUZ], fuelData.incidentData.gulfChokepointWatch.read)} />
-                {fuelData.incidentData.gulfChokepointWatch.currentItemLines.length > 0 && (
-                  <ul
-                    className="list-disc pl-5 space-y-1.5"
-                    style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-                  >
-                    {fuelData.incidentData.gulfChokepointWatch.currentItemLines.map((line, i) => (
-                      <li key={i} className="text-[14px] leading-[1.6] font-light">
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {fuelData.incidentData.gulfChokepointWatch.standingNote &&
-                  fuelData.incidentData.gulfChokepointWatch.standingItemLines.length > 0 && (
+            {fuelData.incidentData.gulfChokepointWatch && (() => {
+              // Owner per-bullet overrides (rewrite/suppress; blank = auto),
+              // applied identically in the PDF exporter so preview == PDF.
+              const gulf = fuelData.incidentData.gulfChokepointWatch;
+              const gbOverrides = sectionOverrides?.gulfBulletOverrides;
+              const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
+              const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
+              return (
+                <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
+                  <Paragraphs text={pickRead(panelReads[PANEL_READ_GULF_HORMUZ], gulf.read)} />
+                  {currentLines.length > 0 && (
+                    <ul
+                      className="list-disc pl-5 space-y-1.5"
+                      style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+                    >
+                      {currentLines.map((line, i) => (
+                        <li key={i} className="text-[14px] leading-[1.6] font-light">
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {gulf.standingNote && standingLines.length > 0 && (
                     <>
                       <div
                         className="text-[13px] leading-[1.5] font-medium mt-3 mb-1"
                         style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
                       >
-                        {fuelData.incidentData.gulfChokepointWatch.standingNote}
+                        {gulf.standingNote}
                       </div>
                       <ul
                         className="list-disc pl-5 space-y-1.5"
                         style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
                       >
-                        {fuelData.incidentData.gulfChokepointWatch.standingItemLines.map((line, i) => (
+                        {standingLines.map((line, i) => (
                           <li key={i} className="text-[14px] leading-[1.6] font-light">
                             {line}
                           </li>
@@ -1024,13 +1032,22 @@ export default function ReportPreview({
                       </ul>
                     </>
                   )}
-              </Section>
-            )}
-            {fuelData.incidentData.producerBuyerActions.length > 0 && (
-              <Section hidden={!show("producer-buyer")} title="Market and Operator Responses">
-                <ProducerActionsTable rows={fuelData.incidentData.producerBuyerActions} />
-              </Section>
-            )}
+                </Section>
+              );
+            })()}
+            {(() => {
+              // Owner per-row overrides (rewrite cells / suppress rows). The
+              // section is omitted entirely when every row is suppressed.
+              const producerRows = applyMarketOperatorOverrides(
+                fuelData.incidentData.producerBuyerActions,
+                sectionOverrides?.marketOperatorOverrides,
+              );
+              return producerRows.length > 0 ? (
+                <Section hidden={!show("producer-buyer")} title="Market and Operator Responses">
+                  <ProducerActionsTable rows={producerRows} />
+                </Section>
+              ) : null;
+            })()}
             <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)} />
             <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelData.narrativeData.implications} />
             <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />

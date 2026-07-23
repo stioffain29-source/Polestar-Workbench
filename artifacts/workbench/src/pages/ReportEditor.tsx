@@ -60,10 +60,13 @@ import {
   topicSectionKeys,
   pruneTopicSectionOverrides,
   PANEL_READ_GULF_HORMUZ,
+  marketOperatorRowKey,
   type TopicSectionOverrides,
   type FastFactOverride,
   reattachFastFactOverride,
   clearFastFactOverride,
+  type GulfBulletOverride,
+  type MarketOperatorRowOverride,
 } from "@/lib/topicSectionOverrides";
 import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
@@ -87,6 +90,7 @@ import {
   EMPTY_FUEL_MARKET_FORM,
   type FuelMarketFormState,
   type FuelMarketCardForm,
+  type ProducerBuyerActionRow,
 } from "@/lib/fuelWatchReport";
 
 const legacyExecSummaryStorageKey = (id: number) =>
@@ -498,6 +502,34 @@ export default function ReportEditor() {
     hardNumbersEdited,
     report,
   ]);
+
+  // The AUTO Gulf/Hormuz bullets and Market & Operator Responses rows for a
+  // fuel report, computed from the SAME canonical builder the preview/PDF
+  // use, so the override editor lists exactly the bullets/rows that render.
+  const fuelOverridePanels = useMemo<{
+    gulfLines: string[];
+    producerRows: ProducerBuyerActionRow[];
+  } | null>(() => {
+    if (form.topic !== "fuel" || !form.issueDate) return null;
+    try {
+      const d = buildFuelWatchReportData(
+        {
+          issueDate: form.issueDate,
+          hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+        },
+        incidentsForExport,
+      );
+      const gulf = d.incidentData.gulfChokepointWatch;
+      return {
+        gulfLines: gulf
+          ? [...gulf.currentItemLines, ...gulf.standingItemLines]
+          : [],
+        producerRows: d.incidentData.producerBuyerActions,
+      };
+    } catch {
+      return null;
+    }
+  }, [form.topic, form.issueDate, incidentsForExport, hardNumbersEdited, report]);
 
   // Full deduplicated cargo register (the Workbench-only companion to the PDF's
   // curated Selected Incidents), exported to CSV on demand. Built from the SAME
@@ -1859,6 +1891,156 @@ export default function ReportEditor() {
                 className="rounded-sm"
               />
             </Field>
+          )}
+
+          {/* Fuel Watch: per-bullet overrides for the Gulf & Hormuz Chokepoint
+              Watch lists. Keyed by the bullet's AUTO line so a saved override
+              re-attaches to the same bullet. Uncheck to suppress; non-blank
+              text replaces the line; blank = auto. Applied identically in the
+              preview AND the PDF exporter. */}
+          {form.topic === "fuel" &&
+            (fuelOverridePanels?.gulfLines.length ?? 0) > 0 && (
+            <div className="border-t border-border pt-3 mt-1">
+              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
+                Gulf &amp; Hormuz bullet overrides
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Uncheck to remove a bullet. Blank text keeps the auto line.
+              </p>
+              <div className="flex flex-col gap-2">
+                {fuelOverridePanels!.gulfLines.map((line) => {
+                  const ov: GulfBulletOverride =
+                    sectionOverrides.gulfBulletOverrides?.[line] ?? {};
+                  const setG = (patch: Partial<GulfBulletOverride>) =>
+                    setSectionOverrides((prev) => ({
+                      ...prev,
+                      gulfBulletOverrides: {
+                        ...(prev.gulfBulletOverrides ?? {}),
+                        [line]: {
+                          ...(prev.gulfBulletOverrides?.[line] ?? {}),
+                          ...patch,
+                        },
+                      },
+                    }));
+                  return (
+                    <div
+                      key={line}
+                      className="border border-border rounded-sm p-2"
+                      style={{ opacity: ov.suppressed ? 0.5 : 1 }}
+                    >
+                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground mb-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!ov.suppressed}
+                          className="mt-0.5"
+                          onChange={(e) =>
+                            setG({ suppressed: !e.target.checked })
+                          }
+                        />
+                        <span>{line}</span>
+                      </label>
+                      <Input
+                        placeholder="Replacement text (blank = auto)"
+                        value={ov.text ?? ""}
+                        onChange={(e) => setG({ text: e.target.value })}
+                        className="rounded-sm text-[12px] h-8"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fuel Watch: per-row overrides for the Market and Operator
+              Responses table. Keyed by the AUTO row's date|actor|action so a
+              saved override re-attaches to the same row. Uncheck to suppress;
+              non-blank fields replace the displayed cells; blank = auto.
+              Applied identically in the preview AND the PDF exporter. */}
+          {form.topic === "fuel" &&
+            (fuelOverridePanels?.producerRows.length ?? 0) > 0 && (
+            <div className="border-t border-border pt-3 mt-1">
+              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
+                Market and Operator Responses overrides
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">
+                Uncheck to remove a row. Blank fields keep the auto text.
+              </p>
+              <div className="flex flex-col gap-2">
+                {fuelOverridePanels!.producerRows.map((row) => {
+                  const k = marketOperatorRowKey(row);
+                  const ov: MarketOperatorRowOverride =
+                    sectionOverrides.marketOperatorOverrides?.[k] ?? {};
+                  const setR = (patch: Partial<MarketOperatorRowOverride>) =>
+                    setSectionOverrides((prev) => ({
+                      ...prev,
+                      marketOperatorOverrides: {
+                        ...(prev.marketOperatorOverrides ?? {}),
+                        [k]: {
+                          ...(prev.marketOperatorOverrides?.[k] ?? {}),
+                          ...patch,
+                        },
+                      },
+                    }));
+                  return (
+                    <div
+                      key={k}
+                      className="border border-border rounded-sm p-2"
+                      style={{ opacity: ov.suppressed ? 0.5 : 1 }}
+                    >
+                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground mb-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={!ov.suppressed}
+                          className="mt-0.5"
+                          onChange={(e) =>
+                            setR({ suppressed: !e.target.checked })
+                          }
+                        />
+                        <span>
+                          {row.actor} · {row.category} · {row.date} —{" "}
+                          {row.action}
+                        </span>
+                      </label>
+                      <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+                        <Input
+                          placeholder="Actor"
+                          value={ov.actor ?? ""}
+                          onChange={(e) => setR({ actor: e.target.value })}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Category"
+                          value={ov.category ?? ""}
+                          onChange={(e) => setR({ category: e.target.value })}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Date"
+                          value={ov.date ?? ""}
+                          onChange={(e) => setR({ date: e.target.value })}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <Input
+                          placeholder="Action"
+                          value={ov.action ?? ""}
+                          onChange={(e) => setR({ action: e.target.value })}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                        <Input
+                          placeholder="Operational read"
+                          value={ov.read ?? ""}
+                          onChange={(e) => setR({ read: e.target.value })}
+                          className="rounded-sm text-[12px] h-8"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Energy/fertiliser: Market Prices row overrides. Value must be numeric (the

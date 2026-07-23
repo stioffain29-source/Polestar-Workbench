@@ -41,6 +41,31 @@ export interface MarketPriceOverride {
   change?: string;
 }
 
+// Per-bullet override for the Fuel Watch Gulf & Hormuz Chokepoint Watch
+// lists. Keyed by the bullet's AUTO line text (deterministic — built from
+// date/title/severity by the canonical builder), mirroring the Fast Facts
+// label-keying so a saved override re-attaches to the same bullet.
+// `text` replaces the displayed line (blank = auto); `suppressed` drops the
+// bullet entirely. STRICT no-fabrication: the owner can only rewrite or
+// remove auto bullets, never add one.
+export interface GulfBulletOverride {
+  text?: string;
+  suppressed?: boolean;
+}
+
+// Per-row override for the fuel "Market and Operator Responses" table.
+// Keyed by marketOperatorRowKey (date|actor|action of the AUTO row).
+// Non-blank fields replace the displayed cell text; `suppressed` removes
+// the row. Display-only — never feeds back into classification.
+export interface MarketOperatorRowOverride {
+  actor?: string;
+  category?: string;
+  action?: string;
+  read?: string;
+  date?: string;
+  suppressed?: boolean;
+}
+
 export interface TopicSectionOverrides extends CountrySectionOverrides {
   /** Fast Facts tile overrides keyed by the tile's AUTO label. */
   fastFactOverrides?: Record<string, FastFactOverride>;
@@ -50,6 +75,10 @@ export interface TopicSectionOverrides extends CountrySectionOverrides {
   panelReads?: Record<string, string>;
   /** Market Prices table row overrides keyed "group:key". */
   marketPriceOverrides?: Record<string, MarketPriceOverride>;
+  /** Fuel Gulf/Hormuz bullet overrides keyed by the bullet's AUTO line. */
+  gulfBulletOverrides?: Record<string, GulfBulletOverride>;
+  /** Market and Operator Responses row overrides keyed by marketOperatorRowKey. */
+  marketOperatorOverrides?: Record<string, MarketOperatorRowOverride>;
 }
 
 /** Stable panel key for the Fuel Watch Gulf & Hormuz Chokepoint Watch read. */
@@ -167,6 +196,83 @@ export function clearFastFactOverride(
 }
 
 /**
+ * Stable identity for a "Market and Operator Responses" row — derived from
+ * the AUTO row's date, actor and action so a saved override re-attaches to
+ * the same row even after the owner rewrites the displayed cells.
+ */
+export function marketOperatorRowKey(row: {
+  date: string;
+  actor: string;
+  action: string;
+}): string {
+  return `${row.date}|${row.actor}|${row.action}`;
+}
+
+/**
+ * Apply Gulf/Hormuz bullet overrides to an AUTO line list. A suppressed
+ * bullet is dropped; a non-blank text override replaces the displayed line;
+ * blank text keeps the auto line. Order is preserved.
+ */
+export function applyGulfBulletOverrides(
+  lines: string[],
+  overrides: Record<string, GulfBulletOverride> | null | undefined,
+): string[] {
+  if (!overrides || Object.keys(overrides).length === 0) return lines;
+  const out: string[] = [];
+  for (const line of lines) {
+    const ov = overrides[line];
+    if (ov?.suppressed) continue;
+    const text = (ov?.text ?? "").trim();
+    out.push(text || line);
+  }
+  return out;
+}
+
+/**
+ * Apply Market and Operator Responses row overrides. Row identity is the
+ * AUTO row's marketOperatorRowKey. A suppressed row is dropped; non-blank
+ * field overrides replace the displayed cell text (display-only — the
+ * category override never feeds back into classification).
+ */
+export function applyMarketOperatorOverrides<
+  T extends {
+    actor: string;
+    category: string;
+    action: string;
+    operationalRead: string;
+    date: string;
+  },
+>(
+  rows: T[],
+  overrides: Record<string, MarketOperatorRowOverride> | null | undefined,
+): T[] {
+  if (!overrides || Object.keys(overrides).length === 0) return rows;
+  const out: T[] = [];
+  for (const r of rows) {
+    const ov = overrides[marketOperatorRowKey(r)];
+    if (ov?.suppressed) continue;
+    if (!ov) {
+      out.push(r);
+      continue;
+    }
+    const actor = (ov.actor ?? "").trim();
+    const category = (ov.category ?? "").trim();
+    const action = (ov.action ?? "").trim();
+    const read = (ov.read ?? "").trim();
+    const date = (ov.date ?? "").trim();
+    out.push({
+      ...r,
+      actor: actor || r.actor,
+      category: (category || r.category) as T["category"],
+      action: action || r.action,
+      operationalRead: read || r.operationalRead,
+      date: date || r.date,
+    });
+  }
+  return out;
+}
+
+/**
  * Drop blank entries so the persisted jsonb holds only genuine overrides —
  * an all-blank tile/row entry is removed entirely (clearing = revert to auto).
  */
@@ -205,6 +311,33 @@ export function pruneTopicSectionOverrides(
     mp[k] = { ...(value ? { value } : {}), ...(change ? { change } : {}) };
   }
   if (Object.keys(mp).length) out.marketPriceOverrides = mp;
+  const gb: Record<string, GulfBulletOverride> = {};
+  for (const [k, v] of Object.entries(ov.gulfBulletOverrides ?? {})) {
+    const text = (v.text ?? "").trim();
+    const suppressed = v.suppressed === true;
+    if (!text && !suppressed) continue;
+    gb[k] = { ...(text ? { text } : {}), ...(suppressed ? { suppressed } : {}) };
+  }
+  if (Object.keys(gb).length) out.gulfBulletOverrides = gb;
+  const mo: Record<string, MarketOperatorRowOverride> = {};
+  for (const [k, v] of Object.entries(ov.marketOperatorOverrides ?? {})) {
+    const actor = (v.actor ?? "").trim();
+    const category = (v.category ?? "").trim();
+    const action = (v.action ?? "").trim();
+    const read = (v.read ?? "").trim();
+    const date = (v.date ?? "").trim();
+    const suppressed = v.suppressed === true;
+    if (!actor && !category && !action && !read && !date && !suppressed) continue;
+    mo[k] = {
+      ...(actor ? { actor } : {}),
+      ...(category ? { category } : {}),
+      ...(action ? { action } : {}),
+      ...(read ? { read } : {}),
+      ...(date ? { date } : {}),
+      ...(suppressed ? { suppressed } : {}),
+    };
+  }
+  if (Object.keys(mo).length) out.marketOperatorOverrides = mo;
   return out;
 }
 
