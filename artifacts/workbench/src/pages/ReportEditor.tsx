@@ -62,7 +62,10 @@ import {
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
   type FastFactOverride,
+  reattachFastFactOverride,
+  clearFastFactOverride,
 } from "@/lib/topicSectionOverrides";
+import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
@@ -1804,6 +1807,35 @@ export default function ReportEditor() {
                   );
                 })}
               </div>
+
+              {/* Orphaned overrides: saved edits keyed to an auto tile label
+                  that no longer exists (a builder renamed the tile). They no
+                  longer apply anywhere; surface them so the owner can
+                  re-attach the edit to a current tile or clear it. Nothing is
+                  migrated silently. */}
+              <OrphanedFastFactsPanel
+                autoFastFacts={autoFastFacts}
+                overrides={sectionOverrides.fastFactOverrides}
+                onReattach={(from, to) =>
+                  setSectionOverrides((prev) => ({
+                    ...prev,
+                    fastFactOverrides: reattachFastFactOverride(
+                      prev.fastFactOverrides,
+                      from,
+                      to,
+                    ),
+                  }))
+                }
+                onClear={(key) =>
+                  setSectionOverrides((prev) => ({
+                    ...prev,
+                    fastFactOverrides: clearFastFactOverride(
+                      prev.fastFactOverrides,
+                      key,
+                    ),
+                  }))
+                }
+              />
             </div>
           )}
 

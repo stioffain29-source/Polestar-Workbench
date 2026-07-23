@@ -113,6 +113,60 @@ export function applyMarketPriceOverrides<
 }
 
 /**
+ * Find Fast Facts override keys that no longer match any current auto tile
+ * label. Happens when a dataset builder renames a tile: the saved override is
+ * still persisted but silently stops applying (applyFastFactOverrides matches
+ * by exact auto label). The editor surfaces these so the owner can re-attach
+ * the edit to a current tile or clear it — nothing is migrated silently.
+ */
+export function orphanedFastFactOverrideKeys(
+  cards: ReadonlyArray<{ label: string }>,
+  overrides: Record<string, FastFactOverride> | null | undefined,
+): string[] {
+  if (!overrides) return [];
+  const live = new Set(cards.map((c) => c.label));
+  return Object.keys(overrides).filter((k) => !live.has(k));
+}
+
+/**
+ * Re-key a Fast Facts override from an orphaned auto-label key to a current
+ * tile's auto label. Pure/immutable. If the target tile already has an
+ * override, the orphan's non-blank fields fill only the target's blank fields
+ * (existing owner edits on the target are never overwritten). Returns the
+ * input unchanged if the orphan key is absent or from === to.
+ */
+export function reattachFastFactOverride(
+  overrides: Record<string, FastFactOverride> | null | undefined,
+  from: string,
+  to: string,
+): Record<string, FastFactOverride> {
+  const src = overrides ?? {};
+  const orphan = src[from];
+  if (!orphan || from === to) return src;
+  const out: Record<string, FastFactOverride> = { ...src };
+  delete out[from];
+  const existing = out[to] ?? {};
+  out[to] = {
+    ...(existing.label?.trim() ? { label: existing.label } : orphan.label?.trim() ? { label: orphan.label } : {}),
+    ...(existing.value?.trim() ? { value: existing.value } : orphan.value?.trim() ? { value: orphan.value } : {}),
+    ...(existing.note?.trim() ? { note: existing.note } : orphan.note?.trim() ? { note: orphan.note } : {}),
+  };
+  return out;
+}
+
+/** Remove a Fast Facts override entry entirely (clear an orphan). Pure. */
+export function clearFastFactOverride(
+  overrides: Record<string, FastFactOverride> | null | undefined,
+  key: string,
+): Record<string, FastFactOverride> {
+  const src = overrides ?? {};
+  if (!(key in src)) return src;
+  const out = { ...src };
+  delete out[key];
+  return out;
+}
+
+/**
  * Drop blank entries so the persisted jsonb holds only genuine overrides —
  * an all-blank tile/row entry is removed entirely (clearing = revert to auto).
  */
