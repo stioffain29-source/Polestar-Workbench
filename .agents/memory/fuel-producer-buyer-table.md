@@ -1,9 +1,16 @@
 ---
-name: Fuel Watch Producer/Buyer Actions table sparseness
-description: Why the Fuel Watch "Producer and Buyer Actions" table read sparse during a crisis, and the two-layer fix (relevance gate + dedup).
+name: Fuel Watch Market and Operator Responses table (ex Producer/Buyer Actions)
+description: Why the Fuel Watch responses table read sparse during a crisis, the two-layer fix (relevance gate + dedup), and the owner's 2026-07 rework rules (rename, fire exclusion, sentence-casing, corridor collapse).
 ---
 
-# Fuel Watch Producer/Buyer Actions table
+# Fuel Watch "Market and Operator Responses" table (formerly "Producer and Buyer Actions")
+
+**Owner rework (July 2026) — standing rules, do not revert:**
+- Heading is now **"Market and Operator Responses"** in preview + PDF + section-override label; the stored override key stays `producer-buyer` (renaming it would orphan saved per-report overrides).
+- **Involuntary refinery/depot fires are OUT of the table entirely** (the old fire→Market rule is deleted). Owner ruling: a fire is not a market or operator RESPONSE; it enters only if the reporting itself evidences a market effect. Fires still appear in the report's incident sections.
+- Action cell = **sentence-cased headline** (conservative `SENTENCE_LOWER` common-word list; "canal/strait/sea/gulf" deliberately absent — they're proper-noun parts: Suez Canal, Red Sea) **+ country suffix only when the headline carries no other capitalised token** (first word counts as a cue unless it's a known common word). This stops misleading suffixes like "— Pakistan" on a US-margins headline whose country stamp is reporting origin, not event geography (no-fabrication). Date under the action covers "when".
+- **Same-corridor reroute syndication collapses** via `detectRerouteCorridor` story key (red-sea-suez / hormuz / malacca / panama), mirroring the pivot story-key pattern; different corridors stay separate.
+- Reads: **margins = "Supporting market indicator … Not an operational driver on its own"** (branch runs FIRST); no read may claim price follow-through ("usually firms within days" is banned); no repeated diversification boilerplate (Infra fallback replaced it).
 
 A sparse Producer/Buyer Actions table during an obvious fuel crisis was NOT a
 classifier-cap problem. The real chain, in order, was:
@@ -86,9 +93,10 @@ tanker (an operational supply move, no action verb) surfaces. It could over-
 admit a future bare "OPEC meeting" mention; owner prose review is the backstop.
 Tightening to require an action verb would regress the current fix, so don't.
 **Shadow of the same rule:** CATEGORY_RULES is first-match, so an NOC-named
-refinery fire ("Pertamina refinery ablaze") classifies **Producer** (an
-involuntary event shown as an "action") — the fire→Market rule only catches
-the no-NOC case. Accepted, same backstop; don't "fix" by reordering rules.
+refinery fire ("Pertamina refinery ablaze") still classifies **Producer** (an
+involuntary event shown as an "action"). The no-NOC fire case is now fully
+EXCLUDED (fire→Market rule deleted per owner rework above). Accepted, same
+owner-prose backstop; don't "fix" by reordering rules.
 
 ## Fourth cause: classifier vocabulary gaps (display-side, no version bump)
 
@@ -99,8 +107,8 @@ relevance change, no RELEVANCE_RULE_VERSION bump):
   "seeks <product> from X", NAMED products only (gasoline/diesel/jet fuel/
   fuel/crude), never bare "oil" (palm-oil guard). Speculative "could turn to"
   commentary can match — accepted, owner prose review backstop.
-- **Market:** `refin(ery|er|ing) margins?`/`crack spreads?`; refinery/depot/
-  terminal fire → Market (see NOC shadow above).
+- **Market:** `refin(ery|er|ing) margins?`/`crack spreads?`. (Fires no longer
+  classify Market — excluded entirely per the owner rework; NOC shadow above.)
 - **Pivot story-key dedupe:** two syndicated rewrites of one pivot share too
   few tokens for nearDuplicate (jaccard 0.267 < the load-bearing 0.4 floor —
   NEVER lower it), so the builder loop also dedupes on
@@ -116,5 +124,8 @@ rows through the real builder AND assert rendered markup via
 
 Unit tests live in `__tests__/workbench/fuelProducerBuyerActions.test.ts`
 (Pertamina inclusion, oil-price/reliance/palm-oil exclusion, pivot
-classify+collapse, different-buyers separate, refiner margins, refinery fire,
-cross-read Market refusal).
+classify+collapse, different-buyers separate, refiner margins supporting-read,
+fire exclusion, cross-read Market refusal, corridor collapse/separation,
+sentence-casing, suffix both ways, "usually" ban). Cross-read test fixtures
+must carry a `FUEL_ACTION_TOPICAL_RE` token ("crude"/"oil") — bare "tankers
+reroute" never enters via shipping.

@@ -4,7 +4,7 @@ import {
 } from "@/lib/fuelNarratives";
 import type { TopicFastFactsIncident } from "@/lib/topicFastFacts";
 
-// The Fuel Watch "Producer and Buyer Actions" table cross-reads genuine
+// The Fuel Watch "Market and Operator Responses" table cross-reads genuine
 // producer/buyer/government/infrastructure ACTIONS that the ingest pipeline
 // files under the `shipping` topic (OPEC+ / ADNOC / Aramco / Pertamina crude-
 // route moves), which the fuel-only relevance gate deliberately never keeps.
@@ -123,13 +123,24 @@ describe("Market / supply signal wording variants", () => {
     expect(rows[0].category).toBe("Market / supply signal");
   });
 
-  it("classifies a refinery fire as a Market supply signal, never a Producer action", () => {
+  it("excludes an involuntary refinery fire — not a market or operator RESPONSE", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [mk(21, "fuel", "Oil refinery ablaze in Cuba as fuel crisis deepens")],
     });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("gives margin rows a supporting-indicator read, never a driver claim", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(23, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
+      ],
+    });
     expect(rows).toHaveLength(1);
-    expect(rows[0].category).toBe("Market / supply signal");
+    expect(rows[0].operationalRead).toMatch(/supporting market indicator/i);
+    expect(rows[0].operationalRead).toMatch(/not an operational driver/i);
   });
 
   it("still refuses market signals via the shipping cross-read", () => {
@@ -140,5 +151,77 @@ describe("Market / supply signal wording variants", () => {
       ],
     });
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("Market and Operator Responses rework", () => {
+  // The two live prod headlines that described ONE operational development
+  // (Red Sea / Suez corridor rerouting) under different wire styling.
+  const rerouteCopies: TopicFastFactsIncident[] = [
+    mk(30, "shipping", "Asian refineries reroute Saudi oil imports via the Suez Canal"),
+    mk(31, "shipping", "Two Saudi Oil Tankers Reroute in the Red Sea Toward the Suez Canal"),
+  ];
+
+  it("collapses same-corridor reroute copies to one row (newest survives)", () => {
+    const rows = buildFuelProducerBuyerActions({ issueDate: ISSUE_DATE, incidents: rerouteCopies });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Infrastructure / routing action");
+    expect(rows[0].action).toMatch(/Asian refineries reroute/);
+  });
+
+  it("keeps reroutes on DIFFERENT corridors as separate rows", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(32, "shipping", "Crude tankers reroute to avoid the Strait of Hormuz amid tensions"),
+        mk(33, "shipping", "Crude carriers rerouting in the Red Sea toward the Suez Canal"),
+      ],
+    });
+    expect(rows).toHaveLength(2);
+  });
+
+  it("sentence-cases headline caps while preserving proper nouns", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [mk(34, "shipping", "Two Saudi Oil Tankers Reroute in the Red Sea Toward the Suez Canal")],
+    });
+    expect(rows[0].action).toBe(
+      "Two Saudi oil tankers reroute in the Red Sea toward the Suez Canal",
+    );
+  });
+
+  it("appends the country stamp only when the headline names no actor or place", () => {
+    const withPlace: TopicFastFactsIncident = {
+      ...mk(35, "fuel", "Diesel export ban ordered amid worsening fuel shortage"),
+      country: "Sri Lanka",
+    };
+    const carriesOwnCue: TopicFastFactsIncident = {
+      ...mk(36, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
+      country: "Pakistan", // reporting origin, NOT the event geography
+    };
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [withPlace, carriesOwnCue],
+    });
+    const ban = rows.find((r) => /export ban/i.test(r.action));
+    const margins = rows.find((r) => /refiner margins/i.test(r.action));
+    expect(ban?.action).toMatch(/— Sri Lanka$/);
+    expect(margins?.action).not.toMatch(/Pakistan/);
+  });
+
+  it("never claims price follow-through ('usually firms within days' is gone)", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        ...rerouteCopies,
+        mk(37, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
+        mk(38, "fuel", "Russia orders diesel export ban amid fuel shortage"),
+      ],
+    });
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(r.operationalRead).not.toMatch(/usually/i);
+      expect(r.operationalRead).not.toMatch(/firms within days/i);
+    }
   });
 });

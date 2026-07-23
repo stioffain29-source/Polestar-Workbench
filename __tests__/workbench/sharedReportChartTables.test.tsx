@@ -192,8 +192,8 @@ describe("ReportPreview (fuel) market tiles & Producer/Buyer Actions table", () 
     expect(html).toContain("2.410 USD/gal");
   });
 
-  it("renders the Producer and Buyer Actions table", () => {
-    expect(html).toContain("Producer and Buyer Actions");
+  it("renders the Market and Operator Responses table", () => {
+    expect(html).toContain("Market and Operator Responses");
   });
 
   it("renders action-table rows with classified actors and the action text", () => {

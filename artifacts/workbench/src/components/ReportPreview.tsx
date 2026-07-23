@@ -1017,7 +1017,7 @@ export default function ReportPreview({
               </Section>
             )}
             {fuelData.incidentData.producerBuyerActions.length > 0 && (
-              <Section hidden={!show("producer-buyer")} title="Producer and Buyer Actions">
+              <Section hidden={!show("producer-buyer")} title="Market and Operator Responses">
                 <ProducerActionsTable rows={fuelData.incidentData.producerBuyerActions} />
               </Section>
             )}

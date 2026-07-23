@@ -1016,7 +1016,7 @@ export async function exportTopicReportPdf(
     }
 
     // Ordered Fuel Watch sections. Auto-derived sections (Market Read,
-    // Operational Read, Regional Highlights, Producer and Buyer Actions)
+    // Operational Read, Regional Highlights, Market and Operator Responses)
     // sit alongside the editor-authored prose so the report reads 60%
     // analysis / 40% data rather than dashboard-style cards.
     // Use the atomic heading+first-paragraph renderer for every Fuel
@@ -1085,7 +1085,7 @@ export async function exportTopicReportPdf(
       // for the heading + table header + a couple of rows, push the
       // whole block to the next page before drawing the heading.
       ensureSpace(ctx, 24 + 18 + 60);
-      drawSectionHeading(ctx, "Producer and Buyer Actions");
+      drawSectionHeading(ctx, "Market and Operator Responses");
       drawProducerBuyerActionsTable(
         ctx,
         fuelData.incidentData.producerBuyerActions,

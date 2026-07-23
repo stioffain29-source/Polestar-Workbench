@@ -622,14 +622,13 @@ const CATEGORY_RULES: CategoryRule[] = [
       // "refiner margins" / "refining margins" are the same signal as
       // "refinery margin" — wire-service styling varies word by word.
       /\b(refin(?:ery|er|ing) margins?|crack spreads?)/,
-      // A refinery / fuel-depot fire or blast is an involuntary supply
-      // signal (capacity loss), not an actor's action — it belongs under
-      // Market / supply signal. NOTE: CATEGORY_RULES is first-match, so a
-      // fire headline that NAMES a national oil company still classifies
-      // Producer via the earlier bare-NOC rule (load-bearing; see
-      // fuel-producer-buyer-table.md watch-points). This rule catches the
-      // no-NOC case (e.g. "Oil refinery ablaze in Cuba").
-      /\b(refinery|fuel depot|oil depot|oil terminal) .{0,30}(ablaze|on fire|blaze|fire|explosion|blast)/,
+      // NOTE: refinery/depot FIRES are deliberately NOT classified here.
+      // An involuntary fire is neither a market nor an operator RESPONSE,
+      // and the owner's ruling is that a fire enters this table only when
+      // the reporting itself evidences a material effect on the covered
+      // markets — which a bare "refinery ablaze" headline does not. Fires
+      // still appear in the report's incident sections; they are only
+      // excluded from the responses table.
       // Supply resuming / arriving / shortage easing is a genuine availability
       // signal (bearish for local pump prices), not a policy action.
       /\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/,
@@ -650,8 +649,13 @@ function classifyCategory(t: string): FuelActionCategory | null {
 // don't all carry an identical generic line. Falls back to a per-
 // category default only when no keyword matches.
 function deriveOperationalRead(t: string, category: FuelActionCategory): string {
-  if (/\b(refinery|refining|crack spread)\b/.test(t))
-    return "Refinery-side move: regional crack spreads tighten and downstream pump and bunker pricing usually firms within days.";
+  // Margin / crack-spread rows are a SUPPORTING market indicator, not a
+  // separate operational driver — the read must frame them that way
+  // (owner ruling), so this branch precedes the generic refinery branch.
+  if (/\b(refin(?:ery|er|ing) margins?|crack spreads?)\b/.test(t))
+    return "Supporting market indicator: margin strength corroborates tight refined-product supply. Not an operational driver on its own.";
+  if (/\b(refinery|refining)\b/.test(t))
+    return "Refinery-side change to regional product supply; watch crack spreads and downstream product availability.";
   if ((/\b(flight|flights|route|routes|capacity|aviation|airline|carrier|airways)\b/.test(t))
       && /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim|drop)\w*/.test(t))
     return "Aviation demand response: carriers trimming capacity signal jet-fuel cost or availability stress feeding straight into route economics.";
@@ -662,14 +666,15 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   if (/\b(subsidy|subsidies|levy|levies|duty|excise|tax|price control|price cap|price freeze)\b/.test(t))
     return "Policy reset: review pump-price exposure and contract pass-through clauses before the next billing cycle.";
   if (/\b(jet fuel|bunker|fuel) hedg/.test(t))
-    return "Hedging signal from buyers; contract pricing on similar grades typically follows the lead within weeks.";
+    return "Hedging signals buyers positioning against sustained fuel-cost pressure on similar grades.";
   if (/\b(spot purchase|tender|long[- ]term contract|long[- ]term deal|supply (contract|deal|agreement|swap))\b/.test(t))
     return "Procurement signal: near-term demand pulled forward; watch tender outcomes and freight follow-through.";
   if (/\b(strategic reserve|\bspr\b|storage|stockpile|reserve) (release|draw|tap|build|expand)/.test(t))
     return "Reserve action smooths near-term pricing but does not fix the underlying supply tightness.";
   if (/\b(pipeline|terminal|jetty|berth|loading)\b.{0,30}(bypass|reroute|rerouting|open|close|shut|expand|sabotage|attack)/.test(t)
-      || /\b(alternative route|bypass(?:ing)? hormuz|red sea bypass)/.test(t))
-    return "Logistics rerouting raises bunker and transit cost on dependent fuel flows.";
+      || /\b(alternative route|bypass(?:ing)? hormuz|red sea bypass)/.test(t)
+      || /\b(reroute|rerouting|rerouted)\b/.test(t))
+    return "Rerouting adds voyage time and freight cost to affected fuel cargoes; landed cost and delivery schedules on the corridor are the direct exposure.";
   if (/\b(production|output) (cut|reduce|curtail)/.test(t))
     return "Output discipline tightens balances and supports a firmer crude floor.";
   if (/\b(production|output) (hike|increase|boost|expand|raise|restart)/.test(t))
@@ -680,18 +685,18 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
       || /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/.test(t))
     return "Supply resuming eases the local shortage; pump-price and surcharge pressure should soften as availability normalises.";
   if (/\b(price|prices) (rise|climb|surge|jump|hit|reach|break)/.test(t))
-    return "Reinforces the cost-pressure picture; freight surcharges and bunker invoices follow in the weeks ahead.";
+    return "Reinforces the cost-pressure picture on freight surcharges and bunker invoices.";
   // Per-category fallbacks (different from each other so the table never
   // shows the same operational read across multiple categories).
   switch (category) {
     case "Producer action":
       return "Supply-side move with read-through to bunker, jet and downstream pricing if the action sustains.";
     case "Buyer action":
-      return "Buyer behaviour to track; spot and contract pricing on similar grades tends to follow the lead.";
+      return "Buyer-side shift; watch spot and contract pricing on similar grades for follow-on effects.";
     case "Government / policy action":
       return "Policy intervention resets pump-price and surcharge exposure for the next contract cycle.";
     case "Infrastructure / routing action":
-      return "Keeps Gulf and Red Sea routing diversification a live mitigation theme rather than a future option.";
+      return "Routing or infrastructure change with direct bearing on fuel delivery cost and transit time.";
     case "Market / supply signal":
       return "Confirming evidence in the market indicators; treat as supporting context rather than a fresh driver.";
   }
@@ -703,6 +708,101 @@ function fmtDate(iso: string): string {
     if (isNaN(d.getTime())) return "";
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   } catch { return ""; }
+}
+
+// Headline -> declarative action text. Conservative sentence-casing: a
+// word is lowercased ONLY when it is a plain Capitalised word (never an
+// acronym like "US"/"OPEC") AND appears on the curated common-word list
+// below — proper nouns (Saudi, Suez, Cuba, Aramco …) are never on the
+// list, so they keep their capitals. No-fabrication: every word is the
+// headline's own; only casing changes and a trailing "— <country>" is
+// appended when the text itself does not already name the place. The
+// WHEN is the date line rendered under the action cell on both surfaces.
+const SENTENCE_LOWER = new Set([
+  // articles / conjunctions / prepositions / auxiliaries
+  "a", "an", "the", "and", "or", "but", "as", "at", "by", "for", "from",
+  "in", "into", "of", "on", "to", "toward", "towards", "via", "with",
+  "over", "under", "after", "before", "amid", "against", "near", "off",
+  "out", "up", "down", "this", "that", "its", "is", "are", "was", "were",
+  "has", "have", "will", "could", "may", "says", "say", "said", "not",
+  "no", "now", "new", "more", "than", "their", "his", "her",
+  // common fuel-market vocabulary (never a proper noun)
+  "oil", "fuel", "fuels", "gas", "gasoline", "petrol", "diesel", "crude",
+  "kerosene", "jet", "bunker", "tanker", "tankers", "ship", "ships",
+  "vessel", "vessels", "cargo", "cargoes", "refinery", "refineries",
+  "refiner", "refiners", "refining", "margins", "margin", "price",
+  "prices", "pricing", "supply", "supplies", "shortage", "shortages",
+  "crisis", "imports", "import", "exports", "export", "output",
+  // NOTE: "canal" / "strait" / "sea" / "gulf" are deliberately absent —
+  // they are almost always part of a proper name (Suez Canal, Red Sea,
+  // Strait of Hormuz) and must keep their capitals.
+  "production", "pipeline", "pipelines", "terminal", "storage",
+  "reserve", "reserves", "stockpile", "route",
+  "routes", "routing", "reroute", "reroutes", "rerouting", "rerouted",
+  "bypass", "bypassing", "flights", "flight", "capacity", "week",
+  "month", "year", "record", "records", "highs", "high", "lows", "low",
+  "concerns", "concern", "damage", "grow", "grows", "growing", "deepens",
+  "deepen", "spiked", "spikes", "spike", "surge", "surges", "rise",
+  "rises", "rising", "fall", "falls", "falling", "hits", "hit", "cuts",
+  "cut", "cutting", "suspends", "suspend", "suspended", "cancels",
+  "cancel", "cancelled", "turns", "turn", "turned", "seeks", "seeking",
+  "buys", "buy", "buying", "sells", "sell", "selling", "two", "three",
+  "four", "five", "six", "seven", "eight", "nine", "ten", "toll",
+  "amid", "worsens", "worsening", "eases", "easing", "announces",
+  "announce", "announced", "plans", "plan", "planned", "begins",
+  "begin", "began", "starts", "start", "started", "halts", "halt",
+  "halted", "resumes", "resume", "resumed",
+]);
+function sentenceCaseHeadline(title: string): string {
+  return title
+    .split(/(\s+)/)
+    .map((w, idx) => {
+      if (idx === 0 || /^\s+$/.test(w)) return w;
+      // Only plain Capitalised words are candidates; acronyms, mixed-case
+      // and already-lowercase words pass through untouched.
+      if (!/^[A-Z][a-z'’-]*$/.test(w)) return w;
+      const key = w.toLowerCase().replace(/[^a-z']/g, "");
+      return SENTENCE_LOWER.has(key) ? w.toLowerCase() : w;
+    })
+    .join("");
+}
+
+// WHERE for the action cell: the incident's country stamp, appended ONLY
+// when the sentence-cased headline carries no other capitalised token —
+// i.e. the text itself names no actor or geography of its own. A headline
+// that already names a place or actor ("US refiner margins…", "Two Saudi
+// Oil Tankers…") gets NO suffix: the country stamp can reflect reporting
+// origin rather than the event's geography, and appending it there would
+// mislead (no-fabrication).
+function actionPlaceSuffix(sentenceCased: string, country: string | null | undefined): string {
+  const c = (country ?? "").trim();
+  if (!c || /^unknown$/i.test(c)) return "";
+  const words = sentenceCased.split(/\s+/);
+  const carriesOwnCue = words.some((w, idx) => {
+    if (!/^[A-Z]/.test(w)) return false;
+    // The first word is always capitalised; it only counts as a cue when
+    // it is NOT a known common word ("US refiner margins…" / "Aramco cuts
+    // output" → cue; "Refinery output cut…" → not a cue).
+    if (idx === 0) return !SENTENCE_LOWER.has(w.toLowerCase().replace(/[^a-z']/g, ""));
+    return true;
+  });
+  if (carriesOwnCue) return "";
+  return ` — ${c}`;
+}
+
+// Corridor grouping for reroute story-key dedupe: syndicated copies of one
+// rerouting development ("Two Saudi Oil Tankers Reroute in the Red Sea
+// Toward the Suez Canal" vs "Asian refineries reroute Saudi oil imports
+// via the Suez Canal") share too few distinctive tokens for the near-
+// duplicate guard, but traffic shifting on ONE corridor in one window is
+// ONE operational development — one row. Red Sea / Suez / Bab el-Mandeb /
+// Cape of Good Hope form a single diversion axis.
+function detectRerouteCorridor(t: string): string | null {
+  if (/\b(red sea|suez|bab[- ]el[- ]mandeb|cape of good hope)\b/.test(t)) return "red-sea-suez";
+  if (/\bhormuz\b/.test(t)) return "hormuz";
+  if (/\bmalacca\b/.test(t)) return "malacca";
+  if (/\bpanama\b/.test(t)) return "panama";
+  return null;
 }
 
 function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): string {
@@ -867,8 +967,14 @@ export function buildFuelProducerBuyerActions(opts: {
     const t = haystack(i);
     const category = classifyCategory(t);
     if (!category) continue;
-    const action = i.title.trim().replace(/\.$/, "");
-    const dedupeKey = action.toLowerCase();
+    // Action cell: WHO/WHAT from the headline (conservatively sentence-
+    // cased so it reads as a statement, not a news headline), WHERE
+    // appended from the incident's country stamp when the text itself
+    // does not carry it. WHEN is the date line under the cell.
+    const headline = i.title.trim().replace(/\.$/, "");
+    const sentenceCased = sentenceCaseHeadline(headline);
+    const action = sentenceCased + actionPlaceSuffix(sentenceCased, i.country);
+    const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;
     // Supplier-pivot story-key collapse: syndicated rewrites of one buyer
     // pivot ("Russia Turns To India For Gasoline" vs "Russia seeking extra
@@ -884,6 +990,22 @@ export function buildFuelProducerBuyerActions(opts: {
       const pivotKey = `pivot:${subject}:${product}`;
       if (seen.has(pivotKey)) continue;
       seen.add(pivotKey);
+    }
+    // Reroute story-key collapse: syndicated copies of one corridor's
+    // rerouting development describe the SAME operational development
+    // even when the headlines share few distinctive tokens ("Two Saudi
+    // Oil Tankers Reroute…Suez" vs "Asian refineries reroute Saudi oil
+    // imports via the Suez Canal"). One corridor, one window — one row.
+    if (
+      category === "Infrastructure / routing action" &&
+      /\b(reroute|rerouting|rerouted|bypass(?:ing)?)\b/.test(t)
+    ) {
+      const corridor = detectRerouteCorridor(t);
+      if (corridor) {
+        const rerouteKey = `reroute:${corridor}`;
+        if (seen.has(rerouteKey)) continue;
+        seen.add(rerouteKey);
+      }
     }
     // Near-duplicate guard: collapse syndicated re-writes of the same
     // story within a category (e.g. the ADNOC / UAE Hormuz-bypass
