@@ -67,8 +67,10 @@ import {
   clearFastFactOverride,
   type GulfBulletOverride,
   type MarketOperatorRowOverride,
+  orphanedFastFactOverrideKeys,
 } from "@/lib/topicSectionOverrides";
 import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
+import { OrphanSaveWarning } from "@/components/OrphanSaveWarning";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
@@ -530,6 +532,27 @@ export default function ReportEditor() {
       return null;
     }
   }, [form.topic, form.issueDate, incidentsForExport, hardNumbersEdited, report]);
+
+  // Orphaned Fast Facts override keys (saved edits keyed to a renamed tile).
+  // Drives the save-time notice near the Save button: the owner must either
+  // fix them (re-attach/clear in the panel) or explicitly "Save anyway".
+  const orphanedFastFactKeys = useMemo(
+    () =>
+      autoFastFacts.length > 0
+        ? orphanedFastFactOverrideKeys(
+            autoFastFacts,
+            sectionOverrides.fastFactOverrides,
+          )
+        : [],
+    [autoFastFacts, sectionOverrides.fastFactOverrides],
+  );
+  // True after a Save click was intercepted because orphans exist; renders the
+  // inline warning with a "Save anyway" confirm. Auto-dismissed once every
+  // orphan is re-attached or cleared, so a fixed form saves with no notice.
+  const [orphanSavePending, setOrphanSavePending] = useState(false);
+  useEffect(() => {
+    if (orphanedFastFactKeys.length === 0) setOrphanSavePending(false);
+  }, [orphanedFastFactKeys.length]);
 
   // Full deduplicated cargo register (the Workbench-only companion to the PDF's
   // curated Selected Incidents), exported to CSV on demand. Built from the SAME
@@ -1207,7 +1230,17 @@ export default function ReportEditor() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const save = () => {
+  const save = (opts?: { force?: boolean }) => {
+    // Orphaned Fast Facts guard: saving would persist owner edits keyed to a
+    // tile that no longer exists (they render nowhere). First Save click with
+    // orphans present shows a notice naming them next to the Save button; the
+    // owner either fixes them in the panel (notice auto-clears, next Save is
+    // silent) or explicitly clicks "Save anyway".
+    if (orphanedFastFactKeys.length > 0 && !opts?.force) {
+      setOrphanSavePending(true);
+      return;
+    }
+    setOrphanSavePending(false);
     // Conflict Watch is location-led: it drops the Executive Summary, What
     // Happened and Implications sections. Only Situation / What Matters /
     // Watch Next / Polestar View are editable + persisted; the rest of the
@@ -1609,13 +1642,24 @@ export default function ReportEditor() {
             {exporting ? "Generating PDF..." : "Download PDF"}
           </Button>
           <Button
-            onClick={save}
+            onClick={() => save()}
             className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
           >
             <Save className="w-4 h-4 mr-2" /> Save
           </Button>
         </div>
       </div>
+
+      {/* Save intercepted: orphaned Fast Facts edits exist. Names each orphan
+          so the owner sees exactly what would persist dead; "Save anyway"
+          bypasses once, fixing the orphans clears the notice automatically. */}
+      {orphanSavePending && (
+        <OrphanSaveWarning
+          orphanKeys={orphanedFastFactKeys}
+          onSaveAnyway={() => save({ force: true })}
+          onCancel={() => setOrphanSavePending(false)}
+        />
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-sm p-5 space-y-3 no-print">
