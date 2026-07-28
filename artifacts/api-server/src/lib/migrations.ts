@@ -4765,9 +4765,24 @@ export async function runDataMigrations(): Promise<void> {
           ];
           const failedSlugs: string[] = [];
           for (const slug of slugs) {
+            // Per-slug resume marker: a heavy slug (indonesia is 30k+ rows and
+            // CPU-bound) can outlive the deployment healthcheck window and get
+            // the instance SIGTERMed mid-loop. Without per-slug markers every
+            // reboot redid the finished slugs and never reached the end.
+            const slugMarker = `${markerKey}:${slug}`;
+            const doneSlug = await db.execute(sql`
+              SELECT 1 FROM app_migration_markers WHERE key = ${slugMarker}
+            `);
+            if ((doneSlug.rowCount ?? 0) > 0) continue;
             try {
               await runCountryEngine(slug);
+              await db.execute(sql`
+                INSERT INTO app_migration_markers (key) VALUES (${slugMarker})
+                ON CONFLICT (key) DO NOTHING
+              `);
               logger.info({ slug, marker: markerKey }, "Country engine initial reprocess ran");
+              // Yield so queued healthcheck requests get serviced between slugs.
+              await new Promise((r) => setImmediate(r));
             } catch (slugErr) {
               failedSlugs.push(slug);
               logger.error(
