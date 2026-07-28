@@ -741,8 +741,11 @@ function drawJakartaBulletList(ctx: Ctx, items: string[]) {
 }
 
 // ELECTRIC strand sub-heading (used above the port-action list).
+// Keep-with-next: reserve room for the label PLUS at least two lines of the
+// body that follows (~2×16px + padding), so the label can never sit orphaned
+// at the bottom of a page with its content on the next one.
 function drawJakartaStrandLabel(ctx: Ctx, label: string) {
-  ensureSpace(ctx, 22);
+  ensureSpace(ctx, 22 + 40);
   const { pdf, MX } = ctx;
   setRoboto(pdf, "bold");
   pdf.setFontSize(8);

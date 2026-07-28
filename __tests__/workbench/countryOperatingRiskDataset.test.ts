@@ -131,17 +131,27 @@ describe("buildCountryOperatingRiskDataset — no-count prose", () => {
 describe("buildCountryOperatingRiskDataset — operational recommendations", () => {
   const ds = build(POPULATED);
 
-  it("keys each recommended action to a location, an action and an escalation trigger", () => {
+  it("keys each recommended action to a location and an action, with each escalation trigger stated once", () => {
     expect(ds.businessImpact.length).toBeGreaterThan(0);
+    const marker = "Escalation trigger —";
+    const seenTriggers = new Set<string>();
+    let triggerLines = 0;
     for (const line of ds.businessImpact) {
-      // Shape: "<Location>: <action>. Escalation trigger — <trigger>."
-      expect(line).toMatch(/^.+?: .+ Escalation trigger — .+\.$/);
+      // Shape: "<Location>: <action>[ Escalation trigger — <trigger>.]" — the
+      // trigger clause appears on the FIRST line carrying that trigger and is
+      // omitted on verbatim repeats (repetition guard).
+      expect(line).toMatch(/^.+?: .+/);
       const loc = line.slice(0, line.indexOf(":")).trim();
       expect(loc.length).toBeGreaterThan(0);
-      const marker = "Escalation trigger —";
-      const trigger = line.slice(line.indexOf(marker) + marker.length).trim();
-      expect(trigger.length).toBeGreaterThan(10); // a real forward-looking condition
+      if (line.includes(marker)) {
+        triggerLines++;
+        const trigger = line.slice(line.indexOf(marker) + marker.length).trim();
+        expect(trigger.length).toBeGreaterThan(10); // a real forward-looking condition
+        expect(seenTriggers.has(trigger)).toBe(false); // never repeated verbatim
+        seenTriggers.add(trigger);
+      }
     }
+    expect(triggerLines).toBeGreaterThan(0); // at least one trigger is stated
   });
 
   it("carries no incident-count annotation in the recommendations", () => {

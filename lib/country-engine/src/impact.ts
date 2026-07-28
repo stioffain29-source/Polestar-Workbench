@@ -50,6 +50,15 @@ const CONFIRMED_EFFECT_RULES: Array<[RegExp, string]> = [
 const INDIRECT_RE =
   /\b(near|close to|approaching|outskirts|on the (?:road|route) to|delays? (?:expected|possible|likely)|disrupt\w* (?:traffic|movement)|heightened security|checkpoints?|police (?:operation|presence)|tensions? (?:remain|persist)|ongoing (?:operation|clash))\b/i;
 
+// The fixed Indirect assessment template. Exported with an alternate wording so
+// the Operational Impact section can restate it WITHOUT repeating the exact
+// sentence a Top Development card already carries (repetition guard). Same
+// meaning, no new claim.
+export const INDIRECT_ASSESSED_SENTENCE =
+  "Reporting places this event near routes or areas in active use, so check local movement and site plans against it before travel nearby.";
+export const INDIRECT_ASSESSED_SENTENCE_ALT =
+  "This reporting sits near routes or areas in active use — check movement and site plans against it before travelling nearby.";
+
 // Assess operational impact per §12-13.
 export function assessImpact(input: ImpactInput): ImpactResult {
   const text = englishText(input);
@@ -71,8 +80,7 @@ export function assessImpact(input: ImpactInput): ImpactResult {
     return {
       impactLevel: "Indirect",
       confirmedOperationalEffect: null,
-      assessedOperationalRelevance:
-        "The event is close to, or significant enough for, local movement and planning to be reviewed.",
+      assessedOperationalRelevance: INDIRECT_ASSESSED_SENTENCE,
     };
   }
 

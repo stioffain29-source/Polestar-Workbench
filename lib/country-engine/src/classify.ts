@@ -171,6 +171,15 @@ function englishText(input: {
   return `${title} ${input.summary ?? ""}`;
 }
 
+// Deliberate interpersonal-violence cues. The Violent crime rule also matches
+// generic fatality words ("killed", "fatal…") so that a bare killing still
+// classifies — but when a story carries ONLY a generic fatality token (a fire
+// that kills, a flood death toll, a fatal crash), the death belongs to the
+// occurrence category (Fire and accident / Natural hazard / Road and rail…),
+// not to Violent crime. This regex decides which case we are in.
+const DELIBERATE_VIOLENCE_RE =
+  /\b(murder\w*|stabb\w*|shot (?:dead|and|by|at)|shot\b|gunned down|gunmen|gunman|homicide|assault\w*|rape\w*|gang[- ]?rape|shooting|beaten to death|hacked to death|machete|lynch\w*)\b/i;
+
 // Map the primary issue category from keyword rules incl. config.localTerms.
 function mapCategory(
   text: string,
@@ -184,10 +193,21 @@ function mapCategory(
       if (re.test(text)) return { category: cat, matched: true };
     }
   }
+  // A "Violent crime" match backed only by a generic fatality token defers to
+  // any LATER occurrence rule (fire, hazard, transport…) that also matches —
+  // "fire kills 3" is a fire, not a violent crime. If nothing later matches,
+  // the deferred Violent crime match still wins (a bare killing stays crime).
+  let deferred: IssueCategory | null = null;
   for (const [cat, re] of CATEGORY_RULES) {
     if (re.source === "\\b()\\b") continue; // skip placeholder
-    if (re.test(text)) return { category: cat, matched: true };
+    if (!re.test(text)) continue;
+    if (cat === "Violent crime" && !DELIBERATE_VIOLENCE_RE.test(text)) {
+      if (deferred === null) deferred = cat;
+      continue;
+    }
+    return { category: cat, matched: true };
   }
+  if (deferred) return { category: deferred, matched: true };
   return { category: "Other operational disruption", matched: false };
 }
 

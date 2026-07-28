@@ -236,6 +236,10 @@ function ItemCard({
 function StrandLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
+      // Keep-with-next: the DOM-rasterise paginator must never break directly
+      // after this label — a strand heading orphaned at the bottom of a page
+      // with its body on the next is a layout defect (owner-flagged).
+      data-pdf-keep-with-next="true"
       style={{
         fontFamily: ROBOTO,
         fontSize: 11,

@@ -45,15 +45,85 @@ import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCo
 //     mirroring maritimeReportParity.test.ts).
 // ---------------------------------------------------------------------------
 
-// The exact trajectory clauses (JAKARTA_TRAJECTORY_SENTENCE in jakartaBrief.ts).
+// The exact trajectory clause FAMILIES (JAKARTA_TRAJECTORY_SENTENCES in
+// jakartaBrief.ts). Each trajectory now carries deterministic wording variants
+// (repetition guard) — a paragraph must end with ONE member of its family.
 // Pinned here so a wording drift on either side fails the build.
-const RISING = "Against the previous week this theme is rising.";
-const EASING = "Against the previous week this theme is easing.";
-const STEADY = "Against the previous week this theme is broadly steady.";
-const NEW =
-  "It was not reported a week earlier, so it reads as newly prominent this period.";
-const NOBASIS =
-  "With no prior-week baseline, no week-on-week trend is asserted.";
+const RISING = [
+  "Against the previous week this theme is rising.",
+  "This theme drew more reporting than in the previous week.",
+  "Week on week, reporting under this theme increased.",
+  "Reporting under this theme ran ahead of the previous week.",
+  "The previous week saw less of this reporting than this period did.",
+  "Compared with the week before, this theme gained ground.",
+  "This period carried more of this reporting than the week before.",
+];
+const EASING = [
+  "Against the previous week this theme is easing.",
+  "This theme drew less reporting than in the previous week.",
+  "Week on week, reporting under this theme declined.",
+  "Reporting under this theme ran below the previous week.",
+  "The previous week saw more of this reporting than this period did.",
+  "Compared with the week before, this theme lost ground.",
+  "This period carried less of this reporting than the week before.",
+];
+const STEADY = [
+  "Against the previous week this theme is broadly steady.",
+  "This theme ran at much the same level as the previous week.",
+  "Week on week, reporting under this theme was broadly unchanged.",
+  "Reporting under this theme held near the previous week's level.",
+  "The previous week saw a similar amount of this reporting.",
+  "Compared with the week before, this theme was little changed.",
+  "This period carried about as much of this reporting as the week before.",
+];
+const NEW = [
+  "It was not reported a week earlier, so it reads as newly prominent this period.",
+  "This theme was absent from the previous week's reporting and is newly prominent.",
+  "No comparable reporting appeared a week earlier, making this newly prominent.",
+  "The previous week carried none of this reporting, so it is new this period.",
+  "This reporting had no counterpart a week earlier and stands out as new.",
+  "A week earlier this theme did not feature, so it registers as new.",
+  "Nothing under this theme appeared the week before, so it is new this period.",
+];
+const NOBASIS = [
+  "With no prior-week baseline, no week-on-week trend is asserted.",
+  "There is no prior-week baseline, so no trend is asserted for this theme.",
+  "No week-on-week comparison is made — the prior week carries no baseline.",
+  "Absent a prior-week baseline, this theme carries no trend judgement.",
+  "This theme is stated without a trend — the prior week offers no baseline.",
+  "No baseline exists for the prior week, so no trend is claimed here.",
+  "The prior week provides no baseline, so this theme carries no trend call.",
+];
+const endsWithOneOf = (s: string, family: string[]): boolean =>
+  family.some((f) => s.endsWith(f));
+
+describe("trajectory/severity variant exhaustion (7-theme worst case)", () => {
+  it("all seven themes sharing one trajectory never repeat the clause verbatim", () => {
+    // Jakarta has 7 themes; build 7 same-trajectory items (nobasis: no
+    // baseline) across all themes and assert the appended clauses are unique.
+    const cats: Array<[string, PngCategory]> = [
+      ["c1", "Civil unrest / protest" as PngCategory],
+      ["c2", "Natural hazard" as PngCategory],
+      ["c3", "Fire" as PngCategory],
+      ["c4", "Theft / break-in" as PngCategory],
+      ["c5", "Road / highway" as PngCategory],
+      ["c6", "Aviation / airport" as PngCategory],
+      ["c7", "Policing operation" as PngCategory],
+    ];
+    // worstRank 4 so a theme with no concrete anchor still emits via the
+    // high-severity NO_ANCHOR_NOTE path instead of being dropped.
+    const items = cats.map(([id, category]) =>
+      crimeItem(id, 4, { category, displayCategory: String(category) }),
+    );
+    const themes = buildJakartaIncidentThemes(items, [], false);
+    const tails = themes.map((t) => {
+      const hit = NOBASIS.find((f) => t.paragraph.endsWith(f));
+      expect(hit).toBeDefined();
+      return hit;
+    });
+    expect(new Set(tails).size).toBe(tails.length);
+  });
+});
 
 // A crime item with a concrete anchor (a CRIME_GROUPS token in the title +
 // a resolved province) so themeParagraph returns a non-null paragraph rather
@@ -89,13 +159,13 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
   it("reads 'nobasis' when no prior-week baseline is supplied", () => {
     const themes = buildJakartaIncidentThemes([crimeItem("c1", 3)], [], false);
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(NOBASIS)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, NOBASIS)).toBe(true);
   });
 
   it("reads 'new' when a baseline exists but the prior window was empty", () => {
     const themes = buildJakartaIncidentThemes([crimeItem("c1", 3)], [], true);
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(NEW)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, NEW)).toBe(true);
   });
 
   it("reads 'rising' when this week's worst severity exceeds the prior week", () => {
@@ -105,7 +175,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
       true,
     );
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(RISING)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, RISING)).toBe(true);
   });
 
   it("reads 'easing' when this week's worst severity is below the prior week", () => {
@@ -115,7 +185,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
       true,
     );
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(EASING)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, EASING)).toBe(true);
   });
 
   it("reads 'steady' when severity and volume are broadly unchanged", () => {
@@ -125,7 +195,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
       true,
     );
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(STEADY)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, STEADY)).toBe(true);
   });
 
   it("breaks a severity tie by volume: +2 items reads 'rising'", () => {
@@ -135,7 +205,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
       true,
     );
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(RISING)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, RISING)).toBe(true);
   });
 
   it("breaks a severity tie by volume: -2 items reads 'easing'", () => {
@@ -145,7 +215,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
       true,
     );
     expect(themes).toHaveLength(1);
-    expect(themes[0]!.paragraph.endsWith(EASING)).toBe(true);
+    expect(endsWithOneOf(themes[0]!.paragraph, EASING)).toBe(true);
   });
 
   it("appends the trajectory clause to EVERY present theme, not just the first", () => {
@@ -162,7 +232,7 @@ describe("Jakarta theme trajectory (assessed week-on-week judgement)", () => {
     );
     expect(themes.length).toBeGreaterThanOrEqual(2);
     for (const t of themes) {
-      expect(t.paragraph.endsWith(NOBASIS)).toBe(true);
+      expect(endsWithOneOf(t.paragraph, NOBASIS)).toBe(true);
     }
   });
 });
@@ -245,7 +315,7 @@ describe("Jakarta Incident Details override — preview == PDF parity", () => {
     expect(override!.length).toBeGreaterThan(0);
     // Empty prior window supplied → every present theme reads 'new'.
     for (const g of override!) {
-      expect(g.paragraph.endsWith(NEW)).toBe(true);
+      expect(endsWithOneOf(g.paragraph, NEW)).toBe(true);
     }
   });
 

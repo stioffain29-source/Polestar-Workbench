@@ -135,13 +135,21 @@ export function buildOperatingRiskPriorities(
   groups: { location: string; dominantDisplayCat: string }[],
 ): string[] {
   const seen = new Set<string>();
+  // Repetition guard: the same dominant category at several locations shares
+  // one trigger phrase — state it on the first line only, omit thereafter
+  // (omit, never pad; a verbatim repeated sentence reads as boilerplate).
+  const usedTriggers = new Set<string>();
   const out: string[] = [];
   for (const g of groups) {
     const loc = g.location.trim();
     if (!loc) continue;
     const action = operatingRiskAction(g.dominantDisplayCat);
     const trigger = operatingRiskTrigger(g.dominantDisplayCat);
-    const line = `${loc}: ${action} Escalation trigger — ${trigger}.`;
+    const firstUse = !usedTriggers.has(trigger);
+    usedTriggers.add(trigger);
+    const line = firstUse
+      ? `${loc}: ${action} Escalation trigger — ${trigger}.`
+      : `${loc}: ${action}`;
     const key = line.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);

@@ -415,6 +415,120 @@ describe("buildTopThree (§14)", () => {
     expect(assessed!.supportingEventIds).toContain(value[0].eventId);
   });
 
+  it("never repeats the same derived category implication verbatim across the top slots", () => {
+    // Three same-category events with no explicit effect: the generic
+    // "For operators, an event of this kind..." implication may appear at most
+    // ONCE across the three business sentences (owner-flagged boilerplate).
+    const events = [
+      makeEvent({ severity: "Extreme", casualties: 2 }),
+      makeEvent({ severity: "High" }),
+      makeEvent({ severity: "High" }),
+    ];
+    const { value } = buildTopThree(events);
+    const operatorSentences = value
+      .map((td) => td.businessSentence ?? "")
+      .flatMap((s) => s.match(/For operators,[^.]*\./g) ?? []);
+    expect(operatorSentences.length).toBeLessThanOrEqual(1);
+    // Event-specific harm sentences are still allowed on later items.
+    expect(value[0].businessSentence).toBeTruthy();
+  });
+
+  it("still derives distinct implications when the top slots carry different categories", () => {
+    const events = [
+      makeEvent({ severity: "High", issueCategory: "Violent crime" }),
+      makeEvent({ severity: "High", issueCategory: "Civil unrest" }),
+    ];
+    const { value } = buildTopThree(events);
+    const sentences = value.map((td) => td.businessSentence ?? "");
+    expect(sentences[0]).not.toBe(sentences[1]);
+  });
+
+  it("BLUF groups repeated category+location clauses instead of repeating them", () => {
+    // Three violent-crime events in the same place must not read as three
+    // near-identical clauses ("violent crime in X on ... and violent crime in
+    // X on ..."). The category+location phrase may appear at most twice
+    // (lead + one grouped "further" clause).
+    const events = [
+      makeEvent({ eventTitle: "Fatal stabbing near the market", city: "East Jakarta", severity: "Extreme", eventDate: "2026-07-28" }),
+      makeEvent({ eventTitle: "Shooting outside a bar", city: "East Jakarta", severity: "High", eventDate: "2026-07-28" }),
+      makeEvent({ eventTitle: "Armed assault on a shop owner", city: "East Jakarta", severity: "High", eventDate: "2026-07-27" }),
+    ];
+    const { value } = buildBluf(events, "Jakarta", []);
+    const occurrences = value.match(/violent crime[^,.]* in East Jakarta/gi) ?? [];
+    expect(occurrences.length).toBeLessThanOrEqual(2);
+    expect(value).toMatch(/further/i);
+  });
+
+  it("BLUF never lists the report's own theatre name as a location", () => {
+    const events = [
+      makeEvent({ eventTitle: "Robbery downtown", city: "Jakarta", severity: "High" }),
+      makeEvent({ eventTitle: "Burglary in a suburb", city: "Jakarta", severity: "Moderate", issueCategory: "Theft and robbery" }),
+    ];
+    const { value } = buildBluf(events, "Jakarta", []);
+    expect(value).not.toMatch(/recorded in Jakarta\b/);
+  });
+
+  it("keeps a follow-up of the same story out of the top slots", () => {
+    // An event and its "suspects named" follow-up share category + a
+    // distinctive title anchor within 2 days — only one may be selected.
+    const original = makeEvent({
+      eventTitle: "Circumstances behind the Matraman clash that killed one person",
+      eventDate: "2026-07-28",
+      severity: "High",
+      issueCategory: "Civil unrest",
+    });
+    const followUp = makeEvent({
+      eventTitle: "3 Matraman residents named suspects in Menteng clash",
+      eventDate: "2026-07-27",
+      severity: "High",
+      issueCategory: "Civil unrest",
+    });
+    const third = makeEvent({
+      eventTitle: "Warehouse fire in Cakung injures two workers",
+      eventDate: "2026-07-26",
+      severity: "Moderate",
+      issueCategory: "Fire and accident",
+    });
+    const { value } = buildTopThree([original, followUp, third]);
+    const ids = value.map((td) => td.eventId);
+    expect(ids).not.toEqual(expect.arrayContaining([original.eventId, followUp.eventId]));
+    expect(ids).toContain(third.eventId);
+  });
+
+  it("never merges two distinct events on a shared PLACE token alone", () => {
+    // Both titles name the same district (also the resolved city) — a place
+    // token must not act as a story anchor.
+    const a = makeEvent({
+      eventTitle: "Armed robbery at a Matraman mini-market",
+      eventDate: "2026-07-28",
+      city: "Matraman",
+      severity: "High",
+    });
+    const b = makeEvent({
+      eventTitle: "Stabbing outside a Matraman school",
+      eventDate: "2026-07-27",
+      city: "Matraman",
+      severity: "High",
+    });
+    const { value } = buildTopThree([a, b]);
+    expect(value).toHaveLength(2);
+  });
+
+  it("keeps genuinely distinct same-category events in separate slots", () => {
+    const a = makeEvent({
+      eventTitle: "Armed robbery at a Kelapa Gading mini-market",
+      eventDate: "2026-07-28",
+      severity: "High",
+    });
+    const b = makeEvent({
+      eventTitle: "Stabbing outside a Blok M nightclub",
+      eventDate: "2026-07-27",
+      severity: "High",
+    });
+    const { value } = buildTopThree([a, b]);
+    expect(value).toHaveLength(2);
+  });
+
   it("uses confirmed effect for the business sentence when present", () => {
     const e = makeEvent({
       confirmedOperationalEffect: "The road was closed for three hours.",

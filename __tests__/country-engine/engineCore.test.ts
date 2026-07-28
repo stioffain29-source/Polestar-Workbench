@@ -57,6 +57,42 @@ describe("classifyArticle exclusions (§3-4)", () => {
     expect(r.exclusionReason).toBe("appointment_or_leadership");
   });
 
+  it("classifies a fatal fire as Fire and accident, not Violent crime", () => {
+    // "kills/killed" is a generic fatality token — when the occurrence is a
+    // fire (or hazard/transport), the death belongs to that category, not to
+    // Violent crime (owner-flagged mis-category in the Jakarta Top 3).
+    const r = classifyArticle(
+      { title: "Fire kills three in crowded market building" },
+      PNG,
+    );
+    expect(r.isEvent).toBe(true);
+    expect(r.issueCategory).toBe("Fire and accident");
+  });
+
+  it("classifies flood deaths as Natural hazard, not Violent crime", () => {
+    const r = classifyArticle(
+      { title: "Flash flood leaves four dead in low-lying district" },
+      PNG,
+    );
+    expect(r.isEvent).toBe(true);
+    expect(r.issueCategory).toBe("Natural hazard");
+  });
+
+  it("keeps a deliberate killing classified as Violent crime", () => {
+    const r = classifyArticle(
+      { title: "Man stabbed to death in late-night street attack" },
+      PNG,
+    );
+    expect(r.isEvent).toBe(true);
+    expect(r.issueCategory).toBe("Violent crime");
+  });
+
+  it("keeps a bare killing with no other occurrence cue as Violent crime", () => {
+    const r = classifyArticle({ title: "Two killed in village dispute" }, PNG);
+    expect(r.isEvent).toBe(true);
+    expect(r.issueCategory).toBe("Violent crime");
+  });
+
   it("excludes commentary / opinion", () => {
     const r = classifyArticle(
       { title: "Opinion: why the government must do more on law and order" },

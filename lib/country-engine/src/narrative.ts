@@ -20,6 +20,10 @@ import {
   findBannedPhrases,
   findBannedOpeners,
 } from "./bannedPhrases";
+import {
+  INDIRECT_ASSESSED_SENTENCE,
+  INDIRECT_ASSESSED_SENTENCE_ALT,
+} from "./impact";
 
 // Re-export the banned-phrase surface so callers can reach it via ./narrative.
 export {
@@ -406,7 +410,61 @@ function topRankedEvents(events: CanonicalEvent[]): CanonicalEvent[] {
       // correct when the week produced nothing that qualifies.
       isMaterialEvent(e),
   );
-  return rankEvents(eligible).slice(0, 3);
+  // Same-story guard (owner-flagged): an event and its follow-up ("suspects
+  // named in the X clash") must not occupy two of the three slots. Two events
+  // are the same story when they are linked by duplicate/related ids, or share
+  // category + a distinctive proper-noun title anchor within a 2-day window.
+  const ranked = rankEvents(eligible);
+  const picked: CanonicalEvent[] = [];
+  for (const e of ranked) {
+    if (picked.some((p) => isSameStory(p, e))) continue;
+    picked.push(e);
+    if (picked.length === 3) break;
+  }
+  return picked;
+}
+
+// Geographic/administrative filler that must not count as a story anchor (see
+// the same-event clustering rule: shared place words merge DISTINCT events).
+const STORY_ANCHOR_FILLER = new Set([
+  "jakarta", "central", "north", "south", "east", "west", "greater",
+  "police", "district", "village", "province", "regency", "city", "island",
+]);
+
+function isSameStory(a: CanonicalEvent, b: CanonicalEvent): boolean {
+  if (a.duplicateGroupId && a.duplicateGroupId === b.duplicateGroupId) return true;
+  if (a.relatedEventIds.includes(b.eventId) || b.relatedEventIds.includes(a.eventId)) {
+    return true;
+  }
+  if (a.issueCategory !== b.issueCategory) return false;
+  if (!a.eventDate || !b.eventDate) return false;
+  const dayDiff =
+    Math.abs(Date.parse(a.eventDate) - Date.parse(b.eventDate)) / 86_400_000;
+  if (!(dayDiff <= 2)) return false;
+  // A shared PLACE name must never merge two distinct events (two separate
+  // crimes in the same district are two stories). Exclude every token drawn
+  // from either event's resolved location fields from anchor matching.
+  const placeTokens = new Set<string>();
+  for (const e of [a, b]) {
+    for (const field of [e.city, e.district, e.provinceOrState]) {
+      for (const w of (field ?? "").toLowerCase().split(/[^a-z]+/)) {
+        if (w.length >= 4) placeTokens.add(w);
+      }
+    }
+  }
+  // Proper-noun anchors only: drop the title's leading word first (sentence
+  // case makes any opening word capitalized — "Armed robbery…" is not an
+  // anchor), then keep remaining capitalized tokens minus geographic filler
+  // and minus resolved place names.
+  const tokens = (t: string): Set<string> =>
+    new Set(
+      (t.replace(/^\s*\S+/, "").match(/\b[A-Z][a-z]{4,}\b/g) ?? [])
+        .map((s) => s.toLowerCase())
+        .filter((s) => !STORY_ANCHOR_FILLER.has(s) && !placeTokens.has(s)),
+    );
+  const ta = tokens(a.eventTitle);
+  for (const t of tokens(b.eventTitle)) if (ta.has(t)) return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -502,16 +560,26 @@ function harmPhrase(events: CanonicalEvent[]): string | null {
 function trajectorySentence(
   events: CanonicalEvent[],
   priorPeriodEvents: CanonicalEvent[],
+  variant = 0,
 ): string {
   const delta = events.length - priorPeriodEvents.length;
   // §16 — comparative claims always carry the figures they rest on.
   const figures = `(${events.length} validated ${events.length === 1 ? "event" : "events"} against ${priorPeriodEvents.length})`;
+  // Repetition guard: this sentence renders in both the BLUF and the Outlook —
+  // the second surface uses alternate wording so the same sentence never
+  // appears verbatim twice. Same facts, same figures.
   const volume =
     delta >= 2
-      ? `Reporting volume increased compared with the previous period ${figures}`
+      ? variant === 0
+        ? `Reporting volume increased compared with the previous period ${figures}`
+        : `Validated reporting ran higher than in the previous period ${figures}`
       : delta <= -2
-        ? `Reporting volume fell compared with the previous period ${figures}`
-        : `Reporting volume was broadly in line with the previous period ${figures}`;
+        ? variant === 0
+          ? `Reporting volume fell compared with the previous period ${figures}`
+          : `Validated reporting ran lower than in the previous period ${figures}`
+        : variant === 0
+          ? `Reporting volume was broadly in line with the previous period ${figures}`
+          : `Validated reporting held near the previous period's level ${figures}`;
   const worst = (list: CanonicalEvent[]): number =>
     list.reduce((m, e) => Math.max(m, severityRank(e.severity)), -1);
   const cur = worst(events);
@@ -600,6 +668,13 @@ export function buildTopThree(
   // §14 excludes commentary/background/not-an-incident/cancelled from top slots.
   const ranked = topRankedEvents(events);
 
+  // Repeat suppression: the derived category implication is generic to the
+  // category, so printing it verbatim on more than one of the three slots is
+  // boilerplate, not analysis. Each implication string appears at most once;
+  // later same-category items keep their harm/ongoing sentences (event-specific)
+  // and otherwise omit rather than repeat (§14 — omit, never pad).
+  const usedImplications = new Set<string>();
+
   const value: TopDevelopment[] = ranked.map((e) => {
     const location = locationLabel(e);
     const factualSentence = e.eventSummary.trim();
@@ -629,8 +704,15 @@ export function buildTopThree(
           confidence: e.classificationConfidence,
         }),
       );
-    } else if (e.assessedOperationalRelevance) {
+    } else if (
+      e.assessedOperationalRelevance &&
+      !usedImplications.has(e.assessedOperationalRelevance.trim())
+    ) {
+      // Repetition guard: the assessed relevance is a fixed template sentence,
+      // so two developments can carry identical text — emit it once, omit the
+      // repeat (§14 — omit, never pad).
       businessSentence = e.assessedOperationalRelevance.trim();
+      usedImplications.add(businessSentence);
       claims.push(
         makeClaim({
           claimText: businessSentence,
@@ -641,7 +723,7 @@ export function buildTopThree(
           confidence: e.classificationConfidence,
         }),
       );
-    } else {
+    } else if (!e.confirmedOperationalEffect && !e.assessedOperationalRelevance) {
       // No stored effect — derive a proportionate assessed meaning from the
       // event's OWN stored attributes (category, status, casualties). This is
       // still evidence-linked (the implication follows from the stored
@@ -653,6 +735,7 @@ export function buildTopThree(
       const implication = isMaterialEvent(e)
         ? CATEGORY_IMPLICATIONS[e.issueCategory]
         : undefined;
+      const isRepeat = implication != null && usedImplications.has(implication);
       if (implication) {
         const harm = harmPhrase([e]);
         const parts: string[] = [];
@@ -661,13 +744,17 @@ export function buildTopThree(
             `The reported ${harm} make this a staff-safety concern first.`,
           );
         }
-        parts.push(`For operators, an event of this kind ${implication}.`);
+        if (!isRepeat) {
+          usedImplications.add(implication);
+          parts.push(`For operators, an event of this kind ${implication}.`);
+        }
         if (e.eventStatus === "Ongoing") {
           parts.push(
             "The situation was reported as ongoing, so conditions nearby may change at short notice.",
           );
         }
-        businessSentence = parts.join(" ");
+        businessSentence = parts.length > 0 ? parts.join(" ") : null;
+        if (businessSentence) {
         claims.push(
           makeClaim({
             claimText: businessSentence,
@@ -678,6 +765,7 @@ export function buildTopThree(
             confidence: 70,
           }),
         );
+        }
       }
     }
 
@@ -745,7 +833,10 @@ export function buildBluf(
     .map(([c]) => categoryPhrase(c));
   const { locations: allLocations, hasUnlocated, unlocatedCount, totalCount } =
     priorityLocations(events);
-  const locations = allLocations.slice(0, 3);
+  // Tautology guard: never list the report's own theatre name as a location.
+  const locations = allLocations
+    .filter((l) => l.toLowerCase() !== countryName.toLowerCase())
+    .slice(0, 3);
 
   // Sentence 1 — most significant development with location + date. The title
   // is naturalised (never a raw wire headline) and the location clause is
@@ -765,9 +856,33 @@ export function buildBluf(
     return `${categoryPhrase(e.issueCategory)}${harm ? ` with reported ${harm}` : ""}${locationClause(e)} on ${formatDate(e.eventDate)}`;
   };
   const s1 = `The most serious validated development in ${countryName} was ${describeEvent(lead)}.`;
+  // Repetition guard (owner-flagged): when the other top developments share the
+  // lead's category and location, naming each in full reads as the same clause
+  // three times ("violent crime in East Jakarta on ... and violent crime in
+  // East Jakarta on ..."). Group same category+location stories into ONE
+  // clause carrying all their dates, and prefix "further" when the group
+  // repeats the lead's category+location.
+  const descKey = (e: CanonicalEvent): string =>
+    `${categoryPhrase(e.issueCategory)}|${locationClause(e)}`;
+  const leadKey = descKey(lead);
+  const otherGroups = new Map<string, CanonicalEvent[]>();
+  for (const e of otherTop) {
+    const k = descKey(e);
+    const g = otherGroups.get(k);
+    if (g) g.push(e);
+    else otherGroups.set(k, [e]);
+  }
+  const otherClauses = [...otherGroups.entries()].map(([k, evs]) => {
+    if (evs.length === 1 && k !== leadKey) return describeEvent(evs[0]);
+    const first = evs[0];
+    const harm = harmPhrase(evs);
+    const dates = [...new Set(evs.map((ev) => formatDate(ev.eventDate)))];
+    const prefix = k === leadKey ? "further " : "";
+    return `${prefix}${categoryPhrase(first.issueCategory)}${harm ? ` with reported ${harm}` : ""}${locationClause(first)} on ${joinAnd(dates)}`;
+  });
   const s1bText =
     otherTop.length > 0
-      ? `The period also brought ${joinAnd(otherTop.map(describeEvent))}.`
+      ? `The period also brought ${joinAnd(otherClauses)}.`
       : "";
   claims.push(
     makeClaim({
@@ -1037,8 +1152,14 @@ export function buildCurrentSituation(
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .map(([c]) => categoryPhrase(c));
-  const { locations, hasUnlocated, unlocatedCount, totalCount } =
+  const { locations: rawLocations, hasUnlocated, unlocatedCount, totalCount } =
     priorityLocations(events);
+  // Tautology guard (owner-flagged): "concentrated in Jakarta" inside the
+  // Jakarta report says nothing — drop any location equal to the report's own
+  // theatre name from the concentration list.
+  const locations = rawLocations.filter(
+    (l) => l.toLowerCase() !== countryName.toLowerCase(),
+  );
 
   const s1 = locations.length
     ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`
@@ -1145,6 +1266,11 @@ export function buildOperationalImpact(
 ): NarrativeResult<OperationalImpactEntry[]> {
   const claims: EvidenceRecord[] = [];
   const value: OperationalImpactEntry[] = [];
+  // Repetition guard (owner-flagged): assessedOperationalRelevance is a fixed
+  // template sentence, so several categories can carry the identical text.
+  // Emit each verbatim assessed sentence ONCE across the whole section —
+  // repeating it per category is boilerplate, not analysis.
+  const usedAssessed = new Set<string>();
 
   for (const [category, catEvents] of eventsByCategory) {
     const confirmed = catEvents.filter((e) => e.confirmedOperationalEffect);
@@ -1173,9 +1299,15 @@ export function buildOperationalImpact(
       );
     }
 
-    if (assessed.length > 0) {
+    if (assessed.length > 0 && !usedAssessed.has(assessed[0].assessedOperationalRelevance!.trim())) {
       const e = assessed[0];
-      const sentence = `${e.assessedOperationalRelevance!.trim()}`;
+      const raw = e.assessedOperationalRelevance!.trim();
+      usedAssessed.add(raw);
+      // A Top Development card already carries the fixed Indirect template
+      // verbatim; this section restates it in alternate wording (same meaning)
+      // so the identical sentence never renders twice in one report.
+      const sentence =
+        raw === INDIRECT_ASSESSED_SENTENCE ? INDIRECT_ASSESSED_SENTENCE_ALT : raw;
       parts.push(sentence.endsWith(".") ? sentence : `${sentence}.`);
       claims.push(
         makeClaim({
@@ -1473,7 +1605,7 @@ export function buildOutlook(
 
   // Trajectory framing — legal only with prior data (§16).
   if (priorPeriodEvents) {
-    const s2b = `${trajectorySentence(events, priorPeriodEvents)} The coming days should be judged against that direction rather than any single event.`;
+    const s2b = `${trajectorySentence(events, priorPeriodEvents, 1)} The coming days should be judged against that direction rather than any single event.`;
     parts.push(s2b);
     claims.push(
       makeClaim({
