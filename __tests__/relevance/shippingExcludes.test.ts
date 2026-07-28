@@ -112,6 +112,17 @@ describe("shipping exclude stack (off-region gate + commerce-homonym regression 
     expect(v.relevant).toBe(true);
   });
 
+  it("a masthead .net TLD cannot fire the 'nets?' commerce verb against a vessel word", () => {
+    // Real row (id 562): title+summary concatenation put "…Breakingthenews.net
+    // UK receives report of vessel…" inside the 30-char window, so the bare
+    // \bnets?\b alternation matched the TLD and hid a live vessel-fire report.
+    const v = verdict(
+      "UK receives report of vessel on fire - Breakingthenews.net",
+      "UK receives report of vessel on fire in the Red Sea Breakingthenews.net",
+    );
+    expect(v.relevant).toBe(true);
+  });
+
   it("SHIPPING_EXCLUDE is NOT theatre-suppressed (Hormuz name-drop cannot rescue commerce noise)", () => {
     const v = verdict("Defender-Viper: Royal Navy's new minehunting drone helping to safeguard the Strait of Hormuz");
     expect(v.relevant).toBe(false);

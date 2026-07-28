@@ -11,3 +11,6 @@ description: Freight-economics words leaking into the maritime-SECURITY relevanc
 
 ## Sale-and-purchase verb ambiguity (2026-07-28)
 "lands" and "orders" in the S&P exclude collaterally swallowed live coverage ("projectile LANDS near tanker", "Iran ORDERS tanker to stop"). Ambiguous verbs may only pair with an unambiguous vessel-CLASS/newbuild object, never bare tanker/vessel/tonnage. UKMTO "projectile near tanker" advisories also needed their own REQUIRED phrase (they'd only ever ingested because the exclude short-circuited first). KEEP/DROP fixture suites now pin fuel + shipping (__tests__/relevance/fuelExcludes.test.ts, shippingExcludes.test.ts).
+
+## Masthead-TLD verb trap (2026-07-28)
+The relevance haystack concatenates title+summary, so a source-name TLD can complete a commerce-verb match ACROSS the boundary: "…Breakingthenews**.net** UK receives report of **vessel**…" fired `\bnets?\b … vessel` and hid a live vessel-fire advisory. `nets?` now carries `(?<!\.)`. When adding short commerce verbs, check whether a masthead/TLD substring (".net") can satisfy them at a `\b` boundary. Also: UKMTO "vessel ON fire / ablaze" needed its own REQUIRED phrase (the adjacent "vessel fire" alternation misses the preposition).

@@ -1026,7 +1026,11 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   // incidents, so they only fire against an unambiguous vessel-CLASS /
   // newbuild object below ("Dynacom lands $65m for ageing suezmax",
   // "orders VLCC newbuilds"), never a bare tanker/vessel.
-  /\b(cashes? in|pockets?|nets?|bags?|snaps? up|offloads?|disposes?|sells?|buys?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  // NOTE: "nets" carries a lookbehind so a masthead TLD (".net" in
+  // "Breakingthenews.net") can never fire it — a concatenated
+  // title+summary haystack put "…breakingthenews.net UK receives report
+  // of vessel…" within the 30-char window and hid a live vessel-fire row.
+  /\b(cashes? in|pockets?|(?<!\.)nets?|bags?|snaps? up|offloads?|disposes?|sells?|buys?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
   /\b(lands?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership|newbuild)/,
   /\b(ageing|aging|veteran|elderly|second[- ]hand|secondhand) (suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|pair|trio|duo|tonnage)\b/,
   /\b\$\d+\s*m?\s*(gain|profit) from\b/,
@@ -1485,6 +1489,10 @@ const REQUIRED: Record<string, RegExp[]> = {
   ],
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
+    // UKMTO-style casualty advisories phrase it as "vessel ON fire" /
+    // "tanker ablaze" — the adjacent "vessel fire" phrase above misses the
+    // preposition (real row: "UK receives report of vessel on fire").
+    /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (is |reported )?(on fire|ablaze|caught fire)\b/,
     /\battack (on|against) (a |an |the )?(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew)/,
     // Piracy / sea robbery against vessels (mirrors the ingest ALLOW list).
     // Maritime-qualified phrases plus a proximity match so a ReCAAP-style
