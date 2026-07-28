@@ -607,6 +607,54 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // otherwise carry it. Requires the syndicate/organised-crime noun in the
   // headline, so a "crackdown on protesters" headline never matches.
   /\b(counter[- ]setting|crime |criminal |smuggling |scam |drug |vice |illegal[- ]betting )?syndicates?\b[^.!?]{0,60}\bcrackdowns?\b|\bcrackdowns?\b[^.!?]{0,40}\b(counter[- ]setting|syndicates?)\b/i,
+  // ---- Think-piece / retrospective essays about PAST unrest ----
+  // Analytical essays and retrospectives carry protest keywords but no live
+  // public-order signal. Each pattern below is bound to distinctive essay
+  // framing that never appears in a live-event headline, so genuine coverage
+  // (including protests AT a High Commission, "demands release of commission
+  // report", anniversary marches) is untouched.
+  //
+  // Essay thesis framing — "Nepal's Gen Z protests are a call for democratic
+  // renewal", "Nepal's youth protests: A warning for South Asian democracies".
+  // The protest noun followed by an "is/are/: a <abstraction>" copula is a
+  // commentary thesis, never an event report.
+  /\b(protests?|unrest|uprising|riots?)\b[^.!?]{0,10}\b(is|are|was|were|remains?)\s+a\s+(call for|warning|lesson|reminder|wake[- ]up call|turning point|test|watershed|blueprint|template)\b/i,
+  /\b(protests?|unrest|uprising|riots?):\s+a\s+(call for|warning|lesson|reminder|wake[- ]up call|turning point|test|watershed)\b/i,
+  // "The questions emerging from Nepal's Gen Z protests", "lessons learned
+  // from the uprising" — reflective distillation, not an event.
+  /\b(questions?|lessons?|takeaways?)\s+(emerging|arising|learn(ed|t)|drawn|to be learn(ed|t))\s+from\b/i,
+  // "What Authoritarians May Learn About Censorship From Nepal's Protests" —
+  // the may/could-learn-from construction is essay-speak only.
+  /\b(may|might|can|could|should|must)\s+learn\s+(from|about)\b/i,
+  // "Nepal's Protest-Fueled Transition" — the compound adjective + an
+  // abstract political-arc noun is analysis framing; a live headline says
+  // "protests fuel clashes", never "protest-fueled transition".
+  /\bprotest[- ]fuel(l)?ed\s+(transition|shift|reckoning|moment|era|reset|realignment|awakening)\b/i,
+  // "Post-Protest Bangladesh: Restoration More than Renewal" — the
+  // "post-protest/post-uprising <place>" label is retrospective analysis;
+  // live coverage says "after the protests", never "post-protest".
+  /\bpost[- ](protest|uprising|unrest|revolution)\b/i,
+  // Obituary / profile retrospective — "Who was Sharif Osman Hadi? The rise
+  // and killing of Bangladesh's protest icon".
+  /^\s*who\s+(was|is)\b[^?]{0,60}\?/i,
+  /\brise and (killing|fall|death|assassination) of\b/i,
+  // Trend-analysis framing — "Balen Shah's political rise … reflects a
+  // broader shift after youth-led protests".
+  /\breflects?\s+a\s+(broader|wider|deeper|larger)\s+(shift|trend|change|realignment)\b/i,
+  // Question-framed capability/forecast analysis — "Can Nepal actually
+  // enforce its Human Rights Commission's findings?". A leading
+  // can/could/should/will interrogative marks a debate piece, not an event
+  // report (extends the existing what/why/how/did openers).
+  /^\s*(?:can|could|should|will)\b[^?]{0,90}\?/i,
+  // Commission / inquiry AFTERMATH procedure — "Nepal commission submits
+  // September protest probe report", "Inquiry commission seeks extra month
+  // to probe … crackdown", "commission hears", "probe finds security
+  // lapses", "NHRC Directs Further Investigation into … Protest
+  // Organizers". Gated on the inquiry NOUN plus a procedural verb, so a
+  // live protest that merely NAMES a commission ("Gen Z Alliance Protests…
+  // Demands Release of Karki Commission Report", any demonstration outside
+  // a High Commission, "Police Commissioner apologises") never matches.
+  /\b(commissions?|inquir(y|ies)|probes?|panels?|tribunals?)\b[^.!?]{0,60}\b(submits?|submitted|hands? (over|in)|hears?|heard|finds?|found|concludes?|concluded|releases? (its|the|final)|seeks? (an? )?(extra|more|additional)|directs? (a )?(further|fresh|new)? ?investigation)\b/i,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
