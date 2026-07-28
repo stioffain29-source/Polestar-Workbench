@@ -455,6 +455,22 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\b(in|look)\s+photos:\s/,
   /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
+  // Misinformation / fact-check headline — "video falsely shared", "falsely
+  // linked to … protests", "Fake Letter Falsely Claims …", "AFP Fact Check".
+  // The STORY is about false content, not a public-order event, yet phrases
+  // like "Gen-Z protest" inside the debunk title would otherwise title-rescue
+  // it. "falsely"/"fact check"/"debunk" never appear in a genuine live-protest
+  // headline, so this is safe to run before the rescue.
+  /\bfalsely\b|\bfact[- ]check\w*\b|\bdebunk\w*\b|\bmisinformation\b|\bdoctored\b|\bai[- ]generated (video|image|clip|footage)\b|\bfake (letter|video|image|clip|footage|post|account|news)\b/,
+  // Staged law-enforcement SHOWCASE demonstration — "Drug Smuggling Crackdown
+  // Demonstration at Incheon Airport's … Inspection Checkpoint" is a press /
+  // photo-op display of enforcement capability, not a protest. A genuine demo
+  // AGAINST a crackdown reads "demonstration against/over the crackdown",
+  // never "<enforcement-noun> demonstration", so the noun-immediately-before
+  // shape is unambiguous. Must run before the title-rescue (the bare word
+  // "demonstration" would rescue it) and cannot live in the display-
+  // demonstration gate (its protest-companion spare includes "crackdown").
+  /\b(crackdown|inspection|screening|checkpoint|customs|counter[- ]?terror\w*|anti[- ]?smuggling|k-?9|sniffer|drill|drills)\s+demonstrations?\b/,
   // Metaphorical "instant protest" headline — runs BEFORE the title-rescue so
   // the bare word "protest" can no longer rescue the quoted figure of speech.
   /\binstant protest\b/,
