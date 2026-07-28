@@ -455,13 +455,6 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\b(in|look)\s+photos:\s/,
   /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
-  // Misinformation / fact-check headline — "video falsely shared", "falsely
-  // linked to … protests", "Fake Letter Falsely Claims …", "AFP Fact Check".
-  // The STORY is about false content, not a public-order event, yet phrases
-  // like "Gen-Z protest" inside the debunk title would otherwise title-rescue
-  // it. "falsely"/"fact check"/"debunk" never appear in a genuine live-protest
-  // headline, so this is safe to run before the rescue.
-  /\bfalsely\b|\bfact[- ]check\w*\b|\bdebunk\w*\b|\bmisinformation\b|\bdoctored\b|\bai[- ]generated (video|image|clip|footage)\b|\bfake (letter|video|image|clip|footage|post|account|news)\b/,
   // Staged law-enforcement SHOWCASE demonstration — "Drug Smuggling Crackdown
   // Demonstration at Incheon Airport's … Inspection Checkpoint" is a press /
   // photo-op display of enforcement capability, not a protest. A genuine demo
