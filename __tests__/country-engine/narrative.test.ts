@@ -14,6 +14,7 @@ import {
   assertNoUnsupportedTrend,
   findBannedOpeners,
   naturaliseTitle,
+  compactTitle,
   APPROVED_RECOMMENDATIONS,
 } from "@workspace/country-engine/narrative";
 
@@ -96,6 +97,41 @@ describe("capWords", () => {
 // ---------------------------------------------------------------------------
 // naturaliseTitle (§14/§15)
 // ---------------------------------------------------------------------------
+
+describe("compactTitle (§31 clause-boundary trimming)", () => {
+  it("trims at a semicolon", () => {
+    expect(
+      compactTitle("Kama SDA student found dead; police investigate murder"),
+    ).toBe("Kama SDA student found dead");
+  });
+
+  it("trims at a dash", () => {
+    expect(compactTitle("Highway ambush halts convoys — drivers strike")).toBe(
+      "Highway ambush halts convoys",
+    );
+  });
+
+  it("trims at a comma followed by a connective", () => {
+    expect(
+      compactTitle("Armed raid leaves two dead, as tensions rise in Lae"),
+    ).toBe("Armed raid leaves two dead");
+  });
+
+  it("does not trim at a bare list comma", () => {
+    const t = "Clashes reported in Lae, Madang and Wewak";
+    expect(compactTitle(t)).toBe(t);
+  });
+
+  it("returns the whole title when no clause boundary exists", () => {
+    const t = "Armed robbery at a market in Lae";
+    expect(compactTitle(t)).toBe(t);
+  });
+
+  it("returns the whole title when the first clause is too short", () => {
+    const t = "Riot erupts; hundreds of protesters storm the assembly grounds";
+    expect(compactTitle(t)).toBe(t);
+  });
+});
 
 describe("naturaliseTitle", () => {
   it("converts a shouty ALL-CAPS headline to sentence case", () => {
@@ -533,6 +569,41 @@ describe("buildBluf top-development references vs word cap (§14/§15)", () => {
     const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
     for (const dev of top) {
       expect(bluf.toLowerCase()).toContain(dev.title.trim().toLowerCase());
+    }
+  });
+
+  it("compacts long titles at clause boundaries to keep the BLUF within 120 words", () => {
+    // Titles long enough that FULL forms alone would exceed the 120-word cap,
+    // but each carrying a clause boundary the compact form can trim at.
+    const pad = (n: number) =>
+      Array.from({ length: 30 }, (_, i) => `context${n}word${i}`).join(" ");
+    const events = [
+      makeEvent({
+        eventTitle: `Armed raid on a fuel depot leaves two dead, as ${pad(1)}`,
+        severity: "Extreme",
+        casualties: 2,
+      }),
+      makeEvent({
+        eventTitle: `Riot outside the provincial assembly injures police; ${pad(2)}`,
+        severity: "High",
+      }),
+      makeEvent({
+        eventTitle: `Highway ambush near Kainantu halts convoys — ${pad(3)}`,
+        severity: "High",
+      }),
+    ];
+    const { value: top } = buildTopThree(events);
+    expect(top).toHaveLength(3);
+    const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
+    expect(countWords(bluf)).toBeLessThanOrEqual(120);
+    // Every top development is still referenced via its compact form, which is
+    // a verbatim leading clause of the stored title (no fabrication).
+    for (const dev of top) {
+      const compact = compactTitle(dev.title).toLowerCase();
+      expect(dev.title.toLowerCase().startsWith(compact.toLowerCase())).toBe(
+        true,
+      );
+      expect(bluf.toLowerCase()).toContain(compact);
     }
   });
 

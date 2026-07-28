@@ -14,6 +14,7 @@ import type {
 import { findBannedPhrases } from "./bannedPhrases";
 import {
   assertNoUnsupportedTrend,
+  compactTitle,
   countWords,
   type CountryNarrative,
 } from "./narrative";
@@ -134,9 +135,16 @@ export function checkTopDevelopmentsReferenced(
   for (const dev of n.topThree) {
     // TopDevelopment.title is the naturalised title — the exact text buildBluf
     // embeds (case-insensitively; only the first letter may differ).
+    // buildBluf may fall back to the compact (clause-boundary trimmed)
+    // reference form when full titles alone would blow the §31 word cap, so
+    // accept either the full naturalised title or its compact form.
     const needle = dev.title.trim().toLowerCase();
+    const compactNeedle = compactTitle(dev.title).trim().toLowerCase();
     if (!needle) continue;
-    if (!haystack.includes(needle)) {
+    if (
+      !haystack.includes(needle) &&
+      !(compactNeedle && haystack.includes(compactNeedle))
+    ) {
       failures.push({
         check: "top_development_referenced",
         severity: "critical",

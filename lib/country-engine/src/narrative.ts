@@ -229,6 +229,28 @@ export function naturaliseTitle(title: string): string {
 }
 
 /**
+ * §15/§31 — compact reference form of a title for the BLUF when the mandatory
+ * top-development references alone would blow the 120-word cap. Trims at a
+ * CLAUSE BOUNDARY ONLY (semicolon, colon, dash, or a comma followed by a
+ * subordinating/coordinating connective) so the shortened reference is always
+ * a true statement drawn verbatim from the stored title — never a mid-clause
+ * fragment, never fabricated. Titles without a clause boundary (or whose
+ * first clause is too short to stand alone) are returned whole.
+ */
+const CLAUSE_BOUNDARY_RE =
+  /\s*(?:;|—|–|-{2,})\s*|:\s+|,\s+(?:as|after|amid|while|following|with|before|which|who|where|when|and|but)\b/i;
+
+export function compactTitle(title: string): string {
+  const full = naturaliseTitle(title);
+  const m = CLAUSE_BOUNDARY_RE.exec(full);
+  if (!m || m.index === 0) return full;
+  const clause = full.slice(0, m.index).trim();
+  // A stand-alone clause needs enough substance to identify the story.
+  if (countWords(clause) < 4) return full;
+  return clause;
+}
+
+/**
  * Priority-location list for BLUF / Current Situation / Pole Star View.
  * Prefers sub-national locations and NEVER mixes the country name into the
  * list when sub-national ones exist (naming the whole country as a "location"
@@ -668,9 +690,33 @@ export function buildBluf(
   // Sentence 1 — most significant development with location + date. The title
   // is naturalised (never a raw wire headline) and the location clause is
   // omitted when the location is Country only / Unknown (§14/§15).
-  const s1 =
-    `The most serious validated development in ${countryName} was ` +
-    `${lowerFirst(naturaliseTitle(lead.eventTitle))}${locationClause(lead)} on ${formatDate(lead.eventDate)}.`;
+  //
+  // §31 — when the mandatory reference sentences built from FULL titles would
+  // alone exceed the 120-word cap, fall back to the compact (clause-boundary
+  // trimmed) reference form so the BLUF names every headline story AND stays
+  // within the limit. Compaction never invents words — it only drops trailing
+  // clauses — and the §33 reference check accepts the compact form.
+  const otherTop = topRanked.slice(1);
+  const composeMandatory = (titleOf: (t: string) => string) => {
+    const first =
+      `The most serious validated development in ${countryName} was ` +
+      `${lowerFirst(titleOf(lead.eventTitle))}${locationClause(lead)} on ${formatDate(lead.eventDate)}.`;
+    const second =
+      otherTop.length > 0
+        ? `The period also brought ${joinAnd(
+            otherTop.map(
+              (e) => `${lowerFirst(titleOf(e.eventTitle))}${locationClause(e)}`,
+            ),
+          )}.`
+        : "";
+    return { first, second };
+  };
+  let { first: s1, second: s1bText } = composeMandatory(naturaliseTitle);
+  if (
+    countWords([s1, s1bText].filter(Boolean).join(" ")) > BLUF_MAX_WORDS
+  ) {
+    ({ first: s1, second: s1bText } = composeMandatory(compactTitle));
+  }
   claims.push(
     makeClaim({
       claimText: s1,
@@ -687,12 +733,8 @@ export function buildBluf(
   // only the single lead). Deterministic, drawn only from stored titles and
   // resolved locations — no fabrication.
   let s1b = "";
-  const otherTop = topRanked.slice(1);
   if (otherTop.length > 0) {
-    const refs = otherTop.map(
-      (e) => `${lowerFirst(naturaliseTitle(e.eventTitle))}${locationClause(e)}`,
-    );
-    s1b = `The period also brought ${joinAnd(refs)}.`;
+    s1b = s1bText;
     claims.push(
       makeClaim({
         claimText: s1b,
