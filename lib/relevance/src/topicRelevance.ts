@@ -577,7 +577,7 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // rights protest…to mock Colombo mayor"), the verification-piece framing
   // "Here's the truth", and rumour headlines quoting a purported 'support
   // letter' to protesters. All are coverage OF misinformation, not unrest.
-  /\b(doctored?|manipulated|edited|fabricated)\b[^.!?]{0,12}\b(photo|image|picture|video|clip|footage)s?\b|\bhere'?s the truth\b|['‘’"“”]support letter['‘’"“”]|\bspreads? false\b|\bmyths? vs\.? facts?\b/i,
+  /\b(doctor(s|ed)?|manipulated|edited|fabricated)\b[^.!?]{0,12}\b(photo|image|picture|video|clip|footage)s?\b|\bhere'?s the truth\b|['‘’"“”]support letter['‘’"“”]|\bspreads? false\b|\bmyths? vs\.? facts?\b/i,
   // Interrogative rumour-verification headline — "Did Bangladesh's
   // Jamaat-e-Islami send a 'support letter' to Delhi protesters?". A "Did …?"
   // question opener is a verification/debate piece, not an incident report.
@@ -718,7 +718,7 @@ const FP_REAL_UNREST_COMPANION_RE =
 // — deliberately NOT the bare word "demonstration", which the display sense
 // shares) so a real "farmers' demonstration turns violent" is always kept.
 const FP_DISPLAY_DEMONSTRATION_RE =
-  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|facilit(y|ies)|models?|kitchens?)\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
+  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|facilit(y|ies)|models?|kitchens?)\b|\bdemonstration\s+at\b[^.!?]{0,60}\b(music festival|festival|expo|fair|trade show|conference|summit)\b|\bdemonstration\s+and\s+(art\s+)?exhibition\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
 // Protest-specific companion (excludes the bare word "demonstration", which the
 // display sense shares) — used only to SPARE a genuine protest from the display-
 // demonstration exclude above.
@@ -753,12 +753,20 @@ const FP_ADVISORY_AGGREGATOR_RE =
 const FP_EDITORIAL_LABEL_RE =
   /^\s*\[?\s*(analysis|commentary|opinion|editorial|perspective|viewpoint|column|explainer|backgrounder|factbox|q&a)\s*[:\]\-–—|]/i;
 
+// Fact-check OUTLET credited in the raw headline suffix ("… - AFP Fact
+// Check", "… | BOOM Fact Check", "… - Newschecker"). Masthead stripping
+// removes the suffix from titleHaystack, so the misinformation excludes never
+// see it — a verification outlet only publishes verification journalism, so
+// the raw-title credit alone is decisive. Runs on the RAW title.
+const FP_FACTCHECK_OUTLET_RE =
+  /[-|–—:]\s*(afp|boom|reuters|ap)?\s*fact[- ]?check(er)?s?\s*$|\b(newschecker|factly|vera files fact check|rappler fact check|boomlive)\b/i;
+
 // Editorial FORMATS — listicles ("5 things to know"), digests ("Today's Top 3
 // News"), photo galleries ("in pictures"), yearenders, "explained" /
 // "what's next for" think-pieces, "lessons from" / "why X matters". A bundle
 // or retrospective, not a single civil-unrest event.
 const FP_EDITORIAL_FORMAT_RE =
-  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|\bphoto\s+(gallery|essay)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b/i;
+  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|\bphoto\s+(gallery|essay)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b|^\s*why\b[^.!?]{0,80}\b(protest\w*|unrest|movement)\b/i;
 
 // Protest AFTERMATH / clean-up (street cleaning after a demo, a "protests
 // aftermath" retrospective) — a non-event, unless an ongoing-unrest signal
@@ -2125,6 +2133,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // the raw title so the ^ anchor holds.
     if (FP_EDITORIAL_LABEL_RE.test(i.title ?? "")) {
       return { relevant: false, reason: "excluded: editorial label (opinion/analysis/explainer), not a civil-unrest event" };
+    }
+    // Fact-check outlet credited in the raw title (masthead stripping hides
+    // the "- AFP Fact Check" suffix from the misinformation excludes).
+    if (FP_FACTCHECK_OUTLET_RE.test(i.title ?? "")) {
+      return { relevant: false, reason: "excluded: fact-check outlet verification piece, not a civil-unrest event" };
     }
     // Editorial FORMAT (listicle/digest/gallery/yearender/think-piece).
     if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {

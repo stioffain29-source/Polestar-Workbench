@@ -1323,7 +1323,7 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   const driverLine = drivers.length > 0
     ? `Activity is being driven by ${joinList(drivers)} — several separate organising efforts that are harder for authorities to contain than a single-issue wave and that historically turn into rolling road action within 24-72 hours of an announced date.`
     : `Activity is running on steady background organising rather than any single named driver, which usually points to a quiet stretch rather than a lasting easing.`;
-  const operational = `Operationally, the pressure points to watch are city-centre commercial districts, court complexes, party headquarters, ministry quarters and the main intercity arteries. Staff movement, last-mile deliveries and customer-facing sites are usually affected before anything else; supply-chain friction from sectoral walkouts tends to follow a day or so later.`;
+  const operational = `The locations to watch are city-centre commercial districts, court complexes, party headquarters, ministry quarters and the main intercity roads. Staff movement, deliveries and customer-facing sites are usually affected first; disruption to suppliers from sectoral walkouts tends to follow a day or so later.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${driverLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -1348,7 +1348,7 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   const postureLine = postureBits.length > 0
     ? `How the authorities are responding is the key point right now: ${joinList(postureBits)}. That shortens the time from an announced rally to violence from days to hours and raises the chance that the next protest date draws a tougher response rather than measured policing.`
     : `The authorities' response looks measured rather than escalating — no curfews, mass arrests or visible crackdowns have been reported. That can change within days once a high-profile incident or political trigger occurs.`;
-  const operational = `For businesses, the takeaway is that crackdowns, curfew orders and internet shutdowns matter more than the headline number of protests: they show where staff movement, commercial operations and venue access can be disrupted at short notice. Where enforcement clusters around a single city or district, expect rolling road closures, patchy connectivity and same-day venue access restrictions.`;
+  const operational = `For businesses, the takeaway is that crackdowns, curfew orders and internet shutdowns matter more than the number of protests: they show where staff movement, commercial operations and venue access can be disrupted at short notice. Where enforcement clusters around a single city or district, expect road closures, patchy connectivity and same-day venue access restrictions.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -1377,7 +1377,7 @@ function buildForecastRead(opts: {
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
   const lines: string[] = [futureBlock];
   if (total === 0) {
-    lines.push(`The outlook for the next 7-14 days is for continued quiet, with little fresh protest or civil-unrest activity expected for now. The risk increases if a policy trigger occurs (a court ruling, a fuel-price decision, an election-calendar event) or a named opposition movement announces a fresh protest schedule. The risk eases if political calendars stay quiet and trade groups hold back.`);
+    lines.push(`The outlook for the next 7-14 days is for continued quiet, with little fresh protest or civil-unrest activity expected for now. The risk increases if a named movement announces a fresh protest schedule. The risk eases if political calendars stay quiet and trade groups hold back.`);
     return lines.join("\n\n");
   }
   const allRows = [...activismRows, ...unrestRows];
@@ -1516,7 +1516,7 @@ function buildRegionalCountryRead(opts: {
     const a = rows.filter((r) => r.bucket === "activism").length;
     const u = rows.filter((r) => r.bucket === "unrest").length;
     if (a > 0 && u > 0) return "announced rallies and sectoral walkouts that routinely draw a visible enforcement response";
-    if (a >= u) return "announced rallies, sectoral walkouts and student-body actions converting into rolling road closures";
+    if (a >= u) return "announced rallies, sectoral walkouts and student-body actions converting into road closures";
     return "visible state enforcement — curfew orders, mass arrests and security-force operations around named flashpoints";
   };
   const lociFor = (rows: EnrichedIncident[]): string => {
@@ -1691,7 +1691,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
     );
   } else if (lead) {
     lines.push(
-      `What matters most this week is how concentrated activity is in ${lead.label}, which historically turns into rolling road closures, patchy connectivity and short-notice pressure on staff movement around known flashpoints.`,
+      `What matters most this week is how concentrated activity is in ${lead.label}, which historically turns into road closures, patchy connectivity and short-notice pressure on staff movement around known protest sites.`,
     );
   } else {
     lines.push(
@@ -1738,7 +1738,7 @@ function buildImplications(ctx: AutoCtx): string {
     bullets.push(`Monitor for Section 144 / curfew orders, mass arrests and internet-shutdown notices in cities of operation — these move ahead of visible street-level disruption.`);
   }
   if (hasSectoral) {
-    bullets.push(`Wire procurement, distribution and customer-service into the security early-warning feed — the trade-group and union walkouts already reported routinely run 24-72 hours ahead of supply-chain friction.`);
+    bullets.push(`Wire procurement, distribution and customer-service into the security early-warning feed — the trade-group and union walkouts already reported routinely run 24-72 hours ahead of supply disruption.`);
   }
   if (hasCampus) {
     bullets.push(`Brief campus-adjacent sites on student-mobilisation patterns — campus action seeds wider city-centre protests within a week and is an early sign of a sustained run.`);
@@ -1794,7 +1794,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
     );
   }
   bullets.push(
-    `Union or chamber strike notices: supply-chain friction 24-72 hours ahead of any visible street activity.`,
+    `Union or chamber strike notices: supply disruption 24-72 hours ahead of any visible street activity.`,
     `Section 144 / curfew orders or assembly bans in a city of operation: trigger WFH and close public-facing sites the same day.`,
     `Court hearings or detention rulings on political figures: an adverse decision converts into same-day rallies near the court complex.`,
     `Student-union or campus mobilisation calls: an early sign that activity is building into a sustained rather than one-off run.`,
@@ -1835,7 +1835,7 @@ function buildWatchNext(ctx: AutoCtx): string {
     );
   } else {
     items.push(
-      `Triggers that historically turn a quiet stretch into a sharp one — fuel-price decisions, currency moves, election-calendar shifts, security-force deaths or a major court ruling. Treat any of these as accelerants and step up monitoring immediately.`,
+      `Any strike, rally or court date announced in current reporting. Treat confirmed dates as the main escalation risk and step up monitoring around them.`,
     );
   }
   return `${intro}\n\n${items.map((l) => `\u2022 ${l}`).join("\n\n")}`;
@@ -1864,7 +1864,7 @@ function buildPolestarView(ctx: AutoCtx): string {
   }
 
   // 2. Business disruption risk judgement.
-  const disruption = `Business disruption risk is moderate-to-elevated: short-notice transport disruption on protest days, closures of public-facing sites driven by Section 144 / curfew orders, and supply-chain friction from trade-group walkouts. The main remaining risk is a trigger — an adverse court ruling, a fuel-price decision, a security-force death — that tips this into sustained unrest.`;
+  const disruption = `Business disruption risk is moderate: short-notice transport disruption on protest days, closures of public-facing sites driven by Section 144 / curfew orders, and supply disruption from trade-group walkouts. The main remaining risk is an announced protest or strike date that draws larger crowds than this week's actions.`;
 
   return [verdict, disruption].join("\n\n");
 }

@@ -31,6 +31,16 @@ const DROP_FIXTURES: Array<[string, string]> = [
   ["fact-check debunk", "Video falsely shared as footage of Gen-Z protest in Kathmandu"],
   ["fake-content debunk", "Fake letter falsely claims university backed student protest"],
   ["AI-generated debunk", "AI-generated video of Jakarta riot circulates online, AFP fact check finds"],
+  ["fact-check outlet suffix", "South Korean reporter covering poll demonstrations targeted by anti-Chinese claims - AFP Fact Check"],
+  ["fact-check outlet suffix 2", "Bangladesh Nationalist Party Secures Majority In First Election After 2024 Protest - BOOM Fact Check"],
+  ["falsely link (uninflected)", "Posts falsely link old images to July 2025 Bangladesh protest"],
+  ["peddled-as debunk", "Video Of Protest In Bangladesh Peddled As CRPF Action In West Bengal"],
+  ["viral with false claim", "Old Photo Of Anti-India Protest In Bangladesh Viral With False Claim"],
+  ["shared with false communal claim", "Video Of Staged Protest In Bangladesh Shared With False Communal Claim"],
+  ["bare AI-generated", "Aerial view of South Korean election protests is AI-generated"],
+  ["footage-verification contrast", "Video shows land rights demonstration in Chiang Mai, not Bangkok rally against Myanmar leader"],
+  ["urges fact-checks statement", "Indonesia denies social media blocks during protest, urges fact-checks"],
+  ["posts doctor old photo", "Posts doctor old photo of prisoner rights protest in Sri Lanka to mock Colombo mayor"],
   // ---- Diplomatic / filed protest (a note, not a street event) ----
   ["filed diplomatic protest", "Manila files diplomatic protest after South China Sea clash"],
   ["lodged formal protest", "Vietnam lodges a formal protest over survey ship incursion"],
@@ -63,6 +73,12 @@ const DROP_FIXTURES: Array<[string, string]> = [
   ["further investigation directed", "Inquiry panel directs fresh investigation into protest organizers"],
   // ---- Crime-syndicate crackdown colour ----
   ["syndicate crackdown", "'Counter-setting syndicate' active at Johor border, KLIA despite crackdown"],
+  // ---- Showcase / essay leaks seen in the 21-27 Jul window ----
+  ["tech showcase at festival", "South Korea's First 'AI Urban Control Service' Demonstration at Incheon Pentaport Music Festival"],
+  ["demonstration-and-exhibition", "Demonstration and Art Exhibition at TIM Jakarta"],
+  ["why-essay comparative", "Why India's Gen Z protest movement differs from Nepal, Bangladesh and Sri Lanka"],
+  ["why-essay question", "Why Pakistan hasn't seen a major youth protest? US analyst reveals reason: 'Its social cleavages ...'"],
+  ["why-essay global trend", "Why Gen Z protests are reshaping politics worldwide: From Bangladesh and Nepal to India"],
 ];
 
 // [class label, headline] — every row must KEEP. Each shares vocabulary with a
@@ -83,6 +99,10 @@ const KEEP_FIXTURES: Array<[string, string]> = [
   ["protest turns violent (not heritage arc)", "Student protest turns violent as police fire tear gas in Kathmandu"],
   ["protesters file past parliament", "Protesters file past parliament demanding electoral reform"],
   ["teachers protest (title-rescue)", "Teachers protest abduction of colleague in Manila"],
+  ["doctors protest (not 'doctor photo')", "Doctors protest unpaid wages outside health ministry in Colombo"],
+  ["video shows crackdown (no contrast)", "Video shows police firing tear gas at protesters in Kathmandu"],
+  ["quoted-slogan real demonstration", "'No More Fuel Hikes' demonstration draws thousands in Jakarta"],
+  ["demonstration at govt venue", "Protesters stage demonstration at parliament over election law"],
 ];
 
 describe("flashpoint title hard-excludes (protest-noise regression pins)", () => {

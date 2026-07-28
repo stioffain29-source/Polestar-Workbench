@@ -213,18 +213,18 @@ export function forecastMeaningFor(r: UpcomingSignalInput): string {
   if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security and visitor management.";
   if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "Adverse ruling converts into same-day rallies near the court complex.";
   if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Validate against logistics corridor; pre-position alternative routings.";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply-chain friction and sectoral closures 24-72h ahead.";
-  return "Treat as leading indicator; confirm operating impact inside 24-48h.";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply disruption and sectoral closures 24-72h ahead.";
+  return "Confirm details, expected turnout and operating impact inside 24-48h.";
 }
 
 export function operationalMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply-chain friction and sectoral closures 24-72h ahead.";
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply disruption and sectoral closures 24-72h ahead.";
   if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "road closures and venue-access friction; brief drivers in advance.";
   if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "adverse ruling triggers same-day rallies near the court complex.";
   if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate against logistics corridor; pre-position alternative routings.";
   if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger WFH and close public-facing sites in the affected area.";
-  return "treat as leading indicator; confirm inside 24-48h.";
+  return "confirm details and likely turnout inside 24-48h.";
 }
 
 // A rendered forewarning row. `announcedAt` is the ANNOUNCEMENT / report date
