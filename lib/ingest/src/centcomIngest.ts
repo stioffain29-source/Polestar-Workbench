@@ -13,7 +13,6 @@ import {
   parseCentcomListing,
   parseCentcomRssListing,
   filterCentcomPressReleaseItems,
-  filterCentcomOfficialArticleItems,
   dedupeCentcomListingItems,
   bodyTextFromRssDescription,
   extractCentcomImageUrlsFromHtml,
@@ -31,6 +30,7 @@ import {
   CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
   DOD_NEWS_RELEASES_RSS_URL,
   CENTCOM_SOURCE_URL,
+  CENTCOM_PUBLIC_RELEASES_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
@@ -326,9 +326,12 @@ async function fetchDodCentcomListing(log: (s: string) => void): Promise<Centcom
 }
 
 function preparedFromRssListingItem(item: CentcomListingItem): PreparedRelease | null {
-  const bodyText = item.rssDescriptionHtml
+  const fromDescription = item.rssDescriptionHtml
     ? bodyTextFromRssDescription(item.rssDescriptionHtml)
     : item.summary?.trim() ?? "";
+  // Google News and official news RSS often ship whitespace-only descriptions;
+  // title-only is enough for routing/flags when detail pages are WAF-blocked.
+  const bodyText = fromDescription.trim() || item.title.trim();
   if (!bodyText) return null;
 
   const imageUrls = item.rssDescriptionHtml
@@ -430,11 +433,6 @@ async function loadListingItems(
   await trySource("official news RSS (press-release filter)", () =>
     fetchOfficialRssListing(CENTCOM_NEWS_RSS_URL, true),
   );
-  await trySource("official news RSS (all centcom.mil articles)", () =>
-    fetchOfficialRssListing(CENTCOM_NEWS_RSS_URL, false).then((items) =>
-      filterCentcomOfficialArticleItems(items),
-    ),
-  );
   await trySource("Google News narrow (press-release paths)", () =>
     fetchGoogleNewsCentcomListing(
       CENTCOM_GOOGLE_NEWS_RSS_URL,
@@ -446,7 +444,7 @@ async function loadListingItems(
     fetchGoogleNewsCentcomListing(
       CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
       log,
-      isCentcomOfficialArticleUrl,
+      isCentcomPressReleaseUrl,
     ),
   );
   await trySource("DoD news releases RSS (CENTCOM links)", () =>
@@ -456,11 +454,23 @@ async function loadListingItems(
   const listing = dedupeCentcomListingItems(merged);
   if (listing.length > 0) return listing;
 
-  try {
-    log(`  live fetch — HTML listing ${CENTCOM_SOURCE_URL}`);
-    const listingHtml = await fetchHtmlWithRetry(CENTCOM_SOURCE_URL);
+  const tryHtmlListing = async (label: string, url: string) => {
+    log(`  live fetch — HTML listing ${label}`);
+    const listingHtml = await fetchHtmlWithRetry(url);
     const fromHtml = parseCentcomListing(listingHtml, CENTCOM_SITE_ORIGIN);
-    if (fromHtml.length > 0) return fromHtml;
+    if (fromHtml.length > 0) {
+      log(`  ${label}: ${fromHtml.length} press release(s)`);
+      return fromHtml;
+    }
+    log(`  ${label}: no listing tiles`);
+    return null;
+  };
+
+  try {
+    const fromPublic =
+      (await tryHtmlListing("PUBLIC-RELEASES", CENTCOM_PUBLIC_RELEASES_URL)) ??
+      (await tryHtmlListing("PRESS-RELEASES", CENTCOM_SOURCE_URL));
+    if (fromPublic) return fromPublic;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (isCentcomBlockedError(err)) {
@@ -687,7 +697,11 @@ export async function runCentcomIngest(
     }
 
     if (commit) {
-      const feedOk = errors.length === 0 && prepared.length > 0;
+      const caughtUp =
+        parsedListing.length > 0 &&
+        listing.length === 0 &&
+        errors.length === 0;
+      const feedOk = errors.length === 0 && (prepared.length > 0 || caughtUp);
       const rawError = feedOk
         ? null
         : errors[0] ??

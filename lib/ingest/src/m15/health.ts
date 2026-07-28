@@ -6,7 +6,11 @@ export const UKMTO_HEALTH_NAME = "UKMTO Official Products";
 export const UKMTO_SOURCE_URL = "https://www.ukmto.org/ukmto-products";
 
 export const CENTCOM_HEALTH_NAME = "CENTCOM Press Releases";
+/** Legacy press-releases listing — may redirect or be empty; kept for Source Health URL. */
 export const CENTCOM_SOURCE_URL = "https://www.centcom.mil/MEDIA/PRESS-RELEASES/";
+/** Primary live listing path since mid-2026 (operational releases moved here from ContentType=2 RSS). */
+export const CENTCOM_PUBLIC_RELEASES_URL =
+  "https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/";
 /** Official press-release RSS (less WAF-sensitive than the HTML listing page). */
 export const CENTCOM_RSS_URL =
   "https://www.centcom.mil/DesktopModules/ArticleCS/RSS.ashx?ContentType=2&Site=808&isdashboardselected=0&max=50";

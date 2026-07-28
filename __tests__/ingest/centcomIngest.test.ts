@@ -395,4 +395,31 @@ describe("CENTCOM persist + routing (Step 3)", () => {
     });
     expect(stored[0]?.bodyText).toMatch(/Strait of Hormuz/);
   });
+
+  it("ingests from title when RSS description is empty and detail pages are blocked", async () => {
+    setupDbMock();
+    const listingItem = {
+      externalId: "4549648",
+      title: "CENTCOM Update on Recently Fallen U.S. Service Members",
+      publishedAt: new Date("2026-07-19"),
+      sourceUrl:
+        "https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/Article/4549648/centcom-update-on-recently-fallen-us-service-members/",
+      rssDescriptionHtml: " ",
+    };
+
+    const summary = await runCentcomIngest({
+      commit: true,
+      listingItems: [listingItem],
+      fetchDetailHtml: async () => {
+        throw new Error("Status code 403");
+      },
+      sincePublishedAt: null,
+    });
+
+    expect(summary.inserted).toBe(1);
+    expect(summary.errors).toEqual([]);
+    expect(stored[0]?.bodyText).toBe(
+      "CENTCOM Update on Recently Fallen U.S. Service Members",
+    );
+  });
 });
