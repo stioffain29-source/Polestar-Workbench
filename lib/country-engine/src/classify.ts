@@ -137,6 +137,15 @@ const CATEGORY_RULES: Array<[IssueCategory, RegExp]> = [
   ["Aviation", /\b(aircraft|aeroplane|airplane|\bplane\b|airline|flight|airport|helicopter|air traffic|runway|aviation)\b/i],
   ["Maritime", /\b(ferry|vessel|\bship\b|boat|maritime|capsiz\w*|shipwreck|port (?:closure|suspended)|coast ?guard|sank|drown\w*|jetty|wharf)\b/i],
   ["Road and rail", /\b(road (?:accident|crash)|traffic accident|bus (?:crash|accident)|train (?:crash|derail\w*)|derail\w*|highway (?:closed|blocked)|collision|pile[- ]up|rail\w*)\b/i],
+  // Fire and accident (§10 taxonomy extension). Precision-first: every alternate
+  // binds "fire"/"blaze" to an occurrence verb, a burned structure, or an
+  // accident noun — never a bare token — so metaphors ("under fire", "drawing
+  // fire", "fire sale"), dismissals ("fired"), gunfire ("open fire", excluded
+  // via lookbehind) and prevention/awareness PR (already excluded upstream by
+  // preparedness_or_awareness) cannot classify here. Ordered AFTER Violent
+  // crime / Civil unrest / transport rules so shootings, riots and crashes
+  // keep their primary category.
+  ["Fire and accident", /(?:\bfire (?:breaks? out|broke out|guts?|gutted|destroy\w*|engulf\w*|raz\w*|rips? through|ripped through|sweeps? through|swept through|kills?|killed|injur\w*|burns? down|burn(?:ed|t) (?:down|through))|\b(?:catch(?:es)?|caught) fire\b|\bburn(?:s|ed|t)? down\b|\bburned to the ground\b|\bgutted by (?:a )?(?:fire|blaze)\b|\b(?:house|home|residential|school|market|factory|plant|warehouse|shop|store|mall|building|hotel|apartment|kitchen|hospital|mosque|church|slum|depot|mill)s? (?:fire|blaze)\b|\bblaze (?:destroy\w*|guts?|gutted|engulf\w*|kills?|injur\w*|rips? through|ripped through)\b|\bmassive (?:fire|blaze)\b|(?<!open(?:s|ed)? )\bfire (?:at|in|hits?) (?:a|an|the)\b|\b(?:electrical|gas[- ]cylinder|lpg) (?:fire|explosion)\b|\bgas leak\b|\b(?:workplace|industrial|work) accident\b|\belectrocut\w*\b)/i],
   ["Utilities", /\b(power (?:cut|outage|failure)|blackout|electricity (?:cut|outage)|water (?:supply|shortage|cut)|load[- ]shedding|utility|grid failure|gas supply)\b/i],
   ["Telecommunications", /\b(internet (?:outage|shutdown|blackout)|network (?:outage|down)|telecom\w*|mobile network|connectivity (?:loss|outage)|fibre cut|undersea cable)\b/i],
   ["Natural hazard", /\b(earthquake|quake|tsunami|volcan\w*|eruption|flood\w*|landslide|cyclone|typhoon|storm|drought|wildfire|bushfire|tremor|mudslide|heavy rain)\b/i],

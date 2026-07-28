@@ -146,6 +146,64 @@ describe("classifyArticle exclusions (§3-4)", () => {
     }
   });
 
+  it("classifies genuine fire/accident events into Fire and accident with auto-include confidence", () => {
+    for (const title of [
+      "Fire breaks out at a plywood factory in Bekasi, dozens of workers evacuated",
+      "Warehouse fire in Tangerang destroys stored goods",
+      "School gutted by fire in Port Moresby overnight",
+      "House burns down in Quezon City, family displaced",
+      "Massive blaze rips through Jakarta slum area",
+      "Gas leak forces evacuation of apartment block in Surabaya",
+      "Two workers injured in industrial accident at Cilegon plant",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.isEvent).toBe(true);
+      expect(r.issueCategory).toBe("Fire and accident");
+      expect(r.classificationConfidence).toBeGreaterThanOrEqual(70);
+    }
+  });
+
+  it("keeps fire metaphors and non-fire homonyms out of Fire and accident", () => {
+    // Metaphor / dismissal / criticism homonyms must NOT match the fire rule.
+    for (const title of [
+      "Minister under fire over budget shortfall",
+      "Airline draws fire for delayed refunds",
+      "Company fires 200 workers amid restructuring",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.issueCategory).not.toBe("Fire and accident");
+    }
+    // Gunfire stays a security event, not a Fire and accident record.
+    const shooting = classifyArticle(
+      { title: "Soldiers opened fire at the checkpoint, two killed" },
+      INDONESIA,
+    );
+    expect(shooting.isEvent).toBe(true);
+    expect(shooting.issueCategory).not.toBe("Fire and accident");
+  });
+
+  it("fire-prevention PR stays excluded (preparedness beats the new category)", () => {
+    const r = classifyArticle(
+      { title: "Regency launches fire prevention campaign ahead of dry season" },
+      INDONESIA,
+    );
+    expect(r.isEvent).toBe(false);
+    expect(r.exclusionReason).toBe("preparedness_or_awareness");
+  });
+
+  it("wildfire stays Natural hazard, arson attack stays with security categories", () => {
+    const wild = classifyArticle(
+      { title: "Wildfire spreads across plantations in Riau" },
+      INDONESIA,
+    );
+    expect(wild.issueCategory).toBe("Natural hazard");
+    const torched = classifyArticle(
+      { title: "Rioters torched shops during unrest in Wamena" },
+      INDONESIA,
+    );
+    expect(torched.issueCategory).toBe("Civil unrest");
+  });
+
   it("classifies a genuine violent incident as an event", () => {
     const r = classifyArticle(
       { title: "Three killed in armed robbery at Lae market" },

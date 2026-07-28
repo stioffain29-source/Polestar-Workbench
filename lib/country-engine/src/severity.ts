@@ -135,7 +135,8 @@ export function assessSeverity(
     (category === "Natural hazard" ||
       category === "Aviation" ||
       category === "Maritime" ||
-      category === "Infrastructure") &&
+      category === "Infrastructure" ||
+      category === "Fire and accident") &&
     !CEREMONIAL_RE.test(text)
   ) {
     return {

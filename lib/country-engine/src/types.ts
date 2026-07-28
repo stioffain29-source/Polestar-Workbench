@@ -61,6 +61,7 @@ export const ISSUE_CATEGORIES = [
   "Utilities",
   "Telecommunications",
   "Infrastructure",
+  "Fire and accident",
   "Natural hazard",
   "Health",
   "Supply chain",
