@@ -91,6 +91,11 @@ import {
 } from "./fuelNarratives";
 import { pickRead } from "./pickRead";
 import { assertCargoReportValid } from "./cargoReportValidation";
+import {
+  buildCargoSecurityRead,
+  buildLogisticsHubRead,
+  buildCargoCountryBreakdown,
+} from "./cargoNarratives";
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -884,6 +889,24 @@ export async function exportTopicReportPdf(
   });
 
   const isCargo = data.topic === "cargo_watch";
+  // Hoisted narrative-incident list shared by buildCargoPatternModel and the
+  // three read builders so all derive from the exact same filtered window.
+  const cargoNarrativeIncidents = isCargo
+    ? filterTopicReportIncidents(incidents, data.topic, data.issueDate).map(
+        (i) => ({
+          id: i.id,
+          topic: i.topic,
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          sourceUrl: i.sourceUrl ?? null,
+          location: i.location ?? null,
+          country: i.country ?? null,
+          severity: i.severity ?? "",
+          occurredAt: i.occurredAt,
+        }),
+      )
+    : null;
   // Cargo Watch is a pattern report: one shared model drives Fast Facts, the
   // four operational graphics, the deterministic assessment prose, the
   // executive summary and the curated Key Incidents — built ONCE, above the
@@ -891,20 +914,18 @@ export async function exportTopicReportPdf(
   // screen == PDF. Hoisted here so the Executive Summary can read it.
   const cargoModel = isCargo
     ? buildCargoPatternModel(
-        filterTopicReportIncidents(incidents, data.topic, data.issueDate).map(
-          (i) => ({
-            id: i.id,
-            topic: i.topic,
-            title: i.title,
-            summary: i.summary ?? null,
-            source: i.source ?? null,
-            sourceUrl: i.sourceUrl ?? null,
-            location: i.location ?? null,
-            country: i.country ?? null,
-            severity: i.severity ?? null,
-            occurredAt: i.occurredAt,
-          }),
-        ),
+        cargoNarrativeIncidents!.map((i) => ({
+          id: i.id,
+          topic: i.topic,
+          title: i.title,
+          summary: i.summary ?? null,
+          source: i.source ?? null,
+          sourceUrl: i.sourceUrl ?? null,
+          location: i.location ?? null,
+          country: i.country ?? null,
+          severity: i.severity ?? null,
+          occurredAt: i.occurredAt,
+        })),
         {
           issueDate: data.issueDate,
           topicLabel: topicLabels[data.topic] ?? data.topic,
@@ -1284,6 +1305,32 @@ export async function exportTopicReportPdf(
           heading: null,
           subtitle: null,
         });
+      }
+
+      // Data-driven reads — editor override wins; auto-generated text fills
+      // any blank field so the section always carries substance.
+      // Drawn after enforcement and before the analyst assessment, matching
+      // the CargoReportPreview order so screen == PDF.
+      if (show("cargo-security-read")) {
+        const secRead = pickRead(
+          data.cargoSecurityRead,
+          buildCargoSecurityRead(cargoNarrativeIncidents!),
+        );
+        if (secRead.trim()) drawSectionWithProse(ctx, "Cargo Security Read", secRead);
+      }
+      if (show("logistics-hub-read")) {
+        const hubRead = pickRead(
+          data.logisticsHubRead,
+          buildLogisticsHubRead(cargoNarrativeIncidents!),
+        );
+        if (hubRead.trim()) drawSectionWithProse(ctx, "Logistics Hub Read", hubRead);
+      }
+      if (show("regional-read")) {
+        const regRead = pickRead(
+          data.regionalCountryRead,
+          buildCargoCountryBreakdown(cargoNarrativeIncidents!).regionalRead,
+        );
+        if (regRead.trim()) drawSectionWithProse(ctx, "Regional Read", regRead);
       }
 
       // Operational assessment. Editor text wins; the deterministic model

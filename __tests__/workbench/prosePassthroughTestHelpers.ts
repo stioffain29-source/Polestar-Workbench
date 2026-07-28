@@ -199,15 +199,16 @@ export const ENERGY_REPORT = {
 };
 
 // ---------------------------------------------------------------------------
-// Cargo Watch — the pattern report's editable assessment sections. The cargo
-// surfaces (CargoReportPreview + exportTopicReportPdf's cargo branch) render
-// executiveSummary via resolveSimpleProse and the five assessment sections via
-// the identical resolveSimpleProse stack, all under the HARD 10-check
-// validation gate — so these fixtures must also PASS the gate (distinct
-// per-section text, no sensational/evidence-claim vocabulary, Polestar View
-// >= 120 words). The legacy cargoSecurityRead / logisticsHubRead columns are
-// NOT rendered by the pattern report (they survive only in the unreachable
-// generic ReportPreview cargo branch), so they carry no sentinel here.
+// Cargo Watch — the pattern report's editable assessment sections AND the
+// three data-driven reads (cargoSecurityRead, logisticsHubRead,
+// regionalCountryRead) now wired into both CargoReportPreview and the
+// exportTopicReportPdf cargo branch.
+//
+// The cargo surfaces render executiveSummary via resolveSimpleProse and the
+// five assessment sections via the identical resolveSimpleProse stack, all
+// under the HARD 10-check validation gate — so these fixtures must also PASS
+// the gate (distinct per-section text, no sensational/evidence-claim
+// vocabulary, Polestar View >= 120 words).
 // ---------------------------------------------------------------------------
 export const CARGO_SENTINELS: Record<string, string> = {
   executiveSummary:
@@ -231,6 +232,13 @@ export const CARGO_SENTINELS: Record<string, string> = {
     "measures at loading points, storage sites and transfer points. We will keep reviewing each new record as " +
     "it arrives and will flag any sustained change in volume, geography or method in the next issue of this " +
     "report, together with any practical steps that the evidence at that point supports for affected operators.",
+  // Three data-driven reads now rendered on both surfaces (wired in task 452).
+  cargoSecurityRead:
+    "ZZ-CARGO-SECURITY-READ-OVERRIDE-ZZ Saved analyst route-side cargo security read.",
+  logisticsHubRead:
+    "ZZ-CARGO-LOGISTICS-HUB-READ-OVERRIDE-ZZ Saved analyst logistics hub read.",
+  regionalCountryRead:
+    "ZZ-CARGO-REGIONAL-READ-OVERRIDE-ZZ Saved analyst regional read.",
 };
 
 export const CARGO_REPORT = {

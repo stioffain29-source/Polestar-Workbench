@@ -10,6 +10,12 @@ import {
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { pickRead } from "@/lib/pickRead";
 import { validateCargoReport } from "@/lib/cargoReportValidation";
+import {
+  buildCargoSecurityRead,
+  buildLogisticsHubRead,
+  buildCargoCountryBreakdown,
+  type CargoNarrativeIncident,
+} from "@/lib/cargoNarratives";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { DISCLAIMER_TEXT } from "@/lib/pdfChrome";
 import {
@@ -507,10 +513,30 @@ export default function CargoReportPreview({
   const periodLabel = resolveReportWindow(topic, issueDate).label;
   const coverUrl = topicCoverUrl(topic);
 
+  // Memoised narrative-incident list shared by buildCargoPatternModel,
+  // buildCargoSecurityRead, buildLogisticsHubRead and buildCargoCountryBreakdown
+  // so all four derive from the exact same deduplicated window.
+  const narrativeIncidents = useMemo(
+    (): CargoNarrativeIncident[] =>
+      incidents.map((i) => ({
+        id: i.id,
+        topic: i.topic,
+        title: i.title,
+        summary: i.summary ?? null,
+        source: i.source ?? null,
+        sourceUrl: i.sourceUrl ?? null,
+        location: i.location ?? null,
+        country: i.country ?? null,
+        severity: i.severity ?? "",
+        occurredAt: i.occurredAt,
+      })),
+    [incidents],
+  );
+
   const model = useMemo(
     () =>
       buildCargoPatternModel(
-        incidents.map(
+        narrativeIncidents.map(
           (i): CargoPatternModelInput => ({
             id: i.id,
             topic: i.topic,
@@ -526,7 +552,7 @@ export default function CargoReportPreview({
         ),
         { issueDate },
       ),
-    [incidents, issueDate],
+    [narrativeIncidents, issueDate],
   );
 
   // Executive Summary is a deterministic, analytical paragraph built from the
@@ -833,6 +859,42 @@ export default function CargoReportPreview({
               {model.enforcement.statement}
             </p>
             <SelectedIncidents rows={model.enforcement.rows} subtitle={null} />
+          </Section>
+        )}
+
+        {/* Data-driven reads — editor override wins; auto-generated text fills
+            any blank field so the section always carries substance.
+            Placement after the operational graphics and before the analyst
+            assessment mirrors the legacy cargo report layout and matches the
+            PDF export order so screen == PDF. */}
+        {show("cargo-security-read") && (
+          <Section title="Cargo Security Read">
+            <Paragraphs
+              text={pickRead(
+                report.cargoSecurityRead,
+                buildCargoSecurityRead(narrativeIncidents),
+              )}
+            />
+          </Section>
+        )}
+        {show("logistics-hub-read") && (
+          <Section title="Logistics Hub Read">
+            <Paragraphs
+              text={pickRead(
+                report.logisticsHubRead,
+                buildLogisticsHubRead(narrativeIncidents),
+              )}
+            />
+          </Section>
+        )}
+        {show("regional-read") && (
+          <Section title="Regional Read">
+            <Paragraphs
+              text={pickRead(
+                report.regionalCountryRead,
+                buildCargoCountryBreakdown(narrativeIncidents).regionalRead,
+              )}
+            />
           </Section>
         )}
 
