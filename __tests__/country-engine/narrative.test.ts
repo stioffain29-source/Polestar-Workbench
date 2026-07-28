@@ -183,6 +183,75 @@ describe("BLUF title + location rendering (§14/§15)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Priority-location lists never name the whole country (task 473)
+// ---------------------------------------------------------------------------
+
+describe("priority locations never mix in the country name", () => {
+  const mixed = [
+    makeEvent(), // Lae / Morobe (sub-national)
+    makeEvent({
+      eventTitle: "Nationwide unrest reports",
+      city: null,
+      district: null,
+      provinceOrState: null,
+      locationPrecision: "Country only",
+    }),
+  ];
+
+  it("BLUF keeps the country name out of the location list and notes the unlocated remainder", () => {
+    const { value } = buildBluf(mixed, "Papua New Guinea", null);
+    expect(value).not.toMatch(/recorded in [^.]*Papua New Guinea/);
+    expect(value).toMatch(/with the remainder unlocated/);
+  });
+
+  it("Current Situation concentrates on sub-national locations only, with a remainder clause", () => {
+    const { value } = buildCurrentSituation(mixed, "Papua New Guinea");
+    expect(value).not.toMatch(/concentrated in [^.]*Papua New Guinea/);
+    expect(value).toMatch(/concentrated in Lae, with the remainder unlocated/);
+  });
+
+  it("Current Situation falls back to country-level phrasing when nothing is located", () => {
+    const only = [
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+      }),
+    ];
+    const { value } = buildCurrentSituation(only, "Papua New Guinea");
+    expect(value).toMatch(/recorded at country level only/);
+    expect(value).not.toMatch(/concentrated in Papua New Guinea/);
+  });
+
+  it("Pole Star View prioritises sub-national locations, never the country", () => {
+    const { value } = buildPolestarView(mixed, {});
+    expect(value).not.toMatch(
+      /route and site information for [^.]*Papua New Guinea/,
+    );
+    if (/route and site information/.test(value)) {
+      expect(value).toMatch(/route and site information for Lae/);
+    }
+  });
+
+  it("Pole Star View falls back to 'the affected areas' when nothing is located", () => {
+    const only = [
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+      }),
+    ];
+    const { value } = buildPolestarView(only, {});
+    expect(value).not.toMatch(/for Papua New Guinea/);
+    if (/route and site information/.test(value)) {
+      expect(value).toMatch(/for the affected areas/);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Word caps enforced per §31
 // ---------------------------------------------------------------------------
 

@@ -229,6 +229,26 @@ export function naturaliseTitle(title: string): string {
 }
 
 /**
+ * Priority-location list for BLUF / Current Situation / Pole Star View.
+ * Prefers sub-national locations and NEVER mixes the country name into the
+ * list when sub-national ones exist (naming the whole country as a "location"
+ * reads as filler). `hasUnlocated` is true when at least one event carried no
+ * sub-national location while others did — callers render a country-level
+ * phrase ("with the remainder unlocated") so no event is silently dropped.
+ */
+function priorityLocations(events: CanonicalEvent[]): {
+  locations: string[];
+  hasUnlocated: boolean;
+} {
+  const locations = unique(
+    events.map((e) => subNationalLocation(e) ?? ""),
+  );
+  const hasUnlocated =
+    locations.length > 0 && events.some((e) => !subNationalLocation(e));
+  return { locations, hasUnlocated };
+}
+
+/**
  * §15 — the sub-national location for an event, or null when the location is
  * Country only / Unknown (in which case no location clause should be rendered).
  */
@@ -642,7 +662,8 @@ export function buildBluf(
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 2)
     .map(([c]) => categoryPhrase(c));
-  const locations = unique(events.map((e) => locationLabel(e))).slice(0, 3);
+  const { locations: allLocations, hasUnlocated } = priorityLocations(events);
+  const locations = allLocations.slice(0, 3);
 
   // Sentence 1 — most significant development with location + date. The title
   // is naturalised (never a raw wire headline) and the location clause is
@@ -695,7 +716,7 @@ export function buildBluf(
   const repeats = repeatSubLocations(events);
   const s2 = repeats.length
     ? `During the reporting period, ${catText || "security"} events made up most of the reporting, and ${repeats[0]} carried a disproportionate share of it.`
-    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre.`;
+    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre${hasUnlocated ? ", with the remainder unlocated" : ""}.`;
   claims.push(
     makeClaim({
       claimText: s2,
@@ -907,9 +928,11 @@ export function buildCurrentSituation(
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .map(([c]) => categoryPhrase(c));
-  const locations = unique(events.map((e) => locationLabel(e)));
+  const { locations, hasUnlocated } = priorityLocations(events);
 
-  const s1 = `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3)) || countryName}.`;
+  const s1 = locations.length
+    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ", with the remainder unlocated" : ""}.`
+    : `Security incidents in ${countryName} during the reporting period were recorded at country level only, without located concentrations.`;
   const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
 
   // Assessed synthesis — repeat-location pressure and casualty framing, both
@@ -1464,7 +1487,7 @@ export function buildPolestarView(
     return { value: capWords(text, POLESTAR_VIEW_MAX_WORDS), claims };
   }
 
-  const locations = unique(events.map((e) => locationLabel(e)));
+  const { locations } = priorityLocations(events);
   const scope = locations.length > 1 ? "localised and varies by location" : "localised";
   const byCat = groupByCategory(events);
   const principal = [...byCat.entries()].sort(
@@ -1533,7 +1556,9 @@ export function buildPolestarView(
       claimType: "Assessment",
     },
     {
-      text: `Businesses should prioritise verified route and site information for ${joinAnd(locations.slice(0, 2))} over broad precautionary measures.`,
+      text: locations.length
+        ? `Businesses should prioritise verified route and site information for ${joinAnd(locations.slice(0, 2))} over broad precautionary measures.`
+        : `Businesses should prioritise verified route and site information for the affected areas over broad precautionary measures.`,
       claimType: "Assessment",
     },
   ];
