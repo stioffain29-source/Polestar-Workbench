@@ -326,6 +326,23 @@ function mostSignificant(events: CanonicalEvent[]): CanonicalEvent | null {
   return ranked[0] ?? null;
 }
 
+/**
+ * §14 — the ranked top developments (up to three). ONE shared selection used by
+ * buildTopThree AND the narrative sections (BLUF), so every Top-3 story is
+ * referenced in the written analysis and the QC cross-check cannot diverge.
+ * Excludes commentary/background/not-an-incident/cancelled (§14).
+ */
+function topRankedEvents(events: CanonicalEvent[]): CanonicalEvent[] {
+  const eligible = events.filter(
+    (e) =>
+      e.eventStatus !== "Commentary" &&
+      e.eventStatus !== "Background" &&
+      e.eventStatus !== "Not an incident" &&
+      e.eventStatus !== "Cancelled",
+  );
+  return rankEvents(eligible).slice(0, 3);
+}
+
 // ---------------------------------------------------------------------------
 // Assessed-meaning helpers — deterministic synthesis drawn ONLY from stored
 // event attributes (category, location, status, casualties). These give the
@@ -485,14 +502,7 @@ export function buildTopThree(
 ): NarrativeResult<TopDevelopment[]> {
   const claims: EvidenceRecord[] = [];
   // §14 excludes commentary/background/not-an-incident/cancelled from top slots.
-  const eligible = events.filter(
-    (e) =>
-      e.eventStatus !== "Commentary" &&
-      e.eventStatus !== "Background" &&
-      e.eventStatus !== "Not an incident" &&
-      e.eventStatus !== "Cancelled",
-  );
-  const ranked = rankEvents(eligible).slice(0, 3);
+  const ranked = topRankedEvents(events);
 
   const value: TopDevelopment[] = ranked.map((e) => {
     const location = locationLabel(e);
@@ -622,7 +632,11 @@ export function buildBluf(
     return { value: text, claims };
   }
 
-  const lead = mostSignificant(events)!;
+  // §14/§15 — the BLUF anchors on the SAME ranked Top-3 selection as
+  // buildTopThree so the lead sentence and the Top Developments section can
+  // never diverge, and every Top-3 story is referenced in the analysis.
+  const topRanked = topRankedEvents(events);
+  const lead = topRanked[0] ?? mostSignificant(events)!;
   const byCat = groupByCategory(events);
   const topCategories = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
@@ -646,6 +660,31 @@ export function buildBluf(
       confidence: lead.classificationConfidence,
     }),
   );
+
+  // Sentence 1b — the OTHER ranked top developments, each named with its
+  // location, so the written analysis acknowledges every headline story (not
+  // only the single lead). Deterministic, drawn only from stored titles and
+  // resolved locations — no fabrication.
+  let s1b = "";
+  const otherTop = topRanked.slice(1);
+  if (otherTop.length > 0) {
+    const refs = otherTop.map(
+      (e) => `${lowerFirst(naturaliseTitle(e.eventTitle))}${locationClause(e)}`,
+    );
+    s1b = `The period also brought ${joinAnd(refs)}.`;
+    claims.push(
+      makeClaim({
+        claimText: s1b,
+        section: "Bottom Line Up Front",
+        supportingEventIds: otherTop.map((e) => e.eventId),
+        supportingSourceIds: otherTop.flatMap((e) => e.supportingSourceIds),
+        claimType: "Confirmed fact",
+        confidence: Math.min(
+          ...otherTop.map((e) => e.classificationConfidence),
+        ),
+      }),
+    );
+  }
 
   // Sentence 2 — assessed reporting pattern this period. Where one sub-national
   // location carried repeat reporting, say so — concentration is the single
@@ -724,21 +763,30 @@ export function buildBluf(
     );
   }
 
-  let text = capWords([s1, s2, s2b, s3].filter(Boolean).join(" "), BLUF_MAX_WORDS);
+  let text = capWords(
+    [s1, s1b, s2, s2b, s3].filter(Boolean).join(" "),
+    BLUF_MAX_WORDS,
+  );
 
   // §16 — strip trend wording if there is no comparative data. The composed
   // BLUF uses "During the reporting period" (neutral) so this is defensive.
   const trend = assertNoUnsupportedTrend(text, hasPriorData);
   if (trend.length > 0) {
-    // Fall back to the neutral lead sentence only.
-    text = capWords(s1, BLUF_MAX_WORDS);
+    // Fall back to the neutral event-led sentences only (lead + other top
+    // developments), mirroring the tolerance already extended to s1: quoted
+    // event titles are facts, not analytical trend claims.
+    text = capWords([s1, s1b].filter(Boolean).join(" "), BLUF_MAX_WORDS);
   }
 
   return { value: text, claims };
 }
 
 function lowerFirst(s: string): string {
-  return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
+  if (!s) return s;
+  // Never de-capitalise an acronym ("PNG's East New Britain…" must not become
+  // "pNG's…") — if the second character is also upper case, leave it intact.
+  if (s.length > 1 && /[A-Z]/.test(s.charAt(1))) return s;
+  return s.charAt(0).toLowerCase() + s.slice(1);
 }
 
 // ---------------------------------------------------------------------------
