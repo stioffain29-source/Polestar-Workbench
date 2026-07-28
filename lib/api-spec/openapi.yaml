@@ -1620,12 +1620,72 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [included, excluded, held]
+        - name: category
+          in: query
+          required: false
+          schema: { type: string }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer }
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CountryEngineView" }
+
+  /countries/{slug}/engine/bulk:
+    post:
+      operationId: bulkOverrideCountryEngine
+      tags: [country-engine]
+      summary: Bulk-triage matching engine events (approve/exclude by filter; audit-logged; re-runs the engine once)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountryEngineBulkInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryEngineBulkResult" }
+        "400":
+          description: Invalid bulk body
+        "401":
+          description: Missing or invalid admin token
+        "503":
+          description: Admin token not configured
+
+  /country-engine/held-summary:
+    get:
+      operationId: getCountryEngineHeldSummary
+      tags: [country-engine]
+      summary: Per-country inclusion-status counts for the engine review backlog
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CountryEngineHeldSummaryRow" }
 
   /countries/{slug}/engine/reprocess:
     post:
@@ -3707,7 +3767,8 @@ components:
           items: { type: string }
 
     # The engine review-queue view for a country (owner brief §7/§37): all
-    # canonical events, the latest run's stats and the persisted overrides.
+    # canonical events (optionally filtered/paged), the latest run's stats,
+    # per-status counts and the persisted overrides.
     CountryEngineView:
       type: object
       required: [events, overrides]
@@ -3723,6 +3784,79 @@ components:
           items:
             type: object
             additionalProperties: true
+        statusCounts:
+          type: object
+          additionalProperties: false
+          properties:
+            included: { type: integer }
+            excluded: { type: integer }
+            held: { type: integer }
+        totalMatched: { type: integer }
+
+    # Bulk triage input (§37 at review-queue scale): a filter selecting engine
+    # events plus the status to set on every match. dryRun previews only.
+    CountryEngineBulkInput:
+      type: object
+      additionalProperties: false
+      required: [set]
+      properties:
+        filter:
+          type: object
+          additionalProperties: false
+          properties:
+            inclusionStatus:
+              type: string
+              enum: [included, excluded, held]
+            issueCategory: { type: string }
+            exclusionReason: { type: string }
+            dateFrom: { type: string }
+            dateTo: { type: string }
+            minConfidence: { type: integer }
+            maxConfidence: { type: integer }
+        set:
+          type: object
+          additionalProperties: false
+          required: [inclusionStatus]
+          properties:
+            inclusionStatus:
+              type: string
+              enum: [included, excluded]
+            exclusionReason: { type: ["string", "null"] }
+        dryRun: { type: boolean }
+
+    # Bulk triage result: how many events matched, whether the change was
+    # applied (false on dryRun), a sample of matches, and the fresh run stats.
+    CountryEngineBulkResult:
+      type: object
+      required: [matched, applied, dryRun]
+      properties:
+        matched: { type: integer }
+        applied: { type: integer }
+        dryRun: { type: boolean }
+        sample:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            properties:
+              eventId: { type: string }
+              eventTitle: { type: string }
+              issueCategory: { type: string }
+              eventDate: { type: ["string", "null"] }
+        stats:
+          type: ["object", "null"]
+          additionalProperties: true
+
+    # Per-country backlog counts (held at a glance).
+    CountryEngineHeldSummaryRow:
+      type: object
+      required: [countrySlug, included, excluded, held, total]
+      properties:
+        countrySlug: { type: string }
+        included: { type: integer }
+        excluded: { type: integer }
+        held: { type: integer }
+        total: { type: integer }
 
     # Result of a reprocess run (owner brief §35).
     CountryEngineReprocessResult:

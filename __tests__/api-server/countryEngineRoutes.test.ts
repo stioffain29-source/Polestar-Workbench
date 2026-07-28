@@ -17,6 +17,7 @@ import type { Server } from "node:http";
 jest.mock("../../artifacts/api-server/src/lib/countryEngine", () => ({
   runCountryEngine: jest.fn(),
   applyOverride: jest.fn(),
+  applyBulkOverride: jest.fn(),
 }));
 
 import {
@@ -26,7 +27,11 @@ import {
   countryEngineAuditTable,
   countryEngineRunsTable,
 } from "@workspace/db";
-import { runCountryEngine, applyOverride } from "../../artifacts/api-server/src/lib/countryEngine";
+import {
+  runCountryEngine,
+  applyOverride,
+  applyBulkOverride,
+} from "../../artifacts/api-server/src/lib/countryEngine";
 import countryEngineRouter from "../../artifacts/api-server/src/routes/countryEngine";
 import {
   adminAuthHeaders,
@@ -37,13 +42,18 @@ type Rows = Record<string, unknown>[];
 
 const SLUG = "papua-new-guinea";
 
-// A resolved thenable chain that also supports .orderBy()/.limit(). The engine
-// routes use db.select().from().where().orderBy() and .limit(1), so the stub's
-// where() returns an object that IS a promise AND still chains orderBy/limit.
+// A resolved thenable chain that also supports .orderBy()/.limit()/.offset()
+// and .groupBy(). The engine routes use db.select().from().where().orderBy()
+// (optionally .limit()/.offset()), plus grouped count queries, so the stub's
+// where() returns an object that IS a promise AND still chains everything.
 function selectResult(rows: Rows): unknown {
   const p = Promise.resolve(rows) as Record<string, unknown> & Promise<Rows>;
   p.orderBy = () => p;
-  p.limit = () => Promise.resolve(rows);
+  p.groupBy = () => p;
+  p.offset = () => Promise.resolve(rows);
+  const lim = Promise.resolve(rows) as Record<string, unknown> & Promise<Rows>;
+  lim.offset = () => Promise.resolve(rows);
+  p.limit = () => lim;
   return p;
 }
 
@@ -53,9 +63,12 @@ function stubSelect(byTable: Map<unknown, Rows>): void {
     const chain: Record<string, unknown> = {
       from: (t: unknown) => {
         tbl = t;
-        return chain;
+        // The result is a REAL promise carrying chain methods; attach where()
+        // so both from().where()… and from().groupBy()… (held-summary) work.
+        const res = selectResult(byTable.get(tbl) ?? []) as Record<string, unknown>;
+        res.where = () => selectResult(byTable.get(tbl) ?? []);
+        return res;
       },
-      where: () => selectResult(byTable.get(tbl) ?? []),
     };
     return chain as never;
   });
@@ -98,6 +111,7 @@ beforeEach(() => {
   jest.restoreAllMocks();
   (runCountryEngine as jest.Mock).mockReset();
   (applyOverride as jest.Mock).mockReset();
+  (applyBulkOverride as jest.Mock).mockReset();
 });
 
 describe("GET /countries/:slug/engine", () => {
@@ -221,6 +235,107 @@ describe("PATCH /countries/:slug/engine/events/:eventId", () => {
     });
     expect(res.status).toBe(401);
     expect(applyOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /countries/:slug/engine/bulk", () => {
+  it("applies a bulk override and returns the result (admin token)", async () => {
+    const bulkResult = {
+      matched: 42,
+      applied: 42,
+      dryRun: false,
+      sample: [{ eventId: "1", eventTitle: "t", issueCategory: "Civil unrest", eventDate: null }],
+      stats: { held: 100 },
+    };
+    (applyBulkOverride as jest.Mock).mockResolvedValue(bulkResult);
+
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/engine/bulk`, {
+      method: "POST",
+      headers: adminAuthHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({
+        filter: { issueCategory: "Civil unrest", maxConfidence: 69 },
+        set: { inclusionStatus: "included" },
+      }),
+    });
+    const json = (await res.json()) as Record<string, unknown>;
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual(bulkResult);
+    const [slugArg, filterArg, setArg, actorArg, dryRunArg] =
+      (applyBulkOverride as jest.Mock).mock.calls[0];
+    expect(slugArg).toBe(SLUG);
+    expect(filterArg).toEqual({ issueCategory: "Civil unrest", maxConfidence: 69 });
+    expect(setArg).toEqual({ inclusionStatus: "included" });
+    expect(actorArg).toBe("admin-token");
+    expect(dryRunArg).toBe(false);
+  });
+
+  it("passes dryRun through", async () => {
+    (applyBulkOverride as jest.Mock).mockResolvedValue({
+      matched: 5, applied: 0, dryRun: true, sample: [], stats: null,
+    });
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/engine/bulk`, {
+      method: "POST",
+      headers: adminAuthHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ set: { inclusionStatus: "included" }, dryRun: true }),
+    });
+    expect(res.status).toBe(200);
+    expect((applyBulkOverride as jest.Mock).mock.calls[0][4]).toBe(true);
+  });
+
+  it("rejects a bulk EXCLUDE without an exclusionReason", async () => {
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/engine/bulk`, {
+      method: "POST",
+      headers: adminAuthHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ set: { inclusionStatus: "excluded" } }),
+    });
+    expect(res.status).toBe(400);
+    expect(applyBulkOverride).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown filter field (strict body)", async () => {
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/engine/bulk`, {
+      method: "POST",
+      headers: adminAuthHeaders({ "content-type": "application/json" }),
+      body: JSON.stringify({ filter: { bogus: 1 }, set: { inclusionStatus: "included" } }),
+    });
+    expect(res.status).toBe(400);
+    expect(applyBulkOverride).not.toHaveBeenCalled();
+  });
+
+  it("rejects a bulk action without the admin token", async () => {
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/engine/bulk`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ set: { inclusionStatus: "included" } }),
+    });
+    expect(res.status).toBe(401);
+    expect(applyBulkOverride).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /country-engine/held-summary", () => {
+  it("aggregates per-country status counts sorted by held desc", async () => {
+    stubSelect(
+      new Map<unknown, Rows>([
+        [
+          countryEngineEventsTable,
+          [
+            { countrySlug: "indonesia", inclusionStatus: "held", n: 11300 },
+            { countrySlug: "indonesia", inclusionStatus: "included", n: 200 },
+            { countrySlug: "jakarta", inclusionStatus: "held", n: 11800 },
+            { countrySlug: "jakarta", inclusionStatus: "excluded", n: 50 },
+          ],
+        ],
+      ]),
+    );
+    const res = await fetch(`${baseUrl}/country-engine/held-summary`);
+    const json = (await res.json()) as Rows;
+    expect(res.status).toBe(200);
+    expect(json).toEqual([
+      { countrySlug: "jakarta", included: 0, excluded: 50, held: 11800, total: 11850 },
+      { countrySlug: "indonesia", included: 200, excluded: 0, held: 11300, total: 11500 },
+    ]);
   });
 });
 

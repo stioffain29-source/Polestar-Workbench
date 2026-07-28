@@ -1758,11 +1758,89 @@ export type CountryEngineViewStats = { [key: string]: unknown } | null;
 
 export type CountryEngineViewOverridesItem = { [key: string]: unknown };
 
+export type CountryEngineViewStatusCounts = {
+  included?: number;
+  excluded?: number;
+  held?: number;
+};
+
 export interface CountryEngineView {
   events: CanonicalEvent[];
   /** @nullable */
   stats?: CountryEngineViewStats;
   overrides: CountryEngineViewOverridesItem[];
+  statusCounts?: CountryEngineViewStatusCounts;
+  totalMatched?: number;
+}
+
+export type CountryEngineBulkInputFilterInclusionStatus = typeof CountryEngineBulkInputFilterInclusionStatus[keyof typeof CountryEngineBulkInputFilterInclusionStatus];
+
+
+export const CountryEngineBulkInputFilterInclusionStatus = {
+  included: 'included',
+  excluded: 'excluded',
+  held: 'held',
+} as const;
+
+export type CountryEngineBulkInputFilter = {
+  inclusionStatus?: CountryEngineBulkInputFilterInclusionStatus;
+  issueCategory?: string;
+  exclusionReason?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minConfidence?: number;
+  maxConfidence?: number;
+};
+
+export type CountryEngineBulkInputSetInclusionStatus = typeof CountryEngineBulkInputSetInclusionStatus[keyof typeof CountryEngineBulkInputSetInclusionStatus];
+
+
+export const CountryEngineBulkInputSetInclusionStatus = {
+  included: 'included',
+  excluded: 'excluded',
+} as const;
+
+export type CountryEngineBulkInputSet = {
+  inclusionStatus: CountryEngineBulkInputSetInclusionStatus;
+  /** @nullable */
+  exclusionReason?: string | null;
+};
+
+export interface CountryEngineBulkInput {
+  filter?: CountryEngineBulkInputFilter;
+  set: CountryEngineBulkInputSet;
+  dryRun?: boolean;
+}
+
+export type CountryEngineBulkResultSampleItem = {
+  eventId?: string;
+  eventTitle?: string;
+  issueCategory?: string;
+  /** @nullable */
+  eventDate?: string | null;
+  [key: string]: unknown;
+ };
+
+/**
+ * @nullable
+ */
+export type CountryEngineBulkResultStats = { [key: string]: unknown } | null;
+
+export interface CountryEngineBulkResult {
+  matched: number;
+  applied: number;
+  dryRun: boolean;
+  sample?: CountryEngineBulkResultSampleItem[];
+  /** @nullable */
+  stats?: CountryEngineBulkResultStats;
+}
+
+export interface CountryEngineHeldSummaryRow {
+  countrySlug: string;
+  included: number;
+  excluded: number;
+  held: number;
+  total: number;
 }
 
 export type CountryEngineReprocessResultStats = { [key: string]: unknown };
@@ -2938,6 +3016,22 @@ status?: DataCentreStatus;
 export type ListDataCentreCountryRiskParams = {
 country?: string;
 };
+
+export type GetCountryEngineParams = {
+status?: GetCountryEngineStatus;
+category?: string;
+limit?: number;
+offset?: number;
+};
+
+export type GetCountryEngineStatus = typeof GetCountryEngineStatus[keyof typeof GetCountryEngineStatus];
+
+
+export const GetCountryEngineStatus = {
+  included: 'included',
+  excluded: 'excluded',
+  held: 'held',
+} as const;
 
 export type BeginBrowserLoginParams = {
 /**

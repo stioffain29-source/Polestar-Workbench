@@ -5387,6 +5387,13 @@ export const GetCountryEngineParams = zod.object({
   "slug": zod.coerce.string()
 })
 
+export const GetCountryEngineQueryParams = zod.object({
+  "status": zod.enum(['included', 'excluded', 'held']).optional(),
+  "category": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().optional(),
+  "offset": zod.coerce.number().optional()
+})
+
 export const GetCountryEngineResponse = zod.object({
   "events": zod.array(zod.object({
   "eventId": zod.string().optional(),
@@ -5401,8 +5408,65 @@ export const GetCountryEngineResponse = zod.object({
   "classificationConfidence": zod.number().optional()
 })),
   "stats": zod.record(zod.string(), zod.unknown()).nullish(),
-  "overrides": zod.array(zod.record(zod.string(), zod.unknown()))
+  "overrides": zod.array(zod.record(zod.string(), zod.unknown())),
+  "statusCounts": zod.object({
+  "included": zod.number().optional(),
+  "excluded": zod.number().optional(),
+  "held": zod.number().optional()
+}).optional(),
+  "totalMatched": zod.number().optional()
 })
+
+
+/**
+ * @summary Bulk-triage matching engine events (approve/exclude by filter; audit-logged; re-runs the engine once)
+ */
+export const BulkOverrideCountryEngineParams = zod.object({
+  "slug": zod.coerce.string()
+})
+
+export const BulkOverrideCountryEngineBody = zod.object({
+  "filter": zod.object({
+  "inclusionStatus": zod.enum(['included', 'excluded', 'held']).optional(),
+  "issueCategory": zod.string().optional(),
+  "exclusionReason": zod.string().optional(),
+  "dateFrom": zod.string().optional(),
+  "dateTo": zod.string().optional(),
+  "minConfidence": zod.number().optional(),
+  "maxConfidence": zod.number().optional()
+}).optional(),
+  "set": zod.object({
+  "inclusionStatus": zod.enum(['included', 'excluded']),
+  "exclusionReason": zod.string().nullish()
+}),
+  "dryRun": zod.boolean().optional()
+})
+
+export const BulkOverrideCountryEngineResponse = zod.object({
+  "matched": zod.number(),
+  "applied": zod.number(),
+  "dryRun": zod.boolean(),
+  "sample": zod.array(zod.object({
+  "eventId": zod.string().optional(),
+  "eventTitle": zod.string().optional(),
+  "issueCategory": zod.string().optional(),
+  "eventDate": zod.string().nullish()
+})).optional(),
+  "stats": zod.record(zod.string(), zod.unknown()).nullish()
+})
+
+
+/**
+ * @summary Per-country inclusion-status counts for the engine review backlog
+ */
+export const GetCountryEngineHeldSummaryResponseItem = zod.object({
+  "countrySlug": zod.string(),
+  "included": zod.number(),
+  "excluded": zod.number(),
+  "held": zod.number(),
+  "total": zod.number()
+})
+export const GetCountryEngineHeldSummaryResponse = zod.array(GetCountryEngineHeldSummaryResponseItem)
 
 
 /**

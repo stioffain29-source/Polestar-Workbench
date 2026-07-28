@@ -93,13 +93,19 @@ jest.mock("@workspace/api-client-react", () => ({
     isError: false,
   }),
   useGetCountryEngineAudit: () => ({ data: [], isLoading: false }),
+  useGetCountryEngineHeldSummary: () => ({ data: [], isLoading: false }),
   useReprocessCountryEngine: () => ({ mutate: jest.fn(), isPending: false }),
   useOverrideCountryEngineEvent: () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),
+  useBulkOverrideCountryEngine: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
   getGetCountryEngineQueryKey: () => ["country-engine"],
   getGetCountryEngineAuditQueryKey: () => ["country-engine-audit"],
+  getGetCountryEngineHeldSummaryQueryKey: () => ["country-engine-held-summary"],
 }));
 
 jest.mock("@/lib/exportPdf", () => ({

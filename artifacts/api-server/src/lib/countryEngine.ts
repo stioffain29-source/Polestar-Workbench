@@ -6,7 +6,7 @@ import {
   countryEngineAuditTable,
   countryEngineRunsTable,
 } from "@workspace/db";
-import { and, gte, or, ilike, eq, inArray, not } from "drizzle-orm";
+import { and, gte, lte, or, ilike, eq, inArray, not, sql } from "drizzle-orm";
 import { buildCanonicalEvents } from "@workspace/country-engine/engine";
 import { getCountryEngineConfig } from "@workspace/country-engine/config";
 import type {
@@ -14,6 +14,9 @@ import type {
   EngineResult,
   AnalystEventOverride,
   CanonicalEvent,
+  ExclusionReason,
+  InclusionStatus,
+  IssueCategory,
 } from "@workspace/country-engine/types";
 import { logger } from "./logger";
 
@@ -115,31 +118,20 @@ export async function runCountryEngine(slug: string): Promise<EngineResult> {
   const result = buildCanonicalEvents(inputs, config, overrides);
 
   // Persist: upsert every event, delete rows no longer present, record the run.
+  // Upserts are BATCHED (chunks of 200) — at review-queue scale (10k+ events per
+  // country) one-row-at-a-time round trips made reprocess runs take minutes.
   const now = new Date();
   const events: CanonicalEvent[] = result.events;
   const seenIds = events.map((ev) => ev.eventId);
-  for (const ev of events) {
+  const CHUNK = 200;
+  for (let i = 0; i < events.length; i += CHUNK) {
+    const chunk = events.slice(i, i + CHUNK);
     await db
       .insert(countryEngineEventsTable)
-      .values({
-        countrySlug: slug,
-        eventId: ev.eventId,
-        payload: ev,
-        inclusionStatus: ev.inclusionStatus,
-        exclusionReason: ev.exclusionReason ?? null,
-        duplicateGroupId: ev.duplicateGroupId ?? null,
-        eventDate: eventDateColumn(ev),
-        physicalCountry: ev.physicalCountry ?? null,
-        severity: ev.severity ?? null,
-        classificationConfidence: ev.classificationConfidence ?? null,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [
-          countryEngineEventsTable.countrySlug,
-          countryEngineEventsTable.eventId,
-        ],
-        set: {
+      .values(
+        chunk.map((ev) => ({
+          countrySlug: slug,
+          eventId: ev.eventId,
           payload: ev,
           inclusionStatus: ev.inclusionStatus,
           exclusionReason: ev.exclusionReason ?? null,
@@ -149,6 +141,23 @@ export async function runCountryEngine(slug: string): Promise<EngineResult> {
           severity: ev.severity ?? null,
           classificationConfidence: ev.classificationConfidence ?? null,
           updatedAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [
+          countryEngineEventsTable.countrySlug,
+          countryEngineEventsTable.eventId,
+        ],
+        set: {
+          payload: sql`excluded.payload`,
+          inclusionStatus: sql`excluded.inclusion_status`,
+          exclusionReason: sql`excluded.exclusion_reason`,
+          duplicateGroupId: sql`excluded.duplicate_group_id`,
+          eventDate: sql`excluded.event_date`,
+          physicalCountry: sql`excluded.physical_country`,
+          severity: sql`excluded.severity`,
+          classificationConfidence: sql`excluded.classification_confidence`,
+          updatedAt: sql`excluded.updated_at`,
         },
       });
   }
@@ -226,4 +235,212 @@ export async function applyOverride(
   });
 
   return runCountryEngine(slug);
+}
+
+// ---------------------------------------------------------------------------
+// Bulk triage (review-queue scale). The §7 confidence gate holds mid-confidence
+// records for review; at 10k+ held rows per country, one-event overrides are
+// unworkable. applyBulkOverride selects matching persisted events via the
+// denormalised review-queue columns, upserts one AnalystEventOverride per
+// match (merged over any existing override so prior corrections survive),
+// writes ONE audit row describing the whole action, and re-runs the engine
+// ONCE so persisted events reflect the change.
+// ---------------------------------------------------------------------------
+
+export interface BulkOverrideFilter {
+  /** Which status to select from. Defaults to "held" (the review queue). */
+  inclusionStatus?: InclusionStatus;
+  issueCategory?: IssueCategory;
+  exclusionReason?: ExclusionReason;
+  /** Inclusive event-date bounds (ISO date or datetime). Undated events never
+   * match a date-bounded filter. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Inclusive classification-confidence band (0-100). */
+  minConfidence?: number;
+  maxConfidence?: number;
+}
+
+export interface BulkOverrideSet {
+  inclusionStatus: Extract<InclusionStatus, "included" | "excluded">;
+  exclusionReason?: ExclusionReason | null;
+}
+
+export interface BulkOverrideSample {
+  eventId: string;
+  eventTitle: string;
+  issueCategory: string;
+  eventDate: string | null;
+}
+
+export interface BulkOverrideResult {
+  matched: number;
+  applied: number;
+  dryRun: boolean;
+  sample: BulkOverrideSample[];
+  stats: Record<string, unknown> | null;
+}
+
+const BULK_SAMPLE_SIZE = 20;
+// Audit detail keeps at most this many event ids — enough to trace what a bulk
+// action touched without writing a multi-megabyte jsonb row.
+const BULK_AUDIT_ID_CAP = 500;
+
+export async function applyBulkOverride(
+  slug: string,
+  filter: BulkOverrideFilter,
+  set: BulkOverrideSet,
+  actor: string | null,
+  dryRun: boolean,
+): Promise<BulkOverrideResult> {
+  const conditions = [
+    eq(countryEngineEventsTable.countrySlug, slug),
+    eq(
+      countryEngineEventsTable.inclusionStatus,
+      filter.inclusionStatus ?? "held",
+    ),
+  ];
+  if (filter.issueCategory) {
+    conditions.push(
+      sql`${countryEngineEventsTable.payload}->>'issueCategory' = ${filter.issueCategory}`,
+    );
+  }
+  if (filter.exclusionReason) {
+    conditions.push(
+      eq(countryEngineEventsTable.exclusionReason, filter.exclusionReason),
+    );
+  }
+  if (filter.dateFrom) {
+    conditions.push(
+      gte(countryEngineEventsTable.eventDate, new Date(filter.dateFrom)),
+    );
+  }
+  if (filter.dateTo) {
+    conditions.push(
+      lte(countryEngineEventsTable.eventDate, new Date(filter.dateTo)),
+    );
+  }
+  if (filter.minConfidence != null) {
+    conditions.push(
+      gte(countryEngineEventsTable.classificationConfidence, filter.minConfidence),
+    );
+  }
+  if (filter.maxConfidence != null) {
+    conditions.push(
+      lte(countryEngineEventsTable.classificationConfidence, filter.maxConfidence),
+    );
+  }
+
+  const rows = await db
+    .select({
+      eventId: countryEngineEventsTable.eventId,
+      payload: countryEngineEventsTable.payload,
+    })
+    .from(countryEngineEventsTable)
+    .where(and(...conditions));
+
+  const sample: BulkOverrideSample[] = rows
+    .slice(0, BULK_SAMPLE_SIZE)
+    .map((r) => ({
+      eventId: r.eventId,
+      eventTitle: r.payload.eventTitle,
+      issueCategory: r.payload.issueCategory,
+      eventDate: r.payload.eventDate ?? null,
+    }));
+
+  if (dryRun || rows.length === 0) {
+    return {
+      matched: rows.length,
+      applied: 0,
+      dryRun,
+      sample,
+      stats: null,
+    };
+  }
+
+  // Merge the bulk set over any existing override so prior per-event
+  // corrections (category, date, severity, …) survive the bulk action.
+  const eventIds = rows.map((r) => r.eventId);
+  const existing = new Map<string, AnalystEventOverride>();
+  const LOOKUP_CHUNK = 1000;
+  for (let i = 0; i < eventIds.length; i += LOOKUP_CHUNK) {
+    const chunkIds = eventIds.slice(i, i + LOOKUP_CHUNK);
+    const prior = await db
+      .select()
+      .from(countryEngineOverridesTable)
+      .where(
+        and(
+          eq(countryEngineOverridesTable.countrySlug, slug),
+          inArray(countryEngineOverridesTable.eventId, chunkIds),
+        ),
+      );
+    for (const row of prior) existing.set(row.eventId, row.override);
+  }
+
+  const now = new Date();
+  const overrides: AnalystEventOverride[] = eventIds.map((eventId) => ({
+    ...(existing.get(eventId) ?? {}),
+    eventId,
+    inclusionStatus: set.inclusionStatus,
+    exclusionReason:
+      set.inclusionStatus === "included" ? null : set.exclusionReason ?? null,
+  }));
+
+  const CHUNK = 200;
+  for (let i = 0; i < overrides.length; i += CHUNK) {
+    const chunk = overrides.slice(i, i + CHUNK);
+    await db
+      .insert(countryEngineOverridesTable)
+      .values(
+        chunk.map((override) => ({
+          countrySlug: slug,
+          eventId: override.eventId,
+          override,
+          updatedAt: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [
+          countryEngineOverridesTable.countrySlug,
+          countryEngineOverridesTable.eventId,
+        ],
+        set: {
+          override: sql`excluded.override`,
+          updatedAt: sql`excluded.updated_at`,
+        },
+      });
+  }
+
+  // ONE audit row for the whole bulk action (§37: all manual changes recorded).
+  await db.insert(countryEngineAuditTable).values({
+    countrySlug: slug,
+    eventId: null,
+    action: "bulk_override",
+    detail: {
+      filter,
+      set,
+      matched: rows.length,
+      eventIds: eventIds.slice(0, BULK_AUDIT_ID_CAP),
+      eventIdsTruncated: eventIds.length > BULK_AUDIT_ID_CAP,
+    },
+    actor: actor ?? null,
+    createdAt: now,
+  });
+
+  const result = await runCountryEngine(slug);
+  logger.info(
+    { slug, matched: rows.length, set },
+    "applyBulkOverride: applied bulk triage",
+  );
+  return {
+    matched: rows.length,
+    applied: rows.length,
+    dryRun: false,
+    sample,
+    stats: {
+      ...result.stats,
+      eventsTotal: result.events.length,
+      included: result.included.length,
+    },
+  };
 }

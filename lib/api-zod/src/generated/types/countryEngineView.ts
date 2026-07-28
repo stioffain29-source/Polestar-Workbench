@@ -8,10 +8,13 @@
 import type { CanonicalEvent } from './canonicalEvent';
 import type { CountryEngineViewOverridesItem } from './countryEngineViewOverridesItem';
 import type { CountryEngineViewStats } from './countryEngineViewStats';
+import type { CountryEngineViewStatusCounts } from './countryEngineViewStatusCounts';
 
 export interface CountryEngineView {
   events: CanonicalEvent[];
   /** @nullable */
   stats?: CountryEngineViewStats;
   overrides: CountryEngineViewOverridesItem[];
+  statusCounts?: CountryEngineViewStatusCounts;
+  totalMatched?: number;
 }
