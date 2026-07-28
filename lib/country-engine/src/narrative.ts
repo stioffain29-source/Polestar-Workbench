@@ -784,9 +784,17 @@ export function buildBluf(
     );
   }
 
+  // §14/§15 — s1 (the lead) and s1b (the other ranked top developments) are
+  // MANDATORY: every Top-3 story must be referenced in the BLUF, so the word
+  // cap may only trim the optional analytical tail (s2/s2b/s3), never the
+  // top-development references. If the mandatory sentences alone exceed the
+  // cap they are kept whole — the §33 section-word-count check will surface
+  // that visibly instead of the reference being dropped silently.
+  const mandatory = [s1, s1b].filter(Boolean).join(" ");
+  const blufCap = Math.max(BLUF_MAX_WORDS, countWords(mandatory));
   let text = capWords(
     [s1, s1b, s2, s2b, s3].filter(Boolean).join(" "),
-    BLUF_MAX_WORDS,
+    blufCap,
   );
 
   // §16 — strip trend wording if there is no comparative data. The composed
@@ -796,7 +804,7 @@ export function buildBluf(
     // Fall back to the neutral event-led sentences only (lead + other top
     // developments), mirroring the tolerance already extended to s1: quoted
     // event titles are facts, not analytical trend claims.
-    text = capWords([s1, s1b].filter(Boolean).join(" "), BLUF_MAX_WORDS);
+    text = capWords(mandatory, blufCap);
   }
 
   return { value: text, claims };

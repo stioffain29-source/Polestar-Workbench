@@ -113,6 +113,41 @@ export function checkNoForeignIncludedEvents(
   return failures;
 }
 
+/**
+ * §33 NARRATIVE — every ranked Top Development must be referenced in the
+ * written analysis (BLUF / Current Situation / Outlook). buildBluf composes
+ * its lead + "The period also brought …" sentences from the SAME ranked
+ * selection as buildTopThree, so a miss here means the reference sentence was
+ * dropped (e.g. by a word cap) — a headline story would ship unmentioned.
+ */
+export function checkTopDevelopmentsReferenced(
+  report: QualityGateReport,
+): GateFailure[] {
+  const failures: GateFailure[] = [];
+  const n = report.narrative;
+  // §27 sparse reports intentionally omit the analytical sections.
+  if (n.isSparse) return failures;
+  const haystack = [n.bluf, n.currentSituation, n.outlook]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  for (const dev of n.topThree) {
+    // TopDevelopment.title is the naturalised title — the exact text buildBluf
+    // embeds (case-insensitively; only the first letter may differ).
+    const needle = dev.title.trim().toLowerCase();
+    if (!needle) continue;
+    if (!haystack.includes(needle)) {
+      failures.push({
+        check: "top_development_referenced",
+        severity: "critical",
+        message: `Top development "${dev.title}" (event ${dev.eventId}) is not referenced in the narrative (BLUF / Current Situation / Outlook).`,
+        eventId: dev.eventId,
+        section: "Bottom Line Up Front",
+      });
+    }
+  }
+  return failures;
+}
 /** DATA — no included duplicate (same duplicateGroupId appears twice). */
 export function checkNoIncludedDuplicates(
   report: QualityGateReport,
@@ -480,6 +515,7 @@ export function checkRecommendationsLinked(
 const ALL_CHECKS: ((r: QualityGateReport) => GateFailure[])[] = [
   checkNoForeignIncludedEvents,
   checkNoIncludedDuplicates,
+  checkTopDevelopmentsReferenced,
   checkDatesWithinWindow,
   checkMapPoints,
   checkSeverityConsistency,

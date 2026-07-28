@@ -246,3 +246,79 @@ describe("runQualityGate — fails closed (§33)", () => {
     expect(checkNames(result)).toContain("section_word_count");
   });
 });
+
+// ---------------------------------------------------------------------------
+// §33 — top developments referenced in narrative (task: unmentioned headline)
+// ---------------------------------------------------------------------------
+
+describe("checkTopDevelopmentsReferenced (§33)", () => {
+  it("passes for a normally assembled narrative", () => {
+    const events = [
+      makeEvent({ eventTitle: "Armed robbery at a market", severity: "High" }),
+      makeEvent({ eventTitle: "Riot outside provincial assembly", severity: "High" }),
+      makeEvent({ eventTitle: "Highway ambush near Kainantu", severity: "Medium" }),
+    ];
+    const report = baseReport(events);
+    const result = runQualityGate(report);
+    const hits = result.failures.filter(
+      (f) => f.check === "top_development_referenced",
+    );
+    expect(hits).toHaveLength(0);
+  });
+
+  it("fails when a Top-3 development is absent from the narrative text", () => {
+    const events = [
+      makeEvent({ eventTitle: "Armed robbery at a market", severity: "High" }),
+      makeEvent({ eventTitle: "Riot outside provincial assembly", severity: "High" }),
+    ];
+    const report = baseReport(events);
+    // Simulate a regression that strips the "The period also brought …"
+    // reference from every narrative section.
+    const missing = report.narrative.topThree[1];
+    expect(missing).toBeDefined();
+    const scrub = (s: string) =>
+      s.replace(new RegExp(missing.title, "ig"), "something else");
+    report.narrative = {
+      ...report.narrative,
+      bluf: scrub(report.narrative.bluf),
+      currentSituation: scrub(report.narrative.currentSituation),
+      outlook: scrub(report.narrative.outlook),
+    };
+    const result = runQualityGate(report);
+    const hits = result.failures.filter(
+      (f) => f.check === "top_development_referenced",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].severity).toBe("critical");
+    expect(hits[0].eventId).toBe(missing.eventId);
+    expect(result.passed).toBe(false);
+  });
+
+  it("skips the check for sparse reports (§27)", () => {
+    const report = baseReport([]);
+    const result = runQualityGate(report);
+    expect(
+      result.failures.filter((f) => f.check === "top_development_referenced"),
+    ).toHaveLength(0);
+  });
+
+  it("still passes when top-development titles are so long the BLUF word cap bites", () => {
+    const longTitle = (n: number) =>
+      `Extended incident ${n} in which ` +
+      Array.from({ length: 40 }, (_, i) => `detail${n}x${i}`).join(" ");
+    const events = [
+      makeEvent({ eventTitle: longTitle(1), severity: "Extreme", casualties: 3 }),
+      makeEvent({ eventTitle: longTitle(2), severity: "High" }),
+      makeEvent({ eventTitle: longTitle(3), severity: "High" }),
+    ];
+    const report = baseReport(events);
+    const result = runQualityGate(report);
+    // The reference check must NOT fail — the word cap may only trim the
+    // optional analytical tail, never the top-development references. (The
+    // section word-count check may flag the oversized BLUF separately, which
+    // is a visible failure rather than a silent drop.)
+    expect(
+      result.failures.filter((f) => f.check === "top_development_referenced"),
+    ).toHaveLength(0);
+  });
+});

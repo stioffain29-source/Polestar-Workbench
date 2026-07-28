@@ -513,3 +513,36 @@ describe("buildCountryNarrative sparse handling (§27)", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// BLUF word cap must never drop the top-development reference sentence
+// ---------------------------------------------------------------------------
+
+describe("buildBluf top-development references vs word cap (§14/§15)", () => {
+  it("references every ranked Top-3 development even with very long titles", () => {
+    const longTitle = (n: number) =>
+      `Extended incident ${n} in which ` +
+      Array.from({ length: 40 }, (_, i) => `detail${n}x${i}`).join(" ");
+    const events = [
+      makeEvent({ eventTitle: longTitle(1), severity: "Extreme", casualties: 3 }),
+      makeEvent({ eventTitle: longTitle(2), severity: "High" }),
+      makeEvent({ eventTitle: longTitle(3), severity: "High" }),
+    ];
+    const { value: top } = buildTopThree(events);
+    expect(top).toHaveLength(3);
+    const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
+    for (const dev of top) {
+      expect(bluf.toLowerCase()).toContain(dev.title.trim().toLowerCase());
+    }
+  });
+
+  it("still caps the optional analytical tail at 120 words for normal titles", () => {
+    const events = [
+      makeEvent({ eventTitle: "Armed robbery at a market", severity: "High" }),
+      makeEvent({ eventTitle: "Riot outside provincial assembly", severity: "High" }),
+      makeEvent({ eventTitle: "Highway ambush near Kainantu", severity: "Medium" }),
+    ];
+    const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
+    expect(countWords(bluf)).toBeLessThanOrEqual(120);
+  });
+});
