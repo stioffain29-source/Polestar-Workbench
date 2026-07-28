@@ -60,7 +60,15 @@ for slug in "${SLUGS[@]}"; do
   if grep -q 'hasPriorData=true' <<<"$gate_line"; then has_prior="true"; fi
 
   # --- §30 banned phrases + §16 trend gate over the extracted PDF text.
-  if ! pdftotext "$pdf" "$txt"; then
+  # pdftotext floods stderr with cosmetic "Adobe-Identity-H" syntax errors
+  # from the embedded Roboto font (see memory: openable-pdf-export.md).
+  # Filter that exact chatter but keep any OTHER stderr output visible.
+  pdf_err="$OUT_DIR/${slug}.pdftotext.err"
+  pdftotext "$pdf" "$txt" 2>"$pdf_err"
+  pdftotext_status=$?
+  grep -v "Unknown character collection 'Adobe-Identity-H'" "$pdf_err" || true
+  rm -f "$pdf_err"
+  if [ $pdftotext_status -ne 0 ]; then
     echo "FAIL $slug: pdftotext could not extract $pdf"
     SUMMARY+=("FAIL $slug: pdftotext failed")
     FAILED=1
