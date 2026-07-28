@@ -54,6 +54,10 @@ interface AnyReport {
   implications?: string | null;
   watchNext?: string | null;
   polestarView?: string | null;
+  activismRead?: string | null;
+  civilUnrestRead?: string | null;
+  forecastRead?: string | null;
+  regionalCountryRead?: string | null;
   hardNumbers?: unknown;
 }
 
@@ -125,6 +129,14 @@ async function main() {
     implications: report.implications,
     watchNext: report.watchNext,
     polestarView: report.polestarView,
+    // Flashpoint section "reads" — saved analyst/owner overrides for the
+    // Activism, Civil Unrest, Forecast and Regional & Country View sections.
+    // Without these the headless PDF silently falls back to auto-prose and
+    // diverges from the on-screen preview.
+    activismRead: report.activismRead,
+    civilUnrestRead: report.civilUnrestRead,
+    forecastRead: report.forecastRead,
+    regionalCountryRead: report.regionalCountryRead,
     hardNumbers: report.hardNumbers,
   };
 

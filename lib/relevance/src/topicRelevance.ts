@@ -547,6 +547,50 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // markets story, not civil unrest. Gated on the financial actor + protest +
   // a trading-loss context either side, so a street protest is untouched.
   /\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,45}\bprotest\w*\b[^.!?]{0,50}\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage|broker|share price|stock crash|ponzi)\b|\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage)\b[^.!?]{0,50}\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,20}\bprotest\w*\b/i,
+  // Fact-check / misinformation debunk — "Nepal Gen-Z protest video falsely
+  // shared as…", "Fake Letter Falsely Claims…", "AI-generated video falsely
+  // linked to unrest", "Old videos … falsely linked to CJP protests",
+  // "Unrelated Sikh march falsely linked…". The debunked FOOTAGE often
+  // contains unmistakable public-order vocabulary ("Gen-Z protest", "tear
+  // gas", "demonstration"), so these must drop BEFORE the title-rescue and
+  // before the FP_POS_DEMO keep path — the story is about misinformation,
+  // not a live unrest event. Bound to explicit fact-check verbs/framing so a
+  // genuine protest report is never touched.
+  /\b(fact[- ]?check(er|ers|ing)?|debunk(s|ed|ing)?|falsely (linked|shared|captioned|attributed|claim(s|ed)?|portray(s|ed)?)|misrepresent(s|ed|ing)?|doctored (video|image|photo|clip|footage)|ai[- ]generated (video|image|photo|clip|footage)|fake (letter|video|photo|image|clip|footage)|misinformation|disinformation)\b/i,
+  // Further misinformation shapes: a "doctor(ed)/manipulated/edited/fake …
+  // photo/video" with words between ("Posts doctor old photo of prisoner
+  // rights protest…to mock Colombo mayor"), the verification-piece framing
+  // "Here's the truth", and rumour headlines quoting a purported 'support
+  // letter' to protesters. All are coverage OF misinformation, not unrest.
+  /\b(doctored?|manipulated|edited|fabricated)\b[^.!?]{0,12}\b(photo|image|picture|video|clip|footage)s?\b|\bhere'?s the truth\b|['‘’"“”]support letter['‘’"“”]|\bspreads? false\b|\bmyths? vs\.? facts?\b/i,
+  // Interrogative rumour-verification headline — "Did Bangladesh's
+  // Jamaat-e-Islami send a 'support letter' to Delhi protesters?". A "Did …?"
+  // question opener is a verification/debate piece, not an incident report.
+  /^\s*did\b[^?]{0,90}\?/i,
+  // Staged enforcement/inspection "demonstration" for official photographs —
+  // "[Photo] Drug Smuggling Crackdown Demonstration at Incheon Airport's
+  // Dedicated Drug Inspection Checkpoint". Here "demonstration" is a staged
+  // display of an enforcement capability, not a protest, yet the bare word
+  // would otherwise title-rescue it. Bound to the enforcement noun adjacent
+  // to "demonstration" (a real protest AGAINST a crackdown reads
+  // "demonstration against the crackdown" and is not matched: the enforcement
+  // word must immediately modify the demonstration, or the demonstration must
+  // sit at a checkpoint/inspection venue).
+  /\b(crackdown|enforcement|inspection|interdiction|screening|customs|counter[- ]?terror\w*) demonstration\b|\bdemonstration\b[^.!?]{0,50}\b(inspection (checkpoint|station|facility)|customs checkpoint|screening checkpoint|drug inspection)\b/i,
+  // Interstate / diplomatic "files a protest" — "China Files Protest, Says
+  // Philippines Struck First in Sea Clash". A filed/lodged/registered protest
+  // is a formal complaint note between states or to an authority, never a
+  // street demonstration, yet body-level positive cues ("clash",
+  // "protesters" in unrelated summary copy) can reach the keep path first.
+  // Title-only and verb-bound, so "protesters file past parliament" or a
+  // genuine demonstration headline is untouched.
+  /\b(files?|filed|lodges?|lodged|registers?|registered) (a |an |its |another )?(formal |official |diplomatic |strong |stern |strongly[- ]worded )?protests?\b/i,
+  // Criminal-syndicate enforcement colour — "'Counter-setting syndicate'
+  // active at Johor border, KLIA despite crackdown". A crime-syndicate story
+  // is law enforcement, not civil unrest; the bare word "crackdown" would
+  // otherwise carry it. Requires the syndicate/organised-crime noun in the
+  // headline, so a "crackdown on protesters" headline never matches.
+  /\b(counter[- ]setting|crime |criminal |smuggling |scam |drug |vice |illegal[- ]betting )?syndicates?\b[^.!?]{0,60}\bcrackdowns?\b|\bcrackdowns?\b[^.!?]{0,40}\b(counter[- ]setting|syndicates?)\b/i,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
@@ -611,7 +655,7 @@ const FP_REAL_UNREST_COMPANION_RE =
 // — deliberately NOT the bare word "demonstration", which the display sense
 // shares) so a real "farmers' demonstration turns violent" is always kept.
 const FP_DISPLAY_DEMONSTRATION_RE =
-  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|models?|kitchens?)\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
+  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|facilit(y|ies)|models?|kitchens?)\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
 // Protest-specific companion (excludes the bare word "demonstration", which the
 // display sense shares) — used only to SPARE a genuine protest from the display-
 // demonstration exclude above.
@@ -1541,6 +1585,29 @@ const FP_NEG_INTERSTATE = new RegExp(
   `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (a |another |formal |strong |diplomatic )*protest\\b`,
   "i",
 );
+// Interstate protest EXCHANGE — a state (or its capital, metonymically)
+// getting / drawing / rejecting another state's protest over drills,
+// incursions or talks: "Chinese Destroyer's Live-Fire Drill Draws Protest by
+// Japan", "China rejects Japan's protest over joint drills", "China Foreign
+// Minister Gets Protest From Manila". These are diplomacy, never street
+// protest, yet the shapes above miss the possessive ("Japan's protest") and
+// received forms ("gets protest from Manila"). The state noun is REQUIRED in
+// every branch, so "fuel hike draws protest from workers" is untouched; and
+// this only runs on the negative-sense path, after FP_POS_DEMO/VIOLENCE have
+// already kept any genuine demonstration.
+const FP_NEG_INTERSTATE_STATE =
+  `(?:${FP_NEG_INTERSTATE_NAT}|manila|new delhi|islamabad|taipei|moscow|washington|colombo|dhaka|hanoi|canberra|pyongyang|bangkok|phnom penh|naypyidaw)`;
+const FP_NEG_INTERSTATE_EXCHANGE = new RegExp(
+  `\\b(?:gets?|got|receive[sd]?|draws?|drew|rejects?|dismiss(?:es|ed)?|brush(?:es|ed)\\s+(?:off|aside))\\s+(?:\\w+\\s+){0,2}["'‘’“”]?protests?["'‘’“”]?\\s+(?:by|from)\\s+(?:the\\s+)?${FP_NEG_INTERSTATE_STATE}\\b` +
+    `|\\b(?:draws?|drew|rejects?|dismiss(?:es|ed)?)\\s+(?:a\\s+|an\\s+|sharp\\s+|strong\\s+|formal\\s+|fresh\\s+|stern\\s+|official\\s+|diplomatic\\s+)*${FP_NEG_INTERSTATE_STATE}\\s+["'‘’“”]?protests?\\b` +
+    // Possessive form ONLY when anchored to a diplomatic response verb —
+    // "rejects Japan's protest", "dismisses China's protest", "draws
+    // Manila's protest". A bare possessive ("India's protest movement",
+    // "Nepal's Gen-Z protests") is normal domestic-unrest phrasing and must
+    // never match.
+    `|\\b(?:draws?|drew|rejects?|dismiss(?:es|ed)?|brush(?:es|ed)\\s+(?:off|aside))\\s+(?:the\\s+)?${FP_NEG_INTERSTATE_STATE}[’']s\\s+(?:\\w+\\s+){0,2}["'‘’“”]?protests?\\b`,
+  "i",
+);
 const FP_NEG_CRACKDOWN =
   /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|internet|website|web ?sites?|domains?|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft|safety|eviction|evict|demolition|encroach\w*|squatter|unauthori[sz]ed|vendor|hawker|busker|street performer|sidewalk|noise|helmet|jaywalk|chip|semiconductor|export control|militant|militants|insurgen\w*|separatist\w*|guerrilla\w*|jihad\w*|abu sayyaf|biff|bifm|bangsamoro|moro (rebel\w*|front\w*|fighter\w*|islamic|militant\w*)|\bnpa\b|new people'?s army|tpnpb|\bopm\b|\bttp\b|tehrik|baloch\w*|naxal\w*|maoist|arakan army|ethnic armed|child\w*|minors?|paedophil\w*|pedophil\w*)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|internet|website|web ?site|domain|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+|safety|eviction|demolition|encroachment|vendor|hawker|chip|semiconductor|militant|insurgent|rebel|separatist|jihadist|terrorist|child\w*) crackdown\b|\btiananmen\b/i;
 // Financial / markets / regulatory context. A "crackdown" or "clampdown" set in
@@ -1567,7 +1634,12 @@ function flashpointNegText(i: RelevanceInput): string {
 function flashpointProtestCrackdownVerdict(text: string, negText: string): boolean | null {
   if (/\bprotest(s|ers?|ing|ed)?\b/.test(text)) {
     if (FP_POS_DEMO.test(text) || FP_POS_VIOLENCE.test(text)) return true;
-    if (FP_NEG_GESTURE.test(negText) || FP_NEG_DIPLOMATIC.test(negText) || FP_NEG_INTERSTATE.test(negText)) {
+    if (
+      FP_NEG_GESTURE.test(negText) ||
+      FP_NEG_DIPLOMATIC.test(negText) ||
+      FP_NEG_INTERSTATE.test(negText) ||
+      FP_NEG_INTERSTATE_EXCHANGE.test(negText)
+    ) {
       return false;
     }
     return true;
