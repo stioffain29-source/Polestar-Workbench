@@ -937,7 +937,10 @@ export function buildCategoryIntro(
   }
 
   const count = catEvents.length;
-  const locations = unique(catEvents.map((e) => locationLabel(e))).slice(0, 4);
+  // §15 — prefer sub-national locations; never mix the country name into the
+  // list when located events exist ("mainly in Morobe and Papua New Guinea").
+  const { locations: subLocations } = priorityLocations(catEvents);
+  const locations = subLocations.slice(0, 4);
   const notable = mostSignificant(catEvents)!;
   const severities = catEvents.map((e) => e.severity);
   const minSev = severities.reduce((a, b) =>
@@ -1422,9 +1425,12 @@ export function buildOutlook(
     byCat.get(principalCategory) ?? events,
   ];
   const ongoing = events.filter((e) => e.eventStatus === "Ongoing");
-  const locations = unique(
-    (ongoing.length ? ongoing : events).map((e) => locationLabel(e)),
-  ).slice(0, 3);
+  // §15 — prefer sub-national locations; fall back to the country name only
+  // when nothing in the pool is located below country level.
+  const { locations: subLocations } = priorityLocations(
+    ongoing.length ? ongoing : events,
+  );
+  const locations = subLocations.slice(0, 3);
 
   const s1 = `${capitaliseFirst(categoryPhrase(principalCategory))} is likely to remain the main concern during the next seven days.`;
   claims.push(

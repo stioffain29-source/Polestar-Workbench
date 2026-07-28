@@ -15,7 +15,6 @@
 // authoritative spec), not a category summary generated from database fields.
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
-import type { PolestarViewParts } from "./countryPolestarView";
 import type { JakartaCorridorStatus } from "./jakartaCorridors";
 import { JAKARTA_EXPOSURE_RANK } from "./jakartaCorridors";
 
@@ -538,50 +537,6 @@ export function buildJakartaRecommendedActions(): string[] {
   ];
 }
 
-// --- BLUF / Current Situation / Outlook ------------------------------------
-
-function leadThemePhrases(windowItems: PngReportItem[], cap = 3): string[] {
-  return presentThemes(windowItems)
-    .slice(0, cap)
-    .map((p) => JAKARTA_THEME_PHRASE[p.theme]);
-}
-
-export function buildJakartaBluf(windowItems: PngReportItem[]): string {
-  if (windowItems.length === 0) {
-    return "Jakarta remains a manageable but disruption-prone operating environment. No fresh open-source reporting was identified this period; the capital's standing pattern of protest, congestion, flooding and local crime continues to shape movement planning.";
-  }
-  const phrases = leadThemePhrases(windowItems);
-  const areas = presentAreas(windowItems, 2);
-  const whereTail = areas.length ? ` in ${joinList(areas)}` : "";
-  const themeBit = phrases.length
-    ? joinList(phrases)
-    : "localised, lower-level disruption";
-  return `Jakarta remains a manageable but disruption-prone operating environment. This week's reporting centred on ${themeBit}${whereTail}, with the main operational effect on movement and timings rather than any city-wide deterioration.`;
-}
-
-export function buildJakartaCurrentSituation(windowItems: PngReportItem[]): string {
-  // The structured Jakarta operating picture (spec §3): a short present-active
-  // lead, then four standing operating-picture statements. The four statements
-  // describe Jakarta's standing exposure (not event claims), so they are safe to
-  // state regardless of the window; the lead reflects what was actually reported.
-  const phrases = leadThemePhrases(windowItems);
-  const areas = presentAreas(windowItems, 2);
-  const whereTail = areas.length ? ` in ${joinList(areas)}` : "";
-  const lead =
-    windowItems.length === 0
-      ? "With no fresh open-source reporting this period, Jakarta holds to its standing operating picture."
-      : phrases.length
-        ? `This week's reporting centred on ${joinList(phrases)}${whereTail}, with the main effect on movement and timings.`
-        : "Reporting this week was limited to isolated, lower-level disruption across the capital.";
-  const picture =
-    "Movement planning should focus on Central Jakarta protest exposure around the Gambir, Monas and Istana Merdeka government district, North Jakarta port access around Tanjung Priok, and weather-related disruption on the cross-city and Soekarno-Hatta airport-corridor routes. The main business impact is not city-wide deterioration but short-notice disruption to meetings in the Sudirman–Thamrin and SCBD districts, port collections at Tanjung Priok, warehouse dispatches toward Bekasi and Tangerang, and staff transfers to and from the airport.";
-  return `${lead}\n${picture}`;
-}
-
-export function buildJakartaOutlook(): string {
-  return "Over the next seven days, the most likely picture is localised disruption from protest activity, traffic, heavy rain and local crime rather than a city-wide deterioration. Movement planning — route checks, flexible timings and local verification — remains the main mitigation.";
-}
-
 // Jakarta-specific escalation indicators for the Outlook (spec §5): the standing
 // watch-items an analyst would flag as "what would worsen the picture", phrased
 // for the capital rather than the generic country list.
@@ -597,32 +552,6 @@ export function buildJakartaEscalationIndicators(): string[] {
     "A driver unable to confirm two viable routes",
     "A security provider advising delay or reroute",
   ];
-}
-
-// --- Polestar View ---------------------------------------------------------
-
-// The spec's strongest-paragraph Polestar View, near-verbatim, in British
-// English. A standing assessed judgement of the capital, not a count summary.
-export const JAKARTA_POLESTAR_PARAGRAPH =
-  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and local crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.";
-
-export function buildJakartaPolestarView(): PolestarViewParts {
-  return {
-    direction: "Operating risk in Jakarta is broadly stable but disruption-prone.",
-    driver:
-      "The main driver is the combined effect of protests, congestion, flooding and local crime, rather than any single high-impact threat.",
-    exposedGeography:
-      "Exposure concentrates in the central government and business districts, the main commuting corridors and the Soekarno-Hatta airport corridor.",
-    exposedActivity:
-      "The main business exposure is staff movement, journey timings and airport transfers.",
-    likelyDisruption:
-      "The most likely disruption over the next seven days is localised interruption to movement from protest activity, traffic, heavy rain and local crime.",
-    whatWouldChange:
-      "The assessment would change if large-scale unrest, severe flooding or a major security incident disrupted the capital city-wide.",
-    practicalJudgement:
-      "For now, business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.",
-    paragraph: JAKARTA_POLESTAR_PARAGRAPH,
-  };
 }
 
 // --- Top 3 development transform -------------------------------------------
@@ -1202,11 +1131,6 @@ export interface JakartaBriefInput {
 }
 
 export interface JakartaBriefOverrides {
-  bluf: string;
-  executiveSummary: string;
-  outlook: string;
-  polestarView: string;
-  polestarViewParts: PolestarViewParts;
   recommendedActions: string[];
   operationalImpact: string[];
   escalationIndicators: string[];
@@ -1216,13 +1140,7 @@ export interface JakartaBriefOverrides {
 }
 
 export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrides {
-  const parts = buildJakartaPolestarView();
   return {
-    bluf: buildJakartaBluf(input.windowItems),
-    executiveSummary: buildJakartaCurrentSituation(input.windowItems),
-    outlook: buildJakartaOutlook(),
-    polestarView: parts.paragraph,
-    polestarViewParts: parts,
     recommendedActions: buildJakartaRecommendedActions(),
     operationalImpact: buildJakartaOperationalImpact(),
     escalationIndicators: buildJakartaEscalationIndicators(),

@@ -1490,7 +1490,7 @@ const CATEGORY_PHRASE: Record<string, string> = {
   "power / utilities": "power and utility disruption",
   "telecoms / connectivity": "telecoms and connectivity disruption",
   "government stability": "governance and political developments",
-  "other security": "other security-relevant incidents",
+  "other security": "other security incidents",
 };
 function categoryPhrase(label: string): string {
   const k = label.toLowerCase();
@@ -1838,7 +1838,7 @@ export function buildStructuredReportDataset(
     : [];
 
   const leadCat = topCats[0] ?? "security-relevant activity";
-  const leadCatPhrase = topCatPhrases[0] ?? "security-relevant incidents";
+  const leadCatPhrase = topCatPhrases[0] ?? "security incidents";
 
   // --- BLUF (Bottom Line Up Front) ------------------------------------------
   // Legacy deterministic BLUF generator deleted — the engine narrative block

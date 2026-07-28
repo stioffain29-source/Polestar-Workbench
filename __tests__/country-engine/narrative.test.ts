@@ -629,3 +629,70 @@ describe("buildBluf top-development references vs word cap (§14/§15)", () => {
     expect(countWords(bluf)).toBeLessThanOrEqual(120);
   });
 });
+
+// ---------------------------------------------------------------------------
+// §15 follow-up — category intro and outlook location lists never mix the
+// country name in when sub-national locations exist.
+// ---------------------------------------------------------------------------
+
+describe("category intro / outlook location priority (§15)", () => {
+  it("category intro prefers sub-national locations over the country name in a mixed window", () => {
+    const events = [
+      makeEvent({ city: "Lae", provinceOrState: "Morobe" }),
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+      }),
+    ];
+    const { value } = buildCategoryIntro("Violent crime", events);
+    expect(value).toMatch(/mainly in Lae/);
+    expect(value).not.toMatch(/mainly in [^.]*Papua New Guinea/);
+  });
+
+  it("category intro falls back to the country name only when nothing is located", () => {
+    const events = [
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+      }),
+    ];
+    const { value } = buildCategoryIntro("Violent crime", events);
+    expect(value).toMatch(/mainly in Papua New Guinea/);
+  });
+
+  it("outlook review sentence prefers sub-national locations in a mixed window", () => {
+    const events = [
+      makeEvent({ city: "Mount Hagen", provinceOrState: "Western Highlands" }),
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+        issueCategory: "Civil unrest",
+      }),
+    ];
+    const { value } = buildOutlook(events, null);
+    if (/should remain under review/.test(value)) {
+      expect(value).not.toMatch(/Papua New Guinea should remain under review/);
+    }
+  });
+
+  it("outlook falls back to the country name when nothing is located", () => {
+    const events = [
+      makeEvent({
+        city: null,
+        district: null,
+        provinceOrState: null,
+        locationPrecision: "Country only",
+      }),
+    ];
+    const { value } = buildOutlook(events, null);
+    if (/should remain under review/.test(value)) {
+      expect(value).toMatch(/Papua New Guinea should remain under review/);
+    }
+  });
+});

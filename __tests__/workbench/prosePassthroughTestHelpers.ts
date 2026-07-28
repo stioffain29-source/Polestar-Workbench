@@ -397,3 +397,62 @@ export function cargoReportWithoutReadOverrides(
     regionalCountryRead: "",
   };
 }
+
+// ---------------------------------------------------------------------------
+// Hidden-section gate coverage for the REMAINING editable read sections
+// (task 457, extending the task-454 cargo pattern above). Each entry pairs a
+// canonical section key (topicSectionOverrides.ts TOPIC_SECTION_KEYS) with the
+// rendered heading and the fixture's override sentinel token, so the preview
+// suite asserts heading+text and the PDF suite (recording stub captures prose
+// only) asserts the sentinel. A typo'd key on either surface fails the
+// "hidden" leg because the real section would still render.
+// ---------------------------------------------------------------------------
+export interface GatedSection {
+  key: string;
+  heading: string;
+  sentinelToken: string;
+}
+
+export const FLASHPOINT_GATED_SECTIONS: GatedSection[] = [
+  { key: "activism", heading: "Activism and Protest Read", sentinelToken: "ZZ-ACTIVISM-READ-OVERRIDE-ZZ" },
+  { key: "civil-unrest", heading: "Civil Unrest and Public Order Read", sentinelToken: "ZZ-CIVIL-UNREST-READ-OVERRIDE-ZZ" },
+  { key: "forecast", heading: "Forecast: Next 7\u201314 Days", sentinelToken: "ZZ-FORECAST-READ-OVERRIDE-ZZ" },
+  { key: "regional", heading: "Regional and Country View", sentinelToken: "ZZ-REGIONAL-READ-OVERRIDE-ZZ" },
+  { key: "executive-summary", heading: "Executive Summary", sentinelToken: "ZZ-EXEC-OVERRIDE-ZZ" },
+  { key: "what-matters", heading: "What Matters", sentinelToken: "ZZ-WHAT-MATTERS-OVERRIDE-ZZ" },
+  { key: "watch-next", heading: "Watch Next", sentinelToken: "ZZ-WATCH-NEXT-OVERRIDE-ZZ" },
+  { key: "polestar-view", heading: "Polestar View", sentinelToken: "ZZ-POLESTAR-OVERRIDE-ZZ" },
+  { key: "implications", heading: "Implications for Business", sentinelToken: "ZZ-IMPLICATIONS-OVERRIDE-ZZ" },
+];
+
+export const SHIPPING_GATED_SECTIONS: GatedSection[] = [
+  { key: "chokepoint-route", heading: "Chokepoint / Route Read", sentinelToken: "ZZ-CHOKEPOINT-READ-OVERRIDE-ZZ" },
+  { key: "vessel-piracy", heading: "Vessel Threat and Piracy Read", sentinelToken: "ZZ-PIRACY-READ-OVERRIDE-ZZ" },
+  { key: "commercial-impact", heading: "Commercial Impact on Shipping", sentinelToken: "ZZ-COMMERCIAL-READ-OVERRIDE-ZZ" },
+  { key: "regional", heading: "Regional and Country View", sentinelToken: "ZZ-SHIP-REGIONAL-READ-OVERRIDE-ZZ" },
+  { key: "maritime-security", heading: "Maritime Security (ICC CCS / IMB)", sentinelToken: "ZZ-MARSEC-READ-OVERRIDE-ZZ" },
+];
+
+export const CONFLICT_GATED_SECTIONS: GatedSection[] = [
+  { key: "other-watched", heading: "Other Watched Theatres", sentinelToken: "ZZ-OTHER-WATCHED-READ-OVERRIDE-ZZ" },
+];
+
+export const FUEL_GATED_SECTIONS: GatedSection[] = [
+  { key: "market-read", heading: "Market Read", sentinelToken: "ZZ-FUEL-MARKET-READ-OVERRIDE-ZZ" },
+  { key: "operational-read", heading: "Operational Read", sentinelToken: "ZZ-FUEL-OPERATIONAL-READ-OVERRIDE-ZZ" },
+  { key: "regional-highlights", heading: "Regional Highlights", sentinelToken: "ZZ-FUEL-REGIONAL-READ-OVERRIDE-ZZ" },
+];
+
+export const ENERGY_GATED_SECTIONS: GatedSection[] = [
+  { key: "executive-summary", heading: "Executive Summary", sentinelToken: "ZZ-ENERGY-EXEC-OVERRIDE-ZZ" },
+  { key: "situation", heading: "Situation", sentinelToken: "ZZ-ENERGY-SITUATION-OVERRIDE-ZZ" },
+  { key: "what-happened", heading: "What Happened", sentinelToken: "ZZ-ENERGY-WHAT-HAPPENED-OVERRIDE-ZZ" },
+  { key: "what-matters", heading: "What Matters", sentinelToken: "ZZ-ENERGY-WHAT-MATTERS-OVERRIDE-ZZ" },
+  { key: "polestar-view", heading: "Polestar View", sentinelToken: "ZZ-ENERGY-POLESTAR-OVERRIDE-ZZ" },
+  { key: "implications", heading: "Implications for Business", sentinelToken: "ZZ-ENERGY-IMPLICATIONS-OVERRIDE-ZZ" },
+  { key: "watch-next", heading: "Watch Next", sentinelToken: "ZZ-ENERGY-WATCH-NEXT-OVERRIDE-ZZ" },
+];
+
+export const CARGO_EXTRA_GATED_SECTIONS: GatedSection[] = [
+  { key: "enforcement", heading: "Enforcement Activity", sentinelToken: "" },
+];

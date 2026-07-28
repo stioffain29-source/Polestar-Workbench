@@ -1,11 +1,8 @@
 import {
-  buildJakartaOutlook,
   buildJakartaOperationalImpact,
   buildJakartaRecommendedActions,
   buildJakartaRouteTiming,
   buildJakartaEscalationIndicators,
-  buildJakartaPolestarView,
-  JAKARTA_POLESTAR_PARAGRAPH,
 } from "../../artifacts/workbench/src/lib/jakartaBrief";
 
 // Parenthetical record/incident count annotations are banned from report prose
@@ -29,29 +26,6 @@ function assertClean(text: string) {
 }
 
 describe("jakartaBrief deterministic prose builders", () => {
-  it("the outlook paragraph is non-empty and count-free", () => {
-    assertClean(buildJakartaOutlook());
-  });
-
-  it("the Polestar paragraph is non-empty and count-free", () => {
-    assertClean(JAKARTA_POLESTAR_PARAGRAPH);
-  });
-
-  it("the Polestar view parts are non-empty and count-free", () => {
-    const parts = buildJakartaPolestarView();
-    const all = [
-      parts.direction,
-      parts.driver,
-      parts.exposedGeography,
-      parts.exposedActivity,
-      parts.likelyDisruption,
-      parts.whatWouldChange,
-      parts.practicalJudgement,
-      parts.paragraph,
-    ].join(" \n ");
-    assertClean(all);
-  });
-
   it.each([
     ["operational impact", buildJakartaOperationalImpact()],
     ["recommended actions", buildJakartaRecommendedActions()],

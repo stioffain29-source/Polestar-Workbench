@@ -304,3 +304,106 @@ describe("cargo hidden section keys gate the three data-driven reads (PDF)", () 
     });
   }
 });
+
+// Task 457: every remaining editable/gated section obeys its hiddenSections
+// key on the PDF surface too. The recording pdfChrome stub captures prose text
+// (not headings), so assertions key on each section's override sentinel — the
+// same content the preview suite pairs with the heading.
+import {
+  FLASHPOINT_GATED_SECTIONS,
+  SHIPPING_GATED_SECTIONS,
+  CONFLICT_GATED_SECTIONS,
+  FUEL_GATED_SECTIONS,
+  ENERGY_GATED_SECTIONS,
+  type GatedSection,
+} from "./prosePassthroughTestHelpers";
+
+function pdfGateSuite(
+  label: string,
+  sections: GatedSection[],
+  run: (hiddenSections: string[]) => Promise<string>,
+) {
+  const withSentinels = sections.filter((s) => s.sentinelToken);
+  describe(`${label} hidden section keys gate their sections (PDF)`, () => {
+    it("renders every gated section's text when hiddenSections is empty", async () => {
+      const text = await run([]);
+      for (const s of withSentinels) expect(text).toContain(s.sentinelToken);
+    });
+
+    for (const s of withSentinels) {
+      it(`omits "${s.heading}" when "${s.key}" is hidden — and keeps the rest`, async () => {
+        const text = await run([s.key]);
+        expect(text).not.toContain(s.sentinelToken);
+        for (const other of withSentinels) {
+          if (other.key === s.key) continue;
+          expect(text).toContain(other.sentinelToken);
+        }
+      });
+    }
+  });
+}
+
+pdfGateSuite("flashpoint", FLASHPOINT_GATED_SECTIONS, (hiddenSections) =>
+  captureText(() =>
+    exportFlashpointReportPdf(
+      buildHeadlessReportData(FLASHPOINT_REPORT) as never,
+      FLASHPOINT_INCIDENTS as never,
+      "flashpoint.pdf",
+      null,
+      hiddenSections,
+    ),
+  ),
+);
+
+pdfGateSuite("shipping", SHIPPING_GATED_SECTIONS, (hiddenSections) =>
+  captureText(() =>
+    exportShippingReportPdf(
+      buildHeadlessReportData(SHIPPING_REPORT) as never,
+      SHIPPING_INCIDENTS as never,
+      "shipping.pdf",
+      [],
+      [],
+      {},
+      null,
+      hiddenSections,
+    ),
+  ),
+);
+
+pdfGateSuite("conflict", CONFLICT_GATED_SECTIONS, (hiddenSections) =>
+  captureText(() =>
+    exportConflictReportPdf(
+      buildHeadlessReportData(CONFLICT_REPORT) as never,
+      CONFLICT_INCIDENTS as never,
+      "conflict.pdf",
+      null,
+      {},
+      null,
+      hiddenSections,
+    ),
+  ),
+);
+
+pdfGateSuite("fuel", FUEL_GATED_SECTIONS, (hiddenSections) =>
+  captureText(() =>
+    exportTopicReportPdf(
+      buildHeadlessReportData(FUEL_REPORT) as never,
+      FUEL_INCIDENTS as never,
+      { fuel: "Fuel Watch" },
+      "fuel.pdf",
+      { hiddenSections },
+    ),
+  ),
+);
+
+pdfGateSuite("generic energy", ENERGY_GATED_SECTIONS, (hiddenSections) =>
+  captureText(() =>
+    exportTopicReportPdf(
+      buildHeadlessReportData(ENERGY_REPORT) as never,
+      ENERGY_INCIDENTS as never,
+      { energy: "Energy Watch" },
+      "energy.pdf",
+      { hiddenSections },
+    ),
+  ),
+);

@@ -184,3 +184,94 @@ describe("cargo hidden section keys gate the three data-driven reads (preview)",
     }
   });
 });
+
+// Task 457: every remaining editable/gated section obeys its hiddenSections
+// key on the preview surface — hiding one section removes exactly that
+// heading and its text while every other gated section keeps rendering.
+import {
+  FLASHPOINT_GATED_SECTIONS,
+  SHIPPING_GATED_SECTIONS,
+  CONFLICT_GATED_SECTIONS,
+  FUEL_GATED_SECTIONS,
+  ENERGY_GATED_SECTIONS,
+  type GatedSection,
+} from "./prosePassthroughTestHelpers";
+
+function gateSuite(
+  label: string,
+  sections: GatedSection[],
+  render: (hiddenSections: string[]) => string,
+) {
+  describe(`${label} hidden section keys gate their sections (preview)`, () => {
+    it("renders every gated section when hiddenSections is empty", () => {
+      const html = render([]);
+      for (const s of sections) {
+        expect(html).toContain(s.heading);
+        if (s.sentinelToken) expect(html).toContain(s.sentinelToken);
+      }
+    });
+
+    for (const s of sections) {
+      it(`omits "${s.heading}" when "${s.key}" is hidden — and keeps the rest`, () => {
+        const html = render([s.key]);
+        expect(html).not.toContain(`>${s.heading}<`);
+        if (s.sentinelToken) expect(html).not.toContain(s.sentinelToken);
+        for (const other of sections) {
+          if (other.key === s.key) continue;
+          expect(html).toContain(other.heading);
+          if (other.sentinelToken) expect(html).toContain(other.sentinelToken);
+        }
+      });
+    }
+  });
+}
+
+gateSuite("flashpoint", FLASHPOINT_GATED_SECTIONS, (hiddenSections) =>
+  renderToStaticMarkup(
+    createElement(FlashpointReportPreview, {
+      report: FLASHPOINT_REPORT,
+      incidents: FLASHPOINT_INCIDENTS,
+      hiddenSections,
+    } as never),
+  ),
+);
+
+gateSuite("shipping", SHIPPING_GATED_SECTIONS, (hiddenSections) =>
+  renderToStaticMarkup(
+    createElement(ShippingReportPreview, {
+      report: SHIPPING_REPORT,
+      incidents: SHIPPING_INCIDENTS,
+      hiddenSections,
+    } as never),
+  ),
+);
+
+gateSuite("conflict", CONFLICT_GATED_SECTIONS, (hiddenSections) =>
+  renderToStaticMarkup(
+    createElement(ConflictReportPreview, {
+      report: CONFLICT_REPORT,
+      incidents: CONFLICT_INCIDENTS,
+      hiddenSections,
+    } as never),
+  ),
+);
+
+gateSuite("fuel", FUEL_GATED_SECTIONS, (hiddenSections) =>
+  renderToStaticMarkup(
+    createElement(ReportPreview, {
+      report: FUEL_REPORT,
+      incidents: FUEL_INCIDENTS,
+      hiddenSections,
+    } as never),
+  ),
+);
+
+gateSuite("generic energy", ENERGY_GATED_SECTIONS, (hiddenSections) =>
+  renderToStaticMarkup(
+    createElement(ReportPreview, {
+      report: ENERGY_REPORT,
+      incidents: ENERGY_INCIDENTS,
+      hiddenSections,
+    } as never),
+  ),
+);

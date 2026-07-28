@@ -201,6 +201,55 @@ function parseValidityRange(text: string, pub: Date | null): ValidityRange | nul
     if (start && end) return { start, end };
   }
 
+  // "from 23 July to 31 July [2026]" / Bahasa "mulai 23 Juli hingga 31 Juli"
+  // (each side carries its own day + month name).
+  const fromTo = text.match(
+    /\b(?:from|mulai|dari)\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\s+(?:to|until|till|through|thru|hingga|sampai)\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/,
+  );
+  if (fromTo && MONTHS[fromTo[2]] !== undefined && MONTHS[fromTo[5]] !== undefined) {
+    const startYear = fromTo[3] ? Number(fromTo[3]) : fromTo[6] ? Number(fromTo[6]) : pubYear;
+    const endYear = fromTo[6] ? Number(fromTo[6]) : startYear;
+    const start = mkDate(Number(fromTo[1]), MONTHS[fromTo[2]], startYear);
+    const end = mkDate(Number(fromTo[4]), MONTHS[fromTo[5]], endYear);
+    if (start && end) return { start, end };
+  }
+
+  // "from July 23 to July 31 [2026]" (month-day order on each side).
+  const fromToMd = text.match(
+    /\b(?:from|mulai|dari)\s+([a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\s+(?:to|until|till|through|thru|hingga|sampai)\s+([a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/,
+  );
+  if (fromToMd && MONTHS[fromToMd[1]] !== undefined && MONTHS[fromToMd[4]] !== undefined) {
+    const startYear = fromToMd[3] ? Number(fromToMd[3]) : fromToMd[6] ? Number(fromToMd[6]) : pubYear;
+    const endYear = fromToMd[6] ? Number(fromToMd[6]) : startYear;
+    const start = mkDate(Number(fromToMd[2]), MONTHS[fromToMd[1]], startYear);
+    const end = mkDate(Number(fromToMd[5]), MONTHS[fromToMd[4]], endYear);
+    if (start && end) return { start, end };
+  }
+
+  // "between 23 and 31 July [2026]" (shared month named once after the range).
+  const between = text.match(
+    /\bbetween\s+(\d{1,2})\s+and\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/,
+  );
+  if (between && MONTHS[between[3]] !== undefined) {
+    const month = MONTHS[between[3]];
+    const year = between[4] ? Number(between[4]) : pubYear;
+    const start = mkDate(Number(between[1]), month, year);
+    const end = mkDate(Number(between[2]), month, year);
+    if (start && end) return { start, end };
+  }
+
+  // "between 23 July and 31 July [2026]" (month named on both sides).
+  const betweenFull = text.match(
+    /\bbetween\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\s+and\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/,
+  );
+  if (betweenFull && MONTHS[betweenFull[2]] !== undefined && MONTHS[betweenFull[5]] !== undefined) {
+    const startYear = betweenFull[3] ? Number(betweenFull[3]) : betweenFull[6] ? Number(betweenFull[6]) : pubYear;
+    const endYear = betweenFull[6] ? Number(betweenFull[6]) : startYear;
+    const start = mkDate(Number(betweenFull[1]), MONTHS[betweenFull[2]], startYear);
+    const end = mkDate(Number(betweenFull[4]), MONTHS[betweenFull[5]], endYear);
+    if (start && end) return { start, end };
+  }
+
   // "until 31 July [2026]" / "till" / "through" / "up to" / Bahasa "hingga"/"sampai".
   const until = text.match(
     /\b(?:until|till|through|thru|up to|hingga|sampai)\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/,
@@ -221,6 +270,7 @@ function parseValidityRange(text: string, pub: Date | null): ValidityRange | nul
     const end = mkDate(Number(untilMd[2]), month, year);
     if (end) return { start: null, end };
   }
+
   return null;
 }
 

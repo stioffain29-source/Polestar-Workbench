@@ -580,3 +580,72 @@ describe("config registry", () => {
     expect(c.mapBounds).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Range phrasings: "from X to Y", "between X and Y", Bahasa "mulai … hingga …"
+// resolve to the range START, never the end (§6 follow-up).
+// ---------------------------------------------------------------------------
+
+describe("extractEventDate range phrasings (§6)", () => {
+  const input = (over: Record<string, unknown>) =>
+    ({
+      id: "r1",
+      title: "",
+      summary: null,
+      incidentDate: null,
+      occurredAt: "2026-07-24T00:00:00.000Z",
+      ...over,
+    }) as never;
+
+  it("dates a 'from 23 July to 31 July' advisory to the range start", () => {
+    const r = extractEventDate(
+      input({ title: "Flood advisory in effect from 23 July to 31 July" }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("dates a 'from July 23 to July 31' (month-day) advisory to the range start", () => {
+    const r = extractEventDate(
+      input({ title: "Coastal flooding expected from July 23 to July 31" }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("dates a 'between 23 and 31 July' advisory to the range start", () => {
+    const r = extractEventDate(
+      input({ title: "Tidal flooding possible between 23 and 31 July" }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("dates a 'between 23 July and 31 July' advisory to the range start", () => {
+    const r = extractEventDate(
+      input({ title: "Heavy rain forecast between 23 July and 31 July" }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("dates a Bahasa 'mulai 23 Juli hingga 31 Juli' advisory to the range start", () => {
+    const r = extractEventDate(
+      input({ title: "Peringatan banjir rob mulai 23 juli hingga 31 juli" }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("overrides an explicit incidentDate that echoes a 'from…to' range end", () => {
+    const r = extractEventDate(
+      input({
+        title: "Flood advisory in effect from 23 July to 31 July",
+        incidentDate: "2026-07-31T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("leaves single-date extraction unchanged", () => {
+    const r = extractEventDate(
+      input({ title: "Flash flooding hit the district on 22 July" }),
+    );
+    expect(r.eventDate).toBe("2026-07-22");
+  });
+});
