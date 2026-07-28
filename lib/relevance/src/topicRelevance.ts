@@ -1019,7 +1019,15 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\b(heads? back to|returns? to|back in|reverts? to|orders?|orderbook|order book|fleet renewal|invests? in|expands?.{0,15}fleet|signs?|inks?|places?|cancels?|delivery of|delivered)\b.{0,25}newbuild/i,
   /\bnewbuild(s|ing)?\b.{0,25}(order|orders|orderbook|order book|programme|program|deal|contract|delivery|delivered|christen|named|spree|push|tally|wave)/i,
   /\b(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership) (pair|trio|duo|disposal|sale|resale)\b/,
-  /\b(cashes? in|pockets?|nets?|bags?|lands?|snaps? up|offloads?|disposes?|sells?|buys?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  // Unambiguous commercial verbs pair with ANY vessel word. "lands" and
+  // "orders" are kept out of this group: they are ambiguous against live
+  // security coverage ("projectile LANDS near tanker", "Iran ORDERS tanker
+  // to stop") and were collaterally swallowing real Red Sea / Hormuz
+  // incidents, so they only fire against an unambiguous vessel-CLASS /
+  // newbuild object below ("Dynacom lands $65m for ageing suezmax",
+  // "orders VLCC newbuilds"), never a bare tanker/vessel.
+  /\b(cashes? in|pockets?|nets?|bags?|snaps? up|offloads?|disposes?|sells?|buys?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  /\b(lands?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership|newbuild)/,
   /\b(ageing|aging|veteran|elderly|second[- ]hand|secondhand) (suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|pair|trio|duo|tonnage)\b/,
   /\b\$\d+\s*m?\s*(gain|profit) from\b/,
   /\bgain from .{0,20}(disposal|sale|vessel|tanker)\b/,
@@ -1486,6 +1494,10 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(piracy|pirate|pirates|robbery|robbed) .{0,40}(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage|strait|at sea|off (the )?coast)\b/,
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage) .{0,40}(piracy|pirate|pirates|sea robbery|armed robbery|robbed|robbery)\b/,
     /\b(missile|drone) (strike|attack) .{0,30}(ship|vessel|tanker|maritime|port|hormuz|red sea)/,
+    // UKMTO-style near-miss advisories — "unidentified projectile lands near
+    // tanker in southern Red Sea". Bound to a vessel word so ground-war
+    // projectile wires never qualify.
+    /\bprojectile\b[^.]{0,30}\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier)\b/,
     // Port DISRUPTION as a security/operational event — NOT commercial "port
     // congestion", which is freight-economics commentary, not a maritime
     // security incident (admitting it leaked container-rate / shipping-cost

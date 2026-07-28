@@ -8,3 +8,6 @@ description: Freight-economics words leaking into the maritime-SECURITY relevanc
 - Any REQUIRED / relevance edit must bump `RELEVANCE_RULE_VERSION` so the version-gated boot re-clean re-evaluates persisted rows. Verify by replaying live: commerce rows flip to "dropped: no required topic phrase matched" while controls (port closure, piracy, vessel attack) stay relevant.
 
 **Why:** congestion/freight-rate are inherently commercial; a genuine maritime-security event never depends SOLELY on them, so removal is safe and over-deny is the bigger risk.
+
+## Sale-and-purchase verb ambiguity (2026-07-28)
+"lands" and "orders" in the S&P exclude collaterally swallowed live coverage ("projectile LANDS near tanker", "Iran ORDERS tanker to stop"). Ambiguous verbs may only pair with an unambiguous vessel-CLASS/newbuild object, never bare tanker/vessel/tonnage. UKMTO "projectile near tanker" advisories also needed their own REQUIRED phrase (they'd only ever ingested because the exclude short-circuited first). KEEP/DROP fixture suites now pin fuel + shipping (__tests__/relevance/fuelExcludes.test.ts, shippingExcludes.test.ts).
