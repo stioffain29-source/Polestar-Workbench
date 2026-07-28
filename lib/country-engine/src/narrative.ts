@@ -326,6 +326,119 @@ function mostSignificant(events: CanonicalEvent[]): CanonicalEvent | null {
   return ranked[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Assessed-meaning helpers — deterministic synthesis drawn ONLY from stored
+// event attributes (category, location, status, casualties). These give the
+// narrative its "what this means for operators" layer without inventing facts.
+// ---------------------------------------------------------------------------
+
+// Per-category operator implication, written to be proportionate and generic
+// to the category (never event-specific claims). Used where no confirmed or
+// assessed operational effect exists — the implication follows from the stored
+// category alone, so it is an evidence-linked Assessment, not fabrication.
+const CATEGORY_IMPLICATIONS: Partial<Record<IssueCategory, string>> = {
+  "Violent crime":
+    "bears directly on staff safety and journey planning around the affected area",
+  "Theft and robbery":
+    "points to a property and vehicle crime concern for premises and movements nearby",
+  "Organised crime":
+    "signals criminal activity capable of touching legitimate commerce in the affected area",
+  "Communal or tribal violence":
+    "can close roads and draw in bystanders at short notice, so nearby movement carries added risk",
+  Terrorism:
+    "raises the possibility of deliberate violence around public and commercial locations nearby",
+  Insurgency:
+    "indicates armed activity that can affect road movement and rural operations in the wider area",
+  "Political violence":
+    "raises tension around political events and gatherings in the affected area",
+  "Civil unrest":
+    "can disrupt access, traffic and working hours around assembly points at short notice",
+  "Strike or labour action":
+    "can interrupt services and staffing where the affected workforce operates",
+  "Governance and regulatory":
+    "may change the rules or permissions under which local operations run",
+  "Policing operation":
+    "brings checkpoints and short-notice road restrictions to the surrounding area",
+  Aviation: "affects flight reliability and connections through the airports involved",
+  Maritime: "affects port calls and sea freight through the waters or ports involved",
+  "Road and rail": "affects journey times and overland freight on the routes involved",
+  Utilities: "affects power or water reliability for sites in the served area",
+  Telecommunications:
+    "affects connectivity and communications for operations in the served area",
+  Infrastructure:
+    "affects the reliability of fixed infrastructure that local operations depend on",
+  "Fire and accident": "highlights safety conditions around the site involved",
+  "Natural hazard":
+    "can affect access, utilities and staff availability across the affected area",
+  Health: "bears on staff health precautions and medical planning in the affected area",
+  "Supply chain":
+    "affects the movement and availability of goods through the routes involved",
+  "Other operational disruption":
+    "may interrupt routine operations in the affected area",
+};
+
+/**
+ * Sub-national locations that recorded MORE THAN ONE event this period, ordered
+ * by how many events each carried (highest first). A repeat location is the
+ * strongest deterministic signal of sustained (rather than one-off) pressure.
+ */
+function repeatSubLocations(events: CanonicalEvent[]): string[] {
+  const counts = new Map<string, number>();
+  for (const e of events) {
+    const sub = subNationalLocation(e);
+    if (!sub) continue;
+    counts.set(sub, (counts.get(sub) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([loc]) => loc);
+}
+
+/** Events that recorded deaths or injuries. */
+function harmEvents(events: CanonicalEvent[]): CanonicalEvent[] {
+  return events.filter((e) => (e.casualties ?? 0) > 0 || (e.injuries ?? 0) > 0);
+}
+
+/** "deaths", "injuries" or "deaths or injuries" — only what was reported. */
+function harmPhrase(events: CanonicalEvent[]): string | null {
+  const deaths = events.some((e) => (e.casualties ?? 0) > 0);
+  const injuries = events.some((e) => (e.injuries ?? 0) > 0);
+  if (deaths && injuries) return "deaths or injuries";
+  if (deaths) return "deaths";
+  if (injuries) return "injuries";
+  return null;
+}
+
+/**
+ * §16-legal trajectory wording. ONLY called when priorPeriodEvents exists —
+ * comparative wording is banned otherwise. Compares volume and worst severity
+ * of the current window against the previous equivalent window.
+ */
+function trajectorySentence(
+  events: CanonicalEvent[],
+  priorPeriodEvents: CanonicalEvent[],
+): string {
+  const delta = events.length - priorPeriodEvents.length;
+  const volume =
+    delta >= 2
+      ? "Reporting volume increased compared with the previous period"
+      : delta <= -2
+        ? "Reporting volume fell compared with the previous period"
+        : "Reporting volume was broadly in line with the previous period";
+  const worst = (list: CanonicalEvent[]): number =>
+    list.reduce((m, e) => Math.max(m, severityRank(e.severity)), -1);
+  const cur = worst(events);
+  const prev = worst(priorPeriodEvents);
+  const sev =
+    prev < 0 || cur === prev
+      ? ""
+      : cur > prev
+        ? ", and the most serious reporting worsened"
+        : ", while the most serious reporting eased";
+  return `${volume}${sev}.`;
+}
+
 /** Group events by primary issue category. */
 function groupByCategory(
   events: CanonicalEvent[],
@@ -422,6 +535,39 @@ export function buildTopThree(
           confidence: e.classificationConfidence,
         }),
       );
+    } else {
+      // No stored effect — derive a proportionate assessed meaning from the
+      // event's OWN stored attributes (category, status, casualties). This is
+      // still evidence-linked (the implication follows from the stored
+      // category), so the report explains why the event matters instead of
+      // leaving the reader with a bare headline.
+      const implication = CATEGORY_IMPLICATIONS[e.issueCategory];
+      if (implication) {
+        const harm = harmPhrase([e]);
+        const parts: string[] = [];
+        if (harm) {
+          parts.push(
+            `The reported ${harm} make this a staff-safety concern first.`,
+          );
+        }
+        parts.push(`For operators, an event of this kind ${implication}.`);
+        if (e.eventStatus === "Ongoing") {
+          parts.push(
+            "The situation was reported as ongoing, so conditions nearby may change at short notice.",
+          );
+        }
+        businessSentence = parts.join(" ");
+        claims.push(
+          makeClaim({
+            claimText: businessSentence,
+            section: "Top Developments",
+            supportingEventIds: [e.eventId],
+            supportingSourceIds: e.supportingSourceIds,
+            claimType: "Assessment",
+            confidence: 70,
+          }),
+        );
+      }
     }
 
     return {
@@ -501,12 +647,16 @@ export function buildBluf(
     }),
   );
 
-  // Sentence 2 — reporting pattern this period (categories + concentration).
+  // Sentence 2 — assessed reporting pattern this period. Where one sub-national
+  // location carried repeat reporting, say so — concentration is the single
+  // most useful pattern judgement a reader can act on. Otherwise state the
+  // dispersion honestly.
   const catText = joinAnd(topCategories);
   const locText = locations.length ? joinAnd(locations) : countryName;
-  const s2 =
-    `During the reporting period, ${catText || "security"} events were the main concerns, ` +
-    `recorded mainly in ${locText}.`;
+  const repeats = repeatSubLocations(events);
+  const s2 = repeats.length
+    ? `During the reporting period, ${catText || "security"} events made up most of the reporting, and ${repeats[0]} carried a disproportionate share of it.`
+    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre.`;
   claims.push(
     makeClaim({
       claimText: s2,
@@ -516,6 +666,23 @@ export function buildBluf(
       confidence: 75,
     }),
   );
+
+  // Sentence 2b — trajectory against the previous period. ONLY when prior data
+  // exists (§16 — comparative wording is illegal otherwise).
+  let s2b = "";
+  if (priorPeriodEvents) {
+    s2b = trajectorySentence(events, priorPeriodEvents);
+    claims.push(
+      makeClaim({
+        claimText: s2b,
+        section: "Bottom Line Up Front",
+        supportingEventIds: events.map((e) => e.eventId),
+        supportingMetric: `current=${events.length}; prior=${priorPeriodEvents.length}`,
+        claimType: "Trend",
+        confidence: 75,
+      }),
+    );
+  }
 
   // Sentence 3 — practical meaning for operations (only evidence-based).
   let s3 = "";
@@ -534,22 +701,30 @@ export function buildBluf(
       }),
     );
   } else {
-    // No confirmed effect — state the localised nature only (evidence-based).
-    const scope =
-      locations.length > 1 ? "varies by location" : "appears localised";
-    s3 = `Businesses should note that risk ${scope} and plan movement around the affected areas.`;
+    // No confirmed effect — draw the lead event's category implication so the
+    // reader is told what the week means, not just what happened.
+    const implication = CATEGORY_IMPLICATIONS[lead.issueCategory];
+    const focusLoc = subNationalLocation(lead);
+    if (implication) {
+      s3 = `For operations, the immediate significance is that the lead event ${implication}${focusLoc ? `, so plans touching ${focusLoc} deserve the closest attention` : ""}.`;
+    } else {
+      const scope =
+        locations.length > 1 ? "varies by location" : "appears localised";
+      s3 = `Businesses should note that risk ${scope} and plan movement around the affected areas.`;
+    }
     claims.push(
       makeClaim({
         claimText: s3,
         section: "Bottom Line Up Front",
-        supportingEventIds: events.map((e) => e.eventId),
+        supportingEventIds: [lead.eventId],
+        supportingSourceIds: lead.supportingSourceIds,
         claimType: "Assessment",
         confidence: 70,
       }),
     );
   }
 
-  let text = capWords([s1, s2, s3].join(" "), BLUF_MAX_WORDS);
+  let text = capWords([s1, s2, s2b, s3].filter(Boolean).join(" "), BLUF_MAX_WORDS);
 
   // §16 — strip trend wording if there is no comparative data. The composed
   // BLUF uses "During the reporting period" (neutral) so this is defensive.
@@ -688,6 +863,22 @@ export function buildCurrentSituation(
 
   const s1 = `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3)) || countryName}.`;
   const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
+
+  // Assessed synthesis — repeat-location pressure and casualty framing, both
+  // drawn only from stored attributes.
+  const repeats = repeatSubLocations(events);
+  const repeatEvents = events.filter((e) => {
+    const sub = subNationalLocation(e);
+    return sub != null && repeats.slice(0, 2).includes(sub);
+  });
+  const s2b = repeats.length
+    ? `${joinAnd(repeats.slice(0, 2))} generated repeat reporting within the period, so the pressure there is sustained rather than a one-off.`
+    : "";
+  const harmed = harmEvents(events);
+  const harm = harmPhrase(harmed);
+  const s2c = harm
+    ? `Some of the reporting involved ${harm}, which raises the stakes for staff working in or moving through the affected areas.`
+    : "";
   const s3 =
     locations.length > 1
       ? "The incidents do not currently form a single nationwide pattern; risk varies by location, and movement decisions should be based on current conditions at the destination."
@@ -708,6 +899,30 @@ export function buildCurrentSituation(
       claimType: "Assessment",
       confidence: 75,
     }),
+  );
+  if (s2b) {
+    claims.push(
+      makeClaim({
+        claimText: s2b,
+        section: "Current Situation",
+        supportingEventIds: repeatEvents.map((e) => e.eventId),
+        claimType: "Assessment",
+        confidence: 75,
+      }),
+    );
+  }
+  if (s2c) {
+    claims.push(
+      makeClaim({
+        claimText: s2c,
+        section: "Current Situation",
+        supportingEventIds: harmed.map((e) => e.eventId),
+        claimType: "Assessment",
+        confidence: 75,
+      }),
+    );
+  }
+  claims.push(
     makeClaim({
       claimText: s3,
       section: "Current Situation",
@@ -717,7 +932,10 @@ export function buildCurrentSituation(
     }),
   );
 
-  const text = capWords([s1, s2, s3].join(" "), CURRENT_SITUATION_MAX_WORDS);
+  const text = capWords(
+    [s1, s2, s2b, s2c, s3].filter(Boolean).join(" "),
+    CURRENT_SITUATION_MAX_WORDS,
+  );
   return { value: text, claims };
 }
 
@@ -1038,20 +1256,49 @@ export function buildOutlook(
     }),
   );
 
-  const s2 = `${joinAnd(locations) || events[0].physicalCountry} should remain under review because incidents were reported there during the period.`;
+  // Repeat-location grounding — where a location carried repeat reporting this
+  // period it is the most defensible setting for renewed incidents; otherwise
+  // fall back to the plain review sentence.
+  const repeats = repeatSubLocations(events);
+  const repeatEvents = events.filter((e) => {
+    const sub = subNationalLocation(e);
+    return sub != null && repeats.slice(0, 3).includes(sub);
+  });
+  const s2 = repeats.length
+    ? `${joinAnd(repeats.slice(0, 3))} saw repeat reporting within the period and ${repeats.length === 1 ? "is" : "are"} the most likely setting for renewed incidents.`
+    : `${joinAnd(locations) || events[0].physicalCountry} should remain under review because incidents were reported there during the period.`;
   claims.push(
     makeClaim({
       claimText: s2,
       section: "Outlook",
-      supportingEventIds: (ongoing.length ? ongoing : events).map(
-        (e) => e.eventId,
-      ),
+      supportingEventIds: (repeats.length
+        ? repeatEvents
+        : ongoing.length
+          ? ongoing
+          : events
+      ).map((e) => e.eventId),
       claimType: "Forecast",
       confidence: 70,
     }),
   );
 
   const parts = [s1, s2];
+
+  // Trajectory framing — legal only with prior data (§16).
+  if (priorPeriodEvents) {
+    const s2b = `${trajectorySentence(events, priorPeriodEvents)} The coming days should be judged against that direction rather than any single event.`;
+    parts.push(s2b);
+    claims.push(
+      makeClaim({
+        claimText: s2b,
+        section: "Outlook",
+        supportingEventIds: events.map((e) => e.eventId),
+        supportingMetric: `current=${events.length}; prior=${priorPeriodEvents.length}`,
+        claimType: "Trend",
+        confidence: 72,
+      }),
+    );
+  }
 
   // Only include ongoing-dispute indicator where grounded in an ongoing event.
   if (ongoing.length > 0) {
@@ -1068,6 +1315,26 @@ export function buildOutlook(
         supportingEventIds: ongoing.map((e) => e.eventId),
         claimType: "Forecast",
         confidence: 72,
+      }),
+    );
+  }
+
+  // De-escalation indicator — only where casualty-bearing reporting exists to
+  // anchor it. Gives the reader a concrete sign of reduced concern, not filler.
+  const harmed = harmEvents(events);
+  const harm = harmPhrase(harmed);
+  if (harm) {
+    const anchor =
+      repeats[0] ?? subNationalLocation(harmed[0]) ?? harmed[0].physicalCountry;
+    const s4 = `A run of days without reported ${harm} in ${anchor} would be the clearest sign of reduced concern.`;
+    parts.push(s4);
+    claims.push(
+      makeClaim({
+        claimText: s4,
+        section: "Outlook",
+        supportingEventIds: harmed.map((e) => e.eventId),
+        claimType: "Forecast",
+        confidence: 70,
       }),
     );
   }
@@ -1131,6 +1398,7 @@ function tokenSet(text: string): Set<string> {
 export function buildPolestarView(
   events: CanonicalEvent[],
   sections: PolestarViewSections,
+  priorPeriodEvents: CanonicalEvent[] | null = null,
 ): NarrativeResult<string> {
   const claims: EvidenceRecord[] = [];
   const refs = [sections.bluf ?? "", sections.outlook ?? ""].filter(Boolean);
@@ -1155,8 +1423,44 @@ export function buildPolestarView(
     (a, b) => b[1].length - a[1].length,
   )[0][0];
 
+  // Exposure orientation — is the week's reporting mostly about how people and
+  // goods move, or about the safety of staff and premises? Derived from the
+  // stored category mix only.
+  const MOVEMENT_CATEGORIES = new Set<IssueCategory>([
+    "Civil unrest",
+    "Strike or labour action",
+    "Policing operation",
+    "Aviation",
+    "Maritime",
+    "Road and rail",
+    "Supply chain",
+  ]);
+  const SAFETY_CATEGORIES = new Set<IssueCategory>([
+    "Violent crime",
+    "Theft and robbery",
+    "Organised crime",
+    "Communal or tribal violence",
+    "Terrorism",
+    "Insurgency",
+    "Political violence",
+  ]);
+  const movementCount = events.filter((e) => MOVEMENT_CATEGORIES.has(e.issueCategory)).length;
+  const safetyCount = events.filter((e) => SAFETY_CATEGORIES.has(e.issueCategory)).length;
+  const focusPhrase =
+    movementCount > 0 && safetyCount > 0
+      ? "both movement planning and the safety of staff and premises"
+      : movementCount > 0
+        ? "how people and goods move"
+        : safetyCount > 0
+          ? "the safety of staff and premises"
+          : "routine operational planning";
+
   // Candidate judgement sentences — each grounded, each tested for overlap.
   const candidates: { text: string; claimType: ClaimType }[] = [
+    {
+      text: `Weighed together, the week's reporting bears most on ${focusPhrase}, and that is where checks will pay off first.`,
+      claimType: "Assessment",
+    },
     {
       text: `On assessment, the risk is ${scope}, and it is best managed through location-specific decisions rather than country-wide measures.`,
       claimType: "Assessment",
@@ -1170,6 +1474,25 @@ export function buildPolestarView(
       claimType: "Assessment",
     },
   ];
+
+  // Trajectory judgement — legal only with prior data (§16).
+  if (priorPeriodEvents) {
+    const worst = (list: CanonicalEvent[]): number =>
+      list.reduce((m, e) => Math.max(m, severityRank(e.severity)), -1);
+    const cur = worst(events);
+    const prev = worst(priorPeriodEvents);
+    const volDelta = events.length - priorPeriodEvents.length;
+    const direction =
+      cur > prev || volDelta >= 2
+        ? "worsened"
+        : cur < prev || volDelta <= -2
+          ? "eased"
+          : "held broadly steady";
+    candidates.push({
+      text: `Set against the previous period, the direction of reporting ${direction}, and planning weight should follow that direction rather than any single headline event.`,
+      claimType: "Trend",
+    });
+  }
 
   const kept: string[] = [];
   for (const c of candidates) {
@@ -1315,10 +1638,14 @@ export function buildCountryNarrative(
   claims.push(...outlook.claims);
   sectionWordCounts["Outlook"] = countWords(outlook.value);
 
-  const polestarView = buildPolestarView(events, {
-    bluf: bluf.value,
-    outlook: outlook.value,
-  });
+  const polestarView = buildPolestarView(
+    events,
+    {
+      bluf: bluf.value,
+      outlook: outlook.value,
+    },
+    priorPeriodEvents,
+  );
   claims.push(...polestarView.claims);
   sectionWordCounts["Pole Star View"] = countWords(polestarView.value);
 

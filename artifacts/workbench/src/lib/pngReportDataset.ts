@@ -2205,7 +2205,18 @@ export function buildStructuredReportDataset(
       // top event without a matching card is dropped (never fabricated).
       const cardById = new Map(windowItems.map((it) => [it.id, it]));
       const engineTop = n.topThree
-        .map((td) => cardById.get(td.eventId))
+        .map((td) => {
+          const card = cardById.get(td.eventId);
+          if (!card) return undefined;
+          // Carry the engine's assessed "what this means" sentence onto the
+          // card body so the Top-3 tiles read as analysis, not headlines. The
+          // sentence is evidence-linked in the engine (confirmed effect,
+          // assessed relevance, or a category-derived implication); when the
+          // engine has nothing to say the card keeps its deterministic line.
+          return td.businessSentence
+            ? { ...card, businessImpact: td.businessSentence }
+            : card;
+        })
         .filter((it): it is PngReportItem => Boolean(it));
       // If the engine's representative ids do not line up with the card ids (a
       // clustering divergence), keep the previously selected Top-3 rather than

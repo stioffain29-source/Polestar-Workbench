@@ -1427,6 +1427,19 @@ export async function exportCountryReportPdf(
         return end;
       })(),
     });
+    // Surface the §33 fail-closed gate result in headless runs too (the
+    // on-screen page blocks the PDF on a critical failure; the headless font
+    // audit at minimum needs the result visible in its log).
+    if (typeof console !== "undefined") {
+      const g = structuredDataset.gate;
+      // eslint-disable-next-line no-console
+      console.log(
+        `[countryGate] ${country.name}: passed=${g.passed}` +
+          (g.failures.length
+            ? ` failures=${g.failures.map((f) => `${f.check}(${f.severity})`).join(", ")}`
+            : ""),
+      );
+    }
     const jakartaExposure = isJakartaBrief
       ? buildJakartaCorridorStatuses(
           active.incidents as unknown as CountryFastFactsIncident[],

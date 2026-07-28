@@ -290,9 +290,17 @@ describe("buildTopThree (§14)", () => {
     }
   });
 
-  it("omits business sentence when there is no basis (not invented)", () => {
-    const { value } = buildTopThree([makeEvent()]);
-    expect(value[0].businessSentence).toBeNull();
+  it("derives an evidence-linked assessed sentence from stored attributes when no explicit effect exists", () => {
+    const { value, claims } = buildTopThree([makeEvent()]);
+    // makeEvent is Violent crime with injuries — the category implication plus
+    // the injury framing form the assessed "what this means" sentence.
+    expect(value[0].businessSentence).toMatch(/injuries/i);
+    expect(value[0].businessSentence).toMatch(/staff safety|staff-safety/i);
+    const assessed = claims.find(
+      (c) => c.claimType === "Assessment" && c.claimText === value[0].businessSentence,
+    );
+    expect(assessed).toBeDefined();
+    expect(assessed!.supportingEventIds).toContain(value[0].eventId);
   });
 
   it("uses confirmed effect for the business sentence when present", () => {
