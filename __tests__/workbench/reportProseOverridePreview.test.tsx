@@ -18,6 +18,7 @@ import FlashpointReportPreview from "../../artifacts/workbench/src/components/Fl
 import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
 import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
 import ReportPreview from "../../artifacts/workbench/src/components/ReportPreview";
+import CargoReportPreview from "../../artifacts/workbench/src/components/CargoReportPreview";
 import {
   FLASHPOINT_REPORT,
   FLASHPOINT_INCIDENTS,
@@ -31,6 +32,12 @@ import {
   ENERGY_REPORT,
   ENERGY_INCIDENTS,
   ENERGY_SENTINELS,
+  CARGO_REPORT,
+  CARGO_INCIDENTS,
+  CARGO_SENTINELS,
+  FUEL_REPORT,
+  FUEL_INCIDENTS,
+  FUEL_SENTINELS,
 } from "./prosePassthroughTestHelpers";
 
 function expectAllSentinels(html: string, sentinels: Record<string, string>) {
@@ -83,5 +90,32 @@ describe("saved prose overrides reach the on-screen preview", () => {
       } as never),
     );
     expectAllSentinels(html, ENERGY_SENTINELS);
+  });
+
+  it("cargo preview renders every saved assessment override without tripping the validation gate", () => {
+    const html = renderToStaticMarkup(
+      createElement(CargoReportPreview, {
+        report: CARGO_REPORT,
+        incidents: CARGO_INCIDENTS,
+      } as never),
+    );
+    // The gate renders a blocking panel INSTEAD of the report — assert the
+    // fixture passes so the sentinels are proven on the real report body.
+    if (html.includes("data-cargo-validation-blocked")) {
+      throw new Error(
+        "Cargo fixture tripped the hard validation gate — the preview rendered the blocking panel instead of the report.",
+      );
+    }
+    expectAllSentinels(html, CARGO_SENTINELS);
+  });
+
+  it("fuel preview renders every saved fuel read override", () => {
+    const html = renderToStaticMarkup(
+      createElement(ReportPreview, {
+        report: FUEL_REPORT,
+        incidents: FUEL_INCIDENTS,
+      } as never),
+    );
+    expectAllSentinels(html, FUEL_SENTINELS);
   });
 });

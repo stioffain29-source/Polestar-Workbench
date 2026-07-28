@@ -138,6 +138,12 @@ import {
   ENERGY_REPORT,
   ENERGY_INCIDENTS,
   ENERGY_SENTINELS,
+  CARGO_REPORT,
+  CARGO_INCIDENTS,
+  CARGO_SENTINELS,
+  FUEL_REPORT,
+  FUEL_INCIDENTS,
+  FUEL_SENTINELS,
 } from "./prosePassthroughTestHelpers";
 
 const pdfChromeMock = jest.requireMock(
@@ -218,5 +224,38 @@ describe("saved prose overrides reach the exported PDF (headless pass-through)",
       ),
     );
     expectAllSentinels(text, ENERGY_SENTINELS);
+  });
+
+  it("cargo: every editable assessment section renders the saved override AND the fixture passes the hard validation gate", async () => {
+    const data = buildHeadlessReportData(CARGO_REPORT);
+    // No allowValidationFailures: assertCargoReportValid runs over the SAME
+    // resolved override text, so this test also proves a clean edited report
+    // is not fail-closed by the 10-check gate.
+    const text = await captureText(() =>
+      exportTopicReportPdf(
+        data as never,
+        CARGO_INCIDENTS as never,
+        { cargo_watch: "Cargo Watch" },
+        "cargo.pdf",
+        {},
+      ),
+    );
+    expectAllSentinels(text, CARGO_SENTINELS);
+  });
+
+  it("fuel: every editable fuel read renders the saved override with real market data (no missing-data opt-out)", async () => {
+    const data = buildHeadlessReportData(FUEL_REPORT);
+    // No allowMissingMarketData: the hardNumbers fixture must satisfy the
+    // Brent/WTI/jet fail-closed gate, mirroring a real export.
+    const text = await captureText(() =>
+      exportTopicReportPdf(
+        data as never,
+        FUEL_INCIDENTS as never,
+        { fuel: "Fuel Watch" },
+        "fuel.pdf",
+        {},
+      ),
+    );
+    expectAllSentinels(text, FUEL_SENTINELS);
   });
 });

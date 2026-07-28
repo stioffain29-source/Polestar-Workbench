@@ -198,6 +198,134 @@ export const ENERGY_REPORT = {
   ...ENERGY_SENTINELS,
 };
 
+// ---------------------------------------------------------------------------
+// Cargo Watch — the pattern report's editable assessment sections. The cargo
+// surfaces (CargoReportPreview + exportTopicReportPdf's cargo branch) render
+// executiveSummary via resolveSimpleProse and the five assessment sections via
+// the identical resolveSimpleProse stack, all under the HARD 10-check
+// validation gate — so these fixtures must also PASS the gate (distinct
+// per-section text, no sensational/evidence-claim vocabulary, Polestar View
+// >= 120 words). The legacy cargoSecurityRead / logisticsHubRead columns are
+// NOT rendered by the pattern report (they survive only in the unreachable
+// generic ReportPreview cargo branch), so they carry no sentinel here.
+// ---------------------------------------------------------------------------
+export const CARGO_SENTINELS: Record<string, string> = {
+  executiveSummary:
+    "ZZ-CARGO-EXEC-OVERRIDE-ZZ Saved analyst summary of this month's cargo crime pattern used for the parity check.",
+  situation:
+    "ZZ-CARGO-SITUATION-OVERRIDE-ZZ Saved analyst situation text describing this month's cargo theft reporting in the covered region.",
+  whatMatters:
+    "ZZ-CARGO-WHAT-MATTERS-OVERRIDE-ZZ Saved analyst note on why the month's theft pattern matters for shippers.",
+  implications:
+    "ZZ-CARGO-IMPLICATIONS-OVERRIDE-ZZ Saved analyst implication for logistics operators planning warehouse protection.",
+  watchNext:
+    "ZZ-CARGO-WATCH-NEXT-OVERRIDE-ZZ Saved analyst watch item for the coming reporting period.",
+  // Check 9 of the cargo validation gate requires >= 120 words when present.
+  polestarView:
+    "ZZ-CARGO-POLESTAR-OVERRIDE-ZZ This saved analyst assessment is written to satisfy the hard validation gate " +
+    "while carrying a unique sentinel token that both parity suites assert on. The month's reporting shows a " +
+    "steady level of theft activity against goods in transit and in storage across the covered countries, with " +
+    "no single location dominating the picture and no confirmed change in the methods described by the " +
+    "underlying records. We assess that the overall level of risk to commercial cargo remains broadly in line " +
+    "with previous reporting periods, and that operators should continue to apply their existing security " +
+    "measures at loading points, storage sites and transfer points. We will keep reviewing each new record as " +
+    "it arrives and will flag any sustained change in volume, geography or method in the next issue of this " +
+    "report, together with any practical steps that the evidence at that point supports for affected operators.",
+};
+
+export const CARGO_REPORT = {
+  id: 1,
+  topic: "cargo_watch",
+  status: "published",
+  issueDate: ISSUE_DATE,
+  title: "Cargo Watch",
+  whatHappened: "",
+  author: "Test",
+  ...CARGO_SENTINELS,
+};
+
+// In-scope (APAC) cargo theft records: pass isCargoInScope, classify as
+// OPERATIONAL (no arrest/seizure vocabulary, so nothing lands in the
+// enforcement partition), all dated inside the monthly window.
+export const CARGO_INCIDENTS = [
+  baseInc({
+    id: "cg1",
+    topic: "cargo_watch",
+    country: "Indonesia",
+    severity: "high",
+    title: "Armed men hijack a cargo truck carrying electronics near Jakarta",
+    summary: "Armed men hijacked a truck carrying electronics on the highway.",
+  }),
+  baseInc({
+    id: "cg2",
+    topic: "cargo_watch",
+    country: "Philippines",
+    severity: "moderate",
+    title: "Thieves break into a warehouse and steal freight consignments in Manila",
+    summary: "Thieves broke into a warehouse and stole freight consignments.",
+  }),
+  baseInc({
+    id: "cg3",
+    topic: "cargo_watch",
+    country: "Malaysia",
+    severity: "moderate",
+    title: "Container theft reported at a port terminal in Port Klang",
+    summary: "A container was stolen from a port terminal storage yard.",
+  }),
+];
+
+// ---------------------------------------------------------------------------
+// Fuel Watch — the three fuel-specific editable reads (pickRead: editor text
+// replaces the generated read outright). hardNumbers carries Brent + WTI +
+// jet fuel so the exporter's fail-closed market-data gate passes without
+// allowMissingMarketData.
+// ---------------------------------------------------------------------------
+export const FUEL_SENTINELS: Record<string, string> = {
+  fuelMarketRead: "ZZ-FUEL-MARKET-READ-OVERRIDE-ZZ saved analyst text.",
+  fuelOperationalRead: "ZZ-FUEL-OPERATIONAL-READ-OVERRIDE-ZZ saved analyst text.",
+  fuelRegionalHighlights: "ZZ-FUEL-REGIONAL-READ-OVERRIDE-ZZ saved analyst text.",
+};
+
+export const FUEL_HARD_NUMBERS = {
+  prices: [
+    { label: "Brent crude", value: 78.2, unit: "USD/bbl", asOf: "2026-06-19" },
+    { label: "WTI crude", value: 74.1, unit: "USD/bbl", asOf: "2026-06-19" },
+    { label: "Jet fuel", value: 2.05, unit: "USD/gal", asOf: "2026-06-16" },
+  ],
+};
+
+export const FUEL_REPORT = {
+  id: 1,
+  topic: "fuel",
+  status: "published",
+  issueDate: ISSUE_DATE,
+  title: "Fuel Watch",
+  situation: "",
+  whatHappened: "",
+  author: "Test",
+  hardNumbers: FUEL_HARD_NUMBERS,
+  ...FUEL_SENTINELS,
+};
+
+export const FUEL_INCIDENTS = [
+  baseInc({
+    id: "fu1",
+    topic: "fuel",
+    country: "Indonesia",
+    severity: "high",
+    title: "Refinery fire disrupts fuel supply and distribution in Java",
+    summary: "A refinery fire disrupted fuel supply and distribution.",
+  }),
+  baseInc({
+    id: "fu2",
+    topic: "fuel",
+    country: "Philippines",
+    severity: "moderate",
+    title: "Fuel depot outage delays jet fuel deliveries to the airport",
+    summary: "A depot outage delayed jet fuel deliveries to the airport.",
+  }),
+];
+
 export const ENERGY_INCIDENTS = [
   baseInc({
     id: "e1",
