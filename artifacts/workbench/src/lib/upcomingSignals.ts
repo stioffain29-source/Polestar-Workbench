@@ -102,46 +102,74 @@ export function extractFutureSignals<T extends UpcomingSignalInput>(rows: T[]): 
 // Detect a city / location cue in the text so signal labels can carry
 // "Country (City)" rather than country alone. Restricted to the recurring APAC
 // capitals and major commercial cities the workbench actually covers.
-const CITY_LOOKUP: Array<[RegExp, string]> = [
-  [/\bislamabad\b/i, "Islamabad"],
-  [/\brawalpindi\b/i, "Rawalpindi"],
-  [/\blahore\b/i, "Lahore"],
-  [/\bkarachi\b/i, "Karachi"],
-  [/\bpeshawar\b/i, "Peshawar"],
-  [/\bquetta\b/i, "Quetta"],
-  [/\badiala\b/i, "Rawalpindi"],
-  [/\bdhaka\b/i, "Dhaka"],
-  [/\bchittagong\b/i, "Chittagong"],
-  [/\bnew delhi\b|\bdelhi\b/i, "Delhi"],
-  [/\bmumbai\b/i, "Mumbai"],
-  [/\bkolkata\b/i, "Kolkata"],
-  [/\bchennai\b/i, "Chennai"],
-  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru"],
-  [/\bmanila\b|\bquezon city\b/i, "Manila"],
-  [/\bcebu\b/i, "Cebu"],
-  [/\bseoul\b/i, "Seoul"],
-  [/\bbusan\b/i, "Busan"],
-  [/\btokyo\b/i, "Tokyo"],
-  [/\bosaka\b/i, "Osaka"],
-  [/\bjakarta\b/i, "Jakarta"],
-  [/\bbangkok\b/i, "Bangkok"],
-  [/\bkuala lumpur\b/i, "Kuala Lumpur"],
-  [/\bhanoi\b/i, "Hanoi"],
-  [/\bho chi minh\b/i, "Ho Chi Minh City"],
-  [/\bkathmandu\b/i, "Kathmandu"],
-  [/\bcolombo\b/i, "Colombo"],
-  [/\bport moresby\b/i, "Port Moresby"],
-  [/\bsydney\b/i, "Sydney"],
-  [/\bmelbourne\b/i, "Melbourne"],
-  [/\bcanberra\b/i, "Canberra"],
-  [/\btaipei\b/i, "Taipei"],
+const CITY_LOOKUP: Array<[RegExp, string, string]> = [
+  [/\bislamabad\b/i, "Islamabad", "Pakistan"],
+  [/\brawalpindi\b/i, "Rawalpindi", "Pakistan"],
+  [/\blahore\b/i, "Lahore", "Pakistan"],
+  [/\bkarachi\b/i, "Karachi", "Pakistan"],
+  [/\bpeshawar\b/i, "Peshawar", "Pakistan"],
+  [/\bquetta\b/i, "Quetta", "Pakistan"],
+  [/\badiala\b/i, "Rawalpindi", "Pakistan"],
+  [/\bdhaka\b/i, "Dhaka", "Bangladesh"],
+  [/\bchittagong\b/i, "Chittagong", "Bangladesh"],
+  [/\bnew delhi\b|\bdelhi\b/i, "Delhi", "India"],
+  [/\bmumbai\b/i, "Mumbai", "India"],
+  [/\bkolkata\b/i, "Kolkata", "India"],
+  [/\bchennai\b/i, "Chennai", "India"],
+  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru", "India"],
+  [/\bmanila\b|\bquezon city\b/i, "Manila", "Philippines"],
+  [/\bcebu\b/i, "Cebu", "Philippines"],
+  [/\bseoul\b/i, "Seoul", "South Korea"],
+  [/\bbusan\b/i, "Busan", "South Korea"],
+  [/\btokyo\b/i, "Tokyo", "Japan"],
+  [/\bosaka\b/i, "Osaka", "Japan"],
+  [/\bjakarta\b/i, "Jakarta", "Indonesia"],
+  [/\bbangkok\b/i, "Bangkok", "Thailand"],
+  [/\bkuala lumpur\b/i, "Kuala Lumpur", "Malaysia"],
+  [/\bhanoi\b/i, "Hanoi", "Vietnam"],
+  [/\bho chi minh\b/i, "Ho Chi Minh City", "Vietnam"],
+  [/\bkathmandu\b/i, "Kathmandu", "Nepal"],
+  [/\bpokhara\b/i, "Pokhara", "Nepal"],
+  [/\bcolombo\b/i, "Colombo", "Sri Lanka"],
+  [/\bport moresby\b/i, "Port Moresby", "Papua New Guinea"],
+  [/\bsydney\b/i, "Sydney", "Australia"],
+  [/\bmelbourne\b/i, "Melbourne", "Australia"],
+  [/\bcanberra\b/i, "Canberra", "Australia"],
+  [/\bbrisbane\b/i, "Brisbane", "Australia"],
+  [/\btaipei\b/i, "Taipei", "Taiwan"],
 ];
+
+// Country-strict city detection. A city label may only attach to a record
+// whose own `country` field is the city's home country (or is unknown).
+// This is what keeps "Kathmandu" out of an India-labelled row when a
+// mis-stamped or cross-border headline mentions the foreign capital.
+function countryMatchesHome(country: string | null | undefined, home: string): boolean {
+  const c = (country ?? "").trim().toLowerCase();
+  if (!c) return true; // unknown country — no basis to reject
+  return c === home.toLowerCase();
+}
+
 export function detectCity(r: UpcomingSignalInput): string | null {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  for (const [rx, name] of CITY_LOOKUP) {
-    if (rx.test(text)) return name;
+  for (const [rx, name, home] of CITY_LOOKUP) {
+    if (rx.test(text) && countryMatchesHome(r.country, home)) return name;
   }
   return null;
+}
+
+/**
+ * True when a free-text location names a known city whose home country is
+ * NOT the given country. Used by per-country location lists so a foreign
+ * city carried by a mis-attributed record can never appear under another
+ * country's heading (e.g. Kathmandu listed under India).
+ */
+export function locationForeignToCountry(location: string, country: string): boolean {
+  const c = country.trim().toLowerCase();
+  if (!c) return false;
+  for (const [rx, , home] of CITY_LOOKUP) {
+    if (rx.test(location)) return home.toLowerCase() !== c;
+  }
+  return false;
 }
 
 // Clean, content-based signal labels for Watch Next and the Forecast table.

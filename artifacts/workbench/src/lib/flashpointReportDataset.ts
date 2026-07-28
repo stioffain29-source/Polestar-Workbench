@@ -8,6 +8,7 @@ import {
   shortSignalLabel,
   forecastMeaningFor,
   operationalMeaningFor,
+  locationForeignToCountry,
 } from "./upcomingSignals";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
@@ -25,6 +26,13 @@ import {
 // that cap — otherwise rows beyond it would silently show the deterministic
 // line. Asserted in __tests__/workbench/relatedIncidentsCap.test.ts.
 export const FLASHPOINT_RELATED_ROW_CAP = 6;
+
+// Rows actually rendered by the Activism / Civil Unrest incident tables in
+// BOTH the preview (FlashpointReportPreview IncidentTable rowLimit) and the
+// PDF (exportFlashpointReportPdf drawIncidentTable rowLimit). Keep the three
+// in lockstep — the cross-section dedupe below uses this cap to decide which
+// incidents have already been surfaced.
+export const FLASHPOINT_TABLE_ROW_CAP = 12;
 
 export interface FlashpointReportIncident {
   id: number | string;
@@ -1109,8 +1117,14 @@ export function buildFlashpointReportDataset(
   const activismRows = enriched.filter((r) => r.bucket === "activism");
   const unrestRows = enriched.filter((r) => r.bucket === "unrest");
 
-  // Fast Facts
-  const hs = highestSeverity(enriched);
+  // Fast Facts. The single top-severity incident is computed ONCE over the
+  // full usable set and shared with every prose builder (Exec Summary,
+  // Forecast, Watch Next) so the Fast Facts card and the narrative can never
+  // disagree about what "the most serious" event was.
+  const topSeverity = topSeverityIncident(enriched);
+  const hs = topSeverity
+    ? { key: sevKey(topSeverity.severity), label: SEV_LABEL[sevKey(topSeverity.severity)] ?? topSeverity.severity }
+    : { key: "", label: "—" };
   const countryCount = countriesOf(enriched);
   let topCountry = "—", topCountryN = 0;
   for (const [c, n] of countryCount) if (n > topCountryN) { topCountryN = n; topCountry = c; }
@@ -1197,6 +1211,8 @@ export function buildFlashpointReportDataset(
     hasFutureTable: forecastFuture.length > 0,
     forecastLeadCountry: forecastFuture[0]?.country ?? null,
     forecastLeadSignal: forecastFuture[0]?.signal ?? null,
+    forecastRows: forecastFuture,
+    topSeverity,
   });
   const regionalCountryRead = buildRegionalCountryRead({
     enriched,
@@ -1206,11 +1222,19 @@ export function buildFlashpointReportDataset(
   // Related Incidents — prioritise activism + unrest, drop "Other" / weak
   // buckets, and seed with the strongest political-mobilisation record so
   // the centre-of-gravity geography (Pakistan / PTI / Section 144) leads
-  // ahead of generic sectoral entries.
-  const relatedIncidents = prioritiseRelated(enriched);
+  // ahead of generic sectoral entries. Rows already surfaced in the rendered
+  // Activism / Civil Unrest tables are excluded so no incident appears in
+  // two sections of the same report.
+  const shownInTables = new Set<string | number>(
+    [
+      ...activismRows.slice(0, FLASHPOINT_TABLE_ROW_CAP),
+      ...unrestRows.slice(0, FLASHPOINT_TABLE_ROW_CAP),
+    ].map((r) => r.id),
+  );
+  const relatedIncidents = prioritiseRelated(enriched, shownInTables);
 
   // Auto-prose for the closing analyst sections.
-  const autoCtx = { activismRows, unrestRows, countryRows, enriched };
+  const autoCtx = { activismRows, unrestRows, countryRows, enriched, topSeverity };
   const autoExecutiveSummary = buildAutoExecutiveSummary({
     ...autoCtx,
     windowLabel: win.shortLabel,
@@ -1381,6 +1405,8 @@ function buildForecastRead(opts: {
   hasFutureTable: boolean;
   forecastLeadCountry?: string | null;
   forecastLeadSignal?: string | null;
+  forecastRows?: ForecastFutureRow[];
+  topSeverity?: EnrichedIncident | null;
 }): string {
   const { activismRows, unrestRows, countryRows, hasFutureTable } = opts;
   const forecastLeadCountry = (opts.forecastLeadCountry ?? "").trim();
@@ -1401,8 +1427,12 @@ function buildForecastRead(opts: {
     return lines.join("\n\n");
   }
   const allRows = [...activismRows, ...unrestRows];
-  const sevInc = topSeverityIncident(allRows);
-  const sevHs = highestSeverity(allRows);
+  // The ONE shared top-severity incident (same as Fast Facts / Exec Summary),
+  // falling back to a local computation only when the caller cannot supply it.
+  const sevInc = opts.topSeverity !== undefined ? opts.topSeverity : topSeverityIncident(allRows);
+  const sevHs = sevInc
+    ? { key: sevKey(sevInc.severity), label: SEV_LABEL[sevKey(sevInc.severity)] ?? sevInc.severity }
+    : highestSeverity(allRows);
   const sevCountry = (sevInc?.country ?? "").trim();
   // A severity lead is only worth calling out when it is genuinely
   // elevated (Moderate or higher). A "highest" that is still Low is not
@@ -1457,6 +1487,17 @@ function buildForecastRead(opts: {
   } else {
     lines.push(
       `Protest activity and civil unrest are roughly balanced across the window.`,
+    );
+  }
+  // When several confirmed civic protest marches sit in the forward table,
+  // summarise them as one cross-country line instead of leaving the reader
+  // to stitch the per-row detail together.
+  const marches = (opts.forecastRows ?? []).filter((r) =>
+    /civic protest march/i.test(r.signal),
+  );
+  if (marches.length > 1) {
+    lines.push(
+      `Civic protest marches are confirmed in ${joinList(marches.map((m) => m.country))} — confirm turnout and access impact in each host city before the date.`,
     );
   }
   lines.push(
@@ -1544,12 +1585,16 @@ function buildRegionalCountryRead(opts: {
   // Pull the LOCATIONS actually named in this country's own records rather
   // than asserting generic districts. Only report places that appear in the
   // incident set; if none are named, say so plainly instead of inventing them.
-  const lociFor = (rows: EnrichedIncident[]): string => {
+  const lociFor = (rows: EnrichedIncident[], country: string): string => {
     const seen: string[] = [];
     const seenLower = new Set<string>();
     for (const r of rows) {
       const loc = (r.location ?? "").trim();
       if (!loc) continue;
+      // Strictly this country's own places: a mis-attributed record can
+      // carry a foreign city (e.g. Kathmandu on an India-labelled row) —
+      // never list it under this country's heading.
+      if (locationForeignToCountry(loc, country)) continue;
       const key = loc.toLowerCase();
       if (seenLower.has(key)) continue;
       seenLower.add(key);
@@ -1567,7 +1612,7 @@ function buildRegionalCountryRead(opts: {
     if (rows.length === 0) return;
     const n = rows.length;
     const countLabel = `${n} incident${n === 1 ? "" : "s"}`;
-    const loci = lociFor(rows);
+    const loci = lociFor(rows, cr.label);
     const lociClause = loci ? ` Locations named in the records: ${loci}.` : "";
     countryParas.push(
       `${cr.label} — ${RANK_LABEL[idx] ?? "A leading country"} this week (${countLabel}), driven by ${driverFor(rows)}, mostly ${formFor(rows)}.${lociClause}`,
@@ -1635,7 +1680,10 @@ function pickPoliticalSeed(rows: EnrichedIncident[]): EnrichedIncident | null {
   })[0];
 }
 
-function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
+function prioritiseRelated(
+  rows: EnrichedIncident[],
+  excludeIds: Set<string | number> = new Set(),
+): EnrichedIncident[] {
   // Hard-exclude armed-conflict / crime / robbery, novelty/parody and
   // weak-operational items. Then rank what remains by operational
   // usefulness (severity > action verbs > credibility > recency) and
@@ -1643,6 +1691,7 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
   // spread of the file rather than a Pakistan-only lead.
   const ACTION_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|clash|fatalit)\b/i;
   const eligible = rows.filter((r) => {
+    if (excludeIds.has(r.id)) return false;
     if (r.issue === "Armed robbery" || r.issue === "Crime / public safety" || r.issue === "Armed group activity") return false;
     if (isWeakNovelty(r)) return false;
     if (isWeakOperational(r)) return false;
@@ -1662,7 +1711,7 @@ function prioritiseRelated(rows: EnrichedIncident[]): EnrichedIncident[] {
   const CAP = FLASHPOINT_RELATED_ROW_CAP;
   // Seed the lead row with the strongest political-mobilisation record
   // so the centre-of-gravity geography opens the table.
-  const politicalSeed = pickPoliticalSeed(rows);
+  const politicalSeed = pickPoliticalSeed(rows.filter((r) => !excludeIds.has(r.id)));
   const out: EnrichedIncident[] = [];
   const taken = new Set<string | number>();
   if (politicalSeed && !isWeakOperational(politicalSeed)) {
@@ -1712,6 +1761,11 @@ interface AutoCtx {
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
   enriched: EnrichedIncident[];
+  // The one shared top-severity incident (computed over the full usable set
+  // in buildFlashpointReportDataset). Every "most serious" reference in the
+  // prose MUST use this — never recompute over a subset — so the narrative
+  // always matches the Fast Facts Highest Severity card.
+  topSeverity: EnrichedIncident | null;
 }
 
 function buildWhatMatters(ctx: AutoCtx): string {
@@ -1806,7 +1860,9 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   // section is never a single thin line when only one future item exists
   // (the previous behaviour, which the client flagged as weak).
   const lead = ctx.countryRows[0];
-  const sevInc = topSeverityIncident(all);
+  // The ONE shared top-severity incident — same object the Fast Facts card
+  // and Exec Summary use, never recomputed over a subset.
+  const sevInc = ctx.topSeverity;
   const sevCountry = (sevInc?.country ?? "").trim();
   const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
 
@@ -1818,9 +1874,18 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const bullets: string[] = [];
   for (const r of future) {
     const where = r.country ? `${r.country} — ` : "";
-    bullets.push(`${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`);
+    // Forward-looking items are announcements, not events that have
+    // happened: label them plainly as upcoming and unconfirmed.
+    bullets.push(`${where}${shortSignalLabel(r)}: upcoming, unconfirmed — ${operationalMeaningFor(r)}`);
   }
-  if (sevInc && sevCountry && sevElevated) {
+  // Never describe a forecast/announcement item as "the most serious
+  // incident reported this week" — the follow-through line only fires when
+  // the top-severity record is an incident that has actually occurred, not
+  // one of the future-dated signals above.
+  // The suppression universe must match the universe topSeverity was
+  // computed over (full enriched set), not just the activism/unrest subset.
+  const futureSignalIds = new Set(extractFutureSignals(ctx.enriched).map((r) => r.id));
+  if (sevInc && sevCountry && sevElevated && !futureSignalIds.has(sevInc.id)) {
     bullets.push(
       `${sevCountry} — follow-through after ${shortSignalLabel(sevInc)}, the most serious incident reported this week: watch for further developments in the days that follow.`,
     );
@@ -1881,6 +1946,7 @@ interface ExecCtx {
   countryRows: BarRow[];
   enriched: EnrichedIncident[];
   windowLabel: string;
+  topSeverity: EnrichedIncident | null;
 }
 function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const total = ctx.enriched.length;
@@ -1921,7 +1987,9 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   // volume lead and the severity lead explicitly (and reconcile them
   // when they diverge) so the summary reads as a decision, not a recap.
   const allRows = [...ctx.activismRows, ...ctx.unrestRows];
-  const sevInc = topSeverityIncident(allRows);
+  void allRows;
+  // The ONE shared top-severity incident — identical to the Fast Facts card.
+  const sevInc = ctx.topSeverity;
   const sevCountry = (sevInc?.country ?? "").trim();
   const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
   const volClause = lead
@@ -1945,3 +2013,66 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
 }
 
 export const FLASHPOINT_SEV_LABEL = SEV_LABEL;
+
+// --- Dataset self-validation -------------------------------------------------
+// Structural consistency checks over a built dataset. Returns a list of
+// human-readable errors (empty = valid). Exercised by the jest suite so a
+// regression in any of the invariants below fails CI instead of shipping:
+//   1. The Fast Facts "Highest Severity" card equals the severity of the
+//      single top-severity incident in the usable set (the same incident the
+//      prose references as "the most serious").
+//   2. Per-country location lists never name a known city that belongs to a
+//      different country.
+//   3. Related Incidents never repeats a row already surfaced in the rendered
+//      Activism / Civil Unrest tables.
+export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
+  const errors: string[] = [];
+
+  // 1. Fast Facts severity == actual highest severity in the usable set.
+  const card = ds.fastFacts.find((k) => k.label === "Highest Severity");
+  const top = topSeverityIncident(ds.enriched);
+  const expected = top ? (SEV_LABEL[sevKey(top.severity)] ?? top.severity) : "—";
+  if (card && card.value !== expected) {
+    errors.push(
+      `Fast Facts severity "${card.value}" != actual highest "${expected}"`,
+    );
+  }
+
+  // 2. No foreign city under another country's heading in the regional read.
+  const countries = new Set<string>();
+  for (const r of ds.enriched) {
+    const c = (r.country ?? "").trim();
+    if (c) countries.add(c);
+  }
+  for (const country of countries) {
+    const para = ds.regionalCountryRead
+      .split("\n\n")
+      .find((p) => p.startsWith(`${country} —`));
+    if (!para) continue;
+    const m = para.match(/Locations named in the records: (.+?)\.$/);
+    if (!m) continue;
+    const listed = m[1].split(/,\s*|\s+and\s+/).map((s) => s.trim()).filter(Boolean);
+    const bad = listed.filter((loc) => locationForeignToCountry(loc, country));
+    if (bad.length > 0) {
+      errors.push(
+        `${country} location list contains cities not tied to that country: ${bad.join(", ")}`,
+      );
+    }
+  }
+
+  // 3. Related Incidents must not repeat rows already shown in the tables.
+  const shown = new Set<string | number>(
+    [
+      ...ds.activismRows.slice(0, FLASHPOINT_TABLE_ROW_CAP),
+      ...ds.unrestRows.slice(0, FLASHPOINT_TABLE_ROW_CAP),
+    ].map((r) => r.id),
+  );
+  const dupes = ds.relatedIncidents.filter((r) => shown.has(r.id));
+  if (dupes.length > 0) {
+    errors.push(
+      `Related Incidents repeats already-shown incidents: ${dupes.map((r) => r.id).join(", ")}`,
+    );
+  }
+
+  return errors;
+}
