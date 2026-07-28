@@ -294,6 +294,17 @@ const THAILAND_CONFIG: CountryEngineConfig = {
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
+
+// Bump when engine rules change in a way that must re-process persisted
+// country_engine_events (new gate/exclusion rules, classification changes,
+// dedupe changes). The api-server boot reprocess keys its migration marker on
+// this version, so a bump re-runs the engine for every registered slug on the
+// next boot in EVERY environment — gate changes always propagate to the
+// persisted review queues instead of waiting for an analyst-triggered re-run.
+// v2: legal_process + preparedness_or_awareness gate rules (retire ~1.9k held
+// rows for Indonesia alone).
+export const COUNTRY_ENGINE_RULE_VERSION = "v2";
+
 export const COUNTRY_ENGINE_CONFIGS: Record<string, CountryEngineConfig> = {
   "papua-new-guinea": PNG_CONFIG,
   papua: PAPUA_CONFIG,

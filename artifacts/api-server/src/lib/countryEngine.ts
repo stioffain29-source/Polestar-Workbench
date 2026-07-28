@@ -8,7 +8,10 @@ import {
 } from "@workspace/db";
 import { and, gte, lte, or, ilike, eq, inArray, not, sql } from "drizzle-orm";
 import { buildCanonicalEvents } from "@workspace/country-engine/engine";
-import { getCountryEngineConfig } from "@workspace/country-engine/config";
+import {
+  getCountryEngineConfig,
+  COUNTRY_ENGINE_CONFIGS,
+} from "@workspace/country-engine/config";
 import type {
   EngineSourceInput,
   EngineResult,
@@ -196,6 +199,36 @@ export async function runCountryEngine(slug: string): Promise<EngineResult> {
     "runCountryEngine: persisted engine result",
   );
   return result;
+}
+
+/**
+ * Re-run the engine for EVERY registered country slug. Used after each
+ * scheduled ingest so freshly-ingested incidents (and any rule changes already
+ * live in the process) propagate to the persisted review queues without
+ * waiting for a boot or an analyst-triggered reprocess. Each slug is wrapped
+ * in its own try/catch so one country's failure never blocks the rest.
+ */
+export async function runCountryEngineAll(
+  reason: string,
+): Promise<{ ok: string[]; failed: string[] }> {
+  const ok: string[] = [];
+  const failed: string[] = [];
+  for (const slug of Object.keys(COUNTRY_ENGINE_CONFIGS)) {
+    try {
+      await runCountryEngine(slug);
+      ok.push(slug);
+      // Yield between heavy CPU-bound slugs so queued requests get serviced.
+      await new Promise((r) => setImmediate(r));
+    } catch (err) {
+      failed.push(slug);
+      logger.error(
+        { err, slug, reason },
+        "runCountryEngineAll: engine run failed for country (continuing)",
+      );
+    }
+  }
+  logger.info({ reason, ok, failed }, "runCountryEngineAll: finished");
+  return { ok, failed };
 }
 
 /**

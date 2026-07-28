@@ -4722,10 +4722,14 @@ export async function runDataMigrations(): Promise<void> {
       logger.error({ err: repairErr }, "Dashboard source-health noise repair failed");
     }
 
-    // ONE-TIME initial reprocess of the active country reports through the new
+    // Rule-versioned reprocess of the active country reports through the
     // shared country-report engine (owner brief §35: reprocess existing data;
     // do not apply the new rules only to reports created after deployment).
-    // Marker-gated so it runs exactly once per environment. Each country is
+    // The marker key embeds COUNTRY_ENGINE_RULE_VERSION, so bumping that
+    // constant re-runs the engine for every slug on the next boot in every
+    // environment — gate-rule changes always propagate to the persisted review
+    // queues (e.g. v2's legal_process / preparedness_or_awareness rules retire
+    // the held backlog those rules now stop regrowing). Each country is
     // wrapped in its own try/catch so one country's failure does not block
     // boot or the remaining countries. If the engine module itself throws at
     // import time (engine-core not yet landed), we skip the whole block WITHOUT
@@ -4737,32 +4741,40 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "country_engine_initial_reprocess_v1";
-      const existingMarker = await db.execute(sql`
-        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
-      `);
-      if ((existingMarker.rowCount ?? 0) === 0) {
-        let runCountryEngine:
-          | ((slug: string) => Promise<unknown>)
-          | null = null;
-        try {
-          ({ runCountryEngine } = await import("./countryEngine"));
-        } catch (importErr) {
-          runCountryEngine = null;
-          logger.warn(
-            { err: importErr, marker: markerKey },
-            "Country engine module unavailable — skipping initial reprocess (marker not written; will retry next boot)",
-          );
-        }
-        if (runCountryEngine) {
-          const slugs = [
-            "papua-new-guinea",
-            "papua",
-            "indonesia",
-            "jakarta",
-            "philippines",
-            "thailand",
-          ];
+      let engineMod:
+        | {
+            runCountryEngine: (slug: string) => Promise<unknown>;
+            ruleVersion: string;
+            slugs: string[];
+          }
+        | null = null;
+      try {
+        const { runCountryEngine } = await import("./countryEngine");
+        const { COUNTRY_ENGINE_RULE_VERSION, COUNTRY_ENGINE_CONFIGS } =
+          await import("@workspace/country-engine/config");
+        engineMod = {
+          runCountryEngine,
+          ruleVersion: COUNTRY_ENGINE_RULE_VERSION,
+          slugs: Object.keys(COUNTRY_ENGINE_CONFIGS),
+        };
+      } catch (importErr) {
+        engineMod = null;
+        logger.warn(
+          { err: importErr },
+          "Country engine module unavailable — skipping engine reprocess (marker not written; will retry next boot)",
+        );
+      }
+      const markerKey = engineMod
+        ? `country_engine_reprocess_${engineMod.ruleVersion}`
+        : "";
+      const existingMarker = engineMod
+        ? await db.execute(sql`
+            SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+          `)
+        : null;
+      if (engineMod && (existingMarker?.rowCount ?? 0) === 0) {
+        const { runCountryEngine, slugs } = engineMod;
+        {
           const failedSlugs: string[] = [];
           for (const slug of slugs) {
             // Per-slug resume marker: a heavy slug (indonesia is 30k+ rows and

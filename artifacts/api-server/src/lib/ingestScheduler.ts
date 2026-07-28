@@ -21,6 +21,7 @@ import {
   runStrikesOnce,
   runTitleTranslationOnce,
 } from "./ingestRunner";
+import { runCountryEngineAll } from "./countryEngine";
 import { logger } from "./logger";
 
 // Automatic ingestion scheduler.
@@ -485,6 +486,16 @@ async function tick(reason: string): Promise<boolean> {
       logger.warn(payload, "scheduled ingest finished with failures");
     } else {
       logger.info(payload, "scheduled ingest finished");
+    }
+    // Propagate the fresh incidents (and any live rule changes) into the
+    // persisted country-engine review queues. Without this, persisted
+    // country_engine_events only refresh on boot or analyst-triggered
+    // reprocess, so the review queues drift stale between deploys. Failures
+    // are logged per-slug inside runCountryEngineAll and never fail the tick.
+    try {
+      await runCountryEngineAll(`post-ingest:${reason}`);
+    } catch (err) {
+      logger.error({ err, reason }, "post-ingest country engine re-run failed");
     }
     return true;
   } catch (err) {
