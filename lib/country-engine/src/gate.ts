@@ -136,7 +136,20 @@ export function checkNoIncludedDuplicates(
   return failures;
 }
 
-/** DATA — no included event dated outside the reporting window. */
+/**
+ * DATA — no included event dated outside the reporting window.
+ *
+ * The window is a REPORTING window: the brief deliberately keeps an event that
+ * was reported (published) inside the window even when the event itself
+ * occurred a few days earlier, or an advisory that runs past the window end
+ * ("tidal flooding until 31 July") — the narrative flags such items and states
+ * both dates (occurredOutOfWindow), and truly recycled items (>~35 days) are
+ * already excluded upstream (§6). So:
+ *   - eventDate outside the window but SOME supporting publication inside it
+ *     → warning (visible, never blocks);
+ *   - eventDate outside the window and NO in-window publication → critical
+ *     (the event has no business in this report at all).
+ */
 export function checkDatesWithinWindow(
   report: QualityGateReport,
 ): GateFailure[] {
@@ -150,10 +163,16 @@ export function checkDatesWithinWindow(
     if (!e.eventDate) continue;
     const d = e.eventDate.slice(0, 10);
     if (d < start || d > end) {
+      const reportedInWindow = (e.publicationDates ?? []).some((p) => {
+        const pd = (p ?? "").slice(0, 10);
+        return pd >= start && pd <= end;
+      });
       failures.push({
         check: "event_within_window",
-        severity: "critical",
-        message: `Included event ${e.eventId} is dated ${e.eventDate}, outside the reporting window ${start}..${end}.`,
+        severity: reportedInWindow ? "warning" : "critical",
+        message: reportedInWindow
+          ? `Included event ${e.eventId} is dated ${e.eventDate} (outside the reporting window ${start}..${end}) but was reported inside it; the narrative must state both dates.`
+          : `Included event ${e.eventId} is dated ${e.eventDate}, outside the reporting window ${start}..${end}, with no in-window reporting.`,
         eventId: e.eventId,
       });
     }

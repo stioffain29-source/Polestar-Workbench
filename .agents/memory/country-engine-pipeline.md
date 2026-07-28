@@ -20,6 +20,10 @@ description: One validated pipeline for ALL country reports — canonical events
 - Legacy free-form prose builders are DELETED (BLUF/Exec/Outlook/Polestar/recommended-actions/keyDevelopments/whatMatters/customerRelevance); the engine block in the dataset builder is the SOLE author of those sections. The rendered NON-engine surfaces that survive (assessed-theme paragraphs → incidentThemesOverride, operating-risk priorities, watchlist lines) must themselves stay banned-phrase-clean — the §30 list applies to them too, and the headless pdftotext scan is the check that catches leaks there.
 - Large held/review queues on high-volume countries are expected data reality (the gate holds low-confidence rows), not a bug; tune deliberately via overrides or thresholds.
 
+## §33 gate: window is a REPORTING window
+- `event_within_window` must not fail-close on an event whose eventDate falls outside the window while SOME publicationDate is inside it (fresh reporting of an earlier occurrence, or an advisory dated past the window end like "flooding until 31 July") — that class is a WARNING; only no-in-window-publication is critical. **Why:** the briefs deliberately keep such items (occurredOutOfWindow, both dates stated); the old strictly-occurred check fail-closed 5 of 6 theatres on live data while PNG passed only by luck.
+- Repeatable proof: `bash artifacts/workbench/scripts/verifyCountryBriefs.sh` sweeps ALL supported COUNTRY_SLUGs headlessly and asserts gate passed + no §30 banned phrase in pdftotext + no §16 trend words when hasPriorData=false (the exporter's `[countryGate]` log line carries hasPriorData).
+
 ## Assessed-meaning layer (analysis, not incident list)
 - All "what this means" synthesis lives in `lib/country-engine/src/narrative.ts` (CATEGORY_IMPLICATIONS, repeatSubLocations, harmPhrase, trajectorySentence). Enrich prose THERE — preview==PDF parity is free because the engine narrative is the sole author.
 - Top-3 tiles show the engine's assessed sentence via the dataset remap in pngReportDataset (engine businessSentence spliced into the card's businessImpact); the card components themselves were not changed.

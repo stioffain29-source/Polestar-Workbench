@@ -1427,6 +1427,7 @@ export async function exportCountryReportPdf(
       // eslint-disable-next-line no-console
       console.log(
         `[countryGate] ${country.name}: passed=${g.passed}` +
+          ` hasPriorData=${structuredDataset.gateReport?.hasPriorData ?? false}` +
           (g.failures.length
             ? ` failures=${g.failures.map((f) => `${f.check}(${f.severity})`).join(", ")}`
             : ""),
