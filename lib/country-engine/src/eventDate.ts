@@ -26,6 +26,19 @@ const MONTHS: Record<string, number> = {
   october: 9, oct: 9,
   november: 10, nov: 10,
   december: 11, dec: 11,
+  // Indonesian month names (Bahasa advisories, e.g. "hingga 31 Juli").
+  januari: 0,
+  februari: 1,
+  maret: 2,
+  // april shared with English
+  mei: 4,
+  juni: 5,
+  juli: 6,
+  agustus: 7,
+  // september shared with English
+  oktober: 9,
+  nopember: 10, // november shared with English; nopember is an older spelling
+  desember: 11,
 };
 
 const WEEKDAYS: Record<string, number> = {
@@ -60,20 +73,52 @@ const RETROSPECTIVE_RE =
 //   3. relative cues ("on Monday", "last week", "yesterday") vs publicationDate
 //   4. fall back to publicationDate with modest confidence
 // Retrospective cues drop confidence and flag recycled.
+//
+// Validity-range advisories ("tidal flooding until 31 July", "23–31 July")
+// describe a warning window, not an event on the range END. When a range cue is
+// present, the event date is the range START (if stated) or the publication
+// date — never the end date.
 export function extractEventDate(input: EngineSourceInput): EventDateResult {
   const pub = parseIso(input.occurredAt) ?? parseIso(input.incidentDate);
   const text = englishText(input);
   const retrospective = RETROSPECTIVE_RE.test(text);
+  const range = parseValidityRange(text, pub);
 
-  // 1. Explicit extracted event date is authoritative.
+  // 1. Explicit extracted event date is authoritative — unless it merely echoes
+  //    a validity-range END date (an advisory's expiry, not the event day).
   const explicit = parseIso(input.incidentDate);
   if (explicit) {
-    const recycled = isOutOfWindow(pub, explicit) || retrospective;
-    return {
-      eventDate: toIsoDate(explicit),
-      dateConfidence: recycled ? 40 : 90,
-      recycled,
-    };
+    if (range && range.end && toIsoDate(explicit) === toIsoDate(range.end)) {
+      const resolved = range.start ?? pub;
+      if (resolved) {
+        const recycled = isOutOfWindow(pub, resolved) || retrospective;
+        return {
+          eventDate: toIsoDate(resolved),
+          dateConfidence: recycled ? 40 : 70,
+          recycled,
+        };
+      }
+    } else {
+      const recycled = isOutOfWindow(pub, explicit) || retrospective;
+      return {
+        eventDate: toIsoDate(explicit),
+        dateConfidence: recycled ? 40 : 90,
+        recycled,
+      };
+    }
+  }
+
+  // 2a. Validity range in text: date to the range start (or publication day).
+  if (range) {
+    const resolved = range.start ?? pub;
+    if (resolved) {
+      const recycled = isOutOfWindow(pub, resolved) || retrospective;
+      return {
+        eventDate: toIsoDate(resolved),
+        dateConfidence: recycled ? 40 : 70,
+        recycled,
+      };
+    }
   }
 
   // 2. Absolute date cues in text.
@@ -131,6 +176,52 @@ export function extractEventDate(input: EngineSourceInput): EventDateResult {
 function isOutOfWindow(pub: Date | null, event: Date): boolean {
   if (!pub) return false;
   return pub.getTime() - event.getTime() > 35 * DAY_MS;
+}
+
+// Validity-range cues in advisory text ("until 31 July", "through 31 July",
+// "hingga 31 Juli", "23–31 July"). Returns the range start (when stated) and
+// end so callers can avoid dating the event to the range END.
+interface ValidityRange {
+  start: Date | null;
+  end: Date | null;
+}
+
+function parseValidityRange(text: string, pub: Date | null): ValidityRange | null {
+  const pubYear = pub ? pub.getUTCFullYear() : new Date(Date.parse("2000-01-01")).getUTCFullYear();
+  const mkDate = (day: number, month: number, year: number): Date | null =>
+    day >= 1 && day <= 31 ? new Date(Date.UTC(year, month, day)) : null;
+
+  // "23–31 July [2026]" / "23-31 July" (day range within one named month).
+  const dayRange = text.match(/\b(\d{1,2})\s*[–—-]\s*(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/);
+  if (dayRange && MONTHS[dayRange[3]] !== undefined) {
+    const month = MONTHS[dayRange[3]];
+    const year = dayRange[4] ? Number(dayRange[4]) : pubYear;
+    const start = mkDate(Number(dayRange[1]), month, year);
+    const end = mkDate(Number(dayRange[2]), month, year);
+    if (start && end) return { start, end };
+  }
+
+  // "until 31 July [2026]" / "till" / "through" / "up to" / Bahasa "hingga"/"sampai".
+  const until = text.match(
+    /\b(?:until|till|through|thru|up to|hingga|sampai)\s+(\d{1,2})\s+([a-z]+)\.?(?:\s+(\d{4}))?\b/,
+  );
+  if (until && MONTHS[until[2]] !== undefined) {
+    const month = MONTHS[until[2]];
+    const year = until[3] ? Number(until[3]) : pubYear;
+    const end = mkDate(Number(until[1]), month, year);
+    if (end) return { start: null, end };
+  }
+  // "until July 31[, 2026]" (month-day order).
+  const untilMd = text.match(
+    /\b(?:until|till|through|thru|up to|hingga|sampai)\s+([a-z]+)\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?\b/,
+  );
+  if (untilMd && MONTHS[untilMd[1]] !== undefined) {
+    const month = MONTHS[untilMd[1]];
+    const year = untilMd[3] ? Number(untilMd[3]) : pubYear;
+    const end = mkDate(Number(untilMd[2]), month, year);
+    if (end) return { start: null, end };
+  }
+  return null;
 }
 
 // Parse an absolute date cue ("12 March 2023", "March 12", "on 3 April").

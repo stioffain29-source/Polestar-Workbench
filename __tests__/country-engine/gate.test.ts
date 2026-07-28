@@ -218,8 +218,18 @@ describe("runQualityGate — fails closed (§33)", () => {
     expect(checkNames(result)).toContain("no_included_duplicate");
   });
 
-  it("fails when an included event is dated outside the window", () => {
+  it("warns (not fails) on an out-of-window event reported inside the window", () => {
     const report = baseReport([makeEvent({ eventDate: "2024-01-01" })]);
+    const result = runQualityGate(report);
+    // publicationDates default to in-window, so §33 downgrades to a warning.
+    const failure = result.failures.find((f) => f.check === "event_within_window");
+    expect(failure?.severity).toBe("warning");
+  });
+
+  it("fails when an included event is dated AND reported outside the window", () => {
+    const report = baseReport([
+      makeEvent({ eventDate: "2024-01-01", publicationDates: ["2024-01-02"] }),
+    ]);
     const result = runQualityGate(report);
     expect(result.passed).toBe(false);
     expect(checkNames(result)).toContain("event_within_window");

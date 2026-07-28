@@ -271,6 +271,98 @@ describe("extractEventDate (§6)", () => {
     expect(r.eventDate).toBe("2024-06-14");
     expect(r.recycled).toBe(false);
   });
+
+  it("dates an 'until <date>' advisory to publication, not the range end", () => {
+    const r = extractEventDate(
+      input({
+        id: "6",
+        title: "Jakarta coastal residents warned of tidal flooding until 31 July 2026",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-25");
+    expect(r.recycled).toBe(false);
+  });
+
+  it("overrides an explicit incidentDate that echoes the range end", () => {
+    const r = extractEventDate(
+      input({
+        id: "7",
+        title: "Residents warned of tidal flooding until 31 July",
+        incidentDate: "2026-07-31T00:00:00.000Z",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-25");
+  });
+
+  it("keeps an explicit incidentDate that differs from the range end", () => {
+    const r = extractEventDate(
+      input({
+        id: "8",
+        title: "Flooding warning in effect until 31 July",
+        incidentDate: "2026-07-24T00:00:00.000Z",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-24");
+  });
+
+  it("dates a '23–31 July' advisory to the range start", () => {
+    const r = extractEventDate(
+      input({
+        id: "9",
+        title: "Tidal flood alert for north coast 23–31 July",
+        occurredAt: "2026-07-24T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-23");
+  });
+
+  it("resolves an 'until July 31' (month-day) advisory to publication", () => {
+    const r = extractEventDate(
+      input({
+        id: "10",
+        title: "Coastal flooding expected until July 31",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-25");
+  });
+
+  it("dates a Bahasa 'hingga <date>' advisory to publication, not the range end", () => {
+    const r = extractEventDate(
+      input({
+        id: "12",
+        title: "Warga pesisir Jakarta diminta waspada banjir rob hingga 31 Juli 2026",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-25");
+  });
+
+  it("overrides an explicit incidentDate echoing a Bahasa range end", () => {
+    const r = extractEventDate(
+      input({
+        id: "13",
+        title: "Banjir rob diperkirakan berlangsung sampai 31 Juli",
+        incidentDate: "2026-07-31T00:00:00.000Z",
+        occurredAt: "2026-07-25T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2026-07-25");
+  });
+
+  it("still extracts a plain single date from the title", () => {
+    const r = extractEventDate(
+      input({
+        id: "11",
+        title: "Clash in Enga on 14 June 2024",
+        occurredAt: "2024-06-15T00:00:00.000Z",
+      }),
+    );
+    expect(r.eventDate).toBe("2024-06-14");
+  });
 });
 
 describe("assessSeverity (§11)", () => {
