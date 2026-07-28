@@ -61,7 +61,6 @@ import {
   isPreparednessDrill,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
-import { CountryEngineReviewPanel } from "@/components/CountryEngineReviewPanel";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
 import type {
@@ -1448,7 +1447,6 @@ export default function CountryReport() {
       {/* Owner-only country-engine review panel (§29–32). Rendered OUTSIDE the
           `.print-report` element below and carries `no-print`, so it never
           reaches the on-screen report, in-app PDF, or headless re-render. */}
-      {isStructured && <CountryEngineReviewPanel slug={slug} />}
 
       {qcWarnings.length > 0 && (
         <div
