@@ -76,6 +76,28 @@ const EXCLUSION_RULES: ExclusionRule[] = [
     re: /\b(safely rescued|all (?:passengers|crew) (?:were )?rescued|rescued unharmed|successful\w* (?:rescue|evacuation|drill|exercise)|routine drill|training (?:drill|exercise)|mock drill|safely evacuated|no (?:injuries|casualties) reported)\b/i,
   },
   {
+    // §7 gate tuning: judicial / prosecutorial PROCESS reporting (trials,
+    // corruption probes, pretrial rulings, sentencing) describes legal
+    // machinery, not a physical occurrence. Cues are phrase-bound (never bare
+    // "trial"/"court") so crime-scene reporting is untouched; a hard security
+    // cue in the same text (e.g. a fresh killing that is also before a court)
+    // overrides this rule (soft exclusion).
+    reason: "legal_process",
+    status: "Not an incident",
+    re: /\b(corruption (?:case|cases|investigation|probe|charges?|scandal|trial|suspects?|defendants?)|graft (?:case|trial|probe)|pretrial (?:petition|motion|hearing|ruling)|granting .{0,40}pretrial|court (?:sentences?|acquits?|convicts?|hears|rules? (?:on|that))|district court sentences?|sentenced to (?:\d+|life|community service|prison|jail|death)|stands? trial|to be tried|goes? on trial|verdict (?:read|due|expected|in the)|prosecutor'?s? office|high prosecutor|attorney[- ]general'?s? office|indicted|indictment|sting operation|anti[- ]?corruption (?:commission|agency|court)|\bkpk\b|bribery (?:case|trial|charges?)|embezzlement (?:case|charges?)|money[- ]?laundering (?:case|charges?|trial))\b/i,
+  },
+  {
+    // §7 gate tuning: preparedness / awareness / risk-warning activity
+    // (alert postures, prevention drives, mitigation meetings, "vulnerable
+    // to" warnings) is anticipatory — nothing has happened. Cues require the
+    // preparedness verb to bind to a hazard/prevention object so genuine
+    // hazard events ("flood hits", "wildfire destroys") never match; a hard
+    // security cue overrides (soft exclusion).
+    reason: "preparedness_or_awareness",
+    status: "Not an incident",
+    re: /\b(on (?:high )?alert for|preparedness|(?:fire|flood|disaster|landslide) prevention|prevention of (?:forest|land|fires?|floods?|disasters?)|prevent(?:ing)? (?:forest|land) (?:and land )?fires?|prepares? for (?:possible |potential )?(?:floods?|drought|fires?|disasters?|the )|anticipat\w* (?:floods?|drought|fires?|disasters?)|vulnerable to (?:floods?|drought|wildfires?|landslides?|fires?)|mitigation (?:meeting|plan|efforts?|measures?)|rais\w* awareness|awareness (?:campaign|drive|programme|program)|socializ(?:ation|es?|ing)|coordination to (?:handle|address|prepare)|urges? (?:residents|farmers|the public|communit\w+|people) to (?:prevent|prepare|be (?:alert|vigilant|careful)|monitor|stay)|fire[- ]prone areas?)/i,
+  },
+  {
     reason: "response_only_followup",
     status: "Not an incident",
     re: /\b(condemn\w*|expresses? (?:concern|condolences)|offers? condolences|calls? for (?:calm|peace|restraint|an investigation|unity|education|counselling)|vows? to|urges? (?:calm|restraint)|investigation (?:opened|launched|into|underway)|probe (?:ordered|launched)|suspect\w* (?:arrested|detained|charged) (?:days later|weeks later|over the|following the)|visits? (?:the )?(?:site|families|victims)|pays? tribute|holds? talks|meets? with|to visit)\b/i,
@@ -85,6 +107,15 @@ const EXCLUSION_RULES: ExclusionRule[] = [
 // Hard security-event cues that OVERRIDE a soft exclusion: if the text clearly
 // describes a violent occurrence, an otherwise-excludable framing word (e.g. a
 // "condemnation" that also reports a fresh attack) should not silently drop it.
+// Companion overrides for the two §7 gate-tuning rules (legal_process /
+// preparedness_or_awareness): a story that ALSO reports live unrest (a rally
+// over a graft case, a demonstration at a prosecutor's office) or a physical
+// policing operation (a raid in a corruption probe) is a real occurrence and
+// must not be dropped as process/preparedness coverage.
+const UNREST_COMPANION_RE =
+  /\b(protest\w*|demonstrat\w*|rally|rallies|rallied|riot\w*|marchers|march(?:es|ed)? (?:on|to|through)|strike\b|walkout|picket\w*|blockad\w*|road ?block)\b/i;
+const POLICING_COMPANION_RE = /\b(raid\w*|searched|swoop|manhunt|cordon)\b/i;
+
 const HARD_EVENT_RE =
   /\b(killed|shot dead|gunned down|stabbed|murder\w*|dead|fatalit\w*|bodies|explosion|bombing|blast|open(?:ed)? fire|gun ?(?:fight|battle|men)|ambush\w*|riot\w*|clash\w*|torched|set (?:on )?fire|derail\w*|capsiz\w*|hijack\w*|kidnap\w*|abduct\w*|hostage|looted|ransack\w*)\b/i;
 
@@ -164,11 +195,22 @@ export function classifyArticle(
   // which describe non-occurrences even when they mention violence.
   for (const rule of EXCLUSION_RULES) {
     if (!rule.re.test(text)) continue;
+    // Companion overrides for the §7 gate-tuning rules: live unrest or a
+    // physical policing operation in the same text is a real occurrence.
+    if (
+      (rule.reason === "legal_process" || rule.reason === "preparedness_or_awareness") &&
+      UNREST_COMPANION_RE.test(text)
+    ) {
+      continue;
+    }
+    if (rule.reason === "legal_process" && POLICING_COMPANION_RE.test(text)) continue;
     const overridable =
       rule.reason === "commentary_or_opinion" ||
       rule.reason === "background_or_explainer" ||
       rule.reason === "response_only_followup" ||
-      rule.reason === "successful_routine_response";
+      rule.reason === "successful_routine_response" ||
+      rule.reason === "legal_process" ||
+      rule.reason === "preparedness_or_awareness";
     if (overridable && hardEvent) continue;
     return {
       isEvent: false,

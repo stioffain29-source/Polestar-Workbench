@@ -84,6 +84,68 @@ describe("classifyArticle exclusions (§3-4)", () => {
     expect(r.exclusionReason).toBe("successful_routine_response");
   });
 
+  it("excludes judicial / prosecutorial process reporting (legal_process)", () => {
+    for (const title of [
+      "Medan Corruption Court judge acquits defendant in PTPN IV land corruption case",
+      "Former Tapteng health chief sentenced to 5 years for Rp 10.6 billion BOK corruption",
+      "Judge's reasoning for granting Bahtiar's pretrial in pineapple seed corruption case",
+      "KPK urges law enforcement to coordinate to eradicate corruption in Papua",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.isEvent).toBe(false);
+      expect(r.exclusionReason).toBe("legal_process");
+    }
+  });
+
+  it("keeps a fresh violent occurrence despite legal-process framing (hard-event override)", () => {
+    const r = classifyArticle(
+      { title: "Drug case suspect shot dead by police as trial verdict read in court" },
+      INDONESIA,
+    );
+    expect(r.isEvent).toBe(true);
+  });
+
+  it("keeps live unrest about a graft case (unrest companion override)", () => {
+    const r = classifyArticle(
+      { title: "Thousands rally in Philippines over graft case against pro-Duterte senator" },
+      getCountryEngineConfig("philippines"),
+    );
+    expect(r.isEvent).toBe(true);
+    expect(r.issueCategory).toBe("Civil unrest");
+  });
+
+  it("keeps a physical police raid in a corruption probe (policing companion override)", () => {
+    const r = classifyArticle(
+      { title: "Police Raid Jakarta Cafe in Probe of Sumatra Blackout Corruption Case" },
+      INDONESIA,
+    );
+    expect(r.isEvent).toBe(true);
+  });
+
+  it("excludes preparedness / awareness activity (preparedness_or_awareness)", () => {
+    for (const title of [
+      "Dry season, BPBD Samarinda strengthens preparedness for forest and land fires",
+      "Gunung Megang police chief urges farmers to be frontline in preventing forest and land fires",
+      "BMKG holds earthquake and tsunami field school to boost coastal community preparedness",
+      "Danrem 042/Gapu surveys fire-prone areas by air to strengthen prevention measures",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.isEvent).toBe(false);
+      expect(r.exclusionReason).toBe("preparedness_or_awareness");
+    }
+  });
+
+  it("keeps a genuine hazard occurrence untouched by the preparedness rule", () => {
+    for (const title of [
+      "Plywood factory fire in Kuningan destroys wood raw materials and 15 buildings",
+      "Garut disaster agency deploys assessment team as land movement and landslides hit Banjarwangi",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.isEvent).toBe(true);
+      expect(r.exclusionReason).toBeNull();
+    }
+  });
+
   it("classifies a genuine violent incident as an event", () => {
     const r = classifyArticle(
       { title: "Three killed in armed robbery at Lae market" },

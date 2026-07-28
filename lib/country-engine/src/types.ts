@@ -87,6 +87,11 @@ export const EXCLUSION_REASONS = [
   "successful_routine_response",
   "low_confidence",
   "not_an_event",
+  // §7 gate tuning (held-queue regrowth): judicial / prosecutorial process
+  // reporting (trials, corruption probes, verdicts) and preparedness /
+  // awareness / risk-warning activity are non-occurrences, not incidents.
+  "legal_process",
+  "preparedness_or_awareness",
   // City-scoped reports (Jakarta): a home-country record with no gazetteer
   // match inside the city footprint is out of scope for the city brief.
   "outside_city_scope",
