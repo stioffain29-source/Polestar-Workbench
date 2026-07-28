@@ -144,6 +144,7 @@ import {
   FUEL_REPORT,
   FUEL_INCIDENTS,
   FUEL_SENTINELS,
+  CARGO_READ_SECTIONS,
 } from "./prosePassthroughTestHelpers";
 
 const pdfChromeMock = jest.requireMock(
@@ -258,4 +259,44 @@ describe("saved prose overrides reach the exported PDF (headless pass-through)",
     );
     expectAllSentinels(text, FUEL_SENTINELS);
   });
+});
+
+// Task 454 (PDF mirror of the preview suite): the three cargo reads are gated
+// by show(key) in exportTopicReportPdf's cargo branch. Prove preview == PDF
+// for the hide path: a key in hiddenSections omits the section from the PDF
+// text stream, and an empty hiddenSections renders all three.
+describe("cargo hidden section keys gate the three data-driven reads (PDF)", () => {
+  async function exportCargo(hiddenSections: string[]): Promise<string> {
+    const data = buildHeadlessReportData(CARGO_REPORT);
+    return captureText(() =>
+      exportTopicReportPdf(
+        data as never,
+        CARGO_INCIDENTS as never,
+        { cargo_watch: "Cargo Watch" },
+        "cargo.pdf",
+        { hiddenSections },
+      ),
+    );
+  }
+
+  // NOTE: the recording pdfChrome stub captures PROSE text calls but not
+  // section headings, so the PDF assertions key on the read's sentinel text —
+  // the same content the preview suite pairs with the heading.
+  it("renders all three reads when hiddenSections is empty", async () => {
+    const text = await exportCargo([]);
+    for (const s of CARGO_READ_SECTIONS) {
+      expect(text).toContain(s.sentinelToken);
+    }
+  });
+
+  for (const s of CARGO_READ_SECTIONS) {
+    it(`omits "${s.heading}" when "${s.key}" is hidden — and keeps the other two`, async () => {
+      const text = await exportCargo([s.key]);
+      expect(text).not.toContain(s.sentinelToken);
+      for (const other of CARGO_READ_SECTIONS) {
+        if (other.key === s.key) continue;
+        expect(text).toContain(other.sentinelToken);
+      }
+    });
+  }
 });

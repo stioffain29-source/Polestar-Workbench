@@ -38,6 +38,8 @@ import {
   FUEL_REPORT,
   FUEL_INCIDENTS,
   FUEL_SENTINELS,
+  CARGO_READ_SECTIONS,
+  cargoReportWithoutReadOverrides,
 } from "./prosePassthroughTestHelpers";
 
 function expectAllSentinels(html: string, sentinels: Record<string, string>) {
@@ -117,5 +119,68 @@ describe("saved prose overrides reach the on-screen preview", () => {
       } as never),
     );
     expectAllSentinels(html, FUEL_SENTINELS);
+  });
+});
+
+// Task 454: the three cargo reads are gated by show(key). A typo in a section
+// key would silently suppress a section — these tests pin the exact keys.
+describe("cargo hidden section keys gate the three data-driven reads (preview)", () => {
+  function renderCargo(hiddenSections: string[]): string {
+    const html = renderToStaticMarkup(
+      createElement(CargoReportPreview, {
+        report: CARGO_REPORT,
+        incidents: CARGO_INCIDENTS,
+        hiddenSections,
+      } as never),
+    );
+    if (html.includes("data-cargo-validation-blocked")) {
+      throw new Error(
+        "Cargo fixture tripped the hard validation gate — the preview rendered the blocking panel instead of the report.",
+      );
+    }
+    return html;
+  }
+
+  it("renders all three reads when hiddenSections is empty", () => {
+    const html = renderCargo([]);
+    for (const s of CARGO_READ_SECTIONS) {
+      expect(html).toContain(s.heading);
+      expect(html).toContain(s.sentinelToken);
+    }
+  });
+
+  for (const s of CARGO_READ_SECTIONS) {
+    it(`omits "${s.heading}" when "${s.key}" is hidden — and keeps the other two`, () => {
+      const html = renderCargo([s.key]);
+      expect(html).not.toContain(s.heading);
+      expect(html).not.toContain(s.sentinelToken);
+      for (const other of CARGO_READ_SECTIONS) {
+        if (other.key === s.key) continue;
+        expect(html).toContain(other.heading);
+        expect(html).toContain(other.sentinelToken);
+      }
+    });
+  }
+
+  it("suppresses the AUTO-generated read text too, not just saved overrides", () => {
+    const report = cargoReportWithoutReadOverrides(CARGO_REPORT);
+    const shown = renderToStaticMarkup(
+      createElement(CargoReportPreview, {
+        report,
+        incidents: CARGO_INCIDENTS,
+        hiddenSections: [],
+      } as never),
+    );
+    const hidden = renderToStaticMarkup(
+      createElement(CargoReportPreview, {
+        report,
+        incidents: CARGO_INCIDENTS,
+        hiddenSections: CARGO_READ_SECTIONS.map((s) => s.key),
+      } as never),
+    );
+    for (const s of CARGO_READ_SECTIONS) {
+      expect(shown).toContain(s.heading);
+      expect(hidden).not.toContain(s.heading);
+    }
   });
 });

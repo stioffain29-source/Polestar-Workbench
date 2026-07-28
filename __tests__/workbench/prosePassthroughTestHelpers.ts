@@ -352,3 +352,48 @@ export const ENERGY_INCIDENTS = [
     summary: "A substation fire forced rolling blackouts on the grid.",
   }),
 ];
+
+// ---------------------------------------------------------------------------
+// Cargo hidden-section gate (task 454): the three data-driven reads are gated
+// by show(key) on BOTH surfaces. These constants pair each canonical section
+// key with the section heading and the override sentinel token, so the
+// preview and PDF suites assert the SAME contract: a key in hiddenSections
+// removes the section (heading + text), and an empty hiddenSections renders
+// it. A typo'd key in the component would fail the "hidden" leg because the
+// real section would still render.
+// ---------------------------------------------------------------------------
+export const CARGO_READ_SECTIONS: Array<{
+  key: string;
+  heading: string;
+  sentinelToken: string;
+}> = [
+  {
+    key: "cargo-security-read",
+    heading: "Cargo Security Read",
+    sentinelToken: "ZZ-CARGO-SECURITY-READ-OVERRIDE-ZZ",
+  },
+  {
+    key: "logistics-hub-read",
+    heading: "Logistics Hub Read",
+    sentinelToken: "ZZ-CARGO-LOGISTICS-HUB-READ-OVERRIDE-ZZ",
+  },
+  {
+    key: "regional-read",
+    heading: "Regional Read",
+    sentinelToken: "ZZ-CARGO-REGIONAL-READ-OVERRIDE-ZZ",
+  },
+];
+
+// A report variant with the three read overrides BLANK, so the rendered text
+// is the auto-generated read — proving the gate also suppresses auto prose,
+// not just saved overrides.
+export function cargoReportWithoutReadOverrides(
+  base: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...base,
+    cargoSecurityRead: "",
+    logisticsHubRead: "",
+    regionalCountryRead: "",
+  };
+}
