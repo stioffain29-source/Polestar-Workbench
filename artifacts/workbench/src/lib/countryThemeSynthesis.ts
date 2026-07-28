@@ -53,29 +53,12 @@ export interface AssessedTheme {
   businessExposure: string;
   // HOW it is trending against the prior week.
   trajectory: ThemeTrajectory;
-  // A short count-free phrase for the trajectory (no leading conjunction).
-  trajectoryPhrase: string;
   // The full count-free analytical paragraph combining the three judgements.
   narrative: string;
 }
 
 // Default number of leading themes (the "two-to-three assessed themes" rule).
 export const MAX_ASSESSED_THEMES = 3;
-
-// A short concern phrase per theme for BLUF / Executive Summary leads. Kept here
-// (not imported) so this module is self-contained and directly unit-testable.
-const THEME_CONCERN: Record<CountryIncidentTheme, string> = {
-  protest: "protest and civil unrest",
-  crime: "crime, theft and violent incidents",
-  natural: "natural-hazard disruption",
-  governance: "policing and regulatory activity",
-  fire: "fire and explosion incidents",
-  other: "transport, utility and connectivity disruption",
-};
-
-export function themeConcernPhrase(t: { key: CountryIncidentTheme }): string {
-  return THEME_CONCERN[t.key];
-}
 
 function worstRankOf(items: PngReportItem[]): number {
   return items.reduce((m, it) => Math.max(m, it.severityRank ?? 0), 0);
@@ -99,13 +82,6 @@ function themeTrajectory(
   return "steady";
 }
 
-const TRAJECTORY_PHRASE: Record<ThemeTrajectory, string> = {
-  rising: "rising against the previous week",
-  easing: "easing against the previous week",
-  steady: "holding at the previous week's level",
-  new: "newly prominent this period, with no comparable reporting a week earlier",
-  nobasis: "with no prior-week baseline to compare against",
-};
 
 // A count-free trajectory clause for the narrative paragraph. Names the activity
 // rather than asserting a bare "the theme is rising" — the spec bans generic,
@@ -113,11 +89,11 @@ const TRAJECTORY_PHRASE: Record<ThemeTrajectory, string> = {
 function trajectorySentence(t: ThemeTrajectory): string {
   switch (t) {
     case "rising":
-      return "This activity was more prominent than in the previous week.";
+      return "Reporting of this activity picked up against the previous week.";
     case "easing":
-      return "This activity was less prominent than in the previous week.";
+      return "Reporting of this activity eased against the previous week.";
     case "steady":
-      return "This activity held broadly at the previous week's level.";
+      return "Reporting of this activity held broadly at the previous week's level.";
     case "new":
       return "It was not reported a week earlier, so it reads as newly prominent this period.";
     case "nobasis":
@@ -212,7 +188,6 @@ export function synthesiseAssessedThemes(
       concentration,
       businessExposure,
       trajectory,
-      trajectoryPhrase: TRAJECTORY_PHRASE[trajectory],
       narrative,
     });
   }
@@ -253,22 +228,3 @@ export function buildAssessedThemeGroups(
   });
 }
 
-// One short, count-free "What Matters This Week" line per assessed theme.
-export function buildWhatMattersFromThemes(
-  themes: AssessedTheme[],
-  emptyNote: string,
-): string[] {
-  if (themes.length === 0) return [emptyNote];
-  return themes.map((t) => {
-    const clause = `${themeConcernPhrase(t)}, ${t.concentration}, ${t.trajectoryPhrase}`;
-    return `${clause.charAt(0).toUpperCase()}${clause.slice(1)}.`;
-  });
-}
-
-// The BLUF / Executive-Summary lead fragment naming the assessed themes, e.g.
-// "the assessment centres on protest and civil unrest and crime, theft and
-// violent incidents". Empty themes → "".
-export function themeLedLead(themes: AssessedTheme[]): string {
-  if (themes.length === 0) return "";
-  return `the assessment centres on ${joinList(themes.map(themeConcernPhrase))}`;
-}

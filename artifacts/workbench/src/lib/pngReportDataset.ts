@@ -41,7 +41,7 @@ import { subDays, format as formatDate } from "date-fns";
 import { isLikelyNonEnglish, stripWireCruft } from "./incidentTitle";
 import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
-import { summariseFireCauses, classifyFireCause } from "./countryFireCause";
+import { classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import { scoreClusterValue } from "./countryTopValue";
 import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
@@ -52,36 +52,12 @@ export type { PngCategory } from "@workspace/ingest/pngExtract";
 import type { PngCategory } from "@workspace/ingest/pngExtract";
 import {
   operatingRiskDisplayCategory,
-  operatingRiskCategoryPhrase,
-  operatingRiskAction,
-  buildOperatingRiskBluf,
-  buildOperatingRiskExecutiveSummary,
   buildOperatingRiskPriorities,
 } from "./operatingRiskProse";
 import {
-  COUNTRY_INCIDENT_THEMES,
   buildCountryIncidentThemes,
-  themeForCategory,
-  type CountryIncidentTheme,
 } from "./countryIncidentThemes";
-import {
-  synthesiseAssessedThemes,
-  buildAssessedThemeGroups,
-  buildWhatMattersFromThemes,
-  themeLedLead,
-  type AssessedTheme,
-} from "./countryThemeSynthesis";
-import {
-  buildPolestarView,
-  type PolestarDirection,
-  type PolestarViewParts,
-} from "./countryPolestarView";
-import {
-  buildCustomerRelevance,
-  driverPhrasesForThemes,
-  exposureLabelsForThemes,
-  scenarioForThemes,
-} from "./countryCustomerRelevance";
+import { buildAssessedThemeGroups } from "./countryThemeSynthesis";
 import {
   buildCountryNarrative,
   type CanonicalEvent,
@@ -848,33 +824,12 @@ export interface ReportingConfidence {
   rationale: string;
 }
 
-// One themed "Key Development" group: the period's incidents grouped by their
-// client-facing display category (e.g. "Protest / civil unrest"). Carries the
-// tile/severity cards for that theme and a deterministic business-impact line.
-export interface KeyDevelopmentGroup {
-  key: string;
-  heading: string;
-  items: PngReportItem[];
-  businessImpact: string;
-}
-
 export interface PngReportDataset {
   periodLabel: string;
   // Bottom Line Up Front — a single short paragraph at the very top giving the
   // week's trajectory, the lead concern and the principal business risk.
   bluf: string;
   executiveSummary: string;
-  // "What Matters This Week" framing bullets — the dominant risk themes this
-  // period as short, count-free lines. Empty-window → a single standing caveat.
-  whatMattersBullets: string[];
-  // Themed developments (incidents grouped by display category, severity-ranked),
-  // each closing with a business-impact line. Drives the operating-risk layout.
-  keyDevelopments: KeyDevelopmentGroup[];
-  // The two-to-three ASSESSED themes the brief leads with (each carrying
-  // concentration, business exposure and trajectory-vs-baseline). Selected by
-  // assessed value, deterministic, count-free — drives the BLUF / Executive
-  // Summary lead and the Key Developments section.
-  assessedThemes: AssessedTheme[];
   // "Escalation indicators" for the Outlook: what would raise concern in the
   // coming week. Deterministic, derived from the period's categories/severity.
   escalationIndicators: string[];
@@ -917,14 +872,6 @@ export interface PngReportDataset {
   // adjustment for the week, and what would raise concern. Rendered as one
   // flowing paragraph composed from the seven structured parts below.
   polestarView: string;
-  // The seven Polestar View components (direction / driver / exposed geography /
-  // exposed activity / likely next disruption / what would change / practical
-  // judgement). Optional/default-safe — the renderer prints `polestarView`.
-  polestarViewParts?: PolestarViewParts;
-  // Customer Relevance prose: who the brief matters to plus the period's main
-  // issues, derived from the incident mix. Optional/default-safe — the renderer
-  // shows the section only when present.
-  customerRelevance?: string;
   reportingConfidence: ReportingConfidence;
   windowItems: PngReportItem[];
   // Incidents to analyse in "Incident Details" — every windowItem NOT promoted
@@ -1556,35 +1503,6 @@ function formatBriefDate(d: Date): string {
   return formatDate(d, "d MMM yyyy");
 }
 
-// Event-led opening clause naming the period's PRINCIPAL development — the lead
-// Top-3 story — instead of an abstract theme. The spec requires the brief to
-// open on what actually happened. When the lead item's own event date fell
-// before the reporting window (occurredOutOfWindow) it is framed as fresh
-// findings on an EARLIER incident, stating BOTH the occurrence and report dates
-// so an old event is never presented as new. Returns "" when there is no lead
-// (caller then falls back to the theme sentence). Never fabricates.
-function eventLedLeadSentence(lead: PngReportItem | undefined): string {
-  if (!lead) return "";
-  const head = stripWireCruft(lead.title)
-    .replace(/\s+/g, " ")
-    .replace(/[.;,]+\s*$/, "")
-    .trim();
-  if (!head) return "";
-  const place = (lead.location || lead.province || "").trim();
-  const placeClause =
-    place && !head.toLowerCase().includes(place.toLowerCase()) ? ` in ${place}` : "";
-  if (lead.occurredOutOfWindow && lead.incidentDate) {
-    return `This period's lead item was fresh reporting on an earlier development${placeClause}: ${head} (occurred ${formatBriefDate(lead.incidentDate)}, reported ${formatBriefDate(lead.reportedDate)}).`;
-  }
-  const phrase = categoryPhrase(lead.category);
-  // The generic "other security-relevant incidents" bucket adds no information
-  // in front of a specific headline and reads as filler, so drop it and state
-  // the development directly (spec §11: no generic, un-anchored commentary).
-  if (phrase === "other security-relevant incidents") {
-    return `This period's lead development${placeClause} was: ${head}.`;
-  }
-  return `This period's lead development was ${phrase}${placeClause}: ${head}.`;
-}
 
 // Map a curated category (matched on keywords, mirroring strandForItem) to a
 // recommended action. Returns a standing-precautions default so a row is never
@@ -1637,93 +1555,6 @@ function whyForLocation(dominantCatLower: string | null, worstRank: number, fres
   return `Fresh ${sev}reporting of ${cat} this period.`;
 }
 
-// Build the grouped Recommended Actions from this period's incident mix and the
-// location watchlist. Deterministic, count-free, British English. Only groups
-// with at least one applicable action are returned; an empty window yields none.
-function buildRecommendedActions(
-  windowItems: PngReportItem[],
-  locationWatchlist: LocationWatchlistEntry[],
-  worstRank: number,
-): RecommendedActionGroup[] {
-  if (windowItems.length === 0) return [];
-  const cats = windowItems.map((it) => it.category.toLowerCase());
-  const has = (re: RegExp) => cats.some((c) => re.test(c));
-  const protest = has(/(protest|unrest|demonstration|riot|strike|blockad|march|labour)/);
-  const armed = has(
-    /(tribal|communal|clash|violen|attack|arson|insurg|militant|armed|gun|shoot|ambush|kidnap|terror|homicide)/,
-  );
-  const crime = has(/(robbery|hold-up|holdup|carjack|theft|break-in|burglar|crime|assault|hijack)/);
-  const natural = has(/(natural|hazard|flood|quake|earthquake|landslide|storm|cyclone|volcan|haze|environment)/);
-  const fire = has(/(fire|explos)/);
-  const transport = has(/(aviation|airport|maritime|port|road|highway|power|utilit|telecom|connectivity)/);
-  const hasWatch = locationWatchlist.length > 0;
-  const groups: RecommendedActionGroup[] = [];
-
-  const movement: string[] = [];
-  if (protest || armed || crime || hasWatch)
-    movement.push(
-      "Vary routes and timings, avoid predictable patterns, and confirm route status before travel.",
-    );
-  if (protest)
-    movement.push("Route around gatherings, rallies and choke points, and build in extra transit time.");
-  if (armed)
-    movement.push(
-      "Treat areas with confirmed violence as no-go for non-essential travel; use secure transport for any essential movement.",
-    );
-  if (movement.length) groups.push({ key: "movement", heading: "Movement security", actions: movement });
-
-  const site: string[] = [];
-  if (armed || crime || protest)
-    site.push("Maintain premises protection: access control, guarding and after-hours security at exposed sites.");
-  if (fire) {
-    // Cause-aware fire advice. A deliberate (arson / attack / unrest) fire only
-    // registers here when the source STATED it, so the security line never
-    // appears on an accidental or unexplained blaze.
-    const fs = summariseFireCauses(windowItems);
-    if (fs.security > 0)
-      site.push(
-        "Treat fires reported as deliberate or attack-related as a security matter: review site protection and access control around affected premises.",
-      );
-    site.push(
-      "Confirm site fire status, fire-safety provision and evacuation readiness before approach.",
-    );
-  }
-  if (site.length) groups.push({ key: "site", heading: "Site security", actions: site });
-
-  const staff: string[] = [];
-  if (crime || protest || armed)
-    staff.push("Brief staff and travellers on current risks, local reporting lines and areas to avoid.");
-  if (crime) staff.push("Remind staff to keep a low profile with cash, devices and valuables in public.");
-  if (staff.length) groups.push({ key: "staff", heading: "Staff awareness", actions: staff });
-
-  const journey: string[] = [];
-  if (transport || protest || natural)
-    journey.push("Confirm road, air and port status before travel and hold viable alternates.");
-  if (natural) journey.push("Check weather and hazard conditions before movement and allow for delays.");
-  if (journey.length) groups.push({ key: "journey", heading: "Journey planning", actions: journey });
-
-  groups.push({
-    key: "escalation",
-    heading: "Escalation triggers",
-    actions: [
-      worstRank >= 4
-        ? "Activate contingency and movement-restriction plans if higher-severity or casualty-bearing incidents occur close to staffed premises."
-        : "Be ready to tighten precautions if incidents rise in severity or spread to new districts.",
-    ],
-  });
-
-  groups.push({
-    key: "monitoring",
-    heading: "Local monitoring",
-    actions: [
-      hasWatch
-        ? "Track local reporting and official advisories for the locations on the watchlist, and reassess as fresh reporting comes through."
-        : "Track local reporting and official advisories, and reassess as fresh reporting comes through.",
-    ],
-  });
-
-  return groups;
-}
 
 // Generic config-driven builder. The PNG and West Papua entry points below are
 // thin wrappers that pass their theatre config.
@@ -1835,37 +1666,6 @@ export function buildStructuredReportDataset(
   const prevTopProv = topLabels(prevAggregateItems.filter((it) => it.province), (it) => it.province as string, 1)[0] ?? null;
   const prevTopCat = (topLabels(prevAggregateItems, (it) => it.category, 1)[0] ?? "").toLowerCase() || null;
 
-  // Categories / provinces ranked by ASSESSED SIGNIFICANCE — the worst severity
-  // each carries this period, then volume as a tie-break — rather than by raw
-  // volume. Routine governance, political and hazard items can dominate a feed by
-  // count without being the period's most serious reporting, so the TOP-OF-REPORT
-  // framing (BLUF, Current Situation, Outlook) leads with the significant security
-  // themes instead of whatever simply appears most often. This is a severity-
-  // derived significance claim, never a proportion/volume claim, so it stays
-  // faithful to the no-fabrication rule; the per-theme Incident Details sections
-  // keep their own item-driven descriptions unchanged.
-  const rankBySignificance = (
-    keyOf: (it: (typeof aggregateItems)[number]) => string | null | undefined,
-  ): string[] => {
-    const m = new Map<string, { worst: number; count: number }>();
-    for (const it of aggregateItems) {
-      const k = keyOf(it);
-      if (!k) continue;
-      const s = m.get(k) ?? { worst: 0, count: 0 };
-      s.worst = Math.max(s.worst, it.severityRank);
-      s.count += 1;
-      m.set(k, s);
-    }
-    return Array.from(m.entries())
-      .sort((a, b) => b[1].worst - a[1].worst || b[1].count - a[1].count)
-      .slice(0, 3)
-      .map(([k]) => k);
-  };
-  const sigCats = rankBySignificance((it) => it.category.toLowerCase());
-  const sigCatPhrases = sigCats.map(categoryPhrase);
-  const sigProvs = rankBySignificance((it) => it.province);
-  const sigLeadCatPhrase = sigCatPhrases[0] ?? "security-relevant incidents";
-  const sigProvClause = sigProvs.length ? ` concentrated around ${joinList(sigProvs.slice(0, 2))}` : "";
 
   // Volume trajectory bucket: "up" / "down" / "level" (>=2-incident swing to
   // register as a move; otherwise level), and "nohistory" when the prior week
@@ -1992,43 +1792,10 @@ export function buildStructuredReportDataset(
   // open by naming the SAME themes — every brief then reads consistently from
   // the first line down. Empty window → no themes → no lead sentence (honest
   // silence, never a fabricated theme).
-  const assessedThemes = synthesiseAssessedThemes(windowItems, previousWindowItems, {
-    hasBaseline: hasPreviousWindow,
-  });
-  const themeLeadFragment = themeLedLead(assessedThemes);
-  const themeLeadSentence = themeLeadFragment
-    ? `${themeLeadFragment.charAt(0).toUpperCase()}${themeLeadFragment.slice(1)}.`
-    : "";
-  // Event-led opening sentence naming the period's PRINCIPAL development (the
-  // lead Top-3 story). Preferred over the abstract theme sentence at the top of
-  // the Executive Summary and BLUF; the theme sentence stays only as a fallback
-  // when there is no lead item. Empty ("") when the window is empty.
-  const eventLeadSentence = eventLedLeadSentence(topThree[0]);
-
-  // --- Executive summary (deterministic, event-led, no parenthetical counts) -
-  let executiveSummary: string;
-  if (windowItems.length === 0) {
-    executiveSummary = `${config.emptyLocationFallback} The standing operating picture for ${config.countryName} carries over from the preceding period; treat the absence of fresh reporting as a coverage signal, not as an improvement in conditions.`;
-  } else {
-    const worst = [...aggregateItems].sort((a, b) => b.severityRank - a.severityRank)[0];
-    const catText = sigCatPhrases.length ? joinList(sigCatPhrases) : "security-relevant activity";
-    const provText = sigProvs.length ? ` Reporting concentrated around ${joinList(sigProvs)}.` : "";
-    const sevText =
-      worst && worst.severityRank >= 4
-        ? ` The most serious entry reached ${worst.severityLabel} severity.`
-        : "";
-    // Lead with the period's most operationally significant reporting (severity-
-    // ranked), NOT the highest-volume category — routine governance/hazard items
-    // can outnumber the security events without being the story. The principal
-    // development is named once in the BLUF above, so the Current Situation opens
-    // on the security concentration rather than repeating that sentence verbatim.
-    const p1 = `The most operationally significant reporting in ${config.countryName} this period concerned ${catText}.${provText}${sevText}`;
-    // Business-guidance close. The old "operational rather than a single dramatic
-    // event" framing was banned by the spec (generic, dismissive); state the
-    // practical priority directly instead.
-    const p2 = `For business users the priority is movement security, premises protection and continuity at exposed sites while this picture holds.`;
-    executiveSummary = `${p1}\n\n${p2}`;
-  }
+  // --- Executive summary -----------------------------------------------------
+  // Legacy deterministic generator deleted (owner: "no old path remains"). The
+  // engine narrative block below is the SOLE author of this section text.
+  let executiveSummary = "";
 
   // --- Business impact (de-duplicated impact lines for the categories present)-
   // Priorities This Week: the few most serious real events this period, ranked by
@@ -2047,36 +1814,9 @@ export function buildStructuredReportDataset(
 
   // --- Outlook (structured: most-likely scenario / key locations / escalation
   // triggers / what would reduce concern; forward-looking, no counts) ---------
-  let outlook: string;
-  if (windowItems.length === 0) {
-    outlook = config.emptyOutlook;
-  } else {
-    const recurringProv = sigProvs.slice(0, 2);
-    const recurringCat = sigCatPhrases.slice(0, 2);
-    const keyLocs = recurringProv.length
-      ? joinList(recurringProv)
-      : baselineWatchlist.length
-        ? joinList(baselineWatchlist.slice(0, 3))
-        : "the main urban centres";
-    const escClause =
-      curWorstRank >= 4
-        ? "a spread of high-severity or casualty-bearing incidents beyond the locations above"
-        : "any move to high-severity or casualty-bearing incidents, or a spread to new districts";
-    const mostLikely =
-      recurringCat.length >= 2
-        ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]} and ${recurringCat[1]}.`
-        : recurringCat.length === 1
-          ? `The coming week most likely follows the current pattern, led by ${recurringCat[0]}.`
-          : "The coming week most likely follows the established pattern.";
-    const locLine = `Key locations to watch: ${keyLocs}.`;
-    const escLine = `Escalation triggers: ${escClause}, and flashpoints around ${config.outlookVolatilityClause}.`;
-    const deEscalation = `Concern would ease with a sustained quiet stretch across ${keyLocs}, no further high-severity or casualty-bearing incidents, and no spread to new districts.`;
-    const worseImpact =
-      curWorstRank >= 4
-        ? "Were the picture to deteriorate, expect direct disruption to movement and site access at the affected locations, with knock-on delays to staff travel and logistics."
-        : "Were the picture to deteriorate, expect localised disruption to movement and access, with possible delays to staff travel and logistics.";
-    outlook = `${mostLikely} ${locLine}\n\n${escLine}\n\n${deEscalation} ${worseImpact}`;
-  }
+  // Legacy deterministic outlook generator deleted — the engine narrative block
+  // below is the sole author of the Outlook prose.
+  let outlook = "";
 
   // --- Reported upcoming activity (advance warning) --------------------------
   // Forward-looking protest signals extracted via the shared upcomingSignals
@@ -2097,47 +1837,13 @@ export function buildStructuredReportDataset(
       )
     : [];
 
-  // --- Trajectory (shared by BLUF + Polestar View) ---------------------------
-  // Without a previous window there is NO honest basis for a trend, so report
-  // "nobasis" and state that explicitly rather than inferring a move (up or
-  // down) from an absent baseline. Improving/deteriorating language is only ever
-  // asserted when a real prior-period comparison exists.
-  const trajectory: "worsening" | "easing" | "stable" | "quiet" | "nobasis" =
-    windowItems.length === 0
-      ? "quiet"
-      : !hasPreviousWindow
-        ? "nobasis"
-        : curWorstRank > prevWorstRank && curWorstRank >= 4
-          ? "worsening"
-          : volumeTrend === "up" && curWorstRank >= prevWorstRank
-            ? "worsening"
-            : volumeTrend === "down" && curWorstRank <= prevWorstRank
-              ? "easing"
-              : "stable";
   const leadCat = topCats[0] ?? "security-relevant activity";
   const leadCatPhrase = topCatPhrases[0] ?? "security-relevant incidents";
 
   // --- BLUF (Bottom Line Up Front) ------------------------------------------
-  let bluf: string;
-  if (windowItems.length === 0) {
-    bluf = `No fresh open-source reporting emerged for ${config.countryName} this period, so the picture is best read as a gap in coverage rather than a genuine improvement; standing exposures are unchanged. Risk stays concentrated where it has historically sat, and the trajectory is steady rather than easing. For business users this means existing movement and continuity precautions remain appropriate, with a fresh review warranted as soon as reporting resumes.`;
-  } else {
-    const trendWord =
-      trajectory === "worsening"
-        ? "looks to be deteriorating"
-        : trajectory === "easing"
-          ? "looks to be easing, though from a high baseline"
-          : trajectory === "nobasis"
-            ? "cannot be compared with a prior period, so no trend is asserted"
-            : "holds to the standing pattern";
-    const bizRisk =
-      curWorstRank >= 4
-        ? "the principal business risk is direct exposure to violence and disruption at affected sites"
-        : "the principal business risk is incidental exposure to crime and localised disruption rather than a targeted threat";
-    const blufBody = `The operating picture for ${config.countryName} this period ${trendWord}: the most operationally significant reporting concerned ${sigLeadCatPhrase}${sigProvClause}. For business users, ${bizRisk}.`;
-    const blufLead = eventLeadSentence || themeLeadSentence;
-    bluf = blufLead ? `${blufLead} ${blufBody}` : blufBody;
-  }
+  // Legacy deterministic BLUF generator deleted — the engine narrative block
+  // below is the sole author of the BLUF prose.
+  let bluf = "";
 
   // --- What Changed This Week (week-on-week delta, qualitative) --------------
   let whatChanged: string;
@@ -2248,15 +1954,14 @@ export function buildStructuredReportDataset(
   }
 
   // --- Recommended Actions (grouped) -----------------------------------------
-  let recommendedActions = buildRecommendedActions(windowItems, locationWatchlist, curWorstRank);
+  // Legacy generator deleted — the engine narrative block below is the sole
+  // author (grouped from the approved engine menu, §20).
+  let recommendedActions: RecommendedActionGroup[] = [];
 
-  // --- Polestar View + Customer Relevance ------------------------------------
-  // Both are computed AFTER the operating-risk variant block below (which can
-  // refine the lead categories/locations), from one shared source of truth so
-  // the standard and operating-risk paths stay consistent. Declared here.
+  // --- Polestar View ----------------------------------------------------------
+  // Legacy builder deleted — the engine narrative block below is the sole
+  // author of the Polestar View prose.
   let polestarView = "";
-  let polestarViewParts: PolestarViewParts | undefined;
-  let customerRelevance: string | undefined;
   // Jakarta-only section overrides (assigned in the Jakarta block below; left
   // undefined for every other theatre so the renderer uses its generic path).
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
@@ -2271,34 +1976,10 @@ export function buildStructuredReportDataset(
   // flag, so the PNG / West Papua path above is left byte-identical. Categories
   // use the display-mapped labels (it.displayCategory) here.
   if (config.proseVariant === "operating-risk") {
+    // Legacy operating-risk BLUF / Executive-Summary generators deleted — the
+    // engine narrative block below authors those sections. Only the rendered
+    // Priorities-This-Week list (businessImpact) is still built here.
     const empty = windowItems.length === 0;
-    const leadDisplayCats = topLabels(windowItems, (it) => it.displayCategory, 3);
-    // Lead locations as friendly bucket labels, deduplicated (two provinces can
-    // share one bucket label, e.g. Kalimantan).
-    const seenLoc = new Set<string>();
-    const leadLocations: string[] = [];
-    for (const p of topProvs) {
-      const lbl = provinceLabel.get(p) ?? p;
-      const k = lbl.toLowerCase();
-      if (seenLoc.has(k)) continue;
-      seenLoc.add(k);
-      leadLocations.push(lbl);
-      if (leadLocations.length >= 4) break;
-    }
-    const orInput = {
-      countryName: config.countryName,
-      empty,
-      trajectory,
-      leadDisplayCats,
-      leadLocations,
-      worstRank: curWorstRank,
-    };
-    bluf = buildOperatingRiskBluf(orInput);
-    executiveSummary = buildOperatingRiskExecutiveSummary(orInput);
-    if (!empty && themeLeadSentence) {
-      bluf = `${themeLeadSentence} ${bluf}`;
-      executiveSummary = `${themeLeadSentence} ${executiveSummary}`;
-    }
     if (!empty) {
       const groups = scoredProvinces.map(({ prov, s, score }) => ({
         location: provinceLabel.get(prov) ?? prov,
@@ -2321,85 +2002,13 @@ export function buildStructuredReportDataset(
     }
   }
 
-  // --- Polestar View (7-part judgement) + Customer Relevance -----------------
-  // Built from the deduped incident mix for EVERY variant, so the standard and
-  // operating-risk paths share one source of truth. Present incident themes
-  // (most prominent first) drive the drivers, exposed activities and the most-
-  // likely-disruption scenario; the theatre config supplies the audience.
-  {
-    const empty = windowItems.length === 0;
-    const themeCounts = new Map<CountryIncidentTheme, number>();
-    const themeWorst = new Map<CountryIncidentTheme, number>();
-    for (const it of windowItems) {
-      const k = themeForCategory(it.category);
-      themeCounts.set(k, (themeCounts.get(k) ?? 0) + 1);
-      themeWorst.set(k, Math.max(themeWorst.get(k) ?? 0, it.severityRank));
-    }
-    // Drivers lead with the most SIGNIFICANT present themes (worst severity, then
-    // volume), so the Polestar View is security-led rather than volume-led.
-    const presentThemeKeys = COUNTRY_INCIDENT_THEMES.map((d) => d.key)
-      .filter((k) => (themeCounts.get(k) ?? 0) > 0)
-      .sort(
-        (a, b) =>
-          (themeWorst.get(b) ?? 0) - (themeWorst.get(a) ?? 0) ||
-          (themeCounts.get(b) ?? 0) - (themeCounts.get(a) ?? 0),
-      );
-
-    // Lead locations as friendly bucket labels (raw province fallback for
-    // generic countries with no buckets), deduplicated, capped to three.
-    const seenPL = new Set<string>();
-    const polestarLocations: string[] = [];
-    for (const p of topProvs) {
-      const lbl = provinceLabel.get(p) ?? p;
-      const k = lbl.toLowerCase();
-      if (seenPL.has(k)) continue;
-      seenPL.add(k);
-      polestarLocations.push(lbl);
-      if (polestarLocations.length >= 3) break;
-    }
-
-    const direction: PolestarDirection =
-      trajectory === "worsening"
-        ? "deteriorating"
-        : trajectory === "easing"
-          ? "easing"
-          : curWorstRank >= 4
-            ? "elevated"
-            : "stable";
-
-    const action =
-      curWorstRank >= 4
-        ? "tighten movement planning and site protection at the exposed locations and keep contingency arrangements under active review"
-        : "keep standard movement and continuity precautions in place and vary routines around the exposed locations";
-    const trigger = `larger-scale incidents, casualty-bearing violence or sustained disruption emerge around ${config.outlookVolatilityClause}`;
-
-    const parts = buildPolestarView({
-      countryName: config.countryName,
-      empty,
-      direction,
-      drivers: driverPhrasesForThemes(presentThemeKeys),
-      exposedAreas: polestarLocations,
-      exposedActivities: exposureLabelsForThemes(presentThemeKeys),
-      likelyDisruption: scenarioForThemes(presentThemeKeys),
-      trigger,
-      action,
-    });
-    polestarView = parts.paragraph;
-    polestarViewParts = parts;
-
-    const audience =
-      config.audienceProfile?.audience ??
-      `organisations with staff, sites, travel and supply exposure in ${config.countryName}`;
-    customerRelevance = buildCustomerRelevance({ audience, presentThemeKeys, empty });
-  }
-
   // --- Jakarta analyst-brief overrides ---------------------------------------
   // Replace the generic operating-risk sections with Jakarta-specific,
   // operationally-framed prose. Gated behind config.jakartaProse (set ONLY on
   // JAKARTA_REPORT_CONFIG) so Indonesia / PNG / West Papua are untouched. Pure,
   // deterministic, count-free, present-theme-gated (no fabrication). Runs AFTER
   // the operating-risk + polestar blocks so it has the final say on the sections
-  // it owns; polestarViewParts is kept consistent with the overridden paragraph.
+  // it owns.
   if (config.jakartaProse) {
     // Per-area corridor statuses for the live-aware tactical sections. Derived
     // from the SAME window incidents the rest of the brief reads; the derivation
@@ -2422,12 +2031,10 @@ export function buildStructuredReportDataset(
       previousWindowItems,
       hasBaseline: hasPreviousWindow,
     });
-    bluf = jakarta.bluf;
-    executiveSummary = jakarta.executiveSummary;
-    outlook = jakarta.outlook;
+    // NOTE: the Jakarta BLUF / Executive Summary / Outlook / Polestar builders
+    // are no longer consumed — the engine narrative block below is the sole
+    // author of those sections for every theatre, Jakarta included.
     businessImpact = jakarta.recommendedActions;
-    polestarView = jakarta.polestarView;
-    polestarViewParts = jakarta.polestarViewParts;
     operationalImpactOverride = jakarta.operationalImpact;
     jakartaEscalationIndicators = jakarta.escalationIndicators;
     incidentThemesOverride = jakarta.incidentThemes;
@@ -2514,21 +2121,6 @@ export function buildStructuredReportDataset(
   // theatre: operatingRiskDisplayCategory maps the granular categories onto the
   // business labels (and passes unmapped labels through unchanged). Each theme
   // keeps the tile/severity cards and closes with a deterministic business line.
-  // The two-to-three ASSESSED themes are synthesised once, earlier (they also
-  // seed the Executive Summary / BLUF leads). Each is selected by assessed value
-  // (scoreClusterValue), not raw count, and carries a concentration phrase,
-  // business-exposure sentence and a trajectory judged against the prior-week
-  // baseline. Deterministic, count-free, no LLM.
-  // Key Developments are the assessed themes themselves — the brief leads with
-  // synthesised judgements rather than one group per display category.
-  const keyDevelopments: KeyDevelopmentGroup[] = assessedThemes.map((t) => ({
-    key: t.key,
-    heading: t.heading,
-    // Cap per theme so the section reads as a brief, not an exhaustive list.
-    items: t.items.slice(0, 4),
-    businessImpact: t.narrative,
-  }));
-
   // Lead the rendered Incident Details section with the assessed themes drawn
   // from the REMAINING incidents (those not promoted into the Top 3), so every
   // theatre reads as two-to-three assessed themes rather than a flat per-category
@@ -2551,14 +2143,6 @@ export function buildStructuredReportDataset(
       { hasBaseline: hasPreviousWindow },
     );
   }
-
-  // --- What Matters This Week (framing bullets) ------------------------------
-  // One short, count-free line per assessed theme: the theme, where it
-  // clustered, and its trajectory. Empty window → standing caveat.
-  const whatMattersBullets: string[] = buildWhatMattersFromThemes(
-    assessedThemes,
-    "No fresh open-source reporting was identified this period; standing exposures continue to apply and the quiet stretch is read as a coverage signal, not an improvement.",
-  );
 
   // --- Escalation indicators (Outlook) ---------------------------------------
   // What would raise concern in the coming week — deterministic, drawn from the
@@ -2680,9 +2264,6 @@ export function buildStructuredReportDataset(
     periodLabel,
     bluf,
     executiveSummary,
-    whatMattersBullets,
-    keyDevelopments,
-    assessedThemes,
     escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
     jakartaTacticalBrief,
     whatChanged,
@@ -2702,8 +2283,6 @@ export function buildStructuredReportDataset(
     topIncidentsHeading: config.topIncidentsHeading,
     proseVariant: config.proseVariant,
     polestarView,
-    polestarViewParts,
-    customerRelevance,
     reportingConfidence,
     windowItems,
     incidentDetailsItems,

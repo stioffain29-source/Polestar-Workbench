@@ -17,5 +17,5 @@ description: One validated pipeline for ALL country reports — canonical events
 **How to apply:**
 - Duplicate grouping is date-bucketed; do NOT revert to a plain pairwise scan — an ~18k-row country window hangs the boot reprocess for many minutes, bucketed it finishes.
 - Prod reprocess arrives via a marker-gated boot migration; the marker is written ONLY when every slug succeeds, so partial failures retry on the next boot (engine runs are idempotent).
-- Old free-form prose builders are NEUTRALISED (engine output overwrites them), not deleted — don't treat their output as rendered.
+- Legacy free-form prose builders are DELETED (BLUF/Exec/Outlook/Polestar/recommended-actions/keyDevelopments/whatMatters/customerRelevance); the engine block in the dataset builder is the SOLE author of those sections. The rendered NON-engine surfaces that survive (assessed-theme paragraphs → incidentThemesOverride, operating-risk priorities, watchlist lines) must themselves stay banned-phrase-clean — the §30 list applies to them too, and the headless pdftotext scan is the check that catches leaks there.
 - Large held/review queues on high-volume countries are expected data reality (the gate holds low-confidence rows), not a bug; tune deliberately via overrides or thresholds.

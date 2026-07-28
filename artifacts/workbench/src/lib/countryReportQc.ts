@@ -98,10 +98,7 @@ type QcDataset = Pick<
   | "polestarView"
   | "whatChanged"
   | "businessImpact"
-  | "whatMattersBullets"
   | "escalationIndicators"
-  | "keyDevelopments"
-  | "assessedThemes"
   | "recommendedActions"
 > &
   // The §33 gate result is AUTHORITATIVE — its failures are surfaced first. Made
@@ -129,8 +126,8 @@ export function runCountryReportQc(
 
   // ---- Narrative haystack (shared by checks A and C) ---------------------
   // Everything a place or date could legitimately be stated in. Nested prose
-  // (key developments, assessed themes, recommended actions) is folded in via
-  // JSON so a place or date named only inside a themed paragraph still counts.
+  // (recommended actions) is folded in via JSON so a place or date named only
+  // inside a grouped action still counts.
   const narrative = [
     dataset.bluf,
     dataset.executiveSummary,
@@ -138,10 +135,7 @@ export function runCountryReportQc(
     dataset.polestarView,
     dataset.whatChanged,
     ...(dataset.businessImpact ?? []),
-    ...(dataset.whatMattersBullets ?? []),
     ...(dataset.escalationIndicators ?? []),
-    JSON.stringify(dataset.keyDevelopments ?? []),
-    JSON.stringify(dataset.assessedThemes ?? []),
     JSON.stringify(dataset.recommendedActions ?? []),
   ]
     .filter(Boolean)
