@@ -287,9 +287,12 @@ describe("Jakarta brief plain-prose sections emitted into the PDF", () => {
     const tb = expectedTacticalBrief();
     return [
       { heading: "Bottom Line Up Front", body: () => d.bluf },
-      { heading: "Tactical Operating Picture", body: () => d.executiveSummary },
+      { heading: "Current Situation", body: () => d.executiveSummary },
+      // Airport Transfer Impact is now a strand label folded inside the
+      // canonical Operational Impact section, still emitted upper-cased then
+      // followed by its prose — a contiguous run just like a section heading.
       { heading: "Airport Transfer Impact", body: () => tb.airportTransfer },
-      { heading: "Seven Day Outlook", body: () => d.outlook },
+      { heading: "Outlook: Next Seven Days", body: () => d.outlook },
       { heading: "Polestar View", body: () => d.polestarView },
     ];
   };
@@ -344,16 +347,16 @@ describe("Jakarta brief plain-prose sections emitted into the PDF", () => {
     expect(runCount(text, seq)).toBe(1);
   });
 
-  it("draws the Operational Map area summary prose under its heading", async () => {
+  it("draws the Operational Map area summary prose", async () => {
     const text = await jakartaPdfText();
     const areaSummary = expectedTacticalBrief().areaSummary;
 
     expect(areaSummary.trim().length).toBeGreaterThan(0);
     expect(FALLBACKS).not.toContain(areaSummary.trim());
 
-    // The heading is emitted (the posture table is drawn between it and the
-    // summary, so the two are not contiguous).
-    expect(text).toContain("Operational Map".toUpperCase());
+    // The Jakarta map slot no longer draws its own "Operational Map" heading:
+    // the posture table + area summary ride the analyst-placed map slot at the
+    // end of the canonical brief (after Polestar View).
 
     // The area summary is drawn via a single renderProse call, so its
     // paragraphs land back to back — exactly one run guards against the summary
