@@ -202,6 +202,25 @@ export function impactForIncident(i: RelevanceInput): ImpactLevel {
   return "Monitor only";
 }
 
+/**
+ * Owner rule: the operational map only shows incidents with genuine
+ * monitoring value. An event qualifies when it carries any impact beyond
+ * "Monitor only", or when — though Monitor-only — it is a real security /
+ * crime / unrest / hazard event worth watching. A routine low-impact item
+ * (e.g. a successful tugboat rescue) matches none of these and is not
+ * plotted.
+ */
+export function hasMonitoringValue(i: RelevanceInput): boolean {
+  if (impactForIncident(i) !== "Monitor only") return true;
+  const text = normText(i);
+  return (
+    CRIME_SIGNALS.test(text) ||
+    UNREST_SIGNALS.test(text) ||
+    SECURITY_SIGNALS.test(text) ||
+    HAZARD_SIGNALS.test(text)
+  );
+}
+
 // The impact level for a mapped AREA is the level of its highest-impact reported
 // event (the one that leads the card).
 export function impactLevelForSet(incidents: RelevanceInput[]): ImpactLevel {

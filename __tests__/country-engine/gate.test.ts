@@ -279,15 +279,26 @@ describe("checkTopDevelopmentsReferenced (§33)", () => {
   it("fails when a Top-3 development is absent from the narrative text", () => {
     const events = [
       makeEvent({ eventTitle: "Armed robbery at a market", severity: "High" }),
-      makeEvent({ eventTitle: "Riot outside provincial assembly", severity: "High" }),
+      makeEvent({
+        eventTitle: "Riot outside provincial assembly",
+        severity: "High",
+        issueCategory: "Civil unrest",
+        city: "Port Moresby",
+        provinceOrState: "National Capital District",
+      }),
     ];
     const report = baseReport(events);
     // Simulate a regression that strips the "The period also brought …"
     // reference from every narrative section.
     const missing = report.narrative.topThree[1];
     expect(missing).toBeDefined();
+    // Remove BOTH the headline reference and the own-words summary cues
+    // (category phrase, location, date) so the development is truly absent.
     const scrub = (s: string) =>
-      s.replace(new RegExp(missing.title, "ig"), "something else");
+      s
+        .replace(new RegExp(missing.title, "ig"), "something else")
+        .replace(/civil unrest|unrest|riot/gi, "someevent")
+        .replace(new RegExp(missing.location || "@@none@@", "ig"), "someplace");
     report.narrative = {
       ...report.narrative,
       bluf: scrub(report.narrative.bluf),

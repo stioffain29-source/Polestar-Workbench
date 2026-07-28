@@ -2174,7 +2174,9 @@ export function buildStructuredReportDataset(
         ? `Spread of incidents beyond ${joinList(escLeadLocs)} into new districts`
         : "A spread of incidents into new districts, or a single dominant centre emerging",
     );
-    escalationIndicators.push(`Flashpoints around ${config.outlookVolatilityClause}`);
+    // Owner rule: only indicators tied to this period's actual themes — the
+    // generic standing-volatility clause (elections, anniversaries, student
+    // mobilisation …) is NOT data-grounded and must not appear here.
   }
 
   // --- Apply the engine narrative as the AUTHORITATIVE section TEXT (§36) ----

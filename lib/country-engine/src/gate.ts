@@ -14,8 +14,10 @@ import type {
 import { findBannedPhrases } from "./bannedPhrases";
 import {
   assertNoUnsupportedTrend,
+  categoryPhrase,
   compactTitle,
   countWords,
+  formatDate,
   type CountryNarrative,
 } from "./narrative";
 
@@ -132,18 +134,35 @@ export function checkTopDevelopmentsReferenced(
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
+  // Sentence-level split: an own-words reference only counts when the
+  // development's cues co-occur inside ONE sentence, so tokens scattered
+  // across aggregate prose (a category here, a date there) cannot fake a
+  // reference to a development that was actually dropped.
+  const sentences = haystack.split(/(?<=[.!?])\s+/);
   for (const dev of n.topThree) {
-    // TopDevelopment.title is the naturalised title — the exact text buildBluf
-    // embeds (case-insensitively; only the first letter may differ).
-    // buildBluf may fall back to the compact (clause-boundary trimmed)
-    // reference form when full titles alone would blow the §31 word cap, so
-    // accept either the full naturalised title or its compact form.
+    // The BLUF summarises each top development in its own words (owner rule:
+    // no raw or quoted headlines), so a development counts as referenced when
+    // ONE sentence names its category phrase together with its location or
+    // date. Title matching (full or compact) is retained for sections that
+    // still cite the headline (e.g. Current Situation).
     const needle = dev.title.trim().toLowerCase();
     const compactNeedle = compactTitle(dev.title).trim().toLowerCase();
     if (!needle) continue;
+    const catNeedle = categoryPhrase(dev.category).trim().toLowerCase();
+    const locNeedle = (dev.location ?? "").trim().toLowerCase();
+    const dateNeedle = formatDate(dev.date).trim().toLowerCase();
+    const summarised =
+      !!catNeedle &&
+      sentences.some(
+        (s) =>
+          s.includes(catNeedle) &&
+          ((!!locNeedle && s.includes(locNeedle)) ||
+            (!!dateNeedle && s.includes(dateNeedle))),
+      );
     if (
       !haystack.includes(needle) &&
-      !(compactNeedle && haystack.includes(compactNeedle))
+      !(compactNeedle && haystack.includes(compactNeedle)) &&
+      !summarised
     ) {
       failures.push({
         check: "top_development_referenced",

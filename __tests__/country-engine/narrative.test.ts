@@ -15,6 +15,7 @@ import {
   findBannedOpeners,
   naturaliseTitle,
   compactTitle,
+  categoryPhrase,
   APPROVED_RECOMMENDATIONS,
 } from "@workspace/country-engine/narrative";
 
@@ -181,9 +182,13 @@ describe("BLUF title + location rendering (§14/§15)", () => {
       }),
     ];
     const { value } = buildBluf(events, "Papua New Guinea", null);
+    // Owner rule: the BLUF is our own prose — no raw or quoted headlines.
     expect(value).not.toMatch(/STUDENT FOUND DEAD/);
-    expect(value).toMatch(/kama sda student found dead/i);
+    expect(value).not.toMatch(/kama sda/i);
+    expect(value).not.toMatch(/[“”"]/);
     expect(value).not.toMatch(/MURDER:/);
+    // It summarises in our own words: category + place + date.
+    expect(value).toMatch(/in Morobe on \d+ \w+ \d{4}/);
   });
 
   it("omits the location clause for a Country-only location (never 'at <Country>')", () => {
@@ -237,13 +242,15 @@ describe("priority locations never mix in the country name", () => {
   it("BLUF keeps the country name out of the location list and notes the unlocated remainder", () => {
     const { value } = buildBluf(mixed, "Papua New Guinea", null);
     expect(value).not.toMatch(/recorded in [^.]*Papua New Guinea/);
-    expect(value).toMatch(/with the remainder unlocated/);
+    expect(value).toMatch(/1 of 2 records did not specify a location/);
   });
 
   it("Current Situation concentrates on sub-national locations only, with a remainder clause", () => {
     const { value } = buildCurrentSituation(mixed, "Papua New Guinea");
     expect(value).not.toMatch(/concentrated in [^.]*Papua New Guinea/);
-    expect(value).toMatch(/concentrated in Lae, with the remainder unlocated/);
+    expect(value).toMatch(
+      /concentrated in Lae \(1 of 2 records did not specify a location\)/,
+    );
   });
 
   it("Current Situation falls back to country-level phrasing when nothing is located", () => {
@@ -567,12 +574,18 @@ describe("buildBluf top-development references vs word cap (§14/§15)", () => {
     const { value: top } = buildTopThree(events);
     expect(top).toHaveLength(3);
     const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
+    const hay = bluf.toLowerCase();
+    // Owner rule: no raw headlines — each top development is referenced by
+    // its own-words summary (category + location/date), never the title.
     for (const dev of top) {
-      expect(bluf.toLowerCase()).toContain(dev.title.trim().toLowerCase());
+      expect(hay).not.toContain("extended incident");
+      expect(hay).toContain(categoryPhrase(dev.category).toLowerCase());
+      expect(hay).toContain(dev.location.toLowerCase());
     }
+    expect(countWords(bluf)).toBeLessThanOrEqual(120);
   });
 
-  it("compacts long titles at clause boundaries to keep the BLUF within 120 words", () => {
+  it("stays within 120 words without quoting any stored title", () => {
     // Titles long enough that FULL forms alone would exceed the 120-word cap,
     // but each carrying a clause boundary the compact form can trim at.
     const pad = (n: number) =>
@@ -596,14 +609,13 @@ describe("buildBluf top-development references vs word cap (§14/§15)", () => {
     expect(top).toHaveLength(3);
     const { value: bluf } = buildBluf(events, "Papua New Guinea", null);
     expect(countWords(bluf)).toBeLessThanOrEqual(120);
-    // Every top development is still referenced via its compact form, which is
-    // a verbatim leading clause of the stored title (no fabrication).
+    // No stored headline text (full or compact) appears in the BLUF.
+    const hay = bluf.toLowerCase();
     for (const dev of top) {
-      const compact = compactTitle(dev.title).toLowerCase();
-      expect(dev.title.toLowerCase().startsWith(compact.toLowerCase())).toBe(
-        true,
-      );
-      expect(bluf.toLowerCase()).toContain(compact);
+      expect(hay).not.toContain("context1word0");
+      expect(hay).not.toContain(compactTitle(dev.title).toLowerCase());
+      // Referenced instead via category + location/date summary.
+      expect(hay).toContain(categoryPhrase(dev.category).toLowerCase());
     }
   });
 

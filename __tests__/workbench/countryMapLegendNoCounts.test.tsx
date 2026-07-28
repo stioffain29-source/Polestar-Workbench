@@ -39,7 +39,7 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
       countryName="Indonesia"
       incidents={[
         incident({ location: "Jakarta", severity: "high", title: "Fire at Jakarta warehouse" }),
-        incident({ location: "Zurich", title: "Global commodity prices ease" }),
+        incident({ location: "Zurich", title: "Armed men rob a courier near Zurich depot" }),
       ]}
     />,
   );
@@ -89,7 +89,7 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
       countryName="Papua"
       incidents={[
         incident({ location: "Jayapura", severity: "high", title: "Security operation near Jayapura" }),
-        incident({ location: "Zurich", title: "Global commodity prices ease" }),
+        incident({ location: "Zurich", title: "Armed men rob a courier near Zurich depot" }),
       ]}
     />,
   );

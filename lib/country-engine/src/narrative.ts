@@ -185,6 +185,24 @@ function severityRank(s: Severity): number {
   return SEVERITY_RANK[s] ?? 0;
 }
 
+/**
+ * Owner rule: only real, impactful incidents may shape the assessment. An
+ * event is "material" when it is Moderate+ severity, carries reported harm,
+ * has a confirmed operational effect, or is still ongoing. A Low-severity
+ * one-off with no continuing disruption (e.g. a routine rescue) is NOT
+ * material and must not reach the Top 3, drive category implications, or set
+ * the principal concern.
+ */
+function isMaterialEvent(e: CanonicalEvent): boolean {
+  return (
+    severityRank(e.severity) >= SEVERITY_RANK.Moderate ||
+    (e.casualties ?? 0) > 0 ||
+    (e.injuries ?? 0) > 0 ||
+    !!e.confirmedOperationalEffect ||
+    e.eventStatus === "Ongoing"
+  );
+}
+
 /** Human-readable location for an event, most specific first. */
 function locationLabel(e: CanonicalEvent): string {
   return (
@@ -261,13 +279,15 @@ export function compactTitle(title: string): string {
 function priorityLocations(events: CanonicalEvent[]): {
   locations: string[];
   hasUnlocated: boolean;
+  unlocatedCount: number;
+  totalCount: number;
 } {
   const locations = unique(
     events.map((e) => subNationalLocation(e) ?? ""),
   );
-  const hasUnlocated =
-    locations.length > 0 && events.some((e) => !subNationalLocation(e));
-  return { locations, hasUnlocated };
+  const unlocatedCount = events.filter((e) => !subNationalLocation(e)).length;
+  const hasUnlocated = locations.length > 0 && unlocatedCount > 0;
+  return { locations, hasUnlocated, unlocatedCount, totalCount: events.length };
 }
 
 /**
@@ -292,7 +312,7 @@ function locationClause(e: CanonicalEvent): string {
 }
 
 /** Format an ISO date into a plain British-English date, e.g. "5 March". */
-function formatDate(iso: string | null): string {
+export function formatDate(iso: string | null): string {
   if (!iso) return "an undated occasion";
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;
@@ -319,7 +339,7 @@ function formatDate(iso: string | null): string {
 }
 
 /** Lower-case a category label for mid-sentence use. */
-function categoryPhrase(c: IssueCategory): string {
+export function categoryPhrase(c: IssueCategory): string {
   return c.charAt(0).toLowerCase() + c.slice(1);
 }
 
@@ -380,7 +400,11 @@ function topRankedEvents(events: CanonicalEvent[]): CanonicalEvent[] {
       e.eventStatus !== "Commentary" &&
       e.eventStatus !== "Background" &&
       e.eventStatus !== "Not an incident" &&
-      e.eventStatus !== "Cancelled",
+      e.eventStatus !== "Cancelled" &&
+      // Owner rule: Top Developments are reserved for events with material
+      // security or operational significance. Fewer than three (or none) is
+      // correct when the week produced nothing that qualifies.
+      isMaterialEvent(e),
   );
   return rankEvents(eligible).slice(0, 3);
 }
@@ -510,8 +534,13 @@ function trajectorySentence(
 function principalCategoryBySeriousness(
   events: CanonicalEvent[],
 ): IssueCategory {
+  // Owner rule: a single Low-rated event must not elevate its whole category
+  // to a principal concern. Judge only material events; fall back to the full
+  // set when nothing qualifies (so quiet weeks still produce a sentence).
+  const material = events.filter(isMaterialEvent);
+  const pool = material.length > 0 ? material : events;
   let best: { cat: IssueCategory; score: number } | null = null;
-  for (const [cat, list] of groupByCategory(events)) {
+  for (const [cat, list] of groupByCategory(pool)) {
     const worst = list.reduce((m, e) => Math.max(m, severityRank(e.severity)), 0);
     const harm = list.reduce(
       (n, e) => n + (e.casualties ?? 0) + (e.injuries ?? 0),
@@ -618,7 +647,12 @@ export function buildTopThree(
       // still evidence-linked (the implication follows from the stored
       // category), so the report explains why the event matters instead of
       // leaving the reader with a bare headline.
-      const implication = CATEGORY_IMPLICATIONS[e.issueCategory];
+      // Owner rule: the derived category implication is only proportionate
+      // when the event itself is material — a Low one-off with no harm or
+      // continuing disruption gets no manufactured business meaning.
+      const implication = isMaterialEvent(e)
+        ? CATEGORY_IMPLICATIONS[e.issueCategory]
+        : undefined;
       if (implication) {
         const harm = harmPhrase([e]);
         const parts: string[] = [];
@@ -709,7 +743,8 @@ export function buildBluf(
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 2)
     .map(([c]) => categoryPhrase(c));
-  const { locations: allLocations, hasUnlocated } = priorityLocations(events);
+  const { locations: allLocations, hasUnlocated, unlocatedCount, totalCount } =
+    priorityLocations(events);
   const locations = allLocations.slice(0, 3);
 
   // Sentence 1 — most significant development with location + date. The title
@@ -722,30 +757,18 @@ export function buildBluf(
   // within the limit. Compaction never invents words — it only drops trailing
   // clauses — and the §33 reference check accepts the compact form.
   const otherTop = topRanked.slice(1);
-  // §15 — the lead sentence is OUR sentence (category + place + date); the
-  // stored headline appears as a quoted reference, never spliced lower-cased
-  // into the narrative as if it were our prose.
-  const composeMandatory = (titleOf: (t: string) => string) => {
-    const first =
-      `The most serious validated development in ${countryName} was ` +
-      `${categoryPhrase(lead.issueCategory)}${locationClause(lead)} on ${formatDate(lead.eventDate)} (“${titleOf(lead.eventTitle)}”).`;
-    const second =
-      otherTop.length > 0
-        ? `The period also brought ${joinAnd(
-            otherTop.map(
-              (e) =>
-                `${categoryPhrase(e.issueCategory)}${locationClause(e)} (“${titleOf(e.eventTitle)}”)`,
-            ),
-          )}.`
-        : "";
-    return { first, second };
+  // Owner rule: the BLUF is natural prose in OUR words — never raw or quoted
+  // source headlines. Each development is summarised as category + harm +
+  // place + date, all drawn from stored event attributes.
+  const describeEvent = (e: CanonicalEvent): string => {
+    const harm = harmPhrase([e]);
+    return `${categoryPhrase(e.issueCategory)}${harm ? ` with reported ${harm}` : ""}${locationClause(e)} on ${formatDate(e.eventDate)}`;
   };
-  let { first: s1, second: s1bText } = composeMandatory(naturaliseTitle);
-  if (
-    countWords([s1, s1bText].filter(Boolean).join(" ")) > BLUF_MAX_WORDS
-  ) {
-    ({ first: s1, second: s1bText } = composeMandatory(compactTitle));
-  }
+  const s1 = `The most serious validated development in ${countryName} was ${describeEvent(lead)}.`;
+  const s1bText =
+    otherTop.length > 0
+      ? `The period also brought ${joinAnd(otherTop.map(describeEvent))}.`
+      : "";
   claims.push(
     makeClaim({
       claimText: s1,
@@ -787,7 +810,7 @@ export function buildBluf(
   const repeats = repeatSubLocations(events);
   const s2 = repeats.length
     ? `During the reporting period, ${catText || "security"} events made up most of the reporting, and ${repeats[0]} carried a disproportionate share of it.`
-    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre${hasUnlocated ? ", with the remainder unlocated" : ""}.`;
+    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`;
   claims.push(
     makeClaim({
       claimText: s2,
@@ -836,7 +859,9 @@ export function buildBluf(
   } else {
     // No confirmed effect — draw the lead event's category implication so the
     // reader is told what the week means, not just what happened.
-    const implication = CATEGORY_IMPLICATIONS[lead.issueCategory];
+    const implication = isMaterialEvent(lead)
+      ? CATEGORY_IMPLICATIONS[lead.issueCategory]
+      : undefined;
     const focusLoc = subNationalLocation(lead);
     if (implication) {
       s3 = `For operations, the immediate significance is that the lead event ${implication}${focusLoc ? `, so plans touching ${focusLoc} deserve the closest attention` : ""}.`;
@@ -1009,10 +1034,11 @@ export function buildCurrentSituation(
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .map(([c]) => categoryPhrase(c));
-  const { locations, hasUnlocated } = priorityLocations(events);
+  const { locations, hasUnlocated, unlocatedCount, totalCount } =
+    priorityLocations(events);
 
   const s1 = locations.length
-    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ", with the remainder unlocated" : ""}.`
+    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`
     : `Security incidents in ${countryName} during the reporting period were recorded at country level only, without located concentrations.`;
   const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
 

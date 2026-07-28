@@ -307,7 +307,7 @@ const THAILAND_CONFIG: CountryEngineConfig = {
 // persisted review queues instead of waiting for an analyst-triggered re-run.
 // v2: legal_process + preparedness_or_awareness gate rules (retire ~1.9k held
 // rows for Indonesia alone).
-export const COUNTRY_ENGINE_RULE_VERSION = "v3";
+export const COUNTRY_ENGINE_RULE_VERSION = "v4";
 
 export const COUNTRY_ENGINE_CONFIGS: Record<string, CountryEngineConfig> = {
   "papua-new-guinea": PNG_CONFIG,

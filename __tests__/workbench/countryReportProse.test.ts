@@ -210,14 +210,16 @@ describe("top 3 same-story clustering", () => {
   const DISTINCT: PngSourceIncident[] = [
     inc({
       id: "d1",
-      title: "Students stage a large protest in Jayapura over land rights",
+      title:
+        "Students clash with police and several are injured during a large protest in Jayapura over land rights",
       severity: "High",
       province: "Papua",
       category: "Civil unrest / protest",
     }),
     inc({
       id: "d2",
-      title: "Port workers report a fuel shortage at Sorong harbour",
+      title:
+        "Explosion and fire halt port operations and block cargo access at Sorong harbour",
       severity: "High",
       province: "Papua Barat Daya",
       category: "Maritime / port",
