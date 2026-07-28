@@ -43,7 +43,7 @@ by a Tf operator. PASS = no non-Roboto font is ever selected.
 ==== flashpoint_report.pdf (flashpoint) ====
   page 1: Tf-used fonts = ['Roboto-Bold', 'Roboto-Regular']
   page 2: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
-  page 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
+  page 3: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
   page 4: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']
   page 5: Tf-used fonts = ['Roboto-Bold', 'Roboto-Italic', 'Roboto-Light', 'Roboto-Regular']
   page 6: Tf-used fonts = ['Roboto-Bold', 'Roboto-Light', 'Roboto-Regular']

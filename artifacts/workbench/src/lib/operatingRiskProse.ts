@@ -88,7 +88,7 @@ const DISPLAY_CATEGORY_ACTION: Record<string, string> = {
   "natural hazard":
     "Monitor hazard and flood warnings; check site access, drainage and continuity arrangements.",
   "community tension / land dispute":
-    "Avoid disputed or tense areas near operating sites until conditions settle.",
+    "Avoid disputed or tense areas near staffed premises until conditions settle.",
   "security force activity":
     "Expect security-force activity; confirm road, checkpoint and access status before movement.",
   "terrorism / militancy":
@@ -126,7 +126,7 @@ const DISPLAY_CATEGORY_TRIGGER: Record<string, string> = {
   "regulatory / corruption / governance":
     "a new regulation, licence suspension or enforcement action affecting operations",
   "security force activity":
-    "a large security operation, curfew or new checkpoint regime near operating sites",
+    "a large security operation, curfew or new checkpoint regime near staffed premises",
   "community tension / land dispute":
     "escalation to violence, road blockades, or damage to company or contractor assets",
   "terrorism / militancy":

@@ -41,6 +41,9 @@ import {
   type PngSourceIncident,
 } from "@/lib/pngReportDataset";
 import { buildCountryOperatingRiskDataset } from "@/lib/countryOperatingRiskDataset";
+import { runQualityGate } from "@workspace/country-engine/gate";
+import { countWords } from "@workspace/country-engine/narrative";
+import { findBannedPhrases } from "@workspace/country-engine/bannedPhrases";
 import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 import {
   incidentMatchesCountry,
@@ -58,6 +61,7 @@ import {
   isPreparednessDrill,
 } from "@/lib/countryMatch";
 import CountryReportMap from "@/components/CountryReportMap";
+import { CountryEngineReviewPanel } from "@/components/CountryEngineReviewPanel";
 import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
 import type {
@@ -897,16 +901,18 @@ export default function CountryReport() {
     // per-incident AI summaries are unaffected — they are derived separately and
     // still populate each card.
     if (pngDataset.proseVariant === "operating-risk") return pngDataset;
+    // Owner brief §36: the DEFAULT source of the analytical sections is now the
+    // shared country-engine narrative built into pngDataset — the old free-form
+    // AI generator is NO LONGER a silent fallback OR an automatic overlay. Only
+    // an EXPLICIT analyst EDIT (proseResult.edited, or the live draft while
+    // editing) is human review and may override the engine default; the
+    // machine-generated proseResult.sections never overlays the engine text.
     const src =
-      editing && proseDraft
-        ? proseDraft
-        : proseResult
-          ? (proseResult.edited ?? proseResult.sections)
-          : null;
+      editing && proseDraft ? proseDraft : (proseResult?.edited ?? null);
     if (!src) return pngDataset;
-    const prefer = (ai: string | undefined, fallback: string) => {
-      const t = (ai ?? "").trim();
-      return t ? t : fallback;
+    const prefer = (edit: string | undefined, engineDefault: string) => {
+      const t = (edit ?? "").trim();
+      return t ? t : engineDefault;
     };
     return {
       ...pngDataset,
@@ -1038,6 +1044,9 @@ export default function CountryReport() {
 
   const downloadPdf = async () => {
     if (!effective || !draftedProse) return;
+    // §33 — never generate a defective PDF. If the fail-closed gate reports a
+    // critical failure the export is blocked here as well as at the button.
+    if (gateBlocked) return;
     setExporting(true);
     try {
       const reportElement = reportPreviewRef.current?.querySelector<HTMLElement>(".print-report") ?? reportPreviewRef.current;
@@ -1157,6 +1166,92 @@ export default function CountryReport() {
 
   const windowIncidents = facts.windowIncidents;
 
+  // §23 — map gating. Plot ONLY included canonical events with a credible
+  // precision (the shared engine's mapPoints); never Unknown / Country-only /
+  // foreign / excluded / held rows. Map each engine mapPoint (eventId ===
+  // window-incident id) back to the incident the map component renders. When no
+  // engine dataset is available the map falls back to the raw window set.
+  const mapGatedIncidents = (() => {
+    const ds = pngEffectiveDataset;
+    if (!ds || !ds.mapPoints) return windowIncidents;
+    const plottableIds = new Set(ds.mapPoints.map((p) => String(p.eventId)));
+    const gated = (windowIncidents as CountryFastFactsIncident[]).filter((i) =>
+      plottableIds.has(String((i as { id?: number | string }).id ?? "")),
+    );
+    return gated;
+  })();
+
+  // §33 — fail-closed pre-publication quality gate. Any CRITICAL failure blocks
+  // the Download PDF action (mirroring the cargo report validation gate) and
+  // renders a visible failure panel (owner-only page, so admin-visible). The
+  // gate is computed inside the shared dataset build, and — when an explicit
+  // analyst edit overlays a section — RE-RUN here over the FINAL effective
+  // narrative, so the text that renders/exports is always the text that was
+  // validated. If the re-run itself throws, the gate fails CLOSED.
+  // NOTE: computed inline (not useMemo) — this sits below conditional early
+  // returns, so it must not be a hook.
+  const gate = (() => {
+    const base = pngDataset?.gate ?? null;
+    if (!pngDataset || !pngEffectiveDataset || !base) return base;
+    const overlaid =
+      pngEffectiveDataset.bluf !== pngDataset.bluf ||
+      pngEffectiveDataset.executiveSummary !== pngDataset.executiveSummary ||
+      pngEffectiveDataset.whatChanged !== pngDataset.whatChanged ||
+      pngEffectiveDataset.outlook !== pngDataset.outlook ||
+      pngEffectiveDataset.polestarView !== pngDataset.polestarView;
+    if (!overlaid) return base;
+    try {
+      const n = pngDataset.engineNarrative;
+      const patched = {
+        ...n,
+        bluf: pngEffectiveDataset.bluf,
+        currentSituation: pngEffectiveDataset.executiveSummary,
+        outlook: pngEffectiveDataset.outlook,
+        polestarView: pngEffectiveDataset.polestarView,
+        sectionWordCounts: {
+          ...n.sectionWordCounts,
+          "Bottom Line Up Front": countWords(pngEffectiveDataset.bluf),
+          "Current Situation": countWords(pngEffectiveDataset.executiveSummary),
+          Outlook: countWords(pngEffectiveDataset.outlook),
+          "Pole Star View": countWords(pngEffectiveDataset.polestarView),
+        },
+      };
+      const rerun = runQualityGate({
+        ...pngDataset.gateReport,
+        narrative: patched,
+        sectionWordCounts: patched.sectionWordCounts,
+      });
+      // whatChanged is analyst-editable but not a §31 narrative section — still
+      // scan the edited text for §30 banned phrases so no overlay escapes the
+      // language gate.
+      const extra = findBannedPhrases(pngEffectiveDataset.whatChanged ?? "").map(
+        (phrase) => ({
+          check: "no_banned_phrase" as const,
+          severity: "critical" as const,
+          message: `Banned phrase "${phrase}" appears in What Changed (analyst edit).`,
+          section: "What Changed",
+        }),
+      );
+      return extra.length > 0
+        ? { passed: false, failures: [...rerun.failures, ...extra] }
+        : rerun;
+    } catch {
+      return {
+        passed: false,
+        failures: [
+          {
+            check: "gate_rerun_failed",
+            severity: "critical" as const,
+            message:
+              "Quality gate could not be re-run over the edited narrative; export is blocked (fail-closed).",
+          },
+        ],
+      };
+    }
+  })();
+  const gateFailures = gate?.failures ?? [];
+  const gateBlocked = gate ? gate.passed === false : false;
+
   // Non-blocking §13 quality-control pass over the built structured brief. Pure
   // and never throws; a non-empty result renders as a subdued-red, no-print
   // banner (below) so the analyst sees a consistency problem without the report
@@ -1204,7 +1299,7 @@ export default function CountryReport() {
     </div>
   ) : (
     <CountryReportMap
-      incidents={windowIncidents as CountryFastFactsIncident[]}
+      incidents={mapGatedIncidents as CountryFastFactsIncident[]}
       countryName={effective.name}
     />
   );
@@ -1271,8 +1366,14 @@ export default function CountryReport() {
           )}
           <button
             onClick={downloadPdf}
-            disabled={exporting || editing}
-            title={editing ? "Save or cancel edits before exporting" : "Download PDF"}
+            disabled={exporting || editing || gateBlocked}
+            title={
+              editing
+                ? "Save or cancel edits before exporting"
+                : gateBlocked
+                  ? "Download blocked: the pre-publication quality gate reported critical failures"
+                  : "Download PDF"
+            }
             className="inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider rounded-sm disabled:opacity-60"
             style={{ fontFamily: ROBOTO, fontWeight: 700, border: `1px solid ${ELECTRIC}`, background: ELECTRIC, color: "#fff" }}
           >
@@ -1281,6 +1382,38 @@ export default function CountryReport() {
           </button>
         </div>
       </div>
+
+      {/* §33 — fail-closed quality-gate failure panel. Owner-only page, so the
+          admin sees every failed critical check. Not printed. */}
+      {gateBlocked && (
+        <div
+          className="no-print"
+          style={{
+            fontFamily: ROBOTO,
+            fontSize: 12,
+            color: "#7a1f1f",
+            background: "#fdecec",
+            border: "1px solid #e6b3b3",
+            borderRadius: 4,
+            padding: "10px 14px",
+            marginTop: 8,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            PDF blocked — the pre-publication quality gate failed. Resolve the
+            following before exporting:
+          </div>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {gateFailures
+              .filter((f) => f.severity === "critical")
+              .map((f, i) => (
+                <li key={i} style={{ marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>{f.check}</span>: {f.message}
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
       {proseUnavailable && (
         <div
@@ -1311,6 +1444,11 @@ export default function CountryReport() {
           fresh AI draft.
         </div>
       )}
+
+      {/* Owner-only country-engine review panel (§29–32). Rendered OUTSIDE the
+          `.print-report` element below and carries `no-print`, so it never
+          reaches the on-screen report, in-app PDF, or headless re-render. */}
+      {isStructured && <CountryEngineReviewPanel slug={slug} />}
 
       {qcWarnings.length > 0 && (
         <div

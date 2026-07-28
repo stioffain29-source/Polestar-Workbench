@@ -157,17 +157,24 @@ describe("country report deterministic prose — banned filler", () => {
 });
 
 describe("country report outlook — standard structure", () => {
-  it("carries de-escalation and worsening-impact language for a populated window", () => {
+  // The shared country-engine now authors the Outlook (owner brief §36). It
+  // states the most-likely near-term picture and the locations to keep under
+  // review in controlled, count-free prose (no fixed "concern would ease" /
+  // "deteriorate" template from the old generator).
+  it("states a forward-looking most-likely picture for a populated window", () => {
     const ds = build(POPULATED);
-    expect(ds.outlook.toLowerCase()).toContain("concern would ease");
-    expect(ds.outlook.toLowerCase()).toContain("deteriorate");
+    expect(ds.outlook.trim().length).toBeGreaterThan(0);
+    expect(ds.outlook.toLowerCase()).toContain("next seven days");
   });
 
-  it("emits grouped recommended actions including an escalation trigger", () => {
+  // Recommended Actions are now drawn from the shared engine's approved menu and
+  // grouped by its recommendation groups (Movement / Site security / …). Each
+  // emitted group carries at least one action; groups are non-empty.
+  it("emits grouped recommended actions from the engine menu", () => {
     const ds = build(POPULATED);
     expect(ds.recommendedActions.length).toBeGreaterThan(0);
-    expect(ds.recommendedActions.some((g) => g.key === "escalation")).toBe(true);
     for (const g of ds.recommendedActions) {
+      expect(g.heading.trim().length).toBeGreaterThan(0);
       expect(g.actions.length).toBeGreaterThan(0);
     }
   });

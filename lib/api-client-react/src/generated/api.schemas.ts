@@ -1712,6 +1712,87 @@ export interface CountryBaselineInput {
   locationWatchlist?: CountryBaselineWatchlistItem[];
 }
 
+export interface CanonicalEvent {
+  eventId?: string;
+  eventTitle?: string;
+  eventSummary?: string;
+  /** @nullable */
+  eventDate?: string | null;
+  physicalCountry?: string;
+  issueCategory?: string;
+  severity?: string;
+  inclusionStatus?: string;
+  /** @nullable */
+  exclusionReason?: string | null;
+  classificationConfidence?: number;
+  [key: string]: unknown;
+ }
+
+export type CountryEngineOverrideInputInclusionStatus = typeof CountryEngineOverrideInputInclusionStatus[keyof typeof CountryEngineOverrideInputInclusionStatus];
+
+
+export const CountryEngineOverrideInputInclusionStatus = {
+  included: 'included',
+  excluded: 'excluded',
+  held: 'held',
+} as const;
+
+export interface CountryEngineOverrideInput {
+  physicalCountry?: string;
+  /** @nullable */
+  eventDate?: string | null;
+  issueCategory?: string;
+  locationPrecision?: string;
+  severity?: string;
+  inclusionStatus?: CountryEngineOverrideInputInclusionStatus;
+  /** @nullable */
+  exclusionReason?: string | null;
+  mergeIntoEventId?: string;
+  splitSourceIds?: string[];
+}
+
+/**
+ * @nullable
+ */
+export type CountryEngineViewStats = { [key: string]: unknown } | null;
+
+export type CountryEngineViewOverridesItem = { [key: string]: unknown };
+
+export interface CountryEngineView {
+  events: CanonicalEvent[];
+  /** @nullable */
+  stats?: CountryEngineViewStats;
+  overrides: CountryEngineViewOverridesItem[];
+}
+
+export type CountryEngineReprocessResultStats = { [key: string]: unknown };
+
+export interface CountryEngineReprocessResult {
+  stats: CountryEngineReprocessResultStats;
+  eventsTotal: number;
+  included: number;
+  held: number;
+  excluded: number;
+}
+
+/**
+ * @nullable
+ */
+export type CountryEngineAuditRowDetail = { [key: string]: unknown } | null;
+
+export interface CountryEngineAuditRow {
+  id: number;
+  countrySlug: string;
+  /** @nullable */
+  eventId?: string | null;
+  action: string;
+  /** @nullable */
+  detail?: CountryEngineAuditRowDetail;
+  /** @nullable */
+  actor?: string | null;
+  createdAt: string;
+}
+
 export interface ProseIncidentInput {
   /** @nullable */
   id?: string | null;

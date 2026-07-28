@@ -508,7 +508,14 @@ export default function PngCountryReportBody({
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
   const mapAt = (slot: CountryMapPlacement) =>
-    mapPlacement === slot && mapNode ? <div style={{ marginTop: 4 }}>{mapNode}</div> : null;
+    // §25: the map card must not split across pages — keep the map container and
+    // its location cards together (break-inside: avoid), matching the no-split
+    // card pattern used elsewhere in the report body.
+    mapPlacement === slot && mapNode ? (
+      <div data-map-card="true" style={{ marginTop: 4, breakInside: "avoid" }}>
+        {mapNode}
+      </div>
+    ) : null;
   const photoAt = (slot: CountryPhotoPlacement) =>
     photoPlacement === slot && photoNode ? <div style={{ marginTop: 4 }}>{photoNode}</div> : null;
 
@@ -593,16 +600,19 @@ export default function PngCountryReportBody({
       )}
       {mapAt("after-incident-details")}
 
-      {/* 4. Current Situation — concise framing, two short paragraphs maximum. */}
-      {show("current-situation") && (
+      {/* 4. Current Situation — concise framing, two short paragraphs maximum.
+          §27: on a sparse week the engine omits this section; skip it entirely
+          rather than rendering filler. */}
+      {show("current-situation") && d.executiveSummary.trim() !== "" && (
         <Section title="Current Situation">
           <Prose text={d.executiveSummary} />
         </Section>
       )}
 
       {/* 5. Operational Impact — per-theme impact lines for the themes present
-          this period. */}
-      {show("operational-impact") && (
+          this period. §27: omitted entirely (not filler) when the engine has no
+          event-linked impact to state and no tactical brief supplies one. */}
+      {show("operational-impact") && (operationalImpact.length > 0 || Boolean(tactical)) && (
       <Section title="Operational Impact">
         {operationalImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
@@ -634,7 +644,11 @@ export default function PngCountryReportBody({
           Site security, …), emitting only the groups this period's incident mix
           and watchlist support. The operating-risk theatres (Indonesia /
           Jakarta) keep their own flat priorities list unchanged. */}
-      {show("recommended-actions") && (
+      {show("recommended-actions") &&
+        (Boolean(tactical) ||
+          (d.proseVariant === "operating-risk"
+            ? d.businessImpact.length > 0
+            : d.recommendedActions.length > 0)) && (
       <Section title="Recommended Actions">
         {tactical ? (
           <>
@@ -666,8 +680,8 @@ export default function PngCountryReportBody({
       {mapAt("before-outlook")}
 
       {/* 7. Outlook: Next Seven Days — most-likely scenario + escalation
-          indicators */}
-      {show("outlook") && (
+          indicators. §27: omitted when the engine has no outlook prose. */}
+      {show("outlook") && d.outlook.trim() !== "" && (
       <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
         {escalationIndicators.length > 0 ? (
@@ -700,8 +714,9 @@ export default function PngCountryReportBody({
       {mapAt("before-polestar")}
       {photoAt("before-polestar")}
 
-      {/* 8. Polestar View — closes the written brief */}
-      {show("polestar-view") && (
+      {/* 8. Polestar View — closes the written brief. §27: omitted when the
+          engine has no assessed judgement to add. */}
+      {show("polestar-view") && d.polestarView.trim() !== "" && (
         <Section title="Polestar View">
           <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
         </Section>

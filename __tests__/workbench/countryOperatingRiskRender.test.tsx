@@ -273,12 +273,29 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
 describe("PngCountryReportBody — country brief render, quiet window", () => {
   const html = renderToStaticMarkup(<PngCountryReportBody dataset={build([])} />);
 
-  it("still renders the brief sections with no fabricated developments", () => {
-    for (const title of SECTION_ORDER) {
+  // §27: a sparse (quiet) week returns a short report. The framing sections
+  // (Bottom Line, Top 3, Incident Details) still render honest empty notes, but
+  // the analytical sections (Current Situation, Operational Impact, Recommended
+  // Actions, Outlook, Polestar View) are OMITTED rather than padded with filler.
+  const RETAINED = ["Bottom Line Up Front", "Top 3 Developments", "Incident Details"];
+  const OMITTED = [
+    "Current Situation",
+    "Operational Impact",
+    "Recommended Actions",
+    "Outlook: Next Seven Days",
+    "Polestar View",
+  ];
+
+  it("renders the framing sections and omits the analytical ones (no fabrication)", () => {
+    for (const title of RETAINED) {
       expect(html.indexOf(title)).toBeGreaterThanOrEqual(0);
     }
+    for (const title of OMITTED) {
+      expect(html.indexOf(title)).toBe(-1);
+    }
     const text = textOf(html);
-    expect(text).toMatch(/no fresh open-source reporting/i);
+    // The engine's short-report BLUF states the quiet period honestly.
+    expect(text.toLowerCase()).toMatch(/reporting was limited|no significant validated/i);
     // A quiet week must not invent counts either.
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
   });

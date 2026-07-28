@@ -200,7 +200,7 @@ export function synthesiseAssessedThemes(
     const exposureFragment = lowerFirst(businessExposure).replace(/\.$/, "");
     const narrative = `${THEME_WHAT[def.key]}${catClause}, ${concentration}.${leadPart} ${trajectorySentence(
       trajectory,
-    )} Business exposure centres on ${exposureFragment}. ${THEME_SIGNIFICANCE[def.key]}`
+    )} This reporting is most relevant to ${exposureFragment}. ${THEME_SIGNIFICANCE[def.key]}`
       .replace(/\s+/g, " ")
       .trim();
     assessed.push({

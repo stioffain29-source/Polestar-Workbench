@@ -90,6 +90,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.3",
+    "@workspace/country-engine": "workspace:*",
     "leaflet": "^1.9.4",
     "react-leaflet": "^5.0.0"
   }

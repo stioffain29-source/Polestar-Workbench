@@ -82,6 +82,20 @@ import {
   exposureLabelsForThemes,
   scenarioForThemes,
 } from "./countryCustomerRelevance";
+import {
+  buildCountryNarrative,
+  type CanonicalEvent,
+  type CountryNarrative,
+  type EngineResult,
+} from "@workspace/country-engine";
+import { getCountryEngineConfig } from "@workspace/country-engine/config";
+import {
+  runQualityGate,
+  type MapPoint,
+  type QualityGateResult,
+  type QualityGateReport,
+} from "@workspace/country-engine/gate";
+import { runCountryEngine, toMapPoints } from "./countryEngineAdapter";
 
 // ---------------------------------------------------------------------------
 // Input shape (permissive — the page passes CountryFastFactsIncident objects,
@@ -250,6 +264,10 @@ export interface StructuredLocationAugmentation {
 
 export interface StructuredTheatreConfig {
   countryName: string;
+  // Registry slug for the shared @workspace/country-engine config (§1). Drives
+  // the SAME engine used by the api-server owner routes. Unset → the engine
+  // resolves a generic config from the country name.
+  engineSlug?: string;
   buckets: StructuredBucketDef[];
   otherBucketLabel: string;
   emptyLocationFallback: string;
@@ -333,6 +351,7 @@ export interface StructuredTheatreConfig {
 
 export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "Papua New Guinea",
+  engineSlug: "papua-new-guinea",
   buckets: [
     { key: "ncd", label: "Port Moresby / National Capital District", provinces: ["National Capital District"] },
     { key: "morobe", label: "Lae / Morobe", provinces: ["Morobe"] },
@@ -367,6 +386,7 @@ export const PNG_REPORT_CONFIG: StructuredTheatreConfig = {
 
 export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "West Papua",
+  engineSlug: "papua",
   buckets: [
     {
       key: "centralHighlands",
@@ -408,6 +428,7 @@ export const WEST_PAPUA_REPORT_CONFIG: StructuredTheatreConfig = {
 
 export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "Indonesia",
+  engineSlug: "indonesia",
   buckets: [
     {
       key: "greaterJakartaWestJava",
@@ -491,6 +512,7 @@ export const INDONESIA_REPORT_CONFIG: StructuredTheatreConfig = {
 
 export const THAILAND_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "Thailand",
+  engineSlug: "thailand",
   buckets: [
     {
       key: "bangkokMetro",
@@ -627,6 +649,7 @@ export const THAILAND_REPORT_CONFIG: StructuredTheatreConfig = {
 
 export const PHILIPPINES_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "Philippines",
+  engineSlug: "philippines",
   buckets: [
     {
       key: "metroManila",
@@ -689,6 +712,7 @@ export const PHILIPPINES_REPORT_CONFIG: StructuredTheatreConfig = {
 
 export const JAKARTA_REPORT_CONFIG: StructuredTheatreConfig = {
   countryName: "Jakarta",
+  engineSlug: "jakarta",
   buckets: [
     { key: "centralJakarta", label: "Central Jakarta", provinces: ["Central Jakarta"] },
     { key: "southJakarta", label: "South Jakarta", provinces: ["South Jakarta"] },
@@ -933,6 +957,28 @@ export interface PngReportDataset {
   // the complete assessment paragraph never splits across a page boundary
   // (spec §5). Unset for every other theatre — no markup change.
   keepPolestarTogether?: boolean;
+  // --- Shared country-engine wiring (owner brief §14–23, §33, §36) ---------
+  // The full engine run for this window (ALL canonical events + included /
+  // held / excluded splits + stats). Drives the admin review panel and the
+  // map/gate below. INCLUDED events only ever reach a rendered surface.
+  engineResult: EngineResult;
+  // The engine-built narrative — the authoritative source of the section TEXT
+  // (bluf, executiveSummary, outlook, polestarView, topThree, operational
+  // impact, recommendations). Sparse periods (§27) omit sections rather than
+  // pad, so the renderer skips empty ones.
+  engineNarrative: CountryNarrative;
+  // Credible, plottable map points for INCLUDED events only (§23). Never
+  // includes Unknown / Country-only / foreign / excluded / held rows.
+  mapPoints: MapPoint[];
+  // §33 fail-closed pre-publication quality gate. When gate.passed is false on
+  // a critical check the page BLOCKS the Download PDF action and shows the
+  // failure panel (owner-only surface).
+  gate: QualityGateResult;
+  // The exact input the gate was run against. Kept on the dataset so the page
+  // can RE-RUN the gate over the final effective narrative (after an explicit
+  // analyst edit overlays a section) — the rendered/exported text is always the
+  // text that was validated, never a pre-overlay snapshot.
+  gateReport: QualityGateReport;
   // Jakarta-only tactical operating brief (Movement & Access Impact, Business
   // District / Port exposure tables, Airport-Hotel-Office, Route & Timing, and
   // the map area summary). Consumed ONLY by the canonical Jakarta brief
@@ -1661,7 +1707,7 @@ function buildRecommendedActions(
     heading: "Escalation triggers",
     actions: [
       worstRank >= 4
-        ? "Activate contingency and movement-restriction plans if higher-severity or casualty-bearing incidents reach or near operating sites."
+        ? "Activate contingency and movement-restriction plans if higher-severity or casualty-bearing incidents occur close to staffed premises."
         : "Be ready to tighten precautions if incidents rise in severity or spread to new districts.",
     ],
   });
@@ -1738,6 +1784,30 @@ export function buildStructuredReportDataset(
   // impossible — never assert a trend) from "previous window supplied but quiet"
   // (a valid comparison against a calm prior week).
   const hasPreviousWindow = previousWindowIncidents !== undefined;
+
+  // --- Shared country-engine narrative (owner brief §14–23, §30, §33, §36) --
+  // The SAME engine the api-server owner routes use. It re-derives canonical
+  // events from the window items, then composes every analytical section as
+  // controlled, banned-phrase-free, count-free prose. This is the AUTHORITATIVE
+  // source of the section TEXT below — the old uncontrolled generators are
+  // overridden with it (no silent fallback: excluded/held events never reach a
+  // rendered section, map, count or Top-3). Prior-period events (the preceding
+  // window of equal length) enable trend wording (§16); absent → trends barred.
+  const engineSlug = config.engineSlug ?? config.countryName;
+  const engineResult: EngineResult = runCountryEngine(windowItems, engineSlug);
+  const priorEngineResult: EngineResult | null = hasPreviousWindow
+    ? runCountryEngine(previousWindowItems, engineSlug)
+    : null;
+  const engineNarrative: CountryNarrative = buildCountryNarrative(
+    engineResult.included,
+    {
+      countryName: config.countryName,
+      priorPeriodEvents: priorEngineResult ? priorEngineResult.included : null,
+    },
+  );
+  // Credible map points for INCLUDED events only (§23). Never Unknown /
+  // Country-only / foreign / excluded / held.
+  const mapPoints: MapPoint[] = toMapPoints(engineResult.included);
 
   // Trend / severity AGGREGATES read the in-window subset only: a row REPORTED
   // this period but whose own event date fell before the window (occurredOutOfWindow)
@@ -2178,7 +2248,7 @@ export function buildStructuredReportDataset(
   }
 
   // --- Recommended Actions (grouped) -----------------------------------------
-  const recommendedActions = buildRecommendedActions(windowItems, locationWatchlist, curWorstRank);
+  let recommendedActions = buildRecommendedActions(windowItems, locationWatchlist, curWorstRank);
 
   // --- Polestar View + Customer Relevance ------------------------------------
   // Both are computed AFTER the operating-risk variant block below (which can
@@ -2510,7 +2580,7 @@ export function buildStructuredReportDataset(
       );
     escalationIndicators.push(
       curWorstRank >= 4
-        ? "Further casualty-bearing or higher-severity violence at or near operating sites"
+        ? "Further casualty-bearing or higher-severity violence close to staffed premises"
         : "Any move to casualty-bearing or higher-severity incidents",
     );
     escalationIndicators.push(
@@ -2519,6 +2589,91 @@ export function buildStructuredReportDataset(
         : "A spread of incidents into new districts, or a single dominant centre emerging",
     );
     escalationIndicators.push(`Flashpoints around ${config.outlookVolatilityClause}`);
+  }
+
+  // --- Apply the engine narrative as the AUTHORITATIVE section TEXT (§36) ----
+  // The old uncontrolled generators above are overridden here; nothing silently
+  // falls back to them. Sparse periods (§27) leave the analytical sections empty
+  // so PngCountryReportBody omits them rather than padding with filler.
+  let gate: QualityGateResult;
+  let gateReport: QualityGateReport;
+  {
+    const n = engineNarrative;
+    if (n.isSparse) {
+      // §27 — reporting was limited: the short-report text is the only prose;
+      // every analytical section is emptied so the renderer skips it.
+      bluf = n.shortReport ?? config.emptyLocationFallback;
+      executiveSummary = "";
+      outlook = "";
+      polestarView = "";
+      topThree = [];
+      operationalImpactOverride = [];
+      recommendedActions = [];
+      incidentThemesOverride = [];
+    } else {
+      bluf = n.bluf;
+      executiveSummary = n.currentSituation;
+      outlook = n.outlook;
+      polestarView = n.polestarView;
+      // Top-3 SELECTION comes from the engine; reorder the already-built
+      // PngReportItem cards to match (engine eventId === PngReportItem.id) so the
+      // card render keeps working while the choice is the engine's. Any engine
+      // top event without a matching card is dropped (never fabricated).
+      const cardById = new Map(windowItems.map((it) => [it.id, it]));
+      const engineTop = n.topThree
+        .map((td) => cardById.get(td.eventId))
+        .filter((it): it is PngReportItem => Boolean(it));
+      // If the engine's representative ids do not line up with the card ids (a
+      // clustering divergence), keep the previously selected Top-3 rather than
+      // showing nothing — but never widen beyond the engine's three.
+      topThree = engineTop.length > 0 ? engineTop : topThree.slice(0, n.topThree.length);
+      // Operational Impact — per-category engine text (only event-linked, §19).
+      operationalImpactOverride =
+        n.operationalImpact.length > 0
+          ? n.operationalImpact.map((op) => op.text)
+          : [];
+      // Recommended Actions — grouped from the approved engine menu (§20).
+      const recByGroup = new Map<string, string[]>();
+      for (const rec of n.recommendations) {
+        const arr = recByGroup.get(rec.group) ?? [];
+        arr.push(rec.text);
+        recByGroup.set(rec.group, arr);
+      }
+      recommendedActions = [...recByGroup.entries()].map(([heading, actions]) => ({
+        key: heading.toLowerCase().replace(/\s+/g, "-"),
+        heading,
+        actions,
+      }));
+    }
+    // §33 fail-closed gate — re-validate the finished report against the
+    // canonical dataset. Attached to the dataset; the page blocks the PDF when
+    // a critical check fails.
+    gateReport = {
+      events: engineResult.events,
+      included: engineResult.included,
+      narrative: n,
+      mapPoints,
+      sectionWordCounts: n.sectionWordCounts,
+      hasPriorData: priorEngineResult != null,
+      // Physical-country integrity check (§33 DATA) must compare against the
+      // ENGINE's canonical country name for this slug, not the display label:
+      // "West Papua" (display) runs under engine country "Papua", and "Jakarta"
+      // (city display) runs under "Indonesia". Comparing against the display
+      // label would flag every valid included event as foreign and fail-close
+      // the gate for those theatres. Display names stay UI-only.
+      countryName: getCountryEngineConfig(engineSlug).countryName,
+      reportingWindow: args.windowStart
+        ? {
+            start: args.windowStart.toISOString(),
+            end: (() => {
+              const end = new Date(args.windowStart!.getTime());
+              end.setDate(end.getDate() + 7);
+              return end.toISOString();
+            })(),
+          }
+        : null,
+    };
+    gate = runQualityGate(gateReport);
   }
 
   return {
@@ -2557,6 +2712,11 @@ export function buildStructuredReportDataset(
     incidentThemesOverride,
     operationalImpactOverride,
     keepPolestarTogether,
+    engineResult,
+    engineNarrative,
+    mapPoints,
+    gate,
+    gateReport,
   };
 }
 

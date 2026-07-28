@@ -193,6 +193,9 @@ importers:
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
+      '@workspace/country-engine':
+        specifier: workspace:*
+        version: link:../../lib/country-engine
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
@@ -226,6 +229,9 @@ importers:
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
     devDependencies:
       '@types/compression':
         specifier: ^1.8.1
@@ -443,6 +449,9 @@ importers:
       '@expo-google-fonts/roboto':
         specifier: ^0.4.3
         version: 0.4.3
+      '@workspace/country-engine':
+        specifier: workspace:*
+        version: link:../../lib/country-engine
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
@@ -691,8 +700,17 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
+  lib/country-engine:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.6.2
+
   lib/db:
     dependencies:
+      '@workspace/country-engine':
+        specifier: workspace:*
+        version: link:../country-engine
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)

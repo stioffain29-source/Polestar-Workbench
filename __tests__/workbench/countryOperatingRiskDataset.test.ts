@@ -236,9 +236,13 @@ describe("buildCountryOperatingRiskDataset — empty window (no fabrication)", (
     expect(ds.whatMattersBullets[0]).toMatch(/no fresh open-source reporting/i);
   });
 
-  it("flags low reporting confidence and an honest quiet-period outlook", () => {
+  it("flags low reporting confidence and an honest quiet-period brief", () => {
     expect(ds.reportingConfidence.level).toBe("Low");
-    expect(ds.outlook).toMatch(/no fresh reporting/i);
+    // §27: on a sparse week the shared engine returns a short report rather than
+    // padding the analytical sections. The honest quiet-period statement now
+    // sits in the BLUF (short report); Outlook is omitted (empty), not filled.
+    expect(ds.bluf.toLowerCase()).toMatch(/limited|no fresh|quiet|not.*genuine improvement/);
+    expect(ds.outlook).toBe("");
     expect(ds.escalationIndicators.length).toBeGreaterThan(0);
     expect(ds.escalationIndicators.join(" ")).toMatch(
       /return of open-source reporting/i,

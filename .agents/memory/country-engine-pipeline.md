@@ -1,0 +1,21 @@
+---
+name: Shared country-report engine (@workspace/country-engine)
+description: One validated pipeline for ALL country reports — canonical events, exclusions, confidence gate, approved narrative, fail-closed quality gate.
+---
+
+# Shared country-report engine
+
+`@workspace/country-engine` is the ONE pipeline behind every Pole Star country report (owner's 38-section brief lives in attached_assets). Pure TS, zero runtime deps, so the same code runs in browser, api-server and jest.
+
+**Rules that must hold:**
+- Articles ≠ incidents: exclusions are STORED with reasons and never rendered as Low filler. Confidence gate 85/70/50; held rows go to the owner review panel; analyst overrides re-run the engine and are authoritative (audit-logged).
+- Section TEXT comes only from the engine's approved narrative structures (word caps, approved recommendations menu, trend wording only with prior-period data). The §30 banned-phrase list is enforced by the fail-closed quality gate, which blocks Download PDF. **Why:** owner rejected the old template prose wholesale.
+- The generic AI prose never auto-overlays engine text; only an EXPLICIT analyst edit may override a section, and the gate is RE-RUN over the final effective narrative so what renders/exports is what was validated.
+- Banned phrases hide outside the engine too (theme-synthesis / operating-risk / escalation-indicator templates) — verify with a real headless PDF, pdftotext + banned-phrase scan, not just unit tests.
+- Event titles entering prose must be naturalised (no shouty wire headlines) and never say "at <Country>"; Country-only/Unknown precision rows get no location clause and are never plotted.
+
+**How to apply:**
+- Duplicate grouping is date-bucketed; do NOT revert to a plain pairwise scan — an ~18k-row country window hangs the boot reprocess for many minutes, bucketed it finishes.
+- Prod reprocess arrives via a marker-gated boot migration; the marker is written ONLY when every slug succeeds, so partial failures retry on the next boot (engine runs are idempotent).
+- Old free-form prose builders are NEUTRALISED (engine output overwrites them), not deleted — don't treat their output as rendered.
+- Large held/review queues on high-volume countries are expected data reality (the gate holds low-confidence rows), not a bug; tune deliberately via overrides or thresholds.

@@ -14,6 +14,8 @@ tags:
   - name: sources
   - name: reports
   - name: countries
+  - name: country-engine
+    description: Shared country-report engine — canonical events, review queue and admin controls.
   - name: dashboard
   - name: cards
   - name: liveuamap
@@ -1607,6 +1609,97 @@ paths:
           description: No generated prose to edit
         "409":
           description: Fingerprint stale, regenerate first
+
+  /countries/{slug}/engine:
+    get:
+      operationId: getCountryEngine
+      tags: [country-engine]
+      summary: Canonical events, latest run stats and analyst overrides for a country
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryEngineView" }
+
+  /countries/{slug}/engine/reprocess:
+    post:
+      operationId: reprocessCountryEngine
+      tags: [country-engine]
+      summary: Re-run the shared engine for a country and return the fresh run stats
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CountryEngineReprocessResult" }
+        "401":
+          description: Missing or invalid admin token
+        "503":
+          description: Admin token not configured
+
+  /countries/{slug}/engine/events/{eventId}:
+    patch:
+      operationId: overrideCountryEngineEvent
+      tags: [country-engine]
+      summary: Apply an analyst override to one canonical event (audit-logged, re-runs the engine)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CountryEngineOverrideInput" }
+      responses:
+        "200":
+          description: OK — the updated canonical event
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CanonicalEvent" }
+        "400":
+          description: Invalid override body
+        "401":
+          description: Missing or invalid admin token
+        "404":
+          description: Event not found
+        "503":
+          description: Admin token not configured
+
+  /countries/{slug}/engine/audit:
+    get:
+      operationId: getCountryEngineAudit
+      tags: [country-engine]
+      summary: Recent audit-log rows for a country's engine changes
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CountryEngineAuditRow" }
 
   /reports/{id}/incident-summaries:
     post:
@@ -3573,6 +3666,91 @@ components:
         locationWatchlist:
           type: array
           items: { $ref: "#/components/schemas/CountryBaselineWatchlistItem" }
+
+    # A canonical event produced by the shared country-report engine
+    # (@workspace/country-engine). Kept pragmatic — a free-form object so the
+    # full CanonicalEvent shape (owner brief §2) survives without duplicating
+    # every field here and drifting from the engine's TypeScript contract.
+    CanonicalEvent:
+      type: object
+      additionalProperties: true
+      properties:
+        eventId: { type: string }
+        eventTitle: { type: string }
+        eventSummary: { type: string }
+        eventDate: { type: ["string", "null"] }
+        physicalCountry: { type: string }
+        issueCategory: { type: string }
+        severity: { type: string }
+        inclusionStatus: { type: string }
+        exclusionReason: { type: ["string", "null"] }
+        classificationConfidence: { type: number }
+
+    # Analyst override applied to one canonical event (owner brief §37). This is
+    # the AnalystEventOverride MINUS eventId — the eventId comes from the path.
+    CountryEngineOverrideInput:
+      type: object
+      additionalProperties: false
+      properties:
+        physicalCountry: { type: string }
+        eventDate: { type: ["string", "null"] }
+        issueCategory: { type: string }
+        locationPrecision: { type: string }
+        severity: { type: string }
+        inclusionStatus:
+          type: string
+          enum: [included, excluded, held]
+        exclusionReason: { type: ["string", "null"] }
+        mergeIntoEventId: { type: string }
+        splitSourceIds:
+          type: array
+          items: { type: string }
+
+    # The engine review-queue view for a country (owner brief §7/§37): all
+    # canonical events, the latest run's stats and the persisted overrides.
+    CountryEngineView:
+      type: object
+      required: [events, overrides]
+      properties:
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/CanonicalEvent" }
+        stats:
+          type: ["object", "null"]
+          additionalProperties: true
+        overrides:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    # Result of a reprocess run (owner brief §35).
+    CountryEngineReprocessResult:
+      type: object
+      required: [stats, eventsTotal, included, held, excluded]
+      properties:
+        stats:
+          type: object
+          additionalProperties: true
+        eventsTotal: { type: integer }
+        included: { type: integer }
+        held: { type: integer }
+        excluded: { type: integer }
+
+    # One audit-log row (owner brief §37: manual changes are recorded).
+    CountryEngineAuditRow:
+      type: object
+      required: [id, countrySlug, action, createdAt]
+      properties:
+        id: { type: integer }
+        countrySlug: { type: string }
+        eventId: { type: ["string", "null"] }
+        action: { type: string }
+        detail:
+          type: ["object", "null"]
+          additionalProperties: true
+        actor: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
 
     ProseIncidentInput:
       type: object
