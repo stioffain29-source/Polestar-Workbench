@@ -67,7 +67,7 @@ disrupt access at short notice.
 OTHER OPERATIONAL DISRUPTION
 
 Operational disruption to transport, utilities or connectivity was reported, including other security and
-transport disruption, concentrated in DKI Jakarta, North Sumatra and Central Kalimantan. The most serious
+transport disruption, concentrated in DKI Jakarta, Central Kalimantan and North Sumatra. The most serious
 reported was Chelsea, AC Milan to Bring Star Players for Indonesia Super Cup Clash (DKI Jakarta),
 assessed as High severity. Reporting of this activity eased against the previous week. This reporting is
 most relevant to transport, power, communications and the operations that depend on them. Disruption of
@@ -85,6 +85,7 @@ OPERATIONAL IMPACT
 - The event is close to, or significant enough for, local movement and planning to be reviewed.
 - The event is close to, or significant enough for, local movement and planning to be reviewed.
 - The event is close to, or significant enough for, local movement and planning to be reviewed.
+- The event is close to, or significant enough for, local movement and planning to be reviewed.
 
 RECOMMENDED ACTIONS
 - Nationally: Check nearby site exposure, access disruption and continuity arrangements. Escalation
@@ -94,7 +95,6 @@ Escalation trigger - a call for mass mobilisation, a march on government or comp
 with police.
 - Greater Jakarta & West Java: Review movement routines, cash handling, parking and local premises
 security. Escalation trigger - repeat armed incidents in the same area, or targeting of staff, vehicles or
-commercial premises.
 
 polestar-advisory.com
 
@@ -104,8 +104,9 @@ Page 2 of 4
 
 INDONESIA COUNTRY REPORT
 
-- Central & East Java: Monitor for regulatory, procurement or local authority follow-on. Escalation trigger a new regulation, licence suspension or enforcement action affecting operations.
+commercial premises.
 
+- Central & East Java: Monitor for regulatory, procurement or local authority follow-on. Escalation trigger a new regulation, licence suspension or enforcement action affecting operations.
 - Greater Jakarta & West Java: Monitor hazard and flood warnings; check site access, drainage and
 continuity arrangements. Escalation trigger - an official flood, storm or seismic warning upgrade, or an
 airport or port closure.

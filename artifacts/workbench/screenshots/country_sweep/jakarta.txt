@@ -8,9 +8,9 @@ POLESTAR-ADVISORY.COM
 
 BOTTOM LINE UP FRONT
 The most serious validated development in Jakarta was circumstances behind the Matraman clash that
-killed one person in East Jakarta on 28 July 2026. The period also brought 3 Matraman residents named
-suspects in Menteng clash for assault that killed a man in East Jakarta and one person killed in residents'
-clash in Menteng, Central Jakarta in Central Jakarta. During the reporting period, other operational
+killed one person in East Jakarta on 28 July 2026. The period also brought witness recounts moments of
+Pulogadung house fire that killed siblings in East Jakarta and 3 Matraman residents named suspects in
+Menteng clash for assault that killed a man in East Jakarta. During the reporting period, other operational
 disruption and violent crime events made up most of the reporting, and Central Jakarta carried a
 disproportionate share of it. Reporting volume increased compared with the previous period.
 
@@ -24,20 +24,20 @@ Protest / civil unrest · East Jakarta · Reported 28 Jul 2026 · Kompas.com
 
 For operators, an event of this kind bears directly on staff safety and journey planning around the affected area.
 
+Witness recounts moments of Pulogadung house fire that killed siblings
+
+LOW
+
+Fire / explosion · East Jakarta · Reported 28 Jul 2026 · detikNews
+
+For operators, an event of this kind bears directly on staff safety and journey planning around the affected area.
+
 3 Matraman residents named suspects in Menteng clash for assault that killed a
 man
 
 HIGH
 
 Protest / civil unrest · East Jakarta · Reported 27 Jul 2026 · Kompas.com
-
-For operators, an event of this kind bears directly on staff safety and journey planning around the affected area.
-
-One person killed in residents' clash in Menteng, Central Jakarta
-
-HIGH
-
-Protest / civil unrest · Central Jakarta · Reported 26 Jul 2026 · 20detik
 
 For operators, an event of this kind bears directly on staff safety and journey planning around the affected area.
 
@@ -70,8 +70,8 @@ Reported effects include traffic delays. Confirm affected routes before staff tr
 the previous week this theme is easing.
 FIRE INCIDENTS
 
-Fire reporting this period centred on South Jakarta, Greater Jakarta and East Jakarta, markets, shopping
-malls and warehouses. The operational concern is the knock-on effect - possible road closures, local
+Fire reporting this period centred on Greater Jakarta, East Jakarta and Central Jakarta, shopping malls,
+warehouses and hotels. The operational concern is the knock-on effect - possible road closures, local
 evacuation and restricted access around the site - rather than the fire itself. Confirm the status of the
 affected area before movement nearby. Against the previous week this theme is easing.
 CRIME AND PUBLIC SAFETY
@@ -314,9 +314,7 @@ and build a larger buffer
 before time-critical flights
 
 OPERATIONAL IMPACT
-No fresh incident-driven business impact was identified this period. Standing exposures - petty and
-organised urban crime, large demonstrations around the presidential palace, parliament and major
-thoroughfares, traffic and transport disruption, and seasonal flooding - continue to apply across the capital.
+- The event is close to, or significant enough for, local movement and planning to be reviewed.
 STAFF MOVEMENT IMPACT
 OFFICE ACCESS
 
@@ -344,6 +342,10 @@ DRIVER ROUTE PLANNING
 
 Drivers should confirm two viable routes between office, hotel, Tanjung Priok and Soekarno-Hatta before departure, holding
 diversions around the Thamrin-Sudirman corridor and the Gatot Subroto interchange.
+AFTER HOURS MOVEMENT
+
+After-hours movement near offices, hotels, malls and transport hubs in the central and southern districts warrants standard
+personal-security awareness; keep journeys booked and tracked rather than hailed on the street.
 
 polestar-advisory.com
 
@@ -353,10 +355,6 @@ Page 4 of 8
 
 JAKARTA CITY REPORT
 
-AFTER HOURS MOVEMENT
-
-After-hours movement near offices, hotels, malls and transport hubs in the central and southern districts warrants standard
-personal-security awareness; keep journeys booked and tracked rather than hailed on the street.
 AIRPORT TRANSFER IMPACT
 
 Airport transfers should not be treated as routine during heavy-rain periods. Confirm the Soekarno-Hatta
