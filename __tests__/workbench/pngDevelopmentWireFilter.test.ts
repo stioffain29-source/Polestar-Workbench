@@ -52,11 +52,23 @@ describe("isDevelopmentWireItem — guardrails (strict under-filter bias)", () =
       "Digicel di PNG siap kembangkan jaringan 5G",
       "PNG designer Linda Philau Pius returns to Brisbane runway with new collection",
       "US and PNG celebrate enduring relationship during Tamiok Strike",
+      "Chelsea, AC Milan to Bring Star Players for Indonesia Super Cup Clash",
       "PNG Health Access strengthened through Australia aviation partnership",
     ];
     for (const title of drops) {
       expect(isDevelopmentWireItem(pi({ title, severityRank: 2 }))).toBe(true);
     }
+  });
+
+  it("drops a sports fixture promo even at HIGH stored severity (non-event class bypasses the veto)", () => {
+    expect(
+      isDevelopmentWireItem(
+        pi({
+          title: "Chelsea, AC Milan to Bring Star Players for Indonesia Super Cup Clash",
+          severityRank: 4,
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("still keeps a low-severity crime item even when it carries a newly-added PR word (veto)", () => {

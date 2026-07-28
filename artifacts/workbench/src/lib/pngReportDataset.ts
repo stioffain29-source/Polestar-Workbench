@@ -1098,10 +1098,12 @@ const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 //     and insecurity in PNG — Devpolicy Blog") — a Development Policy Centre essay
 //     ABOUT violence, not a violence report.
 //   * SPORTS FIXTURES ("Consistency in Selection Ahead of Blackhawks Clash",
-//     "Flying Fijians name powerful side for Wales opener") — the rugby-league
-//     "clash" is a homonym that trips SECURITY_TERM_RE; a team-selection preview
-//     is not an incident. Anchored on non-event ACTIONS (team selection), never
-//     team names — "Vipers" appears in a genuine attempted-murder conviction.
+//     "Flying Fijians name powerful side for Wales opener", "Chelsea, AC Milan
+//     to Bring Star Players for Indonesia Super Cup Clash") — the sports
+//     "clash" is a homonym that trips SECURITY_TERM_RE; a team-selection or
+//     fixture-promotion preview is not an incident. Anchored on non-event
+//     ACTIONS (team selection, bringing star players), never team names —
+//     "Vipers" appears in a genuine attempted-murder conviction.
 //   * PUBLIC-AWARENESS CAMPAIGNS ("…Robust Awareness Initiative Transforms Local
 //     Wards") — an advocacy drive against violence, not a violent event.
 // These anchors are EMPIRICALLY precision-gated: verified against the full live
@@ -1113,7 +1115,7 @@ const HARD_NON_INCIDENT_TITLE_RE = /\btidbits\b/i;
 // stop riots shot dead"), so it stays veto-protected — the durable fix for those
 // is upstream severity/category reclassification, not a veto bypass here.
 const NON_EVENT_TITLE_RE =
-  /(\bdevpolicy\b|development policy centre|everyday crime and insecurity|\bname[sd]?\s+(?:a\s+)?(?:powerful\s+)?side\b|consistency in selection|selection ahead of|\bawareness\s+(?:initiative|campaign|programme|program|drive|week|month)\b)/i;
+  /(\bdevpolicy\b|development policy centre|everyday crime and insecurity|\bname[sd]?\s+(?:a\s+)?(?:powerful\s+)?side\b|consistency in selection|selection ahead of|\bbring(?:ing|s)?\s+star\s+players\b|\bawareness\s+(?:initiative|campaign|programme|program|drive|week|month)\b)/i;
 
 // Photo-PUBLICATION headlines ("More photos of victims"; Bahasa "Foto korban" /
 // "Foto-foto para korban"). Per spec: the publication of photographs is NOT a
