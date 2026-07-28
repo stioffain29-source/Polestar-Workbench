@@ -1455,8 +1455,23 @@ export function buildPolestarView(
           ? "the safety of staff and premises"
           : "routine operational planning";
 
+  // What actually happened this period — the honest anchor. Grounded in the
+  // worst reported event's category and place so the View opens with substance
+  // rather than a generic posture line.
+  const worstEvent = [...events].sort(
+    (a, b) => severityRank(b.severity) - severityRank(a.severity),
+  )[0];
+  const anchorPlace = locationLabel(worstEvent);
+  // Never name the whole country as a "location" — if the worst event resolved
+  // no sub-national place, anchor on the category alone.
+  const anchorSentence =
+    anchorPlace && anchorPlace !== worstEvent.physicalCountry
+      ? `This period the reporting that carried real weight was ${categoryPhrase(worstEvent.issueCategory)} around ${anchorPlace}; the rest of the week's items were routine by comparison.`
+      : `This period the reporting that carried real weight was ${categoryPhrase(worstEvent.issueCategory)}; the rest of the week's items were routine by comparison.`;
+
   // Candidate judgement sentences — each grounded, each tested for overlap.
   const candidates: { text: string; claimType: ClaimType }[] = [
+    { text: anchorSentence, claimType: "Assessment" },
     {
       text: `Weighed together, the week's reporting bears most on ${focusPhrase}, and that is where checks will pay off first.`,
       claimType: "Assessment",
@@ -1507,6 +1522,27 @@ export function buildPolestarView(
         confidence: 72,
       }),
     );
+  }
+
+  // The View must read as a considered judgement, never a one-liner: when the
+  // overlap filter (vs BLUF/Outlook) trims the set below three sentences, top
+  // back up from the skipped candidates in priority order. Repeating a thread
+  // the BLUF touched is the lesser evil than shipping a single-line View.
+  if (kept.length < 3) {
+    for (const c of candidates) {
+      if (kept.length >= 3) break;
+      if (kept.includes(c.text)) continue;
+      kept.push(c.text);
+      claims.push(
+        makeClaim({
+          claimText: c.text,
+          section: "Pole Star View",
+          supportingEventIds: events.map((e) => e.eventId),
+          claimType: c.claimType,
+          confidence: 72,
+        }),
+      );
+    }
   }
 
   // Guarantee at least one sentence even if everything overlapped.

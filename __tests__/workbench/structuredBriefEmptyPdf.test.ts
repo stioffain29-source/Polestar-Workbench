@@ -225,7 +225,6 @@ function runCount(text: string[], seq: string[]): number {
 // being silently absorbed.
 const NOT_POPULATED_HEADINGS = [
   "Bottom Line Up Front",
-  "Current Situation",
   "Outlook: Next Seven Days",
   "Polestar View",
 ];
@@ -235,7 +234,6 @@ const NOT_POPULATED_HEADINGS = [
 const ALL_HEADINGS = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Incident Details",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",

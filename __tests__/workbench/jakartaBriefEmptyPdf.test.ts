@@ -219,7 +219,6 @@ const TACTICAL_STRAND_LABELS = [
 const CANONICAL_HEADINGS = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Incident Details",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",

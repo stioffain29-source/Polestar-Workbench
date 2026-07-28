@@ -262,7 +262,7 @@ describe("Jakarta Incident Details override — preview == PDF parity", () => {
         .replace(/'/g, "&#x27;");
     const override = dataset.incidentThemesOverride!;
     expect(override.length).toBeGreaterThan(0);
-    const start = html.indexOf("Incident Details");
+    const start = html.indexOf("Current Situation");
     expect(start).toBeGreaterThanOrEqual(0);
     for (const g of override) {
       expect(html.indexOf(esc(g.heading), start)).toBeGreaterThanOrEqual(0);

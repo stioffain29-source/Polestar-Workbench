@@ -1158,31 +1158,30 @@ function renderStructuredBrief(
     ctx.y += 4;
   }
 
-  // 3. Incident Details — meaningful theme groups of the incidents not already
-  // shown as Top 3 developments. Mirrors the on-screen empty-note logic.
-  drawSectionHeading(ctx, "Incident Details");
+  // 3. Current Situation — the single prose narrative of the period. Mirrors
+  // the merged on-screen section (owner ruling, 28 Jul 2026): framing prose
+  // first, then the themed analytical paragraphs. NO per-incident card lists —
+  // the report reads as analysis, not a feed.
+  drawSectionHeading(ctx, "Current Situation");
+  if (d.executiveSummary.trim() !== "") renderProse(ctx, d.executiveSummary);
   const incidentThemes =
     d.incidentThemesOverride ??
     buildCountryIncidentThemes(d.incidentDetailsItems);
   if (incidentThemes.length === 0) {
-    renderProse(
-      ctx,
-      d.windowItems.length === 0
-        ? d.emptyLocationFallback
-        : d.incidentDetailsItems.length === 0
+    if (d.windowItems.length > 0) {
+      renderProse(
+        ctx,
+        d.incidentDetailsItems.length === 0
           ? "No further incident reporting beyond the developments above this period."
           : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail.",
-    );
+      );
+    } else if (d.executiveSummary.trim() === "") {
+      renderProse(ctx, d.emptyLocationFallback);
+    }
   } else {
     for (const g of incidentThemes) {
       drawJakartaStrandLabel(ctx, g.heading);
       renderProse(ctx, g.paragraph);
-      // Per-item cards are PNG-only (d.showPerIncidentCards), mirroring the
-      // on-screen body for screen==PDF parity. The PNG brief lists each theme
-      // incident's own place + honest date beneath the paragraph; West Papua,
-      // Indonesia and Jakarta stay paragraph-only (inert).
-      const themeItems = d.showPerIncidentCards ? (g.items ?? []) : [];
-      for (const it of themeItems) drawStructuredItemCard(ctx, it, false, true);
     }
   }
   if (tactical) {
@@ -1194,13 +1193,6 @@ function renderStructuredBrief(
     drawJakartaStrandLabel(ctx, "Priority Areas This Week");
     drawJakartaPriorityTable(ctx, tactical.priorityAreas);
   }
-
-  // 4. Current Situation
-  drawSectionWithProse(
-    ctx,
-    "Current Situation",
-    d.executiveSummary || "Not populated.",
-  );
 
   // 5. Operational Impact — per-theme impact lines (≤5).
   drawSectionHeading(ctx, "Operational Impact");

@@ -547,67 +547,59 @@ export default function PngCountryReportBody({
       {mapAt("after-top3")}
       {photoAt("after-top3")}
 
-      {/* 3. Incident Details — PRESENT, MEANINGFUL theme groups of the incidents
-          not already shown as Top 3 developments. Each theme is ONE short,
-          count-free analytical paragraph (no four-part sub-template). Trivial
-          single low-severity themes are filtered upstream; absent themes are
-          omitted rather than padded with "not reported" filler. The empty note
-          is no-fabrication-safe: it only claims "no further reporting" when there
-          truly are no leftover incidents; when leftover incidents existed but all
-          fell below the meaningfulness gate it says so honestly instead. */}
-      {show("incident-details") && (
-      <Section title="Incident Details">
-        {incidentThemes.length === 0 ? (
-          <EmptyNote>
-            {d.windowItems.length === 0
-              ? d.emptyLocationFallback
-              : d.incidentDetailsItems.length === 0
-                ? "No further incident reporting beyond the developments above this period."
-                : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
-          </EmptyNote>
-        ) : (
-          incidentThemes.map((g) => {
-            // Per-item cards are PNG-only (d.showPerIncidentCards). The PNG brief
-            // lists each theme incident's own place + honest date beneath the
-            // theme paragraph via a compact ItemCard. West Papua, Indonesia and
-            // Jakarta stay paragraph-only (inert) — Jakarta's override carries no
-            // items anyway, and the high-volume theatres must never explode.
-            const themeItems = d.showPerIncidentCards ? (g.items ?? []) : [];
-            return (
-              <div key={g.key} style={{ marginBottom: 12 }}>
-                <StrandLabel>{g.heading}</StrandLabel>
-                <Prose text={g.paragraph} />
-                {themeItems.map((it) => (
-                  <ItemCard key={it.id} item={it} compact />
-                ))}
-              </div>
-            );
-          })
+      {/* 3. Current Situation — the single prose narrative of the period.
+          Uniform across every country brief (owner ruling, 28 Jul 2026): the
+          framing paragraphs lead, followed by the themed analytical paragraphs
+          that used to sit under a separate "Incident Details" heading. There is
+          deliberately NO per-incident card list anywhere in this section — the
+          report reads as analysis, not a feed. The empty note stays
+          no-fabrication-safe: it only claims "no further reporting" when there
+          truly are no leftover incidents; when leftover incidents existed but
+          all fell below the meaningfulness gate it says so honestly instead.
+          The legacy override keys keep working: "current-situation" hides the
+          framing prose, "incident-details" hides the themed paragraphs. */}
+      {((show("current-situation") && d.executiveSummary.trim() !== "") ||
+        (show("incident-details") &&
+          (incidentThemes.length > 0 || Boolean(tactical) || d.windowItems.length > 0))) && (
+      <Section title="Current Situation">
+        {show("current-situation") && d.executiveSummary.trim() !== "" && (
+          <Prose text={d.executiveSummary} />
         )}
-        {tactical ? (
+        {show("incident-details") && (
           <>
-            <StrandLabel>Crime Trends and Business Impact</StrandLabel>
-            <Prose text={tactical.crimeTrends.reportedThisPeriod} />
-            <Prose text={tactical.crimeTrends.standingPattern} />
-            <Prose text={tactical.crimeTrends.trendRead} />
-            <CrimeTable rows={tactical.crimeTrends.businessImpact} />
-            <StrandLabel>Priority Areas This Week</StrandLabel>
-            <PriorityTable rows={tactical.priorityAreas} />
+            {incidentThemes.length === 0 ? (
+              d.windowItems.length > 0 ? (
+                <EmptyNote>
+                  {d.incidentDetailsItems.length === 0
+                    ? "No further incident reporting beyond the developments above this period."
+                    : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
+                </EmptyNote>
+              ) : null
+            ) : (
+              incidentThemes.map((g) => (
+                <div key={g.key} style={{ marginBottom: 12 }}>
+                  <StrandLabel>{g.heading}</StrandLabel>
+                  <Prose text={g.paragraph} />
+                </div>
+              ))
+            )}
+            {tactical ? (
+              <>
+                <StrandLabel>Crime Trends and Business Impact</StrandLabel>
+                <Prose text={tactical.crimeTrends.reportedThisPeriod} />
+                <Prose text={tactical.crimeTrends.standingPattern} />
+                <Prose text={tactical.crimeTrends.trendRead} />
+                <CrimeTable rows={tactical.crimeTrends.businessImpact} />
+                <StrandLabel>Priority Areas This Week</StrandLabel>
+                <PriorityTable rows={tactical.priorityAreas} />
+              </>
+            ) : null}
+            {photoAt("inside-incident-details")}
           </>
-        ) : null}
-        {photoAt("inside-incident-details")}
+        )}
       </Section>
       )}
       {mapAt("after-incident-details")}
-
-      {/* 4. Current Situation — concise framing, two short paragraphs maximum.
-          §27: on a sparse week the engine omits this section; skip it entirely
-          rather than rendering filler. */}
-      {show("current-situation") && d.executiveSummary.trim() !== "" && (
-        <Section title="Current Situation">
-          <Prose text={d.executiveSummary} />
-        </Section>
-      )}
 
       {/* 5. Operational Impact — per-theme impact lines for the themes present
           this period. §27: omitted entirely (not filler) when the engine has no
