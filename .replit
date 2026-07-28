@@ -24,6 +24,10 @@ args = "pdf-fonts"
 task = "workflow.run"
 args = "topic-font-audit"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "country-brief-sweep"
+
 [[workflows.workflow]]
 name = "pdf-fonts"
 author = "agent"
@@ -45,6 +49,17 @@ args = "bash artifacts/workbench/scripts/auditTopicFonts.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "country-brief-sweep"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash artifacts/workbench/scripts/verifyCountryBriefs.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -8,11 +8,11 @@ POLESTAR-ADVISORY.COM
 
 BOTTOM LINE UP FRONT
 The most serious validated development in Jakarta was circumstances behind the Matraman clash that
-killed one person in East Jakarta on 28 July 2026. During the reporting period, other operational disruption
-and violent crime events made up most of the reporting, and Central Jakarta carried a disproportionate
-share of it. Reporting volume increased compared with the previous period. For operations, the immediate
-significance is that the lead event bears directly on staff safety and journey planning around the affected
-area, so plans touching East Jakarta deserve the closest attention.
+killed one person in East Jakarta on 28 July 2026. The period also brought 3 Matraman residents named
+suspects in Menteng clash for assault that killed a man in East Jakarta and one person killed in residents'
+clash in Menteng, Central Jakarta in Central Jakarta. During the reporting period, other operational
+disruption and violent crime events made up most of the reporting, and Central Jakarta carried a
+disproportionate share of it. Reporting volume increased compared with the previous period.
 
 TOP 3 DEVELOPMENTS
 
@@ -41,15 +41,13 @@ Protest / civil unrest · Central Jakarta · Reported 26 Jul 2026 · 20detik
 
 For operators, an event of this kind bears directly on staff safety and journey planning around the affected area.
 
-INCIDENT DETAILS
+CURRENT SITUATION
+Security incidents in Jakarta during the reporting period were concentrated in Jakarta, Central Jakarta and
+East Jakarta. Other operational disruption and violent crime were the principal concerns. Central Jakarta
+and Jakarta generated repeat reporting within the period, so the pressure there is sustained rather than a
+one-off. The incidents do not currently form a single nationwide pattern; risk varies by location, and
+movement decisions should be based on current conditions at the destination.
 PROTESTS AND DEMONSTRATIONS
-
-Demonstration reporting centred on the Central Jakarta government district, where activity around
-government buildings and main routes can close roads and slow access at short notice. The practical
-concern is short-notice road closure and delayed movement, not a wider city-wide security deterioration.
-Reporting this period reached high severity and warrants closer monitoring. Against the previous week this
-theme is easing.
-FLOODING AND WEATHER DISRUPTION
 
 polestar-advisory.com
 
@@ -59,14 +57,21 @@ Page 1 of 8
 
 JAKARTA CITY REPORT
 
-Flooding and heavy-rain reporting affected Greater Jakarta and Central Jakarta and schools, where
+Demonstration reporting centred on the Central Jakarta government district, where activity around
+government buildings and main routes can close roads and slow access at short notice. The practical
+concern is short-notice road closure and delayed movement, not a wider city-wide security deterioration.
+Reporting this period reached high severity and warrants closer monitoring. Against the previous week this
+theme is easing.
+FLOODING AND WEATHER DISRUPTION
+
+Flooding and heavy-rain reporting affected Central Jakarta and Greater Jakarta and schools, where
 standing water on low-lying roads can lengthen journeys and delay site access and staff commuting.
 Reported effects include traffic delays. Confirm affected routes before staff travel in these areas. Against
 the previous week this theme is easing.
 FIRE INCIDENTS
 
-Fire reporting this period centred on Central Jakarta, Greater Jakarta and South Jakarta, shopping malls,
-warehouses and hotels. The operational concern is the knock-on effect - possible road closures, local
+Fire reporting this period centred on South Jakarta, Greater Jakarta and East Jakarta, markets, shopping
+malls and warehouses. The operational concern is the knock-on effect - possible road closures, local
 evacuation and restricted access around the site - rather than the fire itself. Confirm the status of the
 affected area before movement nearby. Against the previous week this theme is easing.
 CRIME AND PUBLIC SAFETY
@@ -77,24 +82,17 @@ Reporting this period reached high severity and warrants closer monitoring. Agai
 theme is easing.
 POLICING AND REGULATORY ACTIVITY
 
-Policing and regulatory reporting in Greater Jakarta involved arrests and seizures. The practical concern is
-short-notice restriction - such activity can briefly close roads and limit access around the affected area until
-it clears; confirm cordons on the affected roads before approach. Against the previous week this theme is
-easing.
+Policing and regulatory reporting in Central Jakarta and Greater Jakarta involved arrests and seizures. The
+practical concern is short-notice restriction - such activity can briefly close roads and limit access around
+the affected area until it clears; confirm cordons on the affected roads before approach. Against the
+previous week this theme is easing.
 CRIME TRENDS AND BUSINESS IMPACT
 
-This period's open-source reporting featured theft, robbery and assault in East Jakarta, North Jakarta and
+This period's open-source reporting featured theft, robbery and assault in West Jakarta, East Jakarta and
 Greater Jakarta. The most serious reported was Chelsea, AC Milan to Bring Star Players for Indonesia
 Super Cup Clash, assessed as High severity. Reporting clustered around schools. For business, the
-exposure is staff movement around schools in East Jakarta, North Jakarta and Greater Jakarta rather than
+exposure is staff movement around schools in West Jakarta, East Jakarta and Greater Jakarta rather than
 a city-wide threat. Treat this as a partial signal of the wider picture rather than a complete crime record.
-Jakarta's standing crime picture is dominated by opportunistic and property crime rather than targeted
-attacks on business. The persistent exposures are street theft and pickpocketing around transport hubs
-and crowded commercial areas, vehicle crime and smash-and-grab in traffic, residential and premises
-break-ins in dense districts, and card or ATM fraud. Extortion and informal levies (premanisme) affect
-logistics around ports and industrial areas, and periodic drug-enforcement operations create legal and
-reputational risk for staff and visitors. Violent crime is a lower routine concern but can flare around nightlife,
-crowds and disputes.
 
 polestar-advisory.com
 
@@ -104,6 +102,13 @@ Page 2 of 8
 
 JAKARTA CITY REPORT
 
+Jakarta's standing crime picture is dominated by opportunistic and property crime rather than targeted
+attacks on business. The persistent exposures are street theft and pickpocketing around transport hubs
+and crowded commercial areas, vehicle crime and smash-and-grab in traffic, residential and premises
+break-ins in dense districts, and card or ATM fraud. Extortion and informal levies (premanisme) affect
+logistics around ports and industrial areas, and periodic drug-enforcement operations create legal and
+reputational risk for staff and visitors. Violent crime is a lower routine concern but can flare around nightlife,
+crowds and disputes.
 This reporting sits within Jakarta's standing pattern of opportunistic and property crime rather than
 signalling a city-wide shift; use it to focus staff-movement and site precautions where crime actually
 surfaced this period.
@@ -226,6 +231,24 @@ Confirm flood-hit routes
 before staff move on
 heavy-rain days
 
+polestar-advisory.com
+
+info@polestar-advisory.com
+
+Page 3 of 8
+
+JAKARTA CITY REPORT
+
+#
+
+AREA
+
+DRIVER
+
+BUSINESS IMPACT
+
+ACTION
+
 3
 
 Tanjung Priok / North
@@ -259,24 +282,6 @@ Confirm route and arrival
 window before client
 meetings
 
-polestar-advisory.com
-
-info@polestar-advisory.com
-
-Page 3 of 8
-
-JAKARTA CITY REPORT
-
-#
-
-AREA
-
-DRIVER
-
-BUSINESS IMPACT
-
-ACTION
-
 5
 
 Cross-city toll and ring roads
@@ -308,13 +313,6 @@ Confirm toll-route status
 and build a larger buffer
 before time-critical flights
 
-CURRENT SITUATION
-Security incidents in Jakarta during the reporting period were concentrated in Jakarta, Central Jakarta and
-East Jakarta. Other operational disruption and violent crime were the principal concerns. Central Jakarta
-and Jakarta generated repeat reporting within the period, so the pressure there is sustained rather than a
-one-off. The incidents do not currently form a single nationwide pattern; risk varies by location, and
-movement decisions should be based on current conditions at the destination.
-
 OPERATIONAL IMPACT
 No fresh incident-driven business impact was identified this period. Standing exposures - petty and
 organised urban crime, large demonstrations around the presidential palace, parliament and major
@@ -342,6 +340,10 @@ STAFF COMMUTE
 
 Staff commutes from Bekasi, Depok, Tangerang and South Tangerang into the centre are weather-sensitive; heavy rain on
 low-lying access roads lengthens journeys and can strand low-clearance vehicles.
+DRIVER ROUTE PLANNING
+
+Drivers should confirm two viable routes between office, hotel, Tanjung Priok and Soekarno-Hatta before departure, holding
+diversions around the Thamrin-Sudirman corridor and the Gatot Subroto interchange.
 
 polestar-advisory.com
 
@@ -351,10 +353,6 @@ Page 4 of 8
 
 JAKARTA CITY REPORT
 
-DRIVER ROUTE PLANNING
-
-Drivers should confirm two viable routes between office, hotel, Tanjung Priok and Soekarno-Hatta before departure, holding
-diversions around the Thamrin-Sudirman corridor and the Gatot Subroto interchange.
 AFTER HOURS MOVEMENT
 
 After-hours movement near offices, hotels, malls and transport hubs in the central and southern districts warrants standard
@@ -571,12 +569,22 @@ ESCALATION INDICATORS
 - A security provider advising delay or reroute
 
 POLESTAR VIEW
-Weighed together, the week's reporting bears most on both movement planning and the safety of staff and
-premises, and that is where checks will pay off first. On assessment, the risk is localised and varies by
-location, and it is best managed through location-specific decisions rather than country-wide measures.
-The key judgement is that other operational disruption drives the current concern, while other categories
-contributed limited, separate disruption. Businesses should prioritise verified route and site information for
-Jakarta and Central Jakarta over broad precautionary measures.
+This period the reporting that carried real weight was other operational disruption around Jakarta; the rest
+of the week's items were routine by comparison. Weighed together, the week's reporting bears most on
+both movement planning and the safety of staff and premises, and that is where checks will pay off first.
+On assessment, the risk is localised and varies by location, and it is best managed through location-specific
+decisions rather than country-wide measures. The key judgement is that other operational disruption drives
+the current concern, while other categories contributed limited, separate disruption. Businesses should
+prioritise verified route and site information for Jakarta and Central Jakarta over broad precautionary
+measures.
+
+polestar-advisory.com
+
+info@polestar-advisory.com
+
+Page 7 of 8
+
+JAKARTA CITY REPORT
 
 ZONE
 
@@ -598,22 +606,6 @@ central government district.
 Avoid the palace and parliament
 frontage on demonstration days
 and hold a fallback route.
-
-polestar-advisory.com
-
-info@polestar-advisory.com
-
-Page 7 of 8
-
-JAKARTA CITY REPORT
-
-ZONE
-
-EXPOSURE
-
-REASON
-
-ACTION
 
 2. Tanjung Priok / port access
 
