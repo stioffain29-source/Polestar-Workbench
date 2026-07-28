@@ -204,27 +204,27 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
 // content. Kept distinct from the Watch Next bullet line.
 export function forecastMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Road closures and venue-access friction around party HQs, court complexes and city centres.";
-  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Trigger WFH and close public-facing sites in the affected area.";
-  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Pharmacy supply disruption 24-72h ahead; brief procurement and customer-care.";
-  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Sectoral disruption pending court ruling; pre-position contingency supply.";
-  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Sectoral walkout risk; brief logistics and field operations on local delays.";
-  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Campus action seeds city-centre protests within a week; expect adjoining-road disruption.";
-  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security and visitor management.";
-  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "Adverse ruling converts into same-day rallies near the court complex.";
-  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Validate against logistics corridor; pre-position alternative routings.";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply disruption and sectoral closures 24-72h ahead.";
-  return "Confirm details, expected turnout and operating impact inside 24-48h.";
+  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Possible road closures and venue-access friction around party offices, courts and city centres.";
+  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Review site access and staff movement in the affected area.";
+  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Possible pharmacy supply disruption; check whether it affects your suppliers.";
+  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Possible sectoral disruption pending the court ruling.";
+  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Possible sectoral walkout; check for local transport or delivery delays.";
+  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Possible disruption on roads near the named campus.";
+  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security.";
+  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "The ruling could prompt gatherings near the court; watch the outcome.";
+  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Check against the routes the business uses and plan alternatives.";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Possible supply and sectoral disruption; check whether named sites are affected.";
+  return "Confirm the details, expected turnout and operating impact.";
 }
 
 export function operationalMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply disruption and sectoral closures 24-72h ahead.";
-  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "road closures and venue-access friction; brief drivers in advance.";
-  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "adverse ruling triggers same-day rallies near the court complex.";
-  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate against logistics corridor; pre-position alternative routings.";
-  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger WFH and close public-facing sites in the affected area.";
-  return "confirm details and likely turnout inside 24-48h.";
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "possible supply and sectoral disruption; check whether named sites are affected.";
+  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "possible road closures and venue-access friction near the named location.";
+  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "the ruling could prompt gatherings near the court; watch the outcome.";
+  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "check against the routes the business uses and plan alternatives.";
+  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "review site access and staff movement in the affected area.";
+  return "confirm the details and likely turnout.";
 }
 
 // A rendered forewarning row. `announcedAt` is the ANNOUNCEMENT / report date

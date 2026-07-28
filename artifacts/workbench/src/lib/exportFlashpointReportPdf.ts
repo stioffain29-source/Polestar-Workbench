@@ -7,6 +7,7 @@ import {
   drawSubtitle,
   renderProse,
   drawSectionWithProse,
+  drawSectionKeepTogether,
   setRoboto,
   ensureRobotoLoaded,
   drawFastFactsKpiCards,
@@ -677,7 +678,9 @@ export async function exportFlashpointReportPdf(
     return `${t}\n\n${auto}`;
   };
   if (show("what-matters")) {
-    drawSectionWithProse(
+    // "What Matters" is a short, self-contained judgement section, so keep the
+    // whole section on one page rather than allowing it to split at a break.
+    drawSectionKeepTogether(
       ctx,
       "What Matters",
       pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),

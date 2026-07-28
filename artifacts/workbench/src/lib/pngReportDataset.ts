@@ -1968,7 +1968,9 @@ export function buildStructuredReportDataset(
   let operationalImpactOverride: string[] | undefined;
   let jakartaEscalationIndicators: string[] | undefined;
   let jakartaTacticalBrief: JakartaTacticalBrief | undefined;
-  let keepPolestarTogether = false;
+  // The Polestar View closes the brief and must never straddle a page break
+  // in the DOM-rasterised PDF (owner feedback) — keep it together everywhere.
+  let keepPolestarTogether = true;
 
   // --- Operating-risk prose variant (Indonesia / Jakarta only) ---------------
   // Override the BLUF, Executive Summary, Priorities This Week and Polestar View

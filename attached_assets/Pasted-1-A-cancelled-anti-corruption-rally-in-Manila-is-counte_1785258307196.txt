@@ -1,0 +1,79 @@
+1. A cancelled anti-corruption rally in Manila is counted as a completed protest incident.
+
+2. A Kathmandu photo feature is counted as a separate protest incident.
+
+3. An article about people filming “fit checks” during a protest is counted as a separate incident.
+
+4. A profile explaining how an individual became the face of a protest movement is counted as a separate incident.
+
+5. “India’s Protest Movement Ends After Minister Quits” and “India’s CJP says ending protest after minister resigns” appear to describe the same event but are counted separately.
+
+6. The total of 76 incidents is therefore still based on questionable and duplicated records.
+
+7. The Executive Summary still uses phrases such as “operational tempo”, “standing baseline”, “supporting watch areas”, “continuity comms”, “live country-lead routing” and “headline-severity tracking”.
+
+8. The Executive Summary states that the week was “not routine” without defining or evidencing that judgement.
+
+9. The report claims that events move from announcement to disruption inside one working day without presenting supporting data.
+
+10. The report claims that separate campaigns are harder for authorities to contain without evidence.
+
+11. The report claims that protests historically become rolling road action within 24–72 hours without showing the historical evidence.
+
+12. The report claims that supplier disruption follows sectoral walkouts a day later without supporting data.
+
+13. The Civil Unrest section says police action shortens the path from an announced rally to violence from days to hours.
+
+14. The Civil Unrest section predicts internet shutdowns and patchy connectivity without evidence from the listed incidents.
+
+15. The Civil Unrest section treats road closures and venue restrictions as expected outcomes rather than assessed possibilities.
+
+16. The forecast table repeatedly uses an arbitrary 24–48-hour confirmation window.
+
+17. The forecast states that supply disruption and sectoral closures will occur 24–72 hours ahead without evidence.
+
+18. The forecast opening sentence remains awkward and mechanical.
+
+19. The India and Thailand comparison is repetitive and over-written.
+
+20. The forecast introduces court rulings and policy decisions without identifying any named upcoming event.
+
+21. The South Korea country summary appears copied from another country template.
+
+22. The South Korea summary refers to student actions, pharmacies, courts and hauliers without connecting them to the six South Korean records.
+
+23. The Philippines and South Korea summaries use nearly identical wording despite different incident profiles.
+
+24. “What Matters” is split across two pages.
+
+25. “What Matters” repeats analysis already stated in the Executive Summary and Forecast.
+
+26. “What Matters” claims that regional spread is harder to police and harder to predict without evidence.
+
+27. It claims that separate incidents routinely become rolling disruption across several countries in the same week.
+
+28. It describes the interaction between protest activity and police response as a “classic pattern” without evidence.
+
+29. It predicts curfews, internet shutdowns and mass arrests following a high-profile incident without a named supporting trigger.
+
+30. The business implications apply broad regional measures to incidents that are mainly localised.
+
+31. The business implications include guard reinforcement without linking it to a specific threat.
+
+32. The business implications treat any new Section 144 order or curfew as an automatic work-from-home and same-day site-closure trigger.
+
+33. The business implications refer to an undefined security early-warning feed.
+
+34. Watch Next presents road closures and access problems as expected outcomes rather than possibilities.
+
+35. Watch Next includes “India – the next dated opposition, trade-group or court call”, which is not a named or confirmed event.
+
+36. The Polestar View still uses “operational tempo”, “headline severity” and “city-by-city focus”.
+
+37. The Polestar View repeats the same short-notice disruption judgement already used elsewhere.
+
+38. The Related Incidents table still includes the Kathmandu photo feature.
+
+39. The Related Incidents table still includes records selected from the questionable incident dataset.
+
+40. The report’s prose remains repetitive, automated and more complicated than the underlying assessment.

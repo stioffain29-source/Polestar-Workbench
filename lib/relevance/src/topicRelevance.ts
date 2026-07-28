@@ -697,6 +697,44 @@ const FP_CANCELLED_ACTION_RE =
 const FP_CANCELLED_KEEP_RE =
   /\b(continu\w*|resum\w*|protest|clash\w*|charge[sd]?|defy|defian\w*|escalat\w*|riot\w*|violen\w*|killed?|injured)\b/i;
 
+// Cancelled / called-off RALLY or PROTEST = a NON-EVENT (the gathering never
+// took place). Title-bound and verb-BEFORE-noun ("anti-corruption rally called
+// off", "organisers call off tomorrow's protest") so a genuine long-running
+// protest that later concludes ("105-day protest ... called off" — noun first,
+// with a duration) is NOT matched. The cancel verb must sit immediately before
+// the rally/protest noun, optionally through a "planned/scheduled/announced"
+// qualifier, which never appears in a post-hoc "the protest was called off"
+// report. Spared when the headline shows the action still went ahead or turned
+// to unrest (FP_CANCELLED_EVENT_KEEP_RE), so "rally goes ahead despite ban" is
+// kept.
+const FP_CANCELLED_EVENT_RE =
+  // Verb-before-noun: "organisers call off tomorrow's protest".
+  /\b(call(s|ed)?\s+off|called[- ]off|cancel(s|led|ling)?|scrap(s|ped|ping)?|postpon(e|es|ed|ing)|defer(s|red|ring)?|abandon(s|ed|ing)?)\s+(?:its\s+|the\s+|a\s+|an\s+|their\s+|today'?s\s+|tomorrow'?s\s+|this\s+week'?s\s+|planned\s+|scheduled\s+|proposed\s+|upcoming\s+|announced\s+|weekend\s+|[a-z-]+\s+){0,4}(rall(y|ies)|protests?|marches?|march|demonstrations?|sit[- ]?ins?|picket)\b/i;
+// Noun-before-verb: "anti-corruption rally called off". Spared when a preceding
+// DURATION / "held/staged/ongoing" marker shows the gathering actually happened
+// (the concluded "105-day protest ... called off" case), which is handled by
+// FP_CANCELLED_EVENT_KEEP_RE below.
+const FP_CANCELLED_EVENT_NOUN_RE =
+  /\b(rall(y|ies)|protests?|marches?|march|demonstrations?|sit[- ]?ins?|picket)\b[^.!?]{0,20}\b(call(s|ed)?\s+off|called[- ]off|cancel(s|led|ling)?|scrap(s|ped|ping)?|postpon(e|ed)|abandon(s|ed|ing)?)\b/i;
+const FP_CANCELLED_EVENT_KEEP_RE =
+  /\b(goes?\s+ahead|went\s+ahead|defy|defian\w*|despite\s+(the\s+)?(ban|cancel|call)|still\s+(held|gather|march|protest)|clash\w*|riot\w*|violen\w*|tear[- ]?gas|killed?|injured|arrest\w*|storm\w*|\d+[- ]day|\d+[- ]week|\d+[- ]month|days?[- ]?long|weeks?[- ]?long|month\w*[- ]?long|ongoing|held|staged|began|begun|started|entered\s+(?:its\s+)?\d+)\b/i;
+
+// Profile / personality feature — "How X became the face of the movement", "the
+// woman behind the protests", "meet the teenager leading the marches". A
+// biographical portrait of an activist, not a report of a dated event. Bound to
+// the distinctive profile framing so a live headline that merely names a person
+// ("Balen Shah leads Kathmandu rally") is untouched.
+const FP_PROFILE_FEATURE_RE =
+  /\b(became?|becoming|is|are)\s+the\s+(face|voice|symbol|icon|figurehead|poster\s+(child|girl|boy))\s+of\b|\bthe\s+(man|woman|teen(ager)?|student|activist|youth|face|voice|leader)\s+(behind|driving|leading)\s+(the\s+)?(protests?|movement|rally|marches|uprising|unrest)\b|\bmeet\s+the\s+[a-z-]+\s+(who|leading|behind|driving)\b|\b(rise|profile|portrait)\s+of\s+(the\s+)?[a-z-]+\s+(protest|movement|activist)\b/i;
+
+// Social-media-culture SIDEBAR about a protest — "fit checks", outfits, viral
+// looks, influencer content, aesthetics AT a demo. Colour about the online
+// culture around a protest, not a report of the public-order event itself.
+// Bound to the culture cue adjacent to a protest word so a genuine unrest
+// headline is untouched.
+const FP_SOCIAL_SIDEBAR_RE =
+  /\bfit\s+checks?\b|\b(outfit|fashion|aesthetic|vibe|look|style|makeup|drip|ootd|selfie|thirst\s+trap|influencer|content\s+creator|tiktok\w*|instagram\w*|viral\s+(video|clip|look|dance|trend))s?\b[^.!?]{0,40}\b(protest|rally|march|demonstration|unrest)\b|\b(protest|rally|march|demonstration|unrest)\b[^.!?]{0,40}\bfit\s+checks?\b/i;
+
 // Shared "is there genuine unrest here?" companion — spares a figurative match
 // that sits alongside a real public-order signal.
 const FP_REAL_UNREST_COMPANION_RE =
@@ -766,7 +804,7 @@ const FP_FACTCHECK_OUTLET_RE =
 // "what's next for" think-pieces, "lessons from" / "why X matters". A bundle
 // or retrospective, not a single civil-unrest event.
 const FP_EDITORIAL_FORMAT_RE =
-  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|\bphoto\s+(gallery|essay)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b|^\s*why\b[^.!?]{0,80}\b(protest\w*|unrest|movement)\b/i;
+  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|^\s*(in\s+)?(photos|pictures)\s*[:|]|\b(photos|pictures)\s*[:|]\s|\bphoto\s+(gallery|essay|feature)\b|\b(protests?|unrest|rally|march|demonstration)\b[^.!?]{0,30}\bin\s+(photos|pictures)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b|^\s*why\b[^.!?]{0,80}\b(protest\w*|unrest|movement)\b/i;
 
 // Protest AFTERMATH / clean-up (street cleaning after a demo, a "protests
 // aftermath" retrospective) — a non-event, unless an ongoing-unrest signal
@@ -1902,6 +1940,24 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
     if (FP_DISPLAY_DEMONSTRATION_RE.test(text) && !FP_PROTEST_COMPANION_RE.test(text)) {
       return { relevant: false, reason: "slop: product/skill 'demonstration' (display/exhibition, not a protest)" };
     }
+    // Cancelled/called-off gathering, activist profile feature, social-media
+    // sidebar and photo/editorial format — non-events that share protest
+    // vocabulary. Drop BEFORE the title-rescue, mirroring explainRelevance.
+    if (
+      (FP_CANCELLED_EVENT_RE.test(titleHaystack(i)) || FP_CANCELLED_EVENT_NOUN_RE.test(titleHaystack(i))) &&
+      !FP_CANCELLED_EVENT_KEEP_RE.test(titleHaystack(i))
+    ) {
+      return { relevant: false, reason: "slop: cancelled/called-off rally or protest (non-event)" };
+    }
+    if (FP_PROFILE_FEATURE_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: activist profile/personality feature (not a protest)" };
+    }
+    if (FP_SOCIAL_SIDEBAR_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: social-media-culture sidebar (not a protest)" };
+    }
+    if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: editorial format (photo feature/listicle/think-piece)" };
+    }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
     }
@@ -2100,6 +2156,26 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Cancelled / suspended industrial action (non-event) — title-bound.
     if (FP_CANCELLED_ACTION_RE.test(titleHaystack(i)) && !FP_CANCELLED_KEEP_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: cancelled/suspended industrial action (non-event)" };
+    }
+    // Cancelled / called-off rally or protest (a gathering that never took
+    // place) — title-bound, verb-before-noun so a concluded long protest is
+    // kept. Runs before the title-rescue so the bare word "rally"/"protest"
+    // cannot rescue a non-event.
+    if (
+      (FP_CANCELLED_EVENT_RE.test(titleHaystack(i)) || FP_CANCELLED_EVENT_NOUN_RE.test(titleHaystack(i))) &&
+      !FP_CANCELLED_EVENT_KEEP_RE.test(titleHaystack(i))
+    ) {
+      return { relevant: false, reason: "excluded: cancelled/called-off rally or protest (non-event)" };
+    }
+    // Personality PROFILE feature ("how X became the face of the movement") —
+    // a biographical portrait, not a dated event. Runs before the title-rescue.
+    if (FP_PROFILE_FEATURE_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: activist profile/personality feature (not a civil-unrest event)" };
+    }
+    // Social-media-culture sidebar ("fit checks" / outfits / viral looks at a
+    // protest) — colour about the online culture, not the public-order event.
+    if (FP_SOCIAL_SIDEBAR_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: social-media-culture sidebar (not a civil-unrest event)" };
     }
     // "Demonstration" as a product/vehicle/skill DISPLAY, not a protest ("…
     // demonstration flights of flying car"). Runs before the title-rescue so the

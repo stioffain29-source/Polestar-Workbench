@@ -73,7 +73,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     reason: "successful_routine_response",
     status: "Not an incident",
-    re: /\b(safely rescued|all (?:passengers|crew) (?:were )?rescued|rescued unharmed|successful\w* (?:rescue|evacuation|drill|exercise)|routine drill|training (?:drill|exercise)|mock drill|safely evacuated|no (?:injuries|casualties) reported)\b/i,
+    re: /\b(safely rescued|all (?:passengers|crew) (?:were )?rescued|rescued unharmed|successful\w* (?:rescue|evacuation|drill|exercise)|routine drill|training (?:drill|exercise)|mock drill|safely evacuated|no (?:injuries|casualties) reported|(?:crew|fishermen|sailors|passengers|survivors|villagers) (?:were |all )*rescued|rescu\w* (?:of )?(?:the )?(?:crew|fishermen|sailors|passengers|survivors|tug ?boat)|tow(?:ed|s|ing)? (?:to safety|ashore)|brought (?:safely )?ashore|found (?:alive|safe and well))\b/i,
   },
   {
     // §7 gate tuning: judicial / prosecutorial PROCESS reporting (trials,
@@ -115,6 +115,13 @@ const EXCLUSION_RULES: ExclusionRule[] = [
 const UNREST_COMPANION_RE =
   /\b(protest\w*|demonstrat\w*|rally|rallies|rallied|riot\w*|marchers|march(?:es|ed)? (?:on|to|through)|strike\b|walkout|picket\w*|blockad\w*|road ?block)\b/i;
 const POLICING_COMPANION_RE = /\b(raid\w*|searched|swoop|manhunt|cordon)\b/i;
+
+// Prevention / mediation / awareness framing: when a soft-excluded story (e.g.
+// a counselling programme "to reduce sorcery-related violence") mentions past
+// violence, the hard-event cue must NOT rescue it — the story is about the
+// response, not a fresh occurrence.
+const PREVENTION_FRAME_RE =
+  /\b(counsell\w*|counseling|mediat\w*|reconciliation|peacebuilding|peace (?:talks|process|programme|program)|awareness|advocacy|to (?:reduce|curb|end|stop|prevent|tackle|address)|reducing|curbing|education (?:campaign|programme|program))\b/i;
 
 const HARD_EVENT_RE =
   /\b(killed|shot dead|gunned down|stabbed|murder\w*|dead|fatalit\w*|bodies|explosion|bombing|blast|open(?:ed)? fire|gun ?(?:fight|battle|men)|ambush\w*|riot\w*|clash\w*|torched|set (?:on )?fire|derail\w*|capsiz\w*|hijack\w*|kidnap\w*|abduct\w*|hostage|looted|ransack\w*)\b/i;
@@ -220,7 +227,7 @@ export function classifyArticle(
       rule.reason === "successful_routine_response" ||
       rule.reason === "legal_process" ||
       rule.reason === "preparedness_or_awareness";
-    if (overridable && hardEvent) continue;
+    if (overridable && hardEvent && !PREVENTION_FRAME_RE.test(text)) continue;
     return {
       isEvent: false,
       eventStatus: rule.status,

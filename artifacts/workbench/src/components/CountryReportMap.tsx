@@ -595,10 +595,16 @@ function ImpactChip({ impact }: { impact: ImpactLevel }) {
   );
 }
 
-function ImpactLegend() {
+function ImpactLegend({ present }: { present?: Set<string> }) {
+  // Only show the impact levels actually plotted — a legend entry with no
+  // corresponding marker is noise (owner feedback: an all-Monitor map must not
+  // carry Direct/Indirect legend rows).
+  const levels = present
+    ? IMPACT_ORDER.filter((p) => present.has(p))
+    : IMPACT_ORDER;
   return (
     <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-      {IMPACT_ORDER.map((p) => (
+      {levels.map((p) => (
         <div key={p} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
@@ -1111,7 +1117,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         {mapContainer}
         {points.length > 0 ? (
           <>
-            <ImpactLegend />
+            <ImpactLegend present={new Set(points.map((p) => p.impact))} />
             <ImpactCardGrid points={points} />
             {zoneAgg.unattributed > 0 ? (
               <div
@@ -1162,7 +1168,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       />
       {dotPoints.length > 0 ? (
         <>
-          <ImpactLegend />
+          <ImpactLegend present={new Set(dotPoints.map((p) => p.impact))} />
           <ImpactCardGrid points={dotPoints} />
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}

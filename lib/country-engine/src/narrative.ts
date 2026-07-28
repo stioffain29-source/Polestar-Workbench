@@ -419,7 +419,8 @@ const CATEGORY_IMPLICATIONS: Partial<Record<IssueCategory, string>> = {
   "Policing operation":
     "brings checkpoints and short-notice road restrictions to the surrounding area",
   Aviation: "affects flight reliability and connections through the airports involved",
-  Maritime: "affects port calls and sea freight through the waters or ports involved",
+  Maritime:
+    "can affect movement by sea where ports or scheduled services are involved",
   "Road and rail": "affects journey times and overland freight on the routes involved",
   Utilities: "affects power or water reliability for sites in the served area",
   Telecommunications:
@@ -479,12 +480,14 @@ function trajectorySentence(
   priorPeriodEvents: CanonicalEvent[],
 ): string {
   const delta = events.length - priorPeriodEvents.length;
+  // §16 — comparative claims always carry the figures they rest on.
+  const figures = `(${events.length} validated ${events.length === 1 ? "event" : "events"} against ${priorPeriodEvents.length})`;
   const volume =
     delta >= 2
-      ? "Reporting volume increased compared with the previous period"
+      ? `Reporting volume increased compared with the previous period ${figures}`
       : delta <= -2
-        ? "Reporting volume fell compared with the previous period"
-        : "Reporting volume was broadly in line with the previous period";
+        ? `Reporting volume fell compared with the previous period ${figures}`
+        : `Reporting volume was broadly in line with the previous period ${figures}`;
   const worst = (list: CanonicalEvent[]): number =>
     list.reduce((m, e) => Math.max(m, severityRank(e.severity)), -1);
   const cur = worst(events);
@@ -496,6 +499,28 @@ function trajectorySentence(
         ? ", and the most serious reporting worsened"
         : ", while the most serious reporting eased";
   return `${volume}${sev}.`;
+}
+
+/**
+ * The category that carries the report's real weight — seriousness-first, not
+ * volume-first. Ranked by worst severity, then reported harm, then count, so a
+ * cluster of routine maritime items can never outrank a High violent-crime
+ * event as "the main concern".
+ */
+function principalCategoryBySeriousness(
+  events: CanonicalEvent[],
+): IssueCategory {
+  let best: { cat: IssueCategory; score: number } | null = null;
+  for (const [cat, list] of groupByCategory(events)) {
+    const worst = list.reduce((m, e) => Math.max(m, severityRank(e.severity)), 0);
+    const harm = list.reduce(
+      (n, e) => n + (e.casualties ?? 0) + (e.injuries ?? 0),
+      0,
+    );
+    const score = worst * 10000 + Math.min(harm, 99) * 100 + list.length;
+    if (!best || score > best.score) best = { cat, score };
+  }
+  return best!.cat;
 }
 
 /** Group events by primary issue category. */
@@ -697,15 +722,19 @@ export function buildBluf(
   // within the limit. Compaction never invents words — it only drops trailing
   // clauses — and the §33 reference check accepts the compact form.
   const otherTop = topRanked.slice(1);
+  // §15 — the lead sentence is OUR sentence (category + place + date); the
+  // stored headline appears as a quoted reference, never spliced lower-cased
+  // into the narrative as if it were our prose.
   const composeMandatory = (titleOf: (t: string) => string) => {
     const first =
       `The most serious validated development in ${countryName} was ` +
-      `${lowerFirst(titleOf(lead.eventTitle))}${locationClause(lead)} on ${formatDate(lead.eventDate)}.`;
+      `${categoryPhrase(lead.issueCategory)}${locationClause(lead)} on ${formatDate(lead.eventDate)} (“${titleOf(lead.eventTitle)}”).`;
     const second =
       otherTop.length > 0
         ? `The period also brought ${joinAnd(
             otherTop.map(
-              (e) => `${lowerFirst(titleOf(e.eventTitle))}${locationClause(e)}`,
+              (e) =>
+                `${categoryPhrase(e.issueCategory)}${locationClause(e)} (“${titleOf(e.eventTitle)}”)`,
             ),
           )}.`
         : "";
@@ -788,7 +817,9 @@ export function buildBluf(
 
   // Sentence 3 — practical meaning for operations (only evidence-based).
   let s3 = "";
-  const confirmed = events.find((e) => e.confirmedOperationalEffect);
+  // §14/§15 — the BLUF's operational sentence must come from the validated
+  // top developments, never from a story the reader is not shown.
+  const confirmed = topRanked.find((e) => e.confirmedOperationalEffect);
   if (confirmed && confirmed.confirmedOperationalEffect) {
     s3 = `${confirmed.confirmedOperationalEffect.trim()}`;
     if (!/[.!?]$/.test(s3)) s3 += ".";
@@ -1357,10 +1388,13 @@ export function buildOutlook(
   }
 
   const byCat = groupByCategory(events);
-  const principal = [...byCat.entries()].sort(
-    (a, b) => b[1].length - a[1].length,
-  )[0];
-  const principalCategory = principal[0];
+  // Seriousness-first: the outlook's "main concern" must follow the most
+  // serious reporting, never the most frequent category.
+  const principalCategory = principalCategoryBySeriousness(events);
+  const principal: [IssueCategory, CanonicalEvent[]] = [
+    principalCategory,
+    byCat.get(principalCategory) ?? events,
+  ];
   const ongoing = events.filter((e) => e.eventStatus === "Ongoing");
   const locations = unique(
     (ongoing.length ? ongoing : events).map((e) => locationLabel(e)),
@@ -1539,10 +1573,9 @@ export function buildPolestarView(
 
   const { locations } = priorityLocations(events);
   const scope = locations.length > 1 ? "localised and varies by location" : "localised";
-  const byCat = groupByCategory(events);
-  const principal = [...byCat.entries()].sort(
-    (a, b) => b[1].length - a[1].length,
-  )[0][0];
+  // Seriousness-first — the View's "drives the current concern" judgement must
+  // track the most serious reporting, never the most frequent category.
+  const principal = principalCategoryBySeriousness(events);
 
   // Exposure orientation — is the week's reporting mostly about how people and
   // goods move, or about the safety of staff and premises? Derived from the
@@ -1579,22 +1612,20 @@ export function buildPolestarView(
   // What actually happened this period — the honest anchor. Grounded in the
   // worst reported event's category and place so the View opens with substance
   // rather than a generic posture line.
-  const worstEvent = [...events].sort(
-    (a, b) => severityRank(b.severity) - severityRank(a.severity),
-  )[0];
+  const worstEvent = rankEvents(events)[0];
   const anchorPlace = locationLabel(worstEvent);
   // Never name the whole country as a "location" — if the worst event resolved
   // no sub-national place, anchor on the category alone.
   const anchorSentence =
     anchorPlace && anchorPlace !== worstEvent.physicalCountry
-      ? `This period the reporting that carried real weight was ${categoryPhrase(worstEvent.issueCategory)} around ${anchorPlace}; the rest of the week's items were routine by comparison.`
-      : `This period the reporting that carried real weight was ${categoryPhrase(worstEvent.issueCategory)}; the rest of the week's items were routine by comparison.`;
+      ? `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)} around ${anchorPlace}; other items were routine by comparison.`
+      : `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)}; other items were routine by comparison.`;
 
   // Candidate judgement sentences — each grounded, each tested for overlap.
   const candidates: { text: string; claimType: ClaimType }[] = [
     { text: anchorSentence, claimType: "Assessment" },
     {
-      text: `Weighed together, the week's reporting bears most on ${focusPhrase}, and that is where checks will pay off first.`,
+      text: `Taken together, the week's reporting matters most for ${focusPhrase}, and that is where checks should focus first.`,
       claimType: "Assessment",
     },
     {

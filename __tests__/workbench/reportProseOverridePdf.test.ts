@@ -88,6 +88,10 @@ jest.mock("../../artifacts/workbench/src/lib/pdfChrome", () => {
       record(body);
       if (ctx && typeof ctx.y === "number") ctx.y += 10;
     },
+    drawSectionKeepTogether: (ctx: { y: number }, _title: unknown, body: unknown) => {
+      record(body);
+      if (ctx && typeof ctx.y === "number") ctx.y += 10;
+    },
     drawBulletSection: (
       ctx: { y: number },
       _title: unknown,

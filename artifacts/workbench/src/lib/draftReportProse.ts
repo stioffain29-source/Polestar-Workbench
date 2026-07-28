@@ -582,22 +582,22 @@ const FLASHPOINT: ReportPack = {
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
     const geoLead = lead
-      ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
+      ? `${lead} carries the heaviest concentration${secondaries ? `, with further activity in ${secondaries}` : ""}`
       : "no single country stands out this week";
     const sevClause = sev
-      ? ` The most serious reached ${sev.toLowerCase()}, so this week is not routine.`
+      ? ` The most serious reached ${sev.toLowerCase()}.`
       : "";
     const thinClause = thin && total > 0
       ? " There is little to go on this week, so treat this as a rough guide."
       : "";
-    const para1 = `Flashpoint risk this week is about operational tempo rather than a single headline event. It was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
-    const para2 = `What stands out is speed: these events move from notice to road closure, transport halt or site-access disruption inside a working day. The pattern is rapid escalation against a standing baseline, not isolated flare-ups.`;
-    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Standing readiness — refreshed journey-management, agreed escalation triggers and live country-lead routing — does more work this week than headline-severity tracking.`;
+    const para1 = `Flashpoint risk this week was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `The events in scope are protests, strikes and public-order disruption that can affect road access, transport and site entry in the cities named.`;
+    const para3 = `For business users the practical points are staff movement, site access and staff communications in the named cities. Refreshed journey plans and agreed escalation contacts are the useful steps this week.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Fast-moving events on streets, transport hubs and central business districts shape the picture, with ${types} the visible drivers.` : "Fast-moving events on streets, transport hubs and central business districts shape the picture, with rapid escalation the standing risk.";
-    return `${focus} Operational impact lands quickly when these surface.`;
+    const focus = types ? `Events on streets, transport hubs and central business districts shape the picture, with ${types} the visible drivers.` : "Events on streets, transport hubs and central business districts shape the picture.";
+    return `${focus}`;
   },
   whatHappened: ({ types, countries, sev }) => {
     const lead = types ? `Disruption centred on ${types}.` : `Little flashpoint activity came through.`;
@@ -605,22 +605,22 @@ const FLASHPOINT: ReportPack = {
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {
-    const where = countries ? ` Repeat activity in ${countries} is what drives live staff-movement risk.` : "";
-    return `Speed is the issue: these events move from notice to road closure inside a working day, putting staff movement, site access and crisis comms under real-time pressure.${where}`;
+    const where = countries ? ` Repeat activity in ${countries} is where staff-movement risk is most likely.` : "";
+    return `The practical concern is staff movement, site access and staff communications where these events fall on the areas the business uses.${where}`;
   },
   implications: () =>
-    "Hold journey management at short notice, refresh shelter-in-place and lockdown procedures, and confirm escalation routes with country leads.",
+    "Keep journey plans ready to adjust, review site-access and shelter procedures, and confirm escalation contacts with country leads.",
   watchNext: () =>
-    "Track planned political dates, calls to mobilise, security-force deployments and any sign of cross-city escalation.",
+    "Track named, dated protest calls, announced strike notices and scheduled hearings reported this week.",
   polestarView: ({ lead }) => {
-    const tail = lead ? ` ${lead} remains the city-by-city focus.` : "";
-    return `The story this week is operational tempo rather than headline severity. Standing readiness on affected cities is what protects continuity.${tail}`;
+    const tail = lead ? ` ${lead} carries the most activity.` : "";
+    return `The week reads as protest and public-order disruption to plan around rather than a single headline event.${tail}`;
   },
   zeroExec: "Flashpoint reporting was quiet this week. Read that as a gap in reporting, not proof that the streets are calm.",
-  zeroSituation: "Fast-moving disruption risk on transport hubs and central business districts persists whether or not new reporting lands.",
+  zeroSituation: "Protest and public-order disruption risk on transport hubs and central business districts persists whether or not new reporting lands.",
   zeroWhatHappened: "Little flashpoint activity came through, so the picture draws on recent weeks.",
-  zeroWhatMatters: "Speed of escalation continues to set the operational concern; staff movement and site access stay the live points.",
-  zeroPolestar: "Nothing useful came through on flashpoint activity this week. Maintain standing readiness on previously affected cities.",
+  zeroWhatMatters: "Staff movement and site access stay the practical points to watch.",
+  zeroPolestar: "Nothing useful came through on flashpoint activity this week. Keep standing plans for previously affected cities in place.",
   thinNote: "Flashpoint reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
 };
 
@@ -716,21 +716,21 @@ const PROTESTS: ReportPack = {
       ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
       : "";
     const geoLead = lead
-      ? `${lead} carries the heaviest concentration${secondaries ? `, with ${secondaries} as supporting watch areas` : ""}`
+      ? `${lead} carries the heaviest concentration${secondaries ? `, with further activity in ${secondaries}` : ""}`
       : "no single country stands out this week";
     const sevClause = sev
-      ? ` The most serious reached ${sev.toLowerCase()}, so this week is not routine.`
+      ? ` The most serious reached ${sev.toLowerCase()}.`
       : "";
     const thinClause = thin && total > 0
       ? " There is little to go on this week, so treat this as a rough guide."
       : "";
-    const para1 = `Public-order risk this week is about operational tempo rather than a single headline event. It was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
-    const para2 = `What stands out is speed: these events move from notice to road closure, transit halt or site-access disruption inside a working day. The pattern is rapid escalation against a standing baseline of unrest, not isolated flare-ups.`;
-    const para3 = `For business users the implication is straightforward: protect staff movement, site access and continuity comms against short-notice disruption on the named cities. Refreshed journey-management plans, agreed escalation triggers and live country-lead routing do more work this week than headline-severity tracking.`;
+    const para1 = `Public-order risk this week was shaped by ${driver}, and ${geoLead}.${sevClause}${thinClause}`;
+    const para2 = `The events in scope are protests, strikes and public-order disruption that can affect road access, transit and site entry in the cities named.`;
+    const para3 = `For business users the practical points are staff movement, site access and staff communications in the named cities. Refreshed journey plans and agreed escalation contacts are the useful steps this week.`;
     return `${para1}\n\n${para2}\n\n${para3}`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Most events touch transport, access and central business districts, with ${types} the active patterns.` : "Most events touch transport, access and central business districts, with rapid disruption the standing risk.";
+    const focus = types ? `Most events touch transport, access and central business districts, with ${types} the active patterns.` : "Most events touch transport, access and central business districts.";
     return `${focus}`;
   },
   whatHappened: ({ types, countries, sev }) => {
@@ -739,21 +739,21 @@ const PROTESTS: ReportPack = {
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {
-    const where = countries ? ` Concentration in ${countries} carries the operational weight.` : "";
-    return `These events move quickly from notice to disruption, putting staff movement, site access and business continuity under real-time pressure.${where}`;
+    const where = countries ? ` Concentration in ${countries} is where the practical weight sits.` : "";
+    return `The practical concern is staff movement, site access and staff communications where these events fall on the areas the business uses.${where}`;
   },
   implications: () =>
-    "Review staff movement plans, journey management for affected cities, site access controls and standing crisis communication triggers.",
+    "Review staff movement plans, journey plans for affected cities, site-access controls and standing communication contacts.",
   watchNext: () =>
-    "Track planned protest dates, university and union calls to action, police deployment notices and any escalation in arrest numbers.",
+    "Track named, dated protest calls, university and union announcements and scheduled hearings reported this week.",
   polestarView: ({ lead }) => {
-    const tail = lead ? ` ${lead} remains the city-by-city focus.` : "";
-    return `Operational tempo, not headline severity, is the picture this week.${tail}`;
+    const tail = lead ? ` ${lead} carries the most activity.` : "";
+    return `The week reads as public-order disruption to plan around rather than a single headline event.${tail}`;
   },
   zeroExec: "Public-order reporting was quiet this week. Read that as a gap in reporting rather than calm streets.",
-  zeroSituation: "Standing risk to transport, access and central business districts persists whether or not new reporting lands.",
+  zeroSituation: "Risk to transport, access and central business districts persists whether or not new reporting lands.",
   zeroWhatHappened: "Little public-order activity came through, so the picture carries forward from recent weeks.",
-  zeroWhatMatters: "Staff movement and site access remain the operational concern when these events do appear.",
+  zeroWhatMatters: "Staff movement and site access remain the practical concern when these events do appear.",
   zeroPolestar: "Nothing useful came through on public order this week.",
   thinNote: "Public-order reporting was light this week. Treat that as a gap in reporting, not proof of calm.",
 };
