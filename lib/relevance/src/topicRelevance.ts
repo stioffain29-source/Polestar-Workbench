@@ -565,7 +565,13 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // before the FP_POS_DEMO keep path — the story is about misinformation,
   // not a live unrest event. Bound to explicit fact-check verbs/framing so a
   // genuine protest report is never touched.
-  /\b(fact[- ]?check(er|ers|ing)?|debunk(s|ed|ing)?|falsely (linked|shared|captioned|attributed|claim(s|ed)?|portray(s|ed)?)|misrepresent(s|ed|ing)?|doctored (video|image|photo|clip|footage)|ai[- ]generated (video|image|photo|clip|footage)|fake (letter|video|photo|image|clip|footage)|misinformation|disinformation)\b/i,
+  /\b(fact[- ]?check(s|er|ers|ing)?|debunk(s|ed|ing)?|falsely (link|share|caption|attribute|claim|portray|depict)\w*|misrepresent(s|ed|ing)?|doctored (video|image|photo|clip|footage)|ai[- ]generated\b|fake (letter|video|photo|image|clip|footage)|misinformation|disinformation|peddled as|viral with (a )?false|(shared|circulat\w*) with (a )?false (communal |political |misleading )?claims?)\b/i,
+  // Footage-verification piece — "Video shows land rights demonstration in
+  // Chiang Mai, not Bangkok rally against Myanmar leader". The "shows X, not
+  // Y" contrast frame is verification journalism about mislabelled footage,
+  // never a live event report. Requires the contrastive ", not" after a
+  // "video/photo shows" opener so a genuine report is untouched.
+  /\b(video|photo|image|clip|footage)s? shows?\b[^.!?]{0,90},\s*not\b/i,
   // Further misinformation shapes: a "doctor(ed)/manipulated/edited/fake …
   // photo/video" with words between ("Posts doctor old photo of prisoner
   // rights protest…to mock Colombo mayor"), the verification-piece framing

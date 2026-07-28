@@ -1,0 +1,1619 @@
+PERMANENT FIX — ALL POLE STAR COUNTRY REPORTS
+
+This is NOT a request to patch the current Papua New Guinea PDF.
+
+Correct the underlying country-report generation system so that the fixes apply permanently to:
+
+- Papua New Guinea
+- Papua
+- Indonesia
+- India
+- Bangladesh
+- Philippines
+- Thailand
+- Malaysia
+- Sri Lanka
+- Nepal
+- Pakistan
+- South Korea
+- Japan
+- Australia
+- China
+- Every other current or future Pole Star country report using this reporting pipeline
+
+Do not hard-code special rules for one country or one reporting period.
+
+Do not edit only the rendered PDF.
+
+Update the shared country-report pipeline, including:
+
+- Source ingestion
+- Article parsing
+- Event extraction
+- Incident classification
+- Country attribution
+- Location verification
+- Event dating
+- Deduplication
+- Severity assessment
+- Trend assessment
+- Operational-impact assessment
+- Top-development selection
+- Narrative generation
+- Recommendations
+- Outlook generation
+- Maps
+- Charts and tables
+- Pagination
+- Pre-publication validation
+
+Keep the existing Pole Star visual branding unless a layout correction is specifically required.
+
+Do not change:
+
+- Logo treatment
+- Core colour palette
+- Typography
+- Header and footer style
+- Report dimensions
+- General section hierarchy
+- Severity colours
+- Cover format
+
+==================================================
+1. BUILD ONE SHARED COUNTRY-REPORT PIPELINE
+==================================================
+
+All country reports must use the same underlying validation and generation rules.
+
+Do not maintain separate uncontrolled logic for individual countries.
+
+Create a shared country-report engine with country-specific configuration only for:
+
+- Country name
+- Administrative boundaries
+- Known cities and provinces
+- Map bounds
+- Approved local sources
+- Relevant local issue categories
+- Country-specific terminology
+- Country-specific regulatory references
+
+Classification, deduplication, severity, trend, prose and validation rules must remain shared across all countries.
+
+==================================================
+2. CREATE A CANONICAL EVENT SCHEMA
+==================================================
+
+Every source article must be converted into a structured source record and then, where valid, into a canonical event.
+
+Required fields:
+
+SOURCE RECORD
+
+- source_record_id
+- source_name
+- source_url
+- source_type
+- publication_date
+- retrieval_date
+- original_headline
+- article_text
+- language
+- translated_text
+- source_reliability
+- source_country
+- processing_status
+
+CANONICAL EVENT
+
+- event_id
+- event_title
+- event_summary
+- event_date
+- event_end_date
+- publication_dates
+- physical_country
+- related_country
+- city
+- district
+- province_or_state
+- latitude
+- longitude
+- location_precision
+- issue_category
+- issue_subcategory
+- event_status
+- severity
+- severity_reason
+- casualties
+- injuries
+- arrests
+- infrastructure_impact
+- transport_impact
+- commercial_impact
+- staff_impact
+- site_impact
+- continuity_impact
+- confirmed_operational_effect
+- assessed_operational_relevance
+- classification_confidence
+- location_confidence
+- date_confidence
+- supporting_source_ids
+- duplicate_group_id
+- related_event_ids
+- inclusion_status
+- exclusion_reason
+
+Allowed event_status values:
+
+- Confirmed
+- Ongoing
+- Ended
+- Planned
+- Cancelled
+- Unverified
+- Commentary
+- Background
+- Not an incident
+
+Allowed location_precision values:
+
+- Exact site
+- Town or city
+- District
+- Province or state
+- Country only
+- Unknown
+
+Allowed Pole Star severity values:
+
+- Insignificant
+- Low
+- Moderate
+- High
+- Extreme
+
+No other severity wording may enter reports.
+
+==================================================
+3. AN ARTICLE IS NOT AUTOMATICALLY AN INCIDENT
+==================================================
+
+The system must distinguish between:
+
+- A news article
+- A security event
+- An operational event
+- Commentary
+- Policy reporting
+- A ceremony
+- A successful response
+- A forecast
+- An historical event
+- A duplicate report
+
+Do not classify by headline keywords alone.
+
+Do not assume that an article containing words such as:
+
+- Protest
+- Crackdown
+- Murder
+- Tragedy
+- Crisis
+- Security
+- Aviation
+- Maritime
+- Police
+- Attack
+- Emergency
+- Disruption
+
+describes a valid incident for the country report.
+
+Use the full article context.
+
+A valid event must record an actual occurrence with a credible connection to:
+
+- Crime
+- Violence
+- Civil unrest
+- Communal conflict
+- Terrorism
+- Insurgency
+- Labour action
+- Political instability
+- Transport interruption
+- Utility interruption
+- Communications interruption
+- Supply-chain interruption
+- Maritime safety
+- Aviation safety
+- Natural hazards
+- Regulatory action with commercial effect
+- Policing activity with operational effect
+- Infrastructure damage
+- Staff safety
+- Site access
+- Business continuity
+
+==================================================
+4. PERMANENT EXCLUSION RULES
+==================================================
+
+Exclude the following from incident totals unless the article contains a separate, clearly described operational event:
+
+- Conferences
+- Forums
+- Training events
+- Ceremonies
+- Ministerial appointments
+- Leadership changes
+- Official praise or appreciation
+- General policy announcements
+- Development announcements
+- Investment announcements
+- Statements about future infrastructure
+- Opinion articles
+- Editorials
+- Background explainers
+- Human-interest features
+- Photo features with no new incident
+- Political commentary
+- Religious commentary
+- Calls for education or counselling
+- General appeals for peace
+- Articles describing progress
+- Successful routine rescue operations with no continuing disruption
+- Diplomatic protests occurring outside the country
+- Requests for clarification issued by another government
+- False or misleading social-media claims
+- Recycled historical incidents
+- Articles referring to an event outside the reporting period
+- Articles concerning the country but physically occurring elsewhere
+- Duplicate reports
+- Syndicated copies
+- Follow-up articles that add no new event
+- Reports of an incident ending that are counted separately from the incident itself
+
+Do not turn these items into Low-severity filler.
+
+If excluded, store the exclusion reason.
+
+==================================================
+5. COUNTRY ATTRIBUTION MUST USE PHYSICAL LOCATION
+==================================================
+
+The country report must be based primarily on where the event physically happened.
+
+Do not assign an event to a country merely because that country is mentioned.
+
+Examples:
+
+- A protest in Taipei concerning Papua New Guinea is a Taiwan event.
+- A conference in Cairns attended by PNG officials is an Australia event.
+- An Indonesian government statement concerning a PNG shooting is not a second PNG incident.
+- A diplomatic objection issued in Beijing is not a street protest in the country being criticised.
+- A meeting in Singapore about Myanmar is not an incident in Myanmar.
+
+Store separately:
+
+- physical_country
+- related_country
+
+Only physical_country determines the country incident total.
+
+A related-country article may appear as context only where it creates a direct operational implication.
+
+==================================================
+6. VERIFY EVENT DATE, NOT JUST PUBLICATION DATE
+==================================================
+
+Use the date on which the event occurred.
+
+Do not automatically use publication date as event date.
+
+Where an article reports:
+
+- An earlier incident
+- A continuing investigation
+- A funeral
+- A response to an earlier death
+- A policy discussion arising from an earlier incident
+- A retrospective account
+
+the event must retain its original event date.
+
+An older event published during the reporting window must not be counted as a new incident.
+
+If the event date cannot be established:
+
+- Mark event_date as unknown.
+- Set date_confidence accordingly.
+- Do not describe it as the latest incident.
+- Do not include it in daily charts.
+- Hold it for review if necessary.
+
+==================================================
+7. CREATE A CLASSIFICATION CONFIDENCE GATE
+==================================================
+
+Every possible event must receive a classification confidence score from 0 to 100.
+
+Rules:
+
+- 85–100: Include automatically.
+- 70–84: Include only if the article clearly describes an event and location.
+- 50–69: Hold for manual review.
+- Below 50: Exclude.
+- Commentary, Background and Not an incident: Always exclude from incident totals.
+
+The generator must not use review-held records in:
+
+- Totals
+- Charts
+- Top developments
+- Main analysis
+- Severity calculations
+- Maps
+- Outlook
+- Related incidents
+
+Show held records in an internal review queue.
+
+==================================================
+8. DEDUPLICATE BEFORE ANALYSIS
+==================================================
+
+Several articles about one event must become one canonical event.
+
+Use the following matching factors:
+
+- Physical country
+- City
+- Province
+- Event date
+- Event type
+- Named victim
+- Named offender
+- Named organisation
+- Named facility
+- Casualty count
+- Arrest count
+- Description of damage
+- Police operation name
+- Semantic similarity
+- Shared quotations
+- Shared source references
+- Event sequence
+- Publication timing
+
+Merge articles where they describe:
+
+- The same killing
+- The same police operation
+- The same communal clash
+- The same strike
+- The same protest
+- The same transport accident
+- The same rescue
+- The same fire
+- The same infrastructure failure
+- The same government response
+- The same investigation
+- The same event reported by different publishers
+
+One canonical event may have several supporting sources.
+
+Do not count:
+
+- The incident
+- The police response
+- The investigation
+- The request for clarification
+- The article describing public reaction
+
+as separate events unless each describes a genuinely separate occurrence.
+
+==================================================
+9. DISTINGUISH INCIDENTS FROM RESPONSES
+==================================================
+
+A successful response is not automatically a new security incident.
+
+Examples:
+
+- A tugboat rescues passengers.
+- Police recover bodies.
+- A captain is thanked for transport assistance.
+- Authorities issue clarification.
+- A ministry announces an investigation.
+- A community leader calls for calm.
+
+Where these refer to an existing incident:
+
+- Link them to the original event.
+- Add them as updates.
+- Do not count them separately.
+
+A response may become a separate event only where it creates a new operational effect, such as:
+
+- A major road closure
+- A curfew
+- A port closure
+- A flight suspension
+- A new police operation affecting movement
+- A public protest
+- A retaliatory attack
+
+==================================================
+10. USE A CONTROLLED ISSUE TAXONOMY
+==================================================
+
+Use the following primary categories:
+
+- Violent crime
+- Theft and robbery
+- Organised crime
+- Communal or tribal violence
+- Terrorism
+- Insurgency
+- Political violence
+- Civil unrest
+- Strike or labour action
+- Governance and regulatory
+- Policing operation
+- Aviation
+- Maritime
+- Road and rail
+- Utilities
+- Telecommunications
+- Infrastructure
+- Natural hazard
+- Health
+- Supply chain
+- Other operational disruption
+
+Each event must have:
+
+- One primary category
+- Optional secondary categories
+
+Do not place an event under several main sections as separate incidents.
+
+Do not classify general government news as Governance and Regulatory unless it creates a clear compliance, permit, movement or operational effect.
+
+==================================================
+11. MAKE SEVERITY EVIDENCE-BASED
+==================================================
+
+Severity must be derived from the event, not the tone of the headline.
+
+Assess:
+
+- Deaths
+- Injuries
+- Violence
+- Weapon use
+- Geographic spread
+- Duration
+- Infrastructure damage
+- Transport interruption
+- Utility interruption
+- Official restrictions
+- Staff exposure
+- Site exposure
+- Commercial disruption
+- Probability of continuation
+- Reliability of reporting
+
+Store severity once in the canonical event.
+
+All report components must read the same severity value:
+
+- Top developments
+- Incident cards
+- Current Situation
+- Charts
+- Maps
+- Outlook
+- Pole Star View
+- Related incidents
+
+Do not let prose generation independently raise or lower severity.
+
+Add a validation failure if one event appears with different severity values.
+
+==================================================
+12. DO NOT INVENT OPERATIONAL IMPACT
+==================================================
+
+Separate:
+
+- Confirmed operational effect
+- Reasonable assessed relevance
+- Generic possible consequence
+
+Only confirmed effects may be written as facts.
+
+Example:
+
+Confirmed:
+
+“The incident closed the road for three hours.”
+
+Assessment:
+
+“Further police activity could cause local delays.”
+
+Not acceptable:
+
+“This threatens logistics, utilities and connectivity.”
+
+unless the source or event details support those effects.
+
+Do not automatically claim that every incident affects:
+
+- Staff
+- Premises
+- Cash movements
+- Supply chains
+- Airports
+- Ports
+- Logistics
+- Connectivity
+- Production
+- Customers
+- Freedom of movement
+
+Only include an impact where there is a credible causal connection.
+
+==================================================
+13. STOP AUTOMATICALLY GENERATING BUSINESS RISK
+==================================================
+
+A security incident does not automatically create commercial impact.
+
+Use three impact levels:
+
+DIRECT IMPACT
+
+A confirmed effect on:
+
+- Staff
+- A business site
+- A supplier
+- A customer
+- A transport service
+- A delivery route
+- Utilities
+- Production
+- Distribution
+- Commercial access
+
+INDIRECT IMPACT
+
+No confirmed business effect, but the event is close enough or significant enough to affect planning.
+
+MONITOR ONLY
+
+Relevant security reporting with no confirmed or likely commercial effect.
+
+The system must assign impact based on evidence.
+
+Do not default every record to Monitor Only simply to fill the map.
+
+If all records are Monitor Only, consider removing the impact legend or replacing the map with a simple incident-location map.
+
+==================================================
+14. TOP THREE DEVELOPMENTS MUST BE REAL EVENTS
+==================================================
+
+Top Three Developments must be selected from the canonical, validated and deduplicated event dataset.
+
+Selection factors:
+
+1. Deaths or serious injuries
+2. Continuing threat
+3. Direct operational impact
+4. Serious public-order restrictions
+5. Infrastructure or transport interruption
+6. Geographic importance
+7. Proximity to known operating locations
+8. High-confidence escalation potential
+9. Severity
+10. Source reliability
+
+Do not include:
+
+- Conferences
+- Appointments
+- Ceremonial reporting
+- Commentary
+- General policy
+- Development announcements
+- Successful routine responses
+- Articles outside the reporting window
+- Duplicate coverage
+
+Each Top Development must contain:
+
+- Natural event title
+- Date
+- Verified location
+- Category
+- Severity
+- One factual sentence
+- One proportionate business-relevance sentence
+
+Do not invent a possible impact just because the layout requires one.
+
+==================================================
+15. PERMANENT BOTTOM LINE UP FRONT RULES
+==================================================
+
+The Bottom Line Up Front must not begin with a copied news headline.
+
+Maximum length:
+
+- Two short paragraphs
+
+Paragraph 1 must state:
+
+- Main issue category
+- Main affected locations
+- Most serious verified development
+
+Paragraph 2 must state:
+
+- Main business concern
+- Whether the effect is localised or broader
+- Immediate planning priority
+
+Use plain English.
+
+Do not use:
+
+- Operating picture
+- Lead development was
+- Most operationally significant reporting
+- Business exposure centres on
+- Easing from an elevated baseline
+- While this picture holds
+- Principal business risk is direct exposure
+- This period looks to be
+
+Approved structure:
+
+“Violent crime and communal violence were the main security concerns during the reporting period, with the most serious incidents recorded in [locations]. [Named incident or short description] was the highest-rated event.
+
+The immediate business concerns are [supported effects]. Current reporting indicates that the risk is [localised or widespread]. Businesses should focus on [specific planning priority].”
+
+Only populate claims supported by the final dataset.
+
+==================================================
+16. DO NOT CLAIM A TREND WITHOUT COMPARISON DATA
+==================================================
+
+The system must not state that conditions are:
+
+- Easing
+- Worsening
+- Improving
+- Deteriorating
+- Building
+- Spreading
+- Stabilising
+- Accelerating
+- Returning to normal
+- Remaining elevated
+- Falling from a high baseline
+
+unless comparative data exists.
+
+Minimum trend requirement:
+
+- Current reporting period
+- Immediately previous equivalent reporting period
+
+Preferred trend requirement:
+
+- Current period
+- Previous period
+- Four-week average
+
+A trend must be supported by a measurable change in:
+
+- Incident count
+- Severity
+- Casualties
+- Geographic spread
+- Operational impact
+- Duration
+- Frequency
+
+Where no comparative data exists, use neutral wording:
+
+“During the reporting period…”
+
+The pre-publication gate must reject any unsupported trend wording.
+
+==================================================
+17. INCIDENT-SECTION SUMMARIES MUST DESCRIBE THE DATA
+==================================================
+
+For every issue-category section, generate a short introduction covering:
+
+- Number of validated events
+- Main locations
+- Most serious event
+- Confirmed business effect, where any
+- Whether the events appear connected
+
+Do not generate a generic paragraph from category labels.
+
+Do not say:
+
+- This activity was more prominent than last week
+- Business exposure centres on
+- Incidents of this kind threaten
+- The operating picture was concentrated in
+- This can interrupt operations, logistics and connectivity
+
+unless supported.
+
+Approved format:
+
+“[Number] validated [category] events were recorded, mainly in [locations]. The most serious was [event]. [Confirmed effect]. The events appear [connected or separate].”
+
+==================================================
+18. CURRENT SITUATION MUST BE COUNTRY-SPECIFIC
+==================================================
+
+Current Situation must contain:
+
+- Main current issue
+- Main affected locations
+- Whether incidents are localised or widespread
+- Whether there is an ongoing threat
+- Any confirmed movement, access or operational effect
+
+Maximum:
+
+- Two short paragraphs
+
+Do not repeat the Bottom Line Up Front.
+
+Do not repeat the incident list.
+
+Approved structure:
+
+“Security incidents during the reporting period were concentrated in [locations]. [Issue categories] were the principal concerns, while [secondary issue] caused more limited disruption elsewhere.
+
+The incidents do not currently form a single nationwide pattern. Risk varies by location, and movement or operating decisions should be based on current conditions at the destination.”
+
+Adjust this where the data genuinely shows a nationwide event.
+
+==================================================
+19. OPERATIONAL IMPACT MUST BE LINKED TO EVENTS
+==================================================
+
+Only display issue categories supported by included events.
+
+For each category, state:
+
+- Event or locations
+- Confirmed impact
+- Assessed near-term relevance
+
+Example:
+
+“Communal violence in Enga may affect staff movement on routes close to continuing police operations. No direct effect on commercial sites was confirmed.”
+
+Do not write generic catalogue statements such as:
+
+“Crime threatens staff, premises and movement of cash and assets.”
+
+Do not generate categories merely to maintain a fixed layout.
+
+If only two categories are relevant, show two.
+
+==================================================
+20. RECOMMENDATIONS MUST BE PROPORTIONATE
+==================================================
+
+Recommendations must be selected from the actual event effects.
+
+Approved standard options:
+
+MOVEMENT
+
+- Confirm current route conditions before travel into affected districts.
+- Avoid non-essential after-hours movement where recent violence has occurred.
+- Allow extra travel time where police activity or local gatherings are reported.
+- Maintain an alternative route where disruption has been confirmed.
+
+SITE SECURITY
+
+- Review access arrangements at sites close to reported incidents.
+- Confirm after-hours escalation procedures with guards and site managers.
+- Check that emergency contacts and reporting lines remain current.
+
+STAFF AWARENESS
+
+- Brief affected staff on specific locations and current restrictions.
+- Reinforce immediate reporting of roadblocks, violence or police activity.
+- Share only verified areas to avoid.
+
+TRANSPORT AND LOGISTICS
+
+- Confirm airport, port and road status before affected movements.
+- Check supplier and delivery routes where disruption is reported.
+- Hold alternatives for time-sensitive journeys.
+
+ESCALATION
+
+- Escalate when violence approaches a business location or staff route.
+- Escalate when official movement restrictions affect access.
+- Escalate when a direct operational effect is confirmed.
+
+Do not automatically recommend:
+
+- Varying all routines
+- Secure transport for every movement
+- Treating districts as no-go
+- Guard reinforcement
+- Hardened perimeters
+- Movement restrictions
+- Site closure
+- Crisis-plan activation
+- Work from home
+- Nationwide travel restrictions
+
+These stronger measures require event-specific evidence.
+
+==================================================
+21. OUTLOOK MUST USE CURRENT EVIDENCE
+==================================================
+
+The Outlook must be based on:
+
+- Ongoing events
+- Confirmed future events
+- Unresolved disputes
+- Continuing police operations
+- Weather forecasts
+- Named political dates
+- Named court dates
+- Named strike dates
+- Named election dates
+- Credible retaliation risks
+
+Do not invent generic triggers such as:
+
+- Payday
+- Court rulings
+- Election cycles
+- Tribal payback
+- Fuel-price decisions
+- Security-force deaths
+- Political anniversaries
+
+unless a current source identifies the trigger.
+
+Outlook format:
+
+“[Issue] is likely to remain the main concern during the next seven days. [Locations] should remain under review because [current evidence].
+
+The assessment would worsen if [specific supported trigger]. It would ease if [specific observable condition].”
+
+Forecast language must be clearly separated from confirmed facts.
+
+==================================================
+22. POLESTAR VIEW MUST ADD JUDGEMENT, NOT REPETITION
+==================================================
+
+The Pole Star View must:
+
+- State whether risk is localised or widespread
+- Identify the principal issue
+- Identify the key locations
+- State what businesses should prioritise
+- Identify one or two evidence-based worsening indicators
+
+Maximum:
+
+- Three short paragraphs
+
+Do not repeat:
+
+- Bottom Line Up Front
+- Current Situation
+- Outlook
+- Recommendations
+
+Do not use:
+
+- Easing from an elevated baseline
+- Operating risk is moderate-to-elevated
+- Heightened baseline
+- Business exposure centres on
+- Operating picture
+- The picture holds
+- Operational tempo
+
+Use only the approved risk scale where a rating is required.
+
+==================================================
+23. FIX MAP DATA BEFORE FIXING MAP DESIGN
+==================================================
+
+Only plot canonical events with a credible physical location.
+
+Do not plot:
+
+- Country-only records
+- Unknown locations
+- Foreign events
+- Duplicates
+- Commentary
+- Background articles
+- General policy stories
+- Conference locations unrelated to the incident country
+
+Use the following rules:
+
+EXACT SITE
+
+Use exact coordinates only where the site is known.
+
+CITY
+
+Use the city centre or defined city marker and label it as city-level.
+
+DISTRICT OR PROVINCE
+
+Use an administrative centroid and label it clearly as approximate.
+
+UNKNOWN
+
+Do not plot.
+
+Never imply precision that the data does not support.
+
+==================================================
+24. MAP VIEW MUST FIT THE COUNTRY
+==================================================
+
+Generate map bounds from the verified event locations and the relevant country boundary.
+
+The map must:
+
+- Centre on the country
+- Show all valid markers
+- Avoid displaying large irrelevant foreign areas
+- Keep markers inside the frame
+- Include enough geographic context to understand location
+- Avoid excessive empty sea or neighbouring territory
+- Use readable labels
+- Use a consistent legend
+- Clearly distinguish approximate administrative markers
+
+For archipelagic countries:
+
+- Include relevant islands
+- Use inset maps where necessary
+- Do not compress the country until labels become unreadable
+
+For very large countries:
+
+- Use regional insets where national framing makes event locations unreadable
+
+==================================================
+25. MAP CARDS MUST NOT SPLIT ACROSS PAGES
+==================================================
+
+The map and all related location cards must remain together where possible.
+
+Rules:
+
+- Do not split a card between pages.
+- Do not place the top half of a card on one page and the remainder on the next.
+- Do not leave orphan cards at the top of the final page.
+- Use page-break rules around the map container.
+- Reduce card count or use a second complete map page where necessary.
+- Group several incidents at one location into one card with a count.
+- Keep text readable.
+- Do not shrink text excessively to force content onto one page.
+
+If the map cannot fit with all cards:
+
+Option 1:
+
+Show the map plus the highest-priority cards.
+
+Option 2:
+
+Show the map on one full page and a complete location table on the next.
+
+Do not create a half-page continuation.
+
+==================================================
+26. REMOVE LARGE UNUSED PAGE AREAS
+==================================================
+
+The PDF layout engine must recalculate page flow after:
+
+- Exclusions
+- Deduplication
+- Shortened narratives
+- Reduced map cards
+- Removed categories
+
+Do not preserve blank space merely because the original template expected more incidents.
+
+Rules:
+
+- Pull subsequent sections upward.
+- Keep headings with their first paragraph.
+- Keep incident cards intact.
+- Keep tables intact where possible.
+- Avoid blank final pages.
+- Avoid a disclaimer sitting above half a page of empty space.
+- Avoid single lines carried to a new page.
+- Maintain readable spacing.
+
+Do not add filler prose to occupy empty space.
+
+==================================================
+27. ADAPT REPORT LENGTH TO VALID CONTENT
+==================================================
+
+Country reports must not always have the same number of pages.
+
+The report length should depend on the amount of validated content.
+
+Examples:
+
+- Sparse reporting: 2–3 content pages
+- Normal reporting: 4–6 content pages
+- High activity: Additional incident or map pages as required
+
+Do not fill a report with irrelevant Low-severity stories to reach a fixed page count.
+
+A short accurate report is preferable to a long weak report.
+
+==================================================
+28. SOURCE QUALITY MUST AFFECT INCLUSION
+==================================================
+
+Assign source reliability using a controlled scale:
+
+- High
+- Medium
+- Low
+- Unknown
+
+High-confidence claims should normally require:
+
+- One high-reliability source, or
+- Two independent medium-reliability sources
+
+Lower-reliability local reporting may be included where:
+
+- It is clearly labelled
+- The event is plausible
+- The report does not overstate certainty
+- No better source is available
+
+Do not upgrade severity because a headline is dramatic.
+
+Do not present Google News aggregation as the originating source where the underlying publisher is available.
+
+==================================================
+29. ADD AN INTERNAL EVIDENCE RECORD FOR EVERY CLAIM
+==================================================
+
+Every analytical sentence must have an internal evidence object:
+
+- claim_id
+- claim_text
+- section
+- supporting_event_ids
+- supporting_source_ids
+- supporting_metric
+- claim_type
+- confidence
+
+Allowed claim_type values:
+
+- Confirmed fact
+- Assessment
+- Forecast
+- Trend
+- Recommendation
+
+Do not render a claim where:
+
+- No event supports it
+- No metric supports a trend
+- The claim contradicts the dataset
+- Confidence is below the threshold
+- The claim repeats another section without adding value
+
+==================================================
+30. REMOVE AUTOMATED GOBBLEDEGOOK
+==================================================
+
+Permanently remove the following phrases from country-report generation:
+
+- Operating picture
+- Operationally significant reporting
+- Business exposure centres on
+- Easing from an elevated baseline
+- While this picture holds
+- Principal business risk
+- This activity was more prominent
+- Security-relevant incidents
+- Operational centres
+- The picture is led by
+- Business users should
+- For business users the priority is
+- Direct exposure to violence and disruption
+- Most likely disruption over the next seven days
+- The coming week most likely follows the current pattern
+- Sustained quiet stretch
+- Knock-on delays
+- Keep contingency arrangements under active review
+- Operating sites
+- Exposed sites
+- Current pattern
+- Wider operating environment
+
+Use natural language.
+
+Writing rules:
+
+- Use short sentences.
+- Name the event.
+- Name the place.
+- State the effect.
+- Separate fact from judgement.
+- Avoid abstract management language.
+- Avoid saying the same thing in three sections.
+- Do not repeat full article headlines in prose.
+- Do not use an article title as the opening sentence.
+- Do not force analysis where the data supports only a factual summary.
+
+==================================================
+31. SECTION-SPECIFIC LENGTH LIMITS
+==================================================
+
+BOTTOM LINE UP FRONT
+
+- Maximum 120 words
+
+CATEGORY INTRODUCTIONS
+
+- Maximum 90 words each
+
+CURRENT SITUATION
+
+- Maximum 120 words
+
+OPERATIONAL IMPACT
+
+- Maximum 50 words per category
+
+RECOMMENDED ACTIONS
+
+- Maximum 10 actions
+- Maximum 22 words per action
+
+OUTLOOK
+
+- Maximum 150 words
+
+POLESTAR VIEW
+
+- Maximum 180 words
+
+MAP READ
+
+- Maximum 120 words
+
+These are maximums, not targets.
+
+Do not fill the available word count unnecessarily.
+
+==================================================
+32. RELATED INCIDENTS MUST COME FROM CANONICAL EVENTS
+==================================================
+
+Any Related Incidents section must use canonical events.
+
+Select by:
+
+1. Severity
+2. Direct business impact
+3. Ongoing threat
+4. Casualties
+5. Transport or infrastructure effect
+6. Geographic relevance
+7. Connection to the outlook
+
+Exclude:
+
+- Duplicates
+- Commentary
+- Conferences
+- Ceremonial reporting
+- Foreign events
+- Background articles
+- Cancelled events unless the cancellation itself caused disruption
+- General government statements
+- Articles outside the reporting period
+
+==================================================
+33. BUILD A MANDATORY PRE-PUBLICATION QUALITY GATE
+==================================================
+
+Before any country-report PDF is generated, validate:
+
+DATA
+
+- All included records are genuine events.
+- All events occurred in the stated country.
+- Event dates fall within the reporting period or are clearly marked as context.
+- Duplicates have been merged.
+- Planned, cancelled and historical events are treated correctly.
+- Source reliability is recorded.
+- Classification confidence meets the threshold.
+
+ANALYSIS
+
+- Severity is consistent.
+- No unsupported trend claim appears.
+- No unsupported operational effect appears.
+- No unsupported forecast appears.
+- No generic trigger has been invented.
+- Recommendations are linked to actual events.
+- Top developments are genuine events.
+
+MAP
+
+- Every marker has a valid location.
+- Location precision is shown correctly.
+- No foreign event is plotted.
+- No unknown location is plotted.
+- Map bounds fit the country.
+- Cards do not split across pages.
+
+LAYOUT
+
+- No large avoidable blank areas.
+- No orphan headings.
+- No split incident cards.
+- No split map cards.
+- No unreadably small text.
+- Disclaimer appears once at the end.
+
+LANGUAGE
+
+- Only approved risk vocabulary is used.
+- No banned phrase appears.
+- Prose is direct and grammatically complete.
+- Sections do not repeat each other.
+
+The report must fail generation when a critical check fails.
+
+Do not silently generate a defective PDF.
+
+Show all failed checks in the admin interface.
+
+==================================================
+34. ADD AUTOMATED TESTS
+==================================================
+
+Create automated tests covering at least the following:
+
+TEST 1 — FOREIGN CONFERENCE
+
+Input:
+
+A PNG official attends an airport retail forum in Cairns.
+
+Expected:
+
+- Physical country: Australia
+- Not a PNG security incident
+- Excluded from PNG totals
+- Excluded from Top Three Developments
+
+TEST 2 — FOREIGN PROTEST
+
+Input:
+
+A protest occurs in Taipei concerning PNG’s representative office.
+
+Expected:
+
+- Physical country: Taiwan
+- Not counted as a PNG civil-unrest incident
+- May be retained as external political context only
+
+TEST 3 — CEREMONIAL PRAISE
+
+Input:
+
+A governor thanks a captain for transporting recovered bodies.
+
+Expected:
+
+- Commentary or response update
+- Not a new incident
+- Linked to the original incident where relevant
+
+TEST 4 — SUCCESSFUL RESCUE
+
+Input:
+
+A tugboat rescues passengers.
+
+Expected:
+
+- Link to the initiating maritime event
+- Do not automatically classify the rescue itself as operational disruption
+- Include only if continuing transport impact exists
+
+TEST 5 — DUPLICATE POLICE OPERATION
+
+Input:
+
+Two headlines report the same arrest of 65 illegal gamblers.
+
+Expected:
+
+- One canonical event
+- Two supporting sources
+- Counted once
+
+TEST 6 — COMMENTARY ON VIOLENCE
+
+Input:
+
+A priest calls for counselling to reduce sorcery-related violence.
+
+Expected:
+
+- Commentary or background
+- Not a High-severity violent-crime incident
+- Excluded from totals unless a new violent event is described
+
+TEST 7 — MINISTERIAL APPOINTMENT
+
+Input:
+
+A minister takes over the aviation ministry.
+
+Expected:
+
+- Governance news
+- Not an aviation incident
+- Excluded unless it creates a specific operational change
+
+TEST 8 — OLD EVENT
+
+Input:
+
+An article published this week reports an incident from last month.
+
+Expected:
+
+- Use original event date
+- Exclude from current-period incident total
+
+TEST 9 — UNKNOWN LOCATION
+
+Input:
+
+An event has no confirmed city, district or province.
+
+Expected:
+
+- Location precision: Unknown
+- Not plotted
+- Not assigned invented coordinates
+
+TEST 10 — UNSUPPORTED TREND
+
+Input:
+
+No previous-period comparison data exists.
+
+Expected:
+
+- No use of easing, worsening, improving, spreading or stabilising
+
+TEST 11 — INVENTED BUSINESS IMPACT
+
+Input:
+
+A Low-severity political announcement has no reported commercial effect.
+
+Expected:
+
+- No claim of flight disruption, supply-chain impact or site-access effect
+
+TEST 12 — MAP PAGINATION
+
+Input:
+
+Map and cards exceed one page.
+
+Expected:
+
+- Use a complete second map or location page
+- Do not split cards across pages
+
+TEST 13 — SHORT REPORT
+
+Input:
+
+Only four valid incidents remain after cleaning.
+
+Expected:
+
+- Generate a shorter report
+- Do not add irrelevant filler
+- No blank continuation page
+
+TEST 14 — COUNTRY MENTION
+
+Input:
+
+An Indonesian official asks PNG for information about an earlier shooting.
+
+Expected:
+
+- Update linked to the original shooting
+- Not a separate violent-crime incident
+- Not counted twice
+
+TEST 15 — SEVERITY CONSISTENCY
+
+Input:
+
+Canonical event severity is High.
+
+Expected:
+
+- High in every card, table, map, summary and narrative
+- Never Extreme or Moderate elsewhere
+
+==================================================
+35. REPROCESS EXISTING COUNTRY REPORT DATA
+==================================================
+
+After implementing the permanent fix:
+
+1. Reprocess the existing source records for every active country report.
+2. Reclassify all source articles.
+3. Correct physical-country attribution.
+4. Correct event dates.
+5. Merge duplicates.
+6. Remove commentary and irrelevant articles.
+7. Recalculate severity.
+8. Recalculate country totals and categories.
+9. Rebuild Top Three Developments.
+10. Regenerate analysis.
+11. Rebuild maps.
+12. Regenerate PDFs.
+
+Do not apply the new rules only to reports created after the deployment.
+
+==================================================
+36. DO NOT KEEP THE OLD GENERATOR AS A FALLBACK
+==================================================
+
+Remove or disable the old uncontrolled narrative and classification pipeline.
+
+Do not silently fall back to the old system when:
+
+- Classification fails
+- A location is unknown
+- Too few incidents remain
+- A section is empty
+- A map has too few points
+- Trend data is unavailable
+
+Approved fallback behaviour:
+
+- Exclude uncertain incidents.
+- Produce a shorter report.
+- State that reporting was limited.
+- Omit an unsupported section.
+- Show a manual-review warning.
+
+Do not fill gaps with generic prose.
+
+==================================================
+37. ADD ADMIN REVIEW CONTROLS
+==================================================
+
+The admin interface must show:
+
+- Included events
+- Excluded articles
+- Exclusion reason
+- Held-for-review records
+- Duplicate groups
+- Canonical events
+- Physical country
+- Related country
+- Event date
+- Publication date
+- Location precision
+- Severity
+- Severity reason
+- Confirmed business impact
+- Assessed business relevance
+- Supporting sources
+- Generated analytical claims
+- Evidence supporting each claim
+- Failed quality checks
+
+Allow the analyst to:
+
+- Merge records
+- Split records
+- Change country
+- Correct event date
+- Correct category
+- Correct location precision
+- Correct severity
+- Exclude a record
+- Approve a held record
+- Re-run the report
+
+All manual changes must be recorded in an audit log.
+
+==================================================
+38. PROVIDE AN IMPLEMENTATION REPORT
+==================================================
+
+After completing the work, provide:
+
+- Files changed
+- Shared modules created
+- Database migrations applied
+- New fields added
+- Old logic removed
+- Classification rules implemented
+- Deduplication method implemented
+- Country-attribution logic implemented
+- Trend controls implemented
+- Map changes implemented
+- Pagination changes implemented
+- Automated tests added
+- Test results
+- Number of existing source records reprocessed
+- Number excluded
+- Number held for review
+- Number of duplicates merged
+- Number assigned to the wrong country and corrected
+- Number of maps corrected
+- Reports regenerated
+- Any records still requiring analyst review
+
+Do not merely return a revised Papua New Guinea PDF.
+
+The work is complete only when:
+
+- The shared country-report generator has been corrected.
+- Existing country data has been reprocessed.
+- All automated tests pass.
+- The pre-publication gate is active.
+- Future reports use the corrected pipeline automatically.
