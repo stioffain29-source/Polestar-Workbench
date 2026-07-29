@@ -1323,6 +1323,58 @@ export async function runDataMigrations(): Promise<void> {
         updated_at timestamptz NOT NULL DEFAULT now()
       )
     `);
+    // Shared country-report ENGINE persistence (owner brief §2/§7/§35/§37).
+    // The pure @workspace/country-engine pipeline projects incidents into
+    // canonical events; these tables store the result, analyst overrides and an
+    // audit trail. drizzle push only reaches dev, so the writable prod primary
+    // self-provisions them here on boot. All IF NOT EXISTS — safe to re-run.
+    // Mirrors lib/db/src/schema/countryEngine.ts.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_engine_events (
+        id serial PRIMARY KEY,
+        country_slug text NOT NULL,
+        event_id text NOT NULL,
+        payload jsonb NOT NULL,
+        inclusion_status text NOT NULL,
+        exclusion_reason text,
+        duplicate_group_id text,
+        event_date timestamptz,
+        physical_country text,
+        severity text,
+        classification_confidence integer,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT country_engine_events_country_event UNIQUE (country_slug, event_id)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_engine_overrides (
+        id serial PRIMARY KEY,
+        country_slug text NOT NULL,
+        event_id text NOT NULL,
+        override jsonb NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT country_engine_overrides_country_event UNIQUE (country_slug, event_id)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_engine_audit (
+        id serial PRIMARY KEY,
+        country_slug text NOT NULL,
+        event_id text,
+        action text NOT NULL,
+        detail jsonb,
+        actor text,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS country_engine_runs (
+        id serial PRIMARY KEY,
+        country_slug text NOT NULL,
+        ran_at timestamptz NOT NULL DEFAULT now(),
+        stats jsonb NOT NULL
+      )
+    `);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS card_templates (
         id serial PRIMARY KEY,
@@ -4668,6 +4720,107 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (repairErr) {
       logger.error({ err: repairErr }, "Dashboard source-health noise repair failed");
+    }
+
+    // Rule-versioned reprocess of the active country reports through the
+    // shared country-report engine (owner brief §35: reprocess existing data;
+    // do not apply the new rules only to reports created after deployment).
+    // The marker key embeds COUNTRY_ENGINE_RULE_VERSION, so bumping that
+    // constant re-runs the engine for every slug on the next boot in every
+    // environment — gate-rule changes always propagate to the persisted review
+    // queues (e.g. v2's legal_process / preparedness_or_awareness rules retire
+    // the held backlog those rules now stop regrowing). Each country is
+    // wrapped in its own try/catch so one country's failure does not block
+    // boot or the remaining countries. If the engine module itself throws at
+    // import time (engine-core not yet landed), we skip the whole block WITHOUT
+    // writing the marker so it retries on the next boot once the engine exists.
+    {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      let engineMod:
+        | {
+            runCountryEngine: (slug: string) => Promise<unknown>;
+            ruleVersion: string;
+            slugs: string[];
+          }
+        | null = null;
+      try {
+        const { runCountryEngine } = await import("./countryEngine");
+        const { COUNTRY_ENGINE_RULE_VERSION, COUNTRY_ENGINE_CONFIGS } =
+          await import("@workspace/country-engine/config");
+        engineMod = {
+          runCountryEngine,
+          ruleVersion: COUNTRY_ENGINE_RULE_VERSION,
+          slugs: Object.keys(COUNTRY_ENGINE_CONFIGS),
+        };
+      } catch (importErr) {
+        engineMod = null;
+        logger.warn(
+          { err: importErr },
+          "Country engine module unavailable — skipping engine reprocess (marker not written; will retry next boot)",
+        );
+      }
+      const markerKey = engineMod
+        ? `country_engine_reprocess_${engineMod.ruleVersion}`
+        : "";
+      const existingMarker = engineMod
+        ? await db.execute(sql`
+            SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+          `)
+        : null;
+      if (engineMod && (existingMarker?.rowCount ?? 0) === 0) {
+        const { runCountryEngine, slugs } = engineMod;
+        {
+          const failedSlugs: string[] = [];
+          for (const slug of slugs) {
+            // Per-slug resume marker: a heavy slug (indonesia is 30k+ rows and
+            // CPU-bound) can outlive the deployment healthcheck window and get
+            // the instance SIGTERMed mid-loop. Without per-slug markers every
+            // reboot redid the finished slugs and never reached the end.
+            const slugMarker = `${markerKey}:${slug}`;
+            const doneSlug = await db.execute(sql`
+              SELECT 1 FROM app_migration_markers WHERE key = ${slugMarker}
+            `);
+            if ((doneSlug.rowCount ?? 0) > 0) continue;
+            try {
+              await runCountryEngine(slug);
+              await db.execute(sql`
+                INSERT INTO app_migration_markers (key) VALUES (${slugMarker})
+                ON CONFLICT (key) DO NOTHING
+              `);
+              logger.info({ slug, marker: markerKey }, "Country engine initial reprocess ran");
+              // Yield so queued healthcheck requests get serviced between slugs.
+              await new Promise((r) => setImmediate(r));
+            } catch (slugErr) {
+              failedSlugs.push(slug);
+              logger.error(
+                { err: slugErr, slug, marker: markerKey },
+                "Country engine initial reprocess failed for country (continuing)",
+              );
+            }
+          }
+          // Write the marker ONLY when every slug succeeded. Each slug's engine
+          // run is idempotent (re-runs upsert the same canonical rows), so on a
+          // partial failure we leave the marker unwritten and the whole block
+          // retries on the next boot until all countries have been reprocessed.
+          if (failedSlugs.length === 0) {
+            await db.execute(sql`
+              INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+              ON CONFLICT (key) DO NOTHING
+            `);
+            logger.info({ marker: markerKey }, "Country engine initial reprocess complete");
+          } else {
+            logger.warn(
+              { failedSlugs, marker: markerKey },
+              "Country engine initial reprocess incomplete — marker NOT written; will retry next boot",
+            );
+          }
+        }
+      }
     }
 
     logger.info("runDataMigrations: finished");

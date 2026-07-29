@@ -25,6 +25,7 @@ import type {
   BeginBrowserLoginParams,
   BrandSettings,
   BrandSettingsUpdate,
+  CanonicalEvent,
   CardDraft,
   CardDraftInput,
   CardDraftUpdate,
@@ -33,6 +34,13 @@ import type {
   CardTemplateUpdate,
   CountryBaseline,
   CountryBaselineInput,
+  CountryEngineAuditRow,
+  CountryEngineBulkInput,
+  CountryEngineBulkResult,
+  CountryEngineHeldSummaryRow,
+  CountryEngineOverrideInput,
+  CountryEngineReprocessResult,
+  CountryEngineView,
   CountryProseResult,
   CountryReport,
   CountryReportInput,
@@ -55,6 +63,7 @@ import type {
   GenerateCountryProseInput,
   GenerateReportIncidentSummariesInput,
   GenerateReportProseInput,
+  GetCountryEngineParams,
   GetIncidentCountsByTopicParams,
   GetRecentIncidentsParams,
   GetStrikeSummaryParams,
@@ -6249,6 +6258,465 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getEditCountryProseMutationOptions(options));
     }
+
+export const getGetCountryEngineUrl = (slug: string,
+    params?: GetCountryEngineParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/countries/${slug}/engine?${stringifiedParams}` : `/api/countries/${slug}/engine`
+}
+
+/**
+ * @summary Canonical events, latest run stats and analyst overrides for a country
+ */
+export const getCountryEngine = async (slug: string,
+    params?: GetCountryEngineParams, options?: RequestInit): Promise<CountryEngineView> => {
+
+  return customFetch<CountryEngineView>(getGetCountryEngineUrl(slug,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCountryEngineQueryKey = (slug: string,
+    params?: GetCountryEngineParams,) => {
+    return [
+    `/api/countries/${slug}/engine`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetCountryEngineQueryOptions = <TData = Awaited<ReturnType<typeof getCountryEngine>>, TError = ErrorType<unknown>>(slug: string,
+    params?: GetCountryEngineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngine>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCountryEngineQueryKey(slug,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCountryEngine>>> = ({ signal }) => getCountryEngine(slug,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(slug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCountryEngine>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCountryEngineQueryResult = NonNullable<Awaited<ReturnType<typeof getCountryEngine>>>
+export type GetCountryEngineQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Canonical events, latest run stats and analyst overrides for a country
+ */
+
+export function useGetCountryEngine<TData = Awaited<ReturnType<typeof getCountryEngine>>, TError = ErrorType<unknown>>(
+ slug: string,
+    params?: GetCountryEngineParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngine>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCountryEngineQueryOptions(slug,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getBulkOverrideCountryEngineUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/engine/bulk`
+}
+
+/**
+ * @summary Bulk-triage matching engine events (approve/exclude by filter; audit-logged; re-runs the engine once)
+ */
+export const bulkOverrideCountryEngine = async (slug: string,
+    countryEngineBulkInput: CountryEngineBulkInput, options?: RequestInit): Promise<CountryEngineBulkResult> => {
+
+  return customFetch<CountryEngineBulkResult>(getBulkOverrideCountryEngineUrl(slug),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      countryEngineBulkInput,)
+  }
+);}
+
+
+
+
+export const getBulkOverrideCountryEngineMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkOverrideCountryEngine>>, TError,{slug: string;data: BodyType<CountryEngineBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkOverrideCountryEngine>>, TError,{slug: string;data: BodyType<CountryEngineBulkInput>}, TContext> => {
+
+const mutationKey = ['bulkOverrideCountryEngine'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkOverrideCountryEngine>>, {slug: string;data: BodyType<CountryEngineBulkInput>}> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  bulkOverrideCountryEngine(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkOverrideCountryEngineMutationResult = NonNullable<Awaited<ReturnType<typeof bulkOverrideCountryEngine>>>
+    export type BulkOverrideCountryEngineMutationBody = BodyType<CountryEngineBulkInput>
+    export type BulkOverrideCountryEngineMutationError = ErrorType<void>
+
+    /**
+ * @summary Bulk-triage matching engine events (approve/exclude by filter; audit-logged; re-runs the engine once)
+ */
+export const useBulkOverrideCountryEngine = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkOverrideCountryEngine>>, TError,{slug: string;data: BodyType<CountryEngineBulkInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkOverrideCountryEngine>>,
+        TError,
+        {slug: string;data: BodyType<CountryEngineBulkInput>},
+        TContext
+      > => {
+      return useMutation(getBulkOverrideCountryEngineMutationOptions(options));
+    }
+
+export const getGetCountryEngineHeldSummaryUrl = () => {
+
+
+
+
+  return `/api/country-engine/held-summary`
+}
+
+/**
+ * @summary Per-country inclusion-status counts for the engine review backlog
+ */
+export const getCountryEngineHeldSummary = async ( options?: RequestInit): Promise<CountryEngineHeldSummaryRow[]> => {
+
+  return customFetch<CountryEngineHeldSummaryRow[]>(getGetCountryEngineHeldSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCountryEngineHeldSummaryQueryKey = () => {
+    return [
+    `/api/country-engine/held-summary`
+    ] as const;
+    }
+
+
+export const getGetCountryEngineHeldSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getCountryEngineHeldSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineHeldSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCountryEngineHeldSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCountryEngineHeldSummary>>> = ({ signal }) => getCountryEngineHeldSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineHeldSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCountryEngineHeldSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getCountryEngineHeldSummary>>>
+export type GetCountryEngineHeldSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Per-country inclusion-status counts for the engine review backlog
+ */
+
+export function useGetCountryEngineHeldSummary<TData = Awaited<ReturnType<typeof getCountryEngineHeldSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineHeldSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCountryEngineHeldSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getReprocessCountryEngineUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/engine/reprocess`
+}
+
+/**
+ * @summary Re-run the shared engine for a country and return the fresh run stats
+ */
+export const reprocessCountryEngine = async (slug: string, options?: RequestInit): Promise<CountryEngineReprocessResult> => {
+
+  return customFetch<CountryEngineReprocessResult>(getReprocessCountryEngineUrl(slug),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReprocessCountryEngineMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reprocessCountryEngine>>, TError,{slug: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reprocessCountryEngine>>, TError,{slug: string}, TContext> => {
+
+const mutationKey = ['reprocessCountryEngine'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reprocessCountryEngine>>, {slug: string}> = (props) => {
+          const {slug} = props ?? {};
+
+          return  reprocessCountryEngine(slug,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReprocessCountryEngineMutationResult = NonNullable<Awaited<ReturnType<typeof reprocessCountryEngine>>>
+
+    export type ReprocessCountryEngineMutationError = ErrorType<void>
+
+    /**
+ * @summary Re-run the shared engine for a country and return the fresh run stats
+ */
+export const useReprocessCountryEngine = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reprocessCountryEngine>>, TError,{slug: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reprocessCountryEngine>>,
+        TError,
+        {slug: string},
+        TContext
+      > => {
+      return useMutation(getReprocessCountryEngineMutationOptions(options));
+    }
+
+export const getOverrideCountryEngineEventUrl = (slug: string,
+    eventId: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/engine/events/${eventId}`
+}
+
+/**
+ * @summary Apply an analyst override to one canonical event (audit-logged, re-runs the engine)
+ */
+export const overrideCountryEngineEvent = async (slug: string,
+    eventId: string,
+    countryEngineOverrideInput: CountryEngineOverrideInput, options?: RequestInit): Promise<CanonicalEvent> => {
+
+  return customFetch<CanonicalEvent>(getOverrideCountryEngineEventUrl(slug,eventId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      countryEngineOverrideInput,)
+  }
+);}
+
+
+
+
+export const getOverrideCountryEngineEventMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof overrideCountryEngineEvent>>, TError,{slug: string;eventId: string;data: BodyType<CountryEngineOverrideInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof overrideCountryEngineEvent>>, TError,{slug: string;eventId: string;data: BodyType<CountryEngineOverrideInput>}, TContext> => {
+
+const mutationKey = ['overrideCountryEngineEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof overrideCountryEngineEvent>>, {slug: string;eventId: string;data: BodyType<CountryEngineOverrideInput>}> = (props) => {
+          const {slug,eventId,data} = props ?? {};
+
+          return  overrideCountryEngineEvent(slug,eventId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type OverrideCountryEngineEventMutationResult = NonNullable<Awaited<ReturnType<typeof overrideCountryEngineEvent>>>
+    export type OverrideCountryEngineEventMutationBody = BodyType<CountryEngineOverrideInput>
+    export type OverrideCountryEngineEventMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply an analyst override to one canonical event (audit-logged, re-runs the engine)
+ */
+export const useOverrideCountryEngineEvent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof overrideCountryEngineEvent>>, TError,{slug: string;eventId: string;data: BodyType<CountryEngineOverrideInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof overrideCountryEngineEvent>>,
+        TError,
+        {slug: string;eventId: string;data: BodyType<CountryEngineOverrideInput>},
+        TContext
+      > => {
+      return useMutation(getOverrideCountryEngineEventMutationOptions(options));
+    }
+
+export const getGetCountryEngineAuditUrl = (slug: string,) => {
+
+
+
+
+  return `/api/countries/${slug}/engine/audit`
+}
+
+/**
+ * @summary Recent audit-log rows for a country's engine changes
+ */
+export const getCountryEngineAudit = async (slug: string, options?: RequestInit): Promise<CountryEngineAuditRow[]> => {
+
+  return customFetch<CountryEngineAuditRow[]>(getGetCountryEngineAuditUrl(slug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCountryEngineAuditQueryKey = (slug: string,) => {
+    return [
+    `/api/countries/${slug}/engine/audit`
+    ] as const;
+    }
+
+
+export const getGetCountryEngineAuditQueryOptions = <TData = Awaited<ReturnType<typeof getCountryEngineAudit>>, TError = ErrorType<unknown>>(slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCountryEngineAuditQueryKey(slug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCountryEngineAudit>>> = ({ signal }) => getCountryEngineAudit(slug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(slug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCountryEngineAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getCountryEngineAudit>>>
+export type GetCountryEngineAuditQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent audit-log rows for a country's engine changes
+ */
+
+export function useGetCountryEngineAudit<TData = Awaited<ReturnType<typeof getCountryEngineAudit>>, TError = ErrorType<unknown>>(
+ slug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCountryEngineAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCountryEngineAuditQueryOptions(slug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGenerateReportIncidentSummariesUrl = (id: number,) => {
 

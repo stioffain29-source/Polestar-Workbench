@@ -292,6 +292,60 @@ const FIXTURES: Fixture[] = [
     verdict: "KEEP",
   },
 
+  // ---- Cancelled / called-off RALLY or PROTEST (non-event): DROP -------
+  {
+    title: "Anti-corruption rally called off in Manila after warnings",
+    verdict: "DROP",
+    reason: "cancelled/called-off rally or protest",
+  },
+  {
+    title: "Organisers call off tomorrow's anti-graft protest in Kathmandu",
+    verdict: "DROP",
+    reason: "cancelled/called-off rally or protest",
+  },
+  // A gathering that went ahead despite a cancellation order — a real event
+  // with a clear public-order cue — must SURVIVE the cancelled-event gate: KEEP.
+  {
+    title: "Protesters defy cancellation order, clash with police in Colombo",
+    verdict: "KEEP",
+  },
+
+  // ---- Activist PROFILE / personality feature (not an event): DROP -----
+  {
+    title: "How a Gen Z student became the face of the movement",
+    verdict: "DROP",
+    reason: "activist profile/personality feature",
+  },
+  {
+    title: "Meet the teenager leading the Kathmandu marches",
+    verdict: "DROP",
+    reason: "activist profile/personality feature",
+  },
+  // A live headline that merely names a person is untouched: KEEP.
+  {
+    title: "Balen Shah leads Kathmandu rally against corruption",
+    verdict: "KEEP",
+  },
+
+  // ---- Social-media-culture sidebar about a protest: DROP -------------
+  {
+    title: "Gen Z show off outfits and fit checks at the Kathmandu protest",
+    verdict: "DROP",
+    reason: "social-media-culture sidebar",
+  },
+
+  // ---- Photo feature / gallery ("in photos"): DROP --------------------
+  {
+    title: "Kathmandu protests, in photos: A city on edge",
+    verdict: "DROP",
+    reason: /photos|editorial format|homonym/,
+  },
+  {
+    title: "In Pictures: Anti-government marches sweep the capital",
+    verdict: "DROP",
+    reason: /pictures|editorial format|homonym/,
+  },
+
   // ---- Off-topic news digest (protest is one bundled item): DROP -------
   {
     title: "CJP's first protest, India-Nepal ties, and Vizag steel plant accident",

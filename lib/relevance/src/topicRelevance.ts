@@ -455,6 +455,15 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\b(in|look)\s+photos:\s/,
   /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
+  // Staged law-enforcement SHOWCASE demonstration — "Drug Smuggling Crackdown
+  // Demonstration at Incheon Airport's … Inspection Checkpoint" is a press /
+  // photo-op display of enforcement capability, not a protest. A genuine demo
+  // AGAINST a crackdown reads "demonstration against/over the crackdown",
+  // never "<enforcement-noun> demonstration", so the noun-immediately-before
+  // shape is unambiguous. Must run before the title-rescue (the bare word
+  // "demonstration" would rescue it) and cannot live in the display-
+  // demonstration gate (its protest-companion spare includes "crackdown").
+  /\b(crackdown|inspection|screening|checkpoint|customs|counter[- ]?terror\w*|anti[- ]?smuggling|k-?9|sniffer|drill|drills)\s+demonstrations?\b/,
   // Metaphorical "instant protest" headline — runs BEFORE the title-rescue so
   // the bare word "protest" can no longer rescue the quoted figure of speech.
   /\binstant protest\b/,
@@ -547,6 +556,104 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // markets story, not civil unrest. Gated on the financial actor + protest +
   // a trading-loss context either side, so a street protest is untouched.
   /\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,45}\bprotest\w*\b[^.!?]{0,50}\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage|broker|share price|stock crash|ponzi)\b|\b(glitch|sell-?offs?|forced (sale|sales|liquidation|sell)|margin call|trading (halt|loss|losses|error|system)|brokerage)\b[^.!?]{0,50}\b(investors?|traders?|shareholders?|depositors?|clients?|account holders?)\b[^.!?]{0,20}\bprotest\w*\b/i,
+  // Fact-check / misinformation debunk — "Nepal Gen-Z protest video falsely
+  // shared as…", "Fake Letter Falsely Claims…", "AI-generated video falsely
+  // linked to unrest", "Old videos … falsely linked to CJP protests",
+  // "Unrelated Sikh march falsely linked…". The debunked FOOTAGE often
+  // contains unmistakable public-order vocabulary ("Gen-Z protest", "tear
+  // gas", "demonstration"), so these must drop BEFORE the title-rescue and
+  // before the FP_POS_DEMO keep path — the story is about misinformation,
+  // not a live unrest event. Bound to explicit fact-check verbs/framing so a
+  // genuine protest report is never touched.
+  /\b(fact[- ]?check(s|er|ers|ing)?|debunk(s|ed|ing)?|falsely (link|share|caption|attribute|claim|portray|depict)\w*|misrepresent(s|ed|ing)?|doctored (video|image|photo|clip|footage)|ai[- ]generated\b|fake (letter|video|photo|image|clip|footage)|misinformation|disinformation|peddled as|viral with (a )?false|(shared|circulat\w*) with (a )?false (communal |political |misleading )?claims?)\b/i,
+  // Footage-verification piece — "Video shows land rights demonstration in
+  // Chiang Mai, not Bangkok rally against Myanmar leader". The "shows X, not
+  // Y" contrast frame is verification journalism about mislabelled footage,
+  // never a live event report. Requires the contrastive ", not" after a
+  // "video/photo shows" opener so a genuine report is untouched.
+  /\b(video|photo|image|clip|footage)s? shows?\b[^.!?]{0,90},\s*not\b/i,
+  // Further misinformation shapes: a "doctor(ed)/manipulated/edited/fake …
+  // photo/video" with words between ("Posts doctor old photo of prisoner
+  // rights protest…to mock Colombo mayor"), the verification-piece framing
+  // "Here's the truth", and rumour headlines quoting a purported 'support
+  // letter' to protesters. All are coverage OF misinformation, not unrest.
+  /\b(doctor(s|ed)?|manipulated|edited|fabricated)\b[^.!?]{0,12}\b(photo|image|picture|video|clip|footage)s?\b|\bhere'?s the truth\b|['‘’"“”]support letter['‘’"“”]|\bspreads? false\b|\bmyths? vs\.? facts?\b/i,
+  // Interrogative rumour-verification headline — "Did Bangladesh's
+  // Jamaat-e-Islami send a 'support letter' to Delhi protesters?". A "Did …?"
+  // question opener is a verification/debate piece, not an incident report.
+  /^\s*did\b[^?]{0,90}\?/i,
+  // Staged enforcement/inspection "demonstration" for official photographs —
+  // "[Photo] Drug Smuggling Crackdown Demonstration at Incheon Airport's
+  // Dedicated Drug Inspection Checkpoint". Here "demonstration" is a staged
+  // display of an enforcement capability, not a protest, yet the bare word
+  // would otherwise title-rescue it. Bound to the enforcement noun adjacent
+  // to "demonstration" (a real protest AGAINST a crackdown reads
+  // "demonstration against the crackdown" and is not matched: the enforcement
+  // word must immediately modify the demonstration, or the demonstration must
+  // sit at a checkpoint/inspection venue).
+  /\b(crackdown|enforcement|inspection|interdiction|screening|customs|counter[- ]?terror\w*) demonstration\b|\bdemonstration\b[^.!?]{0,50}\b(inspection (checkpoint|station|facility)|customs checkpoint|screening checkpoint|drug inspection)\b/i,
+  // Interstate / diplomatic "files a protest" — "China Files Protest, Says
+  // Philippines Struck First in Sea Clash". A filed/lodged/registered protest
+  // is a formal complaint note between states or to an authority, never a
+  // street demonstration, yet body-level positive cues ("clash",
+  // "protesters" in unrelated summary copy) can reach the keep path first.
+  // Title-only and verb-bound, so "protesters file past parliament" or a
+  // genuine demonstration headline is untouched.
+  /\b(files?|filed|lodges?|lodged|registers?|registered) (a |an |its |another )?(formal |official |diplomatic |strong |stern |strongly[- ]worded )?protests?\b/i,
+  // Criminal-syndicate enforcement colour — "'Counter-setting syndicate'
+  // active at Johor border, KLIA despite crackdown". A crime-syndicate story
+  // is law enforcement, not civil unrest; the bare word "crackdown" would
+  // otherwise carry it. Requires the syndicate/organised-crime noun in the
+  // headline, so a "crackdown on protesters" headline never matches.
+  /\b(counter[- ]setting|crime |criminal |smuggling |scam |drug |vice |illegal[- ]betting )?syndicates?\b[^.!?]{0,60}\bcrackdowns?\b|\bcrackdowns?\b[^.!?]{0,40}\b(counter[- ]setting|syndicates?)\b/i,
+  // ---- Think-piece / retrospective essays about PAST unrest ----
+  // Analytical essays and retrospectives carry protest keywords but no live
+  // public-order signal. Each pattern below is bound to distinctive essay
+  // framing that never appears in a live-event headline, so genuine coverage
+  // (including protests AT a High Commission, "demands release of commission
+  // report", anniversary marches) is untouched.
+  //
+  // Essay thesis framing — "Nepal's Gen Z protests are a call for democratic
+  // renewal", "Nepal's youth protests: A warning for South Asian democracies".
+  // The protest noun followed by an "is/are/: a <abstraction>" copula is a
+  // commentary thesis, never an event report.
+  /\b(protests?|unrest|uprising|riots?)\b[^.!?]{0,10}\b(is|are|was|were|remains?)\s+a\s+(call for|warning|lesson|reminder|wake[- ]up call|turning point|test|watershed|blueprint|template)\b/i,
+  /\b(protests?|unrest|uprising|riots?):\s+a\s+(call for|warning|lesson|reminder|wake[- ]up call|turning point|test|watershed)\b/i,
+  // "The questions emerging from Nepal's Gen Z protests", "lessons learned
+  // from the uprising" — reflective distillation, not an event.
+  /\b(questions?|lessons?|takeaways?)\s+(emerging|arising|learn(ed|t)|drawn|to be learn(ed|t))\s+from\b/i,
+  // "What Authoritarians May Learn About Censorship From Nepal's Protests" —
+  // the may/could-learn-from construction is essay-speak only.
+  /\b(may|might|can|could|should|must)\s+learn\s+(from|about)\b/i,
+  // "Nepal's Protest-Fueled Transition" — the compound adjective + an
+  // abstract political-arc noun is analysis framing; a live headline says
+  // "protests fuel clashes", never "protest-fueled transition".
+  /\bprotest[- ]fuel(l)?ed\s+(transition|shift|reckoning|moment|era|reset|realignment|awakening)\b/i,
+  // "Post-Protest Bangladesh: Restoration More than Renewal" — the
+  // "post-protest/post-uprising <place>" label is retrospective analysis;
+  // live coverage says "after the protests", never "post-protest".
+  /\bpost[- ](protest|uprising|unrest|revolution)\b/i,
+  // Obituary / profile retrospective — "Who was Sharif Osman Hadi? The rise
+  // and killing of Bangladesh's protest icon".
+  /^\s*who\s+(was|is)\b[^?]{0,60}\?/i,
+  /\brise and (killing|fall|death|assassination) of\b/i,
+  // Trend-analysis framing — "Balen Shah's political rise … reflects a
+  // broader shift after youth-led protests".
+  /\breflects?\s+a\s+(broader|wider|deeper|larger)\s+(shift|trend|change|realignment)\b/i,
+  // Question-framed capability/forecast analysis — "Can Nepal actually
+  // enforce its Human Rights Commission's findings?". A leading
+  // can/could/should/will interrogative marks a debate piece, not an event
+  // report (extends the existing what/why/how/did openers).
+  /^\s*(?:can|could|should|will)\b[^?]{0,90}\?/i,
+  // Commission / inquiry AFTERMATH procedure — "Nepal commission submits
+  // September protest probe report", "Inquiry commission seeks extra month
+  // to probe … crackdown", "commission hears", "probe finds security
+  // lapses", "NHRC Directs Further Investigation into … Protest
+  // Organizers". Gated on the inquiry NOUN plus a procedural verb, so a
+  // live protest that merely NAMES a commission ("Gen Z Alliance Protests…
+  // Demands Release of Karki Commission Report", any demonstration outside
+  // a High Commission, "Police Commissioner apologises") never matches.
+  /\b(commissions?|inquir(y|ies)|probes?|panels?|tribunals?)\b[^.!?]{0,60}\b(submits?|submitted|hands? (over|in)|hears?|heard|finds?|found|concludes?|concluded|releases? (its|the|final)|seeks? (an? )?(extra|more|additional)|directs? (a )?(further|fresh|new)? ?investigation)\b/i,
 ];
 
 // Editorial suppression — specific genuine-protest headlines an operator has
@@ -590,6 +697,44 @@ const FP_CANCELLED_ACTION_RE =
 const FP_CANCELLED_KEEP_RE =
   /\b(continu\w*|resum\w*|protest|clash\w*|charge[sd]?|defy|defian\w*|escalat\w*|riot\w*|violen\w*|killed?|injured)\b/i;
 
+// Cancelled / called-off RALLY or PROTEST = a NON-EVENT (the gathering never
+// took place). Title-bound and verb-BEFORE-noun ("anti-corruption rally called
+// off", "organisers call off tomorrow's protest") so a genuine long-running
+// protest that later concludes ("105-day protest ... called off" — noun first,
+// with a duration) is NOT matched. The cancel verb must sit immediately before
+// the rally/protest noun, optionally through a "planned/scheduled/announced"
+// qualifier, which never appears in a post-hoc "the protest was called off"
+// report. Spared when the headline shows the action still went ahead or turned
+// to unrest (FP_CANCELLED_EVENT_KEEP_RE), so "rally goes ahead despite ban" is
+// kept.
+const FP_CANCELLED_EVENT_RE =
+  // Verb-before-noun: "organisers call off tomorrow's protest".
+  /\b(call(s|ed)?\s+off|called[- ]off|cancel(s|led|ling)?|scrap(s|ped|ping)?|postpon(e|es|ed|ing)|defer(s|red|ring)?|abandon(s|ed|ing)?)\s+(?:its\s+|the\s+|a\s+|an\s+|their\s+|today'?s\s+|tomorrow'?s\s+|this\s+week'?s\s+|planned\s+|scheduled\s+|proposed\s+|upcoming\s+|announced\s+|weekend\s+|[a-z-]+\s+){0,4}(rall(y|ies)|protests?|marches?|march|demonstrations?|sit[- ]?ins?|picket)\b/i;
+// Noun-before-verb: "anti-corruption rally called off". Spared when a preceding
+// DURATION / "held/staged/ongoing" marker shows the gathering actually happened
+// (the concluded "105-day protest ... called off" case), which is handled by
+// FP_CANCELLED_EVENT_KEEP_RE below.
+const FP_CANCELLED_EVENT_NOUN_RE =
+  /\b(rall(y|ies)|protests?|marches?|march|demonstrations?|sit[- ]?ins?|picket)\b[^.!?]{0,20}\b(call(s|ed)?\s+off|called[- ]off|cancel(s|led|ling)?|scrap(s|ped|ping)?|postpon(e|ed)|abandon(s|ed|ing)?)\b/i;
+const FP_CANCELLED_EVENT_KEEP_RE =
+  /\b(goes?\s+ahead|went\s+ahead|defy|defian\w*|despite\s+(the\s+)?(ban|cancel|call)|still\s+(held|gather|march|protest)|clash\w*|riot\w*|violen\w*|tear[- ]?gas|killed?|injured|arrest\w*|storm\w*|\d+[- ]day|\d+[- ]week|\d+[- ]month|days?[- ]?long|weeks?[- ]?long|month\w*[- ]?long|ongoing|held|staged|began|begun|started|entered\s+(?:its\s+)?\d+)\b/i;
+
+// Profile / personality feature — "How X became the face of the movement", "the
+// woman behind the protests", "meet the teenager leading the marches". A
+// biographical portrait of an activist, not a report of a dated event. Bound to
+// the distinctive profile framing so a live headline that merely names a person
+// ("Balen Shah leads Kathmandu rally") is untouched.
+const FP_PROFILE_FEATURE_RE =
+  /\b(became?|becoming|is|are)\s+the\s+(face|voice|symbol|icon|figurehead|poster\s+(child|girl|boy))\s+of\b|\bthe\s+(man|woman|teen(ager)?|student|activist|youth|face|voice|leader)\s+(behind|driving|leading)\s+(the\s+)?(protests?|movement|rally|marches|uprising|unrest)\b|\bmeet\s+the\s+[a-z-]+\s+(who|leading|behind|driving)\b|\b(rise|profile|portrait)\s+of\s+(the\s+)?[a-z-]+\s+(protest|movement|activist)\b/i;
+
+// Social-media-culture SIDEBAR about a protest — "fit checks", outfits, viral
+// looks, influencer content, aesthetics AT a demo. Colour about the online
+// culture around a protest, not a report of the public-order event itself.
+// Bound to the culture cue adjacent to a protest word so a genuine unrest
+// headline is untouched.
+const FP_SOCIAL_SIDEBAR_RE =
+  /\bfit\s+checks?\b|\b(outfit|fashion|aesthetic|vibe|look|style|makeup|drip|ootd|selfie|thirst\s+trap|influencer|content\s+creator|tiktok\w*|instagram\w*|viral\s+(video|clip|look|dance|trend))s?\b[^.!?]{0,40}\b(protest|rally|march|demonstration|unrest)\b|\b(protest|rally|march|demonstration|unrest)\b[^.!?]{0,40}\bfit\s+checks?\b/i;
+
 // Shared "is there genuine unrest here?" companion — spares a figurative match
 // that sits alongside a real public-order signal.
 const FP_REAL_UNREST_COMPANION_RE =
@@ -611,7 +756,7 @@ const FP_REAL_UNREST_COMPANION_RE =
 // — deliberately NOT the bare word "demonstration", which the display sense
 // shares) so a real "farmers' demonstration turns violent" is always kept.
 const FP_DISPLAY_DEMONSTRATION_RE =
-  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|models?|kitchens?)\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
+  /\bdemonstration\s+(flights?|flying|laps?|runs?|drives?|rides?|dives?|jumps?|manoeuvres?|maneuvers?|displays?|matches?|match|games?|bouts?|sessions?|exhibitions?|showcases?|events?|classes?|class|workshops?|tours?|projects?|units?|plants?|facilit(y|ies)|models?|kitchens?)\b|\bdemonstration\s+at\b[^.!?]{0,60}\b(music festival|festival|expo|fair|trade show|conference|summit)\b|\bdemonstration\s+and\s+(art\s+)?exhibition\b|\bdemonstration\s+of\s+(?:the\s+|a\s+|an\s+|its\s+|their\s+|his\s+|her\s+|our\s+|new\s+|latest\s+|first\s+|high[- ]?speed\s+|electric\s+|autonomous\s+|prototype\s+|advanced\s+|next[- ]?gen\w*\s+)*(flying car|cars?|vehicles?|aircraft|planes?|jets?|helicopters?|drones?|robot\w*|trains?|boats?|vessels?|ships?|gadgets?|devices?|products?|prototypes?|technolog\w*|tech\b|machines?|engines?|weapon\w*|missiles?|craft\b|kits?|tools?|techniques?|skills?|recipes?|dishes?|dance\w*|katas?|moves?|capabilit\w*|systems?|software|apps?|gear\b|equipment)\b|\b(cooking|culinary|baking|science|technolog\w*|robotics?|robot|drone|flying|aerobatic\w*|aviation|skateboard\w*|surf\w*|ski\w*|snowboard\w*|martial[- ]?arts?|karate|judo|taekwondo|kung[- ]?fu|boxing|wrestling|yoga|danc\w*|gymnastic\w*|magic|craft|knitting|knotting|pottery|painting|drawing|fitness|workout|farming|agricultur\w*|fishing|sailing|kayak\w*|pedalo|cycling|driving|racing|sport\w*|weaving|sewing|embroider\w*|calligraph\w*|first[- ]?aid|cpr|firefighting|welding|woodworking|gardening|puppet\w*|acrobat\w*)\s+demonstration\b/i;
 // Protest-specific companion (excludes the bare word "demonstration", which the
 // display sense shares) — used only to SPARE a genuine protest from the display-
 // demonstration exclude above.
@@ -646,12 +791,20 @@ const FP_ADVISORY_AGGREGATOR_RE =
 const FP_EDITORIAL_LABEL_RE =
   /^\s*\[?\s*(analysis|commentary|opinion|editorial|perspective|viewpoint|column|explainer|backgrounder|factbox|q&a)\s*[:\]\-–—|]/i;
 
+// Fact-check OUTLET credited in the raw headline suffix ("… - AFP Fact
+// Check", "… | BOOM Fact Check", "… - Newschecker"). Masthead stripping
+// removes the suffix from titleHaystack, so the misinformation excludes never
+// see it — a verification outlet only publishes verification journalism, so
+// the raw-title credit alone is decisive. Runs on the RAW title.
+const FP_FACTCHECK_OUTLET_RE =
+  /[-|–—:]\s*(afp|boom|reuters|ap)?\s*fact[- ]?check(er)?s?\s*$|\b(newschecker|factly|vera files fact check|rappler fact check|boomlive)\b/i;
+
 // Editorial FORMATS — listicles ("5 things to know"), digests ("Today's Top 3
 // News"), photo galleries ("in pictures"), yearenders, "explained" /
 // "what's next for" think-pieces, "lessons from" / "why X matters". A bundle
 // or retrospective, not a single civil-unrest event.
 const FP_EDITORIAL_FORMAT_RE =
-  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|\bphoto\s+(gallery|essay)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b/i;
+  /\btoday'?s top\s+\d+\b|\btop\s+\d+\s+(news|stories|issues|things|headlines|moments)\b|\b\d+\s+things\s+to\s+know\b|\bthings\s+to\s+know\b|\byearender\b|\bin\s+(pictures|photos|charts|maps|graphics)\b|^\s*(in\s+)?(photos|pictures)\s*[:|]|\b(photos|pictures)\s*[:|]\s|\bphoto\s+(gallery|essay|feature)\b|\b(protests?|unrest|rally|march|demonstration)\b[^.!?]{0,30}\bin\s+(photos|pictures)\b|\bwhat'?s\s+next\s+for\b|\b(protests?|unrest|crisis|demonstrations?)\s+explained\b|\bexplained\s*[:|]|\blessons?\s+(?:\w+\s+){0,2}(?:from|of|for|learnt|learned)\b|\bthe\s+lesson\b|\bwhy\s+.{2,40}\bmatters?\b|^\s*why\b[^.!?]{0,80}\b(protest\w*|unrest|movement)\b/i;
 
 // Protest AFTERMATH / clean-up (street cleaning after a demo, a "protests
 // aftermath" retrospective) — a non-event, unless an ongoing-unrest signal
@@ -911,7 +1064,19 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\b(heads? back to|returns? to|back in|reverts? to|orders?|orderbook|order book|fleet renewal|invests? in|expands?.{0,15}fleet|signs?|inks?|places?|cancels?|delivery of|delivered)\b.{0,25}newbuild/i,
   /\bnewbuild(s|ing)?\b.{0,25}(order|orders|orderbook|order book|programme|program|deal|contract|delivery|delivered|christen|named|spree|push|tally|wave)/i,
   /\b(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership) (pair|trio|duo|disposal|sale|resale)\b/,
-  /\b(cashes? in|pockets?|nets?|bags?|lands?|snaps? up|offloads?|disposes?|sells?|buys?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  // Unambiguous commercial verbs pair with ANY vessel word. "lands" and
+  // "orders" are kept out of this group: they are ambiguous against live
+  // security coverage ("projectile LANDS near tanker", "Iran ORDERS tanker
+  // to stop") and were collaterally swallowing real Red Sea / Hormuz
+  // incidents, so they only fire against an unambiguous vessel-CLASS /
+  // newbuild object below ("Dynacom lands $65m for ageing suezmax",
+  // "orders VLCC newbuilds"), never a bare tanker/vessel.
+  // NOTE: "nets" carries a lookbehind so a masthead TLD (".net" in
+  // "Breakingthenews.net") can never fire it — a concatenated
+  // title+summary haystack put "…breakingthenews.net UK receives report
+  // of vessel…" within the 30-char window and hid a live vessel-fire row.
+  /\b(cashes? in|pockets?|(?<!\.)nets?|bags?|snaps? up|offloads?|disposes?|sells?|buys?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|tonnage)\b/,
+  /\b(lands?|orders?)\b.{0,30}(suezmax|vlcc|aframax|panamax|capesize|handysize|bulker|boxship|containership|newbuild)/,
   /\b(ageing|aging|veteran|elderly|second[- ]hand|secondhand) (suezmax|vlcc|aframax|panamax|capesize|bulker|boxship|containership|tanker|vessel|pair|trio|duo|tonnage)\b/,
   /\b\$\d+\s*m?\s*(gain|profit) from\b/,
   /\bgain from .{0,20}(disposal|sale|vessel|tanker)\b/,
@@ -1369,6 +1534,10 @@ const REQUIRED: Record<string, RegExp[]> = {
   ],
   shipping: [
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
+    // UKMTO-style casualty advisories phrase it as "vessel ON fire" /
+    // "tanker ablaze" — the adjacent "vessel fire" phrase above misses the
+    // preposition (real row: "UK receives report of vessel on fire").
+    /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (is |reported )?(on fire|ablaze|caught fire)\b/,
     /\battack (on|against) (a |an |the )?(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew)/,
     // Piracy / sea robbery against vessels (mirrors the ingest ALLOW list).
     // Maritime-qualified phrases plus a proximity match so a ReCAAP-style
@@ -1378,6 +1547,10 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(piracy|pirate|pirates|robbery|robbed) .{0,40}(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage|strait|at sea|off (the )?coast)\b/,
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier|crew|boat|tug|barge|anchorage) .{0,40}(piracy|pirate|pirates|sea robbery|armed robbery|robbed|robbery)\b/,
     /\b(missile|drone) (strike|attack) .{0,30}(ship|vessel|tanker|maritime|port|hormuz|red sea)/,
+    // UKMTO-style near-miss advisories — "unidentified projectile lands near
+    // tanker in southern Red Sea". Bound to a vessel word so ground-war
+    // projectile wires never qualify.
+    /\bprojectile\b[^.]{0,30}\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier)\b/,
     // Port DISRUPTION as a security/operational event — NOT commercial "port
     // congestion", which is freight-economics commentary, not a maritime
     // security incident (admitting it leaked container-rate / shipping-cost
@@ -1541,6 +1714,29 @@ const FP_NEG_INTERSTATE = new RegExp(
   `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (a |another |formal |strong |diplomatic )*protest\\b`,
   "i",
 );
+// Interstate protest EXCHANGE — a state (or its capital, metonymically)
+// getting / drawing / rejecting another state's protest over drills,
+// incursions or talks: "Chinese Destroyer's Live-Fire Drill Draws Protest by
+// Japan", "China rejects Japan's protest over joint drills", "China Foreign
+// Minister Gets Protest From Manila". These are diplomacy, never street
+// protest, yet the shapes above miss the possessive ("Japan's protest") and
+// received forms ("gets protest from Manila"). The state noun is REQUIRED in
+// every branch, so "fuel hike draws protest from workers" is untouched; and
+// this only runs on the negative-sense path, after FP_POS_DEMO/VIOLENCE have
+// already kept any genuine demonstration.
+const FP_NEG_INTERSTATE_STATE =
+  `(?:${FP_NEG_INTERSTATE_NAT}|manila|new delhi|islamabad|taipei|moscow|washington|colombo|dhaka|hanoi|canberra|pyongyang|bangkok|phnom penh|naypyidaw)`;
+const FP_NEG_INTERSTATE_EXCHANGE = new RegExp(
+  `\\b(?:gets?|got|receive[sd]?|draws?|drew|rejects?|dismiss(?:es|ed)?|brush(?:es|ed)\\s+(?:off|aside))\\s+(?:\\w+\\s+){0,2}["'‘’“”]?protests?["'‘’“”]?\\s+(?:by|from)\\s+(?:the\\s+)?${FP_NEG_INTERSTATE_STATE}\\b` +
+    `|\\b(?:draws?|drew|rejects?|dismiss(?:es|ed)?)\\s+(?:a\\s+|an\\s+|sharp\\s+|strong\\s+|formal\\s+|fresh\\s+|stern\\s+|official\\s+|diplomatic\\s+)*${FP_NEG_INTERSTATE_STATE}\\s+["'‘’“”]?protests?\\b` +
+    // Possessive form ONLY when anchored to a diplomatic response verb —
+    // "rejects Japan's protest", "dismisses China's protest", "draws
+    // Manila's protest". A bare possessive ("India's protest movement",
+    // "Nepal's Gen-Z protests") is normal domestic-unrest phrasing and must
+    // never match.
+    `|\\b(?:draws?|drew|rejects?|dismiss(?:es|ed)?|brush(?:es|ed)\\s+(?:off|aside))\\s+(?:the\\s+)?${FP_NEG_INTERSTATE_STATE}[’']s\\s+(?:\\w+\\s+){0,2}["'‘’“”]?protests?\\b`,
+  "i",
+);
 const FP_NEG_CRACKDOWN =
   /\bcrackdown\b[^.]{0,30}\b(drug|narcotic|smuggl|traffick|corrupt|graft|tax|illegal|immigration|migrant|overstay|crime|criminal|gang|mafia|cartel|vice|piracy|terror|extremis|cyber|internet|website|web ?sites?|domains?|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach|wildlife|investment|forex|capital|tariff|trade|forced labou?r|child labou?r|pollution|emission|quarry|sand mining|electricity theft|power theft|safety|eviction|evict|demolition|encroach\w*|squatter|unauthori[sz]ed|vendor|hawker|busker|street performer|sidewalk|noise|helmet|jaywalk|chip|semiconductor|export control|militant|militants|insurgen\w*|separatist\w*|guerrilla\w*|jihad\w*|abu sayyaf|biff|bifm|bangsamoro|moro (rebel\w*|front\w*|fighter\w*|islamic|militant\w*)|\bnpa\b|new people'?s army|tpnpb|\bopm\b|\bttp\b|tehrik|baloch\w*|naxal\w*|maoist|arakan army|ethnic armed|child\w*|minors?|paedophil\w*|pedophil\w*)\b|\b(drug|narcotic|smuggl\w*|traffick\w*|corrupt\w*|graft|tax|immigration|migrant|crime|criminal|gang|mafia|cartel|vice|cyber|internet|website|web ?site|domain|online|app|apps|platform|e-?commerce|streaming|fake site|scam site|phishing|scam|fraud|counterfeit|theft|robbery|poach\w*|wildlife|investment|forex|tariff|trade|forced labou?r|pollution|illegal \w+|safety|eviction|demolition|encroachment|vendor|hawker|chip|semiconductor|militant|insurgent|rebel|separatist|jihadist|terrorist|child\w*) crackdown\b|\btiananmen\b/i;
 // Financial / markets / regulatory context. A "crackdown" or "clampdown" set in
@@ -1567,7 +1763,12 @@ function flashpointNegText(i: RelevanceInput): string {
 function flashpointProtestCrackdownVerdict(text: string, negText: string): boolean | null {
   if (/\bprotest(s|ers?|ing|ed)?\b/.test(text)) {
     if (FP_POS_DEMO.test(text) || FP_POS_VIOLENCE.test(text)) return true;
-    if (FP_NEG_GESTURE.test(negText) || FP_NEG_DIPLOMATIC.test(negText) || FP_NEG_INTERSTATE.test(negText)) {
+    if (
+      FP_NEG_GESTURE.test(negText) ||
+      FP_NEG_DIPLOMATIC.test(negText) ||
+      FP_NEG_INTERSTATE.test(negText) ||
+      FP_NEG_INTERSTATE_EXCHANGE.test(negText)
+    ) {
       return false;
     }
     return true;
@@ -1738,6 +1939,24 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
     // GDELT-lane "Protests" event with a showcase headline is kept.
     if (FP_DISPLAY_DEMONSTRATION_RE.test(text) && !FP_PROTEST_COMPANION_RE.test(text)) {
       return { relevant: false, reason: "slop: product/skill 'demonstration' (display/exhibition, not a protest)" };
+    }
+    // Cancelled/called-off gathering, activist profile feature, social-media
+    // sidebar and photo/editorial format — non-events that share protest
+    // vocabulary. Drop BEFORE the title-rescue, mirroring explainRelevance.
+    if (
+      (FP_CANCELLED_EVENT_RE.test(titleHaystack(i)) || FP_CANCELLED_EVENT_NOUN_RE.test(titleHaystack(i))) &&
+      !FP_CANCELLED_EVENT_KEEP_RE.test(titleHaystack(i))
+    ) {
+      return { relevant: false, reason: "slop: cancelled/called-off rally or protest (non-event)" };
+    }
+    if (FP_PROFILE_FEATURE_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: activist profile/personality feature (not a protest)" };
+    }
+    if (FP_SOCIAL_SIDEBAR_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: social-media-culture sidebar (not a protest)" };
+    }
+    if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "slop: editorial format (photo feature/listicle/think-piece)" };
     }
     if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
       return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
@@ -1938,6 +2157,26 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     if (FP_CANCELLED_ACTION_RE.test(titleHaystack(i)) && !FP_CANCELLED_KEEP_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: cancelled/suspended industrial action (non-event)" };
     }
+    // Cancelled / called-off rally or protest (a gathering that never took
+    // place) — title-bound, verb-before-noun so a concluded long protest is
+    // kept. Runs before the title-rescue so the bare word "rally"/"protest"
+    // cannot rescue a non-event.
+    if (
+      (FP_CANCELLED_EVENT_RE.test(titleHaystack(i)) || FP_CANCELLED_EVENT_NOUN_RE.test(titleHaystack(i))) &&
+      !FP_CANCELLED_EVENT_KEEP_RE.test(titleHaystack(i))
+    ) {
+      return { relevant: false, reason: "excluded: cancelled/called-off rally or protest (non-event)" };
+    }
+    // Personality PROFILE feature ("how X became the face of the movement") —
+    // a biographical portrait, not a dated event. Runs before the title-rescue.
+    if (FP_PROFILE_FEATURE_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: activist profile/personality feature (not a civil-unrest event)" };
+    }
+    // Social-media-culture sidebar ("fit checks" / outfits / viral looks at a
+    // protest) — colour about the online culture, not the public-order event.
+    if (FP_SOCIAL_SIDEBAR_RE.test(titleHaystack(i))) {
+      return { relevant: false, reason: "excluded: social-media-culture sidebar (not a civil-unrest event)" };
+    }
     // "Demonstration" as a product/vehicle/skill DISPLAY, not a protest ("…
     // demonstration flights of flying car"). Runs before the title-rescue so the
     // bare word "demonstration" can no longer rescue a showcase headline. Spared
@@ -1970,6 +2209,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // the raw title so the ^ anchor holds.
     if (FP_EDITORIAL_LABEL_RE.test(i.title ?? "")) {
       return { relevant: false, reason: "excluded: editorial label (opinion/analysis/explainer), not a civil-unrest event" };
+    }
+    // Fact-check outlet credited in the raw title (masthead stripping hides
+    // the "- AFP Fact Check" suffix from the misinformation excludes).
+    if (FP_FACTCHECK_OUTLET_RE.test(i.title ?? "")) {
+      return { relevant: false, reason: "excluded: fact-check outlet verification piece, not a civil-unrest event" };
     }
     // Editorial FORMAT (listicle/digest/gallery/yearender/think-piece).
     if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {

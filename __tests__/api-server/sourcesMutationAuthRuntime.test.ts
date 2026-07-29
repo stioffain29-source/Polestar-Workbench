@@ -2,7 +2,16 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
-import { TEST_ADMIN_TOKEN, adminAuthHeaders } from "./adminAuthTestHelpers";
+import {
+  TEST_ADMIN_TOKEN,
+  adminAuthHeaders,
+  installAdminTokenBeforeEach,
+} from "./adminAuthTestHelpers";
+
+// The global jest.setup beforeEach deletes INGEST_ADMIN_TOKEN before every
+// test; re-install it per test so the double-gate assertions exercise the
+// real token gate (tests also set it explicitly for clarity).
+installAdminTokenBeforeEach();
 
 // `openid-client` is a pure-ESM dependency pulled in transitively by the auth
 // router. jest does not transform node_modules, so importing the real module

@@ -767,3 +767,9 @@ id = "wsHeOXuUPBwarE50Yrg7a"
 uri = "file://exports/cargo_pages/page6.png"
 type = "image"
 title = "Cargo Watch — page 6"
+
+[[outputs]]
+id = "DOwySQxi5F-1J77ZHG_SH"
+uri = "file://screenshots/jakarta-brief-proof.pdf"
+type = "pdf"
+title = "Jakarta City Brief — freshly exported proof PDF"

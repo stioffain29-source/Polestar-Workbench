@@ -1,8 +1,6 @@
 import {
   synthesiseAssessedThemes,
   buildAssessedThemeGroups,
-  buildWhatMattersFromThemes,
-  themeLedLead,
   MAX_ASSESSED_THEMES,
 } from "../../artifacts/workbench/src/lib/countryThemeSynthesis";
 import type { PngReportItem } from "../../artifacts/workbench/src/lib/pngReportDataset";
@@ -142,8 +140,6 @@ describe("theme prose helpers are count-free", () => {
   it("never leaks an incident/record count", () => {
     const texts = [
       ...themes.map((t) => t.narrative),
-      ...buildWhatMattersFromThemes(themes, "none"),
-      themeLedLead(themes),
       ...buildAssessedThemeGroups(WINDOW, [], { hasBaseline: false }).map(
         (g) => g.paragraph,
       ),
@@ -154,14 +150,5 @@ describe("theme prose helpers are count-free", () => {
     }
   });
 
-  it("buildWhatMattersFromThemes returns the empty note for no themes", () => {
-    expect(buildWhatMattersFromThemes([], "standing caveat")).toEqual([
-      "standing caveat",
-    ]);
-  });
 
-  it("themeLedLead names the assessed themes", () => {
-    expect(themeLedLead(themes)).toMatch(/assessment centres on/i);
-    expect(themeLedLead([])).toBe("");
-  });
 });

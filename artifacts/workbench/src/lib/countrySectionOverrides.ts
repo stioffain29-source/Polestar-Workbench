@@ -39,8 +39,10 @@ export type CountrySectionKey = (typeof COUNTRY_SECTION_KEYS)[number];
 export const COUNTRY_SECTION_LABELS: Record<CountrySectionKey, string> = {
   "bottom-line": "Bottom Line Up Front",
   "top-3": "Top 3 Developments",
-  "incident-details": "Incident Details",
-  "current-situation": "Current Situation",
+  // Key kept stable (persisted in section_overrides jsonb); "Incident Details"
+  // was merged into Current Situation, so the label reflects what it now gates.
+  "incident-details": "Current Situation — incident themes",
+  "current-situation": "Current Situation — framing prose",
   "operational-impact": "Operational Impact",
   "recommended-actions": "Recommended Actions",
   outlook: "Outlook: Next Seven Days",

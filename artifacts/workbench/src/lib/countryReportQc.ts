@@ -98,24 +98,36 @@ type QcDataset = Pick<
   | "polestarView"
   | "whatChanged"
   | "businessImpact"
-  | "whatMattersBullets"
   | "escalationIndicators"
-  | "keyDevelopments"
-  | "assessedThemes"
   | "recommendedActions"
->;
+> &
+  // The §33 gate result is AUTHORITATIVE — its failures are surfaced first. Made
+  // optional so existing callers/tests that pass a partial dataset still work.
+  Partial<Pick<PngReportDataset, "gate">>;
 
 export function runCountryReportQc(
   dataset: QcDataset,
   mapIncidents: CountryReportQcMapIncident[],
 ): string[] {
   const warnings: string[] = [];
+
+  // §33 — the shared engine quality gate is authoritative. Surface every gate
+  // failure first (critical failures also block the PDF elsewhere), then run the
+  // existing dataset-level consistency checks below.
+  const gate = dataset.gate;
+  if (gate && gate.failures.length > 0) {
+    for (const f of gate.failures) {
+      const tag = f.severity === "critical" ? "GATE (critical)" : "GATE (warning)";
+      warnings.push(`${tag} [${f.check}]: ${f.message}`);
+    }
+  }
+
   const topThree = dataset.topThree ?? [];
 
   // ---- Narrative haystack (shared by checks A and C) ---------------------
   // Everything a place or date could legitimately be stated in. Nested prose
-  // (key developments, assessed themes, recommended actions) is folded in via
-  // JSON so a place or date named only inside a themed paragraph still counts.
+  // (recommended actions) is folded in via JSON so a place or date named only
+  // inside a grouped action still counts.
   const narrative = [
     dataset.bluf,
     dataset.executiveSummary,
@@ -123,10 +135,7 @@ export function runCountryReportQc(
     dataset.polestarView,
     dataset.whatChanged,
     ...(dataset.businessImpact ?? []),
-    ...(dataset.whatMattersBullets ?? []),
     ...(dataset.escalationIndicators ?? []),
-    JSON.stringify(dataset.keyDevelopments ?? []),
-    JSON.stringify(dataset.assessedThemes ?? []),
     JSON.stringify(dataset.recommendedActions ?? []),
   ]
     .filter(Boolean)

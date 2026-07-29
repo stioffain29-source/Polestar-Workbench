@@ -105,48 +105,11 @@ function narrativeOf(ds: PngReportDataset): string[] {
     ds.outlook,
     ds.polestarView,
     ds.reportingConfidence.rationale,
-    ...ds.whatMattersBullets,
     ...ds.escalationIndicators,
     ...ds.businessImpact,
-    ...ds.keyDevelopments.map((g) => g.heading),
-    ...ds.keyDevelopments.map((g) => g.businessImpact),
     ...ds.locationWatchlist.flatMap((w) => [w.location, w.why, w.action]),
   ];
 }
-
-describe("buildCountryOperatingRiskDataset — Key Developments grouping", () => {
-  const ds = build(POPULATED);
-
-  it("leads with the assessed themes, each distinct", () => {
-    // Assessed synthesis buckets into the six fixed themes, not per display
-    // category: two protests + one labour action collapse into the PROTEST
-    // theme, one power/utilities item into OTHER → two assessed themes.
-    expect(ds.keyDevelopments).toHaveLength(2);
-    const headings = ds.keyDevelopments.map((g) => g.heading);
-    expect(new Set(headings).size).toBe(2); // all distinct
-    for (const g of ds.keyDevelopments) {
-      expect(g.heading.trim().length).toBeGreaterThan(0);
-      expect(g.businessImpact.trim().length).toBeGreaterThan(0);
-      expect(g.key.trim().length).toBeGreaterThan(0);
-      expect(g.items.length).toBeGreaterThan(0);
-    }
-    // Group keys are unique too (renderer uses them as React keys).
-    expect(new Set(ds.keyDevelopments.map((g) => g.key)).size).toBe(2);
-  });
-
-  it("co-locates same-theme incidents without dropping or duplicating any", () => {
-    // The grouping must not duplicate an incident and must be a subset of the
-    // window (the per-theme cap can drop low-value items). Here all four land:
-    // the two protests and the labour action share the protest theme.
-    const ids = ds.keyDevelopments.flatMap((g) => g.items.map((it) => it.id));
-    expect(new Set(ids).size).toBe(ids.length); // no duplicates
-    const populatedIds = new Set(POPULATED.map((i) => i.id));
-    for (const id of ids) expect(populatedIds.has(id)).toBe(true); // subset
-    const protest = ds.keyDevelopments.find((g) => g.key === "protest");
-    expect(protest).toBeDefined();
-    expect(protest!.items.map((it) => it.id).sort()).toEqual(["l1", "p1", "p2"]);
-  });
-});
 
 describe("buildCountryOperatingRiskDataset — no-count prose", () => {
   // Populated AND quiet windows; neither may leak a count into narrative prose.
@@ -168,17 +131,27 @@ describe("buildCountryOperatingRiskDataset — no-count prose", () => {
 describe("buildCountryOperatingRiskDataset — operational recommendations", () => {
   const ds = build(POPULATED);
 
-  it("keys each recommended action to a location, an action and an escalation trigger", () => {
+  it("keys each recommended action to a location and an action, with each escalation trigger stated once", () => {
     expect(ds.businessImpact.length).toBeGreaterThan(0);
+    const marker = "Escalation trigger —";
+    const seenTriggers = new Set<string>();
+    let triggerLines = 0;
     for (const line of ds.businessImpact) {
-      // Shape: "<Location>: <action>. Escalation trigger — <trigger>."
-      expect(line).toMatch(/^.+?: .+ Escalation trigger — .+\.$/);
+      // Shape: "<Location>: <action>[ Escalation trigger — <trigger>.]" — the
+      // trigger clause appears on the FIRST line carrying that trigger and is
+      // omitted on verbatim repeats (repetition guard).
+      expect(line).toMatch(/^.+?: .+/);
       const loc = line.slice(0, line.indexOf(":")).trim();
       expect(loc.length).toBeGreaterThan(0);
-      const marker = "Escalation trigger —";
-      const trigger = line.slice(line.indexOf(marker) + marker.length).trim();
-      expect(trigger.length).toBeGreaterThan(10); // a real forward-looking condition
+      if (line.includes(marker)) {
+        triggerLines++;
+        const trigger = line.slice(line.indexOf(marker) + marker.length).trim();
+        expect(trigger.length).toBeGreaterThan(10); // a real forward-looking condition
+        expect(seenTriggers.has(trigger)).toBe(false); // never repeated verbatim
+        seenTriggers.add(trigger);
+      }
     }
+    expect(triggerLines).toBeGreaterThan(0); // at least one trigger is stated
   });
 
   it("carries no incident-count annotation in the recommendations", () => {
@@ -200,8 +173,6 @@ describe("buildCountryOperatingRiskDataset — heading / render invariants", () 
     expect(ds.bluf.trim().length).toBeGreaterThan(0);
     expect(ds.outlook.trim().length).toBeGreaterThan(0);
     expect(ds.polestarView.trim().length).toBeGreaterThan(0);
-    expect(ds.whatMattersBullets.length).toBeGreaterThan(0);
-    expect(ds.keyDevelopments.length).toBeGreaterThan(0);
     expect(ds.escalationIndicators.length).toBeGreaterThan(0);
     expect(ds.businessImpact.length).toBeGreaterThan(0);
     expect(ds.locationWatchlist.length).toBeGreaterThan(0);
@@ -229,16 +200,17 @@ describe("buildCountryOperatingRiskDataset — heading / render invariants", () 
 describe("buildCountryOperatingRiskDataset — empty window (no fabrication)", () => {
   const ds = build([]);
 
-  it("yields no themed developments and a standing caveat", () => {
-    expect(ds.keyDevelopments).toHaveLength(0);
+  it("yields an empty window without fabricated items", () => {
     expect(ds.windowItems).toHaveLength(0);
-    expect(ds.whatMattersBullets).toHaveLength(1);
-    expect(ds.whatMattersBullets[0]).toMatch(/no fresh open-source reporting/i);
   });
 
-  it("flags low reporting confidence and an honest quiet-period outlook", () => {
+  it("flags low reporting confidence and an honest quiet-period brief", () => {
     expect(ds.reportingConfidence.level).toBe("Low");
-    expect(ds.outlook).toMatch(/no fresh reporting/i);
+    // §27: on a sparse week the shared engine returns a short report rather than
+    // padding the analytical sections. The honest quiet-period statement now
+    // sits in the BLUF (short report); Outlook is omitted (empty), not filled.
+    expect(ds.bluf.toLowerCase()).toMatch(/limited|no fresh|quiet|not.*genuine improvement/);
+    expect(ds.outlook).toBe("");
     expect(ds.escalationIndicators.length).toBeGreaterThan(0);
     expect(ds.escalationIndicators.join(" ")).toMatch(
       /return of open-source reporting/i,

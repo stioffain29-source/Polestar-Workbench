@@ -53,29 +53,12 @@ export interface AssessedTheme {
   businessExposure: string;
   // HOW it is trending against the prior week.
   trajectory: ThemeTrajectory;
-  // A short count-free phrase for the trajectory (no leading conjunction).
-  trajectoryPhrase: string;
   // The full count-free analytical paragraph combining the three judgements.
   narrative: string;
 }
 
 // Default number of leading themes (the "two-to-three assessed themes" rule).
 export const MAX_ASSESSED_THEMES = 3;
-
-// A short concern phrase per theme for BLUF / Executive Summary leads. Kept here
-// (not imported) so this module is self-contained and directly unit-testable.
-const THEME_CONCERN: Record<CountryIncidentTheme, string> = {
-  protest: "protest and civil unrest",
-  crime: "crime, theft and violent incidents",
-  natural: "natural-hazard disruption",
-  governance: "policing and regulatory activity",
-  fire: "fire and explosion incidents",
-  other: "transport, utility and connectivity disruption",
-};
-
-export function themeConcernPhrase(t: { key: CountryIncidentTheme }): string {
-  return THEME_CONCERN[t.key];
-}
 
 function worstRankOf(items: PngReportItem[]): number {
   return items.reduce((m, it) => Math.max(m, it.severityRank ?? 0), 0);
@@ -99,30 +82,61 @@ function themeTrajectory(
   return "steady";
 }
 
-const TRAJECTORY_PHRASE: Record<ThemeTrajectory, string> = {
-  rising: "rising against the previous week",
-  easing: "easing against the previous week",
-  steady: "holding at the previous week's level",
-  new: "newly prominent this period, with no comparable reporting a week earlier",
-  nobasis: "with no prior-week baseline to compare against",
-};
 
 // A count-free trajectory clause for the narrative paragraph. Names the activity
 // rather than asserting a bare "the theme is rising" — the spec bans generic,
 // un-anchored trend language, so each clause is tied to the reported activity.
-function trajectorySentence(t: ThemeTrajectory): string {
-  switch (t) {
-    case "rising":
-      return "This activity was more prominent than in the previous week.";
-    case "easing":
-      return "This activity was less prominent than in the previous week.";
-    case "steady":
-      return "This activity held broadly at the previous week's level.";
-    case "new":
-      return "It was not reported a week earlier, so it reads as newly prominent this period.";
-    case "nobasis":
-      return "With no prior-week baseline, no week-on-week trend is asserted.";
-  }
+// Owner-flagged repetition guard: with several themes sharing one trajectory,
+// a single fixed sentence pastes verbatim under every theme and reads as
+// boilerplate. Each trajectory carries deterministic phrasing VARIANTS; the
+// caller passes the theme's position so consecutive themes never repeat the
+// exact sentence. All variants state the same fact — no meaning drift.
+const TRAJECTORY_VARIANTS: Record<ThemeTrajectory, string[]> = {
+  rising: [
+    "Reporting of this activity picked up against the previous week.",
+    "This activity drew more reporting than in the previous week.",
+    "Week on week, reporting of this activity increased.",
+    "Reporting of this activity ran ahead of the previous week.",
+    "The previous week saw less of this reporting than this period did.",
+    "Compared with the week before, this activity gained ground.",
+  ],
+  easing: [
+    "Reporting of this activity eased against the previous week.",
+    "This activity drew less reporting than in the previous week.",
+    "Week on week, reporting of this activity declined.",
+    "Reporting of this activity ran below the previous week.",
+    "The previous week saw more of this reporting than this period did.",
+    "Compared with the week before, this activity lost ground.",
+  ],
+  steady: [
+    "Reporting of this activity held broadly at the previous week's level.",
+    "This activity ran at much the same level as the previous week.",
+    "Week on week, reporting of this activity was broadly unchanged.",
+    "Reporting of this activity held near the previous week's level.",
+    "The previous week saw a similar amount of this reporting.",
+    "Compared with the week before, this activity was little changed.",
+  ],
+  new: [
+    "It was not reported a week earlier, so it reads as newly prominent this period.",
+    "This activity was absent from the previous week's reporting and is newly prominent.",
+    "No comparable reporting appeared a week earlier, making this newly prominent.",
+    "The previous week carried none of this reporting, so it is new this period.",
+    "This reporting had no counterpart a week earlier and stands out as new.",
+    "A week earlier this activity did not feature, so it registers as new.",
+  ],
+  nobasis: [
+    "With no prior-week baseline, no week-on-week trend is asserted.",
+    "There is no prior-week baseline, so no trend is asserted for this theme.",
+    "No week-on-week comparison is made — the prior week carries no baseline.",
+    "Absent a prior-week baseline, this theme carries no trend judgement.",
+    "This theme is stated without a trend — the prior week offers no baseline.",
+    "No baseline exists for the prior week, so no trend is claimed here.",
+  ],
+};
+
+function trajectorySentence(t: ThemeTrajectory, variant = 0): string {
+  const list = TRAJECTORY_VARIANTS[t];
+  return list[((variant % list.length) + list.length) % list.length];
 }
 
 function lowerFirst(s: string): string {
@@ -182,6 +196,9 @@ export function synthesiseAssessedThemes(
   );
 
   const assessed: AssessedTheme[] = [];
+  // Per-trajectory counters: variants must rotate WITHIN each trajectory or a
+  // global index can hand the same variant to two themes sharing a trajectory.
+  const trajectoryUse = new Map<ThemeTrajectory, number>();
   for (const def of COUNTRY_INCIDENT_THEMES) {
     const items = byTheme.get(def.key);
     if (!items || items.length === 0) continue;
@@ -198,9 +215,12 @@ export function synthesiseAssessedThemes(
     const leadClause = def.key === "fire" ? "" : leadIncidentSentence(items);
     const leadPart = leadClause ? ` ${leadClause}` : "";
     const exposureFragment = lowerFirst(businessExposure).replace(/\.$/, "");
+    const trajectoryUseCount = trajectoryUse.get(trajectory) ?? 0;
+    trajectoryUse.set(trajectory, trajectoryUseCount + 1);
     const narrative = `${THEME_WHAT[def.key]}${catClause}, ${concentration}.${leadPart} ${trajectorySentence(
       trajectory,
-    )} Business exposure centres on ${exposureFragment}. ${THEME_SIGNIFICANCE[def.key]}`
+      trajectoryUseCount,
+    )} This reporting is most relevant to ${exposureFragment}. ${THEME_SIGNIFICANCE[def.key]}`
       .replace(/\s+/g, " ")
       .trim();
     assessed.push({
@@ -212,7 +232,6 @@ export function synthesiseAssessedThemes(
       concentration,
       businessExposure,
       trajectory,
-      trajectoryPhrase: TRAJECTORY_PHRASE[trajectory],
       narrative,
     });
   }
@@ -236,7 +255,10 @@ export function buildAssessedThemeGroups(
   baselineItems: PngReportItem[],
   opts: SynthesiseOptions = {},
 ): CountryIncidentThemeGroup[] {
+  const trajectoryUse = new Map<ThemeTrajectory, number>();
   return synthesiseAssessedThemes(windowItems, baselineItems, opts).map((t) => {
+    const use = trajectoryUse.get(t.trajectory) ?? 0;
+    trajectoryUse.set(t.trajectory, use + 1);
     const cats = topCategories(t.items).map(categoryNoun);
     return {
       key: t.key,
@@ -247,28 +269,9 @@ export function buildAssessedThemeGroups(
         ? `${THEME_WHAT[t.key]}, including ${joinList(cats)}.`
         : `${THEME_WHAT[t.key]}.`,
       where: `Reporting ${t.concentration}.`,
-      whyItMatters: trajectorySentence(t.trajectory),
+      whyItMatters: trajectorySentence(t.trajectory, use),
       whatCouldBeAffected: t.businessExposure,
     };
   });
 }
 
-// One short, count-free "What Matters This Week" line per assessed theme.
-export function buildWhatMattersFromThemes(
-  themes: AssessedTheme[],
-  emptyNote: string,
-): string[] {
-  if (themes.length === 0) return [emptyNote];
-  return themes.map((t) => {
-    const clause = `${themeConcernPhrase(t)}, ${t.concentration}, ${t.trajectoryPhrase}`;
-    return `${clause.charAt(0).toUpperCase()}${clause.slice(1)}.`;
-  });
-}
-
-// The BLUF / Executive-Summary lead fragment naming the assessed themes, e.g.
-// "the assessment centres on protest and civil unrest and crime, theft and
-// violent incidents". Empty themes → "".
-export function themeLedLead(themes: AssessedTheme[]): string {
-  if (themes.length === 0) return "";
-  return `the assessment centres on ${joinList(themes.map(themeConcernPhrase))}`;
-}

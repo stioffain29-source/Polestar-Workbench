@@ -43,10 +43,7 @@ function dataset(over: Partial<Ds> = {}): Ds {
     polestarView: "",
     whatChanged: "",
     businessImpact: [],
-    whatMattersBullets: [],
     escalationIndicators: [],
-    keyDevelopments: [],
-    assessedThemes: [],
     recommendedActions: [],
     ...over,
   } as Ds;
@@ -155,19 +152,19 @@ describe("runCountryReportQc — non-blocking §13 quality checks", () => {
     ).toBe(true);
   });
 
-  it("counts a place named only inside a themed key-development paragraph as referenced", () => {
+  it("counts a place named only inside a grouped recommended action as referenced", () => {
     const dev = item({ id: "6", title: "Robbery in Nabire", location: "Nabire" });
     const ds = dataset({
       topThree: [dev],
       windowItems: [dev],
       bluf: "Security across the province remained broadly stable.",
-      keyDevelopments: [
+      recommendedActions: [
         {
-          heading: "Violent crime",
-          items: [],
-          businessImpact: "An armed robbery in Nabire disrupted local trade.",
+          key: "movement",
+          heading: "Movement security",
+          actions: ["Avoid the affected area around Nabire until conditions settle."],
         },
-      ] as unknown as Ds["keyDevelopments"],
+      ] as unknown as Ds["recommendedActions"],
     });
     const w = runCountryReportQc(ds, map("Nabire"));
     expect(

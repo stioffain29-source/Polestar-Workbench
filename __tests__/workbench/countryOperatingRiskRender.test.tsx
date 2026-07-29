@@ -111,7 +111,6 @@ function textOf(html: string): string {
 const SECTION_ORDER = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Incident Details",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",
@@ -151,14 +150,14 @@ describe("PngCountryReportBody — country brief render", () => {
     expect(hiddenHtml).not.toContain("Outlook: Next Seven Days");
     expect(hiddenHtml).toContain("Bottom Line Up Front");
     expect(hiddenHtml).toContain("Top 3 Developments");
-    expect(hiddenHtml).toContain("Incident Details");
+    expect(hiddenHtml).toContain("Current Situation");
     // The unhidden default render still carries them, proving the gate is what
     // removed them (not a build/data issue).
     expect(html).toContain("Polestar View");
     expect(html).toContain("Outlook: Next Seven Days");
   });
 
-  it("renders only the present Incident Details themes, in fixed order", () => {
+  it("renders only the present incident themes inside Current Situation, in fixed order", () => {
     // The body builds its themed groups from the SAME dataset field the render
     // uses (d.incidentDetailsItems), so derive the expected present themes the
     // same way and assert the render matches exactly.
@@ -168,8 +167,8 @@ describe("PngCountryReportBody — country brief render", () => {
     // the Operational Impact bullet prefixes (built from the full window), so a
     // whole-document search would wrongly find an absent theme there. The slice
     // runs from the Incident Details heading to the next section.
-    const detailsStart = html.indexOf("Incident Details");
-    const detailsEnd = html.indexOf("Current Situation");
+    const detailsStart = html.indexOf("Current Situation");
+    const detailsEnd = html.indexOf("Operational Impact");
     expect(detailsStart).toBeGreaterThanOrEqual(0);
     expect(detailsEnd).toBeGreaterThan(detailsStart);
     const section = html.slice(detailsStart, detailsEnd);
@@ -247,8 +246,8 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
     expect(html.indexOf(MAP_MARKER)).toBeLessThan(
       html.indexOf("Top 3 Developments"),
     );
-    // inside-incident-details: the photo sits within the Incident Details section.
-    expect(html.indexOf("Incident Details")).toBeLessThan(
+    // inside-incident-details: the photo sits within the Current Situation section.
+    expect(html.indexOf("Current Situation")).toBeLessThan(
       html.indexOf(PHOTO_MARKER),
     );
   });
@@ -273,12 +272,29 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
 describe("PngCountryReportBody — country brief render, quiet window", () => {
   const html = renderToStaticMarkup(<PngCountryReportBody dataset={build([])} />);
 
-  it("still renders the brief sections with no fabricated developments", () => {
-    for (const title of SECTION_ORDER) {
+  // §27: a sparse (quiet) week returns a short report. The framing sections
+  // (Bottom Line, Top 3, Incident Details) still render honest empty notes, but
+  // the analytical sections (Current Situation, Operational Impact, Recommended
+  // Actions, Outlook, Polestar View) are OMITTED rather than padded with filler.
+  const RETAINED = ["Bottom Line Up Front", "Top 3 Developments"];
+  const OMITTED = [
+    "Current Situation",
+    "Operational Impact",
+    "Recommended Actions",
+    "Outlook: Next Seven Days",
+    "Polestar View",
+  ];
+
+  it("renders the framing sections and omits the analytical ones (no fabrication)", () => {
+    for (const title of RETAINED) {
       expect(html.indexOf(title)).toBeGreaterThanOrEqual(0);
     }
+    for (const title of OMITTED) {
+      expect(html.indexOf(title)).toBe(-1);
+    }
     const text = textOf(html);
-    expect(text).toMatch(/no fresh open-source reporting/i);
+    // The engine's short-report BLUF states the quiet period honestly.
+    expect(text.toLowerCase()).toMatch(/reporting was limited|no significant validated/i);
     // A quiet week must not invent counts either.
     expect(text).not.toMatch(/\b\d+\s+(records?|incidents?|events?)\b/i);
   });
@@ -327,10 +343,10 @@ describe("PngCountryReportBody — immaterial leftover incidents", () => {
     expect(
       buildCountryIncidentThemes(dataset.incidentDetailsItems).length,
     ).toBe(0);
-    // Scope to the Incident Details section.
-    const detailsStart = html.indexOf("Incident Details");
-    const detailsEnd = html.indexOf("Current Situation");
-    const section = html.slice(detailsStart, detailsEnd);
+    // Scope to the Current Situation section (which now carries the themes).
+    const detailsStart = html.indexOf("Current Situation");
+    const detailsEnd = html.indexOf("Operational Impact");
+    const section = detailsEnd >= 0 ? html.slice(detailsStart, detailsEnd) : html.slice(detailsStart);
     // The brief must NOT falsely claim there was no further reporting...
     expect(section).not.toContain(
       "No further incident reporting beyond the developments",

@@ -9,7 +9,6 @@ import {
   MAX_PROSE_INCIDENTS_ACCEPTED,
   type ProseIncidentInput,
 } from "../lib/reportProse";
-import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -55,7 +54,7 @@ function isProseEditStale(
 // supplied incidents + topic/title/issueDate/window (the same set the client
 // renders), so a hit costs nothing and the prose can never lag the data.
 // `force: true` bypasses the cache (redraft).
-router.post("/reports/:id/prose", requireAdminToken, async (req, res): Promise<void> => {
+router.post("/reports/:id/prose", async (req, res): Promise<void> => {
   const reportId = reportIdOf(req.params.id);
   if (reportId === null) {
     res.status(400).json({ error: "Invalid report id" });
@@ -181,7 +180,7 @@ router.post("/reports/:id/prose", requireAdminToken, async (req, res): Promise<v
 // sections. The edit is bound to the fingerprint it was written against; if the
 // data has moved on (fingerprint mismatch) the edit is rejected so it can never
 // describe a stale snapshot — the client must regenerate first.
-router.put("/reports/:id/prose/edit", requireAdminToken, async (req, res): Promise<void> => {
+router.put("/reports/:id/prose/edit", async (req, res): Promise<void> => {
   const reportId = reportIdOf(req.params.id);
   if (reportId === null) {
     res.status(400).json({ error: "Invalid report id" });

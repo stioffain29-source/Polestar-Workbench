@@ -1,0 +1,181 @@
+Review and correct the current Flashpoint report for 21–27 July 2026.
+
+DO NOT redesign the report. Keep the existing Pole Star branding, page layout, typography, colours, tables, charts, headers and footers. This is a content, classification and report-logic correction only.
+
+1. FIX INCIDENT CLASSIFICATION
+
+The report is incorrectly treating unrelated uses of the words “protest” and “crackdown” as civil-unrest incidents.
+
+Only include incidents involving:
+
+- Public demonstrations
+- Political rallies
+- Strikes and labour action
+- Riots or public disorder
+- Student mobilisation
+- Curfews or emergency orders linked to unrest
+- Police action taken against demonstrations
+
+Remove incidents that are actually:
+
+- Criminal enforcement operations
+- Smuggling or border-control cases
+- Diplomatic protests or government statements
+- False or misleading social-media content
+- Ceremonial demonstrations or exhibitions
+- News headlines that do not describe an actual public-order incident
+
+Specifically remove the following from the civil-unrest analysis and related-incident tables:
+
+- “Counter-setting syndicate active at Johor border, KLIA despite crackdown”
+- Nepal Gen-Z protest video falsely shared
+- Drug Smuggling Crackdown Demonstration at Incheon Airport
+- China Files Protest, Says Philippines Struck First in Sea Clash
+
+Check all remaining incidents against the same rule.
+
+2. RECALCULATE ALL REPORT FIGURES
+
+After removing misclassified incidents, recalculate:
+
+- Incidents in window
+- Highest severity
+- Top issue type
+- Most affected country
+- Latest incident
+- Country incident totals
+- Country chart
+- Related incidents
+- Any statements about which country was busiest
+
+Do not leave any figure based on the old dataset.
+
+3. FIX THE SEVERITY CONTRADICTIONS
+
+The report currently states that the highest severity was both High and Extreme.
+
+Use one severity value from the incident dataset as the single source of truth.
+
+The Thailand martial-law incident must show the same severity everywhere it appears, including:
+
+- Executive Summary
+- Fast Facts
+- Forecast
+- Incident table
+- What Matters
+- Related Incidents
+
+Do not use “Extreme” unless the underlying incident is actually rated Extreme.
+
+4. REMOVE UNSUPPORTED ANALYSIS
+
+Do not describe separate incidents across several countries as a “coordinated regional picture” unless there is evidence of coordination.
+
+Remove or rewrite unsupported claims including:
+
+- “Activity is building, not easing”
+- “Rapid escalation against a standing baseline”
+- “Coordinated rather than localised picture”
+- Claims that protests will move from announcement to violence within hours
+- Claims based on trends that are not demonstrated by the reporting-period data
+
+Report only what the corrected dataset supports.
+
+5. REWRITE THE PROSE IN NATURAL ENGLISH
+
+The report currently sounds automated and overcomplicated.
+
+Do not use phrases such as:
+
+- Operational tempo
+- Headline severity
+- Standing baseline
+- Pressure points
+- Operational surfaces
+- Leading indicator
+- City-by-city focus
+- Converting into rolling road closures
+- Live country-lead routing
+- Supply-chain friction tracks one news cycle behind
+
+Use clear, direct language suitable for a business reader.
+
+6. REMOVE REPETITION
+
+The India-versus-Thailand comparison is currently repeated in:
+
+- Forecast
+- What Matters
+- Polestar View
+
+State it once clearly in “What Matters”. Do not repeat the same assessment elsewhere.
+
+Each section must have a separate purpose:
+
+- Executive Summary: overall weekly picture
+- Activism and Protest Read: what happened
+- Civil Unrest and Public Order Read: police response, restrictions and escalation
+- Forecast: confirmed upcoming events and likely disruption
+- Regional and Country View: short country summaries
+- What Matters: main analytical judgement
+- Implications for Business: proportionate actions
+- Watch Next: named upcoming events
+- Polestar View: final judgement only
+
+7. REPLACE THE CIVIL UNREST AND PUBLIC ORDER READ
+
+Use this wording:
+
+“Three higher-risk public-order developments were recorded during the reporting period: martial law in Narathiwat, police use of tear gas against protesters in India and continued enforcement action around demonstrations.
+
+The main concern is the speed at which local disruption can develop once police restrictions are imposed. Road closures, arrests, curfews and the use of crowd-control measures can affect staff movement and access to offices, transport hubs and public venues with little warning.
+
+Businesses should monitor confirmed protest locations and police restrictions rather than the overall number of reported incidents. Most disruption is likely to remain localised, but conditions may change quickly where demonstrations draw a strong security response.”
+
+Only retain this section if all three statements remain supported after the dataset is corrected.
+
+8. REPLACE THE FORECAST INTRODUCTION
+
+Use this wording:
+
+“The table above lists the main events currently expected during the next 7–14 days. These should be the immediate focus for journey planning, staff communications and local monitoring.”
+
+9. KEEP THE WHAT MATTERS SECTION TIGHT
+
+Use this wording:
+
+“India and Thailand present different risks. India recorded the greatest amount of activity and is the more likely source of repeated, localised disruption. Thailand recorded fewer incidents, but martial law in Narathiwat creates greater potential for serious escalation.
+
+The practical distinction is straightforward: prepare for more frequent disruption in India and potentially more serious disruption in southern Thailand.”
+
+10. MAKE BUSINESS RECOMMENDATIONS PROPORTIONATE
+
+Remove blanket instructions to:
+
+- Reinforce guards
+- Close sites automatically
+- Trigger work from home for every restriction
+- Harden all site access controls
+
+Replace them with:
+
+- Confirm staff routes around announced protest locations.
+- Allow additional travel time on demonstration days.
+- Monitor police restrictions, curfews and road closures.
+- Prepare work-from-home or delayed-start options where access is affected.
+- Brief drivers and security teams before confirmed rallies.
+- Check delivery routes where strikes may affect transport or distribution.
+- Escalate site-closure decisions through the local crisis-management process.
+
+11. FINAL QUALITY CHECK
+
+Before generating the revised PDF, confirm that:
+
+- Every included incident is genuinely related to civil unrest or public order.
+- All totals match the corrected incident dataset.
+- Severity is consistent throughout.
+- No removed incident remains in a chart, table or paragraph.
+- No section repeats another section.
+- No trend claim is made without supporting data.
+- Grammar and sentence structure are natural.
+- The existing visual design has not been changed.

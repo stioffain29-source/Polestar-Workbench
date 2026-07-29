@@ -59,6 +59,54 @@ describe("explainRelevance", () => {
       expect(result.reason).toMatch(/unambiguous|ambiguous token/);
     });
 
+    it("drops think-piece / retrospective essays about past unrest", () => {
+      const drops = [
+        "Nepal’s Gen Z protests are a call for democratic renewal",
+        "Nepal’s youth protests: A warning for South Asian democracies",
+        "The questions emerging from Nepal’s Gen Z protests",
+        "What Authoritarians May Learn About Censorship From Nepal’s Protests",
+        "Nepal’s Protest-Fueled Transition",
+        "Post-Protest Bangladesh: Restoration More than Renewal",
+        "Who was Sharif Osman Hadi? The rise and killing of Bangladesh’s protest icon",
+        "Can Nepal actually enforce its Human Rights Commission’s findings?",
+      ];
+      for (const title of drops) {
+        const result = explainRelevance("flashpoint", input({ topic: "flashpoint", title }));
+        expect(result.relevant).toBe(false);
+        expect(result.reason).toContain("homonym in headline");
+      }
+    });
+
+    it("drops commission/inquiry aftermath items (inquiry noun + procedural verb)", () => {
+      const drops = [
+        "Nepal commission submits September protest probe report",
+        "Commission probing Nepal’s Gen Z protests submits report to PM Karki",
+        "Inquiry commission seeks extra month to probe Nepal’s Gen Z protest crackdown",
+        "Nepal probe finds security lapses during Gen-Z protest, submits report to interim PM",
+        "University of Melbourne ‘sharply’ changed protest policies after pro-Palestine sit-ins, commission hears",
+      ];
+      for (const title of drops) {
+        const result = explainRelevance("flashpoint", input({ topic: "flashpoint", title }));
+        expect(result.relevant).toBe(false);
+        expect(result.reason).toContain("homonym in headline");
+      }
+    });
+
+    it("keeps live protests that merely mention a commission or report submission", () => {
+      const keeps = [
+        "Gen Z Alliance Protests in Kathmandu, Demands Release of Karki Commission Report and Revocation of Appointments",
+        "Hindutva protest at Bangladesh High Commission over lynching of Hindu man",
+        "Police clash with protesters near Bangladesh Deputy High Commission in Kolkata",
+        "Protesters march to parliament and submit report to speaker over police crackdown",
+        "Filipinos protest corruption on anniversary of Marcos's ouster",
+        "Police Commissioner apologises to Muslim worshippers over actions at Sydney protest",
+      ];
+      for (const title of keeps) {
+        const result = explainRelevance("flashpoint", input({ topic: "flashpoint", title }));
+        expect(result.relevant).toBe(true);
+      }
+    });
+
     it("drops student crime stories that are not mobilisation", () => {
       const result = explainRelevance(
         "flashpoint",

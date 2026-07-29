@@ -107,8 +107,6 @@ function makePngDataset(): PngReportDataset {
     whatChanged: "What changed since the previous reporting period.",
     polestarView: "Polestar's standing assessment for the period.",
     locationWatchlist: [],
-    whatMattersBullets: ["Urban crime remains the dominant exposure this week."],
-    keyDevelopments: [],
     escalationIndicators: ["A sustained rise in armed robberies around Port Moresby."],
     diagnostics: {
       totalInWindow: 4,
@@ -140,28 +138,19 @@ describe("PngCountryReportBody page-break markers", () => {
   );
 
   it("marks every atomic block with data-pdf-row", () => {
-    // The rebuilt renderer marks each Top 3 tile card, each per-incident compact
-    // card inside a PRESENT Incident Details theme group (the theme wrapper is no
-    // longer atomic — each incident earns its own place + date card), and each
-    // grouped Recommended Actions block as atomic blocks the exporter must never
-    // split mid-cut. Present-only themes (no fixed six-theme scaffold), so derive
-    // the expected count from the same dataset.
+    // Since the Current Situation merge (owner ruling, 28 Jul 2026) NO theatre
+    // renders per-incident cards under the themed paragraphs — the atomic
+    // blocks are the Top 3 tile cards and each grouped Recommended Actions
+    // block only.
     const ds = makePngDataset();
-    const themeItemRows = buildCountryIncidentThemes(ds.incidentDetailsItems).reduce(
-      (sum, g) => sum + g.items.length,
-      0,
-    );
-    const expected =
-      ds.topThree.length + themeItemRows + ds.recommendedActions.length;
+    const expected = ds.topThree.length + ds.recommendedActions.length;
     expect(expected).toBeGreaterThan(0);
     expect(countMatches(html, /data-pdf-row="true"/g)).toBe(expected);
   });
 
-  it("stays paragraph-only (no per-item cards) when showPerIncidentCards is off", () => {
-    // West Papua / Indonesia / Jakarta keep the Incident Details section
-    // paragraph-only (inert) so high-volume theatres never explode into hundreds
-    // of pages. With the flag off, the ONLY data-pdf-row blocks are the Top 3
-    // tiles and the grouped Recommended Actions — no per-incident theme cards.
+  it("stays paragraph-only (no per-item cards) regardless of showPerIncidentCards", () => {
+    // The legacy PNG-only flag is inert everywhere now: themed paragraphs are
+    // prose-only, so the marker count is identical with the flag on or off.
     const ds = { ...makePngDataset(), showPerIncidentCards: false };
     const inertHtml = renderToStaticMarkup(<PngCountryReportBody dataset={ds} />);
     const expected = ds.topThree.length + ds.recommendedActions.length;

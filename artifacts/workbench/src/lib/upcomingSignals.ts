@@ -102,46 +102,74 @@ export function extractFutureSignals<T extends UpcomingSignalInput>(rows: T[]): 
 // Detect a city / location cue in the text so signal labels can carry
 // "Country (City)" rather than country alone. Restricted to the recurring APAC
 // capitals and major commercial cities the workbench actually covers.
-const CITY_LOOKUP: Array<[RegExp, string]> = [
-  [/\bislamabad\b/i, "Islamabad"],
-  [/\brawalpindi\b/i, "Rawalpindi"],
-  [/\blahore\b/i, "Lahore"],
-  [/\bkarachi\b/i, "Karachi"],
-  [/\bpeshawar\b/i, "Peshawar"],
-  [/\bquetta\b/i, "Quetta"],
-  [/\badiala\b/i, "Rawalpindi"],
-  [/\bdhaka\b/i, "Dhaka"],
-  [/\bchittagong\b/i, "Chittagong"],
-  [/\bnew delhi\b|\bdelhi\b/i, "Delhi"],
-  [/\bmumbai\b/i, "Mumbai"],
-  [/\bkolkata\b/i, "Kolkata"],
-  [/\bchennai\b/i, "Chennai"],
-  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru"],
-  [/\bmanila\b|\bquezon city\b/i, "Manila"],
-  [/\bcebu\b/i, "Cebu"],
-  [/\bseoul\b/i, "Seoul"],
-  [/\bbusan\b/i, "Busan"],
-  [/\btokyo\b/i, "Tokyo"],
-  [/\bosaka\b/i, "Osaka"],
-  [/\bjakarta\b/i, "Jakarta"],
-  [/\bbangkok\b/i, "Bangkok"],
-  [/\bkuala lumpur\b/i, "Kuala Lumpur"],
-  [/\bhanoi\b/i, "Hanoi"],
-  [/\bho chi minh\b/i, "Ho Chi Minh City"],
-  [/\bkathmandu\b/i, "Kathmandu"],
-  [/\bcolombo\b/i, "Colombo"],
-  [/\bport moresby\b/i, "Port Moresby"],
-  [/\bsydney\b/i, "Sydney"],
-  [/\bmelbourne\b/i, "Melbourne"],
-  [/\bcanberra\b/i, "Canberra"],
-  [/\btaipei\b/i, "Taipei"],
+const CITY_LOOKUP: Array<[RegExp, string, string]> = [
+  [/\bislamabad\b/i, "Islamabad", "Pakistan"],
+  [/\brawalpindi\b/i, "Rawalpindi", "Pakistan"],
+  [/\blahore\b/i, "Lahore", "Pakistan"],
+  [/\bkarachi\b/i, "Karachi", "Pakistan"],
+  [/\bpeshawar\b/i, "Peshawar", "Pakistan"],
+  [/\bquetta\b/i, "Quetta", "Pakistan"],
+  [/\badiala\b/i, "Rawalpindi", "Pakistan"],
+  [/\bdhaka\b/i, "Dhaka", "Bangladesh"],
+  [/\bchittagong\b/i, "Chittagong", "Bangladesh"],
+  [/\bnew delhi\b|\bdelhi\b/i, "Delhi", "India"],
+  [/\bmumbai\b/i, "Mumbai", "India"],
+  [/\bkolkata\b/i, "Kolkata", "India"],
+  [/\bchennai\b/i, "Chennai", "India"],
+  [/\bbengaluru\b|\bbangalore\b/i, "Bengaluru", "India"],
+  [/\bmanila\b|\bquezon city\b/i, "Manila", "Philippines"],
+  [/\bcebu\b/i, "Cebu", "Philippines"],
+  [/\bseoul\b/i, "Seoul", "South Korea"],
+  [/\bbusan\b/i, "Busan", "South Korea"],
+  [/\btokyo\b/i, "Tokyo", "Japan"],
+  [/\bosaka\b/i, "Osaka", "Japan"],
+  [/\bjakarta\b/i, "Jakarta", "Indonesia"],
+  [/\bbangkok\b/i, "Bangkok", "Thailand"],
+  [/\bkuala lumpur\b/i, "Kuala Lumpur", "Malaysia"],
+  [/\bhanoi\b/i, "Hanoi", "Vietnam"],
+  [/\bho chi minh\b/i, "Ho Chi Minh City", "Vietnam"],
+  [/\bkathmandu\b/i, "Kathmandu", "Nepal"],
+  [/\bpokhara\b/i, "Pokhara", "Nepal"],
+  [/\bcolombo\b/i, "Colombo", "Sri Lanka"],
+  [/\bport moresby\b/i, "Port Moresby", "Papua New Guinea"],
+  [/\bsydney\b/i, "Sydney", "Australia"],
+  [/\bmelbourne\b/i, "Melbourne", "Australia"],
+  [/\bcanberra\b/i, "Canberra", "Australia"],
+  [/\bbrisbane\b/i, "Brisbane", "Australia"],
+  [/\btaipei\b/i, "Taipei", "Taiwan"],
 ];
+
+// Country-strict city detection. A city label may only attach to a record
+// whose own `country` field is the city's home country (or is unknown).
+// This is what keeps "Kathmandu" out of an India-labelled row when a
+// mis-stamped or cross-border headline mentions the foreign capital.
+function countryMatchesHome(country: string | null | undefined, home: string): boolean {
+  const c = (country ?? "").trim().toLowerCase();
+  if (!c) return true; // unknown country — no basis to reject
+  return c === home.toLowerCase();
+}
+
 export function detectCity(r: UpcomingSignalInput): string | null {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
-  for (const [rx, name] of CITY_LOOKUP) {
-    if (rx.test(text)) return name;
+  for (const [rx, name, home] of CITY_LOOKUP) {
+    if (rx.test(text) && countryMatchesHome(r.country, home)) return name;
   }
   return null;
+}
+
+/**
+ * True when a free-text location names a known city whose home country is
+ * NOT the given country. Used by per-country location lists so a foreign
+ * city carried by a mis-attributed record can never appear under another
+ * country's heading (e.g. Kathmandu listed under India).
+ */
+export function locationForeignToCountry(location: string, country: string): boolean {
+  const c = country.trim().toLowerCase();
+  if (!c) return false;
+  for (const [rx, , home] of CITY_LOOKUP) {
+    if (rx.test(location)) return home.toLowerCase() !== c;
+  }
+  return false;
 }
 
 // Clean, content-based signal labels for Watch Next and the Forecast table.
@@ -204,27 +232,27 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
 // content. Kept distinct from the Watch Next bullet line.
 export function forecastMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Road closures and venue-access friction around party HQs, court complexes and city centres.";
-  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Trigger WFH and close public-facing sites in the affected area.";
-  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Pharmacy supply disruption 24-72h ahead; brief procurement and customer-care.";
-  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Sectoral disruption pending court ruling; pre-position contingency supply.";
-  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Sectoral walkout risk; brief logistics and field operations on local delays.";
-  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Campus action seeds city-centre protests within a week; expect adjoining-road disruption.";
-  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security and visitor management.";
-  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "Adverse ruling converts into same-day rallies near the court complex.";
-  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Validate against logistics corridor; pre-position alternative routings.";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Supply-chain friction and sectoral closures 24-72h ahead.";
-  return "Treat as leading indicator; confirm operating impact inside 24-48h.";
+  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Possible road closures and venue-access friction around party offices, courts and city centres.";
+  if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Review site access and staff movement in the affected area.";
+  if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Possible pharmacy supply disruption; check whether it affects your suppliers.";
+  if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Possible sectoral disruption pending the court ruling.";
+  if (/\b(metro bus|salaries|salary|wages|pay)\b/.test(text)) return "Possible sectoral walkout; check for local transport or delivery delays.";
+  if (/\b(teacher|faculty|campus|university|student)\b/.test(text)) return "Possible disruption on roads near the named campus.";
+  if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security.";
+  if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "The ruling could prompt gatherings near the court; watch the outcome.";
+  if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Check against the routes the business uses and plan alternatives.";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Possible supply and sectoral disruption; check whether named sites are affected.";
+  return "Confirm the details, expected turnout and operating impact.";
 }
 
 export function operationalMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "supply-chain friction and sectoral closures 24-72h ahead.";
-  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "road closures and venue-access friction; brief drivers in advance.";
-  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "adverse ruling triggers same-day rallies near the court complex.";
-  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "validate against logistics corridor; pre-position alternative routings.";
-  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "trigger WFH and close public-facing sites in the affected area.";
-  return "treat as leading indicator; confirm inside 24-48h.";
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "possible supply and sectoral disruption; check whether named sites are affected.";
+  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "possible road closures and venue-access friction near the named location.";
+  if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "the ruling could prompt gatherings near the court; watch the outcome.";
+  if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "check against the routes the business uses and plan alternatives.";
+  if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "review site access and staff movement in the affected area.";
+  return "confirm the details and likely turnout.";
 }
 
 // A rendered forewarning row. `announcedAt` is the ANNOUNCEMENT / report date

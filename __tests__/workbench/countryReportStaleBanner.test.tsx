@@ -85,6 +85,27 @@ jest.mock("@workspace/api-client-react", () => ({
   }),
   getGetCountryReportQueryKey: () => ["country-report"],
   getGetCountryBaselineQueryKey: () => ["country-baseline"],
+  // Shared country-engine review panel hooks (owner brief §29–32). Stubbed with
+  // empty engine data so the owner-only panel renders without a live api-server.
+  useGetCountryEngine: () => ({
+    data: { events: [], stats: null, overrides: [] },
+    isLoading: false,
+    isError: false,
+  }),
+  useGetCountryEngineAudit: () => ({ data: [], isLoading: false }),
+  useGetCountryEngineHeldSummary: () => ({ data: [], isLoading: false }),
+  useReprocessCountryEngine: () => ({ mutate: jest.fn(), isPending: false }),
+  useOverrideCountryEngineEvent: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+  useBulkOverrideCountryEngine: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+  getGetCountryEngineQueryKey: () => ["country-engine"],
+  getGetCountryEngineAuditQueryKey: () => ["country-engine-audit"],
+  getGetCountryEngineHeldSummaryQueryKey: () => ["country-engine-held-summary"],
 }));
 
 jest.mock("@/lib/exportPdf", () => ({
@@ -211,7 +232,7 @@ describe("CountryReport — prose staleness banner", () => {
     expect(finalText).not.toContain(FRESH_DRAFT.polestarView);
   });
 
-  it("does NOT show the stale banner when proseResult.stale is false", async () => {
+  it("does NOT show the stale banner when proseResult.stale is false — and the machine draft never auto-overlays the engine narrative", async () => {
     mockProseResult = {
       available: true,
       fingerprint: "fp-fresh",
@@ -224,9 +245,14 @@ describe("CountryReport — prose staleness banner", () => {
 
     const container = await renderReport();
 
+    // Owner brief §36: with NO analyst edit, the engine narrative stands.
+    // The machine-generated draft (proseResult.sections) must never overlay it.
     await waitFor(() => {
-      expect(container.textContent ?? "").toContain(FRESH_DRAFT.executiveSummary);
+      expect(container.textContent ?? "").toContain(COUNTRY_NAME);
     });
-    expect(container.textContent ?? "").not.toContain(BANNER_TEXT);
+    const finalText = container.textContent ?? "";
+    expect(finalText).not.toContain(FRESH_DRAFT.executiveSummary);
+    expect(finalText).not.toContain(FRESH_DRAFT.polestarView);
+    expect(finalText).not.toContain(BANNER_TEXT);
   });
 });

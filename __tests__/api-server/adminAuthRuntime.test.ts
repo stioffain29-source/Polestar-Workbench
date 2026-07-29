@@ -2,7 +2,16 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
-import { TEST_ADMIN_TOKEN, adminAuthHeaders } from "./adminAuthTestHelpers";
+import {
+  TEST_ADMIN_TOKEN,
+  adminAuthHeaders,
+  installAdminTokenBeforeEach,
+} from "./adminAuthTestHelpers";
+
+// The global jest.setup beforeEach deletes INGEST_ADMIN_TOKEN before every
+// test; re-install it per test so token-configured assertions exercise the
+// real gate. The unconfigured-server 503 tests delete it explicitly.
+installAdminTokenBeforeEach();
 
 // `openid-client` is a pure-ESM dependency pulled in transitively by the auth
 // router. jest does not transform node_modules, so importing the real module
@@ -114,9 +123,11 @@ describe("admin-token gate — runtime behaviour on real mounted routers", () =>
   it.each(ADMIN_ROUTES)(
     "returns 503 (route disabled) when the server token is unset for $path",
     async ({ path, unconfiguredError }) => {
-      // The global jest.setup beforeEach clears INGEST_ADMIN_TOKEN, so it is
-      // already unset here. An anonymous request that lands on a 503 — rather
-      // than the owner gate's 401 — proves the router runs before requireOwner.
+      // Explicitly unset the server token for this test (the suite-level
+      // beforeEach re-installs it). An anonymous request that lands on a 503 —
+      // rather than the owner gate's 401 — proves the router runs before
+      // requireOwner.
+      delete process.env["INGEST_ADMIN_TOKEN"];
       const { status, json } = await post(path, adminAuthHeaders());
       expect(status).toBe(503);
       expect(json.error).toBe(unconfiguredError);

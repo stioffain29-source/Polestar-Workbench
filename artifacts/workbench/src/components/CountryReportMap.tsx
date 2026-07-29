@@ -8,6 +8,7 @@ import {
   impactLevelForSet,
   businessRelevance,
   worstSeverityKey,
+  hasMonitoringValue,
   IMPACT_COLOR,
   IMPACT_ORDER,
   IMPACT_RANK,
@@ -595,10 +596,16 @@ function ImpactChip({ impact }: { impact: ImpactLevel }) {
   );
 }
 
-function ImpactLegend() {
+function ImpactLegend({ present }: { present?: Set<string> }) {
+  // Only show the impact levels actually plotted — a legend entry with no
+  // corresponding marker is noise (owner feedback: an all-Monitor map must not
+  // carry Direct/Indirect legend rows).
+  const levels = present
+    ? IMPACT_ORDER.filter((p) => present.has(p))
+    : IMPACT_ORDER;
   return (
     <div className="mt-3" style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-      {IMPACT_ORDER.map((p) => (
+      {levels.map((p) => (
         <div key={p} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span
             style={{
@@ -788,7 +795,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
           !Number.isNaN(i.latitude) &&
           !Number.isNaN(i.longitude) &&
           typeof i.location === "string" &&
-          i.location.trim().length > 0,
+          i.location.trim().length > 0 &&
+          // Owner rule: only incidents with genuine monitoring value are
+          // plotted — a routine low-impact item never earns a map marker.
+          hasMonitoringValue(i),
       ),
     [incidents],
   );
@@ -796,7 +806,10 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
   // Zone aggregation (area-risk mode only). Memoised so the legend and the
   // marker effect see one consistent result.
   const zoneAgg = useMemo(
-    () => (zonesDef ? aggregateZones(incidents, zonesDef) : { active: [], unattributed: 0 }),
+    () =>
+      zonesDef
+        ? aggregateZones(incidents.filter(hasMonitoringValue), zonesDef)
+        : { active: [], unattributed: 0 },
     [incidents, zonesDef],
   );
 
@@ -1066,7 +1079,22 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     };
   }, []);
 
-  const unplotted = incidents.length - plottable.length;
+  // Honest split of unplotted causes: records with no usable place vs located
+  // records held off the map because they carry no monitoring value (owner
+  // rule). The reader-facing note must never call a located-but-filtered
+  // record "unlocated".
+  const unlocated = incidents.filter(
+    (i) =>
+      !(
+        typeof i.latitude === "number" &&
+        typeof i.longitude === "number" &&
+        !Number.isNaN(i.latitude) &&
+        !Number.isNaN(i.longitude) &&
+        typeof i.location === "string" &&
+        i.location.trim().length > 0
+      ),
+  ).length;
+  const filteredOut = incidents.length - plottable.length - unlocated;
 
   // ---- AREA-RISK legend ------------------------------------------------
   if (zoneMode) {
@@ -1111,7 +1139,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         {mapContainer}
         {points.length > 0 ? (
           <>
-            <ImpactLegend />
+            <ImpactLegend present={new Set(points.map((p) => p.impact))} />
             <ImpactCardGrid points={points} />
             {zoneAgg.unattributed > 0 ? (
               <div
@@ -1162,14 +1190,17 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       />
       {dotPoints.length > 0 ? (
         <>
-          <ImpactLegend />
+          <ImpactLegend present={new Set(dotPoints.map((p) => p.impact))} />
           <ImpactCardGrid points={dotPoints} />
           <div
             style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: DUSK, marginTop: 8, fontStyle: "italic" }}
           >
             Points show reported events at the town or province named in the reporting; where several share a location one marker carries the count. A marker is a town or province-level fix, not an exact point.
-            {unplotted > 0
-              ? ` ${unplotted} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} name no specific place and are included in the totals and tables but not plotted.`
+            {unlocated > 0
+              ? ` ${unlocated} of ${incidents.length} record${incidents.length === 1 ? "" : "s"} name no specific place and are included in the totals and tables but not plotted.`
+              : ""}
+            {filteredOut > 0
+              ? ` ${filteredOut} located record${filteredOut === 1 ? "" : "s"} with no current monitoring value ${filteredOut === 1 ? "is" : "are"} counted in the totals and tables but not plotted.`
               : ""}
           </div>
         </>

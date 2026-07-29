@@ -1,0 +1,25 @@
+{
+  "name": "@workspace/country-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./classify": "./src/classify.ts",
+    "./attribution": "./src/attribution.ts",
+    "./eventDate": "./src/eventDate.ts",
+    "./severity": "./src/severity.ts",
+    "./impact": "./src/impact.ts",
+    "./dedupe": "./src/dedupe.ts",
+    "./reliability": "./src/reliability.ts",
+    "./engine": "./src/engine.ts",
+    "./narrative": "./src/narrative.ts",
+    "./bannedPhrases": "./src/bannedPhrases.ts",
+    "./gate": "./src/gate.ts",
+    "./config": "./src/config.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

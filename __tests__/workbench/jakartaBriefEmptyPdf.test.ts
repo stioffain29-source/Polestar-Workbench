@@ -178,7 +178,6 @@ async function jakartaPdfText(): Promise<string[]> {
 }
 
 const NOT_POPULATED = "Not populated.";
-const NO_ESCALATION = "No specific escalation triggers flagged this period.";
 
 // Count how many times `seq` appears as a CONSECUTIVE run in `text`. A guarded
 // section emits its heading then its fallback body back to back, so heading →
@@ -199,19 +198,32 @@ function runCount(text: string[], seq: string[]): number {
   return count;
 }
 
-// The sections guarded by `if (tactical)` that fall back to "Not populated." as a
-// contiguous heading → body pair. Headings are pinned as test-local canonical
-// constants (NOT imported) so a heading rename in renderJakartaBrief diverges
-// from these and fails, instead of the rename being silently absorbed.
-const CONTIGUOUS_FALLBACK_HEADINGS = [
+// Jakarta now shares the canonical 8-section structured brief; its tactical
+// evidence tables are folded INSIDE the canonical sections as strand labels,
+// each guarded by `if (tactical)`. With the tactical brief null, those strands
+// must be OMITTED ENTIRELY (never drawn as an empty heading or a dangling
+// "Not populated." block). Labels are pinned as test-local canonical constants
+// (NOT imported) so a rename in renderStructuredBrief diverges and fails.
+const TACTICAL_STRAND_LABELS = [
   "Crime Trends and Business Impact",
   "Priority Areas This Week",
   "Staff Movement Impact",
   "Airport Transfer Impact",
   "Port and Logistics Impact",
+  "Port Actions",
   "Office, Hotel and Meeting Venue Exposure",
   "Route and Timing Guidance",
+];
+
+// The canonical section headings every structured brief draws, in order.
+const CANONICAL_HEADINGS = [
+  "Bottom Line Up Front",
+  "Top 3 Developments",
+  "Current Situation",
+  "Operational Impact",
   "Recommended Actions",
+  "Outlook: Next Seven Days",
+  "Polestar View",
 ];
 
 describe("Jakarta brief no-live-data fallback sections in the PDF", () => {
@@ -219,42 +231,47 @@ describe("Jakarta brief no-live-data fallback sections in the PDF", () => {
     await expect(jakartaPdfText()).resolves.toBeInstanceOf(Array);
   });
 
-  it("draws each `if (tactical)` section as heading → 'Not populated.', exactly once", async () => {
+  it("draws every canonical section heading exactly once, in order", async () => {
     const text = await jakartaPdfText();
-    for (const heading of CONTIGUOUS_FALLBACK_HEADINGS) {
-      const seq = [heading.toUpperCase(), NOT_POPULATED];
-      expect({ heading, count: runCount(text, seq) }).toEqual({
-        heading,
-        count: 1,
-      });
+    let prev = -1;
+    for (const heading of CANONICAL_HEADINGS) {
+      const up = heading.toUpperCase();
+      const count = text.filter((t) => t === up).length;
+      expect({ heading, count }).toEqual({ heading, count: 1 });
+      const idx = text.indexOf(up);
+      expect(idx).toBeGreaterThan(prev);
+      prev = idx;
     }
   });
 
-  it("draws the Escalation Triggers heading with its no-triggers line", async () => {
+  it("omits every tactical strand label when the tactical brief is absent", async () => {
     const text = await jakartaPdfText();
-    const seq = ["Escalation Triggers".toUpperCase(), NO_ESCALATION];
-    expect(runCount(text, seq)).toBe(1);
+    for (const label of TACTICAL_STRAND_LABELS) {
+      expect(text).not.toContain(label.toUpperCase());
+    }
   });
 
-  it("draws the Operational Map heading followed by the 'Not populated.' area summary", async () => {
+  it("omits the Escalation Indicators strand when there are no indicators", async () => {
     const text = await jakartaPdfText();
-    const mapIdx = text.indexOf("Operational Map".toUpperCase());
-    expect(mapIdx).toBeGreaterThanOrEqual(0);
-    // The seven-zone posture table is drawn between the heading and the area
-    // summary, so they are not contiguous — assert a "Not populated." appears
-    // AFTER the heading (the area-summary fallback).
-    const summaryIdx = text.indexOf(NOT_POPULATED, mapIdx + 1);
-    expect(summaryIdx).toBeGreaterThan(mapIdx);
+    expect(text).not.toContain("Escalation Indicators".toUpperCase());
   });
 
-  it("never emits a guarded heading with no body after it", async () => {
+  it("never emits a canonical heading with no body after it", async () => {
     const text = await jakartaPdfText();
-    // For every fallback heading, the very next recorded call must be its body,
-    // never another heading (which would mean the section was emitted empty).
-    for (const heading of CONTIGUOUS_FALLBACK_HEADINGS) {
+    const headings = new Set(CANONICAL_HEADINGS.map((h) => h.toUpperCase()));
+    // The very next recorded call after each canonical heading must be body
+    // text (prose, a card or the "Not populated." fallback) — never another
+    // canonical heading, which would mean the section was emitted empty.
+    for (const heading of CANONICAL_HEADINGS) {
       const idx = text.indexOf(heading.toUpperCase());
       expect(idx).toBeGreaterThanOrEqual(0);
-      expect(text[idx + 1]).toBe(NOT_POPULATED);
+      const next = text[idx + 1];
+      expect({ heading, next, isHeading: headings.has(next) }).toEqual({
+        heading,
+        next,
+        isHeading: false,
+      });
+      expect(String(next ?? "").trim().length).toBeGreaterThan(0);
     }
   });
 });

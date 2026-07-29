@@ -52,7 +52,7 @@ describe("Indonesia operational (reporting-driven) map", () => {
     // Map Read note is now on EVERY country map, and disclaims standing risk.
     expect(markup).toContain("Map Read");
     expect(markup).toContain("This map shows reported operationally relevant issues");
-    expect(markup).toContain("Monitor only unless they affect operations directly");
+    expect(markup).toContain("Monitor only unless a clear operational effect is reported");
     // No fixed "standing High" chips survive.
     expect(markup).not.toContain(">High<");
     expect(markup).not.toContain("standing risk areas");
@@ -77,9 +77,13 @@ describe("Indonesia operational (reporting-driven) map", () => {
     expect(markup).toContain("What happened this period:");
     expect(markup).toContain("Fire at Jakarta warehouse");
     expect(markup).toContain("Business relevance:");
-    expect(markup).toContain("Site, asset and business-continuity disruption");
-    // A fire at a warehouse is a confirmed operational effect → Direct impact.
-    expect(markup).toContain("Impact level: Direct impact");
+    expect(markup).toContain("Possible site or asset disruption if operating nearby");
+    // A bare site fire with NO stated current effect on operations is an
+    // Indirect impact: relevant operating environment, no confirmed client
+    // effect. Direct impact is reserved for reporting that states a current
+    // hard disruption (owner ruling: never inflate a lone report to Direct).
+    expect(markup).toContain("Impact level: Indirect impact");
+    expect(markup).not.toContain("Impact level: Direct impact");
     // Areas with NO reporting this period are absent (not painted).
     expect(markup).not.toContain("Sumatra");
     expect(markup).not.toContain(esc("Kalimantan / Borneo"));

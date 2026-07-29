@@ -1226,4 +1226,58 @@ router.post(
   },
 );
 
+// ---------------------------------------------------------------------------
+// Country engine reprocess — admin-token-gated, outside requireOwner so it
+// can be triggered from the CLI / external scheduler without a session cookie.
+// Mirrors the POST /countries/:slug/engine/reprocess route on the owner-gated
+// router, but reachable with only INGEST_ADMIN_TOKEN.
+// ---------------------------------------------------------------------------
+let countryEngineRunning = false;
+
+router.post(
+  "/admin/countries/:slug/engine/reprocess",
+  async (req: Request, res: Response): Promise<void> => {
+    const expected = process.env["INGEST_ADMIN_TOKEN"];
+    if (!expected) {
+      res.status(503).json({ error: "admin_disabled", message: "INGEST_ADMIN_TOKEN is not configured." });
+      return;
+    }
+    const auth = req.header("authorization") ?? "";
+    const headerToken = req.header("x-ingest-token") ?? req.header("x-admin-token");
+    const presented = (/^Bearer\s+/i.test(auth) ? auth.replace(/^Bearer\s+/i, "").trim() : null) ?? headerToken?.trim() ?? null;
+    if (!presented) { res.status(401).json({ error: "unauthorized" }); return; }
+    const ab = Buffer.from(presented), bb = Buffer.from(expected);
+    if (ab.length !== bb.length || !timingSafeEqual(ab, bb)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    if (countryEngineRunning) {
+      res.status(409).json({ error: "already_running" });
+      return;
+    }
+    const slug = (Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug) ?? "";
+    if (!slug) { res.status(400).json({ error: "slug required" }); return; }
+    countryEngineRunning = true;
+    try {
+      const { runCountryEngine } = await import("../lib/countryEngine");
+      const result = await runCountryEngine(slug);
+      res.json({
+        ok: true,
+        slug,
+        eventsTotal: result.events.length,
+        included: result.included.length,
+        held: result.held.length,
+        excluded: result.excluded.length,
+        stats: result.stats,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ err, slug }, "admin country engine reprocess failed");
+      if (!res.headersSent) res.status(500).json({ ok: false, error: "reprocess_failed", message });
+    } finally {
+      countryEngineRunning = false;
+    }
+  },
+);
+
 export default router;

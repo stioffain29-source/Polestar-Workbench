@@ -342,6 +342,47 @@ export function drawSectionWithProse(ctx: Ctx, title: string, body: string) {
   renderProse(ctx, body);
 }
 
+/**
+ * Whole-section keep-together renderer. Measures the heading PLUS the entire
+ * body (all paragraphs) and, if the section does not fit in the remaining space
+ * on the current page but WOULD fit on a fresh page, moves the whole section to
+ * a new page before drawing. This prevents a short, self-contained section such
+ * as "What Matters" from being split across a page break. Sections that are too
+ * tall to fit on any single page fall back to the normal flow (heading, then
+ * paragraph-level break protection via renderProse).
+ */
+export function drawSectionKeepTogether(ctx: Ctx, title: string, body: string) {
+  const { pdf, CW } = ctx;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  const lineH = 17;
+  const paraGap = 14;
+  const paragraphs = sanitize(body)
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0) {
+    drawSectionHeading(ctx, title);
+    return;
+  }
+  // Heading block height mirrors the measurement used in drawSectionWithProse.
+  const headingBlockH = 14 + 14 + 8 + 16;
+  let bodyH = 0;
+  for (const p of paragraphs) {
+    const lines: string[] = pdf.splitTextToSize(p, CW);
+    bodyH += lines.length * lineH + paraGap;
+  }
+  bodyH += 4; // trailing pad added by renderProse
+  const need = headingBlockH + bodyH;
+  const pageBody = ctx.H - ctx.TOP - ctx.BOTTOM;
+  const available = ctx.H - ctx.BOTTOM - ctx.y;
+  // Only relocate when the section fits on a fresh page; if it is taller than a
+  // full page it must flow normally rather than loop.
+  if (need > available && need <= pageBody) newPage(ctx);
+  drawSectionHeading(ctx, title);
+  renderProse(ctx, body);
+}
+
 export function renderProse(ctx: Ctx, body: string) {
   const { pdf, MX, CW } = ctx;
   const applyProseStyle = () => {

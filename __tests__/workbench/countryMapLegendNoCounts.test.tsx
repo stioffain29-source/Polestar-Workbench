@@ -39,7 +39,7 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
       countryName="Indonesia"
       incidents={[
         incident({ location: "Jakarta", severity: "high", title: "Fire at Jakarta warehouse" }),
-        incident({ location: "Zurich", title: "Global commodity prices ease" }),
+        incident({ location: "Zurich", title: "Armed men rob a courier near Zurich depot" }),
       ]}
     />,
   );
@@ -52,9 +52,11 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
   });
 
   it("carries an impact level and NOT a severity chip", () => {
-    // A fire at a warehouse is a confirmed operational effect → Direct impact,
-    // even though the row's severity is graded "high".
-    expect(markup).toContain("Impact level: Direct impact");
+    // A bare warehouse fire with no stated current effect on operations is an
+    // Indirect impact (never inflated to Direct), even though the row's
+    // severity is graded "high" — impact is content-driven, not severity-driven.
+    expect(markup).toContain("Impact level: Indirect impact");
+    expect(markup).not.toContain("Impact level: Direct impact");
     // Severity chips (">High<" etc.) are gone from the operational map.
     expect(markup).not.toContain(">High<");
   });
@@ -74,7 +76,7 @@ describe("CountryReportMap — Indonesia operational map, no reader-facing count
     expect(markup).toContain("Reported operational issues this period");
     expect(markup).toContain("Map Read");
     expect(markup).toContain("This map shows reported operationally relevant issues");
-    expect(markup).toContain("Monitor only unless they affect operations directly");
+    expect(markup).toContain("Monitor only unless a clear operational effect is reported");
   });
 });
 
@@ -87,7 +89,7 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
       countryName="Papua"
       incidents={[
         incident({ location: "Jayapura", severity: "high", title: "Security operation near Jayapura" }),
-        incident({ location: "Zurich", title: "Global commodity prices ease" }),
+        incident({ location: "Zurich", title: "Armed men rob a courier near Zurich depot" }),
       ]}
     />,
   );
@@ -96,7 +98,8 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
     expect(markup).toContain("Jayapura");
     expect(markup).toContain("What happened this period:");
     expect(markup).toContain("Business relevance:");
-    expect(markup).toContain("Impact level: Possible impact");
+    // A security operation is unrest/security context → Indirect impact.
+    expect(markup).toContain("Impact level: Indirect impact");
   });
 
   it("keeps the unattributed-records honesty note but prints no raw number", () => {
@@ -109,6 +112,6 @@ describe("CountryReportMap — generic (Papua) zone mode is reporting-driven too
     expect(markup).toContain("Operational Map");
     expect(markup).toContain("Map Read");
     expect(markup).toContain("This map shows reported operationally relevant issues");
-    expect(markup).toContain("Monitor only unless they affect operations directly");
+    expect(markup).toContain("Monitor only unless a clear operational effect is reported");
   });
 });

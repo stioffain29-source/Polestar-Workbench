@@ -12,7 +12,6 @@ import {
   MAX_PROSE_INCIDENTS_ACCEPTED,
   type ProseIncidentInput,
 } from "../lib/countryProse";
-import { requireAdminToken } from "../lib/adminAuth";
 
 const router: IRouter = Router();
 
@@ -42,7 +41,7 @@ function unavailableSummaries(fingerprint: string) {
 // fingerprint of the supplied incidents (the same set the client renders), so a
 // hit costs nothing and the summaries can never lag the data. `force: true`
 // bypasses the cache (redraft).
-router.post("/reports/:id/incident-summaries", requireAdminToken, async (req, res): Promise<void> => {
+router.post("/reports/:id/incident-summaries", async (req, res): Promise<void> => {
   const reportId = reportIdOf(req.params.id);
   if (reportId === null) {
     res.status(400).json({ error: "Invalid report id" });
@@ -147,7 +146,7 @@ router.post("/reports/:id/incident-summaries", requireAdminToken, async (req, re
 // per-incident summaries. The edit is bound to the fingerprint it was written
 // against; if the data has moved on (fingerprint mismatch) the edit is rejected
 // so it can never describe a stale snapshot — the client must regenerate first.
-router.put("/reports/:id/incident-summaries/edit", requireAdminToken, async (req, res): Promise<void> => {
+router.put("/reports/:id/incident-summaries/edit", async (req, res): Promise<void> => {
   const reportId = reportIdOf(req.params.id);
   if (reportId === null) {
     res.status(400).json({ error: "Invalid report id" });

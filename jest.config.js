@@ -71,6 +71,9 @@ module.exports = {
     "^@workspace/ingest$": "<rootDir>/lib/ingest/src/index.ts",
     "^@workspace/strike-targets$": "<rootDir>/lib/strike-targets/src/index.ts",
     "^@workspace/relevance$": "<rootDir>/lib/relevance/src/index.ts",
+    "^@workspace/country-engine$": "<rootDir>/lib/country-engine/src/index.ts",
+    "^@workspace/country-engine/(.*)$":
+      "<rootDir>/lib/country-engine/src/$1.ts",
     "^@workspace/api-zod$": "<rootDir>/lib/api-zod/src/index.ts",
     "^@workspace/api-client-react$":
       "<rootDir>/lib/api-client-react/src/index.ts",

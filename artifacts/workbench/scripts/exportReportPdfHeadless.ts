@@ -42,20 +42,12 @@ const OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TO
   return this;
 };
 
-interface AnyReport {
-  title: string;
-  topic: string;
-  issueDate: string;
-  author: string;
-  executiveSummary?: string | null;
-  situation?: string | null;
-  whatHappened?: string | null;
-  whatMatters?: string | null;
-  implications?: string | null;
-  watchNext?: string | null;
-  polestarView?: string | null;
-  hardNumbers?: unknown;
-}
+import {
+  buildHeadlessReportData,
+  type HeadlessReportRow,
+} from "./headlessReportData";
+
+type AnyReport = HeadlessReportRow;
 
 async function main() {
   // Country briefs read directly from Postgres below and never touch the
@@ -113,20 +105,12 @@ async function main() {
     (report as { sectionOverrides?: import("../src/lib/topicSectionOverrides").TopicSectionOverrides | null })
       .sectionOverrides ?? null;
   const hiddenSections = sectionOverrides?.hiddenSections ?? undefined;
-  const data = {
-    title: report.title,
-    topic: report.topic,
-    issueDate: issueDateOverride || report.issueDate,
-    author: report.author,
-    executiveSummary: report.executiveSummary ?? report.situation,
-    situation: report.situation,
-    whatHappened: report.whatHappened,
-    whatMatters: report.whatMatters,
-    implications: report.implications,
-    watchNext: report.watchNext,
-    polestarView: report.polestarView,
-    hardNumbers: report.hardNumbers,
-  };
+  // Spread the ENTIRE fetched report row (buildHeadlessReportData) so every
+  // saved prose/read column — including ones added in the future — reaches the
+  // per-topic exporter exactly as the on-screen preview sees it. The previous
+  // hand-mapped field list silently dropped saved overrides (task 445), making
+  // the headless PDF fall back to auto-prose and diverge from the preview.
+  const data = buildHeadlessReportData(report, issueDateOverride);
 
   if (TOPIC === "shipping") {
     const { exportShippingReportPdf } = await import("../src/lib/exportShippingReportPdf");

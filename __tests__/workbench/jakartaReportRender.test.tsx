@@ -113,11 +113,12 @@ function textOf(html: string): string {
     .trim();
 }
 
-// The fixed eight canonical sections, shared by every theatre.
+// The fixed seven canonical sections, shared by every theatre. "Incident
+// Details" was merged into "Current Situation" (owner ruling, 28 Jul 2026):
+// one prose narrative, no per-incident card lists.
 const SECTION_ORDER = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Incident Details",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",
@@ -179,7 +180,7 @@ describe("PngCountryReportBody — Jakarta folded into canonical sections", () =
   const d = build(JAKARTA_WINDOW);
   const html = renderToStaticMarkup(<PngCountryReportBody dataset={d} />);
 
-  it("renders the eight canonical sections in the fixed order", () => {
+  it("renders the seven canonical sections in the fixed order", () => {
     const ats = SECTION_ORDER.map((title) => html.indexOf(`>${title}<`));
     for (let i = 0; i < SECTION_ORDER.length; i++) {
       expect(ats[i]).toBeGreaterThanOrEqual(0);
@@ -193,9 +194,9 @@ describe("PngCountryReportBody — Jakarta folded into canonical sections", () =
     }
   });
 
-  it("folds Crime Trends and Priority Areas inside Incident Details", () => {
-    const start = html.indexOf(">Incident Details<");
-    const end = html.indexOf(">Current Situation<");
+  it("folds Crime Trends and Priority Areas inside Current Situation", () => {
+    const start = html.indexOf(">Current Situation<");
+    const end = html.indexOf(">Operational Impact<");
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     const section = html.slice(start, end);

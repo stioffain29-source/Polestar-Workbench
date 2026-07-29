@@ -15,7 +15,6 @@
 // authoritative spec), not a category summary generated from database fields.
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
-import type { PolestarViewParts } from "./countryPolestarView";
 import type { JakartaCorridorStatus } from "./jakartaCorridors";
 import { JAKARTA_EXPOSURE_RANK } from "./jakartaCorridors";
 
@@ -189,13 +188,45 @@ function presentThemes(items: PngReportItem[]): ThemePresence[] {
 
 // A severity-aware tail sentence for an Incident Details paragraph. Never calls
 // a Low a "severity escalation"; only speaks to severity at Moderate or above.
-function severityTail(worstRank: number): string {
-  if (worstRank >= 5)
-    return " Reporting this period reached extreme severity and warrants close monitoring.";
-  if (worstRank >= 4)
-    return " Reporting this period reached high severity and warrants closer monitoring.";
-  if (worstRank >= 3) return " Reporting this period reached moderate severity.";
-  return "";
+// Deterministic wording variants (repetition guard): two themes sharing a
+// severity band must not paste the identical tail sentence. All variants state
+// the same fact — no meaning drift.
+const SEVERITY_TAIL_VARIANTS: Record<"extreme" | "high" | "moderate", string[]> = {
+  extreme: [
+    " Reporting this period reached extreme severity and warrants close monitoring.",
+    " The most serious of this reporting was extreme and should be watched closely.",
+    " At its worst this reporting reached extreme severity.",
+    " The worst item under this theme rated extreme this period.",
+    " This theme produced extreme-severity reporting this period.",
+    " Severity under this theme peaked at extreme.",
+    " The heaviest reporting under this theme was extreme in severity.",
+  ],
+  high: [
+    " Reporting this period reached high severity and warrants closer monitoring.",
+    " The most serious of this reporting reached high severity.",
+    " At its worst this reporting reached high severity and merits attention.",
+    " The worst item under this theme rated high this period.",
+    " This theme produced high-severity reporting this period.",
+    " Severity under this theme peaked at high.",
+    " The heaviest reporting under this theme was high in severity.",
+  ],
+  moderate: [
+    " Reporting this period reached moderate severity.",
+    " The most serious of this reporting was moderate.",
+    " At its worst this reporting reached moderate severity.",
+    " The worst item under this theme rated moderate this period.",
+    " This theme produced moderate-severity reporting this period.",
+    " Severity under this theme peaked at moderate.",
+    " The heaviest reporting under this theme was moderate in severity.",
+  ],
+};
+
+function severityTail(worstRank: number, variant = 0): string {
+  const band =
+    worstRank >= 5 ? "extreme" : worstRank >= 4 ? "high" : worstRank >= 3 ? "moderate" : null;
+  if (!band) return "";
+  const list = SEVERITY_TAIL_VARIANTS[band];
+  return list[((variant % list.length) + list.length) % list.length];
 }
 
 // The worst, then most-recent crime incident in a set, rendered as ONE concrete,
@@ -339,14 +370,14 @@ const NO_ANCHOR_NOTE =
 // Graceful degradation: emit `primary` when there is something concrete to say;
 // otherwise emit a single non-padding note ONLY for a high-severity leftover,
 // and drop the theme entirely below that. severityTail is appended either way.
-function compose(worstRank: number, primary: string): string | null {
-  const sev = severityTail(worstRank);
+function compose(worstRank: number, primary: string, sevVariant = 0): string | null {
+  const sev = severityTail(worstRank, sevVariant);
   if (primary) return `${primary}${sev}`;
   if (worstRank >= 4) return `${NO_ANCHOR_NOTE}${sev}`;
   return null;
 }
 
-function themeParagraph(p: ThemePresence): string | null {
+function themeParagraph(p: ThemePresence, sevVariant = 0): string | null {
   const areas = presentAreas(p.items);
   const area = joinList(areas);
   const settings = extractLabels(p.items, SETTING_GROUPS);
@@ -361,7 +392,7 @@ function themeParagraph(p: ThemePresence): string | null {
           ? "Demonstration reporting centred on the Central Jakarta government district, where activity around government buildings and main routes can close roads and slow access at short notice. The practical concern is short-notice road closure and delayed movement, not a wider city-wide security deterioration."
           : `Demonstration reporting centred on ${area}, where protest activity can close roads and slow access to surrounding areas and main routes at short notice. The practical concern is short-notice road closure and delayed movement, not a wider city-wide deterioration.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "flooding": {
       let primary = "";
@@ -371,7 +402,7 @@ function themeParagraph(p: ThemePresence): string | null {
         const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
         primary = `Flooding and heavy-rain reporting affected ${where}, where standing water on low-lying roads can lengthen journeys and delay site access${logistics ? ", logistics movements and airport-transfer routes" : " and staff commuting"}.${effTail} Confirm affected routes before staff travel in these areas.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "fire": {
       let primary = "";
@@ -382,7 +413,7 @@ function themeParagraph(p: ThemePresence): string | null {
           : "The operational concern is the knock-on effect — possible road closures, local evacuation and restricted access around the site — rather than the fire itself.";
         primary = `Fire reporting this period centred on ${where}. ${eff} Confirm the status of the affected area before movement nearby.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "crime": {
       const crimeTypes = extractLabels(p.items, CRIME_GROUPS);
@@ -401,7 +432,7 @@ function themeParagraph(p: ThemePresence): string | null {
       } else if (area) {
         primary = `Crime and public-safety reporting was limited to ${area}, with the main concern staff exposure on after-hours and on-foot movement rather than a city-wide threat.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "traffic": {
       const corridor = settings.filter((s) => s === "toll roads" || s === "transport hubs" || s === "port areas");
@@ -411,12 +442,12 @@ function themeParagraph(p: ThemePresence): string | null {
         const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
         primary = `Traffic and movement disruption was reported ${where ? `around ${where}` : "on the capital's main corridors"}.${effTail} Congestion here is a daily planning constraint on meetings, deliveries and airport transfers, and can worsen at short notice with rain or roadworks.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "airport": {
       const effTail = effects.length ? ` Reported effects include ${joinList(effects)}.` : "";
       const primary = `Reporting affected the Soekarno-Hatta airport corridor.${effTail} Transfers between the city and the airport run through congested, flood-sensitive toll routes, so transfer times can lengthen at short notice; widen the transfer window and confirm the airport toll road and Tangerang approach before departure.`;
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
     case "governance": {
       const actions = extractLabels(p.items, ACTION_GROUPS);
@@ -427,7 +458,7 @@ function themeParagraph(p: ThemePresence): string | null {
       } else if (area) {
         primary = `Policing and regulatory activity was reported in ${area}. Such activity can briefly restrict movement and access around the affected area at short notice; confirm cordons before approach.`;
       }
-      return compose(p.worstRank, primary);
+      return compose(p.worstRank, primary, sevVariant);
     }
   }
 }
@@ -464,13 +495,64 @@ function jakartaThemeTrajectory(
 // The count-free trajectory clause appended to each theme paragraph. Matches the
 // shared synthesiser's wording so preview == PDF and Jakarta reads in step with
 // the other briefs.
-const JAKARTA_TRAJECTORY_SENTENCE: Record<JakartaThemeTrajectory, string> = {
-  rising: "Against the previous week this theme is rising.",
-  easing: "Against the previous week this theme is easing.",
-  steady: "Against the previous week this theme is broadly steady.",
-  new: "It was not reported a week earlier, so it reads as newly prominent this period.",
-  nobasis: "With no prior-week baseline, no week-on-week trend is asserted.",
+// Owner-flagged repetition guard: several themes sharing one trajectory must
+// not paste the identical sentence under each. Deterministic variants keyed by
+// the theme's position; all variants state the same fact — no meaning drift.
+const JAKARTA_TRAJECTORY_SENTENCES: Record<JakartaThemeTrajectory, string[]> = {
+  rising: [
+    "Against the previous week this theme is rising.",
+    "This theme drew more reporting than in the previous week.",
+    "Week on week, reporting under this theme increased.",
+    "Reporting under this theme ran ahead of the previous week.",
+    "The previous week saw less of this reporting than this period did.",
+    "Compared with the week before, this theme gained ground.",
+    "This period carried more of this reporting than the week before.",
+  ],
+  easing: [
+    "Against the previous week this theme is easing.",
+    "This theme drew less reporting than in the previous week.",
+    "Week on week, reporting under this theme declined.",
+    "Reporting under this theme ran below the previous week.",
+    "The previous week saw more of this reporting than this period did.",
+    "Compared with the week before, this theme lost ground.",
+    "This period carried less of this reporting than the week before.",
+  ],
+  steady: [
+    "Against the previous week this theme is broadly steady.",
+    "This theme ran at much the same level as the previous week.",
+    "Week on week, reporting under this theme was broadly unchanged.",
+    "Reporting under this theme held near the previous week's level.",
+    "The previous week saw a similar amount of this reporting.",
+    "Compared with the week before, this theme was little changed.",
+    "This period carried about as much of this reporting as the week before.",
+  ],
+  new: [
+    "It was not reported a week earlier, so it reads as newly prominent this period.",
+    "This theme was absent from the previous week's reporting and is newly prominent.",
+    "No comparable reporting appeared a week earlier, making this newly prominent.",
+    "The previous week carried none of this reporting, so it is new this period.",
+    "This reporting had no counterpart a week earlier and stands out as new.",
+    "A week earlier this theme did not feature, so it registers as new.",
+    "Nothing under this theme appeared the week before, so it is new this period.",
+  ],
+  nobasis: [
+    "With no prior-week baseline, no week-on-week trend is asserted.",
+    "There is no prior-week baseline, so no trend is asserted for this theme.",
+    "No week-on-week comparison is made — the prior week carries no baseline.",
+    "Absent a prior-week baseline, this theme carries no trend judgement.",
+    "This theme is stated without a trend — the prior week offers no baseline.",
+    "No baseline exists for the prior week, so no trend is claimed here.",
+    "The prior week provides no baseline, so this theme carries no trend call.",
+  ],
 };
+
+function jakartaTrajectorySentence(
+  t: JakartaThemeTrajectory,
+  variant: number,
+): string {
+  const list = JAKARTA_TRAJECTORY_SENTENCES[t];
+  return list[((variant % list.length) + list.length) % list.length];
+}
 
 // Incident Details theme groups for Jakarta, built from the leftover (non-Top-3)
 // items so a development is never repeated. Present-only; empty input → []. Each
@@ -491,8 +573,17 @@ export function buildJakartaIncidentThemes(
     baselineByTheme.set(t, arr);
   }
   const out: JakartaIncidentTheme[] = [];
+  // Per-trajectory counters: variants must rotate WITHIN each trajectory (two
+  // "easing" themes need different wording; a global index can hand the same
+  // variant to both when other trajectories sit between them).
+  const trajectoryUse = new Map<JakartaThemeTrajectory, number>();
+  // Per-severity-band counter for the paragraph tail sentence (same guard).
+  const sevBandUse = new Map<number, number>();
   for (const p of presentThemes(incidentDetailsItems)) {
-    const paragraph = themeParagraph(p);
+    const band = p.worstRank >= 5 ? 5 : p.worstRank >= 4 ? 4 : p.worstRank >= 3 ? 3 : 0;
+    const sevVariant = sevBandUse.get(band) ?? 0;
+    sevBandUse.set(band, sevVariant + 1);
+    const paragraph = themeParagraph(p, sevVariant);
     // A theme too thin to say anything concrete is dropped, not padded.
     if (!paragraph) continue;
     const trajectory = jakartaThemeTrajectory(
@@ -500,7 +591,9 @@ export function buildJakartaIncidentThemes(
       baselineByTheme.get(p.theme) ?? [],
       hasBaseline,
     );
-    const full = `${paragraph} ${JAKARTA_TRAJECTORY_SENTENCE[trajectory]}`;
+    const use = trajectoryUse.get(trajectory) ?? 0;
+    trajectoryUse.set(trajectory, use + 1);
+    const full = `${paragraph} ${jakartaTrajectorySentence(trajectory, use)}`;
     out.push({ key: p.theme, heading: JAKARTA_THEME_HEADING[p.theme], paragraph: full });
   }
   return out;
@@ -538,50 +631,6 @@ export function buildJakartaRecommendedActions(): string[] {
   ];
 }
 
-// --- BLUF / Current Situation / Outlook ------------------------------------
-
-function leadThemePhrases(windowItems: PngReportItem[], cap = 3): string[] {
-  return presentThemes(windowItems)
-    .slice(0, cap)
-    .map((p) => JAKARTA_THEME_PHRASE[p.theme]);
-}
-
-export function buildJakartaBluf(windowItems: PngReportItem[]): string {
-  if (windowItems.length === 0) {
-    return "Jakarta remains a manageable but disruption-prone operating environment. No fresh open-source reporting was identified this period; the capital's standing pattern of protest, congestion, flooding and local crime continues to shape movement planning.";
-  }
-  const phrases = leadThemePhrases(windowItems);
-  const areas = presentAreas(windowItems, 2);
-  const whereTail = areas.length ? ` in ${joinList(areas)}` : "";
-  const themeBit = phrases.length
-    ? joinList(phrases)
-    : "localised, lower-level disruption";
-  return `Jakarta remains a manageable but disruption-prone operating environment. This week's reporting centred on ${themeBit}${whereTail}, with the main operational effect on movement and timings rather than any city-wide deterioration.`;
-}
-
-export function buildJakartaCurrentSituation(windowItems: PngReportItem[]): string {
-  // The structured Jakarta operating picture (spec §3): a short present-active
-  // lead, then four standing operating-picture statements. The four statements
-  // describe Jakarta's standing exposure (not event claims), so they are safe to
-  // state regardless of the window; the lead reflects what was actually reported.
-  const phrases = leadThemePhrases(windowItems);
-  const areas = presentAreas(windowItems, 2);
-  const whereTail = areas.length ? ` in ${joinList(areas)}` : "";
-  const lead =
-    windowItems.length === 0
-      ? "With no fresh open-source reporting this period, Jakarta holds to its standing operating picture."
-      : phrases.length
-        ? `This week's reporting centred on ${joinList(phrases)}${whereTail}, with the main effect on movement and timings.`
-        : "Reporting this week was limited to isolated, lower-level disruption across the capital.";
-  const picture =
-    "Movement planning should focus on Central Jakarta protest exposure around the Gambir, Monas and Istana Merdeka government district, North Jakarta port access around Tanjung Priok, and weather-related disruption on the cross-city and Soekarno-Hatta airport-corridor routes. The main business impact is not city-wide deterioration but short-notice disruption to meetings in the Sudirman–Thamrin and SCBD districts, port collections at Tanjung Priok, warehouse dispatches toward Bekasi and Tangerang, and staff transfers to and from the airport.";
-  return `${lead}\n${picture}`;
-}
-
-export function buildJakartaOutlook(): string {
-  return "Over the next seven days, the most likely picture is localised disruption from protest activity, traffic, heavy rain and local crime rather than a city-wide deterioration. Movement planning — route checks, flexible timings and local verification — remains the main mitigation.";
-}
-
 // Jakarta-specific escalation indicators for the Outlook (spec §5): the standing
 // watch-items an analyst would flag as "what would worsen the picture", phrased
 // for the capital rather than the generic country list.
@@ -597,32 +646,6 @@ export function buildJakartaEscalationIndicators(): string[] {
     "A driver unable to confirm two viable routes",
     "A security provider advising delay or reroute",
   ];
-}
-
-// --- Polestar View ---------------------------------------------------------
-
-// The spec's strongest-paragraph Polestar View, near-verbatim, in British
-// English. A standing assessed judgement of the capital, not a count summary.
-export const JAKARTA_POLESTAR_PARAGRAPH =
-  "Jakarta remains a manageable but disruption-prone operating environment. The main issue is not a single high-impact threat but the combined effect of protests, congestion, flooding and local crime on movement planning. Business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.";
-
-export function buildJakartaPolestarView(): PolestarViewParts {
-  return {
-    direction: "Operating risk in Jakarta is broadly stable but disruption-prone.",
-    driver:
-      "The main driver is the combined effect of protests, congestion, flooding and local crime, rather than any single high-impact threat.",
-    exposedGeography:
-      "Exposure concentrates in the central government and business districts, the main commuting corridors and the Soekarno-Hatta airport corridor.",
-    exposedActivity:
-      "The main business exposure is staff movement, journey timings and airport transfers.",
-    likelyDisruption:
-      "The most likely disruption over the next seven days is localised interruption to movement from protest activity, traffic, heavy rain and local crime.",
-    whatWouldChange:
-      "The assessment would change if large-scale unrest, severe flooding or a major security incident disrupted the capital city-wide.",
-    practicalJudgement:
-      "For now, business users should focus on route checks, flexible timings, local verification and rapid reporting from staff and drivers rather than broad travel restrictions.",
-    paragraph: JAKARTA_POLESTAR_PARAGRAPH,
-  };
 }
 
 // --- Top 3 development transform -------------------------------------------
@@ -1202,11 +1225,6 @@ export interface JakartaBriefInput {
 }
 
 export interface JakartaBriefOverrides {
-  bluf: string;
-  executiveSummary: string;
-  outlook: string;
-  polestarView: string;
-  polestarViewParts: PolestarViewParts;
   recommendedActions: string[];
   operationalImpact: string[];
   escalationIndicators: string[];
@@ -1216,13 +1234,7 @@ export interface JakartaBriefOverrides {
 }
 
 export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrides {
-  const parts = buildJakartaPolestarView();
   return {
-    bluf: buildJakartaBluf(input.windowItems),
-    executiveSummary: buildJakartaCurrentSituation(input.windowItems),
-    outlook: buildJakartaOutlook(),
-    polestarView: parts.paragraph,
-    polestarViewParts: parts,
     recommendedActions: buildJakartaRecommendedActions(),
     operationalImpact: buildJakartaOperationalImpact(),
     escalationIndicators: buildJakartaEscalationIndicators(),

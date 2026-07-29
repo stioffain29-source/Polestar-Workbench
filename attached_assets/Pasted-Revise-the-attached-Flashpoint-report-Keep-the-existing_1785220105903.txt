@@ -1,0 +1,156 @@
+Revise the attached Flashpoint report. Keep the existing cover, branding, colours, typography, tables, spacing and overall page structure. This is a content and data-quality correction, not a redesign.
+
+The current report has classified several unrelated stories as civil unrest and then built analysis around those errors. Correct the dataset first, then regenerate all figures, tables and prose from the corrected data.
+
+DATA CORRECTIONS
+
+Remove any incident that is not an actual protest, strike, riot, public-order restriction or direct police response to civil unrest.
+
+Specifically remove:
+
+- “Counter-setting syndicate active at Johor border, KLIA despite crackdown.” This is a criminal-enforcement story, not civil unrest.
+- The falsely captioned Nepal protest video. This is a misinformation story, not a separate unrest incident.
+- The Incheon Airport drug-smuggling checkpoint story. This is a law-enforcement or inspection event, not a protest.
+- “China Files Protest, Says Philippines Struck First in Sea Clash.” This refers to a diplomatic protest, not street protest activity.
+
+Review the remaining records for the same problem. Do not classify diplomatic protests, criminal crackdowns, fact-checks, demonstrations created for official photographs, or unrelated enforcement operations as civil unrest.
+
+After filtering the data:
+
+- Recalculate Incidents in Window.
+- Recalculate Top Issue Type.
+- Recalculate Most Affected Country.
+- Recalculate incidents by country.
+- Recalculate all severity summaries.
+- Update every table, chart and narrative that uses those figures.
+
+SEVERITY
+
+The report currently contradicts itself by describing the highest severity as both High and Extreme.
+
+Use the actual rating from the corrected dataset consistently throughout the report.
+
+Do not describe the Thailand martial-law incident as Extreme if its table rating is High.
+
+Remove every remaining severity contradiction.
+
+EXECUTIVE SUMMARY
+
+Replace the existing executive summary with:
+
+Civil-unrest activity during the reporting period was concentrated in India, with further protest and labour activity recorded across parts of South and Southeast Asia. Most incidents were limited in scale, but several caused short-notice disruption through road closures, police action and restrictions on movement.
+
+For businesses, the main concern is the speed at which a planned rally or strike can affect staff travel, deliveries and access to offices or public venues. India remains the main focus because of the number of separate events, while developments in southern Thailand require closer monitoring because of the security measures imposed following the Narathiwat attack.
+
+Planning should focus on confirmed protest dates, local police restrictions and alternative movement arrangements in affected cities.
+
+ACTIVISM AND PROTEST READ
+
+Remove the sentence saying the picture is “led by” a single article headline.
+
+Replace the section with:
+
+Protest activity was concentrated in India, with additional events recorded in the Philippines, Bangladesh, Sri Lanka, Malaysia and elsewhere in the region. The incidents involved a mixture of political demonstrations, student action, labour disputes and local grievance protests.
+
+Most remained small or localised. The main operational effects were temporary road closures, increased police presence and delays around government buildings, universities and city-centre gathering points.
+
+The number of separate organising groups means disruption may occur on different dates and in different locations rather than as one coordinated regional movement.
+
+CIVIL UNREST AND PUBLIC ORDER READ
+
+Replace the full section with:
+
+Authorities across several countries used police deployments, movement restrictions and crowd-control measures to manage demonstrations during the reporting period. The most significant responses were recorded in India and southern Thailand.
+
+In India, police used tear gas during one protest, showing that local demonstrations can escalate quickly when crowds and security forces confront each other. In Thailand, martial law in parts of Narathiwat reflects the wider security situation rather than a regional protest trend, but it may still affect movement and access in the province.
+
+For businesses, the likely impact is localised and short notice. Staff travel, deliveries and access to offices or venues may be disrupted where protests or security operations are concentrated.
+
+FORECAST: NEXT 7–14 DAYS
+
+Replace the opening sentence with:
+
+The table above lists the events already scheduled for the next 7–14 days. These provide the clearest indication of where disruption may occur.
+
+Then use:
+
+India is likely to remain the main source of repeated protest-related disruption because it has the highest volume of activity. Most events are expected to remain localised, although road closures, police deployments and transport delays may occur around announced rallies and strikes.
+
+Southern Thailand presents a different risk. Activity is less frequent, but the security situation in Narathiwat has the potential to produce more serious movement restrictions or operational disruption.
+
+The most likely business impact during the forecast period is short-notice disruption around confirmed protest sites, government districts, universities and major transport routes. Risk will increase where authorities impose curfews, assembly restrictions or aggressive crowd-control measures.
+
+Do not claim that one political event will automatically cause activity to return within 48 hours unless the source data supports that assessment.
+
+REGIONAL AND COUNTRY VIEW
+
+Remove the claim that the incidents form a “coordinated” regional picture.
+
+Replace the introductory paragraph with:
+
+Civil-unrest activity was recorded across several parts of APAC, but the incidents were separate and driven by different local issues. India recorded the highest number of events, while the Philippines and Bangladesh also experienced repeated protest or labour activity. Lower incident numbers elsewhere should not be treated as evidence of a shared regional campaign.
+
+Correct grammar throughout the country summaries. Remove repeated phrases such as “driven by protest alongside other operational incident.”
+
+WHAT MATTERS
+
+Replace the section with:
+
+India is the main concern for the volume of protest activity and the likelihood of repeated local disruption. Southern Thailand is the more serious security concern because restrictions imposed in Narathiwat could affect movement and operations with little warning.
+
+These are different risks and should not be combined into one regional trend. Businesses should track confirmed protest dates in India while maintaining closer security monitoring for Narathiwat and the wider southern border provinces.
+
+IMPLICATIONS FOR BUSINESS
+
+Remove the recommendation to pre-position guard reinforcement unless a specific incident or site assessment supports it.
+
+Remove the automatic instruction that every Section 144 order or curfew must trigger work from home or immediate site closure.
+
+Use these recommendations instead:
+
+- Check confirmed protest and strike dates against staff travel, deliveries and planned business activity.
+- Brief drivers and employees on alternative routes around government districts, universities and known gathering points.
+- Allow local management to delay travel or introduce work-from-home arrangements where police restrictions materially affect access.
+- Monitor curfews, assembly restrictions, internet disruption and transport closures in areas of operation.
+- Confirm that security, operations, procurement and logistics teams receive the same local alerts.
+- Review site access arrangements where protests are planned nearby.
+
+POLESTAR VIEW
+
+Replace the current section with:
+
+India is likely to remain the main source of protest-related business disruption during the coming week, largely because of the number of separate rallies, labour actions and student events. Most are expected to remain localised, but some may affect roads, public transport and access to commercial districts.
+
+Southern Thailand requires separate monitoring. Martial law in Narathiwat reflects a more serious security environment and may lead to movement restrictions or additional enforcement measures.
+
+Overall business disruption risk is Moderate. The most likely effects are short-notice travel delays, temporary access restrictions and local supply-chain disruption around confirmed protest or strike dates.
+
+GENERAL WRITING RULES
+
+Use plain, natural English.
+
+Do not use phrases such as:
+
+- operational tempo
+- standing baseline of unrest
+- surfaces that feel the effect first
+- headline-severity tracking
+- visible enforcement has crossed the threshold
+- coordinated regional picture
+- activity is building, not easing
+
+Do not invent trends from one week of data.
+
+Do not turn unrelated incidents into a single regional narrative.
+
+Do not repeat the same India-versus-Thailand assessment across several sections.
+
+Use the Polestar risk terms only:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+Run a final consistency check across every page before generating the revised PDF.

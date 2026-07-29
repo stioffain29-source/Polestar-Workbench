@@ -236,6 +236,10 @@ function ItemCard({
 function StrandLabel({ children }: { children: React.ReactNode }) {
   return (
     <div
+      // Keep-with-next: the DOM-rasterise paginator must never break directly
+      // after this label — a strand heading orphaned at the bottom of a page
+      // with its body on the next is a layout defect (owner-flagged).
+      data-pdf-keep-with-next="true"
       style={{
         fontFamily: ROBOTO,
         fontSize: 11,
@@ -508,7 +512,14 @@ export default function PngCountryReportBody({
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
   const mapAt = (slot: CountryMapPlacement) =>
-    mapPlacement === slot && mapNode ? <div style={{ marginTop: 4 }}>{mapNode}</div> : null;
+    // §25: the map card must not split across pages — keep the map container and
+    // its location cards together (break-inside: avoid), matching the no-split
+    // card pattern used elsewhere in the report body.
+    mapPlacement === slot && mapNode ? (
+      <div data-map-card="true" style={{ marginTop: 4, breakInside: "avoid" }}>
+        {mapNode}
+      </div>
+    ) : null;
   const photoAt = (slot: CountryPhotoPlacement) =>
     photoPlacement === slot && photoNode ? <div style={{ marginTop: 4 }}>{photoNode}</div> : null;
 
@@ -540,69 +551,64 @@ export default function PngCountryReportBody({
       {mapAt("after-top3")}
       {photoAt("after-top3")}
 
-      {/* 3. Incident Details — PRESENT, MEANINGFUL theme groups of the incidents
-          not already shown as Top 3 developments. Each theme is ONE short,
-          count-free analytical paragraph (no four-part sub-template). Trivial
-          single low-severity themes are filtered upstream; absent themes are
-          omitted rather than padded with "not reported" filler. The empty note
-          is no-fabrication-safe: it only claims "no further reporting" when there
-          truly are no leftover incidents; when leftover incidents existed but all
-          fell below the meaningfulness gate it says so honestly instead. */}
-      {show("incident-details") && (
-      <Section title="Incident Details">
-        {incidentThemes.length === 0 ? (
-          <EmptyNote>
-            {d.windowItems.length === 0
-              ? d.emptyLocationFallback
-              : d.incidentDetailsItems.length === 0
-                ? "No further incident reporting beyond the developments above this period."
-                : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
-          </EmptyNote>
-        ) : (
-          incidentThemes.map((g) => {
-            // Per-item cards are PNG-only (d.showPerIncidentCards). The PNG brief
-            // lists each theme incident's own place + honest date beneath the
-            // theme paragraph via a compact ItemCard. West Papua, Indonesia and
-            // Jakarta stay paragraph-only (inert) — Jakarta's override carries no
-            // items anyway, and the high-volume theatres must never explode.
-            const themeItems = d.showPerIncidentCards ? (g.items ?? []) : [];
-            return (
-              <div key={g.key} style={{ marginBottom: 12 }}>
-                <StrandLabel>{g.heading}</StrandLabel>
-                <Prose text={g.paragraph} />
-                {themeItems.map((it) => (
-                  <ItemCard key={it.id} item={it} compact />
-                ))}
-              </div>
-            );
-          })
+      {/* 3. Current Situation — the single prose narrative of the period.
+          Uniform across every country brief (owner ruling, 28 Jul 2026): the
+          framing paragraphs lead, followed by the themed analytical paragraphs
+          that used to sit under a separate "Incident Details" heading. There is
+          deliberately NO per-incident card list anywhere in this section — the
+          report reads as analysis, not a feed. The empty note stays
+          no-fabrication-safe: it only claims "no further reporting" when there
+          truly are no leftover incidents; when leftover incidents existed but
+          all fell below the meaningfulness gate it says so honestly instead.
+          The legacy override keys keep working: "current-situation" hides the
+          framing prose, "incident-details" hides the themed paragraphs. */}
+      {((show("current-situation") && d.executiveSummary.trim() !== "") ||
+        (show("incident-details") &&
+          (incidentThemes.length > 0 || Boolean(tactical) || d.windowItems.length > 0))) && (
+      <Section title="Current Situation">
+        {show("current-situation") && d.executiveSummary.trim() !== "" && (
+          <Prose text={d.executiveSummary} />
         )}
-        {tactical ? (
+        {show("incident-details") && (
           <>
-            <StrandLabel>Crime Trends and Business Impact</StrandLabel>
-            <Prose text={tactical.crimeTrends.reportedThisPeriod} />
-            <Prose text={tactical.crimeTrends.standingPattern} />
-            <Prose text={tactical.crimeTrends.trendRead} />
-            <CrimeTable rows={tactical.crimeTrends.businessImpact} />
-            <StrandLabel>Priority Areas This Week</StrandLabel>
-            <PriorityTable rows={tactical.priorityAreas} />
+            {incidentThemes.length === 0 ? (
+              d.windowItems.length > 0 ? (
+                <EmptyNote>
+                  {d.incidentDetailsItems.length === 0
+                    ? "No further incident reporting beyond the developments above this period."
+                    : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
+                </EmptyNote>
+              ) : null
+            ) : (
+              incidentThemes.map((g) => (
+                <div key={g.key} style={{ marginBottom: 12 }}>
+                  <StrandLabel>{g.heading}</StrandLabel>
+                  <Prose text={g.paragraph} />
+                </div>
+              ))
+            )}
+            {tactical ? (
+              <>
+                <StrandLabel>Crime Trends and Business Impact</StrandLabel>
+                <Prose text={tactical.crimeTrends.reportedThisPeriod} />
+                <Prose text={tactical.crimeTrends.standingPattern} />
+                <Prose text={tactical.crimeTrends.trendRead} />
+                <CrimeTable rows={tactical.crimeTrends.businessImpact} />
+                <StrandLabel>Priority Areas This Week</StrandLabel>
+                <PriorityTable rows={tactical.priorityAreas} />
+              </>
+            ) : null}
+            {photoAt("inside-incident-details")}
           </>
-        ) : null}
-        {photoAt("inside-incident-details")}
+        )}
       </Section>
       )}
       {mapAt("after-incident-details")}
 
-      {/* 4. Current Situation — concise framing, two short paragraphs maximum. */}
-      {show("current-situation") && (
-        <Section title="Current Situation">
-          <Prose text={d.executiveSummary} />
-        </Section>
-      )}
-
       {/* 5. Operational Impact — per-theme impact lines for the themes present
-          this period. */}
-      {show("operational-impact") && (
+          this period. §27: omitted entirely (not filler) when the engine has no
+          event-linked impact to state and no tactical brief supplies one. */}
+      {show("operational-impact") && (operationalImpact.length > 0 || Boolean(tactical)) && (
       <Section title="Operational Impact">
         {operationalImpact.length === 0 ? (
           <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
@@ -634,7 +640,11 @@ export default function PngCountryReportBody({
           Site security, …), emitting only the groups this period's incident mix
           and watchlist support. The operating-risk theatres (Indonesia /
           Jakarta) keep their own flat priorities list unchanged. */}
-      {show("recommended-actions") && (
+      {show("recommended-actions") &&
+        (Boolean(tactical) ||
+          (d.proseVariant === "operating-risk"
+            ? d.businessImpact.length > 0
+            : d.recommendedActions.length > 0)) && (
       <Section title="Recommended Actions">
         {tactical ? (
           <>
@@ -666,8 +676,8 @@ export default function PngCountryReportBody({
       {mapAt("before-outlook")}
 
       {/* 7. Outlook: Next Seven Days — most-likely scenario + escalation
-          indicators */}
-      {show("outlook") && (
+          indicators. §27: omitted when the engine has no outlook prose. */}
+      {show("outlook") && d.outlook.trim() !== "" && (
       <Section title="Outlook: Next Seven Days">
         <Prose text={d.outlook} />
         {escalationIndicators.length > 0 ? (
@@ -700,8 +710,9 @@ export default function PngCountryReportBody({
       {mapAt("before-polestar")}
       {photoAt("before-polestar")}
 
-      {/* 8. Polestar View — closes the written brief */}
-      {show("polestar-view") && (
+      {/* 8. Polestar View — closes the written brief. §27: omitted when the
+          engine has no assessed judgement to add. */}
+      {show("polestar-view") && d.polestarView.trim() !== "" && (
         <Section title="Polestar View">
           <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
         </Section>
