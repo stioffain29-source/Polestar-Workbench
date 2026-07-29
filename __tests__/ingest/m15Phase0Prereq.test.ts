@@ -30,7 +30,7 @@ describe("M1.5 Phase 0 — prerequisites", () => {
 
   it("exports stable live source URLs for deploy smoke checks", () => {
     expect(CENTCOM_SOURCE_URL).toBe(
-      "https://www.centcom.mil/MEDIA/PRESS-RELEASES/",
+      "https://www.centcom.mil/MEDIA/PUBLIC-RELEASES/",
     );
     expect(CENTCOM_RSS_URL).toContain("ContentType=2");
     expect(UKMTO_SOURCE_URL).toBe("https://www.ukmto.org/ukmto-products");

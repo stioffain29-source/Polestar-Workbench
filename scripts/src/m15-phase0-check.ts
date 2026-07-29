@@ -129,7 +129,7 @@ async function main(): Promise<number> {
     }
     if (liveFailed) {
       console.log(
-        "\nNote: CENTCOM HTML listing may block datacenter egress; RSS (ContentType=2) is the primary live ingest path. Re-run from Replit/prod if local curl fails.",
+        "\nNote: CENTCOM HTML listing may block datacenter egress; Google News broad RSS is the primary live ingest path when ContentType=2 is empty. Re-run from Replit/prod if local curl fails.",
       );
     }
   }

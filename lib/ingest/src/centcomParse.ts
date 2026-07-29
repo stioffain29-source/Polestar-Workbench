@@ -213,6 +213,73 @@ export function parseCentcomListing(
   return items;
 }
 
+/** Strip the publisher masthead Google News appends to CENTCOM titles. */
+export function stripCentcomGoogleNewsTitle(title: string): string {
+  return title.replace(/\s+-\s+centcom\.mil\s*$/i, "").trim();
+}
+
+/** True when a Google News title is clearly not a press / public release. */
+export function isCentcomGoogleNewsNoiseTitle(title: string): boolean {
+  return /\b(photo gallery|tag obama|tag [a-z]+|biograph)/i.test(title);
+}
+
+/**
+ * Parse a Google News RSS search feed for centcom.mil items.
+ * Links are opaque redirects (no /Article/{id}/) until resolved downstream.
+ */
+export function parseGoogleNewsCentcomRssListing(xml: string): CentcomListingItem[] {
+  const items: CentcomListingItem[] = [];
+  const itemRe = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+
+  for (const block of xml.match(itemRe) ?? []) {
+    const titleRaw =
+      firstMatch(block, /<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i) ?? "";
+    const link =
+      firstMatch(block, /<link>([^<]+)<\/link>/i) ??
+      firstMatch(block, /<guid[^>]*>([^<]+)<\/guid>/i);
+    if (!link?.trim()) continue;
+
+    const title = stripCentcomGoogleNewsTitle(stripTags(titleRaw));
+    if (!title || isCentcomGoogleNewsNoiseTitle(title)) continue;
+
+    const pubDate =
+      firstMatch(block, /<pubDate>([^<]+)<\/pubDate>/i) ??
+      firstMatch(block, /<dc:date>([^<]+)<\/dc:date>/i);
+    const publishedAt = pubDate ? parseIsoDate(pubDate) ?? new Date(pubDate) : null;
+    if (publishedAt && Number.isNaN(publishedAt.getTime())) continue;
+
+    const summaryRaw = firstMatch(
+      block,
+      /<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/i,
+    );
+
+    const articleId =
+      firstMatch(link, /\/Article\/(\d+)\//) ??
+      firstMatch(block, /\/Article\/(\d+)\//);
+    const guid =
+      firstMatch(block, /<guid[^>]*>([^<]+)<\/guid>/i) ??
+      extractArticleIdFromGoogleNewsUrl(link);
+    const externalId = articleId ?? (guid ? `gn-${guid.slice(0, 40)}` : null);
+    if (!externalId) continue;
+
+    items.push({
+      externalId,
+      title,
+      publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt : null,
+      sourceUrl: link.trim(),
+      summary: summaryRaw ? stripTags(summaryRaw) : undefined,
+      rssDescriptionHtml: summaryRaw ?? undefined,
+    });
+  }
+
+  return items;
+}
+
+function extractArticleIdFromGoogleNewsUrl(url: string): string | null {
+  const m = url.match(/\/(?:rss\/)?articles\/([^?/]+)/);
+  return m?.[1] ?? null;
+}
+
 /**
  * Parse the official CENTCOM press-release RSS feed (ContentType=2).
  * Used for live ingest when the HTML listing page is WAF-blocked.

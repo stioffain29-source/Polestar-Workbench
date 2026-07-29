@@ -7,6 +7,7 @@ import {
   parseCentcomDetail,
   parseCentcomListing,
   parseCentcomRssListing,
+  parseGoogleNewsCentcomRssListing,
   filterCentcomPressReleaseItems,
   isCentcomPressReleaseUrl,
   bodyTextFromRssDescription,
@@ -73,6 +74,21 @@ describe("CENTCOM press-release URL helpers", () => {
         "MANAMA, Bahrain – <b>forces</b> conducted strikes.<br />",
       ),
     ).toBe("MANAMA, Bahrain – forces conducted strikes.");
+  });
+});
+
+describe("CENTCOM Google News RSS listing parser", () => {
+  const googleXml = readFixture("centcom-google-news-rss.xml");
+
+  it("parses redirect links and strips the centcom.mil title suffix", () => {
+    const items = parseGoogleNewsCentcomRssListing(googleXml);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      title: "U.S. Finishes Latest Strikes Against Iran",
+      sourceUrl: expect.stringContaining("news.google.com/rss/articles/"),
+      externalId: expect.stringMatching(/^gn-/),
+      publishedAt: expect.any(Date),
+    });
   });
 });
 

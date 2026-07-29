@@ -12,6 +12,7 @@ import {
   parseCentcomDetail,
   parseCentcomListing,
   parseCentcomRssListing,
+  parseGoogleNewsCentcomRssListing,
   filterCentcomPressReleaseItems,
   dedupeCentcomListingItems,
   bodyTextFromRssDescription,
@@ -31,6 +32,7 @@ import {
   DOD_NEWS_RELEASES_RSS_URL,
   CENTCOM_SOURCE_URL,
   CENTCOM_PUBLIC_RELEASES_URL,
+  CENTCOM_PRESS_RELEASES_URL,
   OFFICIAL_M15_HEALTH_TOPIC,
 } from "./m15/health";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
@@ -43,6 +45,7 @@ export {
   parseCentcomListing,
   parseCentcomDetail,
   parseCentcomRssListing,
+  parseGoogleNewsCentcomRssListing,
   filterCentcomPressReleaseItems,
   dedupeCentcomListingItems,
   isCentcomPressReleaseUrl,
@@ -269,7 +272,11 @@ async function fetchGoogleNewsCentcomListing(
   acceptCentcomArticle: (url: string) => boolean,
 ): Promise<CentcomListingItem[]> {
   const xml = await fetchRssXmlWithRetry(rssUrl, CENTCOM_GOOGLE_NEWS_CURL_OPTS);
-  const raw = parseCentcomRssListing(xml, CENTCOM_SITE_ORIGIN);
+  const raw = parseGoogleNewsCentcomRssListing(xml);
+  if (raw.length === 0) {
+    log("  Google News — no parseable items in RSS XML");
+    return [];
+  }
   const resolved: CentcomListingItem[] = [];
 
   for (const item of raw) {
@@ -427,6 +434,15 @@ async function loadListingItems(
     }
   };
 
+  // ContentType=2 press RSS is often empty (releases moved to PUBLIC-RELEASES HTML).
+  // Google News broad search is the most reliable live listing when centcom.mil HTML is WAF-blocked.
+  await trySource("Google News broad (site:centcom.mil)", () =>
+    fetchGoogleNewsCentcomListing(
+      CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
+      log,
+      isCentcomPressReleaseUrl,
+    ),
+  );
   await trySource("official press RSS", () =>
     fetchOfficialRssListing(CENTCOM_RSS_URL, false),
   );
@@ -436,13 +452,6 @@ async function loadListingItems(
   await trySource("Google News narrow (press-release paths)", () =>
     fetchGoogleNewsCentcomListing(
       CENTCOM_GOOGLE_NEWS_RSS_URL,
-      log,
-      isCentcomPressReleaseUrl,
-    ),
-  );
-  await trySource("Google News broad (site:centcom.mil)", () =>
-    fetchGoogleNewsCentcomListing(
-      CENTCOM_GOOGLE_NEWS_BROAD_RSS_URL,
       log,
       isCentcomPressReleaseUrl,
     ),
@@ -469,20 +478,20 @@ async function loadListingItems(
   try {
     const fromPublic =
       (await tryHtmlListing("PUBLIC-RELEASES", CENTCOM_PUBLIC_RELEASES_URL)) ??
-      (await tryHtmlListing("PRESS-RELEASES", CENTCOM_SOURCE_URL));
+      (await tryHtmlListing("PRESS-RELEASES", CENTCOM_PRESS_RELEASES_URL));
     if (fromPublic) return fromPublic;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (isCentcomBlockedError(err)) {
       throw new Error(
-        `CENTCOM press releases unavailable — official RSS empty and centcom.mil HTML blocked (${msg})`,
+        `CENTCOM press releases unavailable — official RSS empty, Google News returned no resolvable PUBLIC-RELEASES links, and centcom.mil HTML blocked (${msg})`,
       );
     }
     throw err;
   }
 
   throw new Error(
-    "CENTCOM press releases unavailable — all RSS sources returned no items and HTML listing was empty",
+    "CENTCOM press releases unavailable — official RSS empty, Google News returned no resolvable PUBLIC-RELEASES links, and HTML listing was empty",
   );
 }
 
