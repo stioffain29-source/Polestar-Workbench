@@ -51,6 +51,11 @@ import {
   draftTopicReportProse,
   type DraftableIncident,
 } from "@/lib/draftReportProse";
+import {
+  aiOr,
+  stableDraftTopicReportProse,
+  toDraftableIncidents,
+} from "@/lib/topicProseResolution";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { computeTopicFastFacts, filterTopicReportIncidents } from "@/lib/topicFastFacts";
@@ -387,6 +392,10 @@ export default function ReportEditor() {
   // to the preview so authors see their edits live before saving.
   const [hardNumbersText, setHardNumbersText] = useState<string>("");
   const [hardNumbersError, setHardNumbersError] = useState<string | null>(null);
+  // Save-blocked notice rendered NEXT TO the Save button. The fuel validation
+  // errors live far down the page, so a blocked save previously looked like a
+  // silent no-op ("you are not allowing me to edit the report").
+  const [saveBlocked, setSaveBlocked] = useState<string | null>(null);
   const [hardNumbersEdited, setHardNumbersEdited] = useState<
     unknown | undefined
   >(undefined);
@@ -835,6 +844,83 @@ export default function ReportEditor() {
   // ConflictAiProse prop (extra keys are ignored).
   const aiProseSections = proseRes?.edited ?? proseRes?.sections ?? null;
 
+  // ---- Fuel Watch direct-edit prefill --------------------------------------
+  // The owner edits Fuel Watch by cutting/replacing the rendered text in
+  // place, so every blank narrative box is pre-filled with EXACTLY the text
+  // the preview/PDF currently renders (analyst edit -> AI -> deterministic;
+  // reads use their auto view text). Baselines remember what was pre-filled:
+  // on Save an untouched box persists "" so the section keeps following the
+  // live AI/auto text instead of freezing today's copy into the DB. One-shot
+  // per report id, after the main seed and after the AI narrative settles.
+  const fuelPrefillForId = useRef<number | null>(null);
+  const fuelPrefillBaselines = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!report || form.topic !== "fuel") return;
+    if (seededId !== report.id) return; // main seed must run first
+    if (fuelPrefillForId.current === report.id) return;
+    if (!incidents) return;
+    // Wait for the AI narrative to settle (result or explicit unavailable) so
+    // the boxes hold what actually renders, not the fallback that would be
+    // replaced seconds later.
+    if (proseEnabled && proseRes === null && !proseUnavailable) return;
+    fuelPrefillForId.current = report.id;
+    const ai = aiProseSections;
+    // Mirror ReportPreview exactly: implications/watchNext flow through
+    // buildFuelWatchReportData's narrativeData (AI text + default top-up), so
+    // the prefill must come from the SAME payload, not aiOr() directly.
+    const fuelData = buildFuelWatchReportData(
+      {
+        issueDate: form.issueDate,
+        implications: aiOr(aiProseSections?.implications, ""),
+        watchNext: aiOr(aiProseSections?.watchNext, ""),
+        hardNumbers: hardNumbersEdited ?? report.hardNumbers,
+      },
+      incidentsForExport,
+    );
+    const proseDraft = stableDraftTopicReportProse({
+      topic: "fuel",
+      issueDate: form.issueDate,
+      incidents: toDraftableIncidents(
+        filterTopicReportIncidents(incidentsForExport, "fuel", form.issueDate),
+      ),
+      fuelGulf: fuelData.incidentData.gulfChokepointWatch ?? null,
+    });
+    const resolved: Record<string, string> = {
+      executiveSummary: aiOr(ai?.executiveSummary, proseDraft.executiveSummary),
+      situation: aiOr(ai?.situation, proseDraft.situation),
+      whatHappened: aiOr(ai?.whatHappened, proseDraft.whatHappened),
+      whatMatters: aiOr(ai?.whatMatters, proseDraft.whatMatters),
+      implications: fuelData.narrativeData.implications ?? "",
+      watchNext: fuelData.narrativeData.watchNext ?? "",
+      polestarView: aiOr(ai?.polestarView, proseDraft.polestarView),
+      fuelMarketRead: fuelData.marketData.marketRead ?? "",
+      fuelOperationalRead: fuelData.incidentData.operationalRead ?? "",
+      fuelRegionalHighlights: fuelData.incidentData.regionalHighlights ?? "",
+    };
+    const fills: Partial<FormState> = {};
+    const baselines: Record<string, string> = {};
+    for (const [key, text] of Object.entries(resolved)) {
+      const cur = (form[key as keyof FormState] as string) ?? "";
+      if (cur.trim()) continue; // saved analyst override wins
+      if (!text.trim()) continue; // nothing to pre-fill
+      (fills as Record<string, unknown>)[key] = text;
+      baselines[key] = text;
+    }
+    fuelPrefillBaselines.current = baselines;
+    if (Object.keys(fills).length > 0) setForm((f) => ({ ...f, ...fills }));
+  }, [
+    report,
+    form,
+    seededId,
+    incidents,
+    proseEnabled,
+    proseRes,
+    proseUnavailable,
+    aiProseSections,
+    incidentsForExport,
+    hardNumbersEdited,
+  ]);
+
   const setIncidentSummary = (incidentId: string, text: string) =>
     setEditedSummaries((d) => ({ ...(d ?? {}), [incidentId]: text }));
 
@@ -1172,6 +1258,10 @@ export default function ReportEditor() {
     if (seededForId.current !== null && seededForId.current !== id) {
       seededForId.current = null;
     }
+    if (fuelPrefillForId.current !== null && fuelPrefillForId.current !== id) {
+      fuelPrefillForId.current = null;
+      fuelPrefillBaselines.current = {};
+    }
     if (
       hardNumbersSeededForId.current !== null &&
       hardNumbersSeededForId.current !== id
@@ -1249,6 +1339,7 @@ export default function ReportEditor() {
       return;
     }
     setOrphanSavePending(false);
+    setSaveBlocked(null);
     // Conflict Watch is location-led: it drops the Executive Summary, What
     // Happened and Implications sections. Only Situation / What Matters /
     // Watch Next / Polestar View are editable + persisted; the rest of the
@@ -1373,6 +1464,21 @@ export default function ReportEditor() {
           : (pruned as NonNullable<ReportUpdate["sectionOverrides"]>);
     }
     if (form.topic === "fuel") {
+      // Direct-edit prefill semantics: the boxes were pre-filled with the
+      // rendered auto/AI text so the owner can cut/replace it in place. A box
+      // still byte-equal to its prefill baseline was NOT edited — persist ""
+      // so the section keeps following the live AI/auto text rather than
+      // freezing today's copy. Any changed box persists as a genuine override.
+      for (const [key, baseline] of Object.entries(
+        fuelPrefillBaselines.current,
+      )) {
+        const val =
+          ((payload as Record<string, unknown>)[key] as string | undefined) ??
+          "";
+        if (val.trim() === baseline.trim()) {
+          (payload as Record<string, unknown>)[key] = "";
+        }
+      }
       if (showFuelJson) {
         if (!hardNumbersText.trim()) {
           payload.hardNumbers = null;
@@ -1381,6 +1487,9 @@ export default function ReportEditor() {
           const v = validateFuelHardNumbersJson(hardNumbersText);
           if (!v.ok) {
             setHardNumbersError(v.errors.join(" "));
+            setSaveBlocked(
+              "Not saved — the fuel market data JSON is invalid. See the error under the JSON editor below.",
+            );
             return;
           }
           setHardNumbersError(null);
@@ -1390,6 +1499,9 @@ export default function ReportEditor() {
         const result = buildHardNumbersFromForm(fuelForm);
         if (result.errors.length > 0) {
           setFuelFormErrors(result.errors);
+          setSaveBlocked(
+            `Not saved — fix the fuel market data fields first: ${result.errors.join(" ")}`,
+          );
           return;
         }
         setFuelFormErrors([]);
@@ -1651,12 +1763,36 @@ export default function ReportEditor() {
           </Button>
           <Button
             onClick={() => save()}
+            disabled={update.isPending}
             className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
           >
-            <Save className="w-4 h-4 mr-2" /> Save
+            {update.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            {update.isPending ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
+
+      {/* Save outcome, right where the button is. A blocked or failed save
+          used to be completely silent here (validation errors render far down
+          the page; the PATCH mutation surfaced nothing), which reads as "my
+          edits don't show up" after a reload discards the unsaved form. */}
+      {saveBlocked ? (
+        <p className="text-[12px] font-medium text-amber-700">{saveBlocked}</p>
+      ) : update.isError ? (
+        <p className="text-[12px] font-medium text-destructive">
+          Save failed —{" "}
+          {update.error instanceof Error
+            ? update.error.message
+            : "the server rejected the request."}{" "}
+          Your edits are still in the form; try Save again.
+        </p>
+      ) : update.isSuccess && !update.isPending ? (
+        <p className="text-[12px] font-medium text-emerald-700">Saved.</p>
+      ) : null}
 
       {/* Save intercepted: orphaned Fast Facts edits exist. Names each orphan
           so the owner sees exactly what would persist dead; "Save anyway"
@@ -2438,7 +2574,9 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Clear any read to restore the auto-generated text.
+                  Boxes hold the text the report currently renders — edit, cut
+                  or replace it directly. Clear a box to restore the
+                  auto-generated text.
                 </p>
               </Field>
               <Field label="Fuel Operational Read">
