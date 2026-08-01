@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import {
   useListSources, useGetSourceHealth, useGetIntegrationStatus,
   getListSourcesQueryKey, getGetSourceHealthQueryKey, getGetDashboardOverviewQueryKey,
-  createSource, updateSource, deleteSource,
+  getListIncidentsQueryKey, getListStrikesQueryKey,
+  createSource, updateSource, deleteSource, customFetch,
   type Source,
   type SourceInput,
   type SourceUpdate,
@@ -29,7 +30,7 @@ import {
   getStoredAdminToken,
   setStoredAdminToken,
 } from "@/lib/adminToken";
-import { AlertTriangle, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Operational-impact playbook for non-operational sources. Each entry
@@ -360,6 +361,8 @@ export default function Sources() {
   const [adminToken, setAdminToken] = useState(getStoredAdminToken);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [ingesting, setIngesting] = useState(false);
+  const [ingestStatus, setIngestStatus] = useState<string | null>(null);
   // Fetch the full source list once, then derive both the filtered
   // table view and the (unfiltered) Action Required panel from the
   // same dataset. This avoids a duplicate `/api/sources` round trip.
@@ -415,6 +418,49 @@ export default function Sources() {
     setStoredAdminToken(value);
   };
 
+  // Manually triggers the same full ingest chain the automatic scheduler runs
+  // (see server/lib/ingestScheduler.ts) on demand, via POST /admin/ingest. This
+  // exists because the scheduler's recurring timer only fires reliably on an
+  // always-on/reserved-VM deployment — on autoscale, the process can be torn
+  // down before the interval ever runs, so ingestion can silently lag behind
+  // real-world events until someone forces a refresh. This button is that
+  // forced refresh, from inside the app, instead of a raw authenticated HTTP
+  // request against the production API.
+  const handleRunIngest = async () => {
+    if (!adminToken.trim()) {
+      setMutationError("Admin token is required to run ingestion.");
+      return;
+    }
+    setMutationError(null);
+    setIngestStatus(null);
+    setIngesting(true);
+    try {
+      const result = await customFetch<{ ok: boolean; totalInserted: number; durationMs: number }>(
+        "/api/admin/ingest",
+        { method: "POST", headers: adminBearerHeaders(adminToken) },
+      );
+      const seconds = Math.round(result.durationMs / 1000);
+      setIngestStatus(
+        result.totalInserted > 0
+          ? `Ingest finished in ${seconds}s — ${result.totalInserted} new record${result.totalInserted === 1 ? "" : "s"} inserted.`
+          : `Ingest finished in ${seconds}s — no new records (every source already up to date).`,
+      );
+      invalidate();
+      qc.invalidateQueries({ queryKey: getListIncidentsQueryKey() });
+      qc.invalidateQueries({ queryKey: getListStrikesQueryKey() });
+    } catch (err) {
+      const httpStatus = (err as { status?: number })?.status;
+      setMutationError(
+        httpStatus === 409
+          ? "An ingest run is already in progress on the server — try again shortly."
+          : adminMutationErrorMessage(httpStatus)
+            ?? (err instanceof Error ? err.message : "Ingest failed."),
+      );
+    } finally {
+      setIngesting(false);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm("Delete source?")) return;
     if (!adminToken.trim()) {
@@ -465,6 +511,16 @@ export default function Sources() {
               className="rounded-sm"
             />
           </div>
+          <Button
+            variant="outline"
+            className="rounded-sm"
+            disabled={ingesting}
+            onClick={handleRunIngest}
+            title="Runs the full ingest chain now instead of waiting for the automatic schedule"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", ingesting && "animate-spin")} />
+            {ingesting ? "Running ingest\u2026" : "Run Ingest Now"}
+          </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Plus className="w-4 h-4 mr-2" /> Add Source</Button>
@@ -490,6 +546,12 @@ export default function Sources() {
       {mutationError && (
         <div className="bg-destructive/5 border border-destructive/30 rounded-sm px-4 py-3 text-sm text-destructive">
           {mutationError}
+        </div>
+      )}
+
+      {ingestStatus && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-sm px-4 py-3 text-sm text-emerald-800">
+          {ingestStatus}
         </div>
       )}
 

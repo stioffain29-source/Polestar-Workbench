@@ -165,7 +165,7 @@ export default function MapPage() {
   // new request (React Query keys on the params) rather than re-filtering a full
   // in-memory list, so the payload stays small as the table grows.
   const days = RANGE_DAYS[range];
-  const { data: incidents = [] } = useListIncidents({ days });
+  const { data: incidents = [], isLoading: incidentsLoading } = useListIncidents({ days });
   const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz", days });
   const { data: land = [] } = useListStrikes({ theatre: "land_gcc", days });
   // Standalone ICC/IMB maritime-security events (current calendar year). Plotted
@@ -367,6 +367,21 @@ export default function MapPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
         <div className="relative rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
+          {!incidentsLoading && windowedPoints.length === 0 && (
+            <div
+              className="absolute inset-0 z-[900] flex items-center justify-center bg-background/55 pointer-events-none"
+              aria-live="polite"
+            >
+              <div className="pointer-events-auto mx-4 max-w-md rounded-sm border border-border bg-card px-5 py-4 text-center shadow-none">
+                <p className="font-serif text-sm font-bold uppercase tracking-wide text-primary">
+                  No {view === "incidents" ? "incidents" : view === "maritime" ? "maritime strikes" : "land strikes"} recorded
+                </p>
+                <p className="mt-2 text-[12px] font-sans leading-relaxed text-muted-foreground">
+                  Nothing landed in this feed for {RANGE_NOTE[range]}. Widen the range above, or use Run Ingest Now on the Source Health page to force a fresh pull.
+                </p>
+              </div>
+            </div>
+          )}
           {livePanel && (
             <div
               className={cn(
