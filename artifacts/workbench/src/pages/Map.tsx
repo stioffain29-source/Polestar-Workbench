@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
@@ -67,6 +67,15 @@ function jitter(seed: number): [number, number] {
   const fa = a - Math.floor(a);
   const fb = b - Math.floor(b);
   return [(fa - 0.5) * 0.5, (fb - 0.5) * 0.5];
+}
+
+// An incident is treated as "new" for the pulsing-ring map treatment when it
+// occurred within the last 3 hours. Matches the mockup's "New (last 3h)" cutoff.
+const NEW_INCIDENT_WINDOW_MS = 3 * 60 * 60 * 1000;
+function isNewIncident(when: string): boolean {
+  const t = new Date(when).getTime();
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t < NEW_INCIDENT_WINDOW_MS;
 }
 
 function munitionRating(munition: string): string {
@@ -397,7 +406,23 @@ export default function MapPage() {
             />
             {visiblePoints.map((p) => {
               const s = markerStyle(p.rating);
+              const isNew = isNewIncident(p.when);
               return (
+                <Fragment key={p.id}>
+                {isNew && (
+                  <CircleMarker
+                    key={`${p.id}-pulse`}
+                    center={[p.lat, p.lng]}
+                    radius={7}
+                    interactive={false}
+                    pathOptions={{
+                      color: s.stroke,
+                      weight: 2,
+                      fillOpacity: 0,
+                      className: "map-pulse-ring",
+                    }}
+                  />
+                )}
                 <CircleMarker
                   key={p.id}
                   center={[p.lat, p.lng]}
@@ -553,6 +578,7 @@ export default function MapPage() {
                     </LeafletPopup>
                   )}
                 </CircleMarker>
+                </Fragment>
               );
             })}
             {liveMarkersOn &&
@@ -678,6 +704,13 @@ export default function MapPage() {
               Liveuamap (live)
             </span>
           )}
+          <span className="inline-flex items-center gap-1.5">
+            <span
+              className="map-dot-blink w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: RATING_COLORS.high }}
+            />
+            New (last 3h)
+          </span>
         </span>
       </div>
     </div>

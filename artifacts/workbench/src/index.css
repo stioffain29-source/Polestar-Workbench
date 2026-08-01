@@ -354,3 +354,32 @@
   max-height: 260px;
   overflow-y: auto;
 }
+
+/* Pulsing ring for incidents reported within the last 3 hours. Applied via
+   pathOptions.className on an extra, non-interactive CircleMarker rendered
+   underneath the real marker in Map.tsx. transform-box: fill-box keeps the
+   scale animation centred on the circle itself rather than the SVG origin. */
+.map-pulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mapPinPulse 1.6s cubic-bezier(0.4, 0, 0.3, 1) infinite;
+  pointer-events: none;
+}
+@keyframes mapPinPulse {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  70% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-pulse-ring { animation: none; opacity: 0.35; }
+}
+.map-dot-blink {
+  animation: mapDotBlink 1.2s ease-in-out infinite;
+}
+@keyframes mapDotBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-dot-blink { animation: none; }
+}
