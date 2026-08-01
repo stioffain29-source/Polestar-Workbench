@@ -59,16 +59,45 @@ function topicToCategory(topic: string): string {
   }
 }
 
-// Deterministic small offset so many incidents sharing a country centroid do
-// not stack into a single unreadable marker. Keyed on the incident id, the
-// jitter is stable across renders (no random flicker) and tiny (~±0.25°) so
-// markers stay within their country.
-function jitter(seed: number): [number, number] {
-  const a = Math.sin(seed * 12.9898) * 43758.5453;
-  const b = Math.sin(seed * 78.233) * 43758.5453;
-  const fa = a - Math.floor(a);
-  const fb = b - Math.floor(b);
-  return [(fa - 0.5) * 0.5, (fb - 0.5) * 0.5];
+// Incidents that couldn't be geocoded to a specific town/city fall back to
+// their country's centroid, so several unrelated incidents can share the
+// exact same coordinates. Rather than randomly displacing every point (which
+// makes accurately-placed markers look wrong too), only points that truly
+// share a coordinate are fanned out into a small ring around that shared
+// spot — points with a unique, resolved location are left exactly where they
+// belong. Ring position is deterministic (seeded on the shared coordinate),
+// so it doesn't flicker between renders.
+function spreadOverlapping<T extends { lat: number; lng: number }>(points: T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const p of points) {
+    const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+    const existing = groups.get(key);
+    if (existing) existing.push(p);
+    else groups.set(key, [p]);
+  }
+  const result: T[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      result.push(group[0]);
+      continue;
+    }
+    const n = group.length;
+    // Ring grows gently with the number of stacked incidents but stays close
+    // enough to the real point to still read as "this country/area".
+    const radius = Math.min(0.12 + n * 0.015, 0.4);
+    const seedAngle =
+      ((Math.abs(group[0].lat) * 1000 + Math.abs(group[0].lng) * 1000) % 360) *
+      (Math.PI / 180);
+    group.forEach((p, i) => {
+      const angle = seedAngle + (2 * Math.PI * i) / n;
+      result.push({
+        ...p,
+        lat: p.lat + Math.sin(angle) * radius,
+        lng: p.lng + Math.cos(angle) * radius,
+      });
+    });
+  }
+  return result;
 }
 
 // An incident is treated as "new" for the pulsing-ring map treatment when it
@@ -211,12 +240,10 @@ export default function MapPage() {
     if (view === "incidents") {
       const incidentPoints = incidents
         .filter((i) => i.latitude != null && i.longitude != null)
-        .map<Point>((i) => {
-          const [dLat, dLng] = jitter(i.id);
-          return {
+        .map<Point>((i) => ({
           id: `i-${i.id}`,
-          lat: i.latitude! + dLat,
-          lng: i.longitude! + dLng,
+          lat: i.latitude!,
+          lng: i.longitude!,
           title: i.title,
           displayTitle: i.displayTitle ?? null,
           category: topicToCategory(i.topic),
@@ -231,8 +258,7 @@ export default function MapPage() {
           gdeltEventType: i.gdeltEventType ?? null,
           gdeltSubEventType: i.gdeltSubEventType ?? null,
           gdeltConfidence: i.gdeltConfidence ?? null,
-          };
-        });
+        }));
       // Append the standalone ICC/IMB maritime-security layer (own category,
       // own colour-by-type-severity). Plotted only where the IMB position is
       // usable. These are NOT incidents and never enter any count.
@@ -261,11 +287,11 @@ export default function MapPage() {
           gdeltSubEventType: null,
           gdeltConfidence: null,
         }));
-      return [...incidentPoints, ...maritimePoints];
+      return spreadOverlapping([...incidentPoints, ...maritimePoints]);
     }
     const strikes = view === "maritime" ? maritime : land;
     const fixedCat = view === "maritime" ? "Maritime Strike" : "Land Strike";
-    return strikes
+    return spreadOverlapping(strikes
       .filter((s) => s.latitude != null && s.longitude != null)
       .map<Point>((s) => ({
         id: `s-${s.id}`,
@@ -285,7 +311,7 @@ export default function MapPage() {
         gdeltEventType: null,
         gdeltSubEventType: null,
         gdeltConfidence: null,
-      }));
+      })));
   }, [view, incidents, maritime, land, maritimeSecurityEvents]);
 
   // The API already returns only records within the selected window, so the
