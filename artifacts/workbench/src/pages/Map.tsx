@@ -158,7 +158,7 @@ type Point = {
 export default function MapPage() {
   const [, setLocation] = useLocation();
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
-  const [range, setRange] = useState<RangeKey>("1y");
+  const [range, setRange] = useState<RangeKey>("24h");
   // Fetch only the records within the selected window. Switching ranges issues a
   // new request (React Query keys on the params) rather than re-filtering a full
   // in-memory list, so the payload stays small as the table grows.

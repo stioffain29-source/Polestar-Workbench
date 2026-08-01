@@ -1,4 +1,4 @@
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
@@ -303,7 +303,16 @@ export default function Topic() {
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">{label}</h1>
           <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">{subtitle}</p>
         </div>
-        <RangeToggle range={range} onChange={setRange} />
+        <div className="flex items-center gap-3">
+          <Link
+            href="/reports"
+            className="text-xs font-sans font-medium text-accent hover:underline uppercase tracking-wide whitespace-nowrap"
+            data-testid="link-report-builder"
+          >
+            Go to Report Builder
+          </Link>
+          <RangeToggle range={range} onChange={setRange} />
+        </div>
       </div>
 
       {/* Operational fuel-disruption alert — leads the fuel page so it is never
