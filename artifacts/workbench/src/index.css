@@ -355,7 +355,7 @@
   overflow-y: auto;
 }
 
-/* Pulsing ring for incidents reported within the last 3 hours. Applied via
+/* Pulsing ring for incidents not yet manually cleared. Applied via
    pathOptions.className on an extra, non-interactive CircleMarker rendered
    underneath the real marker in Map.tsx. transform-box: fill-box keeps the
    scale animation centred on the circle itself rather than the SVG origin. */
@@ -370,16 +370,14 @@
   70% { transform: scale(2.2); opacity: 0; }
   100% { transform: scale(2.2); opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .map-pulse-ring { animation: none; opacity: 0.35; }
-}
+/* This tool is an internal ops risk-monitor, not a public site, and the
+   analyst explicitly wants unread incidents to blink regardless of the
+   OS-level reduce-motion preference — so unlike the rest of the app, these
+   two indicators deliberately do NOT honour prefers-reduced-motion. */
 .map-dot-blink {
   animation: mapDotBlink 1.2s ease-in-out infinite;
 }
 @keyframes mapDotBlink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .map-dot-blink { animation: none; }
+  50% { opacity: 0.2; }
 }

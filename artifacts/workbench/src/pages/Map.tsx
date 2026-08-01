@@ -534,6 +534,7 @@ export default function MapPage() {
                     weight: s.strokeWidth,
                     fillColor: s.fill,
                     fillOpacity: s.fillOpacity,
+                    className: isNew ? "map-dot-blink" : undefined,
                   }}
                   eventHandlers={
                     isNew ? { click: () => clearMarkers([p.id]) } : undefined
