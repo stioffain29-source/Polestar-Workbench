@@ -427,17 +427,18 @@ export default function Sources() {
   // forced refresh, from inside the app, instead of a raw authenticated HTTP
   // request against the production API.
   const handleRunIngest = async () => {
-    if (!adminToken.trim()) {
-      setMutationError("Admin token is required to run ingestion.");
-      return;
-    }
+    // No admin token needed here: the workbench is already gated behind an
+    // owner-only login (see AuthGate in App.tsx), and the browser sends that
+    // session cookie with this request automatically since it's same-origin.
+    // The server accepts either that session OR an INGEST_ADMIN_TOKEN, so this
+    // button just works for whoever is signed in as the owner.
     setMutationError(null);
     setIngestStatus(null);
     setIngesting(true);
     try {
       const result = await customFetch<{ ok: boolean; totalInserted: number; durationMs: number }>(
         "/api/admin/ingest",
-        { method: "POST", headers: adminBearerHeaders(adminToken) },
+        { method: "POST" },
       );
       const seconds = Math.round(result.durationMs / 1000);
       setIngestStatus(

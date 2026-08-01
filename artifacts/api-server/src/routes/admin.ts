@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { timingSafeEqual } from "node:crypto";
 import { type IngestSummary, runConflictClustering } from "@workspace/ingest";
 import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
+import { isAllowedUser } from "../lib/ownerAccess";
 import {
   runIngestOnce,
   runReliefWebReportsOnce,
@@ -39,12 +40,18 @@ let conflictClusterRunning = false;
 // on demand from inside the running server process — which, in the
 // deployment, is the only place DATABASE_URL points at the writable
 // production primary. This lets production data be refreshed with a single
-// authenticated request, on top of the automatic schedule.
+// click, on top of the automatic schedule.
 //
-// Protection: requires INGEST_ADMIN_TOKEN to be set in the environment.
-// The caller must present it via `Authorization: Bearer <token>` or the
-// `x-ingest-token` header. If the token is not configured, the route is
-// disabled (503) so it can never run unauthenticated.
+// Protection: EITHER of two gates opens this route:
+//   1. The caller is the logged-in owner (same session cookie the workbench
+//      UI already uses for every other request) — this is what the Sources
+//      page "Run Ingest Now" button relies on, so no separate secret is
+//      needed for the person who's allowed to see the dashboard at all.
+//   2. INGEST_ADMIN_TOKEN is set in the environment and the caller presents
+//      it via `Authorization: Bearer <token>` or the `x-ingest-token` header
+//      — kept for scripted/CI use outside a browser session. If no token is
+//      configured AND the caller isn't the authenticated owner, the route is
+//      disabled (503) so it can never run unauthenticated.
 //
 // Concurrency: runIngestOnce serialises with a cross-instance Postgres
 // advisory lock — a second concurrent run gets 409.
@@ -85,22 +92,27 @@ function trimmedSummary(s: IngestSummary) {
 }
 
 router.post("/admin/ingest", async (req: Request, res: Response) => {
-  const expected = process.env["INGEST_ADMIN_TOKEN"];
-  if (!expected) {
-    req.log.warn(
-      "admin ingest called but INGEST_ADMIN_TOKEN is not configured",
-    );
-    res.status(503).json({
-      error: "ingestion_disabled",
-      message: "INGEST_ADMIN_TOKEN is not configured on the server.",
-    });
-    return;
-  }
+  const isOwnerSession =
+    req.isAuthenticated() && (await isAllowedUser(req.user.id));
 
-  const presented = presentedToken(req);
-  if (!presented || !safeEqual(presented, expected)) {
-    res.status(401).json({ error: "unauthorized" });
-    return;
+  if (!isOwnerSession) {
+    const expected = process.env["INGEST_ADMIN_TOKEN"];
+    if (!expected) {
+      req.log.warn(
+        "admin ingest called but INGEST_ADMIN_TOKEN is not configured and caller has no owner session",
+      );
+      res.status(503).json({
+        error: "ingestion_disabled",
+        message: "INGEST_ADMIN_TOKEN is not configured on the server.",
+      });
+      return;
+    }
+
+    const presented = presentedToken(req);
+    if (!presented || !safeEqual(presented, expected)) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
   }
 
   try {
