@@ -321,10 +321,7 @@ function TopicCard({ topic, trueList }: { topic: DashboardTopicCard; trueList: I
   }, [trueList, days]);
 
   return (
-    <div className="bg-card border border-border p-4 rounded-sm hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
-      {criticalCount > 0 && (
-        <div className="absolute top-0 right-0 w-2 h-full bg-destructive" />
-      )}
+    <div className="bg-card border border-border p-4 rounded-md hover:border-accent/50 transition-colors group h-full flex flex-col relative overflow-hidden">
       <div className="flex justify-between items-start mb-3 gap-3">
         <Link href={href} className="block flex-1 min-w-0">
           <h3 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors truncate">
@@ -336,6 +333,15 @@ function TopicCard({ topic, trueList }: { topic: DashboardTopicCard; trueList: I
           <div className="text-[10px] text-muted-foreground font-sans uppercase tracking-wider">Total Incidents</div>
         </Link>
       </div>
+
+      {criticalCount > 0 && (
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-destructive/10 text-destructive">
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
+            {criticalCount} Critical
+          </span>
+        </div>
+      )}
 
       <div className="border-t border-border/50 pt-2 mb-2">
         <div className="flex items-center justify-between mb-1.5">
