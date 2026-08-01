@@ -10,6 +10,9 @@ import {
   useListLiveuamapEvents,
   useListMaritimeSecurityEvents,
   getListLiveuamapEventsQueryKey,
+  getListIncidentsQueryKey,
+  getListStrikesQueryKey,
+  getListMaritimeSecurityEventsQueryKey,
   LiveuamapRegion,
   type LiveuamapEventsResponse,
 } from "@workspace/api-client-react";
@@ -100,13 +103,30 @@ function spreadOverlapping<T extends { lat: number; lng: number }>(points: T[]):
   return result;
 }
 
-// An incident is treated as "new" for the pulsing-ring map treatment when it
-// occurred within the last 3 hours. Matches the mockup's "New (last 3h)" cutoff.
-const NEW_INCIDENT_WINDOW_MS = 3 * 60 * 60 * 1000;
-function isNewIncident(when: string): boolean {
-  const t = new Date(when).getTime();
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t < NEW_INCIDENT_WINDOW_MS;
+// An incident keeps the pulsing-ring "new" map treatment indefinitely until
+// an analyst explicitly clears it — there is no time cutoff. The cleared set
+// is a plain array of marker IDs (`i-123`, `s-456`, `ms-789`) persisted in
+// localStorage so it survives reloads and stays scoped to this browser/analyst.
+const CLEARED_MARKERS_STORAGE_KEY = "polestar.map.clearedMarkerIds";
+
+function loadClearedMarkerIds(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(CLEARED_MARKERS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((x) => typeof x === "string")) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveClearedMarkerIds(ids: Set<string>): void {
+  try {
+    window.localStorage.setItem(CLEARED_MARKERS_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage unavailable (private browsing, quota) — clearing just won't
+    // persist across reloads; the map still works.
+  }
 }
 
 function munitionRating(munition: string): string {
@@ -194,14 +214,44 @@ export default function MapPage() {
   // new request (React Query keys on the params) rather than re-filtering a full
   // in-memory list, so the payload stays small as the table grows.
   const days = RANGE_DAYS[range];
-  const { data: incidents = [], isLoading: incidentsLoading } = useListIncidents({ days });
-  const { data: maritime = [] } = useListStrikes({ theatre: "maritime_hormuz", days });
-  const { data: land = [] } = useListStrikes({ theatre: "land_gcc", days });
+  // Poll every 5 minutes so freshly-ingested incidents/strikes appear on the
+  // map throughout the day without requiring a manual page reload.
+  const LIVE_REFETCH_MS = 5 * 60 * 1000;
+  const incidentsParams = { days };
+  const { data: incidents = [], isLoading: incidentsLoading } = useListIncidents(incidentsParams, {
+    query: { refetchInterval: LIVE_REFETCH_MS, queryKey: getListIncidentsQueryKey(incidentsParams) },
+  });
+  const maritimeParams = { theatre: "maritime_hormuz" as const, days };
+  const { data: maritime = [] } = useListStrikes(maritimeParams, {
+    query: { refetchInterval: LIVE_REFETCH_MS, queryKey: getListStrikesQueryKey(maritimeParams) },
+  });
+  const landParams = { theatre: "land_gcc" as const, days };
+  const { data: land = [] } = useListStrikes(landParams, {
+    query: { refetchInterval: LIVE_REFETCH_MS, queryKey: getListStrikesQueryKey(landParams) },
+  });
   // Standalone ICC/IMB maritime-security events (current calendar year). Plotted
   // as their own toggleable layer on the incidents tab; never an incident count.
-  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents({
-    limit: 500,
+  const maritimeSecurityParams = { limit: 500 };
+  const { data: maritimeSecurityEvents = [] } = useListMaritimeSecurityEvents(maritimeSecurityParams, {
+    query: {
+      refetchInterval: LIVE_REFETCH_MS,
+      queryKey: getListMaritimeSecurityEventsQueryKey(maritimeSecurityParams),
+    },
   });
+
+  // Cleared markers: an analyst dismisses the pulsing "new" ring by clicking
+  // Clear; the ID is remembered in localStorage so it never blinks again on
+  // this browser — but any newly-ingested incident that shows up on a later
+  // poll starts blinking automatically since its ID has never been cleared.
+  const [clearedIds, setClearedIds] = useState<Set<string>>(() => loadClearedMarkerIds());
+  const clearMarkers = (ids: string[]) => {
+    setClearedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      saveClearedMarkerIds(next);
+      return next;
+    });
+  };
 
   // Liveuamap live overlay — a separate reference layer, kept apart from the
   // curated incident data. It only fetches while the toggle is on (no paid call
@@ -321,6 +371,14 @@ export default function MapPage() {
   const visiblePoints = useMemo(
     () => windowedPoints.filter((p) => activeCategories.has(p.category)),
     [windowedPoints, activeCategories],
+  );
+
+  // Markers currently on screen that haven't been cleared yet — these are the
+  // ones pulsing. Recomputed whenever the visible set or cleared set changes,
+  // so a fresh ingest poll (new IDs) or a Clear click both update the count.
+  const newMarkerIds = useMemo(
+    () => visiblePoints.filter((p) => !clearedIds.has(p.id)).map((p) => p.id),
+    [visiblePoints, clearedIds],
   );
 
   function toggle(cat: string) {
@@ -449,7 +507,7 @@ export default function MapPage() {
             />
             {visiblePoints.map((p) => {
               const s = markerStyle(p.rating);
-              const isNew = isNewIncident(p.when);
+              const isNew = !clearedIds.has(p.id);
               return (
                 <Fragment key={p.id}>
                 {isNew && (
@@ -477,6 +535,9 @@ export default function MapPage() {
                     fillColor: s.fill,
                     fillOpacity: s.fillOpacity,
                   }}
+                  eventHandlers={
+                    isNew ? { click: () => clearMarkers([p.id]) } : undefined
+                  }
                 >
                   <LeafletTooltip direction="top" offset={[0, -6]}>
                     <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
@@ -752,8 +813,18 @@ export default function MapPage() {
               className="map-dot-blink w-1.5 h-1.5 rounded-full"
               style={{ backgroundColor: RATING_COLORS.high }}
             />
-            New (last 3h)
+            New{newMarkerIds.length > 0 ? ` (${newMarkerIds.length})` : ""}
           </span>
+          {newMarkerIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => clearMarkers(newMarkerIds)}
+              className="rounded-sm border border-border px-2 py-0.5 text-[11px] font-sans text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Stop the pulsing ring on every currently visible new marker"
+            >
+              Clear all new
+            </button>
+          )}
         </span>
       </div>
     </div>

@@ -196,6 +196,26 @@ const MARITIME_COUNTRIES = new Set([
 // no littoral state.
 const HORMUZ_CENTROID: [number, number] = [26.57, 56.25];
 
+// City-level geocode matches that are genuinely on the Gulf coastline and may
+// therefore stand in for a maritime strike's location. Anything else — a
+// country's inland capital (Riyadh, Tehran, Sana'a) named only in the
+// diplomatic fallout of a tanker attack — must not be treated as the vessel's
+// actual position. Keep in sync with CITY_COORDS in geocode.ts.
+const MARITIME_SAFE_LOCATIONS = new Set([
+  "dubai",
+  "abu dhabi",
+  "sharjah",
+  "ajman",
+  "doha",
+  "muscat",
+  "salalah",
+  "manama",
+  "dammam",
+  "jeddah",
+  "aden",
+  "basra",
+]);
+
 // Bounding box for the Middle East / Gulf theatre. Any geocode outside this box
 // is a bad match (e.g. a foreign city named only in a source masthead) and must
 // never set a strike's location. Generous enough to cover Jordan through Iran
@@ -612,6 +632,21 @@ export async function runStrikesIngest(
       latitude = null;
       longitude = null;
       location = null;
+    }
+    // Maritime strikes must resolve to water, not a country's inland centroid
+    // or an inland city that merely got mentioned in the story (e.g. a
+    // capital cited in the diplomatic fallout of a tanker attack). A bare
+    // country centroid (location == null) is never a legitimate vessel
+    // position, and only a small allow-list of cities genuinely on the Gulf
+    // coastline may stand in for the incident location — everything else
+    // (Riyadh, Tehran, Sana'a, etc.) falls through to the Hormuz centroid.
+    if (a.theatre === "maritime_hormuz") {
+      const isCoastalMatch = location != null && MARITIME_SAFE_LOCATIONS.has(location.toLowerCase());
+      if (!isCoastalMatch) {
+        latitude = null;
+        longitude = null;
+        location = null;
+      }
     }
     if (latitude == null) {
       if (a.theatre === "maritime_hormuz") {
