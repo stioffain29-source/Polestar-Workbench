@@ -32,6 +32,7 @@ const INCIDENT_CATEGORIES = [
   "Energy / Grid",
   "Shipping",
   "Cargo",
+  "Crime",
   "Maritime Security (IMB)",
   "Other",
 ] as const;
@@ -53,6 +54,7 @@ function topicToCategory(topic: string): string {
     case "energy": return "Energy / Grid";
     case "shipping": return "Shipping";
     case "cargo_watch": return "Cargo";
+    case "crime": return "Crime";
     default: return "Other";
   }
 }

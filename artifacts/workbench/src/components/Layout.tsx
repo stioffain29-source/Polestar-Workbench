@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Map as MapIcon, Clock, Flame, Droplet, Users, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Network, Server
+  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Network, Server, AlertTriangle, Layers, Crosshair
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
@@ -16,66 +16,64 @@ export default function Layout({ children }: LayoutProps) {
 
   const navGroups = [
     {
-      title: "OVERVIEW",
+      title: "HOME",
       items: [
-        { label: "Dashboard", href: "/", icon: Activity },
-        { label: "Incidents", href: "/incidents", icon: Database },
-        { label: "Map", href: "/map", icon: MapIcon },
-        { label: "Timeline", href: "/timeline", icon: Clock },
+        { label: "Home (Map)", href: "/", icon: Home },
+        { label: "Overview", href: "/dashboard", icon: Activity },
       ]
     },
     {
       title: "TOPICS",
       items: [
-        { label: "Fuel", href: "/topics/fuel", icon: Droplet },
-        { label: "Fertiliser", href: "/topics/fertiliser", icon: Package },
-        { label: "Energy", href: "/topics/energy", icon: Zap },
-        { label: "Shipping", href: "/topics/shipping", icon: Ship },
-        { label: "Cargo Watch", href: "/topics/cargo-watch", icon: Package },
-        { label: "Civil Protests & Civil Unrest", href: "/topics/protests", icon: Users },
+        { label: "All Topics", href: "/topics", icon: Layers },
         { label: "Conflict Watch", href: "/topics/conflict", icon: Swords },
-        { label: "Data Centres", href: "/topics/data-centres", icon: Server },
-      ]
-    },
-    {
-      title: "REPORT PRODUCTS",
-      items: [
-        { label: "Flashpoint", href: "/topics/protests", icon: Flame },
-      ]
-    },
-    {
-      title: "MISSILE STRIKE TRACKERS",
-      items: [
-        { label: "Maritime - Hormuz", href: "/strikes/maritime", icon: Navigation },
-        { label: "Land - GCC", href: "/strikes/land", icon: Target },
+        { label: "Fuel Watch", href: "/topics/fuel", icon: Droplet },
+        { label: "Energy Watch", href: "/topics/energy", icon: Zap },
+        { label: "Fertiliser Watch", href: "/topics/fertiliser", icon: Package },
+        { label: "Shipping Watch", href: "/topics/shipping", icon: Ship },
+        { label: "Cargo Watch", href: "/topics/cargo-watch", icon: Package },
+        { label: "Civil Unrest (Flashpoint)", href: "/topics/protests", icon: Flame },
+        { label: "Crime Watch", href: "/topics/crime", icon: AlertTriangle },
       ]
     },
     {
       title: "COUNTRY REPORTS",
       items: [
-        { label: "PNG", href: "/countries/papua-new-guinea", icon: Flag },
-        { label: "Papua", href: "/countries/papua", icon: Flag },
-        { label: "Indonesia", href: "/countries/indonesia", icon: Flag },
-        { label: "Jakarta", href: "/countries/jakarta", icon: Flag },
-        { label: "All Countries", href: "/countries", icon: Database },
+        { label: "All Countries", href: "/countries", icon: Flag },
+      ]
+    },
+    {
+      title: "STRIKE TRACKERS",
+      items: [
+        { label: "All Strike Trackers", href: "/strikes", icon: Crosshair },
+        { label: "Maritime - Hormuz", href: "/strikes/maritime", icon: Navigation },
+        { label: "Land - GCC", href: "/strikes/land", icon: Target },
+      ]
+    },
+    {
+      title: "REPORTS",
+      items: [
+        { label: "Report Builder", href: "/reports", icon: FileText },
+        { label: "Spot Reports", href: "/spot-reports", icon: Siren },
+        { label: "Special Reports", href: "/special-reports", icon: FileText },
+        { label: "Publication Calendar", href: "/calendar", icon: CalendarDays },
       ]
     },
     {
       title: "OPERATIONS",
       items: [
         { label: "Source Health", href: "/sources", icon: Radio },
-        { label: "GDELT Structured Layer", href: "/gdelt-structured", icon: Network },
-        { label: "Publication Calendar", href: "/calendar", icon: CalendarDays },
-        { label: "Report Builder", href: "/reports", icon: FileText },
-        { label: "Spot Reports", href: "/spot-reports", icon: Siren },
-        { label: "Special Reports", href: "/special-reports", icon: FileText },
-        { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
-        { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
       ]
     },
     {
-      title: "CARD STUDIO",
+      title: "MORE",
       items: [
+        { label: "Incidents", href: "/incidents", icon: Database },
+        { label: "Timeline", href: "/timeline", icon: Clock },
+        { label: "Data Centres", href: "/topics/data-centres", icon: Server },
+        { label: "GDELT Structured Layer", href: "/gdelt-structured", icon: Network },
+        { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
+        { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
         { label: "Infographic Cards", href: "/card-builder", icon: ImageIcon },
         { label: "Brand Settings", href: "/card-settings", icon: Settings },
       ]

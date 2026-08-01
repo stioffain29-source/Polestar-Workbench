@@ -19,6 +19,8 @@ import DataCentres from "./pages/DataCentres";
 import DataCentreRegistry from "./pages/DataCentreRegistry";
 import DataCentreRiskFramework from "./pages/DataCentreRiskFramework";
 import Strikes from "./pages/Strikes";
+import TopicsHub from "./pages/TopicsHub";
+import StrikesHub from "./pages/StrikesHub";
 import StrikesBackfill from "./pages/StrikesBackfill";
 import Sources from "./pages/Sources";
 import OfficialSourcesQueue from "./pages/OfficialSourcesQueue";
@@ -197,10 +199,12 @@ function Router() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={Dashboard} />
+        <Route path="/" component={MapPage} />
+        <Route path="/dashboard" component={Dashboard} />
         <Route path="/incidents" component={Incidents} />
         <Route path="/map" component={MapPage} />
         <Route path="/timeline" component={Timeline} />
+        <Route path="/topics" component={TopicsHub} />
         <Route path="/topics/cargo-watch" component={CargoWatch} />
         <Route path="/topics/shipping" component={Shipping} />
         <Route path="/topics/protests" component={Protests} />
@@ -209,6 +213,7 @@ function Router() {
         <Route path="/registry/data-centres" component={DataCentreRegistry} />
         <Route path="/registry/data-centre-risk" component={DataCentreRiskFramework} />
         <Route path="/topics/:topic" component={Topic} />
+        <Route path="/strikes" component={StrikesHub} />
         <Route path="/strikes/backfill" component={StrikesBackfill} />
         <Route path="/strikes/:theatre" component={Strikes} />
         <Route path="/sources" component={Sources} />

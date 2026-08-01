@@ -41,6 +41,7 @@ const TOPIC_SUBTITLE: Record<string, string> = {
   fertiliser: "Fertiliser supply, plant and input-cost disruption monitor.",
   fuel: "Fuel supply, refining and pricing disruption monitor.",
   flashpoint: "Cross-topic flashpoint and civil-disturbance monitor.",
+  crime: "Organised crime, gang activity and trafficking monitor. Maritime piracy and cargo theft are tracked separately under Shipping/Cargo Watch.",
 };
 
 function darken(hex: string, amount = 0.18): string {
