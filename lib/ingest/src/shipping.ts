@@ -4,7 +4,7 @@ import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
-import { geocode } from "./geocode";
+import { geocode, type GeoResult } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
 import type { FeedStat, IngestOptions, IngestSummary } from "./types";
@@ -101,6 +101,66 @@ const VESSEL_FEEDS: { label: string; q: string; defaultCountry: string }[] = [
 ];
 
 const PORT_TERMS = `("port closure" OR "port shutdown" OR "port strike" OR "port congestion" OR "port disruption" OR "berth backlog")`;
+
+// Chokepoint/vessel items are at-sea events. A story that only NAMES a
+// littoral country (e.g. "Saudi Arabia" cited in a Red Sea Houthi-attack
+// report) must never be plotted at that country's inland geographic centre —
+// that reads as a tanker sailing through the middle of the desert. Mirrors
+// the same safeguard already applied to maritime_hormuz rows in strikes.ts,
+// generalised to every strait/sea this feed tracks.
+const CHOKEPOINT_CENTROIDS: { match: RegExp; centroid: [number, number]; label: string }[] = [
+  { match: /hormuz/i, centroid: [26.57, 56.25], label: "Strait of Hormuz" },
+  { match: /bab el-mandeb|bab al-mandab|\bmandeb\b/i, centroid: [12.58, 43.33], label: "Bab el-Mandeb" },
+  { match: /red sea/i, centroid: [20.0, 38.0], label: "Red Sea" },
+  { match: /suez/i, centroid: [30.5, 32.35], label: "Suez Canal" },
+  { match: /malacca/i, centroid: [2.5, 101.0], label: "Strait of Malacca" },
+  { match: /singapore strait/i, centroid: [1.15, 103.8], label: "Singapore Strait" },
+];
+
+// City-level geocode matches that sit ON the coastline of a tracked strait or
+// sea and may therefore stand in for a vessel/chokepoint item's location.
+// Everything else — an inland capital named only in diplomatic fallout, or a
+// bare country centroid — falls through to the nearest chokepoint centroid.
+// Keep in sync with CITY_COORDS in geocode.ts.
+const MARITIME_SAFE_LOCATIONS = new Set([
+  "dubai", "abu dhabi", "sharjah", "jeddah", "dammam", "doha", "muscat",
+  "salalah", "manama", "basra", "aden",
+  "shanghai", "mumbai", "jakarta", "yokohama", "kuala lumpur", "penang",
+  "johor", "port klang", "karachi", "manila", "busan", "bangkok", "haiphong",
+]);
+
+// Countries that are themselves small coastal/island states — their bare
+// country centroid IS a coastal point, so it needs no city match to be safe.
+const MARITIME_SAFE_COUNTRIES = new Set(["singapore"]);
+
+function resolveChokepointFallback(feedLabel: string, defaultCountry: string, text: string): { latitude: number; longitude: number; location: string } {
+  for (const c of CHOKEPOINT_CENTROIDS) {
+    if (c.match.test(feedLabel)) return { latitude: c.centroid[0], longitude: c.centroid[1], location: c.label };
+  }
+  for (const c of CHOKEPOINT_CENTROIDS) {
+    if (c.match.test(text)) return { latitude: c.centroid[0], longitude: c.centroid[1], location: c.label };
+  }
+  // ReCAAP / APAC-default items (e.g. Sea robbery feed defaults to Singapore)
+  // belong in the Singapore Strait / Malacca theatre, not the Gulf.
+  if (/singapore|malaysia/i.test(defaultCountry)) {
+    return { latitude: 1.15, longitude: 103.8, location: "Singapore Strait" };
+  }
+  // Generic vessel-attack / advisory items that name no specific strait — the
+  // Vessel feed's own query is anchored on Hormuz/Red Sea/Gulf, so default
+  // there rather than leaving the row unplaced.
+  return { latitude: 26.57, longitude: 56.25, location: "Strait of Hormuz" };
+}
+
+// At-sea items (chokepoint/vessel groups, NOT port-disruption items — those
+// are real events at a real port and keep normal country/city geocoding)
+// must resolve to water or a genuine coastal city, never a country's raw
+// inland centroid.
+function sanitizeMaritimeGeo(geo: GeoResult | null, feedLabel: string, country: string, defaultCountry: string, text: string): GeoResult {
+  const isSafeCountry = MARITIME_SAFE_COUNTRIES.has(country.trim().toLowerCase());
+  const isSafeCity = geo?.location != null && MARITIME_SAFE_LOCATIONS.has(geo.location.toLowerCase());
+  if (geo && (isSafeCity || (isSafeCountry && geo.location == null))) return geo;
+  return resolveChokepointFallback(feedLabel, defaultCountry, text);
+}
 
 // Port-disruption feeds across Middle East + APAC.
 const PORT_COUNTRIES = [
@@ -389,6 +449,7 @@ export const shippingTestHooks = {
   classify: (title: string, summary: string, defaultCountry = "Unknown"): Classified =>
     classify(title, summary, { label: "test", url: "", group: "vessel", defaultCountry }),
   detectCountry,
+  sanitizeMaritimeGeo,
 };
 
 function dedupeKey(title: string, when: Date, country: string): string {
@@ -408,6 +469,8 @@ type Accepted = {
   source: string;
   sourceUrl: string;
   feedLabel: string;
+  group: "chokepoint" | "vessel" | "port";
+  defaultCountry: string;
   reason: string;
 };
 
@@ -494,6 +557,8 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
           source: sourceName.slice(0, 200),
           sourceUrl: link,
           feedLabel: feed.label,
+          group: feed.group,
+          defaultCountry: feed.defaultCountry,
           reason: c.reason,
         });
         perFeed[feed.label].accepted++;
@@ -632,7 +697,11 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    const rawGeo = geocode(a.country, `${a.title} ${a.summary}`);
+    const geo =
+      a.group === "port"
+        ? rawGeo
+        : sanitizeMaritimeGeo(rawGeo, a.feedLabel, a.country, a.defaultCountry, `${a.title} ${a.summary}`);
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance("shipping", {
