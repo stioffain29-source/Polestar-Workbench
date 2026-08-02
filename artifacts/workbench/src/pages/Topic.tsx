@@ -265,6 +265,20 @@ export default function Topic() {
     [inWindow],
   );
 
+  // Incident-list controls: default to a Moderate+ severity floor (Low /
+  // Insignificant records are noise-heavy and clutter the list) and a
+  // top-20 cap, each with an explicit toggle so nothing is silently hidden.
+  const [showLowSeverity, setShowLowSeverity] = useState(false);
+  const [showAllIncidents, setShowAllIncidents] = useState(false);
+
+  const severityFilteredForTable = useMemo(
+    () => (showLowSeverity ? sortedForTable : sortedForTable.filter((i) => (SEV_RANK[i.severity] ?? 0) >= 3)),
+    [sortedForTable, showLowSeverity],
+  );
+  const hiddenBySeverity = sortedForTable.length - severityFilteredForTable.length;
+  const visibleForTable = showAllIncidents ? severityFilteredForTable : severityFilteredForTable.slice(0, 20);
+  const hiddenByCap = severityFilteredForTable.length - visibleForTable.length;
+
   // --- Derived panels (energy brownouts / fertiliser supply pinch points) ----
   // Slice the windowed set by keyword. The matcher reads the same incidents the
   // rest of the page tallies, so these panels never invent records.
@@ -579,11 +593,37 @@ export default function Topic() {
 
       {/* 6. Incident table */}
       <Section title="Recent Incidents">
+        <div className="flex flex-wrap items-center justify-between gap-3 -mt-1 mb-3">
+          <label className="flex items-center gap-2 text-xs font-sans text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showLowSeverity}
+              onChange={() => setShowLowSeverity((v) => !v)}
+              className="h-3.5 w-3.5 accent-accent"
+              data-testid="checkbox-show-low-severity"
+            />
+            <span>
+              Show Low / Insignificant{hiddenBySeverity > 0 && !showLowSeverity ? ` (${hiddenBySeverity} hidden)` : ""}
+            </span>
+          </label>
+          {severityFilteredForTable.length > 20 && (
+            <button
+              type="button"
+              onClick={() => setShowAllIncidents((v) => !v)}
+              className="text-xs font-sans font-medium text-accent hover:underline uppercase tracking-wide"
+              data-testid="button-toggle-incident-cap"
+            >
+              {showAllIncidents ? "Show top 20" : `Show all ${severityFilteredForTable.length}`}
+            </button>
+          )}
+        </div>
         <div className="bg-white border border-border rounded-sm">
           {isLoading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
-          ) : !sortedForTable.length ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">No incidents recorded for this topic.</div>
+          ) : !visibleForTable.length ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              {sortedForTable.length ? "No incidents match the current severity filter." : "No incidents recorded for this topic."}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -597,7 +637,7 @@ export default function Topic() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {sortedForTable.map((i) => (
+                  {visibleForTable.map((i) => (
                     <tr key={i.id} className="hover:bg-muted/30 align-top">
                       <td className="p-2 font-mono text-xs whitespace-nowrap">
                         {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
@@ -651,6 +691,7 @@ export default function Topic() {
         </div>
         <p className="text-[11px] text-muted-foreground italic mt-2">
           Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Severity is keyword-rated from the headline and summary.
+          {hiddenByCap > 0 ? ` Showing top 20 of ${severityFilteredForTable.length}.` : ""}
         </p>
       </Section>
     </div>
