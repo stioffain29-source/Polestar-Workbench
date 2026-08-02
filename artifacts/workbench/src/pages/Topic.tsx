@@ -325,6 +325,11 @@ export default function Topic() {
         </div>
       </div>
 
+      {/* Report Builder, folded into the topic page — moved up top so drafts
+          for this topic are immediately visible, not buried below the full
+          incident list. */}
+      <TopicReportPanel topic={topic} />
+
       {/* Operational fuel-disruption alert — leads the fuel page so it is never
           buried under generic oil-price commentary. */}
       {topic === "fuel" && <FuelDisruptionPanel />}
@@ -665,11 +670,6 @@ export default function Topic() {
           {hiddenByCap > 0 ? ` Showing top 20 of ${severityFilteredForTable.length}.` : ""}
         </p>
       </Section>
-
-      {/* Report Builder, folded into the topic page — drafts for this topic
-          live here instead of a separate /reports destination you have to
-          jump to. */}
-      <TopicReportPanel topic={topic} />
     </div>
   );
 }

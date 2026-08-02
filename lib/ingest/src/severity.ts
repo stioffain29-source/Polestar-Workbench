@@ -403,6 +403,14 @@ const HIGH: RegExp[] = [
   /\b(curfew|crackdown|mass arrests?|state forces (open|fire))\b/i,
   /\b(at gunpoint|armed (robbery|men|gang|hijack|heist)|gunpoint|brandish|machete|hijack(ed|ing) at|held up)\b/i,
   /\b(stormed|besieg(e|ed)|breach(ed)? the|overran)\b/i,
+  // PNG / Melanesia violent-crime vocabulary and bare sexual-violence terms —
+  // previously absent from every tier, so they fell through to the LOW
+  // default no matter how serious. "raskol" is PNG/Melanesian slang for an
+  // organised street-crime gang member; tribal fighting, payback killings,
+  // bush-knife attacks and sorcery-related killings are the dominant
+  // categories of lethal violence in PNG Highlands reporting. Bare
+  // "rape"/"raped" is a universal gap across every topic, not PNG-specific.
+  /\b(raskols?|tribal (fight(ing)?|clash(es)?|war(fare)?|violence)|payback (killing|attack|revenge)|bush[- ]?knife|home invasion|car[- ]?jack(ed|ing)?|gang[- ]?rape[d]?|rape[d]?|sorcery[- ]?(related|linked) (killing|violence|attack))\b/i,
   ID_VIOLENCE_RE,
   ID_FATAL_RE,
 ];

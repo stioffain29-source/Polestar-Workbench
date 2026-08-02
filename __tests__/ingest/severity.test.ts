@@ -444,6 +444,47 @@ describe("classifySeverity — Bahasa mass-casualty toll", () => {
   });
 });
 
+describe("classifySeverity — PNG / Melanesia violent-crime vocabulary", () => {
+  it("rates a raskol gang attack as high", () => {
+    expect(classifySeverity("Raskol gang bashes shopkeeper in Port Moresby", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a tribal fight as high", () => {
+    expect(classifySeverity("Tribal fight breaks out in Enga Province", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a payback killing as high", () => {
+    expect(classifySeverity("Payback killing reported in Southern Highlands", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a bush-knife attack as high", () => {
+    expect(classifySeverity("Man attacked with bush knife in market dispute", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a home invasion as high", () => {
+    expect(classifySeverity("Home invasion leaves family shaken in Lae", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a carjacking as high", () => {
+    expect(classifySeverity("Carjacking reported on Waigani Drive", "", "apac_local")).toBe("high");
+  });
+
+  it("rates a sorcery-related killing as high", () => {
+    expect(classifySeverity("Sorcery-related killing shocks village", "", "apac_local")).toBe("high");
+  });
+
+  it("rates bare rape as high across topics", () => {
+    expect(classifySeverity("Woman raped in settlement attack", "", "apac_local")).toBe("high");
+    expect(classifySeverity("Gang rape reported near market", "", "flashpoint")).toBe("high");
+  });
+
+  it("still rates unrelated aviation infrastructure news as low", () => {
+    expect(
+      classifySeverity("NAC kicks off Stage 4 of asphalt overlay at Mt Hagen airport", "", "apac_local"),
+    ).toBe("low");
+  });
+});
+
 describe("hasMassCasualtyToll", () => {
   it("detects English and Bahasa mass tolls", () => {
     expect(hasMassCasualtyToll("Fire kills 28", "")).toBe(true);
