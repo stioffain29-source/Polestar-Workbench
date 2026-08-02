@@ -381,3 +381,28 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.2; }
 }
+
+/* Count badge for cluster markers (spreadOverlapping() collapses large
+   stacks of incidents sharing one fallback coordinate into a single marker
+   instead of fanning them into a ring). Overrides the generic
+   .leaflet-tooltip card styling (min/max width, background, border) so this
+   reads as a plain number centred on the marker, not a popup card. */
+.map-cluster-label {
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  font-family: "Roboto Condensed", sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+.map-cluster-label::before {
+  display: none !important;
+}

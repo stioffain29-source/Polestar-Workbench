@@ -16,7 +16,7 @@ import {
   LiveuamapRegion,
   type LiveuamapEventsResponse,
 } from "@workspace/api-client-react";
-import { RATING_COLORS, SEVERITY_LABELS, markerStyle } from "@/lib/topics";
+import { RATING_COLORS, SEVERITY_LABELS, SEVERITY_LEVELS, markerStyle } from "@/lib/topics";
 import { toMaritimeRow, maritimeTypeSeverityKey } from "@/lib/maritimeSecurity";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,24 @@ function topicToCategory(topic: string): string {
 // spot — points with a unique, resolved location are left exactly where they
 // belong. Ring position is deterministic (seeded on the shared coordinate),
 // so it doesn't flicker between renders.
-function spreadOverlapping<T extends { lat: number; lng: number }>(points: T[]): T[] {
+//
+// Above OVERLAP_CLUSTER_THRESHOLD stacked points, fanning them into a ring
+// stops reading as "several incidents near this spot" and starts reading as
+// a perfect geometric donut drawn on the map (seen at country-centroid
+// fallback points, e.g. Indonesia's centroid sitting in open water in the
+// Makassar Strait) — a rendering artifact, not a real spatial pattern. Once a
+// group crosses that size we collapse it into a single cluster marker
+// instead, carrying a count and the group's own points for the popup.
+const OVERLAP_CLUSTER_THRESHOLD = 12;
+
+function severityRank(rating: string): number {
+  const idx = (SEVERITY_LEVELS as readonly string[]).indexOf(rating);
+  return idx === -1 ? 0 : idx;
+}
+
+function spreadOverlapping<T extends { id: string; lat: number; lng: number; rating: string }>(
+  points: T[]
+): (T & { clusterSize?: number; clusterMembers?: T[] })[] {
   const groups = new Map<string, T[]>();
   for (const p of points) {
     const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
@@ -78,13 +95,27 @@ function spreadOverlapping<T extends { lat: number; lng: number }>(points: T[]):
     if (existing) existing.push(p);
     else groups.set(key, [p]);
   }
-  const result: T[] = [];
+  const result: (T & { clusterSize?: number; clusterMembers?: T[] })[] = [];
   for (const group of groups.values()) {
     if (group.length === 1) {
       result.push(group[0]);
       continue;
     }
     const n = group.length;
+    if (n > OVERLAP_CLUSTER_THRESHOLD) {
+      // Represent the whole stack with one marker at the shared coordinate,
+      // styled by the highest severity present in the group.
+      const highest = group.reduce((best, p) =>
+        severityRank(p.rating) > severityRank(best.rating) ? p : best
+      );
+      result.push({
+        ...highest,
+        id: `cluster-${group[0].lat.toFixed(4)},${group[0].lng.toFixed(4)}`,
+        clusterSize: n,
+        clusterMembers: group,
+      });
+      continue;
+    }
     // Ring grows gently with the number of stacked incidents but stays close
     // enough to the real point to still read as "this country/area".
     const radius = Math.min(0.12 + n * 0.015, 0.4);
@@ -204,6 +235,11 @@ type Point = {
   gdeltEventType: string | null;
   gdeltSubEventType: string | null;
   gdeltConfidence: number | null;
+  // Set only on synthetic markers produced by spreadOverlapping() when a
+  // stack of points sharing one fallback coordinate is too large to fan into
+  // a legible ring. clusterMembers holds the original points for the popup.
+  clusterSize?: number;
+  clusterMembers?: Point[];
 };
 
 export default function MapPage() {
@@ -536,6 +572,77 @@ export default function MapPage() {
               subdomains={["a", "b", "c", "d"]}
             />
             {visiblePoints.map((p) => {
+              // Large stacks of incidents sharing one unresolved fallback
+              // coordinate (e.g. a country centroid) are collapsed by
+              // spreadOverlapping() into a single cluster marker rather than
+              // fanned into a ring — at high counts the ring reads as a
+              // fabricated geometric shape rather than real incident spread.
+              if (p.clusterSize && p.clusterSize > 1) {
+                const clusterStyle = markerStyle(p.rating);
+                const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
+                const members = p.clusterMembers ?? [];
+                return (
+                  <CircleMarker
+                    key={p.id}
+                    center={[p.lat, p.lng]}
+                    radius={clusterRadius}
+                    pathOptions={{
+                      color: clusterStyle.stroke,
+                      weight: 2,
+                      fillColor: clusterStyle.fill,
+                      fillOpacity: 0.85,
+                    }}
+                  >
+                    <LeafletTooltip permanent direction="center" className="map-cluster-label" opacity={1}>
+                      {p.clusterSize}
+                    </LeafletTooltip>
+                    <LeafletPopup>
+                      <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 260 }}>
+                        <div style={{ fontWeight: 700, color: "#0b0a3d", marginBottom: 4 }}>
+                          {p.clusterSize} incidents near {p.country}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.35 }}>
+                          These incidents share an unresolved fallback location and
+                          couldn't be placed at a specific city — shown here as one
+                          marker, coloured by the highest risk rating in the group
+                          ({SEVERITY_LABELS[p.rating] ?? p.rating}).
+                        </div>
+                        <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 180, overflowY: "auto" }}>
+                          {members.slice(0, 10).map((m) => (
+                            <li
+                              key={m.id}
+                              style={{
+                                fontSize: 11,
+                                color: "#363636",
+                                marginTop: 4,
+                                borderTop: "1px solid #eee",
+                                paddingTop: 4,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  backgroundColor: RATING_COLORS[m.rating] ?? RATING_COLORS.insignificant,
+                                  marginRight: 6,
+                                }}
+                              />
+                              {displayIncidentTitle(m.title, m.displayTitle)}
+                            </li>
+                          ))}
+                        </ul>
+                        {members.length > 10 && (
+                          <div style={{ fontSize: 10, color: "#666", marginTop: 6 }}>
+                            +{members.length - 10} more
+                          </div>
+                        )}
+                      </div>
+                    </LeafletPopup>
+                  </CircleMarker>
+                );
+              }
               const s = markerStyle(p.rating);
               const isNew = !clearedIds.has(p.id);
               return (
