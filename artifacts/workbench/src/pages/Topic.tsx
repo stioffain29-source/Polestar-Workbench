@@ -9,7 +9,7 @@ import {
   LineChart, Line, LabelList,
 } from "recharts";
 import {
-  TOPIC_LABELS, SEVERITY_LEVELS, SEVERITY_LABELS, severityBadgeStyle, ratingColor,
+  TOPIC_LABELS, SEVERITY_LEVELS, SEVERITY_LABELS, ratingColor,
 } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
@@ -22,6 +22,7 @@ import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
+import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -625,67 +626,43 @@ export default function Topic() {
               {sortedForTable.length ? "No incidents match the current severity filter." : "No incidents recorded for this topic."}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="text-left p-2 font-sans font-medium w-[120px]">Date</th>
-                    <th className="text-left p-2 font-sans font-medium w-[150px]">Country</th>
-                    <th className="text-left p-2 font-sans font-medium">Headline</th>
-                    <th className="text-left p-2 font-sans font-medium w-[110px]">Severity</th>
-                    <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {visibleForTable.map((i) => (
-                    <tr key={i.id} className="hover:bg-muted/30 align-top">
-                      <td className="p-2 font-mono text-xs whitespace-nowrap">
-                        {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
-                      </td>
-                      <td className="p-2 text-xs">{i.country ?? "—"}</td>
-                      <td className="p-2 font-medium">
-                        {displayIncidentTitle(i.title, i.displayTitle)}
-                        <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
-                        {i.corroborations?.length ? (
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold uppercase tracking-wider text-accent">
-                              <BadgeCheck className="w-3 h-3" />
-                              Corroborated by UN OCHA (ReliefWeb)
-                            </span>
-                            {i.corroborations.map((c) => (
-                              <a
-                                key={c.id}
-                                href={c.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 text-[11px] text-accent hover:underline"
-                              >
-                                {c.sourceAgency ?? c.reportTitle}
-                                <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                            ))}
-                          </div>
-                        ) : null}
-                        <GdeltCoding incident={i} variant="inline" />
-                      </td>
-                      <td className="p-2">
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
-                          {SEVERITY_LABELS[i.severity] ?? i.severity}
+            <div className="p-2">
+              <IncidentRowList>
+                {visibleForTable.map((i) => (
+                  <IncidentRowCard
+                    key={i.id}
+                    id={i.id}
+                    occurredDate={i.occurredDate}
+                    country={i.country}
+                    severity={i.severity}
+                    sourceUrl={incidentSourceUrl(i)}
+                  >
+                    {displayIncidentTitle(i.title, i.displayTitle)}
+                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
+                    {i.corroborations?.length ? (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold uppercase tracking-wider text-accent">
+                          <BadgeCheck className="w-3 h-3" />
+                          Corroborated by UN OCHA (ReliefWeb)
                         </span>
-                      </td>
-                      <td className="p-2">
-                        {incidentSourceUrl(i) ? (
-                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
-                            <ExternalLink className="w-3 h-3" />
+                        {i.corroborations.map((c) => (
+                          <a
+                            key={c.id}
+                            href={c.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-[11px] text-accent hover:underline"
+                          >
+                            {c.sourceAgency ?? c.reportTitle}
+                            <ExternalLink className="w-2.5 h-2.5" />
                           </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        ))}
+                      </div>
+                    ) : null}
+                    <GdeltCoding incident={i} variant="inline" />
+                  </IncidentRowCard>
+                ))}
+              </IncidentRowList>
             </div>
           )}
         </div>

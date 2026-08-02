@@ -7,7 +7,7 @@ import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
   LineChart, Line, LabelList,
 } from "recharts";
-import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
+import { ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
@@ -16,10 +16,10 @@ import {
   CONFLICT_CATEGORIES, CATEGORY_COLOR, CATEGORY_CARD_LABEL,
   OPERATIONAL_IMPACTS, type ConflictCategory,
 } from "@/lib/conflictAnalysis";
-import { ExternalLink } from "lucide-react";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
+import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -540,59 +540,35 @@ export default function Conflict() {
           ) : !sortedForTable.length ? (
             <div className="p-8 text-center text-sm text-muted-foreground">No incidents recorded for this topic.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="text-left p-2 font-sans font-medium w-[120px]">Date</th>
-                    <th className="text-left p-2 font-sans font-medium w-[170px]">Type</th>
-                    <th className="text-left p-2 font-sans font-medium w-[130px]">Country</th>
-                    <th className="text-left p-2 font-sans font-medium">Headline</th>
-                    <th className="text-left p-2 font-sans font-medium w-[200px]">Impact</th>
-                    <th className="text-left p-2 font-sans font-medium w-[100px]">Severity</th>
-                    <th className="text-left p-2 font-sans font-medium w-[60px]">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {sortedForTable.map((i) => (
-                    <tr key={i.id} className="hover:bg-muted/30 align-top">
-                      <td className="p-2 font-mono text-xs whitespace-nowrap">
-                        {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
-                      </td>
-                      <td className="p-2">
+            <div className="p-2">
+              <IncidentRowList>
+                {sortedForTable.map((i) => (
+                  <IncidentRowCard
+                    key={i.id}
+                    id={i.id}
+                    occurredDate={i.occurredDate}
+                    country={i.country}
+                    severity={i.severity}
+                    sourceUrl={incidentSourceUrl(i)}
+                    meta={
+                      <div className="mb-1 flex flex-wrap items-center gap-1.5">
                         <span
-                          className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
+                          className="rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white"
                           style={{ backgroundColor: CATEGORY_COLOR[i.category] }}
                         >
                           {i.category}
                         </span>
-                      </td>
-                      <td className="p-2 text-xs">{i.country ?? "—"}</td>
-                      <td className="p-2 font-medium">
-                        {displayTitle(i)}
-                        <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
-                      </td>
-                      <td className="p-2 text-xs text-foreground/80">
-                        {i.impacts.length > 0 ? i.impacts[0] : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="p-2">
-                        <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
-                          {SEVERITY_LABELS[i.severity] ?? i.severity}
-                        </span>
-                      </td>
-                      <td className="p-2">
-                        {incidentSourceUrl(i) ? (
-                          <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline inline-flex items-center gap-1 text-xs" aria-label="Open source">
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {i.impacts.length > 0 ? (
+                          <span className="text-[11px] text-foreground/80">{i.impacts[0]}</span>
+                        ) : null}
+                      </div>
+                    }
+                  >
+                    {displayTitle(i)}
+                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
+                  </IncidentRowCard>
+                ))}
+              </IncidentRowList>
             </div>
           )}
         </div>
