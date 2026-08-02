@@ -4,7 +4,7 @@ import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText, hasWord, parseDate } from "./text";
 import { classifySeverity } from "./severity";
-import { geocode } from "./geocode";
+import { geocode, type GeoResult } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { isLlmAvailable, screenBatch } from "./translateScreen";
 import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
@@ -517,6 +517,122 @@ const ALLOW = [
   "lorry park robbery",
 ];
 
+// At-sea / anchorage / vessel-boarding ALLOW terms (the "widened scope" block
+// above, minus the two truck-park entries which describe a real roadside lot,
+// not open water). A story that only names a littoral COUNTRY for one of
+// these — e.g. "Pirates board bulk carrier off Malaysia", with no port/city
+// in the text — must never be plotted at that country's inland geographic
+// centre: that reads as a bulk carrier boarded in the middle of the jungle.
+// Mirrors the same safeguard already applied to shipping.ts's chokepoint /
+// vessel groups, keyed here off the exact ALLOW term (`a.reason`) rather than
+// feed group, since cargoWatch.ts's "port" feed group also carries genuine
+// named-port stories that already geocode correctly and must be left alone.
+const CARGO_MARITIME_ALLOW_TERMS = new Set([
+  "port robbery",
+  "port theft",
+  "robbery at port",
+  "theft at port",
+  "robbery at the port",
+  "theft at the port",
+  "anchorage robbery",
+  "anchorage theft",
+  "robbery at anchorage",
+  "theft at anchorage",
+  "robbers boarded",
+  "pirates boarded",
+  "boarded the vessel",
+  "boarded the ship",
+  "theft from vessel",
+  "theft from ship",
+  "theft on board",
+  "robbery on board",
+  "stowaway",
+  "stowaways",
+  "port intrusion",
+  "port trespass",
+  "trespass at port",
+  "cargo smuggling",
+  "container smuggling",
+  "smuggling at port",
+  "port smuggling",
+  "narcotics in container",
+  "drugs in container",
+  "cocaine in container",
+  "container seizure",
+  "cargo seizure",
+  "port sabotage",
+  "sabotage at port",
+  "dockworker strike",
+  "dock workers strike",
+  "stevedore strike",
+  "port workers strike",
+  "port blockade",
+  "port access blockade",
+  "blockade at port",
+]);
+
+// Small coastal/island states whose bare country centroid IS a coastal point
+// — no city match needed for these to be a safe maritime location.
+const CARGO_MARITIME_SAFE_COUNTRIES = new Set(["singapore", "bahrain"]);
+
+// Canonical country -> a real coastal port city to use as the maritime
+// fallback when a country-only match (no port/city text) would otherwise
+// plot a boarding/anchorage/stowaway/smuggling item at a bare (often inland)
+// country centroid. Picks the busiest/most cited port already named
+// elsewhere in this file (CARGO_PORT_ALIASES / PORT_FEED_TERMS) so the
+// fallback point matches what a human analyst would expect. Deliberately has
+// NO entry for Laos — it is landlocked, so a maritime-context match there is
+// almost certainly a misclassification and there is no honest coastal point
+// to substitute; the bare centroid is left as-is rather than guessing.
+const CARGO_PORT_FALLBACK: Record<string, { lat: number; lng: number; label: string }> = {
+  UAE: { lat: 25.2, lng: 55.27, label: "Dubai" },
+  "Saudi Arabia": { lat: 21.49, lng: 39.19, label: "Jeddah" },
+  Qatar: { lat: 25.29, lng: 51.53, label: "Doha" },
+  Oman: { lat: 23.59, lng: 58.41, label: "Muscat" },
+  Kuwait: { lat: 29.37, lng: 47.98, label: "Kuwait City" },
+  Jordan: { lat: 29.53, lng: 35.0, label: "Aqaba" },
+  Iran: { lat: 27.18, lng: 56.28, label: "Bandar Abbas" },
+  Iraq: { lat: 30.51, lng: 47.78, label: "Basra" },
+  Yemen: { lat: 12.79, lng: 45.02, label: "Aden" },
+  Israel: { lat: 32.08, lng: 34.78, label: "Tel Aviv" },
+  Lebanon: { lat: 33.89, lng: 35.5, label: "Beirut" },
+  Syria: { lat: 35.52, lng: 35.79, label: "Latakia" },
+  Malaysia: { lat: 3.0, lng: 101.39, label: "Port Klang" },
+  Indonesia: { lat: -6.1, lng: 106.88, label: "Tanjung Priok" },
+  Thailand: { lat: 13.08, lng: 100.88, label: "Laem Chabang" },
+  Vietnam: { lat: 10.52, lng: 107.02, label: "Cai Mep" },
+  Philippines: { lat: 14.6, lng: 120.98, label: "Manila" },
+  India: { lat: 19.08, lng: 72.88, label: "Mumbai" },
+  Pakistan: { lat: 24.86, lng: 67.0, label: "Karachi" },
+  Bangladesh: { lat: 22.36, lng: 91.78, label: "Chittagong" },
+  "Sri Lanka": { lat: 6.93, lng: 79.85, label: "Colombo" },
+  China: { lat: 31.23, lng: 121.47, label: "Shanghai" },
+  Taiwan: { lat: 22.63, lng: 120.3, label: "Kaohsiung" },
+  "South Korea": { lat: 35.18, lng: 129.08, label: "Busan" },
+  Japan: { lat: 35.44, lng: 139.64, label: "Yokohama" },
+  Australia: { lat: -33.87, lng: 151.21, label: "Sydney" },
+  "New Zealand": { lat: -36.85, lng: 174.76, label: "Auckland" },
+  Cambodia: { lat: 10.62, lng: 103.5, label: "Sihanoukville" },
+  Myanmar: { lat: 16.84, lng: 96.17, label: "Yangon" },
+  "Papua New Guinea": { lat: -9.44, lng: 147.18, label: "Port Moresby" },
+};
+
+// At-sea/anchorage/vessel items (per CARGO_MARITIME_ALLOW_TERMS) must resolve
+// to a real coastal point, never a country's raw inland centroid. Genuine
+// named-port matches (geo.location already set by geocode()'s city lookup)
+// are left untouched — those are real events at a real, already-resolved
+// place.
+function sanitizeCargoMaritimeGeo(geo: GeoResult | null, country: string, reason: string): GeoResult | null {
+  const allowTerm = reason.startsWith("allow:") ? reason.slice("allow:".length) : null;
+  if (!allowTerm || !CARGO_MARITIME_ALLOW_TERMS.has(allowTerm)) return geo;
+  if (!geo || geo.location != null) return geo;
+  const key = country.trim();
+  if (CARGO_MARITIME_SAFE_COUNTRIES.has(key.toLowerCase())) return geo;
+  const fallback = CARGO_PORT_FALLBACK[key];
+  if (!fallback) return geo;
+  return { latitude: fallback.lat, longitude: fallback.lng, location: fallback.label };
+}
+
 // Hard denylist: ALWAYS reject, even with cargo/port context. These are
 // non-cargo "theft"/"pilferage" homonyms or finance/corruption framing — none
 // describe a cargo-security incident, so a cargo/port word nearby must not
@@ -700,7 +816,7 @@ function classifyFeedItem(
 }
 
 // Test-only surface (mirrors flashpointTestHooks).
-export const cargoTestHooks = { classify, classifyFeedItem };
+export const cargoTestHooks = { classify, classifyFeedItem, sanitizeCargoMaritimeGeo };
 
 function dedupeKey(title: string, when: Date, country: string): string {
   return [
@@ -1142,7 +1258,8 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    const rawGeo = geocode(a.country, `${a.title} ${a.summary}`);
+    const geo = sanitizeCargoMaritimeGeo(rawGeo, a.country, a.reason);
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance("cargo_watch", {
