@@ -306,6 +306,7 @@ export const ENERGY_CONFIG: NewsTopicConfig = {
     "clean energy opportunit",
   ],
   countryAliases: GLOBAL_TOPIC_ALIASES,
+  globalExtraAliases: GLOBAL_EXTRA_ALIASES,
 };
 
 // ------------------------------------------------------------ fertiliser ----
@@ -351,6 +352,7 @@ export const FERTILISER_CONFIG: NewsTopicConfig = {
     "organic fertiliser tips",
   ],
   countryAliases: GLOBAL_TOPIC_ALIASES,
+  globalExtraAliases: GLOBAL_EXTRA_ALIASES,
 };
 
 // ------------------------------------------------------------------ fuel ----
@@ -418,6 +420,7 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     "price outlook",
   ],
   countryAliases: GLOBAL_TOPIC_ALIASES,
+  globalExtraAliases: GLOBAL_EXTRA_ALIASES,
 };
 
 // ----------------------------------------------------------- data_centres ----
@@ -483,6 +486,7 @@ const DATA_CENTRE_CONFIG: NewsTopicConfig = {
     "career",
   ],
   countryAliases: GLOBAL_TOPIC_ALIASES,
+  globalExtraAliases: GLOBAL_EXTRA_ALIASES,
 };
 
 // -------------------------------------------------------------- conflict ----

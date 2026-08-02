@@ -6,6 +6,17 @@ export function hasWord(hay: string, needle: string): boolean {
   return new RegExp(`\\b${escapeRe(needle)}\\b`, "i").test(hay);
 }
 
+/**
+ * Index of the first word-boundary match of `needle` in `hay` (case-
+ * insensitive), or -1 when it does not appear. Used to compare WHERE in a
+ * piece of text different candidate terms first appear, rather than just
+ * whether they appear at all.
+ */
+export function firstWordIndex(hay: string, needle: string): number {
+  const m = new RegExp(`\\b${escapeRe(needle)}\\b`, "i").exec(hay);
+  return m ? m.index : -1;
+}
+
 export function parseDate(s: string | undefined | null): Date | null {
   if (!s) return null;
   const t = new Date(s);

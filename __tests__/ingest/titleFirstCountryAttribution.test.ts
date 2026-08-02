@@ -75,6 +75,53 @@ describe("title-first country attribution at ingest", () => {
     expect(c.kept).toBe(true);
     expect(c.country).toBe("Pakistan");
   });
+
+  // Regression lock for the Beijing/Mongolia mis-geocode bug: China
+  // (COUNTRY_ALIASES, in-region) used to always beat Mongolia
+  // (GLOBAL_EXTRA_ALIASES, out-of-region) in the multi-country fallback
+  // purely because China is earlier in the alias ARRAY — even when Mongolia,
+  // the true subject, is named FIRST in the actual text. The fallback now
+  // lets an out-of-region country win only when it is genuinely mentioned
+  // earlier in the text than the in-region match.
+  it("attributes a Mongolia-subject headline to Mongolia, not the incidentally-named China", () => {
+    const c = classifyNewsItem(
+      ENERGY_CONFIG,
+      "Mongolia coal shortage worsens as Beijing halts cross-border rail shipments",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("Mongolia");
+  });
+
+  // Same-tier ties are untouched by the Mongolia fix: India and Pakistan are
+  // BOTH in-region (COUNTRY_ALIASES), so this still resolves via array order
+  // (India precedes Pakistan in the gazetteer), even though Pakistan is named
+  // first in the text.
+  it("keeps array-order region-first behaviour for two in-region countries with no global-market country involved", () => {
+    const c = classifyNewsItem(
+      ENERGY_CONFIG,
+      "Pakistan and India both report a worsening electricity crisis",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("India");
+  });
+
+  // The out-of-region country must still LOSE when it is genuinely mentioned
+  // after the in-region subject (matches the existing Turkey/Pakistan and
+  // Iraq/Turkey cases below, restated for Mongolia/China specifically).
+  it("keeps China when Mongolia is only named incidentally after the China-led subject", () => {
+    const c = classifyNewsItem(
+      ENERGY_CONFIG,
+      "China coal shortage deepens as Beijing eyes Mongolia import deal",
+      "",
+      { defaultCountry: "Unknown" },
+    );
+    expect(c.kept).toBe(true);
+    expect(c.country).toBe("China");
+  });
 });
 
 // FUEL and FERTILISER share ENERGY's global gazetteer (GLOBAL_TOPIC_ALIASES) and

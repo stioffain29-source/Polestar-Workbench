@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { cleanText, hasWord, parseDate } from "./text";
+import { cleanText, firstWordIndex, hasWord, parseDate } from "./text";
 import { detectStaleEventDate, isKnownStaleSyndication } from "./structuredExtract";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
@@ -68,6 +68,16 @@ export type NewsTopicConfig = {
   /** Alias → canonical country map. Order matters (specific before broad). */
   countryAliases: CountryAlias[];
   /**
+   * Optional out-of-region ("global market") subset of `countryAliases`,
+   * appended AFTER the in-region entries (see GLOBAL_EXTRA_ALIASES in
+   * topicConfigs.ts). OPT-IN: when set, classify()'s multi/zero-title-country
+   * fallback lets a country from this subset win over the array-order
+   * in-region match ONLY when it is mentioned strictly earlier in the text
+   * (see resolveMultiCountryFallback). When omitted, the fallback is the
+   * original pure array-order detectCountry() scan, unchanged.
+   */
+  globalExtraAliases?: CountryAlias[];
+  /**
    * Optional source-based confidence tiering. When set, each inserted row's
    * confidence is derived from its publisher name; when omitted the row keeps
    * the conservative "low" default unchanged. OPT-IN so existing commodity
@@ -94,6 +104,55 @@ export type Classified = { kept: boolean; reason: string; country: string | null
 export function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
   const match = aliases.find((c) => c.aliases.some((a) => hasWord(hay, a)));
   return match ? match.canonical : null;
+}
+
+// Resolves classify()'s multi/zero-title-country fallback. For configs with
+// no `extraAliases` (CONFLICT/INDONESIA_LOCAL/APAC_LOCAL — no in-region vs
+// global-market tier split), this is exactly the original array-order
+// detectCountry() scan, unchanged.
+//
+// For configs that DO pass `extraAliases` (ENERGY/FUEL/FERTILISER/
+// DATA_CENTRES, whose gazetteer is COUNTRY_ALIASES + GLOBAL_EXTRA_ALIASES), a
+// country from the extra (out-of-region) tier is allowed to win over the
+// array-order in-region match ONLY when it is mentioned STRICTLY EARLIER in
+// the text. This fixes headlines like "Mongolia signs coal export deal with
+// Beijing...", where Mongolia (extra tier, mentioned first) was previously
+// overridden by China (in-region tier, array-order-first) even though
+// Mongolia — mentioned earlier — is the true subject.
+//
+// Same-tier ties are untouched: e.g. "Pakistan and India both face a
+// shortage" still resolves to India (array-order-first within
+// COUNTRY_ALIASES), even though Pakistan is named first in the text — this
+// case has no extra-tier match at all, so it never reaches the tie-break.
+export function resolveMultiCountryFallback(
+  hay: string,
+  allAliases: CountryAlias[],
+  extraAliases?: CountryAlias[],
+): string | null {
+  const regionMatch = detectCountry(hay, allAliases);
+  if (!extraAliases || extraAliases.length === 0) return regionMatch;
+
+  let extraMatch: string | null = null;
+  let extraIdx = Infinity;
+  for (const c of extraAliases) {
+    for (const a of c.aliases) {
+      const idx = firstWordIndex(hay, a);
+      if (idx !== -1 && idx < extraIdx) {
+        extraIdx = idx;
+        extraMatch = c.canonical;
+      }
+    }
+  }
+  if (!extraMatch) return regionMatch;
+  if (!regionMatch) return extraMatch;
+
+  const regionCountry = allAliases.find((c) => c.canonical === regionMatch);
+  const matchedIdxs = regionCountry
+    ? regionCountry.aliases.map((a) => firstWordIndex(hay, a)).filter((i) => i !== -1)
+    : [];
+  const regionIdx = matchedIdxs.length > 0 ? Math.min(...matchedIdxs) : Infinity;
+
+  return extraIdx < regionIdx ? extraMatch : regionMatch;
 }
 
 // All DISTINCT tracked countries named in a piece of text (canonical names, in
@@ -245,7 +304,7 @@ function classify(
   const detected =
     titleCountries.length === 1
       ? titleCountries[0]
-      : detectCountry(geoHay, cfg.countryAliases);
+      : resolveMultiCountryFallback(geoHay, cfg.countryAliases, cfg.globalExtraAliases);
 
   // No in-region country in the text means we are about to blind-trust the
   // feed's defaultCountry. Before doing so, reject obvious cross-syndicated
