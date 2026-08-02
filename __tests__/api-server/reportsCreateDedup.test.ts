@@ -88,7 +88,15 @@ async function post(body: Record<string, unknown>) {
     headers: adminAuthHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body),
   });
-  const json = (await res.json()) as Record<string, unknown>;
+  // Express's default error handler renders an HTML page (not JSON) for an
+  // uncaught 500, which is exactly what the "rethrows a real error" case
+  // below exercises — tolerate that instead of throwing on JSON.parse.
+  let json: Record<string, unknown> | undefined;
+  try {
+    json = (await res.json()) as Record<string, unknown>;
+  } catch {
+    json = undefined;
+  }
   return { status: res.status, json };
 }
 
@@ -141,5 +149,45 @@ describe("POST /reports — duplicate-draft accumulation guard", () => {
 
     expect(status).toBe(201);
     expect(insertCallCount).toBe(1);
+  });
+
+  it("falls back to the existing row (200) when the DB unique index rejects a racing insert", async () => {
+    // Simulates the race the app-level select-then-insert check can't
+    // close: the initial select finds nothing (both concurrent requests
+    // passed it), the insert then hits the partial unique index and
+    // Postgres rejects it with code 23505, and the route must re-query and
+    // return the row the other request just created — not a 500.
+    const winnerRow = { id: 7, ...draftBody };
+    stubSelectQueue([[], [winnerRow]]);
+    jest.spyOn(db, "insert").mockImplementation(() => {
+      insertCallCount++;
+      const chain: Record<string, unknown> = {
+        values: () => chain,
+        returning: () => Promise.reject({ code: "23505" }),
+      };
+      return chain as never;
+    });
+
+    const { status, json } = await post(draftBody);
+
+    expect(status).toBe(200);
+    expect(json).toEqual(winnerRow);
+    expect(insertCallCount).toBe(1);
+  });
+
+  it("rethrows a non-duplicate-key insert failure as a real error", async () => {
+    stubSelectQueue([[]]);
+    jest.spyOn(db, "insert").mockImplementation(() => {
+      insertCallCount++;
+      const chain: Record<string, unknown> = {
+        values: () => chain,
+        returning: () => Promise.reject({ code: "53300", message: "too many connections" }),
+      };
+      return chain as never;
+    });
+
+    const { status } = await post(draftBody);
+
+    expect(status).toBe(500);
   });
 });

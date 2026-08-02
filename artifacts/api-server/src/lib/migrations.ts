@@ -482,6 +482,65 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS section_overrides jsonb`,
     );
 
+    // Schema: DB-level backstop against duplicate draft accumulation. The
+    // "New Report" dialog's create button could fire twice (slow network,
+    // an impatient re-click) with no server-side dedup, leaving duplicate
+    // draft rows for the same topic/date/title. The /reports POST route now
+    // checks for an existing match before inserting (app-level idempotency),
+    // but two near-simultaneous requests could both pass that check before
+    // either has inserted. This partial unique index closes that race at
+    // the database level: a second insert with the same topic + issue_date
+    // + title while status = 'draft' is rejected outright. Scoped to
+    // status = 'draft' only — review/published rows are deliberate
+    // analyst-chosen snapshots, not creation retries, so they are never
+    // constrained by this index. drizzle push only reaches dev; the
+    // writable prod primary gains it here on boot. Idempotent.
+    //
+    // ONE-TIME cleanup MUST run first: CREATE UNIQUE INDEX fails outright if
+    // any pre-existing duplicate draft rows already violate it, and every
+    // migration below this point in the file runs inside the same try block
+    // (see the catch at the bottom of this function) — an unhandled failure
+    // here would silently skip all of them on every boot until fixed. Keep
+    // the earliest row (lowest id) per duplicate group, drop the rest.
+    // Marker-gated so it only scans once; safe no-op after the first run
+    // since the index below then makes new duplicates impossible.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS app_migration_markers (
+        key text PRIMARY KEY,
+        applied_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    {
+      const markerKey = "reports_draft_dedupe_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await db.execute(sql`
+          DELETE FROM reports
+          WHERE status = 'draft'
+            AND id NOT IN (
+              SELECT MIN(id) FROM reports
+              WHERE status = 'draft'
+              GROUP BY topic, issue_date, title
+            )
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { rows: res.rowCount ?? 0, marker: markerKey },
+          "One-time duplicate-draft-report cleanup (kept earliest row per topic/date/title group)",
+        );
+      }
+    }
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS reports_draft_topic_date_title_unique
+        ON reports (topic, issue_date, title)
+        WHERE status = 'draft'
+    `);
+
     // Schema: `edited_fingerprint` on the prose caches. An analyst prose edit is
     // now KEPT across a data-basis regenerate (instead of being dropped); this
     // column records the fingerprint the edit was written against so the client

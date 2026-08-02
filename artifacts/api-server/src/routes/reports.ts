@@ -109,8 +109,39 @@ router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
     issueDate: normalizedIssueDate,
     hardNumbers: normalizeHardNumbers(hardNumbers),
   };
-  const [row] = await db.insert(reportsTable).values(insertValues).returning();
-  res.status(201).json(row);
+  try {
+    const [row] = await db.insert(reportsTable).values(insertValues).returning();
+    res.status(201).json(row);
+  } catch (err) {
+    // DB-level backstop for the race the select-then-insert check above
+    // can't close: two near-simultaneous draft creates for the same
+    // topic + issueDate + title can both pass the "does this exist?"
+    // check before either has inserted. A partial unique index
+    // (reports_draft_topic_date_title_unique, draft-status only) rejects
+    // the second insert with Postgres code 23505 — treat that exactly like
+    // the app-level dedup hit above: return the now-existing row instead
+    // of a 500. Any other insert failure is a real error and rethrows.
+    const pgCode = (err as { code?: string } | null)?.code;
+    if (pgCode === "23505" && rest.status === "draft") {
+      const [existing] = await db
+        .select()
+        .from(reportsTable)
+        .where(
+          and(
+            eq(reportsTable.topic, rest.topic),
+            eq(reportsTable.issueDate, normalizedIssueDate),
+            eq(reportsTable.title, rest.title),
+            eq(reportsTable.status, "draft"),
+          ),
+        )
+        .limit(1);
+      if (existing) {
+        res.status(200).json(existing);
+        return;
+      }
+    }
+    throw err;
+  }
 });
 
 router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
