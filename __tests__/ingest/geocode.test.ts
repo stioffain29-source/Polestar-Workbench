@@ -69,6 +69,36 @@ describe("geocode", () => {
     expect(result?.location).toBeNull();
   });
 
+  it("resolves a Papua New Guinea Bougainville town that previously had no coordinate", () => {
+    // Buka had a province match in PNG_PROVINCE_BY_CITY (pngExtract.ts) for
+    // report text, but no entry here — it used to silently fall back to the
+    // country centroid with location: null. Regression guard for that gap.
+    const result = geocode("Papua New Guinea", "Unrest reported in Buka town");
+    expect(result).toEqual({
+      latitude: -5.42,
+      longitude: 154.67,
+      location: "Buka",
+    });
+  });
+
+  it("resolves a Papua New Guinea Port Moresby suburb that previously had no coordinate", () => {
+    const result = geocode("Papua New Guinea", "Robbery reported at Waigani market");
+    expect(result).toEqual({
+      latitude: -9.45,
+      longitude: 147.17,
+      location: "Waigani",
+    });
+  });
+
+  it("resolves a Papua New Guinea Western province mining town that previously had no coordinate", () => {
+    const result = geocode("Papua New Guinea", "Landslide cuts off access to Tabubil");
+    expect(result).toEqual({
+      latitude: -5.27,
+      longitude: 141.22,
+      location: "Tabubil",
+    });
+  });
+
   it("places a Crimea/Balaklava energy incident within Ukraine", () => {
     const result = geocode(
       "Ukraine",

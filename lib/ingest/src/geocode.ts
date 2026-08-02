@@ -271,6 +271,82 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   popondetta: { lat: -8.77, lng: 148.24, name: "Popondetta" },
   kokoda: { lat: -8.88, lng: 147.74, name: "Kokoda" },
   bougainville: { lat: -6.4, lng: 155.38, name: "Bougainville" },
+  // PNG (further localities) — these have a province/district match in
+  // PNG_PROVINCE_BY_CITY (pngExtract.ts) for report text, but previously had
+  // no coordinate here, so incidents mentioning them fell back to the
+  // country centroid with location: null instead of a real place name/pin.
+  // National Capital District (Port Moresby suburbs)
+  "nine mile": { lat: -9.47, lng: 147.24, name: "Nine Mile" },
+  bomana: { lat: -9.36, lng: 147.2, name: "Bomana" },
+  gerehu: { lat: -9.4, lng: 147.13, name: "Gerehu" },
+  boroko: { lat: -9.46, lng: 147.17, name: "Boroko" },
+  waigani: { lat: -9.45, lng: 147.17, name: "Waigani" },
+  gordons: { lat: -9.47, lng: 147.18, name: "Gordons" },
+  gordon: { lat: -9.47, lng: 147.18, name: "Gordons" },
+  "six mile": { lat: -9.46, lng: 147.2, name: "Six Mile" },
+  hohola: { lat: -9.45, lng: 147.16, name: "Hohola" },
+  badili: { lat: -9.48, lng: 147.17, name: "Badili" },
+  koki: { lat: -9.49, lng: 147.16, name: "Koki" },
+  hanuabada: { lat: -9.47, lng: 147.15, name: "Hanuabada" },
+  erima: { lat: -9.43, lng: 147.2, name: "Erima" },
+  tokarara: { lat: -9.42, lng: 147.16, name: "Tokarara" },
+  morata: { lat: -9.51, lng: 147.19, name: "Morata" },
+  kaugere: { lat: -9.49, lng: 147.19, name: "Kaugere" },
+  sabama: { lat: -9.47, lng: 147.19, name: "Sabama" },
+  korobosea: { lat: -9.47, lng: 147.19, name: "Korobosea" },
+  // Morobe (Lae suburbs + outlying towns)
+  "west taraka": { lat: -6.72, lng: 146.98, name: "West Taraka" },
+  taraka: { lat: -6.72, lng: 146.98, name: "Taraka" },
+  nadzab: { lat: -6.57, lng: 146.73, name: "Nadzab" },
+  bumbu: { lat: -6.71, lng: 146.98, name: "Bumbu" },
+  eriku: { lat: -6.73, lng: 146.99, name: "Eriku" },
+  bulolo: { lat: -7.19, lng: 146.65, name: "Bulolo" },
+  wau: { lat: -7.34, lng: 146.72, name: "Wau" },
+  finschhafen: { lat: -6.6, lng: 147.85, name: "Finschhafen" },
+  menyamya: { lat: -7.2, lng: 146.03, name: "Menyamya" },
+  // Western Highlands / Jiwaka
+  kagamuga: { lat: -5.83, lng: 144.3, name: "Kagamuga" },
+  "mt hagen": { lat: -5.86, lng: 144.23, name: "Mount Hagen" },
+  banz: { lat: -5.75, lng: 144.83, name: "Banz" },
+  minj: { lat: -5.78, lng: 144.63, name: "Minj" },
+  // Eastern Highlands / East Sepik
+  kainantu: { lat: -6.32, lng: 145.87, name: "Kainantu" },
+  maprik: { lat: -3.63, lng: 143.07, name: "Maprik" },
+  // Enga
+  porgera: { lat: -5.46, lng: 143.1, name: "Porgera" },
+  wapenamanda: { lat: -5.64, lng: 143.9, name: "Wapenamanda" },
+  laiagam: { lat: -5.49, lng: 142.94, name: "Laiagam" },
+  kandep: { lat: -5.94, lng: 143.5, name: "Kandep" },
+  kompiam: { lat: -5.6, lng: 143.9, name: "Kompiam" },
+  // Hela / Southern Highlands
+  tari: { lat: -5.85, lng: 142.95, name: "Tari" },
+  komo: { lat: -5.97, lng: 142.78, name: "Komo" },
+  koroba: { lat: -5.65, lng: 142.78, name: "Koroba" },
+  kopiago: { lat: -5.42, lng: 142.38, name: "Kopiago" },
+  ialibu: { lat: -6.3, lng: 143.99, name: "Ialibu" },
+  pangia: { lat: -6.5, lng: 143.83, name: "Pangia" },
+  // Chimbu (further localities)
+  kerowagi: { lat: -6.01, lng: 144.75, name: "Kerowagi" },
+  gumine: { lat: -6.23, lng: 144.98, name: "Gumine" },
+  chuave: { lat: -6.28, lng: 145.11, name: "Chuave" },
+  // Western (Fly / Ok Tedi)
+  kiunga: { lat: -6.12, lng: 141.3, name: "Kiunga" },
+  tabubil: { lat: -5.27, lng: 141.22, name: "Tabubil" },
+  "ok tedi": { lat: -5.27, lng: 141.22, name: "Ok Tedi" },
+  // Gulf / Milne Bay
+  kikori: { lat: -7.42, lng: 144.25, name: "Kikori" },
+  samarai: { lat: -10.62, lng: 150.67, name: "Samarai" },
+  // West Sepik (Sandaun)
+  aitape: { lat: -3.14, lng: 142.35, name: "Aitape" },
+  // New Ireland / Manus
+  namatanai: { lat: -3.66, lng: 152.43, name: "Namatanai" },
+  lihir: { lat: -3.13, lng: 152.62, name: "Lihir" },
+  lorengau: { lat: -2.02, lng: 147.27, name: "Lorengau" },
+  // Bougainville (further localities)
+  buka: { lat: -5.42, lng: 154.67, name: "Buka" },
+  arawa: { lat: -6.22, lng: 155.57, name: "Arawa" },
+  panguna: { lat: -6.32, lng: 155.48, name: "Panguna" },
+  kieta: { lat: -6.22, lng: 155.63, name: "Kieta" },
   // Middle East (Cargo Watch)
   dubai: { lat: 25.2, lng: 55.27 },
   "abu dhabi": { lat: 24.45, lng: 54.38 },
