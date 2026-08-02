@@ -64,22 +64,17 @@ function topicToCategory(topic: string): string {
 
 // Incidents that couldn't be geocoded to a specific town/city fall back to
 // their country's centroid, so several unrelated incidents can share the
-// exact same coordinates. Rather than randomly displacing every point (which
-// makes accurately-placed markers look wrong too), only points that truly
-// share a coordinate are fanned out into a small ring around that shared
-// spot — points with a unique, resolved location are left exactly where they
-// belong. Ring position is deterministic (seeded on the shared coordinate),
-// so it doesn't flicker between renders.
-//
-// Above OVERLAP_CLUSTER_THRESHOLD stacked points, fanning them into a ring
-// stops reading as "several incidents near this spot" and starts reading as
-// a perfect geometric donut drawn on the map (seen at country-centroid
-// fallback points, e.g. Indonesia's centroid sitting in open water in the
-// Makassar Strait) — a rendering artifact, not a real spatial pattern. Once a
-// group crosses that size we collapse it into a single cluster marker
-// instead, carrying a count and the group's own points for the popup.
-const OVERLAP_CLUSTER_THRESHOLD = 12;
-
+// exact same coordinates. Fanning shared-coordinate points into a ring looks
+// tidy but is not practical: at ANY group size it draws a perfect geometric
+// shape that reads as a fabricated spatial pattern rather than real incident
+// spread (seen at country-centroid fallback points, e.g. Indonesia's
+// centroid sitting in open water in the Makassar Strait, and smaller rings
+// on West Papua/Papuan Highlands fallback points). There is no size below
+// which a synthetic ring is an honest representation of the data, so every
+// coordinate with 2+ overlapping incidents collapses into a single cluster
+// marker with a count badge — never a ring, regardless of how many points
+// share the spot. Points with a unique, resolved location are left exactly
+// where they belong.
 function severityRank(rating: string): number {
   const idx = (SEVERITY_LEVELS as readonly string[]).indexOf(rating);
   return idx === -1 ? 0 : idx;
@@ -102,33 +97,17 @@ function spreadOverlapping<T extends { id: string; lat: number; lng: number; rat
       continue;
     }
     const n = group.length;
-    if (n > OVERLAP_CLUSTER_THRESHOLD) {
-      // Represent the whole stack with one marker at the shared coordinate,
-      // styled by the highest severity present in the group.
-      const highest = group.reduce((best, p) =>
-        severityRank(p.rating) > severityRank(best.rating) ? p : best
-      );
-      result.push({
-        ...highest,
-        id: `cluster-${group[0].lat.toFixed(4)},${group[0].lng.toFixed(4)}`,
-        clusterSize: n,
-        clusterMembers: group,
-      });
-      continue;
-    }
-    // Ring grows gently with the number of stacked incidents but stays close
-    // enough to the real point to still read as "this country/area".
-    const radius = Math.min(0.12 + n * 0.015, 0.4);
-    const seedAngle =
-      ((Math.abs(group[0].lat) * 1000 + Math.abs(group[0].lng) * 1000) % 360) *
-      (Math.PI / 180);
-    group.forEach((p, i) => {
-      const angle = seedAngle + (2 * Math.PI * i) / n;
-      result.push({
-        ...p,
-        lat: p.lat + Math.sin(angle) * radius,
-        lng: p.lng + Math.cos(angle) * radius,
-      });
+    // Represent the whole stack with one marker at the shared coordinate,
+    // styled by the highest severity present in the group. Applies uniformly
+    // from n=2 upward — no ring fan-out at any size.
+    const highest = group.reduce((best, p) =>
+      severityRank(p.rating) > severityRank(best.rating) ? p : best
+    );
+    result.push({
+      ...highest,
+      id: `cluster-${group[0].lat.toFixed(4)},${group[0].lng.toFixed(4)}`,
+      clusterSize: n,
+      clusterMembers: group,
     });
   }
   return result;
@@ -235,9 +214,9 @@ type Point = {
   gdeltEventType: string | null;
   gdeltSubEventType: string | null;
   gdeltConfidence: number | null;
-  // Set only on synthetic markers produced by spreadOverlapping() when a
-  // stack of points sharing one fallback coordinate is too large to fan into
-  // a legible ring. clusterMembers holds the original points for the popup.
+  // Set only on synthetic markers produced by spreadOverlapping() when 2 or
+  // more points share one fallback coordinate. clusterMembers holds the
+  // original points for the popup.
   clusterSize?: number;
   clusterMembers?: Point[];
 };
@@ -581,11 +560,11 @@ export default function MapPage() {
               subdomains={["a", "b", "c", "d"]}
             />
             {visiblePoints.map((p) => {
-              // Large stacks of incidents sharing one unresolved fallback
-              // coordinate (e.g. a country centroid) are collapsed by
-              // spreadOverlapping() into a single cluster marker rather than
-              // fanned into a ring — at high counts the ring reads as a
-              // fabricated geometric shape rather than real incident spread.
+              // Any stack of 2+ incidents sharing one unresolved fallback
+              // coordinate (e.g. a country centroid) is collapsed by
+              // spreadOverlapping() into a single cluster marker with a count
+              // badge — never fanned into a ring, which reads as a fabricated
+              // geometric shape rather than real incident spread.
               if (p.clusterSize && p.clusterSize > 1) {
                 const clusterStyle = markerStyle(p.rating);
                 const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
