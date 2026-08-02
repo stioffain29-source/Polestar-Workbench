@@ -9,8 +9,6 @@ import {
 const MIDNIGHT = "#0B0B3D";
 const ELECTRIC = "#4655FF";
 
-const NOT_REPORTED = "Not reported";
-
 function StatusPill({ active }: { active: boolean }) {
   const style = active
     ? { background: "#6FB872", color: "#0B0B3D" }
@@ -47,20 +45,23 @@ function PanelSection({ title, children }: { title: string; children: React.Reac
   );
 }
 
+// Undefined/empty fields are omitted entirely rather than shown as a
+// "Not reported" placeholder — the alert dataset is intentionally sparse
+// per-country (see fuelDisruptionAlert.ts), and a blank field is not new
+// information worth a row of its own.
 function Field({ label, value }: { label: string; value?: string }) {
+  if (!value) return null;
   return (
     <div>
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">{label}</div>
-      <div className={"text-sm font-sans mt-0.5 leading-snug " + (value ? "text-primary" : "text-muted-foreground italic")}>
-        {value || NOT_REPORTED}
-      </div>
+      <div className="text-sm font-sans mt-0.5 leading-snug text-primary">{value}</div>
     </div>
   );
 }
 
 function FieldList({ label, items }: { label: string; items?: string[] }) {
   if (!items || items.length === 0) {
-    return <Field label={label} value={undefined} />;
+    return null;
   }
   return (
     <div>
@@ -78,8 +79,21 @@ function FieldList({ label, items }: { label: string; items?: string[] }) {
 }
 
 function CountryCard({ c }: { c: FuelDisruptionCountry }) {
+  // Only the dimensions the alert actually reports get a row — undefined
+  // fields (e.g. Bangladesh/Nepal have no aviation or power impact data)
+  // are dropped rather than padded out with "Not reported" placeholders.
+  const impactFields: { label: string; value: string }[] = [
+    { label: "Fuel availability", value: c.fuelAvailability },
+    { label: "Transport impact", value: c.transportImpact },
+    { label: "Business impact", value: c.businessImpact },
+    { label: "Aviation impact", value: c.aviationImpact },
+    { label: "Power impact", value: c.powerImpact },
+    { label: "Protest / unrest risk", value: c.protestRisk },
+    { label: "Operational impact", value: c.operationalImpact },
+  ].filter((f): f is { label: string; value: string } => Boolean(f.value));
+
   return (
-    <div className="bg-white border border-border rounded-sm overflow-hidden flex flex-col">
+    <div className="bg-white border border-border rounded-sm overflow-hidden">
       <div
         className="flex items-center justify-between gap-3 px-4 py-2.5"
         style={{ background: MIDNIGHT }}
@@ -95,16 +109,14 @@ function CountryCard({ c }: { c: FuelDisruptionCountry }) {
           <Field label="Status" value={c.status} />
           <Field label="Time frame" value={c.timeFrame} />
         </div>
-        <Field label="Fuel availability" value={c.fuelAvailability} />
+        {impactFields.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-border">
+            {impactFields.map((f) => (
+              <Field key={f.label} label={f.label} value={f.value} />
+            ))}
+          </div>
+        )}
         <FieldList label="Government measures" items={c.governmentMeasures} />
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border">
-          <Field label="Transport impact" value={c.transportImpact} />
-          <Field label="Business impact" value={c.businessImpact} />
-          <Field label="Aviation impact" value={c.aviationImpact} />
-          <Field label="Power impact" value={c.powerImpact} />
-          <Field label="Protest / unrest risk" value={c.protestRisk} />
-          <Field label="Operational impact" value={c.operationalImpact} />
-        </div>
         <div className="pt-1 border-t border-border" style={{ borderTopColor: ELECTRIC }}>
           <div className="text-[10px] uppercase tracking-widest font-sans" style={{ color: ELECTRIC }}>
             Polestar view
@@ -112,9 +124,7 @@ function CountryCard({ c }: { c: FuelDisruptionCountry }) {
           <div className="text-sm font-sans text-primary mt-0.5 leading-snug">{c.polestarView}</div>
         </div>
         <FieldList label="Advice" items={c.advice} />
-        {c.watchNext && c.watchNext.length > 0 && (
-          <FieldList label="Watch next" items={c.watchNext} />
-        )}
+        <FieldList label="Watch next" items={c.watchNext} />
       </div>
     </div>
   );
@@ -191,7 +201,7 @@ export function FuelDisruptionPanel({ alert = SOUTH_ASIA_FUEL_ALERT }: { alert?:
 
       {/* 2. Country impact cards */}
       <PanelSection title="Country Impact">
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
           {alert.countries.map((c) => (
             <CountryCard key={c.country} c={c} />
           ))}
