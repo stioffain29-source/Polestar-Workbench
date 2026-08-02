@@ -296,6 +296,13 @@ export default function MapPage() {
     () => new Set(INCIDENT_CATEGORIES),
   );
 
+  // Low/insignificant incidents dominate the marker count on longer windows
+  // (30d/60d/120d/1y) without meaningfully changing the risk picture, making
+  // the map noisy and hard to scan for what actually matters. This toggle
+  // hides them without touching the underlying category filters or window —
+  // an analyst can still switch it off to see everything.
+  const [hideLowSeverity, setHideLowSeverity] = useState(false);
+
   // When the tab changes, default to all categories of the new tab on.
   useEffect(() => {
     setActiveCategories(new Set(availableCategories));
@@ -384,8 +391,13 @@ export default function MapPage() {
   const windowedPoints = allPoints;
 
   const visiblePoints = useMemo(
-    () => windowedPoints.filter((p) => activeCategories.has(p.category)),
-    [windowedPoints, activeCategories],
+    () =>
+      windowedPoints.filter(
+        (p) =>
+          activeCategories.has(p.category) &&
+          (!hideLowSeverity || (p.rating !== "low" && p.rating !== "insignificant")),
+      ),
+    [windowedPoints, activeCategories, hideLowSeverity],
   );
 
   // The pulsing "new" treatment is meant to flag incidents that just came in
@@ -902,6 +914,18 @@ export default function MapPage() {
                 </label>
               );
             })}
+          </div>
+          <div className="mt-4 pt-3 border-t border-border">
+            <div className="font-serif font-bold uppercase text-primary text-sm tracking-wide mb-1">Severity</div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hideLowSeverity}
+                onChange={() => setHideLowSeverity((v) => !v)}
+                className="h-4 w-4 accent-accent"
+              />
+              <span>Hide Low / Insignificant</span>
+            </label>
           </div>
           {liveOn && (
             <div className="mt-4 pt-3 border-t border-border">
