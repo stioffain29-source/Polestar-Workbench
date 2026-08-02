@@ -429,9 +429,14 @@ const INSIGNIFICANT: RegExp[] = [
 // on the first few words so a fresh-attack headline that merely ENDS with a
 // reaction ("3 injured in armed attack, mob protests treatment") is NOT caught.
 // Protest / rally / clash words are deliberately excluded — they can BE the
-// violent event ("Protest turns deadly, dozens killed").
+// violent event ("Protest turns deadly, dozens killed"). Also covers a
+// government/official body awaiting or pending a report on a prior
+// incident ("Merauke regency government awaits full report on shooting of
+// fishing vessel...") -- the headline is reporting the STATUS of an
+// investigation, not a fresh attack, so any casualty/violence word the
+// underlying incident carries must not drive the reserved tiers either.
 const REACTION_LEAD_RE =
-  /^(?:[\w’'".&()\-]+[\s,;:]+){0,4}(demand(s|ed|ing)?|seek(s|ing)?\s+(justice|a\s+ban|ban|probe|inquiry|action|accountability|compensation|redress)|call(s|ed|ing)?\s+for|condemn(s|ed|ing|ation)?|denounc(e|es|ed|ing|ation)|decr(y|ies|ied)|urg(e|es|ed|ing)\b|appeal(s|ed|ing)?\s+for|mourn(s|ed|ing)?|pay(s|ing)?\s+tribute|tribute|condol|vigil|petition(s|ed|ing)?|memorandum|boycott(s|ed|ing)?|slam(s|med|ming)?|blame(s|d)?|accus(e|es|ed|ing)|hail(s|ed|ing)?|welcom(e|es|ed|ing)|reject(s|ed|ing)?|refus(e|es|ed|ing|al)|summon(s|ed|ing)?)/i;
+  /^(?:[\w’'".&()\-]+[\s,;:]+){0,4}(demand(s|ed|ing)?|seek(s|ing)?\s+(justice|a\s+ban|ban|probe|inquiry|action|accountability|compensation|redress)|call(s|ed|ing)?\s+for|condemn(s|ed|ing|ation)?|denounc(e|es|ed|ing|ation)|decr(y|ies|ied)|urg(e|es|ed|ing)\b|appeal(s|ed|ing)?\s+for|mourn(s|ed|ing)?|pay(s|ing)?\s+tribute|tribute|condol|vigil|petition(s|ed|ing)?|memorandum|boycott(s|ed|ing)?|slam(s|med|ming)?|blame(s|d)?|accus(e|es|ed|ing)|hail(s|ed|ing)?|welcom(e|es|ed|ing)|reject(s|ed|ing)?|refus(e|es|ed|ing|al)|summon(s|ed|ing)?|await(s|ing)?|pending|yet to)/i;
 
 /**
  * True if the headline is led by an advocacy / statement verb — i.e. it reports

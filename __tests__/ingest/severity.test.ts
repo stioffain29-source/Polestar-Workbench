@@ -100,6 +100,44 @@ describe("classifySeverity", () => {
     expect(classifySeverity("Villagers seek justice for slain farmer", "", "conflict")).toBe("low");
   });
 
+  // Regression: "Merauke regency government awaits full report on shooting of
+  // fishing vessel in PNG waters" was rated High/Extreme because the headline
+  // is LED by "awaits" (a status-of-investigation verb), which REACTION_LEAD_RE
+  // did not originally recognise, so the "shooting" in the body drove the
+  // fatal-signal/security-signal HIGH branch instead of being suppressed like
+  // every other reaction-led headline.
+  it("does not escalate an 'awaits full report on shooting' status headline", () => {
+    expect(
+      classifySeverity(
+        "Merauke regency government awaits full report on shooting of fishing vessel in PNG waters",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("low");
+  });
+
+  it("does not escalate a 'report pending' status headline", () => {
+    expect(
+      classifySeverity("Officials say report pending on Merauke fishing vessel incident", "", "apac_local"),
+    ).toBe("low");
+  });
+
+  it("does not escalate a 'yet to release findings' status headline", () => {
+    expect(
+      classifySeverity("Papua police yet to release findings on fishing vessel shooting", "", "indonesia_local"),
+    ).toBe("low");
+  });
+
+  // Control: a genuine fresh shooting (not framed as awaiting/pending a
+  // report) must still escalate normally under the same reaction-guarded
+  // topics -- the fix must not blanket-suppress every headline containing
+  // "shooting".
+  it("still rates a fresh fatal shooting as high even under the reaction-guarded topics", () => {
+    expect(
+      classifySeverity("Gunmen shoot dead two fishermen off Merauke coast", "", "indonesia_local"),
+    ).toBe("high");
+  });
+
   // A fresh attack that merely ENDS with a reaction is still the attack.
   it("still rates a fresh armed attack that ends with a reaction as high", () => {
     expect(
