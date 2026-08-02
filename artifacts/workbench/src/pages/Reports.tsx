@@ -95,7 +95,14 @@ export default function Reports() {
                 <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} className="rounded-sm" /></Field>
               </div>
               <Button
-                onClick={() =>
+                onClick={() => {
+                  // Reliability guard: the server now dedupes identical
+                  // draft creates (same topic + issueDate + title), but the
+                  // isPending check here stops the request from ever being
+                  // sent twice in the common case — an impatient re-click
+                  // before the dialog closes, or a slow network making the
+                  // button look unresponsive.
+                  if (create.isPending) return;
                   create.mutate(
                     { data: { title: form.title, topic: form.topic, issueDate: form.issueDate, status: form.status } as never },
                     {
@@ -106,12 +113,12 @@ export default function Reports() {
                         setLocation(`/reports/${(r as { id: number }).id}`);
                       },
                     },
-                  )
-                }
-                disabled={!form.title}
+                  );
+                }}
+                disabled={!form.title || create.isPending}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm w-full"
               >
-                Create and Open
+                {create.isPending ? "Creating…" : "Create and Open"}
               </Button>
             </div>
           </DialogContent>

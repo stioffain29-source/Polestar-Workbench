@@ -76,9 +76,37 @@ router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
     return;
   }
   const { issueDate, hardNumbers, ...rest } = parsed.data;
+  const normalizedIssueDate = dateToYmd(issueDate);
+  // Reliability guard: "New Report" is a single client button that can fire
+  // twice (slow network, an impatient re-click before the dialog closes), and
+  // any other caller retrying a timed-out POST hits the same risk. Without a
+  // check here every retry inserts ANOTHER identical draft, and drafts have
+  // accumulated in exactly this way. Only status: "draft" is deduped —
+  // review/published are deliberate state transitions the analyst chose, not
+  // creation retries, so they always insert. Match on topic + issueDate +
+  // title so a genuinely distinct draft for the same topic/day (different
+  // title) is never blocked.
+  if (rest.status === "draft") {
+    const [existing] = await db
+      .select()
+      .from(reportsTable)
+      .where(
+        and(
+          eq(reportsTable.topic, rest.topic),
+          eq(reportsTable.issueDate, normalizedIssueDate),
+          eq(reportsTable.title, rest.title),
+          eq(reportsTable.status, "draft"),
+        ),
+      )
+      .limit(1);
+    if (existing) {
+      res.status(200).json(existing);
+      return;
+    }
+  }
   const insertValues: InsertReport = {
     ...rest,
-    issueDate: dateToYmd(issueDate),
+    issueDate: normalizedIssueDate,
     hardNumbers: normalizeHardNumbers(hardNumbers),
   };
   const [row] = await db.insert(reportsTable).values(insertValues).returning();
