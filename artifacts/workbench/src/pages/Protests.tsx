@@ -18,6 +18,7 @@ import {
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { resolveTrueIncidents } from "@/lib/trueIncidents";
 import { RangeToggle } from "@/components/RangeToggle";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import {
   classifyProtestCategory, detectOperationalImpacts,
@@ -739,6 +740,11 @@ export default function Protests() {
       <Section title="Papua / PNG Facebook OSINT">
         <FacebookOsintPanel items={osintItems} isLoading={osintLoading} />
       </Section>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic="protests" />
     </div>
   );
 }

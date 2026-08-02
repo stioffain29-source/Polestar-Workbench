@@ -16,7 +16,7 @@ import { TOPICS, TOPIC_LABELS, REPORT_STATUSES, reportStatusClass } from "@/lib/
 import { format, parseISO } from "date-fns";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { canonicalTopic } from "@/lib/reportNaming";
+import { canonicalTopic, REPORT_TOPICS } from "@/lib/reportNaming";
 
 export default function Reports() {
   const qc = useQueryClient();
@@ -87,9 +87,13 @@ export default function Reports() {
               <Field label="Title"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="rounded-sm" /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Topic">
+                  {/* Only topics the report API actually accepts — TOPICS (from
+                      lib/topics.ts) also includes "crime" and "maritime_security",
+                      which are incident-monitor topics with no report type yet;
+                      offering them here would 400 on create. */}
                   <Select value={form.topic} onValueChange={(v) => setForm({ ...form, topic: v })}>
                     <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{REPORT_TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} className="rounded-sm" /></Field>

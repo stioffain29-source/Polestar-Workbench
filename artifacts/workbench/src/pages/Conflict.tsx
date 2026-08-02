@@ -18,6 +18,7 @@ import {
 } from "@/lib/conflictAnalysis";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
 import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
 
@@ -576,6 +577,11 @@ export default function Conflict() {
           Highest severity on file: {highestSev ? SEVERITY_LABELS[highestSev] ?? highestSev : "—"}. Type is keyword-classified from the headline and summary; where uncertain, records default to Armed Clash.
         </p>
       </Section>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic="conflict" />
     </div>
   );
 }

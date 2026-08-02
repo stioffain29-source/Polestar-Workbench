@@ -18,6 +18,7 @@ import { RANGE_DAYS, RANGE_LABEL, RANGE_NOTE, type RangeKey } from "@/lib/dateRa
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import { DataCentreFacilityMap, statusColor } from "@/components/DataCentreFacilityMap";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { CountryRiskStrip } from "@/components/CountryRiskStrip";
 import { ExternalLink, Server } from "lucide-react";
@@ -436,6 +437,11 @@ export default function DataCentres() {
           </div>
         )}
       </Section>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic="data_centres" />
     </div>
   );
 }

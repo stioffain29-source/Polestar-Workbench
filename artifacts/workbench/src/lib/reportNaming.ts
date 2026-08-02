@@ -33,7 +33,23 @@ export const CANONICAL_TOPIC: Record<string, CanonicalTopic> = {
   energy:      { topicLine: "Energy / Grid", cadence: "Weekly",  title: "Energy Watch" },
   fertiliser:  { topicLine: "Fertiliser",    cadence: "Monthly", title: "Fertiliser Watch" },
   conflict:    { topicLine: "Conflict",      cadence: "Weekly",  title: "Conflict Watch", subtitle: "Armed Conflict, Insurgency & Armed Crime" },
+  data_centres:{ topicLine: "Data Centres",  cadence: "Monthly", title: "Data Centres Watch" },
 };
+
+// Topics the report API actually accepts (mirrors the `Topic` enum in
+// lib/api-spec/openapi.yaml). "crime" and "maritime_security" exist as
+// incident-monitor topics (see TOPIC_LABELS in lib/topics.ts) but have no
+// report type yet — creating a report with either of those topics is
+// rejected by the API. Keep this list in sync with the OpenAPI spec if that
+// enum ever grows.
+export const REPORT_TOPICS = [
+  "fuel", "flashpoint", "protests", "fertiliser", "energy",
+  "shipping", "cargo_watch", "conflict", "data_centres",
+] as const;
+export type ReportTopic = (typeof REPORT_TOPICS)[number];
+export function isReportableTopic(topic: string): topic is ReportTopic {
+  return (REPORT_TOPICS as readonly string[]).includes(topic);
+}
 
 export function canonicalTopic(topic: string): CanonicalTopic {
   return CANONICAL_TOPIC[topic] ?? { topicLine: topic, cadence: "Weekly", title: topic };

@@ -18,6 +18,7 @@ import {
   LineChart, Line, LabelList,
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
 import {
   CHOKEPOINTS, detectChokepoints, classifyPiracy,
@@ -1252,6 +1253,11 @@ export default function Shipping() {
           Kept in totals; excluded from country-level charts. Source records show <span className="font-semibold">{LOCATION_NOT_IDENTIFIED}</span> when no event-country can be derived. Vessel flag state, when present, is surfaced on vessel cards only.
         </div>
       </div>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic="shipping" />
     </div>
   );
 }

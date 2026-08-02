@@ -18,6 +18,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { severityBadgeStyle } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 import {
   classifyRegion,
   classifyCategory,
@@ -935,6 +936,11 @@ export default function CargoWatch() {
           </div>
         )}
       </div>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic="cargo_watch" />
     </div>
   );
 }

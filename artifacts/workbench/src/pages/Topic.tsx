@@ -1,4 +1,4 @@
-import { useRoute, Link } from "wouter";
+import { useRoute } from "wouter";
 import { useMemo, useState } from "react";
 import { useListIncidents } from "@workspace/api-client-react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
@@ -23,6 +23,7 @@ import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
+import { TopicReportPanel } from "@/components/TopicReportPanel";
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
@@ -320,13 +321,6 @@ export default function Topic() {
           <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">{subtitle}</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/reports"
-            className="text-xs font-sans font-medium text-accent hover:underline uppercase tracking-wide whitespace-nowrap"
-            data-testid="link-report-builder"
-          >
-            Go to Report Builder
-          </Link>
           <RangeToggle range={range} onChange={setRange} />
         </div>
       </div>
@@ -671,6 +665,11 @@ export default function Topic() {
           {hiddenByCap > 0 ? ` Showing top 20 of ${severityFilteredForTable.length}.` : ""}
         </p>
       </Section>
+
+      {/* Report Builder, folded into the topic page — drafts for this topic
+          live here instead of a separate /reports destination you have to
+          jump to. */}
+      <TopicReportPanel topic={topic} />
     </div>
   );
 }
