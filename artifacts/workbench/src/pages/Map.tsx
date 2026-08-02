@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
@@ -381,6 +381,36 @@ export default function MapPage() {
     [visiblePoints, clearedIds],
   );
 
+  // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
+  // Leaflet's SVG renderer only applies pathOptions.className once, at the
+  // moment a marker's underlying <path> is first created (_initPath). Every
+  // later style update (which is how React-Leaflet applies pathOptions on
+  // re-render) goes through setStyle(), which only touches stroke/fill
+  // attributes and never touches the CSS class list. So passing
+  // `className: isNew ? "map-dot-blink" : undefined` through pathOptions is
+  // silently a no-op after mount — confirmed by reproducing this exact
+  // pattern against the real react-leaflet + leaflet libraries. Instead we
+  // grab the real marker instances via ref and toggle classList directly.
+  // Leaflet's own Path type doesn't publicly declare `_path` (it's an
+  // internal implementation detail), so we narrow to just what we read.
+  type PathLikeInstance = { _path?: SVGPathElement } | null;
+  const dotPathRefs = useRef<Record<string, PathLikeInstance>>({});
+  const ringPathRefs = useRef<Record<string, PathLikeInstance>>({});
+
+  useEffect(() => {
+    const newIdSet = new Set(newMarkerIds);
+    for (const [id, marker] of Object.entries(dotPathRefs.current)) {
+      const path = marker?._path;
+      if (path) path.classList.toggle("map-dot-blink", newIdSet.has(id));
+    }
+    for (const marker of Object.values(ringPathRefs.current)) {
+      // The ring marker is only ever mounted while its incident is new (see
+      // the `{isNew && (...)}` guard below), so if it exists it should pulse.
+      const path = marker?._path;
+      if (path) path.classList.add("map-pulse-ring");
+    }
+  }, [newMarkerIds]);
+
   function toggle(cat: string) {
     setActiveCategories((prev) => {
       const next = new Set(prev);
@@ -513,6 +543,15 @@ export default function MapPage() {
                 {isNew && (
                   <CircleMarker
                     key={`${p.id}-pulse`}
+                    ref={(instance) => {
+                      // Leaflet only applies pathOptions.className at initial
+                      // path creation (_initPath), never on later setStyle()
+                      // calls — so React-Leaflet's pathOptions.className is
+                      // silently dropped. Set the CSS class directly on the
+                      // underlying SVG path instead.
+                      if (instance) ringPathRefs.current[p.id] = instance as unknown as PathLikeInstance;
+                      else delete ringPathRefs.current[p.id];
+                    }}
                     center={[p.lat, p.lng]}
                     radius={7}
                     interactive={false}
@@ -520,12 +559,15 @@ export default function MapPage() {
                       color: s.stroke,
                       weight: 2,
                       fillOpacity: 0,
-                      className: "map-pulse-ring",
                     }}
                   />
                 )}
                 <CircleMarker
                   key={p.id}
+                  ref={(instance) => {
+                    if (instance) dotPathRefs.current[p.id] = instance as unknown as PathLikeInstance;
+                    else delete dotPathRefs.current[p.id];
+                  }}
                   center={[p.lat, p.lng]}
                   radius={7}
                   pathOptions={{
@@ -534,7 +576,6 @@ export default function MapPage() {
                     weight: s.strokeWidth,
                     fillColor: s.fill,
                     fillOpacity: s.fillOpacity,
-                    className: isNew ? "map-dot-blink" : undefined,
                   }}
                   eventHandlers={
                     isNew ? { click: () => clearMarkers([p.id]) } : undefined
