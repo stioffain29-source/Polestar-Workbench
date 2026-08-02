@@ -409,12 +409,21 @@ export default function MapPage() {
     [windowedPoints, activeCategories],
   );
 
+  // The pulsing "new" treatment is meant to flag incidents that just came in
+  // during the live 24h window, not every not-yet-cleared marker regardless
+  // of how far back you're looking. Without this gate, an incident flagged
+  // new on the 24h view kept blinking on the 7d/30d/etc. views too, since
+  // it's the same marker id and clearedIds has no notion of range at all.
+  const blinkEnabled = range === "24h";
+
   // Markers currently on screen that haven't been cleared yet — these are the
   // ones pulsing. Recomputed whenever the visible set or cleared set changes,
   // so a fresh ingest poll (new IDs) or a Clear click both update the count.
+  // Empty outside the 24h view so the pulse ring, dot blink, and "New (N)"
+  // legend/clear-all control all naturally switch off together.
   const newMarkerIds = useMemo(
-    () => visiblePoints.filter((p) => !clearedIds.has(p.id)).map((p) => p.id),
-    [visiblePoints, clearedIds],
+    () => (blinkEnabled ? visiblePoints.filter((p) => !clearedIds.has(p.id)).map((p) => p.id) : []),
+    [blinkEnabled, visiblePoints, clearedIds],
   );
 
   // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
@@ -644,7 +653,7 @@ export default function MapPage() {
                 );
               }
               const s = markerStyle(p.rating);
-              const isNew = !clearedIds.has(p.id);
+              const isNew = blinkEnabled && !clearedIds.has(p.id);
               return (
                 <Fragment key={p.id}>
                 {isNew && (
