@@ -39,6 +39,15 @@
 //           "Army, police surround two militants in Shopian as gunfight
 //           continues"). The shared place anchor plus the short window keeps a
 //           different town, or the same town more than two days apart, separate.
+//   PATH 3B compatible with PATH 3's philosophy but for a Papua-specific gap: an
+//           armed-actor family match (OPM/TPNPB/KKB — the SAME group under its
+//           government vs separatist name) AND a shared fatal event-nature AND
+//           an EXACT matching casualty count, within a same/next-day window.
+//           Bridges "KKB attacks road workers, five killed" (broad theatre
+//           name) and "Five shot dead in Tolikara; Kodam and TPNPB each claim
+//           responsibility" (specific regency), which share ZERO other content
+//           words. See "Casualty-count anchor (PATH 3B)" below for the full
+//           rationale and false-positive tradeoff.
 //
 // The province gate on PATHS 1-4 is relaxed only for a SINGLE-THEATRE report
 // (crossProvince), where sibling sub-provinces of the one theatre (e.g. Papua
@@ -172,9 +181,60 @@ const CLASS_PATTERNS: Array<[string, RegExp]> = [
   ["injury", /\b(injured|wounded|hurt)\b/i],
   [
     "actor:opm",
-    /\b(opm|tpnpb|west\s+papua\s+liberation(?:\s+army)?|papuan?\s+(?:rebels?|separatists?|insurgents?|militants?|gunmen)|separatist\s+(?:rebels?|fighters?|gunmen))\b/i,
+    // "KKB" (Kelompok Kriminal Bersenjata, "armed criminal group") is the
+    // Indonesian security establishment's official term for the SAME actor
+    // TPNPB/OPM call themselves — outlets mix all three names for one armed
+    // group depending on whether they take the government or separatist
+    // framing ("KKB attacks road workers" vs "TPNPB claim responsibility" can
+    // both describe the identical operation). Recognising "kkb" here lets the
+    // fatal-count anchor below (PATH 3B) corroborate across that naming split.
+    /\b(opm|tpnpb|kkb|west\s+papua\s+liberation(?:\s+army)?|papuan?\s+(?:rebels?|separatists?|insurgents?|militants?|gunmen)|separatist\s+(?:rebels?|fighters?|gunmen))\b/i,
   ],
 ];
+
+// ---------------------------------------------------------------------------
+// Casualty-count anchor (PATH 3B)
+// ---------------------------------------------------------------------------
+// The same Papua KKB/TPNPB/OPM attack is reported under the government frame
+// ("KKB attacks road workers, five killed") and the separatist/neutral frame
+// ("Five shot dead in Tolikara; Kodam and TPNPB each claim responsibility") so
+// differently that they share ZERO content words — not even a place name, since
+// one report uses the broad theatre ("Papua Highlands") and the other the
+// specific regency ("Tolikara"). Bag-of-words Jaccard, named-premises, and the
+// PATH-4 distinctive-place anchor all require some shared vocabulary, so none
+// of them can bridge this pair. The one thing that DOES survive both framings
+// is the casualty figure, which is why this is scoped narrowly: it only fires
+// when BOTH headlines name the SAME armed-actor family (actor:opm, now
+// including "KKB") AND the SAME fatal event-nature AND an EXACT matching
+// casualty count, within a tight same/next-day window. This mirrors PATH 3's
+// principle (corroborating classes are never sufficient alone) but substitutes
+// a matching count for the foreign-national strong entity as the anchor — a
+// coincidental exact-count match between two DIFFERENT armed-actor fatal
+// events on the same day is rare enough to accept, while an actor-name-only or
+// count-only match (already tested as non-merging above) stays a non-merge.
+
+// Small (1-99) casualty counts only — 4-digit numbers are dates/years and are
+// deliberately excluded so a shared "2026" can never pose as a shared count.
+const SPELLED_SMALL_NUMBERS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8,
+  nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
+  fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+  eighty: 80, ninety: 90,
+};
+
+// The small (1-99) casualty-count tokens in a headline, digit and spelled-out
+// forms normalised to the same string keys. Exported for tests.
+export function victimCountTokens(title: string): Set<string> {
+  const out = new Set<string>();
+  const digits = title.match(/\b\d{1,2}\b/g);
+  if (digits) for (const d of digits) out.add(String(parseInt(d, 10)));
+  for (const t of storyTokens(title)) {
+    const v = SPELLED_SMALL_NUMBERS[t];
+    if (v !== undefined) out.add(String(v));
+  }
+  return out;
+}
 
 // Foreign nationalities -> canonical code (kept small; extend as needed). A
 // foreign national in a distinctive role is a strong, event-identifying entity.
@@ -364,6 +424,9 @@ export function clusterSameStoryRows(
       prem: namedPremises(r.title),
       canon: canonicalTitleKey(r.title),
       ent: storyEntities(r.title),
+      // PATH 3B: small casualty-count tokens (digit and spelled), for the
+      // armed-actor + fatal-class + matching-count anchor below.
+      victimCount: victimCountTokens(r.title),
       // PATH 4: whether the headline reports an armed clash, and its DISTINCTIVE
       // place tokens (content tokens minus the generic clash/security/geography
       // vocabulary) — the specific town/premises that identifies one operation.
@@ -423,6 +486,30 @@ export function clusterSameStoryRows(
       const sharedStrong = [...f.ent.strong].some((e) => ff.ent.strong.has(e));
       const sharedClass = [...f.ent.classes].some((cl) => ff.ent.classes.has(cl));
       if (dd <= 3 * DAY && sharedStrong && sharedClass) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
+      // PATH 3B: armed-actor + fatal-class + matching-casualty-count anchor.
+      // See "Casualty-count anchor (PATH 3B)" above for the full rationale —
+      // this bridges the SAME event reported under the government ("KKB")
+      // and separatist ("TPNPB") framings with different place granularity,
+      // where every other path shares zero anchor vocabulary. Evaluated
+      // before the province gate (like PATH 3) since the two framings may
+      // even geocode to different sub-provinces of the same theatre.
+      const sharedArmedActor =
+        f.ent.classes.has("actor:opm") && ff.ent.classes.has("actor:opm");
+      const sharedFatalClass =
+        f.ent.classes.has("fatal") && ff.ent.classes.has("fatal");
+      const sharedCount = [...f.victimCount].some((n) => ff.victimCount.has(n));
+      if (
+        dd <= DAY &&
+        sharedArmedActor &&
+        sharedFatalClass &&
+        f.victimCount.size > 0 &&
+        ff.victimCount.size > 0 &&
+        sharedCount
+      ) {
         c.members.push(i);
         placed = true;
         break;
