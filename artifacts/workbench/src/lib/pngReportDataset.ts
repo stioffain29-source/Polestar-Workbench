@@ -1642,6 +1642,7 @@ export function buildStructuredReportDataset(
     {
       countryName: config.countryName,
       priorPeriodEvents: priorEngineResult ? priorEngineResult.included : null,
+      windowStart: args.windowStart ? args.windowStart.toISOString() : null,
     },
   );
   // Credible map points for INCLUDED events only (§23). Never Unknown /

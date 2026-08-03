@@ -813,6 +813,11 @@ export function classifySeverity(
     }
   }
 
-  if (INSIGNIFICANT.some((re) => re.test(hay))) return "insignificant";
+  // Burial/funeral rite for people already dead, with no other tier having
+  // matched above, is exactly the case the INSIGNIFICANT tier documents:
+  // "aftermath-only language with no active incident." It must not fall
+  // through to the generic LOW default alongside genuinely open/live-but-minor
+  // items (e.g. a small planned protest).
+  if (INSIGNIFICANT.some((re) => re.test(hay)) || burialOrFuneral) return "insignificant";
   return "low";
 }

@@ -57,7 +57,10 @@ export type ReportProseOutcome =
 // vs cargo theft vs fuel cost-and-continuity, etc.) without us hand-writing a
 // separate prompt per topic. protests is folded onto flashpoint's civil-unrest
 // framing; an unknown topic falls back to a generic security-report framing.
-const TOPIC_PROSE_META: Record<string, { label: string; focus: string }> = {
+const TOPIC_PROSE_META: Record<
+  string,
+  { label: string; focus: string; polestarViewMinWords?: number }
+> = {
   shipping: {
     label: "Shipping & Maritime Security",
     focus:
@@ -67,6 +70,13 @@ const TOPIC_PROSE_META: Record<string, { label: string; focus: string }> = {
     label: "Cargo Watch",
     focus:
       "cargo theft, hijack, pilferage, warehouse and depot loss, seal tampering and insider crime affecting goods in transit and storage",
+    // Cargo Watch's HARD validation gate (cargoReportValidation.ts, spec
+    // pt4/pt7) rejects a Polestar View under 120 words and blocks export.
+    // The generation prompt must ask for the same minimum the gate enforces,
+    // otherwise an AI narrative that reads as a perfectly good "bottom-line
+    // judgement" in 3 sentences trips the gate every time. Keep this in sync
+    // with the minimum in cargoReportValidation.ts if that spec value changes.
+    polestarViewMinWords: 120,
   },
   fuel: {
     label: "Fuel Watch",
@@ -105,7 +115,7 @@ const TOPIC_PROSE_META: Record<string, { label: string; focus: string }> = {
   },
 };
 
-function metaFor(topic: string): { label: string; focus: string } {
+function metaFor(topic: string): { label: string; focus: string; polestarViewMinWords?: number } {
   return (
     TOPIC_PROSE_META[topic] ?? {
       label: "Security",
@@ -145,7 +155,7 @@ export function computeReportProseFingerprint(input: {
   return createHash("sha256").update(payload).digest("hex");
 }
 
-function systemPrompt(label: string, focus: string): string {
+function systemPrompt(label: string, focus: string, polestarViewMinWords?: number): string {
   return `You are a senior security-intelligence analyst writing the ${label} report for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded over a reporting window and you produce the narrative sections of the report.
 
 This report covers ${focus}.
@@ -174,7 +184,11 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "whatMatters": string,       // Why it matters for staff movement, site access, supply or continuity, and where to focus attention.
   "implications": string[],    // 4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash.
   "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
-  "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.
+  "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.${
+    polestarViewMinWords
+      ? ` MUST be at least ${polestarViewMinWords} words (aim for ${polestarViewMinWords}-${polestarViewMinWords + 40}): cover the overall judgement, what the data does and does not support, reporting limitations, the near-term outlook and your confidence level, each as its own sentence.`
+      : ""
+  }
 }
 Return ONLY the JSON object.`;
 }
@@ -255,7 +269,7 @@ async function callOnce(input: GenerateReportProseInput): Promise<ReportProseOut
   if (!cfg) return { ok: false, error: "llm-unavailable" };
   const { baseUrl: base, apiKey: key } = cfg;
 
-  const { label, focus } = metaFor(input.topic);
+  const { label, focus, polestarViewMinWords } = metaFor(input.topic);
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), REQUEST_TIMEOUT_MS);
@@ -268,7 +282,7 @@ async function callOnce(input: GenerateReportProseInput): Promise<ReportProseOut
         max_completion_tokens: MAX_COMPLETION_TOKENS,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: systemPrompt(label, focus) },
+          { role: "system", content: systemPrompt(label, focus, polestarViewMinWords) },
           { role: "user", content: buildUserPrompt(input) },
         ],
       }),

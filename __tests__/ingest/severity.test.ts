@@ -484,13 +484,17 @@ describe("classifySeverity — PNG / Melanesia violent-crime vocabulary", () => 
     ).toBe("low");
   });
 
-  it("downgrades a burial/funeral aftermath rite for people already dead, instead of inheriting HIGH from the bare fatal-word + security-noun combination", () => {
+  it("downgrades a burial/funeral aftermath rite for people already dead to insignificant, instead of inheriting HIGH from the bare fatal-word + security-noun combination", () => {
     // Same fatal-word + security-noun combination as a fresh incident, but
     // framed as the ceremony afterwards — must NOT read as a new HIGH event.
-    expect(classifySeverity("3 slain rebel suspects given dignified burial", "", "flashpoint")).toBe("low");
+    // It is pure aftermath language with no active incident, which is the
+    // INSIGNIFICANT tier's own definition — not the generic LOW default.
+    expect(
+      classifySeverity("3 slain rebel suspects given dignified burial", "", "flashpoint"),
+    ).toBe("insignificant");
     expect(
       classifySeverity("Slain militants laid to rest after deadly ambush", "", "flashpoint"),
-    ).toBe("low");
+    ).toBe("insignificant");
     // Control: the same core wording WITHOUT the burial framing still rates
     // high, proving the guard — not some other change — causes the downgrade.
     expect(

@@ -648,6 +648,7 @@ export default function JakartaCorridorMap({
                       {z.name}
                     </span>
                     <span
+                      data-posture-rating-badge="true"
                       style={{
                         flex: "0 0 auto",
                         fontFamily: "Roboto, sans-serif",

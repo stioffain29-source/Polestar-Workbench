@@ -619,6 +619,12 @@ router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
       return;
     }
     const g = result.gdeltStructured;
+    // gdeltPromote bridges the structured layer into real incidents (see the
+    // comment above runGdeltStructuredOnce in ingestRunner.ts) — it was being
+    // computed and logged internally but silently dropped from BOTH this log
+    // line and the JSON response, so an operator triggering this endpoint had
+    // no visibility into whether anything actually got promoted this run.
+    const p = result.gdeltPromote;
     req.log.info(
       {
         configured: g.configured,
@@ -631,6 +637,10 @@ router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
         totalAfter: g.totalAfter,
         quSpent: g.quSpent,
         fetchOk: g.fetchOk,
+        gdeltPromoteInserted: p.inserted,
+        gdeltPromotePromotable: p.promotable,
+        gdeltPromoteTotalAfter: p.totalAfter,
+        gdeltPromoteByTopic: p.byTopic,
         durationMs: result.durationMs,
       },
       "admin gdelt-structured finished",
@@ -659,6 +669,23 @@ router.post("/admin/gdelt-structured", async (req: Request, res: Response) => {
         quSpent: g.quSpent,
         fetchOk: g.fetchOk,
         errors: g.errors,
+      },
+      gdeltPromote: {
+        eventsConsidered: p.eventsConsidered,
+        promotable: p.promotable,
+        skippedNotEvent: p.skippedNotEvent,
+        skippedUnmappedLane: p.skippedUnmappedLane,
+        skippedNoDate: p.skippedNoDate,
+        skippedOutOfScope: p.skippedOutOfScope,
+        duplicateMarker: p.duplicateMarker,
+        duplicateKey: p.duplicateKey,
+        duplicateUrl: p.duplicateUrl,
+        newToInsert: p.newToInsert,
+        inserted: p.inserted,
+        byTopic: p.byTopic,
+        byLane: p.byLane,
+        totalAfter: p.totalAfter,
+        errors: p.errors,
       },
     });
   } catch (err) {

@@ -224,6 +224,56 @@ describe("BLUF title + location rendering (§14/§15)", () => {
 });
 
 // ---------------------------------------------------------------------------
+// BLUF lead sentence states both dates for an out-of-window lead (item 5:
+// a row REPORTED inside the current window whose own event date falls
+// BEFORE the window start, e.g. old news resurfacing with fresh findings).
+// Guarded by countryReportQc.ts Check A, which only WARNS if both dates
+// never appear in the narrative — this proves the engine actually produces
+// them for the lead sentence rather than relying on chance.
+// ---------------------------------------------------------------------------
+
+describe("BLUF lead sentence and out-of-window dates (item 5)", () => {
+  it("states both the event date and the (later) reported date when the lead predates the window", () => {
+    const events = [
+      makeEvent({
+        eventDate: "2024-02-20",
+        publicationDates: ["2024-03-06"],
+      }),
+    ];
+    const { value } = buildBluf(events, "Papua New Guinea", null, "2024-03-01T00:00:00.000Z");
+    // Both dates must appear somewhere in the lead sentence.
+    expect(value).toMatch(/20 February 2024/);
+    expect(value).toMatch(/6 March 2024/);
+    expect(value).toMatch(/only reported on/);
+  });
+
+  it("does not add a reported-date clause when the lead falls inside the window", () => {
+    const events = [
+      makeEvent({
+        eventDate: "2024-03-05",
+        publicationDates: ["2024-03-06"],
+      }),
+    ];
+    const { value } = buildBluf(events, "Papua New Guinea", null, "2024-03-01T00:00:00.000Z");
+    expect(value).not.toMatch(/only reported on/);
+    expect(value).not.toMatch(/6 March 2024/);
+  });
+
+  it("is byte-identical to the no-windowStart call when windowStart is omitted (backward compatible)", () => {
+    const events = [
+      makeEvent({
+        eventDate: "2024-02-20",
+        publicationDates: ["2024-03-06"],
+      }),
+    ];
+    const withoutWindow = buildBluf(events, "Papua New Guinea", null);
+    const withNullWindow = buildBluf(events, "Papua New Guinea", null, null);
+    expect(withoutWindow.value).toBe(withNullWindow.value);
+    expect(withoutWindow.value).not.toMatch(/only reported on/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Priority-location lists never name the whole country (task 473)
 // ---------------------------------------------------------------------------
 

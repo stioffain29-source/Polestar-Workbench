@@ -155,6 +155,14 @@ function SeverityChip({ item }: { item: PngReportItem }) {
 
 function dateLine(item: PngReportItem): string {
   const reported = format(item.reportedDate, "dd MMM yyyy");
+  // An item whose real incident date falls BEFORE the reporting window
+  // (occurredOutOfWindow) needs BOTH full dates spelled out — spec §13 and the
+  // matching QC check (countryReportQc.ts) require this so an old event is
+  // never presented as if it happened this period. "dd MMM" (no year) is not
+  // enough here since the incident could be weeks or months old.
+  if (item.occurredOutOfWindow && item.incidentDate) {
+    return `Occurred ${format(item.incidentDate, "dd MMM yyyy")} (outside this reporting window) · reported ${reported}`;
+  }
   if (item.occurredEarlier && item.incidentDate) {
     return `Occurred ${format(item.incidentDate, "dd MMM")} · reported ${reported}`;
   }

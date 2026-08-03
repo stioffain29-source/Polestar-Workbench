@@ -187,6 +187,13 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
 
   const labels = new Set(["EXTREME", "HIGH", "MODERATE", "LOW", "INSIGNIFICANT"]);
   root.querySelectorAll<HTMLElement>("span").forEach((node) => {
+    // Other badge vocabularies (e.g. Jakarta's operating-exposure scale:
+    // High/Elevated/Monitored/Low/Not assessed) can share words like "High"
+    // or "Low" with this incident-severity vocabulary. Those badges opt out
+    // via data-posture-rating-badge so this generic matcher never force-
+    // stretches their layout (that stretch previously corrupted the Jakarta
+    // zone row's flex sizing and made sibling rows' text overlap).
+    if (node.hasAttribute("data-posture-rating-badge")) return;
     const label = (node.textContent ?? "").trim().toUpperCase();
     if (!labels.has(label)) return;
     const bg = node.style.background || node.style.backgroundColor;
