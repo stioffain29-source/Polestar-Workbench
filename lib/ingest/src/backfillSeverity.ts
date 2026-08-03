@@ -40,6 +40,20 @@ import type { IngestOptions } from "./types";
 // identical code against the writable prod DB — the workspace only sees a
 // read-only prod replica.
 
+// Single source of truth for which analystNotes marker prefixes identify a
+// machine-classified row (never an analyst-entered one). The API server's
+// own severity-backfill route (artifacts/api-server/src/lib/migrations.ts)
+// used to maintain its OWN separate copy of this list, which had silently
+// drifted to miss 'gdelt_cloud:' and 'social_raw:' — exactly the kind of
+// per-topic/per-source patch this constant exists to prevent. Import this
+// from BOTH places instead of re-declaring it.
+export const SEVERITY_BACKFILL_NOTE_PREFIXES = [
+  "auto-scraped:",
+  "gdelt_cloud:",
+  "social_raw:",
+  "legacy:db:",
+] as const;
+
 export type SeverityBackfillSummary = {
   mode: "commit" | "dry-run";
   scanned: number;
@@ -99,11 +113,7 @@ export async function runSeverityBackfill(opts: IngestOptions = {}): Promise<Sev
     .where(
       and(
         inArray(incidentsTable.topic, ALL_SEVERITY_TOPICS),
-        or(
-          like(incidentsTable.analystNotes, "auto-scraped:%"),
-          like(incidentsTable.analystNotes, "gdelt_cloud:%"),
-          like(incidentsTable.analystNotes, "social_raw:%"),
-        ),
+        or(...SEVERITY_BACKFILL_NOTE_PREFIXES.map((prefix) => like(incidentsTable.analystNotes, `${prefix}%`))),
       ),
     );
 
