@@ -18,6 +18,28 @@ import {
   type ImpactLevel,
 } from "@/lib/operationalPinchPoints";
 
+// A lone marker has zero bounding-box area, so Leaflet's fitBounds/setView
+// with a fixed high zoom crops the view down to just that point — on a
+// coordinate away from a labelled town (open country, coastline, forest) the
+// basemap can render as a mostly blank/pale tile with no visible place
+// context, even though the coordinate itself is correct. Padding a lone point
+// out into a small bounding box before fitBounds guarantees the same minimum
+// geographic context (nearby coastline, place labels) that multi-marker
+// reports already get from fitBounds' own padding — this replaces the old
+// fixed setView(point, 6|8) special case for both map modes.
+const LONE_MARKER_CONTEXT_DEG = 0.6;
+
+export function boundsForPoints(points: L.LatLngExpression[]): L.LatLngBounds {
+  if (points.length === 1) {
+    const [lat, lng] = points[0] as [number, number];
+    return L.latLngBounds(
+      [lat - LONE_MARKER_CONTEXT_DEG, lng - LONE_MARKER_CONTEXT_DEG],
+      [lat + LONE_MARKER_CONTEXT_DEG, lng + LONE_MARKER_CONTEXT_DEG],
+    );
+  }
+  return L.latLngBounds(points);
+}
+
 const SEV_LABEL: Record<string, string> = {
   extreme: "Extreme",
   high: "High",
@@ -987,11 +1009,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         map.off("move zoom resize viewreset zoomanim", positionDots);
         return;
       }
-      if (latLngs.length === 1) {
-        map.setView(latLngs[0] as L.LatLngTuple, 6);
-      } else {
-        map.fitBounds(L.latLngBounds(latLngs), { padding: [48, 52], maxZoom: 7 });
-      }
+      map.fitBounds(boundsForPoints(latLngs), { padding: [48, 52], maxZoom: 7 });
       positionDots();
       map.off("move zoom resize viewreset zoomanim", positionDots);
       map.on("move zoom resize viewreset zoomanim", positionDots);
@@ -1065,11 +1083,7 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
       latLngs.push([g.lat, g.lng]);
     }
 
-    if (latLngs.length === 1) {
-      map.setView(latLngs[0] as L.LatLngTuple, 8);
-    } else {
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 44], maxZoom: 9 });
-    }
+    map.fitBounds(boundsForPoints(latLngs), { padding: [40, 44], maxZoom: 9 });
 
     positionDots();
     map.off("move zoom resize viewreset zoomanim", positionDots);
