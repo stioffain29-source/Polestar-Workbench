@@ -313,6 +313,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
           <Section title="Sources & Confidence">
             {report.confidenceLevel && (
               <p
+                data-pdf-flow="true"
                 className="text-[14px] leading-[1.7] mb-3 font-light"
                 style={{ color: DUSK, fontFamily: ROBOTO }}
               >
@@ -324,6 +325,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
         )}
 
         <div
+          data-pdf-flow="true"
           style={{
             marginTop: 8,
             paddingTop: 12,
