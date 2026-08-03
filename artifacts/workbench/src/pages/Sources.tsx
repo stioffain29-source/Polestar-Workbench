@@ -363,6 +363,8 @@ export default function Sources() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [ingesting, setIngesting] = useState(false);
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
+  const [backfillingSeverity, setBackfillingSeverity] = useState(false);
+  const [severityBackfillStatus, setSeverityBackfillStatus] = useState<string | null>(null);
   // Fetch the full source list once, then derive both the filtered
   // table view and the (unfiltered) Action Required panel from the
   // same dataset. This avoids a duplicate `/api/sources` round trip.
@@ -462,6 +464,53 @@ export default function Sources() {
     }
   };
 
+  // Re-rates every machine-provenance incident (auto-scraped / legacy:db /
+  // gdelt_cloud / social_raw) against the CURRENT severity classifier, via
+  // POST /admin/severity-backfill. This is what heals stale severities left
+  // over from before a classifier fix — e.g. a fatal incident that was rated
+  // Low before a rule change — without waiting for a fresh ingest to touch
+  // that row. Requires the admin token below (this endpoint is gated by
+  // INGEST_ADMIN_TOKEN only, unlike Run Ingest Now which also accepts the
+  // owner session).
+  const handleRunSeverityBackfill = async () => {
+    if (!adminToken.trim()) {
+      setMutationError("Admin token is required to run the severity backfill.");
+      return;
+    }
+    setMutationError(null);
+    setSeverityBackfillStatus(null);
+    setBackfillingSeverity(true);
+    try {
+      const result = await customFetch<{
+        ok: boolean;
+        scanned: number;
+        updated: number;
+        upgraded: number;
+        downgraded: number;
+      }>("/api/admin/severity-backfill", {
+        method: "POST",
+        headers: adminBearerHeaders(adminToken),
+      });
+      setSeverityBackfillStatus(
+        result.updated > 0
+          ? `Severity backfill finished — checked ${result.scanned} incidents, re-rated ${result.updated} (${result.upgraded} raised, ${result.downgraded} lowered).`
+          : `Severity backfill finished — checked ${result.scanned} incidents, none needed a change.`,
+      );
+      invalidate();
+      qc.invalidateQueries({ queryKey: getListIncidentsQueryKey() });
+    } catch (err) {
+      const httpStatus = (err as { status?: number })?.status;
+      setMutationError(
+        httpStatus === 409
+          ? "A severity backfill is already in progress on the server — try again shortly."
+          : adminMutationErrorMessage(httpStatus)
+            ?? (err instanceof Error ? err.message : "Severity backfill failed."),
+      );
+    } finally {
+      setBackfillingSeverity(false);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm("Delete source?")) return;
     if (!adminToken.trim()) {
@@ -522,6 +571,16 @@ export default function Sources() {
             <RefreshCw className={cn("w-4 h-4 mr-2", ingesting && "animate-spin")} />
             {ingesting ? "Running ingest\u2026" : "Run Ingest Now"}
           </Button>
+          <Button
+            variant="outline"
+            className="rounded-sm"
+            disabled={backfillingSeverity}
+            onClick={handleRunSeverityBackfill}
+            title="Re-checks every auto-scraped incident's severity against the current classifier and fixes stale ratings"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", backfillingSeverity && "animate-spin")} />
+            {backfillingSeverity ? "Running severity backfill\u2026" : "Run Severity Backfill"}
+          </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
               <Button className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"><Plus className="w-4 h-4 mr-2" /> Add Source</Button>
@@ -553,6 +612,12 @@ export default function Sources() {
       {ingestStatus && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-sm px-4 py-3 text-sm text-emerald-800">
           {ingestStatus}
+        </div>
+      )}
+
+      {severityBackfillStatus && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-sm px-4 py-3 text-sm text-emerald-800">
+          {severityBackfillStatus}
         </div>
       )}
 
