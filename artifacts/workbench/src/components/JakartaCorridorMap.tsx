@@ -649,6 +649,13 @@ export default function JakartaCorridorMap({
                     </span>
                     <span
                       data-posture-rating-badge="true"
+                      data-sev-chip="true"
+                      data-sev-label={POSTURE_EXPOSURE_LABEL[z.rating]}
+                      data-sev-color={POSTURE_EXPOSURE_ACCENT[z.rating]}
+                      data-sev-height="16"
+                      data-sev-pad-x="5"
+                      data-sev-font-size="9.5"
+                      data-sev-letter-spacing="0.04"
                       style={{
                         flex: "0 0 auto",
                         fontFamily: "Roboto, sans-serif",

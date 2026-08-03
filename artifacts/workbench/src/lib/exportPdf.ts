@@ -217,7 +217,7 @@ function applyMapExportLayout(
   legend.appendChild(attribution);
 }
 
-function applySeverityBadgeExportLayout(root: HTMLElement): void {
+export function applySeverityBadgeExportLayout(root: HTMLElement): void {
   // Tagged chips (spot report) become pixel-perfect canvases so the label stays
   // centred — html2canvas renders CSS text low. Done first so the span path below
   // no longer sees them.
@@ -233,6 +233,8 @@ function applySeverityBadgeExportLayout(root: HTMLElement): void {
         height: num(node.dataset.sevHeight),
         minWidth: num(node.dataset.sevMinWidth),
         padX: num(node.dataset.sevPadX),
+        fontSize: num(node.dataset.sevFontSize),
+        letterSpacingEm: num(node.dataset.sevLetterSpacing),
       }),
     );
   });
@@ -325,11 +327,17 @@ function severityChip(label: string, color: string, width = 92, height = 20): HT
 function sidebarSeverityChipCanvas(
   label: string,
   color: string,
-  opts: { height?: number; minWidth?: number; padX?: number } = {},
+  opts: {
+    height?: number;
+    minWidth?: number;
+    padX?: number;
+    fontSize?: number;
+    letterSpacingEm?: number;
+  } = {},
 ): HTMLCanvasElement {
   const text = label.toUpperCase();
-  const fontPx = 10;
-  const letterSpacingPx = 0.08 * fontPx;
+  const fontPx = opts.fontSize ?? 10;
+  const letterSpacingPx = (opts.letterSpacingEm ?? 0.08) * fontPx;
   const padX = opts.padX ?? 11;
   const height = opts.height ?? 20;
   const radius = 2;
