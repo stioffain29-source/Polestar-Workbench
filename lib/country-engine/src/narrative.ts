@@ -801,6 +801,15 @@ export function buildBluf(
   events: CanonicalEvent[],
   countryName: string,
   priorPeriodEvents: CanonicalEvent[] | null,
+  // ISO instant marking the start of the current reporting window. Optional
+  // and additive - omitting it reproduces the prior byte-identical output.
+  // When present, lets the opening sentence flag a lead development whose
+  // OWN event date predates the window (old news resurfacing in fresh
+  // coverage) by stating its reported date alongside the event date, so the
+  // brief never reads as if it happened this period (spec 13; guarded by
+  // countryReportQc.ts Check A, which requires both dates to appear
+  // somewhere in the narrative for exactly this case).
+  windowStart: string | null = null,
 ): NarrativeResult<string> {
   const claims: EvidenceRecord[] = [];
   const hasPriorData = priorPeriodEvents != null;
@@ -831,8 +840,7 @@ export function buildBluf(
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 2)
     .map(([c]) => categoryPhrase(c));
-  const { locations: allLocations, hasUnlocated, unlocatedCount, totalCount } =
-    priorityLocations(events);
+  const { locations: allLocations } = priorityLocations(events);
   // Tautology guard: never list the report's own theatre name as a location.
   const locations = allLocations
     .filter((l) => l.toLowerCase() !== countryName.toLowerCase())
@@ -851,11 +859,30 @@ export function buildBluf(
   // Owner rule: the BLUF is natural prose in OUR words — never raw or quoted
   // source headlines. Each development is summarised as category + harm +
   // place + date, all drawn from stored event attributes.
-  const describeEvent = (e: CanonicalEvent): string => {
+  const describeEvent = (e: CanonicalEvent, opts?: { withReportedDate?: boolean }): string => {
     const harm = harmPhrase([e]);
-    return `${categoryPhrase(e.issueCategory)}${harm ? ` with reported ${harm}` : ""}${locationClause(e)} on ${formatDate(e.eventDate)}`;
+    const base = `${categoryPhrase(e.issueCategory)}${harm ? ` with reported ${harm}` : ""}${locationClause(e)} on ${formatDate(e.eventDate)}`;
+    if (opts?.withReportedDate && e.publicationDates.length > 0) {
+      const reportedIso = [...e.publicationDates].sort()[0];
+      if (reportedIso && reportedIso.slice(0, 10) !== (e.eventDate ?? "").slice(0, 10)) {
+        return `${base}, only reported on ${formatDate(reportedIso)}`;
+      }
+    }
+    return base;
   };
-  const s1 = `The most serious validated development in ${countryName} was ${describeEvent(lead)}.`;
+  // Date-window integrity for the LEAD only - Check A's scope is topThree[0]
+  // specifically (the sentence built here IS that lead reference). Compare as
+  // Date instants, not raw strings: eventDate is a bare YYYY-MM-DD while
+  // windowStart is a full ISO instant, and naive string comparison would
+  // wrongly flag an event dated on the window's own start day.
+  const leadEventDateObj = lead.eventDate ? new Date(lead.eventDate) : null;
+  const windowStartObj = windowStart ? new Date(windowStart) : null;
+  const leadPredatesWindow =
+    windowStartObj != null &&
+    leadEventDateObj != null &&
+    !Number.isNaN(leadEventDateObj.getTime()) &&
+    leadEventDateObj < windowStartObj;
+  const s1 = `The most serious validated development in ${countryName} was ${describeEvent(lead, { withReportedDate: leadPredatesWindow })}.`;
   // Repetition guard (owner-flagged): when the other top developments share the
   // lead's category and location, naming each in full reads as the same clause
   // three times ("violent crime in East Jakarta on ... and violent crime in
@@ -925,7 +952,7 @@ export function buildBluf(
   const repeats = repeatSubLocations(events);
   const s2 = repeats.length
     ? `During the reporting period, ${catText || "security"} events made up most of the reporting, and ${repeats[0]} carried a disproportionate share of it.`
-    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`;
+    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre.`;
   claims.push(
     makeClaim({
       claimText: s2,
@@ -1152,8 +1179,7 @@ export function buildCurrentSituation(
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .map(([c]) => categoryPhrase(c));
-  const { locations: rawLocations, hasUnlocated, unlocatedCount, totalCount } =
-    priorityLocations(events);
+  const { locations: rawLocations } = priorityLocations(events);
   // Tautology guard (owner-flagged): "concentrated in Jakarta" inside the
   // Jakarta report says nothing — drop any location equal to the report's own
   // theatre name from the concentration list.
@@ -1162,7 +1188,7 @@ export function buildCurrentSituation(
   );
 
   const s1 = locations.length
-    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`
+    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}.`
     : `Security incidents in ${countryName} during the reporting period were recorded at country level only, without located concentrations.`;
   const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
 
@@ -1889,6 +1915,9 @@ export function buildPolestarView(
 export interface BuildNarrativeOptions {
   countryName: string;
   priorPeriodEvents?: CanonicalEvent[] | null;
+  // ISO instant marking the start of the current reporting window. See
+  // buildBluf's windowStart param for what this enables.
+  windowStart?: string | null;
 }
 
 export interface CountryNarrative {
@@ -1957,7 +1986,7 @@ export function buildCountryNarrative(
 
   const byCat = groupByCategory(events);
 
-  const bluf = buildBluf(events, countryName, priorPeriodEvents);
+  const bluf = buildBluf(events, countryName, priorPeriodEvents, opts.windowStart ?? null);
   claims.push(...bluf.claims);
   sectionWordCounts["Bottom Line Up Front"] = countWords(bluf.value);
 

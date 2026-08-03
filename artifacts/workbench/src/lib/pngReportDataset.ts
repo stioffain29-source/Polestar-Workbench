@@ -1289,12 +1289,18 @@ export function selectTopStoryClusters(
       picked.push(c);
     }
   }
-  // (c) Jakarta all-Low guard: if every chosen development is Low-or-below but a
-  // story-distinct Moderate-or-worse cluster exists, swap the weakest chosen Low
-  // for the most serious available candidate (preferring a same-theme swap so
-  // theme diversity is preserved).
+  // (c) All-Low guard, EVERY theatre: if every chosen development is
+  // Low-or-below but a story-distinct Moderate-or-worse cluster exists, swap
+  // the weakest chosen Low for the most serious available candidate
+  // (preferring a same-theme swap so theme diversity is preserved). This used
+  // to be gated to Jakarta only, which let non-Jakarta theatres (PNG, etc.)
+  // lead an entire Top 3 with duplicate Low-severity infrastructure stories
+  // while genuinely serious, distinct incidents sat unshown in the window —
+  // in a high-risk theatre that reads as the report missing the story.
+  // jakartaThemeForCategory is a total function over every PngCategory (safe
+  // fallback to "crime"), so the same-theme preference works for any theatre.
   const isLowOrBelow = (c: PngReportItem[]) => c[0].severityRank <= 2;
-  if (opts.jakarta && picked.length > 0 && picked.every(isLowOrBelow)) {
+  if (picked.length > 0 && picked.every(isLowOrBelow)) {
     const candidate = clusters
       .filter(
         (c) => !picked.includes(c) && c[0].severityRank >= 3 && distinctStory(c),
@@ -1636,6 +1642,7 @@ export function buildStructuredReportDataset(
     {
       countryName: config.countryName,
       priorPeriodEvents: priorEngineResult ? priorEngineResult.included : null,
+      windowStart: args.windowStart ? args.windowStart.toISOString() : null,
     },
   );
   // Credible map points for INCLUDED events only (§23). Never Unknown /

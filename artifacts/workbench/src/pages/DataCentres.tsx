@@ -51,7 +51,9 @@ export default function DataCentres() {
   const { data: facilities = [], isLoading: facLoading } = useListDataCentreFacilities();
   const { data: countryRisks = [] } = useListDataCentreCountryRisk();
 
-  const [range, setRange] = useState<RangeKey>("2y");
+  // Defaults to 7 days — a 2-year default meant this page opened buried
+  // under a long incident history before anyone could act on it.
+  const [range, setRange] = useState<RangeKey>("7d");
   const windowDays = RANGE_DAYS[range];
   const now = new Date();
 
@@ -173,6 +175,11 @@ export default function DataCentres() {
           <RangeToggle range={range} onChange={setRange} />
         </div>
       </div>
+
+      {/* Report Builder, folded into the topic page — moved up top so drafts
+          for this topic are immediately visible, not buried below the full
+          incident list. */}
+      <TopicReportPanel topic="data_centres" />
 
       {/* 1. Top metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -437,11 +444,6 @@ export default function DataCentres() {
           </div>
         )}
       </Section>
-
-      {/* Report Builder, folded into the topic page — drafts for this topic
-          live here instead of a separate /reports destination you have to
-          jump to. */}
-      <TopicReportPanel topic="data_centres" />
     </div>
   );
 }

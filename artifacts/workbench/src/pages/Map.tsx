@@ -432,6 +432,10 @@ export default function MapPage() {
   type PathLikeInstance = { _path?: SVGPathElement } | null;
   const dotPathRefs = useRef<Record<string, PathLikeInstance>>({});
   const ringPathRefs = useRef<Record<string, PathLikeInstance>>({});
+  // Same story for the fallback-location cluster's own pulse ring (a stack of
+  // 20 incidents sharing one coordinate has nowhere else to show "something in
+  // here is new" except the cluster marker itself) - keyed by cluster id.
+  const clusterRingPathRefs = useRef<Record<string, PathLikeInstance>>({});
 
   useEffect(() => {
     const newIdSet = new Set(newMarkerIds);
@@ -442,6 +446,11 @@ export default function MapPage() {
     for (const marker of Object.values(ringPathRefs.current)) {
       // The ring marker is only ever mounted while its incident is new (see
       // the `{isNew && (...)}` guard below), so if it exists it should pulse.
+      const path = marker?._path;
+      if (path) path.classList.add("map-pulse-ring");
+    }
+    for (const marker of Object.values(clusterRingPathRefs.current)) {
+      // Same rule: only mounted while `clusterHasNew` is true.
       const path = marker?._path;
       if (path) path.classList.add("map-pulse-ring");
     }
@@ -581,9 +590,31 @@ export default function MapPage() {
                 const clusterStyle = markerStyle(p.rating);
                 const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
                 const members = p.clusterMembers ?? [];
+                // A stack can bury a brand-new incident among 20 old ones with
+                // no visual cue at all - mirror the single-marker "new" ring
+                // (pulses until an analyst clears it) on the cluster itself
+                // whenever ANY member is still unread, and flag which specific
+                // rows are new inside the popup list below.
+                const clusterHasNew = blinkEnabled && members.some((m) => !clearedIds.has(m.id));
                 return (
+                  <Fragment key={p.id}>
+                  {clusterHasNew && (
+                    <CircleMarker
+                      ref={(instance) => {
+                        if (instance) clusterRingPathRefs.current[p.id] = instance as unknown as PathLikeInstance;
+                        else delete clusterRingPathRefs.current[p.id];
+                      }}
+                      center={[p.lat, p.lng]}
+                      radius={clusterRadius + 3}
+                      interactive={false}
+                      pathOptions={{
+                        color: clusterStyle.stroke,
+                        weight: 2,
+                        fillOpacity: 0,
+                      }}
+                    />
+                  )}
                   <CircleMarker
-                    key={p.id}
                     center={[p.lat, p.lng]}
                     radius={clusterRadius}
                     pathOptions={{
@@ -607,31 +638,89 @@ export default function MapPage() {
                           marker, coloured by the highest risk rating in the group
                           ({SEVERITY_LABELS[p.rating] ?? p.rating}).
                         </div>
-                        <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 180, overflowY: "auto" }}>
-                          {members.slice(0, 10).map((m) => (
-                            <li
-                              key={m.id}
-                              style={{
-                                fontSize: 11,
-                                color: "#363636",
-                                marginTop: 4,
-                                borderTop: "1px solid #eee",
-                                paddingTop: 4,
-                              }}
-                            >
-                              <span
+                        <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 220, overflowY: "auto" }}>
+                          {members.slice(0, 10).map((m) => {
+                            // A stack can bury a brand-new incident among old
+                            // ones with no per-row cue - mirror the single-
+                            // marker "new" treatment (bold text + a small NEW
+                            // tag, cleared on click) for each member row, and
+                            // give each row its own Create Spot Report link so
+                            // an analyst never has to leave the cluster popup
+                            // to act on one buried incident.
+                            const memberIsNew = blinkEnabled && !clearedIds.has(m.id);
+                            return (
+                              <li
+                                key={m.id}
                                 style={{
-                                  display: "inline-block",
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  backgroundColor: RATING_COLORS[m.rating] ?? RATING_COLORS.insignificant,
-                                  marginRight: 6,
+                                  fontSize: 11,
+                                  color: "#363636",
+                                  marginTop: 4,
+                                  borderTop: "1px solid #eee",
+                                  paddingTop: 4,
                                 }}
-                              />
-                              {displayIncidentTitle(m.title, m.displayTitle)}
-                            </li>
-                          ))}
+                              >
+                                <div
+                                  style={{ display: "flex", alignItems: "flex-start", cursor: memberIsNew ? "pointer" : "default" }}
+                                  onClick={memberIsNew ? () => clearMarkers([m.id]) : undefined}
+                                >
+                                  <span
+                                    style={{
+                                      display: "inline-block",
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      backgroundColor: RATING_COLORS[m.rating] ?? RATING_COLORS.insignificant,
+                                      marginRight: 6,
+                                      marginTop: 3,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                  <span style={{ fontWeight: memberIsNew ? 700 : 400 }}>
+                                    {displayIncidentTitle(m.title, m.displayTitle)}
+                                    {memberIsNew && (
+                                      <span
+                                        style={{
+                                          marginLeft: 5,
+                                          fontSize: 9,
+                                          fontWeight: 700,
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.05em",
+                                          color: "#fff",
+                                          backgroundColor: "#4655FF",
+                                          borderRadius: 2,
+                                          padding: "1px 4px",
+                                        }}
+                                      >
+                                        New
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                                {m.id.startsWith("i-") && (
+                                  <button
+                                    onClick={(evt) => {
+                                      evt.stopPropagation();
+                                      setLocation(`/spot-reports/new?incidentId=${m.id.slice(2)}`);
+                                    }}
+                                    style={{
+                                      marginTop: 3,
+                                      marginLeft: 12,
+                                      background: "none",
+                                      border: "none",
+                                      color: "#4655FF",
+                                      fontSize: 10,
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.05em",
+                                      cursor: "pointer",
+                                      padding: 0,
+                                    }}
+                                  >
+                                    Create Spot Report
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
                         </ul>
                         {members.length > 10 && (
                           <div style={{ fontSize: 10, color: "#666", marginTop: 6 }}>
@@ -641,6 +730,7 @@ export default function MapPage() {
                       </div>
                     </LeafletPopup>
                   </CircleMarker>
+                  </Fragment>
                 );
               }
               const s = markerStyle(p.rating);

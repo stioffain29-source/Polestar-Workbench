@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { cleanText, hasWord, parseDate } from "./text";
+import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode, type GeoResult } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
@@ -423,7 +423,7 @@ function detectCountry(hay: string): string | null {
 }
 
 function classify(title: string, summary: string, feed: Feed): Classified {
-  const hay = `${title}\n${summary}`.toLowerCase();
+  const hay = stripAttributionMentions(`${title}\n${summary}`.toLowerCase());
 
   const denyHit = DENY.find((d) => hay.includes(d));
   if (denyHit) return { kept: false, reason: `deny:${denyHit}`, country: null };
@@ -697,7 +697,7 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const rawGeo = geocode(a.country, `${a.title} ${a.summary}`);
+    const rawGeo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     const geo =
       a.group === "port"
         ? rawGeo

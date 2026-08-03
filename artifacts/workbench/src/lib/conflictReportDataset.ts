@@ -1084,7 +1084,14 @@ function buildOtherWatched(
     const f = focusOf(a);
     return f.hasFocus ? `${a.theatre} (${joinList(f.labels)})` : a.theatre;
   });
-  return `Lower-level activity also showed in ${joinList(parts)}. It was quieter there this period, but any of these could worsen quickly on a single clash or attack, so they stay on watch.`;
+  // Ground the paragraph in one concrete event from the most notable of these
+  // lower-tier theatres — without this it reads as a bare name-list glued to
+  // fixed boilerplate, identical whether one theatre is listed or six.
+  const notable = topEvents(areas[0]!.incidents, 1)[0];
+  const evClause = notable
+    ? ` The most notable was ${eventClause(notable)} in ${areas[0]!.theatre}.`
+    : "";
+  return `Lower-level activity also showed in ${joinList(parts)}.${evClause} It was quieter there this period, but any of these could worsen quickly on a single clash or attack, so they stay on watch.`;
 }
 
 function buildWhatMatters(

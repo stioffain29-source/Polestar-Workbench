@@ -65,9 +65,10 @@ export default function Protests() {
   const { data: osintItems = [], isLoading: osintLoading } =
     useListSocialRawItems({ limit: 100 });
 
-  // Date-range window. Defaults to the widest option so the first load shows the
-  // full record set; the analyst can narrow the whole dashboard from the header.
-  const [range, setRange] = useState<RangeKey>("2y");
+  // Date-range window. Defaults to 7 days — a 2-year default meant this page
+  // opened buried under a long incident history before anyone could act on
+  // it. The analyst can still widen the whole dashboard from the header.
+  const [range, setRange] = useState<RangeKey>("7d");
   const windowDays = RANGE_DAYS[range];
 
   // Which archived month (yyyy-MM key) is currently expanded in the incident
@@ -381,6 +382,11 @@ export default function Protests() {
         </div>
         <RangeToggle range={range} onChange={setRange} />
       </div>
+
+      {/* Report Builder, folded into the topic page — moved up top so drafts
+          for this topic are immediately visible, not buried below the full
+          incident list. */}
+      <TopicReportPanel topic="protests" />
 
       {/* 1. Top metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -740,11 +746,6 @@ export default function Protests() {
       <Section title="Papua / PNG Facebook OSINT">
         <FacebookOsintPanel items={osintItems} isLoading={osintLoading} />
       </Section>
-
-      {/* Report Builder, folded into the topic page — drafts for this topic
-          live here instead of a separate /reports destination you have to
-          jump to. */}
-      <TopicReportPanel topic="protests" />
     </div>
   );
 }

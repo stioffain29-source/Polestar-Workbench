@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import { fetchFeed } from "./feedFetch";
 import { db, strikesTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { cleanText, hasWord, parseDate } from "./text";
+import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { geocode } from "./geocode";
 import { recordSourceHealth } from "./sourceHealth";
 import { classifyStrikeTarget, classifyStrikeInfrastructure } from "@workspace/strike-targets";
@@ -417,7 +417,7 @@ export async function runStrikesIngest(
         const dashIdx = rawTitle.lastIndexOf(" - ");
         const sourceName = dashIdx > 0 ? rawTitle.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
         const cleanTitle = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
-        const titleLc = cleanTitle.toLowerCase();
+        const titleLc = stripAttributionMentions(cleanTitle.toLowerCase());
         const text = `${cleanTitle} ${summary}`;
 
         // TITLE-FIRST country detection. The dry-run showed that detecting from
@@ -620,7 +620,7 @@ export async function runStrikesIngest(
 
   let geocoded = 0;
   const rows: (typeof strikesTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     let latitude = geo?.latitude ?? null;
     let longitude = geo?.longitude ?? null;
     let location = geo?.location ?? null;
