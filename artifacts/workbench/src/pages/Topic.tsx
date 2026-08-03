@@ -423,7 +423,7 @@ export default function Topic() {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -456,7 +456,7 @@ export default function Topic() {
                   <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY}>
-                    <LabelList dataKey="count" position="top" fontSize={12} fontWeight={700} fill="#303030" />
+                    <LabelList dataKey="count" position="top" fontSize={12} fontWeight={700} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -485,7 +485,7 @@ export default function Topic() {
                       const c = ratingColor(s);
                       return <Cell key={s} fill={c} stroke={darken(c)} />;
                     })}
-                    <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                    <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

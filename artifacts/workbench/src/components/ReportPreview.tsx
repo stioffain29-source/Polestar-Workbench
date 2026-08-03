@@ -978,7 +978,7 @@ export default function ReportPreview({
                     marginTop: 6,
                     fontFamily: "Roboto, sans-serif",
                     fontSize: 11,
-                    color: "#303030",
+                    color: "#363636",
                   }}
                 >
                   {fuelData.marketData.jetDataNote}

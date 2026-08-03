@@ -6,13 +6,13 @@ import {
 } from "@/lib/fuelDisruptionAlert";
 
 // Brand palette (no shadows / gradients per spec).
-const MIDNIGHT = "#0B0B3D";
-const ELECTRIC = "#4655FF";
+const MIDNIGHT = "#0b0a3d";
+const ELECTRIC = "#465bff";
 
 function StatusPill({ active }: { active: boolean }) {
   const style = active
-    ? { background: "#6FB872", color: "#0B0B3D" }
-    : { background: "#E2E2E2", color: "#303030" };
+    ? { background: "#6FB872", color: "#0b0a3d" }
+    : { background: "#e2e2e2", color: "#363636" };
   return (
     <span
       className="text-[10px] font-sans uppercase tracking-widest px-2 py-0.5 rounded-sm"
@@ -137,7 +137,7 @@ function Chips({ items }: { items: string[] }) {
         <span
           key={i}
           className="text-xs font-sans px-2 py-1 rounded-sm border"
-          style={{ borderColor: "#E2E2E2", color: "#303030" }}
+          style={{ borderColor: "#e2e2e2", color: "#363636" }}
         >
           {it}
         </span>

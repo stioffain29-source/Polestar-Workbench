@@ -62,7 +62,7 @@ describe("cargo report graphics — supply-chain exposure", () => {
     expect(physical.some((s) => s.key === "enforcement")).toBe(false);
     for (const s of physical) expect(html).toContain(s.label);
     // Electric-blue share-bar fill.
-    expect(html).toContain("#4655FF");
+    expect(html).toContain("#465bff");
   });
 
   it("degrades to an all-empty period without throwing", () => {
@@ -146,6 +146,6 @@ describe("cargo report graphics — severity palette", () => {
     // Low tier keeps a dark navy label for contrast on the light-green fill.
     const low = renderToStaticMarkup(<SevChip severityKey="low" />);
     expect(low).toContain("#6FB872");
-    expect(low).toContain("#0B0B3D");
+    expect(low).toContain("#0b0a3d");
   });
 });

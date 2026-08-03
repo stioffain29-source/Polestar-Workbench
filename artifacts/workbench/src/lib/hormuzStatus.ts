@@ -291,7 +291,7 @@ export function computeHormuzStatus(
 // approved Midnight / Electric / Dusk colours.
 export const HORMUZ_TONE_COLOR: Record<HormuzStatusTone, string> = {
   kinetic: "#A33232",
-  constrained: "#0B0B3D",
-  elevated: "#4655FF",
-  "no-activity": "#303030",
+  constrained: "#0b0a3d",
+  elevated: "#465bff",
+  "no-activity": "#363636",
 };

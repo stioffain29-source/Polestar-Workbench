@@ -15,8 +15,8 @@ import {
 describe("operationalPinchPoints — impact-level model", () => {
   it("orders and colours impact levels with brand-safe, non-severity hues", () => {
     expect(IMPACT_ORDER).toEqual(["Direct impact", "Indirect impact", "Monitor only"]);
-    expect(IMPACT_COLOR["Direct impact"]).toBe("#0B0B3D"); // Midnight Blue
-    expect(IMPACT_COLOR["Indirect impact"]).toBe("#4655FF"); // Electric Blue
+    expect(IMPACT_COLOR["Direct impact"]).toBe("#0b0a3d"); // Midnight Blue
+    expect(IMPACT_COLOR["Indirect impact"]).toBe("#465bff"); // Electric Blue
     expect(IMPACT_COLOR["Monitor only"]).toBe("#6B7280"); // neutral grey
     // Reserved severity tiers must never be reused as an impact-level colour.
     const hues = Object.values(IMPACT_COLOR).map((h) => h.toUpperCase());

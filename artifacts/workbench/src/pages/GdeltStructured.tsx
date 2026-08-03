@@ -34,7 +34,7 @@ const PRIMARY_COUNTRIES = [
 // Extreme). Use an Electric Blue outline, which is brand-compliant and clearly
 // reads as a tag rather than a risk rating.
 const SUB_BUCKET_BADGE_CLASS =
-  "border border-[#4655FF] text-[#4655FF] bg-transparent";
+  "border border-[#465bff] text-[#465bff] bg-transparent";
 
 // How many recent rows the page pulls in one shot. Stat tiles and filters
 // describe this window; when the result hits the cap we say so (no false

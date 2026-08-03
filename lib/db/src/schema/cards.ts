@@ -84,10 +84,10 @@ export const cardDraftsTable = pgTable("card_drafts", {
  */
 export const brandSettingsTable = pgTable("brand_settings", {
   id: integer("id").primaryKey().default(1),
-  colorMidnight: text("color_midnight").notNull().default("#0B0B3D"),
-  colorElectric: text("color_electric").notNull().default("#4655FF"),
-  colorDusk: text("color_dusk").notNull().default("#303030"),
-  colorPolar: text("color_polar").notNull().default("#E2E2E2"),
+  colorMidnight: text("color_midnight").notNull().default("#0b0a3d"),
+  colorElectric: text("color_electric").notNull().default("#465bff"),
+  colorDusk: text("color_dusk").notNull().default("#363636"),
+  colorPolar: text("color_polar").notNull().default("#e2e2e2"),
   // Subdued red — reserved for the Extreme rating tier only.
   colorExtreme: text("color_extreme").notNull().default("#A33232"),
   // Logo as a data URL (nullable — falls back to the bundled Polestar mark).

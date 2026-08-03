@@ -42,10 +42,10 @@ import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 const queryClient = new QueryClient();
 
 const BRAND = {
-  midnight: "#0B0B3D",
-  electric: "#4655FF",
-  polar: "#E2E2E2",
-  dusk: "#303030",
+  midnight: "#0b0a3d",
+  electric: "#465bff",
+  polar: "#e2e2e2",
+  dusk: "#363636",
 };
 
 function AuthScreen({

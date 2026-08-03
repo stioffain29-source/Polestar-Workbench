@@ -30,7 +30,7 @@ export default function CardMap({
   lat,
   lng,
   zoom = 6,
-  color = "#4655FF",
+  color = "#465bff",
   label,
   domId,
 }: CardMapProps) {
@@ -147,7 +147,7 @@ export default function CardMap({
             left: 0,
             bottom: 0,
             zIndex: 600,
-            background: "#0B0B3D",
+            background: "#0b0a3d",
             color: "#ffffff",
             fontFamily: "Roboto, sans-serif",
             fontSize: 24,

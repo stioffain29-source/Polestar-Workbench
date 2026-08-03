@@ -19,8 +19,8 @@ export const IMPACT_ORDER: ImpactLevel[] = ["Direct impact", "Indirect impact", 
 // (petrol #1B6B7A = Insignificant, subdued red #A33232 = Extreme) are NEVER
 // reused here, so an impact level can never be confused with a severity chip.
 export const IMPACT_COLOR: Record<ImpactLevel, string> = {
-  "Direct impact": "#0B0B3D",
-  "Indirect impact": "#4655FF",
+  "Direct impact": "#0b0a3d",
+  "Indirect impact": "#465bff",
   "Monitor only": "#6B7280",
 };
 

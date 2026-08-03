@@ -485,7 +485,7 @@ export default function Protests() {
                     const c = CATEGORY_COLOR[d.category];
                     return <Cell key={d.category} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -503,7 +503,7 @@ export default function Protests() {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -593,36 +593,36 @@ export default function Protests() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {impactRows.map((row) => {
             const active = row.count > 0;
-            const accent = active ? "#4655FF" : "#E2E2E2";
+            const accent = active ? "#465bff" : "#e2e2e2";
             return (
               <div
                 key={row.label}
                 className="rounded-sm border bg-white p-3"
-                style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
+                style={{ borderColor: "#e2e2e2", borderLeftColor: accent, borderLeftWidth: 4 }}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <div className="font-serif font-bold text-sm" style={{ color: "#0B0B3D" }}>{row.label}</div>
-                  <div className="font-mono text-sm" style={{ color: active ? "#0B0B3D" : "#303030" }}>{row.count}</div>
+                  <div className="font-serif font-bold text-sm" style={{ color: "#0b0a3d" }}>{row.label}</div>
+                  <div className="font-mono text-sm" style={{ color: active ? "#0b0a3d" : "#363636" }}>{row.count}</div>
                 </div>
-                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>{row.description}</div>
+                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#363636" }}>{row.description}</div>
                 {active ? (
                   <ul className="mt-2 space-y-1">
                     {row.recent.map((r, idx) => (
-                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
-                        <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
+                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#363636" }}>
+                        <span className="font-mono mr-1.5" style={{ color: "#363636" }}>
                           {isNaN(r.occurredDate.getTime()) ? "—" : format(r.occurredDate, "dd MMM")}
                         </span>
                         {r.title}
                       </li>
                     ))}
                     {row.count > 3 && (
-                      <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
+                      <li className="text-[11px] font-sans italic" style={{ color: "#363636" }}>
                         +{row.count - 3} more in window
                       </li>
                     )}
                   </ul>
                 ) : (
-                  <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
+                  <div className="text-xs font-sans italic mt-2" style={{ color: "#363636" }}>
                     Nothing matched for this indicator in the loaded window.
                   </div>
                 )}
@@ -754,8 +754,8 @@ export default function Protests() {
 // palette: official = Electric Blue, local media = Midnight, OSINT = Dusk Gray.
 const OSINT_TIER_COLOR: Record<string, string> = {
   official: "#465bff",
-  local_media: "#0B0B3D",
-  osint: "#303030",
+  local_media: "#0b0a3d",
+  osint: "#363636",
 };
 
 const OSINT_TIER_LABEL: Record<string, string> = {
@@ -768,7 +768,7 @@ function OsintTierBadge({ tier }: { tier: string }) {
   return (
     <span
       className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm text-white"
-      style={{ backgroundColor: OSINT_TIER_COLOR[tier] ?? "#303030" }}
+      style={{ backgroundColor: OSINT_TIER_COLOR[tier] ?? "#363636" }}
     >
       {OSINT_TIER_LABEL[tier] ?? tier}
     </span>
@@ -927,10 +927,10 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Kpi label="Posts on file" value={items.length} accent="#465bff" small />
-        <Kpi label="Security-relevant" value={stats.securityRelevant} accent="#0B0B3D" small />
+        <Kpi label="Security-relevant" value={stats.securityRelevant} accent="#0b0a3d" small />
         <Kpi label="Flagged for review" value={stats.flagged} accent="#1B6B7A" small />
-        <Kpi label="Eligible to promote" value={stats.eligible} accent="#0B0B3D" small />
-        <Kpi label="Promoted" value={stats.promoted} accent="#303030" small />
+        <Kpi label="Eligible to promote" value={stats.eligible} accent="#0b0a3d" small />
+        <Kpi label="Promoted" value={stats.promoted} accent="#363636" small />
       </div>
 
       <p className="text-[11px] text-muted-foreground font-sans leading-snug">

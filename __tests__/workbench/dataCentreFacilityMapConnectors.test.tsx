@@ -249,7 +249,7 @@ describe("DataCentreFacilityMap — recent status mover ring", () => {
     expect(ring).toHaveLength(1);
     // The ring is the non-interactive, electric-blue overlay.
     expect(ring[0].getAttribute("data-interactive")).toBe("false");
-    expect(ring[0].getAttribute("data-color")).toBe("#4655FF");
+    expect(ring[0].getAttribute("data-color")).toBe("#465bff");
     expect(host.textContent).toContain("1 recent mover");
   });
 

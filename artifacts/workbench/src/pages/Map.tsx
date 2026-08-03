@@ -684,7 +684,7 @@ export default function MapPage() {
                                           textTransform: "uppercase",
                                           letterSpacing: "0.05em",
                                           color: "#fff",
-                                          backgroundColor: "#4655FF",
+                                          backgroundColor: "#465bff",
                                           borderRadius: 2,
                                           padding: "1px 4px",
                                         }}
@@ -705,7 +705,7 @@ export default function MapPage() {
                                       marginLeft: 12,
                                       background: "none",
                                       border: "none",
-                                      color: "#4655FF",
+                                      color: "#465bff",
                                       fontSize: 10,
                                       textTransform: "uppercase",
                                       letterSpacing: "0.05em",
@@ -812,7 +812,7 @@ export default function MapPage() {
                             fontWeight: 600,
                             textTransform: "uppercase",
                             letterSpacing: "0.08em",
-                            color: "#4655FF",
+                            color: "#465bff",
                           }}
                         >
                           Corroborated by UN OCHA (ReliefWeb)
@@ -835,7 +835,7 @@ export default function MapPage() {
                                 fontWeight: 600,
                                 textTransform: "uppercase",
                                 letterSpacing: "0.08em",
-                                color: "#4655FF",
+                                color: "#465bff",
                               }}
                             >
                               Corroborated by UN OCHA (ReliefWeb)
@@ -847,7 +847,7 @@ export default function MapPage() {
                                     href={c.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    style={{ fontSize: 11, color: "#4655FF", textDecoration: "underline" }}
+                                    style={{ fontSize: 11, color: "#465bff", textDecoration: "underline" }}
                                   >
                                     {c.sourceAgency ?? c.reportTitle}
                                   </a>
@@ -868,7 +868,7 @@ export default function MapPage() {
                                 fontWeight: 600,
                                 textTransform: "uppercase",
                                 letterSpacing: "0.08em",
-                                color: "#4655FF",
+                                color: "#465bff",
                               }}
                             >
                               GDELT structured coding
@@ -902,7 +902,7 @@ export default function MapPage() {
                           onClick={() => setLocation(`/spot-reports/new?incidentId=${p.id.slice(2)}`)}
                           style={{
                             marginTop: 8,
-                            background: "#4655FF",
+                            background: "#465bff",
                             color: "#fff",
                             border: "none",
                             borderRadius: 2,
@@ -929,16 +929,16 @@ export default function MapPage() {
                   center={[e.lat, e.lng]}
                   radius={6}
                   pathOptions={{
-                    color: "#4655FF",
+                    color: "#465bff",
                     opacity: 0.95,
                     weight: 2,
-                    fillColor: "#4655FF",
+                    fillColor: "#465bff",
                     fillOpacity: 0.55,
                   }}
                 >
                   <LeafletTooltip direction="top" offset={[0, -6]}>
                     <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
-                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#4655FF" }}>
+                      <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#465bff" }}>
                         Liveuamap
                       </div>
                       <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>{e.name}</div>
@@ -965,7 +965,7 @@ export default function MapPage() {
                           rel="noopener noreferrer"
                           style={{
                             fontSize: 11,
-                            color: "#4655FF",
+                            color: "#465bff",
                             textDecoration: "underline",
                             display: "inline-block",
                             marginTop: 6,
@@ -1052,7 +1052,7 @@ export default function MapPage() {
             <span className="inline-flex items-center gap-1.5">
               <span
                 className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: "#4655FF", opacity: 0.78, border: "1.5px solid #4655FF" }}
+                style={{ backgroundColor: "#465bff", opacity: 0.78, border: "1.5px solid #465bff" }}
               />
               Liveuamap (live)
             </span>

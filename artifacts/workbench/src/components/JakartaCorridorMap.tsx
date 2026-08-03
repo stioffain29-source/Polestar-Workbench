@@ -13,10 +13,10 @@ import {
 } from "@/lib/jakartaOperatingPosture";
 import { JAKARTA_MAP_OPS_BBOX } from "@/lib/jakartaMapModel";
 
-const NAVY = "#0B0B3D";
-const DUSK = "#303030";
+const NAVY = "#0b0a3d";
+const DUSK = "#363636";
 // Electric Blue (brand) for the route corridors.
-const MOVEMENT_COLOR = "#4655FF";
+const MOVEMENT_COLOR = "#465bff";
 
 // All four required route corridors are drawn (task: Airport, Port, CBD
 // business, North Jakarta access), kept quiet as thin dashed lines.

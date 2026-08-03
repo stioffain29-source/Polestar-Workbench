@@ -65,10 +65,10 @@ export const MasterCard = forwardRef<HTMLDivElement, MasterCardProps>(
     const ratingLabel = cardRatingLabel(content.rating);
     const ratingNote = content.ratingNote?.trim() || cardRatingNote(content.rating);
 
-    const midnight = brand.colorMidnight || "#0B0B3D";
-    const electric = brand.colorElectric || "#4655FF";
-    const dusk = brand.colorDusk || "#303030";
-    const polar = brand.colorPolar || "#E2E2E2";
+    const midnight = brand.colorMidnight || "#0b0a3d";
+    const electric = brand.colorElectric || "#465bff";
+    const dusk = brand.colorDusk || "#363636";
+    const polar = brand.colorPolar || "#e2e2e2";
     // Brand band gradient on the header. The report chrome uses -130deg, but on
     // this wide header that drops the bright electric on the LEFT and midnight on
     // the right — backwards. Mirror it to 130deg so the gradient reads midnight
