@@ -118,6 +118,24 @@ function applyBulletListExportLayout(root: HTMLElement): void {
       if (li.tagName !== "LI") return;
       const computed = window.getComputedStyle(li);
 
+      // Every <li> body here is a bare text node (`<li>{it}</li>` — no
+      // wrapping element). Switching the <li> to `display: flex` turns that
+      // bare text run into an ANONYMOUS flex item — a box the spec requires
+      // browsers to synthesize on the fly. html2canvas does not reliably
+      // rasterise anonymous flex items: it can place the text run using a
+      // different box than the one the live browser laid out, which is what
+      // makes the bullet dot (a real, concrete flex item) end up visually
+      // detached from the text (a synthetic one). Wrapping the existing
+      // content in a real <span> BEFORE flexifying the <li> gives every flex
+      // child a concrete element, removing that ambiguity entirely.
+      const textWrap = document.createElement("span");
+      textWrap.style.display = "inline-block";
+      textWrap.style.flex = "1 1 auto";
+      textWrap.style.minWidth = "0";
+      while (li.firstChild) {
+        textWrap.appendChild(li.firstChild);
+      }
+
       li.style.listStyle = "none";
       li.style.display = "flex";
       li.style.alignItems = "flex-start";
@@ -133,7 +151,8 @@ function applyBulletListExportLayout(root: HTMLElement): void {
       bullet.style.fontSize = computed.fontSize;
       bullet.style.lineHeight = computed.lineHeight;
       bullet.style.color = computed.color;
-      li.insertBefore(bullet, li.firstChild);
+      li.appendChild(bullet);
+      li.appendChild(textWrap);
     });
   });
 }
