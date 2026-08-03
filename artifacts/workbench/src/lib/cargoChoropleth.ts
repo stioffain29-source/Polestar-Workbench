@@ -18,7 +18,7 @@ export const COUNT_BANDS: Array<{ min: number; label: string; color: string }> =
   { min: 6, label: "6–20", color: "#A9B2FF" },
   { min: 21, label: "21–50", color: "#6E7BFF" },
   { min: 51, label: "51–100", color: "#2E3BC7" },
-  { min: 101, label: "100+", color: "#0B0B3D" },
+  { min: 101, label: "100+", color: "#0b0a3d" },
 ];
 
 /** Colour for a country's incident count. Zero incidents stay unshaded (null). */

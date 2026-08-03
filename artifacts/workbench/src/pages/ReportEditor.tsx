@@ -3199,7 +3199,7 @@ export default function ReportEditor() {
         {proseEnabled && proseUnavailable && (
           <div
             className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
-            style={{ borderColor: "#303030", background: "#f4f4f4", color: "#303030" }}
+            style={{ borderColor: "#363636", background: "#f4f4f4", color: "#363636" }}
           >
             <span style={{ fontWeight: 700 }}>AI narrative unavailable.</span>{" "}
             Showing the deterministic template prose. Configure the OpenAI

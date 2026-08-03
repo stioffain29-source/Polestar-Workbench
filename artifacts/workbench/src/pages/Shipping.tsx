@@ -712,18 +712,18 @@ export default function Shipping() {
           >
             {hormuzStatus.headline}
           </div>
-          <div className="text-sm font-sans" style={{ color: "#303030" }}>
+          <div className="text-sm font-sans" style={{ color: "#363636" }}>
             {hormuzStatus.detail}
           </div>
           {hormuzStatus.anyActivity && (
-            <div className="text-[11px] font-sans uppercase tracking-wider mt-2" style={{ color: "#303030" }}>
+            <div className="text-[11px] font-sans uppercase tracking-wider mt-2" style={{ color: "#363636" }}>
               {hormuzStatus.activeCategoryLabels.length} of 6 categories active
               {hormuzStatus.hasKineticInWindow
                 ? " · new kinetic incident in last 7 days"
                 : " · no new kinetic incident in last 7 days"}
             </div>
           )}
-          <div className="text-[11px] font-sans mt-2 pt-2 border-t" style={{ color: "#303030", borderColor: "#E2E2E2" }}>
+          <div className="text-[11px] font-sans mt-2 pt-2 border-t" style={{ color: "#363636", borderColor: "#e2e2e2" }}>
             <span className="uppercase tracking-wider font-semibold">Trigger</span>{" "}
             {HORMUZ_STATUS_THRESHOLDS.find((t) => t.tone === hormuzStatus.tone)?.rule
               ?? "Status derived from the loaded indicator window."}{" "}
@@ -1276,28 +1276,28 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function HormuzCategoryCard({ cat }: { cat: HormuzCategoryResult }) {
   const active = cat.count > 0;
-  const accent = active ? "#4655FF" : "#E2E2E2";
+  const accent = active ? "#465bff" : "#e2e2e2";
   return (
     <div
       className="rounded-sm border bg-white p-3"
-      style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
+      style={{ borderColor: "#e2e2e2", borderLeftColor: accent, borderLeftWidth: 4 }}
     >
       <div className="flex items-baseline justify-between gap-2">
-        <div className="font-serif font-bold text-sm" style={{ color: "#0B0B3D" }}>
+        <div className="font-serif font-bold text-sm" style={{ color: "#0b0a3d" }}>
           {cat.label}
         </div>
-        <div className="font-mono text-sm" style={{ color: active ? "#0B0B3D" : "#303030" }}>
+        <div className="font-mono text-sm" style={{ color: active ? "#0b0a3d" : "#363636" }}>
           {cat.count}
         </div>
       </div>
-      <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>
+      <div className="text-[11px] font-sans mt-0.5" style={{ color: "#363636" }}>
         {cat.description}
       </div>
       {active ? (
         <ul className="mt-2 space-y-1">
           {cat.recent.slice(0, 3).map((r, idx) => (
-            <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
-              <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
+            <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#363636" }}>
+              <span className="font-mono mr-1.5" style={{ color: "#363636" }}>
                 {r.occurredAt
                   ? (() => {
                       try { return format(parseISO(r.occurredAt), "dd MMM"); } catch { return "—"; }
@@ -1308,13 +1308,13 @@ function HormuzCategoryCard({ cat }: { cat: HormuzCategoryResult }) {
             </li>
           ))}
           {cat.count > 3 && (
-            <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
+            <li className="text-[11px] font-sans italic" style={{ color: "#363636" }}>
               +{cat.count - 3} more in window
             </li>
           )}
         </ul>
       ) : (
-        <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
+        <div className="text-xs font-sans italic mt-2" style={{ color: "#363636" }}>
           Nothing on file for this category in the loaded window.
         </div>
       )}
@@ -1457,7 +1457,7 @@ function EmptyChart({ message }: { message: string }) {
 // --- Maritime Intelligence board ---------------------------------------------
 // Renders the one shared deterministic dataset (buildMaritimeIntelligence). The
 // Shipping Watch report renders the SAME dataset in the same section order, so
-// the live board and the report can never disagree. Brand: #0B0B3D / #4655FF /
+// the live board and the report can never disagree. Brand: #0b0a3d / #465bff /
 // #A33232 reserved for level-5 / Extreme only. Terse; no parenthetical counts
 // in prose (counts appear only on stat tiles / captions).
 
@@ -1749,7 +1749,7 @@ function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
               type="submit"
               disabled={submitting}
               className="text-xs font-sans uppercase tracking-widest rounded-sm px-4 py-2 text-white disabled:opacity-60"
-              style={{ background: "#4655FF" }}
+              style={{ background: "#465bff" }}
             >
               {submitting ? "Uploading…" : "Upload movement snapshot"}
             </button>
@@ -1873,7 +1873,7 @@ function ExecSummaryCard({
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">{label}</div>
       <div
         className="font-serif font-bold leading-none text-2xl"
-        style={{ color: valueColor ?? "#0B0B3D" }}
+        style={{ color: valueColor ?? "#0b0a3d" }}
       >
         {value}
       </div>
@@ -1980,7 +1980,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
       </div>
 
       {/* BLUF */}
-      <div className="rounded-sm p-4" style={{ background: "#0B0B3D" }}>
+      <div className="rounded-sm p-4" style={{ background: "#0b0a3d" }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="text-[10px] uppercase tracking-widest font-sans" style={{ color: "#9aa0c8" }}>
             Bottom line up front
@@ -2052,7 +2052,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
       </MaritimeBoardCard>
 
       {/* Polestar View */}
-      <div className="rounded-sm border border-border" style={{ background: "#0B0B3D" }}>
+      <div className="rounded-sm border border-border" style={{ background: "#0b0a3d" }}>
         <div className="px-4 pt-3 text-[10px] uppercase tracking-widest font-sans" style={{ color: "#9aa0c8" }}>
           Polestar View
         </div>
@@ -2067,7 +2067,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
             <ul className="space-y-1 mt-2">
               {keyRiskIndicators.map((k, i) => (
                 <li key={i} className="text-[12px] font-sans leading-snug flex gap-2" style={{ color: "#dfe1f0" }}>
-                  <span style={{ color: "#4655FF" }}>•</span>
+                  <span style={{ color: "#465bff" }}>•</span>
                   <span>{k}</span>
                 </li>
               ))}
@@ -2100,7 +2100,7 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
             <ul className="space-y-1">
               {watchNext.map((w, i) => (
                 <li key={i} className="text-[12px] font-sans leading-snug flex gap-2" style={{ color: "#dfe1f0" }}>
-                  <span style={{ color: "#4655FF" }}>•</span>
+                  <span style={{ color: "#465bff" }}>•</span>
                   <span>{w}</span>
                 </li>
               ))}

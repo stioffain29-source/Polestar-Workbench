@@ -42,7 +42,7 @@ function PriceCard({ p }: { p: MarketPrice }) {
         <span className="text-xs font-sans text-muted-foreground">{p.unit}</span>
       </div>
       {p.change ? (
-        <div className="text-xs font-mono text-[#303030] mt-1">{p.change}</div>
+        <div className="text-xs font-mono text-[#363636] mt-1">{p.change}</div>
       ) : (
         <div className="text-xs font-mono text-muted-foreground mt-1">no prior observation</div>
       )}
@@ -111,7 +111,7 @@ export function MarketPricesSection({ group }: { group: string }) {
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const POLAR = "#e2e2e2";
-const DUSK = "#303030";
+const DUSK = "#363636";
 
 function MiniTrajectory({ points, unit }: { points: { date: string; value: number }[]; unit: string }) {
   const W = 300;

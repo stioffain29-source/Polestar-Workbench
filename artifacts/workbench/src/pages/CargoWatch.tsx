@@ -109,7 +109,7 @@ function CategoryAxisTick(props: {
   const lineH = 11;
   const top = y - ((lines.length - 1) * lineH) / 2;
   return (
-    <text x={x} y={top} textAnchor="end" fontSize={10} fill="#303030">
+    <text x={x} y={top} textAnchor="end" fontSize={10} fill="#363636">
       {lines.map((ln, i) => (
         <tspan key={i} x={x} dy={i === 0 ? 0 : lineH}>
           {ln}
@@ -736,7 +736,7 @@ export default function CargoWatch() {
                   <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={110} fontSize={11} interval={0} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#465bff" radius={[0, 2, 2, 0]}>
-                    <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -762,7 +762,7 @@ export default function CargoWatch() {
                   />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#0b0a3d" radius={[0, 2, 2, 0]}>
-                    <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                    <LabelList dataKey="count" position="right" fontSize={11} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -802,7 +802,7 @@ export default function CargoWatch() {
                     />
                     <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                     <Bar dataKey="count" fill="#465bff" radius={[0, 2, 2, 0]}>
-                      <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#363636" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -820,7 +820,7 @@ export default function CargoWatch() {
                     <YAxis type="category" dataKey="country" tickLine={false} axisLine={false} width={110} fontSize={11} interval={0} />
                     <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                     <Bar dataKey="count" fill="#0b0a3d" radius={[0, 2, 2, 0]}>
-                      <LabelList dataKey="count" position="right" fontSize={11} fill="#303030" />
+                      <LabelList dataKey="count" position="right" fontSize={11} fill="#363636" />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

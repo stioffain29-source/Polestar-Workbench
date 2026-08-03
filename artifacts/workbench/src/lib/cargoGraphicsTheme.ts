@@ -3,16 +3,16 @@
 // One place to hold the brand palette used by the four report graphics
 // (supply-chain exposure, pattern dashboard, incident timeline, priority
 // matrix) so screen and PDF (rasterised via embedReactChartInPdf) stay in
-// lockstep. Brand spec: Midnight Blue #0B0B3D, Electric Blue #4655FF, Dusk
-// Gray #303030, Polar Gray #E2E2E2. No shadows, blurs, gradients or neon.
+// lockstep. Brand spec: Midnight Blue #0b0a3d, Electric Blue #465bff, Dusk
+// Gray #363636, Polar Gray #e2e2e2. No shadows, blurs, gradients or neon.
 
 import { SEV_COLOR, SEV_LABEL, SEV_RANK, sevKey } from "./pdfChrome";
 
 export const G = {
-  navy: "#0B0B3D",
-  electric: "#4655FF",
-  dusk: "#303030",
-  polar: "#E2E2E2",
+  navy: "#0b0a3d",
+  electric: "#465bff",
+  dusk: "#363636",
+  polar: "#e2e2e2",
   muted: "#6B6B72",
   panel: "#FFFFFF",
   panelAlt: "#F6F7FB",

@@ -379,7 +379,7 @@ export default function Conflict() {
                     const c = CATEGORY_COLOR[d.category];
                     return <Cell key={d.category} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -397,7 +397,7 @@ export default function Conflict() {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -487,23 +487,23 @@ export default function Conflict() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {impactRows.map((row) => {
             const active = row.count > 0;
-            const accent = active ? "#4655FF" : "#E2E2E2";
+            const accent = active ? "#465bff" : "#e2e2e2";
             return (
               <div
                 key={row.label}
                 className="rounded-sm border bg-white p-3"
-                style={{ borderColor: "#E2E2E2", borderLeftColor: accent, borderLeftWidth: 4 }}
+                style={{ borderColor: "#e2e2e2", borderLeftColor: accent, borderLeftWidth: 4 }}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <div className="font-serif font-bold text-sm" style={{ color: "#0B0B3D" }}>{row.label}</div>
-                  <div className="font-mono text-sm" style={{ color: active ? "#0B0B3D" : "#303030" }}>{row.count}</div>
+                  <div className="font-serif font-bold text-sm" style={{ color: "#0b0a3d" }}>{row.label}</div>
+                  <div className="font-mono text-sm" style={{ color: active ? "#0b0a3d" : "#363636" }}>{row.count}</div>
                 </div>
-                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#303030" }}>{row.description}</div>
+                <div className="text-[11px] font-sans mt-0.5" style={{ color: "#363636" }}>{row.description}</div>
                 {active ? (
                   <ul className="mt-2 space-y-1">
                     {row.recent.map((r, idx) => (
-                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#303030" }}>
-                        <span className="font-mono mr-1.5" style={{ color: "#303030" }}>
+                      <li key={`${r.id ?? ""}-${idx}`} className="text-xs font-sans" style={{ color: "#363636" }}>
+                        <span className="font-mono mr-1.5" style={{ color: "#363636" }}>
                           {isNaN(r.occurredDate.getTime()) ? "—" : format(r.occurredDate, "dd MMM")}
                         </span>
                         {displayTitle(r)}
@@ -511,13 +511,13 @@ export default function Conflict() {
                       </li>
                     ))}
                     {row.count > 3 && (
-                      <li className="text-[11px] font-sans italic" style={{ color: "#303030" }}>
+                      <li className="text-[11px] font-sans italic" style={{ color: "#363636" }}>
                         +{row.count - 3} more in window
                       </li>
                     )}
                   </ul>
                 ) : (
-                  <div className="text-xs font-sans italic mt-2" style={{ color: "#303030" }}>
+                  <div className="text-xs font-sans italic mt-2" style={{ color: "#363636" }}>
                     Nothing matched for this indicator in the loaded window.
                   </div>
                 )}

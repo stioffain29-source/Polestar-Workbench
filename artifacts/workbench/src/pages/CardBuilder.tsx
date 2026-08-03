@@ -86,10 +86,10 @@ import { CHART_SOURCES, buildCardChart } from "@/lib/cardCharts";
 
 const DEFAULT_BRAND: BrandSettings = {
   id: 1,
-  colorMidnight: "#0B0B3D",
-  colorElectric: "#4655FF",
-  colorDusk: "#303030",
-  colorPolar: "#E2E2E2",
+  colorMidnight: "#0b0a3d",
+  colorElectric: "#465bff",
+  colorDusk: "#363636",
+  colorPolar: "#e2e2e2",
   colorExtreme: "#A33232",
   logoImage: null,
   fontHeading: "Roboto Condensed",

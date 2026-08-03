@@ -39,8 +39,8 @@ const SEV_RANK: Record<string, number> = {
 
 const POLAR = "#e2e2e2";
 const DUSK = "#363636";
-const NAVY = "#0B0B3D";
-const ELECTRIC = "#4655FF";
+const NAVY = "#0b0a3d";
+const ELECTRIC = "#465bff";
 
 export interface CountryReportMapProps {
   incidents: CountryFastFactsIncident[];

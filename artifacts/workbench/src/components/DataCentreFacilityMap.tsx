@@ -42,12 +42,12 @@ export const STATUS_FALLBACK_COLOR = "#8A94A6";
 // Registry status → brand-safe marker colour (mirrors DataCentres.tsx).
 export const STATUS_COLOR: Record<string, string> = {
   Operational: "#1B6B7A",
-  "Under construction": "#4655FF",
-  Approved: "#4655FF",
-  Proposed: "#303030",
-  "Planning submitted": "#303030",
+  "Under construction": "#465bff",
+  Approved: "#465bff",
+  Proposed: "#363636",
+  "Planning submitted": "#363636",
   "Planning refused": "#A33232",
-  Delayed: "#303030",
+  Delayed: "#363636",
   Suspended: "#A33232",
   Cancelled: "#A33232",
   Unknown: "#8A94A6",
@@ -210,7 +210,7 @@ export function DataCentreFacilityMap({
           swatch={
             <span
               className="inline-block w-5"
-              style={{ borderTop: "1.5px dashed #303030" }}
+              style={{ borderTop: "1.5px dashed #363636" }}
             />
           }
         />
@@ -243,7 +243,7 @@ export function DataCentreFacilityMap({
                   [facility.latitude, facility.longitude],
                   [incident.latitude, incident.longitude],
                 ]}
-                pathOptions={{ color: "#303030", weight: 1.25, opacity: 0.6, dashArray: "4 4" }}
+                pathOptions={{ color: "#363636", weight: 1.25, opacity: 0.6, dashArray: "4 4" }}
               />
             ))}
 
@@ -280,7 +280,7 @@ export function DataCentreFacilityMap({
                       <div>Severity: {SEVERITY_LABELS[i.severity] ?? i.severity}</div>
                       <div>{when}</div>
                       {linked && (
-                        <div style={{ fontWeight: 700, color: "#4655FF" }}>
+                        <div style={{ fontWeight: 700, color: "#465bff" }}>
                           Linked to a tracked facility
                         </div>
                       )}
@@ -293,7 +293,7 @@ export function DataCentreFacilityMap({
                       <div>Severity: {SEVERITY_LABELS[i.severity] ?? i.severity}</div>
                       <div>{when}</div>
                       {linked && (
-                        <div style={{ fontWeight: 700, color: "#4655FF" }}>
+                        <div style={{ fontWeight: 700, color: "#465bff" }}>
                           Linked to a tracked facility
                         </div>
                       )}
@@ -302,7 +302,7 @@ export function DataCentreFacilityMap({
                           href={url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ display: "inline-block", marginTop: 6, color: "#4655FF", fontWeight: 600 }}
+                          style={{ display: "inline-block", marginTop: 6, color: "#465bff", fontWeight: 600 }}
                         >
                           Open source article ↗
                         </a>
@@ -329,7 +329,7 @@ export function DataCentreFacilityMap({
                       center={[f.latitude, f.longitude]}
                       radius={11}
                       interactive={false}
-                      pathOptions={{ color: "#4655FF", fillOpacity: 0, weight: 2 }}
+                      pathOptions={{ color: "#465bff", fillOpacity: 0, weight: 2 }}
                     />
                   )}
                   <CircleMarker
@@ -347,7 +347,7 @@ export function DataCentreFacilityMap({
                         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 6 }}>
                           <Link
                             href={`/registry/data-centres?facility=${f.id}`}
-                            style={{ color: "#4655FF", fontWeight: 600, fontSize: 12 }}
+                            style={{ color: "#465bff", fontWeight: 600, fontSize: 12 }}
                           >
                             Open in registry →
                           </Link>
@@ -356,7 +356,7 @@ export function DataCentreFacilityMap({
                               href={f.sourceUrl}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ color: "#4655FF", fontWeight: 600, fontSize: 12 }}
+                              style={{ color: "#465bff", fontWeight: 600, fontSize: 12 }}
                             >
                               Open source ↗
                             </a>
@@ -410,7 +410,7 @@ function FacilityInfo({
       <div>Type: {f.facilityType}</div>
       <div>Status: {f.status}</div>
       {f.statusChanged && (
-        <div style={{ fontWeight: 700, color: "#4655FF" }}>
+        <div style={{ fontWeight: 700, color: "#465bff" }}>
           Recent status change{f.previousStatus ? ` (from ${f.previousStatus})` : ""}
         </div>
       )}
@@ -448,7 +448,7 @@ function LayerToggle({
         disabled={disabled}
         onChange={(e) => onChange(e.target.checked)}
         className="w-3.5 h-3.5"
-        style={{ accentColor: "#4655FF" }}
+        style={{ accentColor: "#465bff" }}
       />
       {swatch}
       <span className="text-foreground">{label}</span>
@@ -473,7 +473,7 @@ function LegendRing() {
     <span className="inline-flex items-center gap-1.5">
       <span
         className="inline-block w-3.5 h-3.5 rounded-full"
-        style={{ border: "2px solid #4655FF" }}
+        style={{ border: "2px solid #465bff" }}
       />
       Recent status mover
     </span>
@@ -497,7 +497,7 @@ function LegendLink() {
     <span className="inline-flex items-center gap-1.5">
       <span
         className="inline-block w-5"
-        style={{ borderTop: "1.5px dashed #303030" }}
+        style={{ borderTop: "1.5px dashed #363636" }}
       />
       Linked incident
     </span>

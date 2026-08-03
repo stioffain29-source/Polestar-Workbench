@@ -235,7 +235,7 @@ export default function DataCentres() {
                       const c = statusColor(d.label);
                       return <Cell key={d.label} fill={c} stroke={darken(c)} />;
                     })}
-                    <LabelList dataKey="value" position="top" fontSize={12} fontWeight={700} fill="#303030" />
+                    <LabelList dataKey="value" position="top" fontSize={12} fontWeight={700} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -253,7 +253,7 @@ export default function DataCentres() {
                   <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="value" fill="#E67E22" stroke={darken("#E67E22")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY}>
-                    <LabelList dataKey="value" position="top" fontSize={12} fontWeight={700} fill="#303030" />
+                    <LabelList dataKey="value" position="top" fontSize={12} fontWeight={700} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -334,7 +334,7 @@ export default function DataCentres() {
                     const c = ratingColor(d.severity);
                     return <Cell key={d.severity} fill={c} stroke={darken(c)} />;
                   })}
-                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#303030" />
+                  <LabelList dataKey="count" position="top" fontSize={13} fontWeight={700} fill="#363636" />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -351,7 +351,7 @@ export default function DataCentres() {
                   <YAxis tickLine={false} axisLine={{ stroke: "#e2e2e2" }} fontSize={11} allowDecimals={false} />
                   <Tooltip contentStyle={{ background: "#0b0a3d", border: "none", color: "#fff", fontSize: 12 }} />
                   <Bar dataKey="count" fill="#465bff" stroke={darken("#465bff")} strokeWidth={STROKE_WIDTH} fillOpacity={FILL_OPACITY}>
-                    <LabelList dataKey="count" position="top" fontSize={12} fontWeight={700} fill="#303030" />
+                    <LabelList dataKey="count" position="top" fontSize={12} fontWeight={700} fill="#363636" />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

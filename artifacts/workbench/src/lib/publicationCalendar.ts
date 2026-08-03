@@ -54,9 +54,9 @@ export const PUB_KIND_LABELS: Record<PubKind, string> = {
 // Distinct, brand-palette swatches per product type. Red stays reserved for
 // the overdue status flag, so no type uses it.
 export const PUB_KIND_COLORS: Record<PubKind, string> = {
-  topic: "#4655FF", // Electric Blue
-  spot: "#303030", // Dusk Gray
-  country: "#0B0B3D", // Midnight Blue
+  topic: "#465bff", // Electric Blue
+  spot: "#363636", // Dusk Gray
+  country: "#0b0a3d", // Midnight Blue
 };
 
 // Canonical topic product lines shown in the per-topic list. `protests` reports

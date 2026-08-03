@@ -88,7 +88,7 @@ const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
-const MIDNIGHT = "#0B0B3D";
+const MIDNIGHT = "#0b0a3d";
 
 // Severity rank + the demote-only option list for the incident-curation editor.
 // Fixed five-tier vocabulary; the picker only ever offers tiers BELOW the

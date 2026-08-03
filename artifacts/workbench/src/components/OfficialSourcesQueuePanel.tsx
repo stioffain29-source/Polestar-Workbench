@@ -219,7 +219,7 @@ export default function OfficialSourcesQueuePanel({
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Kpi label="Total flagged" value={kpis.totalFlagged} accent="#0B0B3D" />
+        <Kpi label="Total flagged" value={kpis.totalFlagged} accent="#0b0a3d" />
         <Kpi label="Significant" value={kpis.significant} accent="#A33232" />
         <Kpi label="Escalation" value={kpis.escalation} accent="#C45B1C" />
         <Kpi

@@ -1462,10 +1462,10 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS brand_settings (
         id integer PRIMARY KEY DEFAULT 1,
-        color_midnight text NOT NULL DEFAULT '#0B0B3D',
-        color_electric text NOT NULL DEFAULT '#4655FF',
-        color_dusk text NOT NULL DEFAULT '#303030',
-        color_polar text NOT NULL DEFAULT '#E2E2E2',
+        color_midnight text NOT NULL DEFAULT '#0b0a3d',
+        color_electric text NOT NULL DEFAULT '#465bff',
+        color_dusk text NOT NULL DEFAULT '#363636',
+        color_polar text NOT NULL DEFAULT '#e2e2e2',
         color_extreme text NOT NULL DEFAULT '#A33232',
         logo_image text,
         font_heading text NOT NULL DEFAULT 'Roboto Condensed',
