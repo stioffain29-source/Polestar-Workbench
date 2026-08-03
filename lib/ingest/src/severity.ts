@@ -296,6 +296,40 @@ export function isMaritimeVesselAttack(title: string, summary: string): boolean 
   return MARITIME_ATTACK_RE.test(hay) && !MARITIME_LABOUR_STRIKE_RE.test(hay);
 }
 
+// Kinetic attack on a security / government installation (police station,
+// military post, checkpoint, government building, embassy, barracks). Local
+// theatre feeds (apac_local / indonesia_local — Thailand Deep South, PNG
+// Highlands, Mindanao) report exactly this class of incident ("Deep South
+// police station attacked, school closed") with NO explicit weapon noun and NO
+// casualty count, so it carried no HIGH signal anywhere in this file and fell
+// all the way through to the LOW default — the same live incidents the
+// "conflict" topic's armed/insurgent/militant-attack tier already escalates,
+// just missing an installation-object anchor and gated to the wrong topic.
+// Mirrors the MARITIME_ATTACK_RE pattern below: bind an attack VERB to a
+// security-installation OBJECT within a short window so a figurative
+// "attacks the policy" / "criticises the government" elsewhere in the story
+// cannot escalate. Applied globally (not topic-gated) — an attack on a police
+// station or military post is a HIGH-severity security event in any theatre.
+const SECURITY_INSTALLATION_ATTACK_VERB =
+  "attack(?:ed|ing|s)?|storm(?:ed|ing|s)?|raid(?:ed|ing|s)?|bomb(?:ed|ing|s)?|shot at|shoot(?:ing)? at|fired?\\s+(?:on|at|upon)|firing\\s+(?:on|at|upon)|ambush(?:ed|ing|es)?|torch(?:ed|ing)?|set\\s+(?:on\\s+)?(?:fire|ablaze)|besieg(?:e|ed|ing)|overran";
+const SECURITY_INSTALLATION_OBJECT =
+  "police (?:station|post|checkpoint|outpost|headquarters)|military (?:base|post|camp|checkpoint|outpost)|army (?:base|post|camp|outpost)|(?:district|government) (?:office|building|compound)|town hall|embassy|consulate|barracks|security (?:post|checkpoint|outpost)|border post|customs post";
+const SECURITY_INSTALLATION_ATTACK_RE = new RegExp(
+  `\\b(?:${SECURITY_INSTALLATION_ATTACK_VERB})\\b[\\s\\S]{0,30}?\\b(?:${SECURITY_INSTALLATION_OBJECT})\\b|\\b(?:${SECURITY_INSTALLATION_OBJECT})\\b[\\s\\S]{0,30}?\\b(?:${SECURITY_INSTALLATION_ATTACK_VERB})\\b`,
+  "i",
+);
+
+/**
+ * True if the text describes a kinetic attack on a security / government
+ * installation — an attack verb bound to a police/military/government object.
+ * Exported so the one-time DB heal can UPGRADE machine-scraped local-feed rows
+ * the topic-gated classifier under-rated.
+ */
+export function isSecurityInstallationAttack(title: string, summary: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return SECURITY_INSTALLATION_ATTACK_RE.test(hay);
+}
+
 // A mass-casualty toll: a digit count >= MASS_FATALITY_THRESHOLD (6-9, or any
 // 10-9999) or a vague large quantity (dozens / scores / hundreds). The unit
 // guard stops a non-toll number — a reward "Rs 8 lakh", an age "10-year-old",
@@ -671,7 +705,11 @@ export function classifySeverity(
     EXTREME.some((re) => re.test(hay))
   )
     return "extreme";
-  if (!reactionLed && HIGH.some((re) => re.test(hay))) return "high";
+  if (
+    !reactionLed &&
+    (HIGH.some((re) => re.test(hay)) || SECURITY_INSTALLATION_ATTACK_RE.test(hay))
+  )
+    return "high";
 
   // Confirmed killing => HIGH. A bare fatal word ("killed", "shot dead",
   // "fatalities") is escalated to High ONLY when it co-occurs with a security /
@@ -817,10 +855,17 @@ export function classifySeverity(
   // raid / operation / arrest / standoff / blockade by security forces is a
   // moderate operational event. Forward-looking / advisory framing falls
   // through to insignificant / low.
-  if (topic === "conflict") {
+  // Scoped to "conflict" AND the local-theatre feeds (apac_local /
+  // indonesia_local) that report the SAME class of live insurgency / militant
+  // activity (Thailand Deep South, PNG Highlands, Mindanao, West Papua) but
+  // previously never received this escalation — the topic gate below used to
+  // read `topic === "conflict"` only, which is why a "militant attack" /
+  // "armed clash" headline from a Thailand or PNG local feed under-rated to
+  // LOW even though the identical wording from the conflict feed read HIGH.
+  if (topic === "conflict" || topic === "apac_local" || topic === "indonesia_local") {
     if (
       !reactionLed &&
-      /\b(armed clash|armed clashes|gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|ambush(ed|es)?|ied|improvised explosive|roadside bomb|land ?mine|car bomb|grenade attack|bomb(ing|s)? attack|suicide bomb|air ?strikes?|drone strikes?|insurgent attack|militant attack|rebel attack|armed attack|armed assault|massacre|kidnap(ped|ping)?|abduct(ed|ion)?|hostage)\b/i.test(hay)
+      /\b(armed clash|armed clashes|gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|ambush(ed|es)?|ied|improvised explosive|roadside bomb|land ?mine|car bomb|grenade attack|bomb(ing|s)? attack|suicide bomb|air ?strikes?|drone strikes?|insurgent(s)? attack(ed|ing|s)?|militant(s)? attack(ed|ing|s)?|rebel(s)? attack(ed|ing|s)?|armed attack|armed assault|massacre|kidnap(ped|ping)?|abduct(ed|ion)?|hostage)\b/i.test(hay)
     ) {
       return "high";
     }
