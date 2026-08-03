@@ -48,6 +48,15 @@
 //           responsibility" (specific regency), which share ZERO other content
 //           words. See "Casualty-count anchor (PATH 3B)" below for the full
 //           rationale and false-positive tradeoff.
+//   PATH 5  a shared DISTINCTIVE PLACE token (same anchor as PATH 4/2b) AND a
+//           shared FATAL event-nature class, within a wider 3-day window and
+//           NO Jaccard floor -- covers a fatal violent-crime story reported
+//           once while facts are unclear ("Woman dead, suspected murder
+//           victim in Grogol Petamburan") and again once a suspect/motive is
+//           confirmed ("Woman killed by her boyfriend in Grogol Petamburan,
+//           West Jakarta"), which shares almost no vocabulary beyond the
+//           place name. See the PATH 5 comment at its call site for the
+//           accepted false-positive tradeoff.
 //
 // The province gate on PATHS 1-4 is relaxed only for a SINGLE-THEATRE report
 // (crossProvince), where sibling sub-provinces of the one theatre (e.g. Papua
@@ -552,6 +561,34 @@ export function clusterSameStoryRows(
         (t) => t.length >= 5 && ff.placeToks.has(t),
       );
       if (dd <= DAY && sharedDistinctiveName && jac >= 0.35) {
+        c.members.push(i);
+        placed = true;
+        break;
+      }
+      // PATH 5: shared distinctive place token + shared FATAL class, wider
+      // window, no Jaccard floor. A single fatal violent-crime event is often
+      // reported once while facts are still unclear ("Woman dead, suspected
+      // murder victim in Grogol Petamburan") and again once a suspect/motive
+      // is confirmed a day or two later ("Woman killed by her boyfriend in
+      // Grogol Petamburan, West Jakarta over WhatsApp message") -- headlines
+      // that share almost no vocabulary beyond the place name (jac ~0.23 for
+      // this real pair: below PATH 2b's 0.35 floor, and PATH 2b's 1-day
+      // window is too tight for the ~2-day gap between the initial and
+      // follow-up report). The DISTINCTIVE PLACE token (a specific
+      // neighbourhood/premises name, never a generic clash/security/
+      // geography word -- same anchor as PATH 2b) plus a shared FATAL
+      // event-nature class is accepted as sufficient evidence within a
+      // 3-day window, with no Jaccard floor: the two corroborating signals
+      // (a specific named place + a violent death) together are strong
+      // enough that a coincidental match is rare. Known tradeoff (accepted,
+      // same principle as PATH 3B): two DIFFERENT fatal incidents that
+      // happen to name the SAME specific place within 3 days will also
+      // merge -- not silently hidden, see the locked-in test case.
+      const sharedFatalPlace =
+        f.ent.classes.has("fatal") &&
+        ff.ent.classes.has("fatal") &&
+        [...f.placeToks].some((t) => t.length >= 5 && ff.placeToks.has(t));
+      if (dd <= 3 * DAY && sharedFatalPlace) {
         c.members.push(i);
         placed = true;
         break;
