@@ -40,6 +40,27 @@ export function boundsForPoints(points: L.LatLngExpression[]): L.LatLngBounds {
   return L.latLngBounds(points);
 }
 
+// fitBounds() always renders the map's FULL container area at whichever zoom
+// makes the tightest axis of the bounds fit -- it does not crop to just the
+// bounds box. A tall/narrow point cluster (large latitude spread, small
+// longitude spread -- e.g. incidents strung from Chiang Rai in the north down
+// to Narathiwat in the south, all within ~2 degrees of longitude) forces
+// fitBounds to zoom out far enough to fit the full latitude spread, and at
+// that zoom the wide/short container then renders many times more longitude
+// than the incidents actually span (Yemen-to-Malaysia for a Thailand-only
+// report). Every marker stays at its correct coordinate; only the zoom is
+// wrong. COUNTRY_VIEW's per-country zoom was hand-tuned to show a sensible
+// single-country view in this exact container (currently used only for the
+// zero-incident fallback) -- reusing it as a FLOOR means fitBounds may still
+// zoom IN past it for a tightly clustered report, but can never zoom OUT past
+// it for a widely spread one. A handful of very widely-spread reports may
+// then show an outlier marker nearer the edge of the view instead of
+// dead-centre -- an acceptable trade-off against showing half a continent.
+export function flooredZoom(computedZoom: number, floorZoom: number | null | undefined): number {
+  if (floorZoom == null) return computedZoom;
+  return Math.max(computedZoom, floorZoom);
+}
+
 const SEV_LABEL: Record<string, string> = {
   extreme: "Extreme",
   high: "High",
@@ -1010,6 +1031,11 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
         return;
       }
       map.fitBounds(boundsForPoints(latLngs), { padding: [48, 52], maxZoom: 7 });
+      {
+        const floor = resolveCountryView(countryName)?.zoom;
+        const z = flooredZoom(map.getZoom(), floor);
+        if (z !== map.getZoom()) map.setZoom(z);
+      }
       positionDots();
       map.off("move zoom resize viewreset zoomanim", positionDots);
       map.on("move zoom resize viewreset zoomanim", positionDots);
@@ -1084,6 +1110,11 @@ export default function CountryReportMap({ incidents, domId, countryName }: Coun
     }
 
     map.fitBounds(boundsForPoints(latLngs), { padding: [40, 44], maxZoom: 9 });
+    {
+      const floor = resolveCountryView(countryName)?.zoom;
+      const z = flooredZoom(map.getZoom(), floor);
+      if (z !== map.getZoom()) map.setZoom(z);
+    }
 
     positionDots();
     map.off("move zoom resize viewreset zoomanim", positionDots);
