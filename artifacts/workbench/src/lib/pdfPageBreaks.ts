@@ -15,6 +15,22 @@
 export const MIN_PAGE_FILL = 0.45;
 export const PAGE_BREAK_GUARD_PX = 24;
 
+// Trigger threshold for the runt-trailing-page rebalance below, deliberately
+// much stricter than MIN_PAGE_FILL. MIN_PAGE_FILL governs the forward scan's
+// own candidate choice ("prefer a break that fills at least 45% of THIS
+// page") — a healthy, common outcome for a normal document ending. The
+// rebalance step is a much rarer intervention meant only for a genuinely
+// near-empty final page (e.g. a short closing paragraph + disclaimer
+// stranded alone, per the original bug report) — sub-20% fill, not merely
+// "below average". Using MIN_PAGE_FILL here previously fired on ANY final
+// page under 45%, including ones with a full section's worth of remaining
+// content: it would drag a healthily-filled (e.g. 95%) second-to-last page
+// back to the combined range's raw midpoint just to plump up a last page
+// that was never actually broken, creating a large mid-document empty gap
+// (worse than the runt page it was meant to fix) with real content spilling
+// past it.
+export const RUNT_PAGE_FILL_THRESHOLD = 0.2;
+
 // A block that must never be sliced across a page boundary (e.g. the Jakarta
 // operational map + legend + operating-zone cards). `top`/`bottom` are offsets
 // from the document top, matching the break-candidate coordinate space.
@@ -128,18 +144,26 @@ export function buildPageSlices(
   }
 
   // Rebalance a runt final page: the forward scan can leave the trailing page
-  // far under-filled when the true remaining content overflows the previous
-  // page's budget by only a small margin (e.g. a short closing paragraph plus
-  // a footer disclaimer, spilling onto an otherwise near-empty page). Re-split
+  // near-empty when the true remaining content overflows the previous page's
+  // budget by only a small margin (e.g. a short closing paragraph plus a
+  // footer disclaimer, spilling onto an otherwise near-empty page). Re-split
   // the last TWO pages together at the effective candidate closest to their
   // combined midpoint — but only when both halves still fit within one page
   // height each, so this can never introduce an overflow or a cut the forward
   // scan itself would not have produced.
+  //
+  // Gated on RUNT_PAGE_FILL_THRESHOLD (not MIN_PAGE_FILL): a final page that's
+  // merely below-average fill (e.g. 30-40%, a normal amount of trailing
+  // content like a whole extra section) must be left alone. Rebalancing it
+  // anyway would drag an already healthily-filled second-to-last page back to
+  // the combined range's raw midpoint, trading a fine-looking document ending
+  // for a large, jarring empty gap mid-document with real content spilling
+  // past it onto the next page.
   if (pages.length >= 2) {
     const lastPage = pages[pages.length - 1];
     const prevPage = pages[pages.length - 2];
     const lastFill = (lastPage.end - lastPage.start) / pageCssHeight;
-    if (lastFill < MIN_PAGE_FILL) {
+    if (lastFill < RUNT_PAGE_FILL_THRESHOLD) {
       const rangeStart = prevPage.start;
       const rangeEnd = lastPage.end;
       const midpoint = (rangeStart + rangeEnd) / 2;

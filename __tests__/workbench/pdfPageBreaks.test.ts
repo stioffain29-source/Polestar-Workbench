@@ -3,6 +3,7 @@ import {
   refineBreakCandidates,
   MIN_PAGE_FILL,
   PAGE_BREAK_GUARD_PX,
+  RUNT_PAGE_FILL_THRESHOLD,
 } from "../../artifacts/workbench/src/lib/pdfPageBreaks";
 
 // Guards the DOM-rasterise PDF export's page-break geometry
@@ -297,6 +298,65 @@ describe("buildPageSlices — runt trailing page rebalance", () => {
     // the rebalance guard must be a no-op here.
     expect(slices.map((s) => s.end)).toEqual([900, 1850, 2500]);
   });
+
+  it("leaves a healthily-filled second-to-last page alone when the final page has a normal (not runt) amount of trailing content", () => {
+    // Regression test for a real Spot Report bug: a section (e.g. Operational
+    // Impact) naturally filled page 2 to 95%, with a whole extra section's
+    // worth of remaining content (multiple paragraphs) carrying over to page
+    // 3, landing it at 30% fill — a perfectly normal document ending, NOT a
+    // "short closing paragraph + disclaimer" runt page. Densely-spaced
+    // candidates (mimicking wrapped prose lines) exist near the combined
+    // range's midpoint, so the old MIN_PAGE_FILL-gated rebalance would have
+    // dragged page 2 back from 95% to ~63% fill, creating a large mid-document
+    // empty gap with real paragraph content spilling onto page 3 — exactly
+    // the bug reported.
+    const pageCssHeight = 1000;
+    const prevPageEnd = 950; // page 2 naturally ends here via a real candidate
+    const totalHeight = prevPageEnd + 300; // page 3 would be 300/1000 = 30% fill
+
+    const candidates: number[] = [0];
+    for (let y = 30; y < totalHeight; y += 26) candidates.push(y);
+    candidates.push(prevPageEnd, totalHeight);
+    const sorted = Array.from(new Set(candidates)).sort((a, b) => a - b);
+
+    const slices = buildPageSlices(totalHeight, pageCssHeight, sorted);
+
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+    // Page 2 must stay near its healthy, naturally-scanned ~950 break — not
+    // get pulled back to the combined range's midpoint (~625) just to plump
+    // up page 3.
+    const page2 = slices[slices.length - 2];
+    const page3 = slices[slices.length - 1];
+    expect(page2.end).toBeGreaterThanOrEqual(900);
+    expect((page2.end - page2.start) / pageCssHeight).toBeGreaterThanOrEqual(0.9);
+    expect(page3.start).toBe(page2.end);
+    expect(page3.end).toBe(totalHeight);
+  });
+
+  it("still rebalances a genuinely near-empty final page (below RUNT_PAGE_FILL_THRESHOLD)", () => {
+    // Same shape as the bug-repro test above but with a much smaller trailing
+    // remainder (15% fill) — a true "short closing paragraph" runt page, which
+    // must still trigger the rebalance.
+    const pageCssHeight = 1000;
+    const prevPageEnd = 950;
+    const totalHeight = prevPageEnd + 150; // final page = 150/1000 = 15% fill
+
+    const candidates: number[] = [0];
+    for (let y = 30; y < totalHeight; y += 26) candidates.push(y);
+    candidates.push(prevPageEnd, totalHeight);
+    const sorted = Array.from(new Set(candidates)).sort((a, b) => a - b);
+
+    const slices = buildPageSlices(totalHeight, pageCssHeight, sorted);
+
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+    // The rebalance should have moved page 2's end away from the runt-causing
+    // 950 break, closer to the combined range's midpoint.
+    expect(slices[slices.length - 2].end).not.toBe(950);
+    const lastPage = slices[slices.length - 1];
+    const prevPage = slices[slices.length - 2];
+    expect((lastPage.end - lastPage.start) / pageCssHeight).toBeGreaterThan(0.15);
+    expect((prevPage.end - prevPage.start) / pageCssHeight).toBeLessThanOrEqual(1);
+  });
 });
 
 describe("buildPageSlices — cover page (page 1) stays intact", () => {
@@ -401,5 +461,13 @@ describe("exported tuning constants", () => {
     expect(PAGE_BREAK_GUARD_PX).toBeGreaterThan(0);
     expect(MIN_PAGE_FILL).toBeGreaterThan(0);
     expect(MIN_PAGE_FILL).toBeLessThan(1);
+  });
+
+  it("keeps the runt-page rebalance threshold strictly below the normal fill target", () => {
+    // The rebalance must only fire for pages far emptier than a normal
+    // "below-target" ending — otherwise it over-triggers on healthy documents
+    // (the exact bug this threshold was introduced to fix).
+    expect(RUNT_PAGE_FILL_THRESHOLD).toBeGreaterThan(0);
+    expect(RUNT_PAGE_FILL_THRESHOLD).toBeLessThan(MIN_PAGE_FILL);
   });
 });
