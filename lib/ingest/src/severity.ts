@@ -64,6 +64,24 @@ export type SeverityTopic =
   | "apac_local"
   | "data_centres";
 
+// Runtime mirror of the SeverityTopic union above — TS types vanish at
+// runtime, so anything that needs to iterate/filter "every topic this
+// classifier covers" (e.g. the one-time DB severity backfill) imports this
+// array instead of hand-listing a subset. Keep in sync with the type above;
+// a lint/test should fail loudly if they ever drift (see severity.test.ts).
+export const ALL_SEVERITY_TOPICS: SeverityTopic[] = [
+  "flashpoint",
+  "cargo_watch",
+  "shipping",
+  "energy",
+  "fertiliser",
+  "fuel",
+  "conflict",
+  "indonesia_local",
+  "apac_local",
+  "data_centres",
+];
+
 // Present-tense fatal headlines. News writes fatal attacks in the present tense
 // ("airstrike kills seven civilians", "gunmen kill 24 construction workers",
 // "shootout kills 30"), but the EXTREME tier originally listed only the past

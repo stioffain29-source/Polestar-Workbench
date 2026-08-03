@@ -162,6 +162,7 @@ function Section({
     <div className="report-section mb-8">
       <h2
         className="uppercase pb-2 mb-4 tracking-wide"
+        data-pdf-keep-with-next="true"
         style={{
           color: NAVY,
           fontFamily: "Roboto, sans-serif",

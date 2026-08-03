@@ -127,5 +127,39 @@ export function buildPageSlices(
     start = end;
   }
 
+  // Rebalance a runt final page: the forward scan can leave the trailing page
+  // far under-filled when the true remaining content overflows the previous
+  // page's budget by only a small margin (e.g. a short closing paragraph plus
+  // a footer disclaimer, spilling onto an otherwise near-empty page). Re-split
+  // the last TWO pages together at the effective candidate closest to their
+  // combined midpoint — but only when both halves still fit within one page
+  // height each, so this can never introduce an overflow or a cut the forward
+  // scan itself would not have produced.
+  if (pages.length >= 2) {
+    const lastPage = pages[pages.length - 1];
+    const prevPage = pages[pages.length - 2];
+    const lastFill = (lastPage.end - lastPage.start) / pageCssHeight;
+    if (lastFill < MIN_PAGE_FILL) {
+      const rangeStart = prevPage.start;
+      const rangeEnd = lastPage.end;
+      const midpoint = (rangeStart + rangeEnd) / 2;
+      const rebalanceCandidates = effective.filter(
+        (y) =>
+          y > rangeStart + PAGE_BREAK_GUARD_PX &&
+          y < rangeEnd - PAGE_BREAK_GUARD_PX &&
+          y - rangeStart <= pageCssHeight &&
+          rangeEnd - y <= pageCssHeight,
+      );
+      if (rebalanceCandidates.length > 0) {
+        let best = rebalanceCandidates[0];
+        for (const c of rebalanceCandidates) {
+          if (Math.abs(c - midpoint) < Math.abs(best - midpoint)) best = c;
+        }
+        prevPage.end = best;
+        lastPage.start = best;
+      }
+    }
+  }
+
   return pages;
 }

@@ -96,6 +96,46 @@ function applyExportOnlyLayout(root: HTMLElement): void {
   applySeverityBadgeExportLayout(root);
   applyCountryTableExportLayout(root);
   applyBarChartExportLayout(root);
+  applyBulletListExportLayout(root);
+}
+
+// html2canvas renders native <ul>/<li> `::marker` bullets inconsistently —
+// the dot can float above and to the left of its line, disconnected from the
+// text baseline. This affects EVERY report's bulleted lists (Spot, Shipping,
+// Conflict, Flashpoint, Special, Country — all share the same `list-disc`
+// pattern), so replace each marker with an explicit, manually positioned
+// bullet character laid out via flexbox. That removes the dependency on
+// html2canvas's marker rendering entirely, the same workaround already used
+// here for severity chips and posture badges.
+function applyBulletListExportLayout(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>("ul.list-disc").forEach((ul) => {
+    ul.style.listStyle = "none";
+    ul.style.paddingLeft = "0";
+    ul.style.marginLeft = "0";
+
+    Array.from(ul.children).forEach((node) => {
+      const li = node as HTMLElement;
+      if (li.tagName !== "LI") return;
+      const computed = window.getComputedStyle(li);
+
+      li.style.listStyle = "none";
+      li.style.display = "flex";
+      li.style.alignItems = "flex-start";
+      li.style.gap = "8px";
+      li.style.paddingLeft = "0";
+      li.style.marginLeft = "0";
+
+      const bullet = document.createElement("span");
+      bullet.textContent = "\u2022";
+      bullet.style.flex = "0 0 14px";
+      bullet.style.width = "14px";
+      bullet.style.display = "inline-block";
+      bullet.style.fontSize = computed.fontSize;
+      bullet.style.lineHeight = computed.lineHeight;
+      bullet.style.color = computed.color;
+      li.insertBefore(bullet, li.firstChild);
+    });
+  });
 }
 
 function applyMapExportLayout(
