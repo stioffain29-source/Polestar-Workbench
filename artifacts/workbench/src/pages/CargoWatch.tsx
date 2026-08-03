@@ -142,10 +142,11 @@ export default function CargoWatch() {
     topic: "cargo_watch",
     includeIrrelevant: true,
   } as never);
-  // Defaults to 7 days — an "all time" default meant this page opened buried
-  // under the full incident history before anyone could act on it. The range
-  // pills below still let an analyst widen back out to All time.
-  const [range, setRange] = useState<RangeKey>("7d");
+  // Defaults to 30 days — matches Cargo Watch's monthly cadence. An "all
+  // time" default meant this page opened buried under the full incident
+  // history before anyone could act on it; 7d was too narrow for a monthly
+  // topic. The range pills below still let an analyst widen out to All time.
+  const [range, setRange] = useState<RangeKey>("30d");
   const [recentTab, setRecentTab] = useState<"main" | "review">("main");
 
   // Needs Review resolution: an analyst assigns the correct country to an
