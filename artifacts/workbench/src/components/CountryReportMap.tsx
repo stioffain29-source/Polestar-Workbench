@@ -576,8 +576,22 @@ function OperationalMapHeader() {
 }
 
 function ImpactChip({ impact }: { impact: ImpactLevel }) {
+  const label = `Impact level: ${impact}`;
   return (
     <span
+      // Tagged so the PDF export swaps this span for a canvas-rendered chip
+      // (see applySeverityBadgeExportLayout / sidebarSeverityChipCanvas in
+      // exportPdf.ts). html2canvas mis-measures long styled-span text like
+      // "Impact level: Indirect impact" against a fallback font width, which
+      // makes the label overflow the pill and overlap the card row below it.
+      // Canvas chips are pre-measured with the real font, so this is a
+      // general fix for every badge on this card grid, not a one-off patch.
+      data-sev-chip="true"
+      data-sev-label={label}
+      data-sev-color={IMPACT_COLOR[impact]}
+      data-sev-height="20"
+      data-sev-min-width="0"
+      data-sev-pad-x="7"
       style={{
         display: "inline-block",
         background: IMPACT_COLOR[impact],
@@ -591,7 +605,7 @@ function ImpactChip({ impact }: { impact: ImpactLevel }) {
         whiteSpace: "nowrap",
       }}
     >
-      Impact level: {impact}
+      {label}
     </span>
   );
 }
