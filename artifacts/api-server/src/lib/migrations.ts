@@ -24,6 +24,10 @@ import {
   severityFromFatalities,
   maxSeverity,
   SEVERITY_RANK,
+  ALL_SEVERITY_TOPICS,
+  SEVERITY_BACKFILL_NOTE_PREFIXES,
+  nextSeverityForRow,
+  type SeverityTopic,
   detectStaleEventDate,
   geocode,
   isReliefWebConfigured,
@@ -5003,20 +5007,6 @@ export async function backfillRelevance(): Promise<{
 // `protests` rows are rated with the flashpoint ruleset (the protests monitor
 // resolves to the flashpoint data topic). Any topic not listed here is left
 // untouched by the re-rate.
-const SEVERITY_RERATE_TOPIC: Record<
-  string,
-  Parameters<typeof classifySeverity>[2]
-> = {
-  flashpoint: "flashpoint",
-  protests: "flashpoint",
-  conflict: "conflict",
-  cargo_watch: "cargo_watch",
-  shipping: "shipping",
-  energy: "energy",
-  fertiliser: "fertiliser",
-  fuel: "fuel",
-};
-
 /**
  * Re-rate stored incident severity against the CURRENT classifySeverity, scoped
  * to MACHINE-PROVENANCE rows only (auto-scraped / legacy:db) so analyst-curated
@@ -5041,6 +5031,18 @@ export async function backfillSeverity(): Promise<{
   downgraded: number;
   perTopic: Record<string, { upgraded: number; downgraded: number }>;
 }> {
+  // Topic and analystNotes-marker scope now come from @workspace/ingest's
+  // ALL_SEVERITY_TOPICS / SEVERITY_BACKFILL_NOTE_PREFIXES — the same single
+  // source of truth used by runSeverityBackfill (lib/ingest, run via
+  // scripts/src/backfill-severity.ts against a local/replica DB). This
+  // route used to keep its OWN separate, narrower topic map
+  // (SEVERITY_RERATE_TOPIC: 8 topics, missing indonesia_local/apac_local/
+  // data_centres) and its OWN narrower marker filter (missing gdelt_cloud:/
+  // social_raw:), so a classifier fix could reach rows via one path and
+  // silently miss them via this one — e.g. a gdelt_cloud:-sourced
+  // indonesia_local incident was invisible to this endpoint. Sharing the
+  // scope constants closes that gap generally instead of re-listing topics
+  // here a second time.
   const rows = await db
     .select({
       id: incidentsTable.id,
@@ -5052,9 +5054,13 @@ export async function backfillSeverity(): Promise<{
     })
     .from(incidentsTable)
     .where(
-      or(
-        like(incidentsTable.analystNotes, "auto-scraped:%"),
-        like(incidentsTable.analystNotes, "legacy:db:%"),
+      and(
+        inArray(incidentsTable.topic, ALL_SEVERITY_TOPICS),
+        or(
+          ...SEVERITY_BACKFILL_NOTE_PREFIXES.map((prefix) =>
+            like(incidentsTable.analystNotes, `${prefix}%`),
+          ),
+        ),
       ),
     );
 
@@ -5065,11 +5071,13 @@ export async function backfillSeverity(): Promise<{
 
   const perTopic = new Map<string, { upgraded: number; downgraded: number }>();
   const writes = rows.flatMap((r) => {
-    const st = SEVERITY_RERATE_TOPIC[r.topic];
-    if (!st) return [];
-    const fromText = classifySeverity(r.title, r.summary ?? "", st);
-    const floor = severityFromFatalities(r.fatalities);
-    const next = floor ? maxSeverity(fromText, floor) : fromText;
+    // Safe: the query above already scoped topic to ALL_SEVERITY_TOPICS.
+    const next = nextSeverityForRow({
+      title: r.title,
+      summary: r.summary,
+      topic: r.topic as SeverityTopic,
+      fatalities: r.fatalities,
+    });
     if (next === r.severity) return [];
     const prevRank = SEVERITY_RANK[r.severity as Severity];
     const bucket = perTopic.get(r.topic) ?? { upgraded: 0, downgraded: 0 };
