@@ -437,10 +437,10 @@ export {
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
 export { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "./sourceHealth";
 export type { FeedHealth } from "./sourceHealth";
-export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal, hasConfirmedKillingSignal, hasMassCasualtyToll, isMaritimeVesselAttack } from "./severity";
+export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, ALL_SEVERITY_TOPICS, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal, hasConfirmedKillingSignal, hasMassCasualtyToll, isMaritimeVesselAttack } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
-export { runSeverityBackfill } from "./backfillSeverity";
-export type { SeverityBackfillSummary } from "./backfillSeverity";
+export { runSeverityBackfill, nextSeverityForRow } from "./backfillSeverity";
+export type { SeverityBackfillSummary, BackfillRow } from "./backfillSeverity";
 export { runCargoCountryBackfill } from "./backfillCargoCountry";
 export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";

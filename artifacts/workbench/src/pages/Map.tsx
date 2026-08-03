@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup, useMapEvents } from "react-leaflet";
+import { clusterPointsByZoom } from "@/lib/mapClustering";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import "leaflet/dist/leaflet.css";
@@ -70,48 +71,17 @@ function topicToCategory(topic: string): string {
 // spread (seen at country-centroid fallback points, e.g. Indonesia's
 // centroid sitting in open water in the Makassar Strait, and smaller rings
 // on West Papua/Papuan Highlands fallback points). There is no size below
-// which a synthetic ring is an honest representation of the data, so every
-// coordinate with 2+ overlapping incidents collapses into a single cluster
-// marker with a count badge — never a ring, regardless of how many points
-// share the spot. Points with a unique, resolved location are left exactly
-// where they belong.
-function severityRank(rating: string): number {
-  const idx = (SEVERITY_LEVELS as readonly string[]).indexOf(rating);
-  return idx === -1 ? 0 : idx;
-}
+// which a synthetic ring is an honest representation of the data, so
+// clustering only ever collapses points into a single marker with a count
+// badge — never a ring, regardless of how many points share the spot.
+// Points with a unique, resolved location are left exactly where they
+// belong. Clustering itself is zoom-aware (see @/lib/mapClustering) so a
+// stack of genuinely distinct, well-resolved coordinates decomposes into
+// individual markers once the analyst zooms in far enough to separate them;
+// only true coordinate duplicates (unresolved fallback locations) stay
+// merged at every zoom, since there is no distinct real position to split
+// them into.
 
-function spreadOverlapping<T extends { id: string; lat: number; lng: number; rating: string }>(
-  points: T[]
-): (T & { clusterSize?: number; clusterMembers?: T[] })[] {
-  const groups = new Map<string, T[]>();
-  for (const p of points) {
-    const key = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
-    const existing = groups.get(key);
-    if (existing) existing.push(p);
-    else groups.set(key, [p]);
-  }
-  const result: (T & { clusterSize?: number; clusterMembers?: T[] })[] = [];
-  for (const group of groups.values()) {
-    if (group.length === 1) {
-      result.push(group[0]);
-      continue;
-    }
-    const n = group.length;
-    // Represent the whole stack with one marker at the shared coordinate,
-    // styled by the highest severity present in the group. Applies uniformly
-    // from n=2 upward — no ring fan-out at any size.
-    const highest = group.reduce((best, p) =>
-      severityRank(p.rating) > severityRank(best.rating) ? p : best
-    );
-    result.push({
-      ...highest,
-      id: `cluster-${group[0].lat.toFixed(4)},${group[0].lng.toFixed(4)}`,
-      clusterSize: n,
-      clusterMembers: group,
-    });
-  }
-  return result;
-}
 
 // An incident keeps the pulsing-ring "new" map treatment indefinitely until
 // an analyst explicitly clears it — there is no time cutoff. The cleared set
@@ -214,17 +184,33 @@ type Point = {
   gdeltEventType: string | null;
   gdeltSubEventType: string | null;
   gdeltConfidence: number | null;
-  // Set only on synthetic markers produced by spreadOverlapping() when 2 or
-  // more points share one fallback coordinate. clusterMembers holds the
-  // original points for the popup.
+  // Set only on synthetic markers produced by clusterPointsByZoom() (see
+  // @/lib/mapClustering) when 2+ points fall within clustering distance of
+  // each other at the current zoom. clusterMembers holds the original
+  // points, each at its own true coordinate, for the popup.
   clusterSize?: number;
   clusterMembers?: Point[];
 };
+
+// Must render as a child of MapContainer (useMapEvents needs the Leaflet map
+// context) and renders nothing itself — it just reports zoom changes up to
+// the page so clustering can recompute. zoomend covers scroll/pinch/double-
+// click/keyboard zoom uniformly.
+function MapZoomTracker({ onZoom }: { onZoom: (zoom: number) => void }) {
+  const map = useMapEvents({
+    zoomend: () => onZoom(map.getZoom()),
+  });
+  return null;
+}
 
 export default function MapPage() {
   const [, setLocation] = useLocation();
   const [view, setView] = useState<"incidents" | "maritime" | "land">("incidents");
   const [range, setRange] = useState<RangeKey>("24h");
+  // Tracks the live Leaflet zoom level so marker clustering can recompute as
+  // the analyst zooms — see MapZoomTracker below and @/lib/mapClustering.
+  // Initial value matches MapContainer's own initial zoom prop.
+  const [zoom, setZoom] = useState(4);
   // Fetch only the records within the selected window. Switching ranges issues a
   // new request (React Query keys on the params) rather than re-filtering a full
   // in-memory list, so the payload stays small as the table grows.
@@ -359,11 +345,11 @@ export default function MapPage() {
           gdeltSubEventType: null,
           gdeltConfidence: null,
         }));
-      return spreadOverlapping([...incidentPoints, ...maritimePoints]);
+      return [...incidentPoints, ...maritimePoints];
     }
     const strikes = view === "maritime" ? maritime : land;
     const fixedCat = view === "maritime" ? "Maritime Strike" : "Land Strike";
-    return spreadOverlapping(strikes
+    return strikes
       .filter((s) => s.latitude != null && s.longitude != null)
       .map<Point>((s) => ({
         id: `s-${s.id}`,
@@ -383,7 +369,7 @@ export default function MapPage() {
         gdeltEventType: null,
         gdeltSubEventType: null,
         gdeltConfidence: null,
-      })));
+      }));
   }, [view, incidents, maritime, land, maritimeSecurityEvents]);
 
   // The API already returns only records within the selected window, so the
@@ -415,6 +401,15 @@ export default function MapPage() {
   const newMarkerIds = useMemo(
     () => (blinkEnabled ? visiblePoints.filter((p) => !clearedIds.has(p.id)).map((p) => p.id) : []),
     [blinkEnabled, visiblePoints, clearedIds],
+  );
+
+  // The actual markers drawn on the map, clustered by their pixel distance
+  // at the CURRENT zoom (see @/lib/mapClustering). Kept separate from
+  // visiblePoints/windowedPoints so the "Showing X of Y" counters below
+  // reflect true incident counts and don't jump around as the user zooms.
+  const renderPoints = useMemo(
+    () => clusterPointsByZoom(visiblePoints, zoom, undefined, SEVERITY_LEVELS),
+    [visiblePoints, zoom],
   );
 
   // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
@@ -580,12 +575,15 @@ export default function MapPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
               subdomains={["a", "b", "c", "d"]}
             />
-            {visiblePoints.map((p) => {
-              // Any stack of 2+ incidents sharing one unresolved fallback
-              // coordinate (e.g. a country centroid) is collapsed by
-              // spreadOverlapping() into a single cluster marker with a count
-              // badge — never fanned into a ring, which reads as a fabricated
-              // geometric shape rather than real incident spread.
+            <MapZoomTracker onZoom={setZoom} />
+            {renderPoints.map((p) => {
+              // Markers within pixel-clustering range at the CURRENT zoom
+              // (see @/lib/mapClustering) are collapsed into a single
+              // cluster marker with a count badge — never fanned into a
+              // ring, which reads as a fabricated geometric shape rather
+              // than real incident spread. As the analyst zooms in, the
+              // same incidents naturally decompose into individual markers
+              // at their true coordinates once they clear the pixel radius.
               if (p.clusterSize && p.clusterSize > 1) {
                 const clusterStyle = markerStyle(p.rating);
                 const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
