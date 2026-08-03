@@ -244,6 +244,61 @@ describe("buildPageSlices — keep-together blocks (data-pdf-keep)", () => {
   });
 });
 
+describe("buildPageSlices — runt trailing page rebalance", () => {
+  it("redistributes content when the true remainder overflows a page by a small margin", () => {
+    const pageCssHeight = 1000;
+    // Remaining content after page 1 (ends at 900) totals 1080px — just over
+    // one more page, so the forward scan is forced onto a 3rd page holding
+    // only the last 80px (a short closing paragraph + disclaimer). 1450 is the
+    // only candidate available between the two pages, close to the midpoint of
+    // [900, 1980].
+    const totalHeight = 1980;
+    // 1000 and 1300 both sit below page 2's minUsefulBreak (1350), so the
+    // forward scan can't use either and is forced to a hard cut at 1900,
+    // leaving an 80px runt final page [1900, 1980]. Both candidates ARE valid
+    // rebalance points though (each keeps both halves ≤ pageCssHeight); the
+    // rebalance step must pick 1300, the one closest to the [900, 1980]
+    // midpoint (1440).
+    const candidates = [0, 900, 1000, 1300, totalHeight];
+
+    const slices = buildPageSlices(totalHeight, pageCssHeight, candidates);
+
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+    expect(slices[slices.length - 2].end).toBe(1300);
+    expect(slices[slices.length - 1].start).toBe(1300);
+    for (const s of slices) {
+      expect(s.end - s.start).toBeLessThanOrEqual(pageCssHeight);
+    }
+  });
+
+  it("leaves a runt final page alone when no safe rebalance candidate exists", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 2400;
+    // No interior candidates at all — matches the existing "full-height cut"
+    // test. The 400px final page is a runt (40% fill) but there is nothing to
+    // rebalance against, so the output must stay exactly as the forward scan
+    // produced it.
+    const candidates = [0, totalHeight];
+
+    const slices = buildPageSlices(totalHeight, pageCssHeight, candidates);
+
+    expect(slices.map((s) => s.end)).toEqual([1000, 2000, 2400]);
+    assertSlicesAreContiguous(slices, 0, totalHeight);
+  });
+
+  it("does not touch a healthily-filled final page", () => {
+    const pageCssHeight = 1000;
+    const totalHeight = 2500;
+    const candidates = [0, 900, 1850, totalHeight];
+
+    const slices = buildPageSlices(totalHeight, pageCssHeight, candidates);
+
+    // Final page fill = (2500-1850)/1000 = 65% — well above MIN_PAGE_FILL, so
+    // the rebalance guard must be a no-op here.
+    expect(slices.map((s) => s.end)).toEqual([900, 1850, 2500]);
+  });
+});
+
 describe("buildPageSlices — cover page (page 1) stays intact", () => {
   it("reserves the cover via initialStart and never re-slices it", () => {
     const pageCssHeight = 1000;

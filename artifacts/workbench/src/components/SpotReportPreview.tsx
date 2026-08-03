@@ -24,6 +24,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="report-section mb-6">
       <h2
         className="uppercase pb-2 mb-3 tracking-wide"
+        data-pdf-keep-with-next="true"
         style={{
           color: NAVY,
           fontFamily: ROBOTO,
