@@ -309,6 +309,77 @@ describe("clusterSameStoryRows PATH 4 (armed-clash syndication)", () => {
   });
 });
 
+describe("clusterSameStoryRows PATH 3B (armed-actor + fatal + matching casualty count)", () => {
+  // Real Papua case: the government frame ("KKB", broad theatre name) and the
+  // separatist/neutral frame ("TPNPB", specific regency) describe the same
+  // attack but share ZERO content words — not even a place name. The shared
+  // actor family, fatal class, and exact "five" count are the only bridge.
+  it("collapses the KKB/TPNPB Papua attack across government vs separatist framing", () => {
+    const rows = [
+      row({
+        title: "KKB attacks road workers, five killed in Papua Highlands",
+        province: "Papua Pegunungan",
+        category: "Other security",
+        dateMs: base,
+        severityRank: 2,
+      }),
+      row({
+        title: "Five shot dead in Tolikara; Kodam and TPNPB each claim responsibility",
+        province: "Papua Pegunungan",
+        category: "Homicide / violent crime",
+        dateMs: base,
+        severityRank: 4,
+      }),
+    ];
+    const clusters = clusterSameStoryRows(rows);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].sort((a, b) => a - b)).toEqual([0, 1]);
+  });
+
+  it("does NOT merge when the casualty counts differ", () => {
+    const rows = [
+      row({ title: "KKB attacks road workers, five killed in Papua Highlands", dateMs: base }),
+      row({ title: "Two shot dead in Tolikara; TPNPB claims responsibility", dateMs: base }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge two DIFFERENT same-day OPM incidents that only coincidentally share a count", () => {
+    // Counter-example: a distinct ambush and a distinct shootout, same day,
+    // same province, both fatal, both name the actor family, and both happen
+    // to report "three" — but they are genuinely different events. PATH 3B
+    // should still fire here (it is intentionally count-anchored, matching the
+    // documented tradeoff), so this test locks in the known scope of the
+    // anchor rather than asserting a stronger guarantee than it provides.
+    // If real-world false positives on this pattern turn up, tighten the
+    // anchor with a shared place/premises token instead of loosening it.
+    const rows = [
+      row({ title: "TPNPB ambush leaves three dead in Puncak", dateMs: base }),
+      row({ title: "OPM gunmen kill three in Nduga shootout", dateMs: base }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(1);
+  });
+
+  it("does NOT merge when only one headline names the armed-actor family", () => {
+    const rows = [
+      row({ title: "KKB attacks road workers, five killed in Papua Highlands", dateMs: base }),
+      row({ title: "Five villagers killed in landslide near Wamena", dateMs: base }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge across more than a one-day gap", () => {
+    const rows = [
+      row({ title: "KKB attacks road workers, five killed in Papua Highlands", dateMs: base }),
+      row({
+        title: "Five shot dead in Tolikara; Kodam and TPNPB each claim responsibility",
+        dateMs: base + 3 * DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+});
+
 describe("storyEntities", () => {
   it("anchors on the foreign-national victim; the actor is only a corroborator", () => {
     const a = storyEntities("American pilot's body killed by Papua rebels");
