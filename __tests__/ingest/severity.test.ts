@@ -483,6 +483,30 @@ describe("classifySeverity — PNG / Melanesia violent-crime vocabulary", () => 
       classifySeverity("NAC kicks off Stage 4 of asphalt overlay at Mt Hagen airport", "", "apac_local"),
     ).toBe("low");
   });
+
+  it("downgrades a burial/funeral aftermath rite for people already dead, instead of inheriting HIGH from the bare fatal-word + security-noun combination", () => {
+    // Same fatal-word + security-noun combination as a fresh incident, but
+    // framed as the ceremony afterwards — must NOT read as a new HIGH event.
+    expect(classifySeverity("3 slain rebel suspects given dignified burial", "", "flashpoint")).toBe("low");
+    expect(
+      classifySeverity("Slain militants laid to rest after deadly ambush", "", "flashpoint"),
+    ).toBe("low");
+    // Control: the same core wording WITHOUT the burial framing still rates
+    // high, proving the guard — not some other change — causes the downgrade.
+    expect(
+      classifySeverity("3 slain rebel suspects found in Southern Highlands", "", "flashpoint"),
+    ).toBe("high");
+  });
+
+  it("still escalates a genuine fresh attack AT a funeral", () => {
+    // The burial guard suppresses references to a PAST death's aftermath; an
+    // attack happening now, even at a funeral, is an independent HIGH signal
+    // via its own violence keyword ("opened fire" is in the HIGH tier, gated
+    // on nothing else), unaffected by the burial/funeral guard.
+    expect(
+      classifySeverity("Gunmen opened fire at funeral, five killed", "", "flashpoint"),
+    ).toBe("high");
+  });
 });
 
 describe("hasMassCasualtyToll", () => {

@@ -24,6 +24,33 @@ export function parseDate(s: string | undefined | null): Date | null {
   return t;
 }
 
+// Strip "<City>-based" / "<City> <City>-based" attribution phrases before a
+// piece of text is used for COUNTRY resolution anywhere in ingest. Wire-copy
+// convention names a quoted person's or outlet's HOME city this way
+// ("Sydney-based political scientist", "Singapore-based analyst",
+// "Manila-based correspondent") to describe where the SPEAKER lives, not
+// where the event happened. Left unstripped, a tracked-country alias list
+// that includes that city (Australia's aliases include "sydney") wins the
+// country match even when the actual incident is unambiguously in a
+// different country named elsewhere in the same headline ("India's Gen Z
+// Protest ... Claims Sydney-Based Political Scientist..." resolving to
+// Australia instead of India). This is a general wire-copy pattern, not
+// specific to any one city or topic - every country-resolution path in
+// ingest (flashpoint, the generic news-topic runner, cargo watch, shipping,
+// strikes) should call this on its haystack before running alias matching.
+// Case-insensitive (both the city and the word "based" — feeds title-case
+// this as "Sydney-Based" as often as "Sydney-based") and not anchored to a
+// capitalised city: several ingest call sites already lowercase their whole
+// haystack before this runs, so requiring a capital letter would silently
+// never match there. Matching a lowercase compound adjective that happens to
+// end in "-based" ("evidence-based", "rules-based") is harmless - stripping
+// it removes no real geo signal since those phrases never contain a place
+// name.
+
+export function stripAttributionMentions(hay: string): string {
+  return hay.replace(/\b[a-zA-Z][a-zA-Z.]+(?:\s[a-zA-Z][a-zA-Z.]+){0,2}-based\b/gi, " ");
+}
+
 export function cleanText(s: string | undefined | null): string {
   if (!s) return "";
   return s

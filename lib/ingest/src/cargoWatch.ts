@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { cleanText, hasWord, parseDate } from "./text";
+import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode, type GeoResult } from "./geocode";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
@@ -761,7 +761,7 @@ const FOREIGN_CONTEXT = [
 
 function classify(title: string, summary: string): Classified {
   const hay = `${title}\n${summary}`.toLowerCase();
-  const titleLc = title.toLowerCase();
+  const titleLc = stripAttributionMentions(title.toLowerCase());
 
   const hardDenyHit = HARD_DENY.find((d) => hay.includes(d));
   if (hardDenyHit) return { kept: false, reason: `deny:${hardDenyHit}`, country: null };
@@ -1258,7 +1258,7 @@ export async function runCargoWatchIngest(opts: IngestOptions = {}): Promise<Ing
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const rawGeo = geocode(a.country, `${a.title} ${a.summary}`);
+    const rawGeo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     const geo = sanitizeCargoMaritimeGeo(rawGeo, a.country, a.reason);
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);

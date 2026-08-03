@@ -532,6 +532,33 @@ export function isJudicialProcess(title: string, summary: string): boolean {
   return JUDICIAL_PROCESS_RE.test(`${title}\n${summary}`);
 }
 
+// Burial / funeral rites for people who are ALREADY dead ("3 slain rebel
+// suspects given dignified burial", "funeral held for shooting victims",
+// "family lays son to rest a week after ambush"). The bare fatal word
+// ("slain") co-occurring with a security noun ("rebel") would otherwise trip
+// the confirmed-killing HIGH tier below, but a burial/funeral is reporting the
+// AFTERMATH ceremony, not a fresh incident — same class of problem as the
+// reaction guard, just not headline-led so REACTION_LEAD_RE never catches it
+// ("3 slain rebel suspects given..." starts with a fatality count, not an
+// advocacy verb). Deliberately NOT gated on SECURITY_OR_CROWD_SIGNAL_RE like
+// the natural-cause/biographical guards — the whole point is to suppress the
+// escalation this security word would otherwise cause. A genuine fresh attack
+// AT a funeral ("gunmen open fire at funeral, five killed") still escalates
+// normally: "open fire"/"gunfire"/"blast" etc. are independent HIGH-tier
+// violence signals (see HIGH array) unaffected by this guard.
+const BURIAL_RE =
+  /\b(burial|buried|funeral\w*|laid to rest|lay\w* to rest|interred|interment|cremat(?:ed|ion)|last rites)\b/i;
+
+/**
+ * True if the text describes a burial / funeral / laying-to-rest for people
+ * who are already dead, as opposed to a fresh killing. Exported so the
+ * one-time DB heal can scope its downgrade to exactly this class of
+ * mis-rated rows.
+ */
+export function isBurialOrFuneralEvent(title: string, summary: string): boolean {
+  return BURIAL_RE.test(`${title}\n${summary}`);
+}
+
 /**
  * Rate an incident's severity from its text.
  *
@@ -585,6 +612,12 @@ export function classifySeverity(
   // only suppresses the bare-death EXTREME match; a genuine violent death keeps
   // its own security signal so this never fires on a real attack.
   const biographicalDeath = isBiographicalOrIllnessDeath(title, summary);
+
+  // Burial/funeral guard. A ceremony for people already confirmed dead ("3
+  // slain rebel suspects given dignified burial") must not inherit HIGH from
+  // the bare fatal-word + security-noun combination below — it is reporting
+  // the aftermath rite, not a fresh incident. See isBurialOrFuneralEvent.
+  const burialOrFuneral = isBurialOrFuneralEvent(title, summary);
 
   // Judicial-emergency guard. EMERGENCY_RULE_RE (martial law / state of
   // emergency) is a reserved-Extreme trigger, but inside a JUDICIAL frame (a
@@ -640,6 +673,7 @@ export function classifySeverity(
     !naturalCauseDeath &&
     !judicialDeath &&
     !biographicalDeath &&
+    !burialOrFuneral &&
     (FATAL_SIGNAL_RE.test(hay) ||
       PRESENT_TENSE_FATAL_RE.test(hay) ||
       PRESENT_TENSE_FATAL_COUNT_RE.test(hay)) &&
@@ -664,6 +698,7 @@ export function classifySeverity(
     !judicialDeath &&
     !biographicalDeath &&
     !accidentalDeath &&
+    !burialOrFuneral &&
     (PAST_TENSE_FATAL_RE.test(hay) ||
       (ID_BARE_TEWAS_RE.test(hay) && ID_SECURITY_CONTEXT_RE.test(hay)))
   )

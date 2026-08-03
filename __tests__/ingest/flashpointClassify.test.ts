@@ -1,4 +1,4 @@
-import { flashpointTestHooks } from "../../lib/ingest/src/flashpoint";
+import { flashpointTestHooks, resolveFlashpointCountry } from "../../lib/ingest/src/flashpoint";
 
 const { classify, resolvePapuaPng, titleSimilarity, eventSignatureTrigrams } = flashpointTestHooks;
 
@@ -186,6 +186,30 @@ describe("classify", () => {
     const result = classify("Two men detained by police in Jakarta over fraud", "");
     expect(result.kept).toBe(false);
     expect(result.reason).toBe("no-flashpoint-cue");
+  });
+});
+
+describe("resolveFlashpointCountry — attribution-phrase collision", () => {
+  it("resolves India, not Australia, when a Sydney-based commentator is quoted", () => {
+    // Reported bug: the quoted expert's home city (an Australia alias) beat
+    // the story's actual country (India) purely on COUNTRY_ALIASES array
+    // order. This must resolve to India regardless of array order.
+    const country = resolveFlashpointCountry(
+      '"India\'s Gen Z Protest Not Organic," Claims Sydney-Based Political Scientist Salvatore Babones - NDTV',
+      '"India\'s Gen Z Protest Not Organic," Claims Sydney-Based Political Scientist Salvatore Babones NDTV',
+    );
+    expect(country).toBe("India");
+  });
+
+  it("is generic across city/country pairs, not a Sydney-specific patch", () => {
+    // A different city (Karachi, a Pakistan alias) quoted as the home base of
+    // an analyst commenting on an unrelated India story must not steal the
+    // country either — proves the fix is the general attribution pattern.
+    const country = resolveFlashpointCountry(
+      "Karachi-Based Analyst Says India Protest Movement Will Grow",
+      "",
+    );
+    expect(country).toBe("India");
   });
 });
 

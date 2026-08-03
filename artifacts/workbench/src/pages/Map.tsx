@@ -432,6 +432,10 @@ export default function MapPage() {
   type PathLikeInstance = { _path?: SVGPathElement } | null;
   const dotPathRefs = useRef<Record<string, PathLikeInstance>>({});
   const ringPathRefs = useRef<Record<string, PathLikeInstance>>({});
+  // Same story for the fallback-location cluster's own pulse ring (a stack of
+  // 20 incidents sharing one coordinate has nowhere else to show "something in
+  // here is new" except the cluster marker itself) - keyed by cluster id.
+  const clusterRingPathRefs = useRef<Record<string, PathLikeInstance>>({});
 
   useEffect(() => {
     const newIdSet = new Set(newMarkerIds);
@@ -442,6 +446,11 @@ export default function MapPage() {
     for (const marker of Object.values(ringPathRefs.current)) {
       // The ring marker is only ever mounted while its incident is new (see
       // the `{isNew && (...)}` guard below), so if it exists it should pulse.
+      const path = marker?._path;
+      if (path) path.classList.add("map-pulse-ring");
+    }
+    for (const marker of Object.values(clusterRingPathRefs.current)) {
+      // Same rule: only mounted while `clusterHasNew` is true.
       const path = marker?._path;
       if (path) path.classList.add("map-pulse-ring");
     }
@@ -581,9 +590,31 @@ export default function MapPage() {
                 const clusterStyle = markerStyle(p.rating);
                 const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
                 const members = p.clusterMembers ?? [];
+                // A stack can bury a brand-new incident among 20 old ones with
+                // no visual cue at all - mirror the single-marker "new" ring
+                // (pulses until an analyst clears it) on the cluster itself
+                // whenever ANY member is still unread, and flag which specific
+                // rows are new inside the popup list below.
+                const clusterHasNew = blinkEnabled && members.some((m) => !clearedIds.has(m.id));
                 return (
+                  <Fragment key={p.id}>
+                  {clusterHasNew && (
+                    <CircleMarker
+                      ref={(instance) => {
+                        if (instance) clusterRingPathRefs.current[p.id] = instance as unknown as PathLikeInstance;
+                        else delete clusterRingPathRefs.current[p.id];
+                      }}
+                      center={[p.lat, p.lng]}
+                      radius={clusterRadius + 3}
+                      interactive={false}
+                      pathOptions={{
+                        color: clusterStyle.stroke,
+                        weight: 2,
+                        fillOpacity: 0,
+                      }}
+                    />
+                  )}
                   <CircleMarker
-                    key={p.id}
                     center={[p.lat, p.lng]}
                     radius={clusterRadius}
                     pathOptions={{
@@ -641,6 +672,7 @@ export default function MapPage() {
                       </div>
                     </LeafletPopup>
                   </CircleMarker>
+                  </Fragment>
                 );
               }
               const s = markerStyle(p.rating);

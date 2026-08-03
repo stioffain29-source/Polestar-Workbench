@@ -2,7 +2,7 @@ import Parser from "rss-parser";
 import { fetchFeed } from "./feedFetch";
 import { db, incidentsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
-import { cleanText, firstWordIndex, hasWord, parseDate } from "./text";
+import { cleanText, firstWordIndex, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { detectStaleEventDate, isKnownStaleSyndication } from "./structuredExtract";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
@@ -286,7 +286,7 @@ function classify(
   // repeated into the summary by Google News) cannot stamp the wrong country on a
   // cross-border event ("strikes ... inside Pakistan" must resolve to Pakistan,
   // not India).
-  const geoHay = stripSourceMasthead(hay, sourceName);
+  const geoHay = stripAttributionMentions(stripSourceMasthead(hay, sourceName));
 
   // Title-first attribution. A country-edition feed cross-syndicates a story
   // that names a DIFFERENT foreign country; the world-scope topics share
@@ -299,7 +299,7 @@ function classify(
   // conservative — fall back to the region-first title+summary scan (no
   // guessing). This fixes the mis-stamp at write time so no further one-time
   // relocate migrations are needed for new rows.
-  const titleHay = stripSourceMasthead(title.toLowerCase(), sourceName);
+  const titleHay = stripAttributionMentions(stripSourceMasthead(title.toLowerCase(), sourceName));
   const titleCountries = detectCountriesInText(titleHay, cfg.countryAliases);
   const detected =
     titleCountries.length === 1
@@ -644,7 +644,7 @@ export async function runNewsTopicIngest(
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance(topic, {

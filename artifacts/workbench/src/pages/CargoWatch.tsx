@@ -142,11 +142,10 @@ export default function CargoWatch() {
     topic: "cargo_watch",
     includeIrrelevant: true,
   } as never);
-  // Default to the full record set so the headline count and confirmed-loss
-  // total reflect every in-scope cargo incident — matching the Dashboard card
-  // (isCargoInScope, all-time) instead of hiding most incidents behind a
-  // 30-day window. The range pills below still let an analyst narrow the view.
-  const [range, setRange] = useState<RangeKey>("all");
+  // Defaults to 7 days — an "all time" default meant this page opened buried
+  // under the full incident history before anyone could act on it. The range
+  // pills below still let an analyst widen back out to All time.
+  const [range, setRange] = useState<RangeKey>("7d");
   const [recentTab, setRecentTab] = useState<"main" | "review">("main");
 
   // Needs Review resolution: an analyst assigns the correct country to an

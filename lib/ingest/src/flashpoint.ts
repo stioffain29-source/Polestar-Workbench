@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import { db, incidentsTable, sourcesTable } from "@workspace/db";
 import { sql, eq, or, gte, isNotNull } from "drizzle-orm";
-import { cleanText, hasWord, parseDate } from "./text";
+import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
 import { evaluateIncidentRelevance, isGenericSectionTitle } from "@workspace/relevance";
@@ -410,7 +410,7 @@ function geoHaystack(title: string, summary: string): string {
   const source = dash > 0 ? title.slice(dash + 3).trim() : "";
   const cleanTitle = dash > 0 ? title.slice(0, dash).trim() : title;
   const cleanSummary = source ? summary.split(source).join(" ") : summary;
-  return `${cleanTitle}\n${cleanSummary}`;
+  return stripAttributionMentions(`${cleanTitle}\n${cleanSummary}`);
 }
 
 /**
@@ -982,7 +982,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, `${a.title} ${a.summary}`);
+    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance("flashpoint", {

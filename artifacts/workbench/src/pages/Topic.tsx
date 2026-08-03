@@ -75,9 +75,10 @@ export default function Topic() {
 
   const { data: raw = [], isLoading } = useListIncidents({ topic: topic as never });
 
-  // Date-range window. Defaults to the widest option so the first load shows the
-  // full record set; the analyst can narrow the whole dashboard from the header.
-  const [range, setRange] = useState<RangeKey>("2y");
+  // Date-range window. Defaults to 7 days — a 2-year default meant every topic
+  // monitor opened buried under 1,000+ incidents before anyone could act on
+  // it. The analyst can still widen the whole dashboard from the header.
+  const [range, setRange] = useState<RangeKey>("7d");
   const windowDays = RANGE_DAYS[range];
 
   // Reconcile to the same scoped, noise-filtered set the dashboard card and the

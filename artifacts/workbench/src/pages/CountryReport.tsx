@@ -41,6 +41,7 @@ import {
   type PngSourceIncident,
 } from "@/lib/pngReportDataset";
 import { buildCountryOperatingRiskDataset } from "@/lib/countryOperatingRiskDataset";
+import { RATING_COLORS } from "@/lib/topics";
 import { runQualityGate } from "@workspace/country-engine/gate";
 import { countWords } from "@workspace/country-engine/narrative";
 import { findBannedPhrases } from "@workspace/country-engine/bannedPhrases";
@@ -1454,8 +1455,13 @@ export default function CountryReport() {
           style={{
             fontFamily: ROBOTO,
             fontSize: 12,
-            color: "#A33232",
-            border: "1px solid #A33232",
+            // Advisory-only, non-blocking — must read as a caution, not a
+            // failure. Reusing the app's real MODERATE severity tone (see
+            // RATING_COLORS in lib/topics.ts) instead of the alarming red
+            // previously borrowed from the blocking-critical panel above,
+            // which made a non-blocking notice look like an export failure.
+            color: RATING_COLORS.moderate,
+            border: `1px solid ${RATING_COLORS.moderate}`,
             borderRadius: 2,
             background: "#fff",
             padding: "6px 10px",

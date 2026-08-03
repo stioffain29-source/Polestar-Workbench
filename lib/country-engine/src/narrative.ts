@@ -831,8 +831,7 @@ export function buildBluf(
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, 2)
     .map(([c]) => categoryPhrase(c));
-  const { locations: allLocations, hasUnlocated, unlocatedCount, totalCount } =
-    priorityLocations(events);
+  const { locations: allLocations } = priorityLocations(events);
   // Tautology guard: never list the report's own theatre name as a location.
   const locations = allLocations
     .filter((l) => l.toLowerCase() !== countryName.toLowerCase())
@@ -925,7 +924,7 @@ export function buildBluf(
   const repeats = repeatSubLocations(events);
   const s2 = repeats.length
     ? `During the reporting period, ${catText || "security"} events made up most of the reporting, and ${repeats[0]} carried a disproportionate share of it.`
-    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`;
+    : `During the reporting period, ${catText || "security"} events were the main concerns, recorded in ${locText} rather than concentrated in a single centre.`;
   claims.push(
     makeClaim({
       claimText: s2,
@@ -1152,8 +1151,7 @@ export function buildCurrentSituation(
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
     .map(([c]) => categoryPhrase(c));
-  const { locations: rawLocations, hasUnlocated, unlocatedCount, totalCount } =
-    priorityLocations(events);
+  const { locations: rawLocations } = priorityLocations(events);
   // Tautology guard (owner-flagged): "concentrated in Jakarta" inside the
   // Jakarta report says nothing — drop any location equal to the report's own
   // theatre name from the concentration list.
@@ -1162,7 +1160,7 @@ export function buildCurrentSituation(
   );
 
   const s1 = locations.length
-    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}${hasUnlocated ? ` (${unlocatedCount} of ${totalCount} records did not specify a location)` : ""}.`
+    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}.`
     : `Security incidents in ${countryName} during the reporting period were recorded at country level only, without located concentrations.`;
   const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
 

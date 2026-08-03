@@ -239,18 +239,17 @@ describe("priority locations never mix in the country name", () => {
     }),
   ];
 
-  it("BLUF keeps the country name out of the location list and notes the unlocated remainder", () => {
+  it("BLUF keeps the country name out of the location list and does not surface a record-count caveat", () => {
     const { value } = buildBluf(mixed, "Papua New Guinea", null);
     expect(value).not.toMatch(/recorded in [^.]*Papua New Guinea/);
-    expect(value).toMatch(/1 of 2 records did not specify a location/);
+    expect(value).not.toMatch(/did not specify a location/);
   });
 
-  it("Current Situation concentrates on sub-national locations only, with a remainder clause", () => {
+  it("Current Situation concentrates on sub-national locations only, without a record-count caveat", () => {
     const { value } = buildCurrentSituation(mixed, "Papua New Guinea");
     expect(value).not.toMatch(/concentrated in [^.]*Papua New Guinea/);
-    expect(value).toMatch(
-      /concentrated in Lae \(1 of 2 records did not specify a location\)/,
-    );
+    expect(value).toMatch(/concentrated in Lae/);
+    expect(value).not.toMatch(/did not specify a location/);
   });
 
   it("Current Situation falls back to country-level phrasing when nothing is located", () => {
