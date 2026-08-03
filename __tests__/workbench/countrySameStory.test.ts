@@ -380,6 +380,104 @@ describe("clusterSameStoryRows PATH 3B (armed-actor + fatal + matching casualty 
   });
 });
 
+describe("clusterSameStoryRows PATH 5 (shared distinctive place + fatal class)", () => {
+  // Real Jakarta case: the same homicide reported once while facts were still
+  // unclear and once a suspect/motive was confirmed a day later. Jaccard is
+  // only 0.23 (below every other path's floor) and there is no foreign-
+  // national strong entity, no named premises, and no armed-clash cue, so
+  // only the shared "grogol"/"petamburan" place tokens plus the shared fatal
+  // class can bridge them.
+  it("collapses the Grogol Petamburan homicide reported a day apart under different framing", () => {
+    const rows = [
+      row({
+        title:
+          "Woman killed by her boyfriend in Grogol Petamburan, West Jakarta over WhatsApp message",
+        province: "West Jakarta",
+        category: "Homicide / violent crime",
+        dateMs: base + DAY,
+        severityRank: 4,
+      }),
+      row({
+        title: "Woman dead, suspected murder victim in Grogol Petamburan",
+        province: "West Jakarta",
+        category: "Homicide / violent crime",
+        dateMs: base,
+        severityRank: 4,
+      }),
+    ];
+    const clusters = clusterSameStoryRows(rows);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].sort((a, b) => a - b)).toEqual([0, 1]);
+  });
+
+  it("does NOT merge two distinct fatal incidents in different neighbourhoods", () => {
+    const rows = [
+      row({
+        title: "Man killed in motorcycle crash in Kebayoran Baru",
+        province: "South Jakarta",
+        category: "Homicide / violent crime",
+        dateMs: base,
+      }),
+      row({
+        title: "Elderly man found dead in Cengkareng, suspected heart attack",
+        province: "West Jakarta",
+        category: "Homicide / violent crime",
+        dateMs: base,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge when only one headline carries a fatal class", () => {
+    const rows = [
+      row({
+        title: "Woman dead, suspected murder victim in Grogol Petamburan",
+        province: "West Jakarta",
+        dateMs: base,
+      }),
+      row({
+        title: "Traffic disrupted near Grogol Petamburan market for road repairs",
+        province: "West Jakarta",
+        dateMs: base,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("does NOT merge across more than a three-day gap", () => {
+    const rows = [
+      row({
+        title: "Woman dead, suspected murder victim in Grogol Petamburan",
+        province: "West Jakarta",
+        dateMs: base,
+      }),
+      row({
+        title:
+          "Woman killed by her boyfriend in Grogol Petamburan, West Jakarta over WhatsApp message",
+        province: "West Jakarta",
+        dateMs: base + 4 * DAY,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+
+  it("still respects the province gate (crossProvince off)", () => {
+    const rows = [
+      row({
+        title: "Woman killed by her boyfriend in Grogol Petamburan, West Jakarta",
+        province: "West Jakarta",
+        dateMs: base,
+      }),
+      row({
+        title: "Woman dead, suspected murder victim in Grogol Petamburan",
+        province: "Central Jakarta",
+        dateMs: base,
+      }),
+    ];
+    expect(clusterSameStoryRows(rows)).toHaveLength(2);
+  });
+});
+
 describe("storyEntities", () => {
   it("anchors on the foreign-national victim; the actor is only a corroborator", () => {
     const a = storyEntities("American pilot's body killed by Papua rebels");
