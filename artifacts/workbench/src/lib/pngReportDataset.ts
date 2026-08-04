@@ -1329,16 +1329,28 @@ export function selectTopStoryClusters(
       for (const it of c) foldMemberIds.add(it.id);
     }
   }
-  // Display order: analyst value, then severity-then-recency, so the most
-  // significant development shows first — WITH a lead-only security guard. The
-  // #1 slot must be a genuine security / conflict story: an incidental hazard
-  // (accidental blast, fire, natural hazard) must never LEAD a security brief
-  // even when its casualty count is higher (spec §2/§4). If the top slot is a
-  // non-security category, promote the best-ranked security cluster to the front;
-  // the hazard keeps its value-ranked place immediately below and is never
-  // dropped (e.g. the deadly-but-accidental Biak wartime-ordnance blast sits at
-  // #2 while the Yahukimo separatist clash leads).
-  const ordered = picked.slice().sort(compareClusterByValue);
+  // Display order: SEVERITY TIER FIRST, analyst value only breaks a tie within
+  // the same tier — WITH a lead-only security guard. Selection (above) still
+  // picks the three most operationally significant DISTINCT stories by analyst
+  // value, so a Low-severity closure/evacuation story can still earn a Top-3
+  // slot. But once the three are chosen, a Moderate-or-worse story must never
+  // display BELOW a Low/Insignificant one just because the Low item matched
+  // more keyword signals (e.g. a school closure outranking two High-severity
+  // incidents). Within the same severity tier, analyst value still governs
+  // order, and recency remains the final tie-break via compareClusterByValue.
+  // The #1 slot must additionally be a genuine security / conflict story: an
+  // incidental hazard (accidental blast, fire, natural hazard) must never LEAD
+  // a security brief even when its casualty count is higher (spec §2/§4). If
+  // the top slot is a non-security category, promote the best-ranked security
+  // cluster to the front; the hazard keeps its place immediately below and is
+  // never dropped (e.g. the deadly-but-accidental Biak wartime-ordnance blast
+  // sits at #2 while the Yahukimo separatist clash leads).
+  const compareClusterForDisplay = (a: PngReportItem[], b: PngReportItem[]): number => {
+    const sevDelta = b[0]!.severityRank - a[0]!.severityRank;
+    if (sevDelta !== 0) return sevDelta;
+    return compareClusterByValue(a, b);
+  };
+  const ordered = picked.slice().sort(compareClusterForDisplay);
   if (ordered.length > 1 && leadSecurityTier(ordered[0]![0]) === 0) {
     const securityIdx = ordered.findIndex((c) => leadSecurityTier(c[0]) === 1);
     if (securityIdx > 0) {
