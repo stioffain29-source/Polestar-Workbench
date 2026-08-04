@@ -6,6 +6,7 @@ import {
   runStrikesBackfill,
   runNewsCountryBackfill,
   runGlobalCountryReattribution,
+  runRegionalOutOfRegionCleanup,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
   runFlashpointMastheadRelocate,
@@ -4578,6 +4579,52 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (reErr) {
       logger.error({ err: reErr }, "Global country re-attribution failed");
+    }
+
+    // One-time retroactive cleanup: apac_local / indonesia_local / conflict are
+    // single-country regional topics (no globalExtraAliases — unlike the global
+    // commodity topics above). Before the OUT_OF_REGION list was expanded to a
+    // near-complete world list, an untracked foreign-country story (e.g. a
+    // Greek wildfire on the Philippine Daily Inquirer feed, a Ceuta riot on an
+    // Indonesian feed) fell through classify() and was blind-stamped with the
+    // feed's default country instead of being rejected. This pass re-runs the
+    // SAME classifyNewsItem() the live classifier now uses over every already-
+    // stored row in these three topics; any row that would now be rejected as
+    // out-of-region is DELETED (there is no correct in-region country to
+    // re-stamp it to, unlike the global-topic reattribution above). Rows that
+    // still resolve in-region are untouched. Idempotent + marker-gated.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "regional_out_of_region_cleanup_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runRegionalOutOfRegionCleanup({
+          commit: true,
+          topics: ["apac_local", "indonesia_local", "conflict"],
+        });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            marker: markerKey,
+            scanned: res.scanned,
+            deleted: res.deleted,
+            perForeignCountry: res.perForeignCountry,
+          },
+          "One-time regional out-of-region cleanup (apac_local/indonesia_local/conflict)",
+        );
+      }
+    } catch (cleanupErr) {
+      logger.error({ err: cleanupErr }, "Regional out-of-region cleanup failed");
     }
 
     // 3d-1z) ONE-TIME purge of falsely-promoted social OSINT incidents.
