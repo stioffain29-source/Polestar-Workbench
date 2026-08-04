@@ -6,6 +6,7 @@ import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text"
 import { geocode } from "./geocode";
 import { recordSourceHealth } from "./sourceHealth";
 import { classifyStrikeTarget, classifyStrikeInfrastructure } from "@workspace/strike-targets";
+import type { StrikeTargetCategory } from "@workspace/strike-targets";
 import type { FeedStat } from "./types";
 
 // Missile Strike Tracker live ingest.
@@ -248,6 +249,34 @@ function classifyMunition(t: string): string {
 // and the dashboard never drift apart. classifyTarget / classifyInfrastructure
 // are thin aliases kept for readability at the call sites below.
 const classifyTarget = classifyStrikeTarget;
+
+// A land_gcc feed's country gate only checks that a GCC state is NAMED in the
+// headline ("Dubai", "Oman") — it says nothing about what was actually hit.
+// "Drone strikes tanker off Dubai coast" and "Vessel seized near Omani port"
+// both satisfy that gate, but the struck target is a ship or port, i.e. a
+// maritime incident, not a land one. Without this check those rows are stored
+// with theatre=land_gcc and targetCategory=vessel/port_maritime, so the Land —
+// GCC tracker's Strike Log shows "Maritime" targets that belong on the
+// Maritime — Hormuz tracker instead. All land_gcc feed countries are already
+// members of MARITIME_COUNTRIES, so re-stamping the theatre never orphans the
+// country onto an unsupported waterway default.
+// Jordan is a land_gcc feed country but has no Persian Gulf / Strait of Hormuz
+// coastline (its only sea access is the Gulf of Aqaba, a different waterway
+// entirely), so it is deliberately absent from MARITIME_COUNTRIES. A vessel/
+// port story surfaced by the Jordan feed cannot be re-homed onto the Hormuz
+// tracker without creating exactly the wrong-theatre error this function
+// exists to prevent — so those rows are rejected outright rather than moved.
+// Returns null to mean "reject this row", not "leave it on the land tracker".
+export function resolveTheatre(
+  feedTheatre: StrikeTheatre,
+  targetCategory: StrikeTargetCategory,
+  country: string,
+): StrikeTheatre | null {
+  if (feedTheatre === "land_gcc" && (targetCategory === "vessel" || targetCategory === "port_maritime")) {
+    return MARITIME_COUNTRIES.has(country) ? "maritime_hormuz" : null;
+  }
+  return feedTheatre;
+}
 const classifyInfrastructure = classifyStrikeInfrastructure;
 
 const WORD_NUM: Record<string, number> = {
@@ -452,11 +481,18 @@ export async function runStrikesIngest(
           country = detected && MARITIME_COUNTRIES.has(detected) ? detected : feed.defaultCountry;
         }
 
+        const targetCategory = classifyTarget(text);
+        const resolvedTheatre = resolveTheatre(feed.theatre, targetCategory, country);
+        if (resolvedTheatre === null) {
+          rejected.push({ title: rawTitle, reason: "maritime-target-out-of-theatre", feedLabel: feed.label });
+          perFeed[feed.label].rejected++;
+          continue;
+        }
         accepted.push({
-          theatre: feed.theatre,
+          theatre: resolvedTheatre,
           country,
           munition: classifyMunition(text),
-          targetCategory: classifyTarget(text),
+          targetCategory,
           infrastructure: classifyInfrastructure(text),
           casualties: parseCasualties(text),
           confidence: classifyConfidence(sourceName),
