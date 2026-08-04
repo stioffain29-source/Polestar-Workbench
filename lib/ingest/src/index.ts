@@ -446,6 +446,8 @@ export type { CargoCountryBackfillSummary } from "./backfillCargoCountry";
 export { runNewsCountryBackfill } from "./backfillNewsCountry";
 export { runGlobalCountryReattribution } from "./globalReattribute";
 export type { GlobalReattributionSummary } from "./globalReattribute";
+export { runRegionalOutOfRegionCleanup, decideRegionalCleanup } from "./regionalOutOfRegionCleanup";
+export type { RegionalOutOfRegionCleanupSummary, RegionalCleanupDecision } from "./regionalOutOfRegionCleanup";
 export { runPngExtractBackfill, runWestPapuaExtractBackfill } from "./backfillPngExtract";
 export type { PngExtractBackfillSummary } from "./backfillPngExtract";
 export {
