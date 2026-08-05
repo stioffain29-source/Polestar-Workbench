@@ -112,7 +112,7 @@ export default function IncidentMap({
       // (div + text), not canvas/SVG, so it rasterises cleanly with the
       // html2canvas PDF export exactly like the other overlay elements here.
       L.control
-        .scale({ position: "bottomleft", metric: true, imperial: false, maxWidth: 120 })
+        .scale({ position: "bottomleft", metric: true, imperial: false, maxWidth: 100 })
         .addTo(mapRef.current);
     }
 
@@ -311,7 +311,12 @@ export default function IncidentMap({
             Mercator view, no bearing control), so "up" is always true north
             regardless of pan/zoom — a static fixed-position indicator is
             correct here, no re-projection needed. Plain HTML/SVG so it
-            rasterises with the rest of the overlay in the PDF export. */}
+            rasterises with the rest of the overlay in the PDF export.
+            Two-tone needle (light/outlined left half, solid right half) is
+            the standard cartographic north-arrow convention — reads as a
+            proper compass rather than a generic up-arrow glyph. A subtle
+            shadow (matching the scale bar's treatment) keeps it legible as
+            a floating indicator against any basemap color underneath. */}
         <div
           aria-label="North"
           style={{
@@ -322,17 +327,19 @@ export default function IncidentMap({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            background: "rgba(255,255,255,0.85)",
+            background: "rgba(255,255,255,0.92)",
             border: `1px solid ${POLAR}`,
             borderRadius: 4,
-            padding: "4px 6px 3px",
+            padding: "5px 7px 4px",
+            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.25)",
             pointerEvents: "none",
           }}
         >
-          <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
-            <path d="M7 0 L13 15 L7 11.5 L1 15 Z" fill={NAVY} />
+          <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
+            <path d="M10 1 L3 16 L10 12 Z" fill="#fff" stroke={NAVY} strokeWidth="1" strokeLinejoin="round" />
+            <path d="M10 1 L17 16 L10 12 Z" fill={NAVY} />
           </svg>
-          <span style={{ font: "700 9px/1 Roboto, sans-serif", color: NAVY, marginTop: 2 }}>
+          <span style={{ font: "700 9px/1 Roboto, sans-serif", color: NAVY, marginTop: 3 }}>
             N
           </span>
         </div>
