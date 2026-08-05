@@ -191,6 +191,22 @@ function applyMapExportLayout(
     node.style.textAlign = "center";
   });
 
+  // Leaflet's default scale-bar CSS gives the label only 1px of padding
+  // above its bottom border (padding: 2px 5px 1px). html2canvas renders
+  // text a few pixels lower than the live DOM (the same quirk compensated
+  // for elsewhere in this file), which is enough for the "km" label to sit
+  // on top of that border line and look like it has a strike through it.
+  // Widen the bottom padding for export only so the low-rendered text
+  // clears the border with room to spare; on-screen spacing is untouched.
+  map.querySelectorAll<HTMLElement>(".leaflet-control-scale-line").forEach((node) => {
+    node.style.boxSizing = "border-box";
+    node.style.border = "2px solid #777";
+    node.style.borderTop = "none";
+    node.style.background = "#fff";
+    node.style.padding = "2px 5px 6px";
+    node.style.lineHeight = "1.1";
+  });
+
   const legend = map.nextElementSibling as HTMLElement | null;
   if (!legend) return;
   legend.style.display = "flex";

@@ -33,6 +33,7 @@ const INCIDENT_CATEGORIES = [
   "Fuel",
   "Fertiliser",
   "Civil Unrest",
+  "Conflict",
   "Energy / Grid",
   "Shipping",
   "Cargo",
@@ -55,6 +56,10 @@ function topicToCategory(topic: string): string {
     case "protests": return "Civil Unrest";
     case "flashpoint": return "Civil Unrest";
     case "apac_local": return "Civil Unrest";
+    // Armed conflict (war, terrorism, armed clashes, etc.) previously had no
+    // dedicated checkbox and fell silently into the generic "Other" bucket,
+    // making it invisible as its own filterable category on this map.
+    case "conflict": return "Conflict";
     case "energy": return "Energy / Grid";
     case "shipping": return "Shipping";
     case "cargo_watch": return "Cargo";
