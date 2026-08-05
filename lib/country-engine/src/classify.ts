@@ -135,6 +135,16 @@ const CATEGORY_RULES: Array<[IssueCategory, RegExp]> = [
   ["Communal or tribal violence", /\b(tribal (?:clash|fight|violence|war)|communal (?:clash|violence|riot)|ethnic (?:clash|violence)|inter[- ]?tribal|clan (?:fight|clash)|sectarian)\b/i],
   ["Political violence", /\b(political violence|election(?:[- ]related)? violence|assassinat\w*|politically motivated|candidate (?:shot|killed|attacked))\b/i],
   ["Terrorism", /\b()\b/i], // placeholder never matches (kept for ordering safety)
+  // "Manhunt" is pulled ahead of Civil unrest (and the rest of the Policing
+  // operation rule below) on its own, precision-first: a search for a fleeing
+  // suspect is unambiguously a policing/crime story, and Civil unrest's own
+  // keywords (unrest, mob, rally, clash with police) can easily co-occur in
+  // the same article as background noise (e.g. "manhunt underway as tensions
+  // rise") without the story actually being about a protest or riot. This is
+  // narrower than promoting the whole Policing operation rule, because
+  // "police raid/crackdown" genuinely can describe a protest-crackdown story
+  // that should stay Civil unrest.
+  ["Policing operation", /\bmanhunt\b/i],
   ["Strike or labour action", /\b(strike|walkout|work stoppage|industrial action|picket\w*|union (?:protest|action)|downed tools|go[- ]?slow)\b/i],
   ["Civil unrest", /\b(protest\w*|demonstrat\w*|riot\w*|unrest|rally|march|road ?block|barricade|looting|civil disorder|mob\b|clash\w* with police)\b/i],
   ["Theft and robbery", /\b(robbery|robbed|burglar\w*|theft|stole|stolen|looted|holdup|hold[- ]up|snatch\w*|carjack\w*|pickpocket|break[- ]?in|ram[- ]?raid)\b/i],
