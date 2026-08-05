@@ -164,7 +164,7 @@ export function resolveSpecialReportBlocks(
 
   if (bluf) pushSection(bluf);
   if (report.mapEnabled) {
-    blocks.push({ id: "legacy-h-map", type: "heading", text: "Incident Map" });
+    blocks.push({ id: "legacy-h-map", type: "heading", text: "Location Map" });
     blocks.push({ id: "legacy-map", type: "map" });
   }
   const hasIncidentDetails = others.some((s) => s.heading === "Incident Details");

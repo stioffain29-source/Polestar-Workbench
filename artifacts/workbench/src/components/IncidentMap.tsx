@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import polestarLogo from "@assets/Polestar_navy_logo_hor.png";
 import { SPOT_SEV_COLOR, SPOT_SEV_LABEL, NAVY, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
 
 export interface IncidentMapPoint {
@@ -104,6 +105,15 @@ export default function IncidentMap({
         maxZoom: 19,
         crossOrigin: true,
       }).addTo(mapRef.current);
+
+      // Scale bar — a printed/PDF map has no interactive zoom to gauge
+      // distance by, so a metric scale bar is standard on any cartographic
+      // report product. This is Leaflet's built-in control: plain HTML
+      // (div + text), not canvas/SVG, so it rasterises cleanly with the
+      // html2canvas PDF export exactly like the other overlay elements here.
+      L.control
+        .scale({ position: "bottomleft", metric: true, imperial: false, maxWidth: 120 })
+        .addTo(mapRef.current);
     }
 
     const map = mapRef.current;
@@ -276,7 +286,57 @@ export default function IncidentMap({
           borderRadius: 2,
           background: "#fafafa",
         }}
-      />
+      >
+        {/* Polestar watermark, fixed top-left, faint so it never competes
+            with the map data itself. Confirms provenance on a printed/PDF
+            map the way the north arrow and scale bar confirm orientation
+            and distance. Plain <img>, so it rasterises with the rest of the
+            overlay in the PDF export. */}
+        <img
+          src={polestarLogo}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            zIndex: 600,
+            height: 20,
+            width: "auto",
+            opacity: 0.55,
+            pointerEvents: "none",
+          }}
+        />
+        {/* North arrow. The basemap never rotates (Leaflet's default Web
+            Mercator view, no bearing control), so "up" is always true north
+            regardless of pan/zoom — a static fixed-position indicator is
+            correct here, no re-projection needed. Plain HTML/SVG so it
+            rasterises with the rest of the overlay in the PDF export. */}
+        <div
+          aria-label="North"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            zIndex: 600,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            background: "rgba(255,255,255,0.85)",
+            border: `1px solid ${POLAR}`,
+            borderRadius: 4,
+            padding: "4px 6px 3px",
+            pointerEvents: "none",
+          }}
+        >
+          <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+            <path d="M7 0 L13 15 L7 11.5 L1 15 Z" fill={NAVY} />
+          </svg>
+          <span style={{ font: "700 9px/1 Roboto, sans-serif", color: NAVY, marginTop: 2 }}>
+            N
+          </span>
+        </div>
+      </div>
       {hasPlotted ? (
         <div className="flex flex-wrap items-center gap-3 mt-3">
           {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (

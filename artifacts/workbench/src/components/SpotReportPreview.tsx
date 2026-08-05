@@ -235,7 +235,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
         )}
 
         {report.mapEnabled && (
-          <Section title="Incident Map">
+          <Section title="Location Map">
             <IncidentMap
               domId="spot-report-map"
               points={mapPoints}
