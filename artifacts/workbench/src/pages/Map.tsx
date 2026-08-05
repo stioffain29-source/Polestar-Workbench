@@ -33,7 +33,8 @@ const INCIDENT_CATEGORIES = [
   "Fuel",
   "Fertiliser",
   "Civil Unrest",
-  "Conflict",
+  "Armed Conflict",
+  "Terrorism",
   "Energy / Grid",
   "Shipping",
   "Cargo",
@@ -49,17 +50,31 @@ const MARITIME_SECURITY_CATEGORY = "Maritime Security (IMB)";
 const MARITIME_CATEGORIES = ["Maritime Strike"] as const;
 const LAND_CATEGORIES = ["Land Strike"] as const;
 
-function topicToCategory(topic: string): string {
+// Conservative terrorism detector used only within the `conflict` topic feed
+// (war / armed clash / insurgency / serious armed crime). Deliberately keyed
+// on explicit terrorism vocabulary and a short list of globally recognized
+// proscribed terrorist organizations — NOT on weapon type (car bombs and
+// airstrikes are also used in state-vs-state and state-vs-insurgent combat),
+// so ordinary armed clashes and insurgent combat stay in Armed Conflict
+// rather than being swept into Terrorism on a shaky signal.
+const TERRORISM_RE =
+  /\b(terroris(t|ts|m)|terror attack|terror cell|terror plot|claim(ed|s)? responsibility for (the |a )?(attack|bombing|blast)|islamic state|\bisis\b|\bisil\b|al[- ]?qaeda|al[- ]?shabaab|boko haram|jemaah islamiyah|abu sayyaf|tehrik[- ]?i[- ]?taliban|\bttp\b|lashkar[- ]?e[- ]?taiba|jaish[- ]?e[- ]?mohammed|\bjem\b)\b/i;
+
+function topicToCategory(topic: string, text?: string): string {
   switch (topic) {
     case "fuel": return "Fuel";
     case "fertiliser": return "Fertiliser";
     case "protests": return "Civil Unrest";
     case "flashpoint": return "Civil Unrest";
     case "apac_local": return "Civil Unrest";
-    // Armed conflict (war, terrorism, armed clashes, etc.) previously had no
+    // Armed conflict (war, armed clashes, insurgency, etc.) previously had no
     // dedicated checkbox and fell silently into the generic "Other" bucket,
     // making it invisible as its own filterable category on this map.
-    case "conflict": return "Conflict";
+    // Terrorism is split out as its own category when the incident text
+    // carries explicit terrorism language (see TERRORISM_RE above);
+    // otherwise it stays in the broader Armed Conflict bucket.
+    case "conflict":
+      return text && TERRORISM_RE.test(text) ? "Terrorism" : "Armed Conflict";
     case "energy": return "Energy / Grid";
     case "shipping": return "Shipping";
     case "cargo_watch": return "Cargo";
@@ -309,7 +324,7 @@ export default function MapPage() {
           lng: i.longitude!,
           title: i.title,
           displayTitle: i.displayTitle ?? null,
-          category: topicToCategory(i.topic),
+          category: topicToCategory(i.topic, `${i.title ?? ""} ${i.summary ?? ""}`),
           country: i.country,
           location: i.location ?? null,
           when: i.occurredAt,
