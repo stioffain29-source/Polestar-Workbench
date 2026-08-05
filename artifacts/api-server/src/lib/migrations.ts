@@ -2922,6 +2922,17 @@ export async function runDataMigrations(): Promise<void> {
     //     "another sunk / seized / boarded" when a vessel noun appears earlier in
     //     the sentence. Rows whose only attack wording was passive were still
     //     landing in 'unknown'; the fill-only-when-blank re-run recovers them.
+    //
+    //     v5 adds theatre reassignment. resolveTheatre() (the land_gcc ->
+    //     maritime_hormuz fix for vessel/port-target strikes stamped by a
+    //     land feed, e.g. Dubai/Oman tanker strikes showing up on the Land —
+    //     GCC Strike Log with TARGET=Maritime) only ran going forward for
+    //     newly-ingested rows. Rows already stored before that fix landed
+    //     kept their old land_gcc stamp. v5 re-runs resolveTheatre() against
+    //     every stored row's existing target_category + country and rewrites
+    //     theatre where it disagrees; Jordan-style vessel/port rows with no
+    //     Hormuz coastline to re-home onto are deleted outright, matching the
+    //     live ingest's reject-rather-than-misroute rule.
     {
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS app_migration_markers (
@@ -2929,7 +2940,7 @@ export async function runDataMigrations(): Promise<void> {
           applied_at timestamptz NOT NULL DEFAULT now()
         )
       `);
-      const markerKey = "strikes_reclassify_columns_v4";
+      const markerKey = "strikes_reclassify_columns_v5";
       const existingMarker = await db.execute(sql`
         SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
       `);
@@ -2946,6 +2957,8 @@ export async function runDataMigrations(): Promise<void> {
               targetFilled: summary.targetFilled,
               infraFilled: summary.infraFilled,
               casualtiesFilled: summary.casualtiesFilled,
+              theatreReassigned: summary.theatreReassigned,
+              outOfTheatreDeleted: summary.outOfTheatreDeleted,
               marker: markerKey,
             },
             "One-time reclassification of auto-scraped strike columns",

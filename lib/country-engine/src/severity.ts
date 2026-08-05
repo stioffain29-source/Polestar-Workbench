@@ -59,6 +59,14 @@ const CEREMONIAL_RE =
 const ARMED_ATTACK_RE =
   /\b(explosion|bombing|blast|bomb\b|open(?:ed)? fire|shoot\w*|gun ?(?:fight|battle|men)|armed attack|ambush\w*|grenade|ied|rocket|artillery|air ?strike)\b/i;
 
+// A manhunt / suspect-search story references a PAST killing as backstory
+// ("manhunt for cop killer", "police hunt for gunman who killed officer")
+// rather than reporting a fresh one. Left unguarded, the bare-fatality-word
+// check below ("reported deaths without a resolved count") cannot tell that
+// apart from breaking news of a new death, and returns High for both.
+const MANHUNT_FOLLOWUP_RE =
+  /\b(manhunt|hunt(?:ing)? (?:is )?(?:on |underway )?for (?:the )?(?:suspect|gunman|attacker|killer|culprit)|search(?:ing)? (?:continues |underway )?for (?:the )?(?:suspect|gunman|attacker|killer|culprit)|wanted in connection with|(?:suspect|gunman|attacker) (?:remains? |is )?at large|police (?:hunt|search) for)\b/i;
+
 const ARMED_ROBBERY_RE = /\b(armed robbery|armed hold[- ]?up|robbery at gunpoint|carjack\w*)\b/i;
 const MINOR_RE = /\b(petty theft|minor theft|vandal\w*|graffiti|pickpocket|shoplift\w*|small (?:protest|gathering|rally))\b/i;
 
@@ -87,6 +95,18 @@ export function assessSeverity(
     return {
       severity: "High",
       severityReason: `${deaths} ${deaths === 1 ? "fatality" : "fatalities"} reported.`,
+    };
+  }
+
+  // Manhunt / suspect-search framing with no fresh, resolved death count is a
+  // policing-operation follow-up to an already-reported killing, not a new
+  // fatality event — check this before the bare fatality-word fallback below,
+  // which would otherwise treat the backstory reference the same as breaking
+  // news of a fresh death.
+  if (MANHUNT_FOLLOWUP_RE.test(text)) {
+    return {
+      severity: "Moderate",
+      severityReason: "Active manhunt or policing operation reported; underlying fatality already occurred, no new casualties in this report.",
     };
   }
 
