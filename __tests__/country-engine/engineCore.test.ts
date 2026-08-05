@@ -249,6 +249,27 @@ describe("classifyArticle exclusions (§3-4)", () => {
     expect(r.classificationConfidence).toBeGreaterThanOrEqual(85);
     expect(["Violent crime", "Theft and robbery"]).toContain(r.issueCategory);
   });
+
+  // Owner-flagged bug: "Manhunt for cop killer" was landing under Civil unrest
+  // instead of a crime category. Civil unrest's own keywords (unrest, mob,
+  // rally, clash with police) can co-occur as background noise in a manhunt
+  // story without the article actually being about a protest or riot, and
+  // Civil unrest was checked before the "manhunt" signal in the priority list.
+  it("classifies a manhunt story as Policing operation, not Civil unrest", () => {
+    const r = classifyArticle(
+      { title: "Manhunt for cop killer sparks unrest fears in the community" },
+      PNG,
+    );
+    expect(r.issueCategory).toBe("Policing operation");
+  });
+
+  it("still classifies a genuine protest/riot story as Civil unrest when there is no manhunt", () => {
+    const r = classifyArticle(
+      { title: "Thousands join street protest, clash with police in Port Moresby" },
+      PNG,
+    );
+    expect(r.issueCategory).toBe("Civil unrest");
+  });
 });
 
 describe("attributeCountry physical location (§5)", () => {
@@ -417,6 +438,27 @@ describe("assessSeverity (§11)", () => {
       "Terrorism",
     );
     expect(r.severity).toBe("Extreme");
+  });
+
+  // Owner-flagged bug: a manhunt story referencing a previously reported
+  // killing ("Manhunt for cop killer") was rated High, the same as breaking
+  // news of a fresh death, because the bare fatality-word check does not
+  // distinguish backstory from a new occurrence.
+  it("rates a manhunt referencing a past killing as Moderate, not High", () => {
+    const r = assessSeverity(
+      { title: "Manhunt intensifies for suspect wanted over police officer's death" },
+      "Policing operation",
+    );
+    expect(r.severity).toBe("Moderate");
+    expect(r.severityReason).toMatch(/manhunt|polic/i);
+  });
+
+  it("still rates a manhunt tied to a fresh, resolved death toll High", () => {
+    const r = assessSeverity(
+      { title: "Manhunt launched after gunman killed 2 police officers in ambush" },
+      "Policing operation",
+    );
+    expect(r.severity).toBe("High");
   });
 });
 
