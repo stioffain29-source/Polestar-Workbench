@@ -1,6 +1,8 @@
 import { db, strikesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { classifyStrikeFields } from "./strikes";
+import { classifyStrikeFields, resolveTheatre } from "./strikes";
+import type { StrikeTheatre } from "./strikes";
+import type { StrikeTargetCategory } from "@workspace/strike-targets";
 import type { IngestOptions } from "./types";
 
 // One-off (idempotent) reclassification of already-stored strike rows.
@@ -39,6 +41,8 @@ export type StrikesBackfillSummary = {
   targetFilled: number;
   infraFilled: number;
   casualtiesFilled: number;
+  theatreReassigned: number;
+  outOfTheatreDeleted: number;
   logLines: string[];
 };
 
@@ -61,6 +65,8 @@ export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<Stri
       targetCategory: strikesTable.targetCategory,
       infrastructure: strikesTable.infrastructure,
       casualties: strikesTable.casualties,
+      theatre: strikesTable.theatre,
+      country: strikesTable.country,
     })
     .from(strikesTable);
 
@@ -69,12 +75,14 @@ export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<Stri
     targetCategory?: string;
     infrastructure?: string;
     casualties?: number;
+    theatre?: string;
   }[] = [];
+  const toDelete: number[] = [];
 
   for (const r of rows) {
     const text = [r.summary ?? "", r.source ?? ""].join(" ");
     const next = classifyStrikeFields(text);
-    const patch: { targetCategory?: string; infrastructure?: string; casualties?: number } = {};
+    const patch: { targetCategory?: string; infrastructure?: string; casualties?: number; theatre?: string } = {};
 
     if ((r.targetCategory ?? "unknown") === "unknown" && next.targetCategory !== "unknown") {
       patch.targetCategory = next.targetCategory;
@@ -86,32 +94,59 @@ export async function runStrikesBackfill(opts: IngestOptions = {}): Promise<Stri
       patch.casualties = next.casualties;
     }
 
+    // Theatre reassignment (root-cause: resolveTheatre() only ran at ingest
+    // time for NEW rows going forward — it never touched rows already stored
+    // BEFORE that fix landed, e.g. Dubai/Oman vessel/port strikes that stayed
+    // stamped land_gcc). Re-run it here against the ALREADY-CLASSIFIED stored
+    // targetCategory (the classification itself isn't the bug, only the
+    // theatre stamp is), using the current target_category value if this pass
+    // just filled it, otherwise the stored one.
+    const effectiveTargetCategory = (patch.targetCategory ?? r.targetCategory) as StrikeTargetCategory;
+    const resolved = resolveTheatre(r.theatre as StrikeTheatre, effectiveTargetCategory, r.country);
+    if (resolved === null) {
+      // Jordan-style vessel/port row with no Hormuz coastline to re-home onto
+      // — same "reject outright, never misroute" rule the live ingest applies.
+      toDelete.push(r.id);
+      continue;
+    }
+    if (resolved !== r.theatre) {
+      patch.theatre = resolved;
+    }
+
     if (Object.keys(patch).length > 0) updates.push({ id: r.id, ...patch });
   }
 
   const targetFilled = updates.filter((u) => u.targetCategory != null).length;
   const infraFilled = updates.filter((u) => u.infrastructure != null).length;
   const casualtiesFilled = updates.filter((u) => u.casualties != null).length;
+  const theatreReassigned = updates.filter((u) => u.theatre != null).length;
+  const outOfTheatreDeleted = toDelete.length;
 
   log(`  Scanned rows              : ${rows.length}`);
   log(`  Rows to update            : ${updates.length}`);
   log(`    target_category filled  : ${targetFilled}`);
   log(`    infrastructure filled   : ${infraFilled}`);
   log(`    casualties filled       : ${casualtiesFilled}`);
+  log(`    theatre reassigned      : ${theatreReassigned}`);
+  log(`  Rows to delete (out-of-theatre, unroutable): ${outOfTheatreDeleted}`);
 
   if (!commit) {
     log("\nDRY-RUN — no rows written. Re-run with --commit to apply.");
-    return { mode: "dry-run", scanned: rows.length, targetFilled, infraFilled, casualtiesFilled, logLines };
+    return { mode: "dry-run", scanned: rows.length, targetFilled, infraFilled, casualtiesFilled, theatreReassigned, outOfTheatreDeleted, logLines };
   }
 
   for (const u of updates) {
-    const set: { targetCategory?: string; infrastructure?: string; casualties?: number } = {};
+    const set: { targetCategory?: string; infrastructure?: string; casualties?: number; theatre?: string } = {};
     if (u.targetCategory != null) set.targetCategory = u.targetCategory;
     if (u.infrastructure != null) set.infrastructure = u.infrastructure;
     if (u.casualties != null) set.casualties = u.casualties;
+    if (u.theatre != null) set.theatre = u.theatre;
     await db.update(strikesTable).set(set).where(eq(strikesTable.id, u.id));
   }
-  log(`\nUpdated ${updates.length} rows.`);
+  for (const id of toDelete) {
+    await db.delete(strikesTable).where(eq(strikesTable.id, id));
+  }
+  log(`\nUpdated ${updates.length} rows. Deleted ${toDelete.length} unroutable rows.`);
 
-  return { mode: "commit", scanned: rows.length, targetFilled, infraFilled, casualtiesFilled, logLines };
+  return { mode: "commit", scanned: rows.length, targetFilled, infraFilled, casualtiesFilled, theatreReassigned, outOfTheatreDeleted, logLines };
 }
