@@ -298,6 +298,11 @@ function ActionGroup({ heading, actions }: { heading: string; actions: string[] 
 // below when d.jakartaTacticalBrief is present; every other theatre leaves them
 // unrendered, so its output is byte-identical. Count-free; brand spec exactly.
 
+// Subtle navy-tinted zebra shading for the tactical evidence tables' odd rows —
+// brand-spec parity with the approved report chrome (navy header + alternating
+// row shading), applied only to these count-free tables.
+const ROW_TINT = "#f4f5fa";
+
 const baseCell: React.CSSProperties = {
   fontFamily: ROBOTO,
   fontSize: 12,
@@ -339,7 +344,7 @@ function PriorityTable({ rows }: { rows: JakartaPriorityAreaRow[] }) {
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>
+          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
             <td style={{ ...baseCell, fontWeight: 700, color: NAVY, textAlign: "center" }}>{r.priority}</td>
             <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>
               {r.elevated ? `${r.area} (active this week)` : r.area}
@@ -369,7 +374,7 @@ function PortTable({ rows }: { rows: JakartaPortLogisticsRow[] }) {
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>
+          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
             <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.area}</td>
             <td style={baseCell}>{r.operationalRelevance}</td>
             <td style={baseCell}>{r.possibleImpact}</td>
@@ -395,7 +400,7 @@ function OpsTable({ rows }: { rows: JakartaTableRow[] }) {
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>
+          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
             <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.area}</td>
             <td style={baseCell}>{r.why}</td>
             <td style={baseCell}>{r.action}</td>
@@ -423,7 +428,7 @@ function CrimeTable({ rows }: { rows: JakartaCrimeBusinessRow[] }) {
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i}>
+          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
             <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.context}</td>
             <td style={baseCell}>{r.exposure}</td>
             <td style={baseCell}>{r.precaution}</td>
@@ -601,9 +606,13 @@ export default function PngCountryReportBody({
                 <Prose text={tactical.crimeTrends.reportedThisPeriod} />
                 <Prose text={tactical.crimeTrends.standingPattern} />
                 <Prose text={tactical.crimeTrends.trendRead} />
-                <CrimeTable rows={tactical.crimeTrends.businessImpact} />
+                <div data-pdf-keep="true">
+                  <CrimeTable rows={tactical.crimeTrends.businessImpact} />
+                </div>
                 <StrandLabel>Priority Areas This Week</StrandLabel>
-                <PriorityTable rows={tactical.priorityAreas} />
+                <div data-pdf-keep="true">
+                  <PriorityTable rows={tactical.priorityAreas} />
+                </div>
               </>
             ) : null}
             {photoAt("inside-incident-details")}
@@ -633,12 +642,16 @@ export default function PngCountryReportBody({
             <Prose text={tactical.airportTransfer} />
             <StrandLabel>Port and Logistics Impact</StrandLabel>
             <Prose text={tactical.portLogistics.intro} />
-            <PortTable rows={tactical.portLogistics.rows} />
+            <div data-pdf-keep="true">
+              <PortTable rows={tactical.portLogistics.rows} />
+            </div>
             <StrandLabel>Port Actions</StrandLabel>
             <BulletList items={tactical.portLogistics.actions} />
             <StrandLabel>Office, Hotel and Meeting Venue Exposure</StrandLabel>
             <Prose text={tactical.officeHotelVenue.intro} />
-            <OpsTable rows={tactical.officeHotelVenue.rows} />
+            <div data-pdf-keep="true">
+              <OpsTable rows={tactical.officeHotelVenue.rows} />
+            </div>
           </>
         ) : null}
       </Section>
