@@ -198,6 +198,19 @@ function applyMapExportLayout(
   // on top of that border line and look like it has a strike through it.
   // Widen the bottom padding for export only so the low-rendered text
   // clears the border with room to spare; on-screen spacing is untouched.
+  //
+  // A basemap country/city name can legitimately sit right behind this
+  // control on a wide-area map (e.g. "South Sudan" at a multi-country
+  // zoom) — the control is opaque and fully hides whatever falls under it,
+  // but the same label's remaining letters continuing just past the box
+  // edge used to look like broken/clipped text rather than a UI element
+  // sitting on top of the map. A visible shadow makes it read clearly as a
+  // floating chip, and the wrapper gets more breathing room from the map
+  // edge (matching the zoom control's own 14px inset).
+  map.querySelectorAll<HTMLElement>(".leaflet-control-scale").forEach((node) => {
+    node.style.marginLeft = "14px";
+    node.style.marginBottom = "14px";
+  });
   map.querySelectorAll<HTMLElement>(".leaflet-control-scale-line").forEach((node) => {
     node.style.boxSizing = "border-box";
     node.style.border = "2px solid #777";
@@ -205,6 +218,7 @@ function applyMapExportLayout(
     node.style.background = "#fff";
     node.style.padding = "2px 5px 6px";
     node.style.lineHeight = "1.1";
+    node.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.25)";
   });
 
   const legend = map.nextElementSibling as HTMLElement | null;
