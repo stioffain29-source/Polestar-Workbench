@@ -31,7 +31,7 @@
 |-----|----------------|------|
 | Owner | Sign Appendix C; confirm integration decisions still match production secrets; provision keys/approvals if turning integrations on | M1 sign-off and ongoing |
 | Dev | Complete this audit pack with code/probe/repo evidence; deliver M2 backlog | M1 now; M2 after sign-off |
-| Owner + Dev | Owner sets environment; dev ensures Source Health UI matches truth table (Appendix B items B1–B4) | M2 must-fix |
+| Owner + Dev | Owner decides enable vs off for B1–B4 integrations; Dev reflects that decision honestly in Source Health UI | M2 must-fix |
 
 **Owner actions at sign-off (confirm, not collect)**
 
@@ -41,8 +41,8 @@
 
 **Dev actions (M2 — after M1 locked)**
 
-- Appendix B items B5–B10: route reliability, error states, integration status tests, smoke PDF path.
-- Appendix B items B1–B4: align Source Health UI with classifications below.
+- Appendix B items B5–B11: engineering deliverables with pass/fail tests and evidence artifacts (see unified table).
+- Appendix B items B1–B4: Owner/third-party decisions (keys, approvals, whitelist) plus Dev honest Source Health and map UI per split table below.
 - M3+ workflow, PDF polish (M4), distribution (M6) per locked priority order.
 
 ## 1. Live app checklist
@@ -100,7 +100,7 @@ Core routes assessed by dev audit: route inventory, June 2026 workbench audit (l
 | Check | Observation | Pass? |
 |-------|-------------|-------|
 | Dashboard incident fetch bounded | Fetches max 1-year window, not full table | Yes (Code) — API caps days at 365 |
-| Core pages load in under 5s on production | Not timed in this audit | No — defer to M2 item B8 if slow |
+| Core pages load in under 5s on production | Not timed in M1 | No — **M2 B8** (must-fix): explicit prod timing acceptance |
 | PDF generation completes without timeout | Country and topic reports export via headless builders | Yes (Dev audit) — font audit PASS; see Appendix D E3 and E4 |
 
 ## 2. Source Health truth table
@@ -309,24 +309,28 @@ Note: June 2026 AUDIT.md stated zero tests — superseded; test suite has since 
 
 ## Appendix B — M2 fix backlog (numbered, for sign-off)
 
-Pull from this audit. Estimate days are guide only.
+Pull from this audit. **Est. (Dev)** is guide only — Owner/third-party actions are not counted in dev-days.
 
-| # | Item | Must-fix / Defer | Est. | Acceptance test |
-|---|------|------------------|------|-----------------|
-| B1 | Source Health reflects admin controls Working (token now set) | Must-fix | 0.5d | Manual ingest 200 with token; UI matches Section 2.2 |
-| B2 | ReliefWeb: approve appname OR mark both rows Pending/off in UI | Must-fix | 0.5d | No false failing noise on Source Health |
-| B3 | Liveuamap: whitelist IP OR clear overlay-unavailable state | Must-fix | 1d | Map page honest when overlay empty |
-| B4 | OpenAI: provision OR confirm template-only prose (already 200) | Must-fix | 0.5d | Country prose 200 with template; UI shows intentionally off |
-| B5 | Core route reliability pass | Must-fix | 2d | All routes load; errors user-visible |
-| B6 | Ingest scheduler: failures visible in logs and Source Health | Must-fix | 1d | Simulated failure surfaces within one cycle |
-| B7 | Loading, empty, and error states on core pages | Must-fix | 2d | No blank screens on API failure |
-| B8 | Dashboard fetch bounds if slow on prod | Defer | 1d | Dashboard under 5s with growing incident table |
-| B9 | Smoke PDF: Country plus one topic report generates | Must-fix | 0.5d | PDF downloads without error (quality = M4) |
-| B10 | Integration status tests pinned | Must-fix | 1d | CI, typecheck, and tests green |
-| B11 | Executive Summary: DB persistence; remove legacy localStorage | Defer to M3 | 0.5d | Summary survives cross-browser open |
-| B12 | Persist any other localStorage-only editor fields | Defer | 1d | Audit complete |
+Every row is sign-off ready: **Deliverable**, **Owner**, **Pass / Fail test**, and **Evidence artifact**.
 
-**M2 total (must-fix):** approximately 9–10 dev-days (within $1,000 / 10–14 day envelope).
+| # | Deliverable | Owner | Priority | Est. (Dev) | Pass / Fail test | Evidence artifact |
+|---|-------------|-------|----------|------------|------------------|-------------------|
+| B1 | Source Health `admin_controls` row shows **Working** (`configured: true`); status API matches Section 2.2 | Owner: retain `INGEST_ADMIN_TOKEN` in production. Dev: UI and API reflect token state | Must-fix | 0.5d | **PASS:** POST `/api/admin/ingest` with valid token → 200; `/sources` row **Working**. **FAIL:** 503 when token set, or UI shows failing/not configured | E12 (M1 prod probe) + `docs/m2-evidence/B1-admin-ingest.log` + screenshot `/sources` admin_controls row |
+| B2 | `reliefweb` and `reliefweb_reports` rows match Owner decision — **Pending** or **Intentionally off**; no false **Broken** | Owner: submit ReliefWeb appname for approval **OR** record defer decision at sign-off. Dev: honest UI for chosen state | Must-fix | 0.5d | **PASS:** both rows match signed Owner decision; zero false failing noise. **FAIL:** either row shows **Broken** while awaiting approval or intentionally off | Owner decision note (Appendix C) + E2 + screenshot `/sources` ReliefWeb rows |
+| B3 | Map page shows overlay-unavailable message when upstream blocked; `liveuamap` Source Health honest (**Broken**/`failing_upstream` or **Intentionally off**) | Owner: request Liveuamap IP whitelist **OR** record overlay-off decision. Dev: map banner + Source Health row | Must-fix | 1d | **PASS:** `/map` shows explicit unavailable copy when overlay empty; Source Health matches Owner decision. **FAIL:** silent blank map or false **Working** | Screenshot `/map` (overlay off) + `/sources` liveuamap row + Owner whitelist/defer note |
+| B4 | Country prose returns 200 with template fallback (no 503); `openai` Source Health **Intentionally off** / `not_configured` (unless Owner provisions keys) | Owner: provision `AI_INTEGRATIONS_OPENAI_*` **OR** confirm template-only at sign-off. Dev: route + UI | Must-fix | 0.5d | **PASS:** country prose API 200 with template body; UI shows intentionally off when no keys. **FAIL:** 503, or UI implies AI active without keys | API response capture + screenshot `/sources` openai row + Owner template-only note if applicable |
+| B5 | Section 1.1 route matrix: each URL mounts a page shell; deep links, 404, and auth redirects (Section 1.2) behave as designed. *Out of scope:* fetch UX (B7); map overlay copy (B3) | Dev | Must-fix | 1.5d | **PASS:** all 12 Section 1.1 routes render without white screen or uncaught error; logged-out user gets 401 or login redirect on protected routes. **FAIL:** any route crash or auth bypass | `docs/m2-evidence/B5-route-matrix.md` (route × status) + screenshot per route or spot-check set |
+| B6 | Scheduled ingest failure propagates to server logs and Source Health within one `INGEST_INTERVAL_HOURS` cycle. *Out of scope:* page UI (B7); row classification (B1–B4) | Dev | Must-fix | 1d | **PASS:** simulated connector failure → WARN (or equivalent) in logs **and** affected Source Health row degraded within one cycle; manual POST `/api/admin/ingest` unchanged. **FAIL:** silent failure or health row stale past one cycle | Log excerpt + Source Health before/after screenshots in `docs/m2-evidence/B6-ingest-failure/` |
+| B7 | Core pages (Section 1.1) show loading, intentional empty, and recoverable error UI on primary fetch outcomes. *Out of scope:* route crashes (B5); scheduler (B6); map overlay (B3) | Dev | Must-fix | 1.5d | **PASS:** forced API 500/timeout → visible error with message and retry (or navigation); empty dataset → empty-state copy. **FAIL:** silent blank table, map, or list | `docs/m2-evidence/B7-ux-states/` — one screenshot per core page (loading, empty, error) |
+| B8 | **Production performance budget:** dashboard (`/`) reaches interactive within **5s** (median of 3 prod runs); incident list API enforces ≤365-day cap (no unbounded fetch) | Dev | Must-fix | 1d | **PASS:** median dashboard interactive ≤5s on production URL; `listIncidents` (or equivalent) rejects or caps `days` >365. **FAIL:** median >5s or unbounded incident fetch | `docs/m2-evidence/B8-performance-spot-check.md` (3-run timings + API cap proof) |
+| B9 | Smoke PDF export: Country (Indonesia) + one topic report (shipping, flashpoint, or fuel) download without error | Dev | Must-fix | 0.5d | **PASS:** both PDFs return non-empty bytes; no timeout or export error. **FAIL:** export error, empty file, or hang. *(Layout quality = M4, out of scope)* | `docs/m2-evidence/pdfs/B9-country-indonesia.pdf` + one topic PDF; reference E4 for M1 baseline |
+| B10 | Integration status tests pinned; workspace typecheck and full test suite green in CI | Dev | Must-fix | 1d | **PASS:** `typecheck` exit 0; test suite exit 0; CI pipeline green on merge commit. **FAIL:** any red job or unpinned integration-status regression | CI run URL or `docs/m2-evidence/B10-ci-green.log` |
+| B11 | Executive Summary persisted in DB; legacy localStorage reads removed | Dev | Defer → M3 | 0.5d | **PASS:** summary survives cross-browser open after cache clear. **FAIL:** localStorage-only persistence | Deferred — evidence in M3 sign-off pack |
+| B12 | Audit and migrate remaining localStorage-only editor fields (or document explicit deferrals) | Dev | Defer | 1d | **PASS:** audit lists every localStorage key; each field migrated or deferred with Owner note. **FAIL:** unaudited localStorage-only fields | Deferred — `docs/m3-evidence/localStorage-audit.md` |
+
+**M2 total (must-fix B1–B10):** approximately **10–11 dev-days** (within $1,000 / 10–14 day envelope).
+
+**M2 evidence bundle:** Store under `docs/m2-evidence/` alongside this document at M2 sign-off.
 
 ## Appendix C — Owner sign-off
 
@@ -368,6 +372,7 @@ Pull from this audit. Estimate days are guide only.
 | E10 | Auth — unauthenticated API blocked | Section 1.2 — GET /api/incidents returned 401 (8 Jul 2026) | Prod |
 | E11 | Health check public | Section 1.2 — GET /api/healthz returned 200 (8 Jul 2026) | Prod |
 | E12 | Admin token configured | Section 1.3 — POST /api/admin/ingest no token returned 401 (8 Jul 2026) | Prod |
+| E13 | M2 sign-off evidence bundle | docs/m2-evidence/ (per Appendix B rows B1–B10) | M2 delivery |
 
 ---
 
