@@ -312,11 +312,13 @@ export default function IncidentMap({
             regardless of pan/zoom — a static fixed-position indicator is
             correct here, no re-projection needed. Plain HTML/SVG so it
             rasterises with the rest of the overlay in the PDF export.
-            Two-tone needle (light/outlined left half, solid right half) is
-            the standard cartographic north-arrow convention — reads as a
-            proper compass rather than a generic up-arrow glyph. A subtle
-            shadow (matching the scale bar's treatment) keeps it legible as
-            a floating indicator against any basemap color underneath. */}
+            A single solid fill keeps the needle visually symmetric so the
+            "N" label reads as centered under it — a two-tone (light/dark
+            split) needle was tried here and reads as off-center because the
+            darker half pulls the eye, even though the underlying geometry
+            is centered. A subtle shadow (matching the scale bar's
+            treatment) keeps it legible as a floating indicator against any
+            basemap color underneath. */}
         <div
           aria-label="North"
           style={{
@@ -336,8 +338,7 @@ export default function IncidentMap({
           }}
         >
           <svg width="18" height="22" viewBox="0 0 20 24" fill="none">
-            <path d="M10 1 L3 16 L10 12 Z" fill="#fff" stroke={NAVY} strokeWidth="1" strokeLinejoin="round" />
-            <path d="M10 1 L17 16 L10 12 Z" fill={NAVY} />
+            <path d="M10 1 L17 16 L10 12 L3 16 Z" fill={NAVY} />
           </svg>
           <span style={{ font: "700 9px/1 Roboto, sans-serif", color: NAVY, marginTop: 3 }}>
             N
