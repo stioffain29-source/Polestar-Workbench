@@ -137,7 +137,10 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
           }}
         >
           {photos.map((p, i) => (
-            <figure key={i} style={{ margin: 0 }}>
+            <figure
+              key={i}
+              style={{ margin: 0, display: "flex", flexDirection: "column", alignItems: "center" }}
+            >
               <img
                 src={p.dataUrl}
                 alt={p.caption || `Figure ${i + 1}`}
@@ -160,6 +163,8 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
                     color: DUSK,
                     fontFamily: ROBOTO,
                     fontWeight: 300,
+                    textAlign: "center",
+                    maxWidth: "90%",
                   }}
                 >
                   {p.caption}
@@ -235,7 +240,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
         )}
 
         {report.mapEnabled && (
-          <Section title="Incident Map">
+          <Section title="Location Map">
             <IncidentMap
               domId="spot-report-map"
               points={mapPoints}
