@@ -45,7 +45,11 @@ function cloneForExport(element: HTMLElement): HTMLElement {
   const clone = source.cloneNode(true) as HTMLElement;
   const width = EXPORT_REPORT_WIDTH_PX;
 
-  clone.querySelectorAll<HTMLElement>(".no-print, .pdf-preview-footer").forEach((node) => {
+  // ".leaflet-control-zoom" — the +/− zoom buttons on the incident/location
+  // map are an on-screen navigation aid only; a static PDF page has no
+  // interactivity, so the buttons are dead UI on the page and are stripped
+  // from the export the same way any other no-print element is.
+  clone.querySelectorAll<HTMLElement>(".no-print, .pdf-preview-footer, .leaflet-control-zoom").forEach((node) => {
     node.style.display = "none";
   });
 
