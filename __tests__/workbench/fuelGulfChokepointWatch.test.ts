@@ -66,6 +66,25 @@ describe("buildFuelGulfChokepointWatch — no-fabrication gates", () => {
     expect(built).not.toBeNull();
     expect(built!.read).toMatch(/dominant fuel-route risk/i);
     expect(built!.read).toMatch(/marked concentration/i);
+    // Concentration is backed by a real count, not left as a bare adjective.
+    expect(built!.read).toMatch(/4 distinct chokepoint incidents were logged across 4 separate days/i);
+  });
+
+  it("grounds the peak-pressure sentence in severity and location, not a bare headline repeat", () => {
+    const incidents = [
+      {
+        id: 1,
+        topic: "fuel",
+        title: "Strait of Hormuz refinery struck in missile attack",
+        country: "Iran",
+        severity: "extreme",
+        occurredAt: "2026-07-12T12:00:00+00:00",
+        sourceUrl: "https://example.test/1",
+      } as TopicFastFactsIncident,
+    ];
+    const built = buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents });
+    expect(built).not.toBeNull();
+    expect(built!.read).toMatch(/extreme-severity incident near Iran/i);
   });
 
   it("omits the reopening clause when reopen headlines predate the peak anchor", () => {
@@ -155,6 +174,48 @@ describe("buildFuelGulfChokepointWatch — current period only, no older materia
     ];
     expect(
       buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents }),
+    ).toBeNull();
+  });
+
+  it("admits a chokepoint incident whose HEADLINE names no chokepoint but whose body clearly describes one (e.g. a corporate statement)", () => {
+    // Mirrors a real gap: a company statement titled generically, entirely
+    // about vessels struck while transiting Hormuz, carried no chokepoint
+    // name in its own headline. Title-only matching silently dropped this.
+    const corporateStatement: TopicFastFactsIncident = {
+      id: 97,
+      topic: "fuel",
+      title: "ADNOC issues statement clarifying attacks on facilities",
+      summary:
+        "ADNOC said 15 of its vessels have been attacked by missiles and drones while transiting the Strait of Hormuz, including three vessels this week alone, with one fatality and 20 injuries to crew members.",
+      severity: "extreme",
+      occurredAt: "2026-07-14T12:00:00+00:00",
+      sourceUrl: "https://example.test/97",
+    };
+    const built = buildFuelGulfChokepointWatch({
+      issueDate: ISSUE_DATE,
+      incidents: [corporateStatement],
+    });
+    expect(built).not.toBeNull();
+    expect(built!.currentItems.length).toBeGreaterThan(0);
+    expect(built!.currentItemLines.join(" ")).toMatch(/ADNOC issues statement/i);
+  });
+
+  it("does NOT admit a story that merely mentions a chokepoint as background colour without an incident verb nearby", () => {
+    const backgroundMention: TopicFastFactsIncident = {
+      id: 96,
+      topic: "fuel",
+      title: "Nigeria fuel subsidy removal drives pump prices higher",
+      summary:
+        "Officials noted Nigeria imports little refined product via the Persian Gulf, with most cargoes sourced from Europe.",
+      severity: "moderate",
+      occurredAt: "2026-07-11T12:00:00+00:00",
+      sourceUrl: "https://example.test/96",
+    };
+    expect(
+      buildFuelGulfChokepointWatch({
+        issueDate: ISSUE_DATE,
+        incidents: [backgroundMention],
+      }),
     ).toBeNull();
   });
 });
