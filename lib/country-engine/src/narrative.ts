@@ -24,6 +24,7 @@ import {
   INDIRECT_ASSESSED_SENTENCE,
   INDIRECT_ASSESSED_SENTENCE_ALT,
 } from "./impact";
+import { compareIncidentSignificance } from "./incidentSignificance";
 
 // Re-export the banned-phrase surface so callers can reach it via ./narrative.
 export {
@@ -364,24 +365,8 @@ function unique(items: string[]): string[] {
 /** Rank events by §14 factors and return them highest-priority first. */
 function rankEvents(events: CanonicalEvent[]): CanonicalEvent[] {
   return [...events].sort((a, b) => {
-    // Deaths / serious injuries.
-    const casA = (a.casualties ?? 0) + (a.injuries ?? 0);
-    const casB = (b.casualties ?? 0) + (b.injuries ?? 0);
-    // Severity.
-    const sevA = severityRank(a.severity);
-    const sevB = severityRank(b.severity);
-    // Direct operational impact (confirmed effect present).
-    const opA = a.confirmedOperationalEffect ? 1 : 0;
-    const opB = b.confirmedOperationalEffect ? 1 : 0;
-    // Continuing threat.
-    const ongoingA = a.eventStatus === "Ongoing" ? 1 : 0;
-    const ongoingB = b.eventStatus === "Ongoing" ? 1 : 0;
-
-    if (sevB !== sevA) return sevB - sevA;
-    if (casB !== casA) return casB - casA;
-    if (opB !== opA) return opB - opA;
-    if (ongoingB !== ongoingA) return ongoingB - ongoingA;
-    // Confidence as final tie-break.
+    const significance = compareIncidentSignificance(a, b);
+    if (significance !== 0) return significance;
     return b.classificationConfidence - a.classificationConfidence;
   });
 }

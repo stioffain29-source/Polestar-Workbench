@@ -200,7 +200,7 @@ function measureProducerBuyerActionsTable(
   const colCatW = Math.round(CW * 0.18);
   const colReadW = Math.round(CW * 0.3);
   const colActionW = CW - colActorW - colCatW - colReadW;
-  const headerH = 20;
+  const headerH = 18;
   const padX = 6;
   const lineH = 11;
 
@@ -231,7 +231,7 @@ function measureProducerBuyerActionsTable(
       actionLines.length,
       readLines.length,
     );
-    total += Math.max(22, maxLines * lineH + 10);
+    total += Math.max(20, maxLines * lineH + 8);
   }
   pdf.setFontSize(prevSize);
   return total + 8;
@@ -275,8 +275,7 @@ function drawProducerBuyerActionsTable(
     pdf.setFontSize(8);
   };
 
-  ensureSpace(ctx, headerH + 30);
-  drawHeader();
+  let headerDrawn = false;
 
   for (const r of rows) {
     const actionText = r.date ? `${r.action}\n${r.date}` : r.action;
@@ -304,9 +303,16 @@ function drawProducerBuyerActionsTable(
     );
     const rh = Math.max(20, maxLines * lineH + 8);
 
-    // Prevent row from splitting across pages - ensure space for the entire row
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+    // Keep a header with its first row, and repeat it before every continued
+    // page. This avoids both an orphan header and a row that starts beneath a
+    // page footer without reserving space for the repeated header.
+    if (!headerDrawn) {
+      ensureSpace(ctx, headerH + rh);
+      drawHeader();
+      headerDrawn = true;
+    } else if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
       newPage(ctx);
+      ensureSpace(ctx, headerH + rh);
       drawHeader();
     }
 
@@ -1135,10 +1141,10 @@ export async function exportTopicReportPdf(
       options.sectionOverrides?.marketOperatorOverrides,
     );
     if (show("producer-buyer") && producerRows.length > 0) {
-      // Guard against an orphaned section heading: if there isn't room
-      // for the heading + table header + a couple of rows, push the
-      // whole block to the next page before drawing the heading.
-      ensureSpace(ctx, 24 + 18 + 60);
+      // Reserve only the heading, table header and first row. Reserving the
+      // entire table created large empty page tails for longer response tables;
+      // the shared renderer now repeats its header safely on continuation pages.
+      ensureSpace(ctx, 24 + 18 + 34);
       drawSectionHeading(ctx, "Market and Operator Responses");
       drawProducerBuyerActionsTable(ctx, producerRows);
     }

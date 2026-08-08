@@ -516,11 +516,11 @@ export default function PngCountryReportBody({
     d.operationalImpactOverride ?? buildOperationalImpactBullets(d.windowItems).slice(0, 5);
   // Jakarta's tactical brief carries its own evidence tables (crime, priority
   // areas, staff movement, port, venue, role actions) that are folded INSIDE the
-  // canonical sections below. When present the Outlook escalation list is left
-  // UNSLICED so every trigger the Jakarta brief flags is preserved.
+  // canonical sections below. Keep the Jakarta indicators compact: route,
+  // congestion and flood advice is consolidated elsewhere in the brief.
   const tactical = d.jakartaTacticalBrief;
   const escalationIndicators = tactical
-    ? d.escalationIndicators
+    ? d.escalationIndicators.slice(0, 3)
     : d.escalationIndicators.slice(0, 3);
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
@@ -635,7 +635,9 @@ export default function PngCountryReportBody({
         {tactical ? (
           <>
             <StrandLabel>Staff Movement Impact</StrandLabel>
-            {STAFF_MOVEMENT_FIELDS.map((f) => (
+            {STAFF_MOVEMENT_FIELDS.filter((f) =>
+              Boolean(tactical.staffMovement[f.key]),
+            ).map((f) => (
               <LabelledBlock key={f.key} label={f.label} text={tactical.staffMovement[f.key]} />
             ))}
             <StrandLabel>Airport Transfer Impact</StrandLabel>

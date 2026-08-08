@@ -1220,8 +1220,7 @@ function renderStructuredBrief(
     ];
     drawJakartaStrandLabel(ctx, "Staff Movement Impact");
     for (const [label, key] of fields) drawJakartaLabelledBlock(ctx, label, sm[key]);
-    drawJakartaStrandLabel(ctx, "Airport Transfer Impact");
-    renderProse(ctx, tactical.airportTransfer);
+    drawSectionWithProse(ctx, "Airport Transfer Impact", tactical.airportTransfer);
     drawJakartaStrandLabel(ctx, "Port and Logistics Impact");
     renderProse(ctx, tactical.portLogistics.intro);
     drawJakartaPortTable(ctx, tactical.portLogistics.rows);
@@ -1262,9 +1261,7 @@ function renderStructuredBrief(
     "Outlook: Next Seven Days",
     d.outlook || "Not populated.",
   );
-  const escalationIndicators = tactical
-    ? d.escalationIndicators
-    : d.escalationIndicators.slice(0, 3);
+  const escalationIndicators = d.escalationIndicators.slice(0, 3);
   if (escalationIndicators.length > 0) {
     drawJakartaStrandLabel(ctx, "Escalation Indicators");
     drawJakartaBulletList(ctx, escalationIndicators);
