@@ -10,6 +10,12 @@ import {
   operationalMeaningFor,
   locationForeignToCountry,
 } from "./upcomingSignals";
+import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
+import {
+  aggregateIncidentSignificance,
+  compareIncidentSignificance,
+  incidentSeverityRank,
+} from "@workspace/country-engine";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -173,7 +179,7 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
   let key = "", rank = 0;
   for (const r of rows) {
     const k = sevKey(r.severity);
-    const v = SEV_RANK[k] ?? 0;
+    const v = incidentSeverityRank(r.severity);
     if (v > rank) { rank = v; key = k; }
   }
   return { key, label: key ? (SEV_LABEL[key] ?? key) : "—" };
@@ -184,13 +190,12 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
 // the VOLUME lead (record count) so the prose can reconcile the two
 // instead of letting the country chart and forecast table contradict.
 function topSeverityIncident(rows: EnrichedIncident[]): EnrichedIncident | null {
-  let best: EnrichedIncident | null = null;
-  let rank = 0;
-  for (const r of rows) {
-    const v = SEV_RANK[sevKey(r.severity)] ?? 0;
-    if (v > rank) { rank = v; best = r; }
-  }
-  return best;
+  return [...rows].sort((a, b) =>
+    compareIncidentSignificance(
+      { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
+      { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
+    ),
+  )[0] ?? null;
 }
 
 // Signature phrases lifted from the legacy generic prose templates
@@ -523,34 +528,6 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   return false;
 }
 
-// --- Country normalisation -------------------------------------------------
-// Upstream feeds frequently deliver multi-country strings such as
-// "Pakistan; India", "India; Bangladesh; Sri Lanka; Nepal" or
-// "Pakistan; United Arab Emirates; Saudi". Rendering those as a single
-// country bar is wrong and embarrassing. Split on the standard
-// delimiters and keep the first non-empty token as the primary country.
-const COUNTRY_SPLIT_RE = /[;/,&]| vs | and /i;
-const COUNTRY_FIX_MAP: Record<string, string> = {
-  "saudi": "Saudi Arabia",
-  "uae": "United Arab Emirates",
-  "u.a.e.": "United Arab Emirates",
-  "u.a.e": "United Arab Emirates",
-  "ksa": "Saudi Arabia",
-  "pak": "Pakistan",
-  "png": "Papua New Guinea",
-  "philippines / manila": "Philippines",
-  "indonesian papua": "Indonesia",
-  "west papua": "Indonesia",
-};
-function primaryCountry(raw: string | null | undefined): string {
-  const s = (raw ?? "").trim();
-  if (!s) return "";
-  const first = s.split(COUNTRY_SPLIT_RE)[0]?.trim() ?? "";
-  if (!first) return "";
-  const lc = first.toLowerCase();
-  return COUNTRY_FIX_MAP[lc] ?? first;
-}
-
 // --- Future-protest extractor ----------------------------------------------
 // Pulls forward-looking signals out of the file: dated protest calls,
 // announced strikes, scheduled court hearings, named mobilisation dates.
@@ -642,10 +619,10 @@ function topicSignature(title: string, date: Date): string {
 // first, then the more recent record. Used by every dedupe pass so the
 // surviving row is consistent across title / signature / same-event collapse.
 function sevDateBetter<T extends { date: Date; severity: string }>(a: T, b: T): boolean {
-  const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
-  const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
-  if (sa !== sb) return sa > sb;
-  return a.date.getTime() >= b.date.getTime();
+  return compareIncidentSignificance(
+    { severity: a.severity, occurredAt: a.date.toISOString() },
+    { severity: b.severity, occurredAt: b.date.toISOString() },
+  ) <= 0;
 }
 
 // Tokens that must NOT anchor a same-event match. Generic mobilisation words
@@ -948,9 +925,10 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
         sourceUrl: r.sourceUrl ?? null,
         location: r.location ?? null,
       });
-      // Normalise multi-country strings down to the primary country so
-      // combined labels like "Pakistan; India" never reach the chart.
-      const country = primaryCountry(r.country);
+      // Resolve physical incident location from title, summary and location
+      // text. The raw country tag can be source attribution and is not trusted
+      // without corroboration.
+      const country = deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED;
       // Clean the rendered title (drop publisher masthead + "Watch:" / "VIDEO
       // BY" video cruft). Classification above runs on the ORIGINAL title.
       return { ...r, title: cleanDisplayTitle(r.title), country, date, issue, bucket: bucketFor(issue) };
@@ -966,7 +944,10 @@ function countriesOf(rows: EnrichedIncident[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const r of rows) {
     const c = (r.country ?? "").trim();
-    if (!c) continue;
+    // An unresolved location is a data-quality state, not a country. Keep it
+    // out of geographic rankings and prose rather than letting it appear as a
+    // false regional leader.
+    if (!c || c === LOCATION_NOT_IDENTIFIED) continue;
     m.set(c, (m.get(c) ?? 0) + 1);
   }
   return m;
@@ -1045,7 +1026,7 @@ export function selectFlashpointUsable(
   ) => {
     rejected.push({
       stage,
-      country: primaryCountry(r.country) || "—",
+      country: deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED,
       title: r.title ?? "",
       date: (r.occurredAt ?? "").slice(0, 10),
     });
@@ -1126,8 +1107,25 @@ export function buildFlashpointReportDataset(
     ? { key: sevKey(topSeverity.severity), label: SEV_LABEL[sevKey(topSeverity.severity)] ?? topSeverity.severity }
     : { key: "", label: "—" };
   const countryCount = countriesOf(enriched);
-  let topCountry = "—", topCountryN = 0;
-  for (const [c, n] of countryCount) if (n > topCountryN) { topCountryN = n; topCountry = c; }
+  const countrySignificance = new Map<string, number>();
+  for (const [country, rows] of Object.entries(
+    enriched.reduce<Record<string, EnrichedIncident[]>>((groups, row) => {
+      const country = (row.country ?? "").trim();
+      if (!country || country === LOCATION_NOT_IDENTIFIED) return groups;
+      (groups[country] ??= []).push(row);
+      return groups;
+    }, {}),
+  )) {
+    countrySignificance.set(country, aggregateIncidentSignificance(rows));
+  }
+  const rankedCountries = [...countryCount.keys()].sort(
+    (a, b) =>
+      (countrySignificance.get(b) ?? 0) - (countrySignificance.get(a) ?? 0) ||
+      (countryCount.get(b) ?? 0) - (countryCount.get(a) ?? 0) ||
+      a.localeCompare(b),
+  );
+  const topCountry = rankedCountries[0] ?? "—";
+  const topCountryN = countryCount.get(topCountry) ?? 0;
   const issueCount = new Map<string, number>();
   for (const r of enriched) issueCount.set(r.issue, (issueCount.get(r.issue) ?? 0) + 1);
   let topIssue = "—", topIssueN = 0;
@@ -1170,7 +1168,10 @@ export function buildFlashpointReportDataset(
     const c = (r.country ?? "").trim();
     if (!c) continue;
     const k = sevKey(r.severity);
-    if ((SEV_RANK[k] ?? 0) > (SEV_RANK[countryTopSev.get(c) ?? ""] ?? 0)) {
+    if (
+      incidentSeverityRank(r.severity) >
+      incidentSeverityRank(countryTopSev.get(c) ?? "")
+    ) {
       countryTopSev.set(c, k);
     }
   }
@@ -1179,7 +1180,13 @@ export function buildFlashpointReportDataset(
       const sk = countryTopSev.get(label);
       return { label, value, color: (sk && SEV_HEX[sk]) || "#465bff" };
     })
-    .sort((a, b) => b.value - a.value)
+    .sort(
+      (a, b) =>
+        (countrySignificance.get(b.label) ?? 0) -
+          (countrySignificance.get(a.label) ?? 0) ||
+        b.value - a.value ||
+        a.label.localeCompare(b.label),
+    )
     .slice(0, 12);
 
   // --- Reads ---------------------------------------------------------------
@@ -1313,21 +1320,22 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
   const STRONG_LEAD_RE = /\b(protest|demonstration|rally|march|sit[- ]?in|strike|walkout|stoppage|shutdown|riot|crackdown|curfew|tear[- ]?gas|water cannon|baton|arrest|detention|roadblock|blockade|section\s*144|assembly ban|mobilisation|mobilization)\b/i;
   const credible = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
   const strong = credible.filter((r) => STRONG_LEAD_RE.test(r.title ?? ""));
-  const sortBySevThenDate = (arr: EnrichedIncident[]) => [...arr].sort((a, b) => {
-    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
-    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
-    if (sb !== sa) return sb - sa;
-    return b.date.getTime() - a.date.getTime();
-  });
+  const sortBySignificance = (arr: EnrichedIncident[]) =>
+    [...arr].sort((a, b) =>
+      compareIncidentSignificance(
+        { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
+        { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
+      ),
+    );
   if (strong.length > 0) {
     // Prefer political-mobilisation records inside the strong+credible
     // pool. Pakistan's PTI / Section 144 cycle, for example, must lead
     // a same-severity Indian sectoral strike.
     const political = strong.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
-    if (political.length > 0) return sortBySevThenDate(political)[0];
-    return sortBySevThenDate(strong)[0];
+    if (political.length > 0) return sortBySignificance(political)[0];
+    return sortBySignificance(strong)[0];
   }
-  if (credible.length > 0) return sortBySevThenDate(credible)[0];
+  if (credible.length > 0) return sortBySignificance(credible)[0];
   const safe = rows.filter((r) => !isWeakNovelty(r));
   return safe[0] ?? rows[0] ?? null;
 }
@@ -1672,12 +1680,12 @@ function pickPoliticalSeed(rows: EnrichedIncident[]): EnrichedIncident | null {
     .filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
     .filter((r) => ACTION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
   if (candidates.length === 0) return null;
-  return [...candidates].sort((a, b) => {
-    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
-    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
-    if (sb !== sa) return sb - sa;
-    return b.date.getTime() - a.date.getTime();
-  })[0];
+  return [...candidates].sort((a, b) =>
+    compareIncidentSignificance(
+      { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
+      { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
+    ),
+  )[0];
 }
 
 function prioritiseRelated(
@@ -1698,10 +1706,12 @@ function prioritiseRelated(
     return r.bucket === "activism" || r.bucket === "unrest";
   });
   const score = (r: EnrichedIncident): number => {
-    const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
+    const significance = aggregateIncidentSignificance([
+      { severity: r.severity, title: r.title, summary: r.summary, occurredAt: r.occurredAt },
+    ]);
     const action = ACTION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`) ? 1 : 0;
     const cred = isLowCredibility(r) ? 0 : 1;
-    return sev * 1000 + action * 50 + cred * 10;
+    return significance + action * 50 + cred * 10;
   };
   const ranked = dedupeByTitle([...eligible].sort((a, b) => {
     const ds = score(b) - score(a);
@@ -1746,9 +1756,12 @@ function prioritiseRelated(
   // Facts (Highest Severity) and Related Incidents cannot contradict.
   const top = eligible.reduce<EnrichedIncident | null>((best, r) => {
     if (!best) return r;
-    const sb = SEV_RANK[sevKey(best.severity)] ?? 0;
-    const sr = SEV_RANK[sevKey(r.severity)] ?? 0;
-    return sr > sb ? r : best;
+    return compareIncidentSignificance(
+      { severity: r.severity, title: r.title, summary: r.summary, occurredAt: r.occurredAt },
+      { severity: best.severity, title: best.title, summary: best.summary, occurredAt: best.occurredAt },
+    ) < 0
+      ? r
+      : best;
   }, null);
   if (top && !out.some((r) => r.id === top.id)) {
     return [out[0], top, ...out.slice(1).filter((r) => r.id !== top.id)].slice(0, CAP);

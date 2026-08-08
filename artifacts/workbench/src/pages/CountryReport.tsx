@@ -1039,6 +1039,7 @@ export default function CountryReport() {
       }
     : null;
 
+  const isJakarta = effective?.name.trim().toLowerCase() === "jakarta";
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
   const periodLabel = active.periodLabel;
 
@@ -1220,6 +1221,19 @@ export default function CountryReport() {
         ...pngDataset.gateReport,
         narrative: patched,
         sectionWordCounts: patched.sectionWordCounts,
+        ...(isJakarta
+          ? {
+              localityScope: {
+                label: "Jakarta",
+                isInScope: (e) =>
+                  isJakartaScoped(
+                    e.eventTitle,
+                    e.eventSummary,
+                    e.district ?? e.city ?? e.provinceOrState,
+                  ),
+              },
+            }
+          : {}),
       });
       // whatChanged is analyst-editable but not a §31 narrative section — still
       // scan the edited text for §30 banned phrases so no overlay escapes the
@@ -1272,25 +1286,23 @@ export default function CountryReport() {
   // Analyst-placed incident map node, rendered at the chosen placement slot.
   // Jakarta uses a corridor & access schematic (operating-exposure graphic)
   // instead of the numbered incident-dot map; all other theatres are unchanged.
-  const isJakarta = effective.name.trim().toLowerCase() === "jakarta";
   // City reports (Jakarta today; Manila/Bangkok planned) are framed as CITY, not
   // COUNTRY, reports — driven by the shared reportKind registry.
   const isCity = isCityReport(effective.name);
-  const jakartaAreaSummary = pngEffectiveDataset?.jakartaTacticalBrief?.areaSummary ?? "";
+  const jakartaMapCaption = pngEffectiveDataset?.jakartaTacticalBrief?.mapCaption ?? "";
   const mapNode = isJakarta ? (
-    // Jakarta's corridor schematic + its operating-zone area summary caption are
-    // one keep-together block so the map, legend and summary never split across a
-    // PDF page. This is the single analyst-placed map slot for the city report.
+    // Jakarta's corridor schematic and its one-line exposure caption stay as a
+    // keep-together block. The caption replaces the former seven-zone table.
     <div data-pdf-keep="true">
       <JakartaCorridorMap
         incidents={windowIncidents as CountryFastFactsIncident[]}
         issueDate={issueDate}
       />
-      {jakartaAreaSummary
-        ? jakartaAreaSummary.split(/\n+/).map((p, i) => (
+      {jakartaMapCaption
+        ? jakartaMapCaption.split(/\n+/).map((p, i) => (
             <p
               key={i}
-              style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: "10px 0 0 0" }}
+              style={{ fontFamily: ROBOTO, fontSize: 11, lineHeight: 1.45, color: DUSK, margin: "8px 0 0 0", fontStyle: "italic" }}
             >
               {p}
             </p>
@@ -1984,10 +1996,12 @@ export default function CountryReport() {
           for EVERY country (structured and generic). Per the reworked country
           standard the Severity Distribution and Incident Breakdown by Type
           charts are no longer shown by default. */}
-      <CountryReportVisuals
-        countryName={effective.name}
-        situationalReports={situationalReports}
-      />
+      {!isJakarta && (
+        <CountryReportVisuals
+          countryName={effective.name}
+          situationalReports={situationalReports}
+        />
+      )}
 
       {/* Internal Source Coverage — screen-only, never in the PDF.
           Surfaces the layer counts and any thin-data signal for the

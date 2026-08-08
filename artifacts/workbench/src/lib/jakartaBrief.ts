@@ -16,7 +16,8 @@
 
 import type { PngReportItem, PngCategory } from "./pngReportDataset";
 import type { JakartaCorridorStatus } from "./jakartaCorridors";
-import { JAKARTA_EXPOSURE_RANK } from "./jakartaCorridors";
+import { hazardSummaryLabel, JAKARTA_EXPOSURE_RANK } from "./jakartaCorridors";
+import { compareIncidentSignificance } from "@workspace/country-engine";
 
 // The Jakarta operating-picture themes, in fixed display order. Deliberately
 // fewer, stronger labels than the generic category list — focused on what
@@ -599,55 +600,6 @@ export function buildJakartaIncidentThemes(
   return out;
 }
 
-// --- Operational Impact bullets --------------------------------------------
-
-// The Jakarta operational-impact bullets (spec §4): five fixed, location-led
-// lines of standing operational guidance. These are conditional advice ("rain
-// and flooding CAN affect…"), not claims that events occurred this period, so
-// they apply every week and the section never reads empty.
-export function buildJakartaOperationalImpact(): string[] {
-  return [
-    "Central Jakarta government district: protest activity can disrupt movement around government buildings and main roads.",
-    "Jabodetabek commuter movement: heavy rain and flooding can lengthen commuting and airport transfers.",
-    "Office, hotel and client site access: brief staff on after-hours movement and confirm secure pickup points around SCBD, Sudirman and Mega Kuningan.",
-    "Cross-city movement: hold two viable routes for meetings, site visits, airport transfers and logistics across the inner and outer ring roads.",
-    "Local teams: confirm protest and flood status on named access roads before movement on protest or heavy-rain days.",
-  ];
-}
-
-// --- Recommended Actions ---------------------------------------------------
-
-// Practical, location-based Jakarta actions. These are standing precautions
-// (advice, not event claims), so the same set applies whether or not the window
-// carried fresh reporting.
-export function buildJakartaRecommendedActions(): string[] {
-  return [
-    "Check protest activity before travelling into the Central Jakarta government district.",
-    "Widen airport-transfer windows and pre-confirm the toll-road approach for cross-city commuter movement.",
-    "Avoid unnecessary after hours staff movement in poorly monitored areas.",
-    "Confirm flood-affected routes before staff travel.",
-    "Keep local staff and drivers briefed on the day's disruption points.",
-    "Escalate incidents near offices, hotels, client sites or main routes.",
-  ];
-}
-
-// Jakarta-specific escalation indicators for the Outlook (spec §5): the standing
-// watch-items an analyst would flag as "what would worsen the picture", phrased
-// for the capital rather than the generic country list.
-export function buildJakartaEscalationIndicators(): string[] {
-  return [
-    "Active protest near Monas, Istana Merdeka, DPR/MPR or Gambir",
-    "Police cordons or road closures on Thamrin, Sudirman, Medan Merdeka or Gatot Subroto",
-    "Flooding affecting low-clearance vehicles on access or commuter roads",
-    "Airport transfer time exceeding the normal planning window",
-    "Tanjung Priok terminal or gate disruption",
-    "Truck queues or staging outside secure areas",
-    "Incidents near client offices, hotels, warehouses or malls",
-    "A driver unable to confirm two viable routes",
-    "A security provider advising delay or reroute",
-  ];
-}
-
 // --- Top 3 development transform -------------------------------------------
 
 // Trim a cleaned headline to a short factual fragment used only to disambiguate
@@ -686,510 +638,218 @@ export function applyJakartaTopThree(topThree: PngReportItem[]): PngReportItem[]
   return out;
 }
 
-// --- Tactical operating brief (spec sections 4–8 and 13) -------------------
+// --- Consolidated weekly operating brief ------------------------------------
 //
-// These power the Jakarta-only tactical sections (Movement and Access Impact,
-// Business District Exposure, Port and Logistics Implications, Airport / Hotel /
-// Office Implications, Route and Timing Guidance, and the map area summary).
-//
-// The TABLES and the standing route/timing guidance are window-independent
-// conditional advice (they apply every week), so they are constant. The INTROS,
-// the movement-impact bullets and the area summary are LIVE-AWARE: they lead with
-// an elevated corridor's reported relevance ONLY when that area actually carried
-// reporting this period (raise-not-invent), then fall back to a standing
-// assessment. Every string is count-free.
+// Jakarta is a city report, not a directory of standing exposure tables. These
+// builders deliberately emit only the active operational picture for the
+// reporting week, plus the compact standing controls needed when reporting is
+// sparse. Corridor attribution and hazard classification remain centralised in
+// jakartaCorridors.ts; this file only turns that shared evidence into the
+// approved report structure.
 
-// A single area row in a tactical exposure table: the location, why it matters
-// operationally, and the recommended action. (`why` doubles as the "Impact"
-// column for the port table.)
-export interface JakartaTableRow {
-  area: string;
-  why: string;
-  action: string;
-}
-
-// A ranked Priority-Areas row (spec §3). The table is built from the live
-// corridor statuses, so the RANK and `elevated` flag change with the incident
-// data; the driver / impact / action text is named-location specific per area.
-export interface JakartaPriorityAreaRow {
-  priority: number;
+export interface JakartaOperatingPictureRow {
   area: string;
   driver: string;
-  businessImpact: string;
+  impact: string;
   action: string;
-  /** True when this area carried live reporting this period. */
-  elevated: boolean;
 }
 
-// Staff-movement impact broken out by movement type (spec §4). Each field names
-// the roads / districts the movement runs through — never "movement may be
-// disrupted".
-export interface JakartaStaffMovementImpact {
-  officeAccess: string;
-  hotelToOffice: string;
-  airportTransfer: string;
-  clientMeeting: string;
-  staffCommute: string;
-  driverRoute: string;
-  afterHours: string;
+export interface JakartaOperatingPicture {
+  rows: JakartaOperatingPictureRow[];
+  emptyNote: string;
 }
 
-// A Port-and-Logistics row (spec §6): the four-column logistics table.
-export interface JakartaPortLogisticsRow {
-  area: string;
-  operationalRelevance: string;
-  possibleImpact: string;
-  requiredAction: string;
-}
-
-// A role-based recommended-action block (spec §10).
-export interface JakartaRoleAction {
-  role: string;
-  guidance: string;
-}
-
-// Crime Trends & Business Impact (dedicated crime section). A single curated
-// STANDING exposure row keyed to a named operating context (staff movement,
-// hotels and client meetings, airport transfers, port access and logistics
-// routes) — durable analyst guidance about how Jakarta's enduring crime
-// patterns bear on business operations, NEVER this period's live findings.
-export interface JakartaCrimeBusinessRow {
-  context: string;
-  exposure: string;
-  precaution: string;
-}
-
-// The Crime Trends & Business Impact section payload. Splits what actually
-// surfaced in reporting THIS period from Jakarta's durable standing pattern, so
-// neither reads as the other. Count-free; no numeric increase/decrease claims.
-export interface JakartaCrimeTrends {
-  // What crime surfaced in open-source reporting this period — or an honest
-  // "not reported this period" note when nothing distinct was identified.
-  reportedThisPeriod: string;
-  // Jakarta's durable, standing crime pattern (analyst baseline, not live data).
-  standingPattern: string;
-  // Qualitative read of this period against the standing pattern. Never asserts
-  // a numeric rise or fall.
-  trendRead: string;
-  // Standing business-impact table (always present).
-  businessImpact: JakartaCrimeBusinessRow[];
+export interface JakartaCrimeEscalationWatch {
+  crime: string;
+  escalationTriggers: string;
 }
 
 export interface JakartaTacticalBrief {
-  priorityAreas: JakartaPriorityAreaRow[];
-  staffMovement: JakartaStaffMovementImpact;
-  airportTransfer: string;
-  portLogistics: {
-    intro: string;
-    rows: JakartaPortLogisticsRow[];
-    actions: string[];
-  };
-  officeHotelVenue: { intro: string; rows: JakartaTableRow[] };
-  routeTiming: string[];
-  roleActions: JakartaRoleAction[];
-  areaSummary: string;
-  crimeTrends: JakartaCrimeTrends;
+  operatingPicture: JakartaOperatingPicture;
+  crimeEscalationWatch: JakartaCrimeEscalationWatch;
+  recommendedActions: string[];
+  mapCaption: string;
 }
 
-function corridorById(
+function rankedLiveStatuses(statuses: JakartaCorridorStatus[]): JakartaCorridorStatus[] {
+  return statuses
+    .filter((status) => status.elevated)
+    .sort(
+      (a, b) =>
+        (JAKARTA_EXPOSURE_RANK[b.displayExposure] ?? 0) -
+          (JAKARTA_EXPOSURE_RANK[a.displayExposure] ?? 0) ||
+        a.number - b.number,
+    );
+}
+
+/**
+ * The one approved Operating Picture table. A row exists only for a corridor
+ * with live reporting; its driver, impact and action all come from the shared
+ * corridor status, so a quiet area cannot be made to look active.
+ */
+export function buildJakartaOperatingPicture(
   statuses: JakartaCorridorStatus[],
-  id: string,
-): JakartaCorridorStatus | null {
-  return statuses.find((s) => s.area.id === id) ?? null;
-}
+): JakartaOperatingPicture {
+  const rows = rankedLiveStatuses(statuses)
+    .map((status) => ({
+      area: status.area.name,
+      driver: hazardSummaryLabel(status),
+      impact: status.relevanceShort,
+      action: status.action,
+    }))
+    .filter((row) =>
+      [row.area, row.driver, row.impact, row.action].every(
+        (value) => value.trim().length > 0,
+      ),
+    );
 
-function elevatedStatuses(
-  statuses: JakartaCorridorStatus[],
-): JakartaCorridorStatus[] {
-  return statuses.filter((s) => s.elevated);
-}
-
-// Spec §3. The ranked Priority-Areas table. Each Jakarta operating zone maps to
-// a corridor area; the row text is named-location specific. Ranking is driven by
-// the live data — areas that carried reporting this period (elevated) rise to
-// the top, ordered by displayed exposure, then the remaining areas follow in
-// their standing order — so the table re-orders as the incident data changes.
-interface JakartaPriorityAreaSpec {
-  corridorId: string;
-  area: string;
-  driver: string;
-  businessImpact: string;
-  action: string;
-}
-
-const JAKARTA_PRIORITY_AREA_SPECS: JakartaPriorityAreaSpec[] = [
-  {
-    corridorId: "central-government",
-    area: "Gambir / Monas / Istana area",
-    driver: "Protest or policing",
-    businessImpact:
-      "Road closures and delayed access around government buildings, Jl. Medan Merdeka, Jl. MH Thamrin and nearby Menteng office areas",
-    action:
-      "Avoid non-essential meetings near Monas, Istana Merdeka and Gambir during active demonstrations or police cordons",
-  },
-  {
-    corridorId: "north-port",
-    area: "Tanjung Priok / North Jakarta",
-    driver: "Port access, congestion, flooding",
-    businessImpact:
-      "Container collection and truck-dispatch delays on the Cilincing, Koja and North Jakarta access roads",
-    action: "Confirm gate, terminal and road status before dispatch",
-  },
-  {
-    corridorId: "commercial-hotels",
-    area: "Sudirman / Thamrin / SCBD",
-    driver: "Business-corridor congestion",
-    businessImpact:
-      "Delays to meetings, hotel access and office movement across SCBD, Kuningan and the Sudirman–Thamrin spine",
-    action: "Confirm route and arrival window before client meetings",
-  },
-  {
-    corridorId: "airport-corridor",
-    area: "Soekarno-Hatta corridor",
-    driver: "Airport-transfer congestion and flooding",
-    businessImpact:
-      "Extended transfer times on the airport toll road and the Tangerang approach",
-    action:
-      "Confirm toll-route status and build a larger buffer before time-critical flights",
-  },
-  {
-    corridorId: "commuter-belt",
-    area: "Greater Jakarta commuter belt",
-    driver: "Rain and flooding",
-    businessImpact:
-      "Lengthened staff commutes and site access across Bekasi, Depok, Tangerang and South Tangerang",
-    action: "Confirm flood-hit routes before staff move on heavy-rain days",
-  },
-  {
-    corridorId: "cross-city-routes",
-    area: "Cross-city toll and ring roads",
-    driver: "Congestion",
-    businessImpact:
-      "Delays to meetings, site visits and deliveries on the inner and outer ring roads and main arterials",
-    action: "Confirm two viable routes and brief drivers before departure",
-  },
-];
-
-export function buildJakartaPriorityAreas(
-  statuses: JakartaCorridorStatus[],
-): JakartaPriorityAreaRow[] {
-  const score = (id: string): number => {
-    const s = corridorById(statuses, id);
-    if (!s) return 0;
-    // Elevated areas sort above standing ones; within each band, higher
-    // displayed exposure sorts first.
-    const expo = JAKARTA_EXPOSURE_RANK[s.displayExposure] ?? 0;
-    return (s.elevated ? 100 : 0) + expo;
-  };
-  return JAKARTA_PRIORITY_AREA_SPECS.map((spec, idx) => ({
-    spec,
-    idx,
-    score: score(spec.corridorId),
-  }))
-    // Stable sort: score desc, then original (standing) order.
-    .sort((a, b) => b.score - a.score || a.idx - b.idx)
-    .map(({ spec }, i) => ({
-      priority: i + 1,
-      area: spec.area,
-      driver: spec.driver,
-      businessImpact: spec.businessImpact,
-      action: spec.action,
-      elevated: corridorById(statuses, spec.corridorId)?.elevated ?? false,
-    }));
-}
-
-// Spec §4. Staff-movement impact broken out by movement type. Each line names
-// the roads / districts the movement runs through — never a bare "movement may
-// be disrupted". Live-aware where a relevant corridor carried reporting this
-// period (raise-not-invent), otherwise the standing named-location assessment.
-export function buildJakartaStaffMovement(
-  statuses: JakartaCorridorStatus[],
-): JakartaStaffMovementImpact {
-  const central = corridorById(statuses, "central-government");
-  const protestLive = !!central?.elevated;
-  const hotelToOffice = protestLive
-    ? "Staff moving between hotels in Sudirman, Thamrin, Kuningan or SCBD and meetings in Central Jakarta should confirm route status before departure; with protest activity reported around Gambir, Monas or Istana Merdeka this period, plan for road closures and police diversions rather than simple traffic delay."
-    : "Staff moving between hotels in Sudirman, Thamrin, Kuningan or SCBD and meetings in Central Jakarta should confirm route status before departure; if protest activity is reported around Gambir, Monas or Istana Merdeka, plan for road closures and police diversions rather than simple traffic delay.";
   return {
-    officeAccess:
-      "Office access along the Sudirman–Thamrin spine, SCBD and Kuningan is normally workable; the constraint is congestion and, on protest days, road closures around the Central Jakarta government district. Confirm the approach to towers near Jl. Jend. Sudirman and Jl. MH Thamrin before morning arrivals.",
-    hotelToOffice,
-    airportTransfer:
-      "Transfers between city hotels and Soekarno-Hatta run on the airport toll road and the Tangerang approach, both of which flood in late-afternoon and evening rain and clog in Friday traffic. Size the buffer to the weather rather than treating the run as fixed.",
-    clientMeeting:
-      "Client-meeting movement across SCBD, Mega Kuningan and Rasuna Said is exposed to short-notice congestion; confirm the arrival window and keep the meeting flexible when routing through the Central Jakarta government district.",
-    staffCommute:
-      "Staff commutes from Bekasi, Depok, Tangerang and South Tangerang into the centre are weather-sensitive; heavy rain on low-lying access roads lengthens journeys and can strand low-clearance vehicles.",
-    driverRoute:
-      "Drivers should confirm two viable routes between office, hotel, Tanjung Priok and Soekarno-Hatta before departure, holding diversions around the Thamrin–Sudirman corridor and the Gatot Subroto interchange.",
-    afterHours:
-      "After-hours movement near offices, hotels, malls and transport hubs in the central and southern districts warrants standard personal-security awareness; keep journeys booked and tracked rather than hailed on the street.",
+    rows,
+    emptyNote:
+      "No area-specific operational driver was identified this period; continue routine pre-departure checks for time-critical movement.",
   };
 }
 
-// Spec §7. Standing exposure table for the office, hotel and meeting venues in
-// the central and southern business districts. The intro leads with a live
-// elevated-area relevance when one is reported, then states the standing framing.
-const JAKARTA_OFFICE_HOTEL_VENUE_ROWS: JakartaTableRow[] = [
-  {
-    area: "Sudirman–Thamrin corridor",
-    why: "Jakarta's primary office and banking spine; protest marches and road closures here directly affect staff movement and client meetings.",
-    action: "Confirm meeting venues and travel windows; keep alternative routes ready on protest days.",
-  },
-  {
-    area: "SCBD, Senayan and Gatot Subroto",
-    why: "Dense corporate towers, hotels and event venues concentrate staff and visitors in a compact area.",
-    action: "Brief staff on venue access; keep arrivals and departures flexible around peak congestion.",
-  },
-  {
-    area: "Kuningan and Mega Kuningan",
-    why: "Embassy, hotel and corporate cluster where localised security or protest activity can restrict access at short notice.",
-    action: "Verify access before client visits; keep situational awareness around hotels and offices.",
-  },
-  {
-    area: "Menteng and the central government fringe",
-    why: "Adjacent to government buildings and frequent protest routes, so spillover can close surrounding roads.",
-    action: "Confirm protest activity before travelling in; hold a diversion via Jl. MH Thamrin on government-district approaches.",
-  },
-];
-
-export function buildJakartaOfficeHotelVenue(
-  statuses: JakartaCorridorStatus[],
-): { intro: string; rows: JakartaTableRow[] } {
-  const central = corridorById(statuses, "central-government");
-  const commercial = corridorById(statuses, "commercial-hotels");
-  const leads: string[] = [];
-  if (commercial?.elevated) leads.push(commercial.relevance);
-  if (central?.elevated) leads.push(central.relevance);
-  const standing =
-    "Jakarta's main offices, hotels and meeting venues run along the Sudirman–Thamrin spine and the southern corporate clusters of SCBD, Senayan, Kuningan and Mega Kuningan. Their density means localised disruption — protest, congestion or a security incident — translates quickly into delays for staff movement, client meetings and hotel access.";
-  const intro = leads.length ? `${leads.join(" ")} ${standing}` : standing;
-  return { intro, rows: JAKARTA_OFFICE_HOTEL_VENUE_ROWS };
-}
-
-// Spec §6. Standing exposure table for North Jakarta and the port, plus a short
-// list of recommended port actions. The intro leads with the port area's live
-// relevance when reported.
-const JAKARTA_PORT_LOGISTICS_ROWS: JakartaPortLogisticsRow[] = [
-  {
-    area: "Tanjung Priok",
-    operationalRelevance: "Indonesia's main container port and clearance point",
-    possibleImpact: "Collection delays, gate disruption and truck queues",
-    requiredAction: "Confirm terminal and gate status before dispatch",
-  },
-  {
-    area: "Cilincing, Koja and North Jakarta access roads",
-    operationalRelevance: "Low-lying approach roads carrying heavy port and industrial traffic",
-    possibleImpact: "Flooding and congestion delaying truck movement",
-    requiredAction: "Check road and flood status before releasing trucks",
-  },
-  {
-    area: "Port to Bekasi and Cikarang",
-    operationalRelevance: "Primary industrial distribution route inland",
-    possibleImpact: "Delayed onward delivery to factories and warehouses",
-    requiredAction: "Build a dispatch buffer and confirm an alternate route",
-  },
-  {
-    area: "Port to Tangerang and the western belt",
-    operationalRelevance: "Cross-city warehouse and distribution route",
-    possibleImpact: "Cross-city congestion delaying collection windows",
-    requiredAction: "Avoid peak movement and confirm two viable routes",
-  },
-  {
-    area: "Airport cargo corridor",
-    operationalRelevance: "Soekarno-Hatta air-freight connection on the airport toll road",
-    possibleImpact: "Time-sensitive cargo delayed by toll-road flooding and congestion",
-    requiredAction: "Confirm toll-route status and transfer time before release",
-  },
-];
-
-export function buildJakartaPortLogistics(
-  statuses: JakartaCorridorStatus[],
-): { intro: string; rows: JakartaPortLogisticsRow[]; actions: string[] } {
-  const port = corridorById(statuses, "north-port");
-  const standing =
-    "North Jakarta and the Tanjung Priok port area drive the capital's logistics timings. Port congestion, low-lying flood-prone access roads around Cilincing and Koja, and heavy industrial traffic toward Bekasi, Cikarang and Tangerang mean dispatch and collection windows need a buffer, especially during heavy rain.";
-  const intro = port?.elevated ? `${port.relevance} ${standing}` : standing;
-  const actions = [
-    "Confirm Tanjung Priok terminal and gate access before dispatch; congestion and restrictions can change at short notice.",
-    "Check flood status on the Cilincing, Koja and North Jakarta approach roads during heavy rain and stage time-critical shipments accordingly.",
-    "Brief drivers on alternative routes between Tanjung Priok, the Bekasi and Cikarang industrial belt, the Tangerang warehouses and the Soekarno-Hatta cargo corridor.",
-  ];
-  return { intro, rows: JAKARTA_PORT_LOGISTICS_ROWS, actions };
-}
-
-// Spec §5. Airport-transfer impact prose. Leads with a live elevated-area
-// relevance for the airport corridor when reported, then the standing
-// assessment naming the toll road and approach.
-export function buildJakartaAirportTransfer(
-  statuses: JakartaCorridorStatus[],
-): string {
-  const airport = corridorById(statuses, "airport-corridor");
-  const lead = airport?.elevated ? `${airport.relevance} ` : "";
-  const standing =
-    "Airport transfers should not be treated as routine during heavy-rain periods. Confirm the Soekarno-Hatta airport toll road and the Tangerang approach before departure, and account for late-afternoon and evening rain and Friday congestion that pool on the low-lying sections. For time-critical flights, build a larger buffer and avoid scheduling cross-city meetings immediately before airport movement; flooding on the toll road can turn a routine transfer into a missed flight.";
-  return `${lead}${standing}`;
-}
-
-// Spec §8. Route and timing guidance — conditional advice that applies every
-// week, so it is a constant set. Each line names the roads, districts or
-// chokepoints the guidance applies to.
-export function buildJakartaRouteTiming(): string[] {
-  return [
-    "Treat the Soekarno-Hatta toll road and the inner and outer ring roads as congested by default; schedule airport runs and cross-city meetings with margin rather than back-to-back.",
-    "Before travelling into the Central Jakarta government district, confirm protest activity around Monas, Istana Merdeka and DPR/MPR and hold a diversion via Jl. MH Thamrin or Jl. Jend. Sudirman.",
-    "On heavy-rain days, confirm flood status on the North Jakarta access roads and the Bekasi, Depok and Tangerang commuter approaches before staff move.",
-    "Keep meeting and travel timings flexible along the Sudirman–Thamrin and Gatot Subroto corridors so movement can shift around protest, flooding or congestion at short notice.",
-    "Confirm two viable routes between offices, hotels, Tanjung Priok and Soekarno-Hatta, and brief drivers on both before dispatch.",
-  ];
-}
-
-// Spec §10. Role-based recommended actions — guidance grouped by who acts on it
-// (travellers, security teams, logistics teams, local management), each naming
-// the relevant Jakarta zones rather than a generic instruction.
-export function buildJakartaRoleActions(): JakartaRoleAction[] {
-  return [
-    {
-      role: "Travellers and visiting staff",
-      guidance:
-        "Confirm route and arrival window before meetings in SCBD, Kuningan and the Sudirman–Thamrin corridor; avoid non-essential movement near Monas, Istana Merdeka and Gambir during demonstrations; treat Soekarno-Hatta transfers as weather-dependent and build a larger buffer on heavy-rain days.",
-    },
-    {
-      role: "Security teams",
-      guidance:
-        "Track protest activity and police cordons around the Central Jakarta government district and the Thamrin–Sudirman spine; pre-position diversions via Jl. MH Thamrin and Gatot Subroto; verify that drivers can confirm two viable routes between office, hotel, Tanjung Priok and the airport before each movement.",
-    },
-    {
-      role: "Logistics teams",
-      guidance:
-        "Confirm Tanjung Priok terminal and gate status before dispatch; check flooding on the Cilincing, Koja and North Jakarta access roads; stage time-critical shipments to the Bekasi, Cikarang and Tangerang belts outside peak congestion and hold an alternate route.",
-    },
-    {
-      role: "Local management",
-      guidance:
-        "Keep meeting and travel schedules flexible across the central and southern business districts during protest or heavy-rain periods; confirm office, hotel and venue access in SCBD, Senayan and Mega Kuningan; act on the escalation triggers above rather than waiting for a city-wide change.",
-    },
-  ];
-}
-
-// Spec §13. Short summary under the corridor map. Names the areas that carried
-// live reporting this period (count-free); otherwise a standing-profile note.
-export function buildJakartaAreaSummary(
-  statuses: JakartaCorridorStatus[],
-): string {
-  const live = elevatedStatuses(statuses);
-  if (live.length === 0) {
-    return "No area carried fresh reporting this period; the map reflects each area's standing operating-exposure profile. The central government district and the North Jakarta port area carry the highest standing exposure.";
+function jakartaControlJudgement(items: PngReportItem[]): string {
+  const lead = [...items].sort((a, b) =>
+    compareIncidentSignificance(
+      {
+        severity: ["", "insignificant", "low", "moderate", "high", "extreme"][a.severityRank],
+        title: a.title,
+        summary: a.summary,
+        occurredAt: (a.incidentDate ?? a.reportedDate).toISOString(),
+      },
+      {
+        severity: ["", "insignificant", "low", "moderate", "high", "extreme"][b.severityRank],
+        title: b.title,
+        summary: b.summary,
+        occurredAt: (b.incidentDate ?? b.reportedDate).toISOString(),
+      },
+    ),
+  )[0];
+  if (!lead) {
+    return "Polestar judges that the standing control is disciplined route, site and after-hours movement planning.";
   }
-  const names = joinList(live.map((s) => s.area.name));
-  return `Reporting this period was attributed to ${names}; the remaining areas reflect their standing operating-exposure profile. Prioritise protest, flood and access checks there before committing staff and vehicle movements.`;
+  const area = areaLabel(lead.province) || "the affected area";
+  const theme = JAKARTA_THEME_PHRASE[jakartaThemeForCategory(lead.category)];
+  return `Polestar judges that the immediate control problem is ${theme} in ${area}, not a city-wide deterioration.`;
 }
 
-// Jakarta's durable, standing crime picture. A curated analyst baseline (NOT
-// this period's reporting) so it can never read as fabricated live data. The
-// dominant business exposures are opportunistic and property crime, not
-// targeted attacks. Count-free; British English.
-const JAKARTA_CRIME_STANDING =
-  "Jakarta's standing crime picture is dominated by opportunistic and property crime rather than targeted attacks on business. The persistent exposures are street theft and pickpocketing around transport hubs and crowded commercial areas, vehicle crime and smash-and-grab in traffic, residential and premises break-ins in dense districts, and card or ATM fraud. Extortion and informal levies (premanisme) affect logistics around ports and industrial areas, and periodic drug-enforcement operations create legal and reputational risk for staff and visitors. Violent crime is a lower routine concern but can flare around nightlife, crowds and disputes.";
-
-// The standing crime-exposure table, keyed to named operating contexts. Always
-// present — it is the durable "how Jakarta's crime picture affects THIS
-// operation" answer, tying each enduring crime pattern to the staff movement,
-// venue, transfer, port and logistics activity it bears on, independent of what
-// surfaced this period. Count-free; British English.
-const JAKARTA_CRIME_CONTEXT_ROWS: JakartaCrimeBusinessRow[] = [
-  {
-    context:
-      "Staff movement and after-hours transport — SCBD and the Sudirman–Thamrin corridor",
-    exposure:
-      "Street theft, pickpocketing and phone-snatching around transport hubs, crowded pavements and busy commercial streets, worst after dark and while staff move on foot between offices, hotels and venues.",
-    precaution:
-      "Use booked, tracked transport rather than street-hailing after hours; keep phones, cash and valuables out of sight on foot; brief staff on well-lit, populated routes.",
-  },
-  {
-    context: "Hotels and client meetings — SCBD, Kuningan and Senayan",
-    exposure:
-      "Distraction theft and bag-snatching in lobbies, cafés and crowded venues, and card skimming or ATM fraud at less secure terminals around meeting locations.",
-    precaution:
-      "Keep bags and devices attended in public areas; use ATMs inside banks and reputable hotels; confirm venues and arrival windows before client meetings.",
-  },
-  {
-    context: "Airport transfers — Soekarno-Hatta corridor",
-    exposure:
-      "Vehicle crime and smash-and-grab at lights and in congestion on the airport toll road, and distraction theft or scams around terminals and the kerbside.",
-    precaution:
-      "Keep doors locked and windows up in traffic; keep bags out of view; use pre-booked drivers and confirm the transfer at both ends.",
-  },
-  {
-    context:
-      "Port access and logistics — Tanjung Priok and North Jakarta industrial roads",
-    exposure:
-      "Extortion and informal levies (premanisme), cargo theft and pilferage, and intimidation around the port, container yards and industrial access roads.",
-    precaution:
-      "Work through established operators and hauliers; report demands rather than paying roadside; confirm gate, escort and yard-security arrangements before dispatch.",
-  },
-  {
-    context: "Cross-city logistics routes and driver planning",
-    exposure:
-      "Smash-and-grab and traffic-stop theft (begal) in night-time congestion, and opportunistic theft from stationary or slow-moving vehicles on the inner and outer ring roads and main arterials.",
-    precaution:
-      "Brief drivers on secure routes and stops; vary predictable timing; keep cargo and valuables out of sight and vehicles locked.",
-  },
-];
-
-// Build the Crime Trends & Business Impact section. `items` is the report window;
-// the this-period read is derived ONLY from crime-theme items (via the shared
-// CRIME_GROUPS / SETTING_GROUPS / presentAreas), so it never invents crime that
-// was not reported. It LEADS the section — naming the crime types, areas,
-// settings and business consequence that actually surfaced this period — with
-// the curated standing pattern and business-impact table shown afterwards as the
-// durable baseline.
-export function buildJakartaCrimeTrends(
-  items: PngReportItem[],
-): JakartaCrimeTrends {
+function compactCrimeLine(items: PngReportItem[]): string {
   const crimeItems = items.filter(
-    (it) => jakartaThemeForCategory(it.category) === "crime",
+    (item) => jakartaThemeForCategory(item.category) === "crime",
   );
-  const crimeTypes = extractLabels(crimeItems, CRIME_GROUPS);
-  const settings = extractLabels(crimeItems, SETTING_GROUPS, 2);
-  const area = joinList(presentAreas(crimeItems));
-
-  let reportedThisPeriod: string;
-  let trendRead: string;
-  // Any crime-theme item produces a this-period read: a classified crime
-  // record must never fall through to "No fresh crime-specific reporting" just
-  // because it lacked an extractable crime-type token or a resolved area.
-  if (crimeItems.length) {
-    const what = crimeTypes.length
-      ? joinList(crimeTypes)
-      : "crime and public-safety incidents";
-    const where = area ? ` in ${area}` : "";
-    // Name the single worst crime that actually surfaced, so the read is a
-    // concrete account of the real event rather than a generic essay.
-    const lead = leadCrimeLine(crimeItems);
-    const leadPart = lead ? ` ${lead}` : "";
-    const settingPart = settings.length
-      ? ` Reporting clustered around ${joinList(settings)}.`
-      : "";
-    // The business consequence is tied to WHERE crime actually surfaced this
-    // period (the resolved areas and reported settings), never to a fixed list
-    // of central business districts or transport hubs that saw no reporting.
-    const consequence = settings.length
-      ? ` For business, the exposure is staff movement around ${joinList(settings)}${area ? ` in ${area}` : ""} rather than a city-wide threat.`
-      : ` For business, the exposure is staff movement${area ? ` in ${area}` : ""} — particularly after-hours and on-foot transfers — rather than a city-wide threat.`;
-    reportedThisPeriod = `This period's open-source reporting featured ${what}${where}.${leadPart}${settingPart}${consequence} Treat this as a partial signal of the wider picture rather than a complete crime record.`;
-    trendRead = `This reporting sits within Jakarta's standing pattern of opportunistic and property crime rather than signalling a city-wide shift; use it to focus staff-movement and site precautions where crime actually surfaced this period.`;
-  } else {
-    reportedThisPeriod = `No fresh crime-specific reporting was identified in the sources this period. This is not evidence that crime is absent — routine opportunistic and property crime is heavily under-reported — so the standing pattern below continues to apply.`;
-    trendRead = `With no distinct crime reporting this period, plan against Jakarta's standing pattern of opportunistic and property crime rather than assuming a quieter environment.`;
+  const judgement = jakartaControlJudgement(items);
+  if (crimeItems.length === 0) {
+    return `${judgement} No fresh crime-specific reporting this period — standing pattern continues to apply.`;
   }
+  const crimeTypes = extractLabels(crimeItems, CRIME_GROUPS, 2);
+  const areas = joinList(presentAreas(crimeItems, 2));
+  const settings = extractLabels(crimeItems, SETTING_GROUPS, 1);
+  const subject = crimeTypes.length
+    ? joinList(crimeTypes)
+    : "crime and public-safety incidents";
+  const where = areas ? ` in ${areas}` : "";
+  const setting = settings.length ? ` around ${settings[0]}` : "";
+  return `${judgement} Fresh crime-specific reporting concerned ${subject}${where}${setting}; keep movement precautions focused on the affected area.`;
+}
 
+function compactEscalationTriggers(statuses: JakartaCorridorStatus[]): string {
+  const live = rankedLiveStatuses(statuses);
+  const triggers: string[] = [];
+  if (
+    live.some((status) =>
+      status.hazards.some((hazard) => hazard === "protest" || hazard === "policing"),
+    )
+  ) {
+    triggers.push(
+      "protest cordon or road closure affecting the government district or Thamrin–Sudirman spine",
+    );
+  }
+  if (
+    live.some((status) =>
+      status.hazards.some((hazard) => hazard === "flooding" || hazard === "traffic"),
+    )
+  ) {
+    triggers.push(
+      "flooding or congestion that removes the airport, port or commuter-route contingency",
+    );
+  }
+  if (
+    live.some((status) =>
+      status.hazards.some((hazard) =>
+        ["crime", "fire"].includes(hazard),
+      ),
+    )
+  ) {
+    triggers.push(
+      "a credible incident close to a staffed site, hotel, warehouse or client movement",
+    );
+  }
+  if (triggers.length === 0) {
+    return "a confirmed protest cordon; loss of a planned airport, port or commuter route; a credible incident close to a staffed site";
+  }
+  return triggers.join(" • ");
+}
+
+/** The compact replacement for Crime Trends, Outlook, Polestar View and the zone table. */
+export function buildJakartaCrimeEscalationWatch(
+  items: PngReportItem[],
+  statuses: JakartaCorridorStatus[],
+): JakartaCrimeEscalationWatch {
   return {
-    reportedThisPeriod,
-    standingPattern: JAKARTA_CRIME_STANDING,
-    trendRead,
-    businessImpact: JAKARTA_CRIME_CONTEXT_ROWS,
+    crime: compactCrimeLine(items),
+    escalationTriggers: compactEscalationTriggers(statuses),
   };
+}
+
+function dedupeActions(actions: string[]): string[] {
+  const seen = new Set<string>();
+  return actions.filter((action) => {
+    const key = action.trim().toLocaleLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * One flat action list. Live corridor actions lead; quiet weeks retain only the
+ * small set of conditional standing controls needed to operate safely.
+ */
+export function buildJakartaRecommendedActions(
+  statuses: JakartaCorridorStatus[],
+  items: PngReportItem[] = [],
+): string[] {
+  const liveActions = rankedLiveStatuses(statuses).map((status) => status.action);
+  const hasCrime = items.some(
+    (item) => jakartaThemeForCategory(item.category) === "crime",
+  );
+  const standing = [
+    "Use one pre-departure check for protest, flood and road-closure status before time-critical movement.",
+    "Keep a primary and alternate route ready for airport, port and cross-city movements.",
+    ...(hasCrime
+      ? [
+          "Use booked, tracked transport after hours and keep valuables out of sight around the affected area.",
+        ]
+      : []),
+  ];
+  const actions = dedupeActions([...liveActions, ...standing]).slice(0, 5);
+  // The post-deduplication guard prevents an empty list even if future corridor
+  // content is blanked or all candidates collapse to duplicates.
+  return actions.length > 0
+    ? actions
+    : [
+        "Continue routine pre-departure checks before time-critical movement.",
+      ];
+}
+
+function buildJakartaMapCaption(statuses: JakartaCorridorStatus[]): string {
+  const names = rankedLiveStatuses(statuses).map((status) => status.area.name);
+  if (names.length === 0) {
+    return "Map panel shows Jakarta's standing movement and access exposure; no area-specific operational driver was identified this period.";
+  }
+  return `Map panel highlights the live operating drivers in ${joinList(names)}; it is an exposure guide, not a city-wide risk rating.`;
 }
 
 export function buildJakartaTacticalBrief(
@@ -1197,15 +857,10 @@ export function buildJakartaTacticalBrief(
   windowItems: PngReportItem[] = [],
 ): JakartaTacticalBrief {
   return {
-    priorityAreas: buildJakartaPriorityAreas(statuses),
-    staffMovement: buildJakartaStaffMovement(statuses),
-    airportTransfer: buildJakartaAirportTransfer(statuses),
-    portLogistics: buildJakartaPortLogistics(statuses),
-    officeHotelVenue: buildJakartaOfficeHotelVenue(statuses),
-    routeTiming: buildJakartaRouteTiming(),
-    roleActions: buildJakartaRoleActions(),
-    areaSummary: buildJakartaAreaSummary(statuses),
-    crimeTrends: buildJakartaCrimeTrends(windowItems),
+    operatingPicture: buildJakartaOperatingPicture(statuses),
+    crimeEscalationWatch: buildJakartaCrimeEscalationWatch(windowItems, statuses),
+    recommendedActions: buildJakartaRecommendedActions(statuses, windowItems),
+    mapCaption: buildJakartaMapCaption(statuses),
   };
 }
 
@@ -1225,24 +880,12 @@ export interface JakartaBriefInput {
 }
 
 export interface JakartaBriefOverrides {
-  recommendedActions: string[];
-  operationalImpact: string[];
-  escalationIndicators: string[];
-  incidentThemes: JakartaIncidentTheme[];
   topThree: PngReportItem[];
   tactical: JakartaTacticalBrief;
 }
 
 export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrides {
   return {
-    recommendedActions: buildJakartaRecommendedActions(),
-    operationalImpact: buildJakartaOperationalImpact(),
-    escalationIndicators: buildJakartaEscalationIndicators(),
-    incidentThemes: buildJakartaIncidentThemes(
-      input.incidentDetailsItems,
-      input.previousWindowItems ?? [],
-      input.hasBaseline ?? false,
-    ),
     topThree: applyJakartaTopThree(input.topThree),
     tactical: buildJakartaTacticalBrief(
       input.corridorStatuses ?? [],

@@ -521,8 +521,34 @@ export function buildFuelMarketRead(opts: {
   }
 
   const para1 = parts.join(" ");
-  const para2 =
-    "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
+  // The closing line must agree with the ACTUAL 7-day direction of the
+  // crude prices just cited, not assert "sustained cost pressure" as a
+  // fixed default — that read as a direct contradiction on a week where
+  // Brent/WTI fell sharply. Parsed from the same change strings already
+  // shown in Fast Facts (e.g. "-7.3% 7d"), so the wording can never drift
+  // from the number sitting next to it on the page.
+  const parseChangePct = (change?: string): number | null => {
+    if (!change) return null;
+    const m = change.match(/(-?\d+(?:\.\d+)?)\s*%/);
+    return m ? parseFloat(m[1]) : null;
+  };
+  const changePcts = [parseChangePct(brent?.change), parseChangePct(wti?.change)].filter(
+    (v): v is number => v !== null,
+  );
+  const avgChangePct = changePcts.length
+    ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
+    : null;
+  let para2: string;
+  if (avgChangePct !== null && avgChangePct <= -3) {
+    para2 =
+      "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
+  } else if (avgChangePct !== null && avgChangePct >= 3) {
+    para2 =
+      "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
+  } else {
+    para2 =
+      "Taken together, the market picture is broadly flat rather than trending sharply in either direction. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing, so treat these market indicators as the cost floor for the decisions that follow.";
+  }
   return para1 ? `${para1}\n\n${para2}` : para2;
 }
 

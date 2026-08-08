@@ -30,7 +30,10 @@ import {
   type CountryIncidentTheme,
   type CountryIncidentThemeGroup,
 } from "./countryIncidentThemes";
-import { scoreClusterValue } from "./countryTopValue";
+import {
+  compareIncidentValueClusters,
+  scoreClusterValue,
+} from "./countryTopValue";
 
 // The trajectory of a theme against the prior-week baseline. "new" = present now
 // but absent a week earlier; "nobasis" = no prior window supplied, so no trend
@@ -238,7 +241,7 @@ export function synthesiseAssessedThemes(
 
   assessed.sort(
     (a, b) =>
-      b.score - a.score ||
+      compareIncidentValueClusters(a.items, b.items) ||
       b.worstRank - a.worstRank ||
       b.items.length - a.items.length ||
       (themeOrder.get(a.key) ?? 0) - (themeOrder.get(b.key) ?? 0),
@@ -274,4 +277,3 @@ export function buildAssessedThemeGroups(
     };
   });
 }
-

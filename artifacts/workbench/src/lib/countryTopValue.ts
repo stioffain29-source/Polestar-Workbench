@@ -12,12 +12,15 @@
 // returns numeric scores and named signals only — never any prose.
 
 import { classifyFireCause } from "./countryFireCause";
+import { incidentSignificanceScore } from "@workspace/country-engine";
 
 export interface ValueScorable {
   title?: string | null;
   summary?: string | null;
   category?: string | null;
   severityRank?: number | null;
+  occurredAt?: string | null;
+  incidentDate?: Date | string | null;
 }
 
 // The value signals a development can carry, with their weights. Higher = more
@@ -68,6 +71,8 @@ const COMMERCIAL_RE =
 export interface IncidentValue {
   /** Total analyst-value score, severity-inclusive. */
   score: number;
+  /** Shared real-world severity ranking, kept separate from analyst value. */
+  significance: number;
   /** Which value signals fired (severity excluded). Test-visible metadata. */
   signals: ValueSignal[];
 }
@@ -89,7 +94,34 @@ export function scoreIncidentValue(it: ValueScorable): IncidentValue {
 
   const signalScore = signals.reduce((sum, s) => sum + SIGNAL_WEIGHT[s], 0);
   const sevRank = typeof it.severityRank === "number" ? it.severityRank : 0;
-  return { score: signalScore + sevRank * 1.5, signals };
+  return {
+    score: signalScore + sevRank * 1.5,
+    significance: incidentSignificanceScore({
+      severity: ["", "insignificant", "low", "moderate", "high", "extreme"][sevRank] ?? "",
+      title: it.title,
+      summary: it.summary,
+      occurredAt:
+        typeof it.incidentDate === "string" ? it.incidentDate : it.occurredAt,
+    }),
+    signals,
+  };
+}
+
+/** Rank incident groups by real severity first, then analyst-value signals. */
+export function compareIncidentValueClusters(
+  a: ValueScorable[],
+  b: ValueScorable[],
+): number {
+  const significanceA = Math.max(
+    0,
+    ...a.map((item) => scoreIncidentValue(item).significance),
+  );
+  const significanceB = Math.max(
+    0,
+    ...b.map((item) => scoreIncidentValue(item).significance),
+  );
+  if (significanceB !== significanceA) return significanceB - significanceA;
+  return scoreClusterValue(b) - scoreClusterValue(a);
 }
 
 // Score a same-story CLUSTER: the best (highest-value) member, plus a small

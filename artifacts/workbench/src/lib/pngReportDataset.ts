@@ -28,7 +28,11 @@ import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest
 import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
 import { deriveThailandProvince, extractThailandItem } from "@workspace/ingest/thailandExtract";
 import { derivePhilippinesProvince, extractPhilippinesItem } from "@workspace/ingest/philippinesExtract";
-import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
+import {
+  deriveJakartaArea,
+  extractJakartaItem,
+  isJakartaScoped,
+} from "@workspace/ingest/jakartaExtract";
 import {
   clusterSameStoryRows,
   incidentTypeKey,
@@ -43,7 +47,11 @@ import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSigna
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
-import { scoreClusterValue } from "./countryTopValue";
+import {
+  compareIncidentValueClusters,
+  scoreClusterValue,
+} from "./countryTopValue";
+import { compareIncidentSignificance } from "@workspace/country-engine";
 import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
 import { buildJakartaCorridorStatuses } from "./jakartaCorridors";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
@@ -1178,10 +1186,20 @@ export function isRetrospectiveItem(item: PngReportItem): boolean {
 }
 
 function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
-  if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
-  const da = (a.incidentDate ?? a.reportedDate).getTime();
-  const db = (b.incidentDate ?? b.reportedDate).getTime();
-  return db - da;
+  return compareIncidentSignificance(
+    {
+      severity: ["", "insignificant", "low", "moderate", "high", "extreme"][a.severityRank] ?? "",
+      title: a.title,
+      summary: a.summary,
+      occurredAt: (a.incidentDate ?? a.reportedDate).toISOString(),
+    },
+    {
+      severity: ["", "insignificant", "low", "moderate", "high", "extreme"][b.severityRank] ?? "",
+      title: b.title,
+      summary: b.summary,
+      occurredAt: (b.incidentDate ?? b.reportedDate).toISOString(),
+    },
+  );
 }
 
 // Categories that are NOT a conflict/security development: accidental blasts,
@@ -1210,8 +1228,8 @@ function leadSecurityTier(it: PngReportItem): number {
 // separately at display time (see selectTopStoryClusters), so the hazard is never
 // dropped, it simply never leads.
 function compareClusterByValue(a: PngReportItem[], b: PngReportItem[]): number {
-  const valueDelta = scoreClusterValue(b) - scoreClusterValue(a);
-  if (valueDelta !== 0) return valueDelta;
+  const incidentDelta = compareIncidentValueClusters(a, b);
+  if (incidentDelta !== 0) return incidentDelta;
   return sortBySeverityThenRecency(a[0], b[0]);
 }
 
@@ -1306,8 +1324,9 @@ export function selectTopStoryClusters(
         (c) => !picked.includes(c) && c[0].severityRank >= 3 && distinctStory(c),
       )
       .sort((a, b) => {
-        if (b[0].severityRank !== a[0].severityRank) return b[0].severityRank - a[0].severityRank;
-        return scoreClusterValue(b) - scoreClusterValue(a);
+        const incidentDelta = compareIncidentValueClusters(a, b);
+        if (incidentDelta !== 0) return incidentDelta;
+        return sortBySeverityThenRecency(a[0], b[0]);
       })[0];
     if (candidate) {
       const candTheme = jakartaThemeForCategory(candidate[0].category);
@@ -1983,11 +2002,10 @@ export function buildStructuredReportDataset(
   // Legacy builder deleted — the engine narrative block below is the sole
   // author of the Polestar View prose.
   let polestarView = "";
-  // Jakarta-only section overrides (assigned in the Jakarta block below; left
-  // undefined for every other theatre so the renderer uses its generic path).
+  // Jakarta carries a separate consolidated tactical payload; the generic
+  // section overrides remain available to the other structured theatres.
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
   let operationalImpactOverride: string[] | undefined;
-  let jakartaEscalationIndicators: string[] | undefined;
   let jakartaTacticalBrief: JakartaTacticalBrief | undefined;
   // The Polestar View closes the brief and must never straddle a page break
   // in the DOM-rasterised PDF (owner feedback) — keep it together everywhere.
@@ -2057,13 +2075,9 @@ export function buildStructuredReportDataset(
     // NOTE: the Jakarta BLUF / Executive Summary / Outlook / Polestar builders
     // are no longer consumed — the engine narrative block below is the sole
     // author of those sections for every theatre, Jakarta included.
-    businessImpact = jakarta.recommendedActions;
-    operationalImpactOverride = jakarta.operationalImpact;
-    jakartaEscalationIndicators = jakarta.escalationIndicators;
-    incidentThemesOverride = jakarta.incidentThemes;
+    businessImpact = jakarta.tactical.recommendedActions;
     topThree = jakarta.topThree;
     jakartaTacticalBrief = jakarta.tactical;
-    keepPolestarTogether = true;
   }
 
   // --- Reporting Confidence --------------------------------------------------
@@ -2282,6 +2296,22 @@ export function buildStructuredReportDataset(
       // label would flag every valid included event as foreign and fail-close
       // the gate for those theatres. Display names stay UI-only.
       countryName: getCountryEngineConfig(engineSlug).countryName,
+      // Re-run the same locality predicate used by the source-row selection as
+      // a fail-closed backstop. Canonical `city` is resolved from that source
+      // location signal; all country reports leave localityScope undefined.
+      ...(engineSlug === "jakarta"
+        ? {
+            localityScope: {
+              label: "Jakarta",
+              isInScope: (e: CanonicalEvent) =>
+                isJakartaScoped(
+                  e.eventTitle,
+                  e.eventSummary,
+                  e.district ?? e.city ?? e.provinceOrState,
+                ),
+            },
+          }
+        : {}),
       reportingWindow: args.windowStart
         ? {
             start: args.windowStart.toISOString(),
@@ -2300,7 +2330,7 @@ export function buildStructuredReportDataset(
     periodLabel,
     bluf,
     executiveSummary,
-    escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
+    escalationIndicators,
     jakartaTacticalBrief,
     whatChanged,
     topThree,
