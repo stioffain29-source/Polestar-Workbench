@@ -280,13 +280,13 @@ export interface FuelGulfChokepointWatch {
   currentItems: FuelGulfWatchItem[];
   /** Pre-formatted "9 Jul 2026 — <title> — High" lines for the current block. */
   currentItemLines: string[];
-  /** Older chokepoint material, retained as standing context only. */
+  /** Deprecated: always empty. Older/pre-period material is never surfaced. */
   standingItems: FuelGulfWatchItem[];
-  /** Pre-formatted lines for the standing-context block. */
+  /** Deprecated: always empty. Older/pre-period material is never surfaced. */
   standingItemLines: string[];
-  /** One-line intro for the standing-context block; null when no older items. */
+  /** Deprecated: always null. Older/pre-period material is never surfaced. */
   standingNote: string | null;
-  /** Date span of the current activity (or the standing set when none is current). */
+  /** Date span of the current-period activity. */
   rangeLabel: string;
 }
 
@@ -299,17 +299,16 @@ function shiftDayKey(key: string, deltaDays: number): string {
 
 /**
  * Build the Gulf & Hormuz Chokepoint Watch section from the fuel incident
- * set. Returns null when no genuine chokepoint reporting falls in the
- * lookback window, so the caller omits the section entirely (no placeholder).
+ * set. Returns null when no genuine chokepoint reporting falls within THIS
+ * reporting period, so the caller omits the section entirely (no placeholder,
+ * no older/standing-context fallback material of any kind).
  *
  * The section is anchored on the report ISSUE DATE (the same window the rest
- * of the report uses), NOT the market-close date. Chokepoint records are split
- * into a CURRENT period (the issue-date report window, extended to the market
- * close if that lands slightly later) and older STANDING CONTEXT. Current
- * material always leads; older material is shown separately and never demotes
- * a current-week Hormuz item. The "no fresh reporting" line is computed only
- * from the current-period set, so it can never contradict fresh items shown
- * elsewhere in the same report.
+ * of the report uses), NOT the market-close date, and is scoped strictly to
+ * that current-period window (extended to the market close if that lands
+ * slightly later). Records outside the current period are excluded entirely
+ * — never shown, never referenced in prose — so the section only ever
+ * reflects this reporting period's activity.
  *
  * Both the on-screen preview and the PDF receive the identical raw incident
  * array and this function is fully deterministic, so screen == PDF.
@@ -320,27 +319,23 @@ export function buildFuelGulfChokepointWatch(opts: {
   /** The market-close date, used only to extend the current end if later. */
   periodEnd?: string;
   incidents: TopicFastFactsIncident[];
-  lookbackDays?: number;
   maxItems?: number;
 }): FuelGulfChokepointWatch | null {
-  const lookbackDays = opts.lookbackDays ?? 60;
   const maxItems = opts.maxItems ?? 6;
   const issueKey = gulfDayKey(opts.issueDate);
   if (!issueKey) return null;
 
   // Current period = the SAME issue-date report window the rest of the report
   // uses (weekly fuel = 7 days), extended to the market close if that lands a
-  // day or two later, so current-week chokepoint items are always treated as
-  // current — never demoted to standing context.
+  // day or two later. Only this window is ever considered — no older material
+  // is retained or referenced.
   const windowDays = reportWindowDefaultDays("fuel");
   const currentStartKey = shiftDayKey(issueKey, -(windowDays - 1));
   const periodEndKey = gulfDayKey(opts.periodEnd ?? null);
   const currentEndKey =
     periodEndKey && periodEndKey > issueKey ? periodEndKey : issueKey;
-  // Standing context reaches back further for older anchor material.
-  const standingStartKey = shiftDayKey(currentStartKey, -lookbackDays);
 
-  // 1. Select fuel chokepoint records within the wider lookback window. Match on
+  // 1. Select fuel chokepoint records within the current-period window. Match on
   //    the TITLE ONLY (not the summary): a genuine Gulf/Hormuz chokepoint story
   //    names the chokepoint in its headline, whereas a domestic pump-price cut,
   //    an SPR-withdrawal note or a fuel-levy debate merely MENTIONS Hormuz as
@@ -362,21 +357,18 @@ export function buildFuelGulfChokepointWatch(opts: {
     .map((i) => ({ i, key: gulfDayKey(i.occurredAt) }))
     .filter(
       (x): x is { i: TopicFastFactsIncident; key: string } =>
-        x.key !== null && x.key >= standingStartKey && x.key <= currentEndKey,
+        x.key !== null && x.key >= currentStartKey && x.key <= currentEndKey,
     )
     .filter(({ i }) => GULF_CHOKEPOINT_RE.test(i.title ?? ""));
   if (matched.length === 0) return null;
 
-  const currentMatched = matched.filter((x) => x.key >= currentStartKey);
-  const standingMatched = matched.filter((x) => x.key < currentStartKey);
+  const currentMatched = matched;
 
   // 2. Rank most-severe-then-newest, then dedupe syndication so one event with
-  //    many rewrites collapses to a single representative row. `seed` carries
-  //    already-kept token sets so a standing copy of a current event is dropped.
+  //    many rewrites collapses to a single representative row.
   type Kept = { i: TopicFastFactsIncident; key: string; title: string };
   const rankAndDedupe = (
     arr: { i: TopicFastFactsIncident; key: string }[],
-    seed: Set<string>[],
   ): Kept[] => {
     const ranked = arr.slice().sort((a, b) => {
       const sa = GULF_SEV_RANK[(a.i.severity ?? "").toLowerCase()] ?? 0;
@@ -385,7 +377,7 @@ export function buildFuelGulfChokepointWatch(opts: {
       return b.key.localeCompare(a.key);
     });
     const kept: Kept[] = [];
-    const keptTokens: Set<string>[] = [...seed];
+    const keptTokens: Set<string>[] = [];
     for (const { i, key } of ranked) {
       const title = stripWireCruft(i.title ?? "").trim();
       if (!title) continue;
@@ -397,12 +389,8 @@ export function buildFuelGulfChokepointWatch(opts: {
     return kept;
   };
 
-  const currentKept = rankAndDedupe(currentMatched, []);
-  const standingKept = rankAndDedupe(
-    standingMatched,
-    currentKept.map((k) => sigTokens(k.title)),
-  );
-  if (currentKept.length === 0 && standingKept.length === 0) return null;
+  const currentKept = rankAndDedupe(currentMatched);
+  if (currentKept.length === 0) return null;
 
   const toItems = (kept: Kept[]): FuelGulfWatchItem[] =>
     kept.slice(0, maxItems).map(({ i, key, title }) => ({
@@ -427,9 +415,7 @@ export function buildFuelGulfChokepointWatch(opts: {
     return a === b ? gulfFmtDay(a) : `${gulfFmtDay(a)} \u2013 ${gulfFmtDay(b)}`;
   };
   const currentKeys = currentMatched.map((x) => x.key);
-  const standingKeys = standingMatched.map((x) => x.key);
-  const rangeLabel =
-    currentKeys.length > 0 ? spanLabel(currentKeys) : spanLabel(standingKeys);
+  const rangeLabel = spanLabel(currentKeys);
 
   // 3. Theme detection over the CURRENT matched set only — the prose leads with
   //    the current period, so the recency claim is derived from current data.
@@ -490,36 +476,19 @@ export function buildFuelGulfChokepointWatch(opts: {
     p2.push(
       "The chokepoint remains a live, standing watch given the fragility of the route.",
     );
-  } else {
-    // No current-period chokepoint reporting. Say so plainly — computed only
-    // from the current set, so it can never contradict fresh items elsewhere.
-    p1.push(
-      "No fresh Gulf or Hormuz chokepoint reporting surfaced in this reporting period.",
-    );
-    const standingLatestKey =
-      standingKeys.length > 0 ? standingKeys.slice().sort().slice(-1)[0] : null;
-    if (standingLatestKey) {
-      p1.push(
-        `The most recent chokepoint activity on record dates to ${gulfFmtDay(standingLatestKey)}, retained below as standing context; the route stays a standing watch given its fragility.`,
-      );
-    } else {
-      p1.push("The route stays a standing watch given its fragility.");
-    }
   }
+  // currentKept.length === 0 is unreachable here (guarded above), so there is
+  // no "no fresh reporting" branch and no older/standing material of any kind
+  // is ever surfaced — this section is scoped strictly to the current period.
   const read = [p1.join(" "), p2.join(" ")].filter((s) => s.trim()).join("\n\n");
-
-  const standingNote =
-    standingKept.length > 0
-      ? "Older chokepoint reporting from before this period, retained for context only — not current-period activity."
-      : null;
 
   return {
     read,
     currentItems: toItems(currentKept),
     currentItemLines: toLines(currentKept),
-    standingItems: toItems(standingKept),
-    standingItemLines: toLines(standingKept),
-    standingNote,
+    standingItems: [],
+    standingItemLines: [],
+    standingNote: null,
     rangeLabel,
   };
 }

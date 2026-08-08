@@ -4,15 +4,15 @@ import type { TopicFastFactsIncident } from "@/lib/topicFastFacts";
 // The Fuel Watch "Gulf and Hormuz Chokepoint Watch" section is auto-derived
 // from live fuel incidents whose TITLE names a Gulf/Hormuz chokepoint. The
 // section is anchored on the report ISSUE DATE (the same window the rest of the
-// report uses), splitting current-period activity from older standing context.
-// These tests lock the no-fabrication gates:
+// report uses) and is scoped STRICTLY to that current-period window — records
+// from before the reporting period are excluded entirely, never shown and
+// never referenced in prose. These tests lock the no-fabrication gates:
 //   1. The "dominant / marked concentration" opener may fire ONLY when current
 //      coverage is broad (several distinct deduped events across several days).
 //   2. "The strait subsequently reopened" may fire ONLY when a reopen record
 //      actually post-dates the peak anchor.
-//   3. The "no fresh reporting" line is computed ONLY from the current-period
-//      set, so it can never contradict fresh current-week items shown elsewhere
-//      in the same report; older material is retained as standing context.
+//   3. The section returns null entirely when nothing falls in the current
+//      reporting period — no older material is ever substituted in.
 
 const ISSUE_DATE = "2026-07-15"; // weekly fuel window: 2026-07-09 .. 2026-07-15
 
@@ -89,28 +89,27 @@ describe("buildFuelGulfChokepointWatch — no-fabrication gates", () => {
   });
 });
 
-describe("buildFuelGulfChokepointWatch — current vs standing context", () => {
-  it("never claims 'no fresh reporting' when current-week chokepoint items exist", () => {
+describe("buildFuelGulfChokepointWatch — current period only, no older material", () => {
+  it("includes only current-period items and never surfaces older material", () => {
     const incidents = [
       // Fresh current-week Hormuz items.
       mk(1, "Tankers reroute as Strait of Hormuz tension flares", "2026-07-09", "moderate"),
       mk(2, "Hormuz shipping advisory issued after Gulf incident", "2026-07-12", "moderate"),
       mk(3, "Strait of Hormuz transit delays reported", "2026-07-14", "moderate"),
-      // Old high-severity May event — must NOT lead, becomes standing context.
+      // Old high-severity May event — must be excluded entirely, not shown anywhere.
       mk(4, "Strait of Hormuz closure halts tanker traffic", "2026-05-20", "high"),
     ];
     const built = buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents });
     expect(built).not.toBeNull();
-    // Contradiction gate: no "no fresh reporting" claim while current items exist.
     expect(built!.read).not.toMatch(/no fresh/i);
-    // Current items lead; the May event is demoted to standing context.
     expect(built!.currentItems.length).toBeGreaterThan(0);
-    expect(built!.standingItems.length).toBeGreaterThan(0);
-    expect(built!.standingNote).not.toBeNull();
+    // Older material is never surfaced anywhere, in any field.
+    expect(built!.standingItems.length).toBe(0);
+    expect(built!.standingItemLines.length).toBe(0);
+    expect(built!.standingNote).toBeNull();
     const currentTitles = built!.currentItemLines.join(" ");
     expect(currentTitles).not.toMatch(/closure halts tanker traffic/i);
-    const standingTitles = built!.standingItemLines.join(" ");
-    expect(standingTitles).toMatch(/closure halts tanker traffic/i);
+    expect(built!.read).not.toMatch(/closure halts tanker traffic/i);
   });
 
   it("admits shipping-topic chokepoint items (they appear in the Producer/Buyer table) so it never contradicts them", () => {
@@ -149,16 +148,13 @@ describe("buildFuelGulfChokepointWatch — current vs standing context", () => {
     ).toBeNull();
   });
 
-  it("states plainly there is no current reporting when only older material exists", () => {
+  it("returns null (section omitted entirely) when only older, out-of-period material exists", () => {
     const incidents = [
       mk(1, "Strait of Hormuz closure halts tanker traffic", "2026-05-20", "high"),
       mk(2, "Persian Gulf refinery struck in drone attack", "2026-05-22", "high"),
     ];
-    const built = buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents });
-    expect(built).not.toBeNull();
-    expect(built!.read).toMatch(/no fresh gulf or hormuz chokepoint reporting surfaced/i);
-    expect(built!.read).toMatch(/standing context/i);
-    expect(built!.currentItems.length).toBe(0);
-    expect(built!.standingItems.length).toBeGreaterThan(0);
+    expect(
+      buildFuelGulfChokepointWatch({ issueDate: ISSUE_DATE, incidents }),
+    ).toBeNull();
   });
 });
