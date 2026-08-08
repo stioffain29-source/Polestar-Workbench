@@ -28,7 +28,11 @@ import { deriveWestPapuaProvince, extractWestPapuaItem } from "@workspace/ingest
 import { deriveIndonesiaProvince, extractIndonesiaItem } from "@workspace/ingest/indonesiaExtract";
 import { deriveThailandProvince, extractThailandItem } from "@workspace/ingest/thailandExtract";
 import { derivePhilippinesProvince, extractPhilippinesItem } from "@workspace/ingest/philippinesExtract";
-import { deriveJakartaArea, extractJakartaItem } from "@workspace/ingest/jakartaExtract";
+import {
+  deriveJakartaArea,
+  extractJakartaItem,
+  isJakartaScoped,
+} from "@workspace/ingest/jakartaExtract";
 import {
   clusterSameStoryRows,
   incidentTypeKey,
@@ -2292,6 +2296,22 @@ export function buildStructuredReportDataset(
       // label would flag every valid included event as foreign and fail-close
       // the gate for those theatres. Display names stay UI-only.
       countryName: getCountryEngineConfig(engineSlug).countryName,
+      // Re-run the same locality predicate used by the source-row selection as
+      // a fail-closed backstop. Canonical `city` is resolved from that source
+      // location signal; all country reports leave localityScope undefined.
+      ...(engineSlug === "jakarta"
+        ? {
+            localityScope: {
+              label: "Jakarta",
+              isInScope: (e: CanonicalEvent) =>
+                isJakartaScoped(
+                  e.eventTitle,
+                  e.eventSummary,
+                  e.district ?? e.city ?? e.provinceOrState,
+                ),
+            },
+          }
+        : {}),
       reportingWindow: args.windowStart
         ? {
             start: args.windowStart.toISOString(),
