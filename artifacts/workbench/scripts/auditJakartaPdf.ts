@@ -1,14 +1,10 @@
-// Repeatable guard for the Jakarta city report. Two independent checks keep the
-// offline jsPDF brief in lockstep with the on-screen one:
+// Repeatable guard for the compact Jakarta city report. Two independent checks
+// keep the offline jsPDF brief in lockstep with the on-screen one:
 //
-//   1. SECTION ORDER PARITY — statically parses the section titles, in order,
-//      from BOTH the on-screen PngCountryReportBody.tsx (`<Section title="...">`)
-//      and the headless renderStructuredBrief() in exportCountryReportPdf.ts
-//      (drawSectionWithProse / drawSectionHeading calls), then asserts they
-//      match each other AND the canonical 8-section order. Jakarta now shares the
-//      unified canonical body; its tactical evidence tables are folded INSIDE
-//      these sections (as strand labels), so the top-level section list is the
-//      same 8 every theatre uses. A reorder or rename on either side fails.
+//   1. SECTION ORDER PARITY — reads the Jakarta-only preview branch and the
+//      headless renderJakartaWeeklyBrief() function, then verifies the approved
+//      five-section weekly structure. A reorder or a return of a retired
+//      multi-table section fails.
 //
 //   2. FONT AUDIT — generates a real Jakarta PDF through the same exporter the
 //      app uses and inventories the per-page Tf (font-select) operators,
@@ -37,44 +33,34 @@ const SRC = (p: string) => resolvePath(WORKBENCH, "src", p);
 const CANONICAL_SECTIONS = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Current Situation",
-  "Operational Impact",
+  "Operating Picture This Week",
+  "Crime & Escalation Watch",
   "Recommended Actions",
-  "Outlook: Next Seven Days",
-  "Polestar View",
 ];
 
 // ---------------------------------------------------------------------------
 // 1. SECTION ORDER PARITY (static source parse)
 // ---------------------------------------------------------------------------
 
-/** On-screen order: every `<Section title="...">` in PngCountryReportBody.tsx. */
+/** On-screen order from the tactical Jakarta-only return branch. */
 function screenSectionOrder(): string[] {
   const body = readFileSync(SRC("components/PngCountryReportBody.tsx"), "utf8");
-  const out: string[] = [];
-  const re = /<Section\s+title="([^"]+)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(body))) out.push(m[1]);
-  return out;
+  const start = body.indexOf("if (tactical) {");
+  const end = body.indexOf("\n  return (", start);
+  if (start === -1 || end === -1) throw new Error("Jakarta preview branch not found");
+  return [...body.slice(start, end).matchAll(/<Section\s+title="([^"]+)"/g)].map((m) => m[1]);
 }
 
-/**
- * Offline order: section headings inside the renderStructuredBrief() function in
- * exportCountryReportPdf.ts. Both drawSectionWithProse(ctx, "Title", ...) and
- * drawSectionHeading(ctx, "Title") open a section.
- */
+/** Offline order from the dedicated compact Jakarta renderer. */
 function pdfSectionOrder(): string[] {
   const src = readFileSync(SRC("lib/exportCountryReportPdf.ts"), "utf8");
-  const start = src.indexOf("function renderStructuredBrief");
-  if (start === -1) throw new Error("renderStructuredBrief() not found");
-  // Bound to the function body: stop at the next top-level `function ` decl.
+  const start = src.indexOf("function renderJakartaWeeklyBrief");
   const after = src.indexOf("\nfunction ", start + 1);
+  if (start === -1) throw new Error("renderJakartaWeeklyBrief() not found");
   const fnBody = src.slice(start, after === -1 ? undefined : after);
-  const out: string[] = [];
-  const re = /draw(?:SectionWithProse|SectionHeading)\(\s*ctx,\s*"([^"]+)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(fnBody))) out.push(m[1]);
-  return out;
+  return [
+    ...fnBody.matchAll(/draw(?:SectionWithProse|SectionHeading)\(\s*ctx,\s*"([^"]+)"/g),
+  ].map((m) => m[1]);
 }
 
 function assertOrder(label: string, actual: string[], expected: string[]) {
@@ -301,7 +287,7 @@ async function main() {
       "screenshots/font_proof/FONT_AUDIT.txt",
     );
     const existing = readFileSync(auditPath, "utf8");
-    const marker = "==== jakarta_country.pdf (Jakarta unified canonical brief) ====";
+    const marker = "==== jakarta_country.pdf (Jakarta compact weekly brief) ====";
     const lines = [
       marker,
       ...perPage.map(

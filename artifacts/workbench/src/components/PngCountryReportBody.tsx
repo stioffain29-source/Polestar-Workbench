@@ -5,14 +5,7 @@ import type {
   PngReportDataset,
   PngReportItem,
 } from "@/lib/pngReportDataset";
-import type {
-  JakartaTableRow,
-  JakartaPriorityAreaRow,
-  JakartaPortLogisticsRow,
-  JakartaStaffMovementImpact,
-  JakartaRoleAction,
-  JakartaCrimeBusinessRow,
-} from "@/lib/jakartaBrief";
+import type { JakartaOperatingPictureRow } from "@/lib/jakartaBrief";
 import {
   buildCountryIncidentThemes,
   buildOperationalImpactBullets,
@@ -291,24 +284,19 @@ function ActionGroup({ heading, actions }: { heading: string; actions: string[] 
   );
 }
 
-// --- Jakarta tactical evidence primitives ---------------------------------
-// These render the Jakarta city report's tactical tables (ranked Priority Areas,
-// broken-out Staff Movement, 4-column Port & Logistics, standing Venue/Crime
-// exposure, role-based actions). They are folded INSIDE the canonical sections
-// below when d.jakartaTacticalBrief is present; every other theatre leaves them
-// unrendered, so its output is byte-identical. Count-free; brand spec exactly.
+// --- Jakarta weekly brief primitives ---------------------------------------
+// Jakarta is deliberately a compact city weekly. Its only table is the live
+// operating picture; quiet corridors are represented by a single honest note,
+// never by standing rows that make the report look busier than the evidence.
 
-// Subtle navy-tinted zebra shading for the tactical evidence tables' odd rows —
-// brand-spec parity with the approved report chrome (navy header + alternating
-// row shading), applied only to these count-free tables.
 const ROW_TINT = "#f4f5fa";
 
 const baseCell: React.CSSProperties = {
   fontFamily: ROBOTO,
   fontSize: 12,
-  lineHeight: 1.5,
+  lineHeight: 1.45,
   color: DUSK,
-  padding: "8px 10px",
+  padding: "7px 8px",
   textAlign: "left",
   verticalAlign: "top",
   border: `1px solid ${POLAR}`,
@@ -320,65 +308,35 @@ const baseHeadCell: React.CSSProperties = {
   background: NAVY,
   color: "#fff",
   fontWeight: 700,
-  fontSize: 11,
+  fontSize: 10,
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   WebkitPrintColorAdjust: "exact",
   printColorAdjust: "exact",
 };
 
-// The ranked Priority Areas table (Priority | Area | Driver | Business impact |
-// Action). The ranking is data-driven; an area that carried live reporting this
-// period is flagged in-cell ("(active this week)") so the row reads as live.
-function PriorityTable({ rows }: { rows: JakartaPriorityAreaRow[] }) {
+function OperatingPictureTable({ rows }: { rows: JakartaOperatingPictureRow[] }) {
+  if (rows.length === 0) return null;
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
-      <thead>
-        <tr>
-          <th style={{ ...baseHeadCell, width: "9%", textAlign: "center" }}>#</th>
-          <th style={{ ...baseHeadCell, width: "23%" }}>Area</th>
-          <th style={{ ...baseHeadCell, width: "17%" }}>Driver</th>
-          <th style={{ ...baseHeadCell, width: "29%" }}>Business impact</th>
-          <th style={{ ...baseHeadCell, width: "22%" }}>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
-            <td style={{ ...baseCell, fontWeight: 700, color: NAVY, textAlign: "center" }}>{r.priority}</td>
-            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>
-              {r.elevated ? `${r.area} (active this week)` : r.area}
-            </td>
-            <td style={baseCell}>{r.driver}</td>
-            <td style={baseCell}>{r.businessImpact}</td>
-            <td style={baseCell}>{r.action}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-// The 4-column Port and Logistics table (Area | Operational relevance | Possible
-// impact | Required action).
-function PortTable({ rows }: { rows: JakartaPortLogisticsRow[] }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
+    <table
+      data-pdf-keep="true"
+      style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}
+    >
       <thead>
         <tr>
           <th style={{ ...baseHeadCell, width: "22%" }}>Area</th>
-          <th style={{ ...baseHeadCell, width: "24%" }}>Operational relevance</th>
-          <th style={{ ...baseHeadCell, width: "27%" }}>Possible impact</th>
-          <th style={{ ...baseHeadCell, width: "27%" }}>Required action</th>
+          <th style={{ ...baseHeadCell, width: "17%" }}>Driver</th>
+          <th style={{ ...baseHeadCell, width: "34%" }}>Impact</th>
+          <th style={{ ...baseHeadCell, width: "27%" }}>Action</th>
         </tr>
       </thead>
       <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
-            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.area}</td>
-            <td style={baseCell}>{r.operationalRelevance}</td>
-            <td style={baseCell}>{r.possibleImpact}</td>
-            <td style={baseCell}>{r.requiredAction}</td>
+        {rows.map((row, i) => (
+          <tr key={`${row.area}-${row.driver}`} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
+            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{row.area}</td>
+            <td style={baseCell}>{row.driver}</td>
+            <td style={baseCell}>{row.impact}</td>
+            <td style={baseCell}>{row.action}</td>
           </tr>
         ))}
       </tbody>
@@ -386,90 +344,14 @@ function PortTable({ rows }: { rows: JakartaPortLogisticsRow[] }) {
   );
 }
 
-// A standing exposure table (Area | Why it matters | Action). A real semantic
-// <table> so the DOM-rasterise PDF treats it as one break candidate.
-function OpsTable({ rows }: { rows: JakartaTableRow[] }) {
+function WatchLine({ label, text }: { label: string; text: string }) {
   return (
-    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
-      <thead>
-        <tr>
-          <th style={{ ...baseHeadCell, width: "24%" }}>Area</th>
-          <th style={{ ...baseHeadCell, width: "42%" }}>Why it matters</th>
-          <th style={{ ...baseHeadCell, width: "34%" }}>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
-            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.area}</td>
-            <td style={baseCell}>{r.why}</td>
-            <td style={baseCell}>{r.action}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-// The standing Crime exposure table, keyed to named operating contexts
-// (Operating context | Crime exposure | Precaution) — durable analyst guidance
-// that links Jakarta's crime picture to staff movement, hotels and client
-// meetings, airport transfers, port access and logistics routes. Not this
-// period's findings.
-function CrimeTable({ rows }: { rows: JakartaCrimeBusinessRow[] }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}>
-      <thead>
-        <tr>
-          <th style={{ ...baseHeadCell, width: "28%" }}>Operating context</th>
-          <th style={{ ...baseHeadCell, width: "40%" }}>Crime exposure</th>
-          <th style={{ ...baseHeadCell, width: "32%" }}>Precaution</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
-            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{r.context}</td>
-            <td style={baseCell}>{r.exposure}</td>
-            <td style={baseCell}>{r.precaution}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-// Movement-type label order for the Staff Movement Impact block.
-const STAFF_MOVEMENT_FIELDS: Array<{ label: string; key: keyof JakartaStaffMovementImpact }> = [
-  { label: "Office access", key: "officeAccess" },
-  { label: "Hotel to office movement", key: "hotelToOffice" },
-  { label: "Airport transfer", key: "airportTransfer" },
-  { label: "Client meeting movement", key: "clientMeeting" },
-  { label: "Staff commute", key: "staffCommute" },
-  { label: "Driver route planning", key: "driverRoute" },
-  { label: "After hours movement", key: "afterHours" },
-];
-
-// A labelled prose block, reused by Staff Movement and role-based Recommended
-// Actions: a bold ELECTRIC label, then the named-location guidance beneath it.
-function LabelledBlock({ label, text }: { label: string; text: string }) {
-  return (
-    <div data-pdf-row="true" style={{ marginBottom: 12 }}>
-      <div
-        style={{
-          fontFamily: ROBOTO,
-          fontSize: 11,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: ELECTRIC,
-          fontWeight: 700,
-          marginBottom: 4,
-        }}
-      >
-        {label}
-      </div>
-      <p style={{ fontFamily: ROBOTO, fontSize: 14, lineHeight: 1.55, color: DUSK, margin: 0 }}>{text}</p>
-    </div>
+    <p
+      data-pdf-flow="true"
+      style={{ fontFamily: ROBOTO, fontSize: 13, lineHeight: 1.5, color: DUSK, margin: "0 0 8px 0" }}
+    >
+      <strong style={{ color: NAVY }}>{label}:</strong> {text}
+    </p>
   );
 }
 
@@ -510,18 +392,12 @@ export default function PngCountryReportBody({
   // here). Operational Impact still draws on the full window.
   const topThree = d.topThree.slice(0, 3);
   const incidentThemes = d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems);
-  // Cap the Operational Impact list (≤5) and the Outlook escalation indicators
-  // (≤3) so the trimmed brief stays sharp.
+  // Cap the generic Operational Impact list (≤5) and Outlook escalation
+  // indicators (≤3). Jakarta returns below with its approved compact layout.
   const operationalImpact =
     d.operationalImpactOverride ?? buildOperationalImpactBullets(d.windowItems).slice(0, 5);
-  // Jakarta's tactical brief carries its own evidence tables (crime, priority
-  // areas, staff movement, port, venue, role actions) that are folded INSIDE the
-  // canonical sections below. Keep the Jakarta indicators compact: route,
-  // congestion and flood advice is consolidated elsewhere in the brief.
   const tactical = d.jakartaTacticalBrief;
-  const escalationIndicators = tactical
-    ? d.escalationIndicators.slice(0, 3)
-    : d.escalationIndicators.slice(0, 3);
+  const escalationIndicators = d.escalationIndicators.slice(0, 3);
 
   // Inline injection helpers for the analyst-placed map / photo blocks.
   const mapAt = (slot: CountryMapPlacement) =>
@@ -535,6 +411,66 @@ export default function PngCountryReportBody({
     ) : null;
   const photoAt = (slot: CountryPhotoPlacement) =>
     photoPlacement === slot && photoNode ? <div style={{ marginTop: 4 }}>{photoNode}</div> : null;
+
+  // Jakarta follows the approved city-weekly structure rather than the generic
+  // multi-section country brief. This early return keeps the on-screen preview
+  // and its DOM-rasterised PDF on the exact same compact content model.
+  if (tactical) {
+    const { operatingPicture, crimeEscalationWatch, recommendedActions } = tactical;
+    return (
+      <IncidentSummaryContext.Provider value={incidentSummaries}>
+        {show("bottom-line") && (
+          <Section title="Bottom Line Up Front"><Prose text={d.bluf} /></Section>
+        )}
+        {mapAt("after-bluf")}
+        {photoAt("after-bluf")}
+
+        {show("top-3") && (
+          <Section title="Top 3 Developments">
+            {topThree.length === 0 ? (
+              <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
+            ) : (
+              <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
+            )}
+          </Section>
+        )}
+        {mapAt("after-top3")}
+        {photoAt("after-top3")}
+
+        {show("operational-impact") && (
+          <Section title="Operating Picture This Week">
+            {operatingPicture.rows.length > 0 ? (
+              <OperatingPictureTable rows={operatingPicture.rows} />
+            ) : (
+              <EmptyNote>{operatingPicture.emptyNote}</EmptyNote>
+            )}
+          </Section>
+        )}
+        {mapAt("after-incident-details")}
+        {photoAt("inside-incident-details")}
+
+        {show("current-situation") && (
+          <Section title="Crime & Escalation Watch">
+            <WatchLine label="Crime" text={crimeEscalationWatch.crime} />
+            <WatchLine label="Escalation triggers" text={crimeEscalationWatch.escalationTriggers} />
+          </Section>
+        )}
+        {mapAt("before-outlook")}
+
+        {show("recommended-actions") && (
+          <Section title="Recommended Actions">
+            {recommendedActions.length > 0 ? (
+              <BulletList items={recommendedActions} />
+            ) : (
+              <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
+            )}
+          </Section>
+        )}
+        {mapAt("before-polestar")}
+        {photoAt("before-polestar")}
+      </IncidentSummaryContext.Provider>
+    );
+  }
 
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
@@ -577,7 +513,7 @@ export default function PngCountryReportBody({
           framing prose, "incident-details" hides the themed paragraphs. */}
       {((show("current-situation") && d.executiveSummary.trim() !== "") ||
         (show("incident-details") &&
-          (incidentThemes.length > 0 || Boolean(tactical) || d.windowItems.length > 0))) && (
+          (incidentThemes.length > 0 || d.windowItems.length > 0))) && (
       <Section title="Current Situation">
         {show("current-situation") && d.executiveSummary.trim() !== "" && (
           <Prose text={d.executiveSummary} />
@@ -600,21 +536,6 @@ export default function PngCountryReportBody({
                 </div>
               ))
             )}
-            {tactical ? (
-              <>
-                <StrandLabel>Crime Trends and Business Impact</StrandLabel>
-                <Prose text={tactical.crimeTrends.reportedThisPeriod} />
-                <Prose text={tactical.crimeTrends.standingPattern} />
-                <Prose text={tactical.crimeTrends.trendRead} />
-                <div data-pdf-keep="true">
-                  <CrimeTable rows={tactical.crimeTrends.businessImpact} />
-                </div>
-                <StrandLabel>Priority Areas This Week</StrandLabel>
-                <div data-pdf-keep="true">
-                  <PriorityTable rows={tactical.priorityAreas} />
-                </div>
-              </>
-            ) : null}
             {photoAt("inside-incident-details")}
           </>
         )}
@@ -622,73 +543,21 @@ export default function PngCountryReportBody({
       )}
       {mapAt("after-incident-details")}
 
-      {/* 5. Operational Impact — per-theme impact lines for the themes present
-          this period. §27: omitted entirely (not filler) when the engine has no
-          event-linked impact to state and no tactical brief supplies one. */}
-      {show("operational-impact") && (operationalImpact.length > 0 || Boolean(tactical)) && (
+      {/* 5. Operational Impact — generic country brief only. */}
+      {show("operational-impact") && operationalImpact.length > 0 && (
       <Section title="Operational Impact">
-        {operationalImpact.length === 0 ? (
-          <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
-        ) : (
-          <BulletList items={operationalImpact} />
-        )}
-        {tactical ? (
-          <>
-            <StrandLabel>Staff Movement Impact</StrandLabel>
-            {STAFF_MOVEMENT_FIELDS.filter((f) =>
-              Boolean(tactical.staffMovement[f.key]),
-            ).map((f) => (
-              <LabelledBlock key={f.key} label={f.label} text={tactical.staffMovement[f.key]} />
-            ))}
-            <StrandLabel>Airport Transfer Impact</StrandLabel>
-            <Prose text={tactical.airportTransfer} />
-            <StrandLabel>Port and Logistics Impact</StrandLabel>
-            <Prose text={tactical.portLogistics.intro} />
-            <div data-pdf-keep="true">
-              <PortTable rows={tactical.portLogistics.rows} />
-            </div>
-            <StrandLabel>Port Actions</StrandLabel>
-            <BulletList items={tactical.portLogistics.actions} />
-            <StrandLabel>Office, Hotel and Meeting Venue Exposure</StrandLabel>
-            <Prose text={tactical.officeHotelVenue.intro} />
-            <div data-pdf-keep="true">
-              <OpsTable rows={tactical.officeHotelVenue.rows} />
-            </div>
-          </>
-        ) : null}
+        <BulletList items={operationalImpact} />
       </Section>
       )}
 
-      {/* 6. Recommended Actions — grouped client priorities (Movement security,
-          Site security, …), emitting only the groups this period's incident mix
-          and watchlist support. The operating-risk theatres (Indonesia /
-          Jakarta) keep their own flat priorities list unchanged. */}
+      {/* 6. Recommended Actions — generic country brief only. */}
       {show("recommended-actions") &&
-        (Boolean(tactical) ||
-          (d.proseVariant === "operating-risk"
-            ? d.businessImpact.length > 0
-            : d.recommendedActions.length > 0)) && (
+        (d.proseVariant === "operating-risk"
+          ? d.businessImpact.length > 0
+          : d.recommendedActions.length > 0) && (
       <Section title="Recommended Actions">
-        {tactical ? (
-          <>
-            {tactical.roleActions.length > 0 ? (
-              tactical.roleActions.map((a: JakartaRoleAction, i) => (
-                <LabelledBlock key={i} label={a.role} text={a.guidance} />
-              ))
-            ) : (
-              <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
-            )}
-            <StrandLabel>Route and Timing Guidance</StrandLabel>
-            <BulletList items={tactical.routeTiming} />
-          </>
-        ) : d.proseVariant === "operating-risk" ? (
-          d.businessImpact.length === 0 ? (
-            <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
-          ) : (
-            <BulletList items={d.businessImpact} />
-          )
-        ) : d.recommendedActions.length === 0 ? (
-          <EmptyNote>{d.businessImpactEmptyNote}</EmptyNote>
+        {d.proseVariant === "operating-risk" ? (
+          <BulletList items={d.businessImpact} />
         ) : (
           d.recommendedActions.map((g) => (
             <ActionGroup key={g.key} heading={g.heading} actions={g.actions} />

@@ -48,7 +48,7 @@ import {
   scoreClusterValue,
 } from "./countryTopValue";
 import { compareIncidentSignificance } from "@workspace/country-engine";
-import { buildJakartaBrief, buildJakartaPolestarView, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
+import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
 import { buildJakartaCorridorStatuses } from "./jakartaCorridors";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
 
@@ -1998,11 +1998,10 @@ export function buildStructuredReportDataset(
   // Legacy builder deleted — the engine narrative block below is the sole
   // author of the Polestar View prose.
   let polestarView = "";
-  // Jakarta-only section overrides (assigned in the Jakarta block below; left
-  // undefined for every other theatre so the renderer uses its generic path).
+  // Jakarta carries a separate consolidated tactical payload; the generic
+  // section overrides remain available to the other structured theatres.
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
   let operationalImpactOverride: string[] | undefined;
-  let jakartaEscalationIndicators: string[] | undefined;
   let jakartaTacticalBrief: JakartaTacticalBrief | undefined;
   // The Polestar View closes the brief and must never straddle a page break
   // in the DOM-rasterised PDF (owner feedback) — keep it together everywhere.
@@ -2072,13 +2071,9 @@ export function buildStructuredReportDataset(
     // NOTE: the Jakarta BLUF / Executive Summary / Outlook / Polestar builders
     // are no longer consumed — the engine narrative block below is the sole
     // author of those sections for every theatre, Jakarta included.
-    businessImpact = jakarta.recommendedActions;
-    operationalImpactOverride = jakarta.operationalImpact;
-    jakartaEscalationIndicators = jakarta.escalationIndicators;
-    incidentThemesOverride = jakarta.incidentThemes;
+    businessImpact = jakarta.tactical.recommendedActions;
     topThree = jakarta.topThree;
     jakartaTacticalBrief = jakarta.tactical;
-    keepPolestarTogether = true;
   }
 
   // --- Reporting Confidence --------------------------------------------------
@@ -2238,9 +2233,7 @@ export function buildStructuredReportDataset(
       bluf = n.bluf;
       executiveSummary = n.currentSituation;
       outlook = n.outlook;
-      polestarView = config.jakartaProse
-        ? buildJakartaPolestarView(windowItems)
-        : n.polestarView;
+      polestarView = n.polestarView;
       // Top-3 SELECTION comes from the engine; reorder the already-built
       // PngReportItem cards to match (engine eventId === PngReportItem.id) so the
       // card render keeps working while the choice is the engine's. Any engine
@@ -2317,7 +2310,7 @@ export function buildStructuredReportDataset(
     periodLabel,
     bluf,
     executiveSummary,
-    escalationIndicators: jakartaEscalationIndicators ?? escalationIndicators,
+    escalationIndicators,
     jakartaTacticalBrief,
     whatChanged,
     topThree,
