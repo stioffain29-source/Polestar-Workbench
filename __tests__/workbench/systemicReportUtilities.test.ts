@@ -67,6 +67,62 @@ describe("systemic report utilities — historical data regressions", () => {
     expect(LOCATION_NOT_IDENTIFIED).toBe("Location not identified");
   });
 
+  it("trusts the raw country field for land incidents with no vessel in the story", () => {
+    // Jazan regression: the record's own country field said Saudi Arabia but
+    // the prose never repeated it, so the record was dropped and Iraq ranked
+    // first in Regional Highlights by default.
+    expect(
+      deriveIncidentCountry({
+        country: "Saudi Arabia",
+        title: "Jazan Refinery reported halted, 400,000 bpd offline",
+        summary: "Fuel market impact identified as refinery outage continues.",
+      }),
+    ).toBe("Saudi Arabia");
+    // A vessel story must NOT get the same trust — the raw field can be a flag.
+    expect(
+      deriveIncidentCountry({
+        country: "Saudi Arabia",
+        title: "6 Saudi-flagged oil carriers reroute around Africa, avoiding Bab el-Mandeb",
+      }),
+    ).toBeNull();
+  });
+
+  it("recognises demonyms and refinery-city cues as event-location signals", () => {
+    expect(
+      deriveIncidentCountry({
+        title: "Iraqi authorities extinguish refinery fire at Baiji oil complex",
+      }),
+    ).toBe("Iraq");
+    expect(deriveIncidentCountry({ location: "Jazan" , title: "Refinery halt"})).toBe("Saudi Arabia");
+    expect(deriveIncidentCountry({ location: "Baiji", title: "Refinery fire" })).toBe("Iraq");
+    // Demonym attached to a vessel is a flag descriptor, not a location.
+    expect(
+      deriveIncidentCountry({
+        title: "Houthis claim missile attack on Saudi oil tanker in Red Sea",
+      }),
+    ).toBeNull();
+  });
+
+  it("lets a country named in the title outrank a raw field backed only by a Hormuz cue", () => {
+    // Kuwait regression: raw country carried Iran (from Hormuz geography) and
+    // the actor row rendered as "Iran infrastructure operator" even though the
+    // title names Kuwait as the acting country.
+    expect(
+      deriveIncidentCountry({
+        country: "Iran",
+        title: "Kuwait discusses oil pipeline with Arab neighbors to bypass Strait of Hormuz: Minister",
+      }),
+    ).toBe("Kuwait");
+    // With no other country in the prose, the Hormuz cue still validates Iran.
+    expect(
+      deriveIncidentCountry({
+        country: "Iran",
+        location: "Strait of Hormuz",
+        title: "Authorities report disruption near Hormuz",
+      }),
+    ).toBe("Iran");
+  });
+
   it("keeps fiscal knock-on stories out of the live Hormuz incident watch", () => {
     expect(
       isGulfChokepointIncident({
