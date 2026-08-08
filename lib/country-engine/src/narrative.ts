@@ -1909,6 +1909,13 @@ export interface BuildNarrativeOptions {
   // ISO instant marking the start of the current reporting window. See
   // buildBluf's windowStart param for what this enables.
   windowStart?: string | null;
+  // True when the coverage determination for the window is a coverage
+  // problem (failing feeds, no location-relevant records, or an empty week
+  // that cannot be confirmed as quiet). The sparse short report must then
+  // never assert "no significant events" as a bare fact, and must not close
+  // the book with "no further analysis is warranted" — the operating picture
+  // is Not Assessed, not quiet.
+  coverageUnconfirmed?: boolean;
 }
 
 export interface CountryNarrative {
@@ -1949,13 +1956,15 @@ export function buildCountryNarrative(
 
   // §27 — sparse handling.
   if (events.length === 0) {
-    const shortReport = `Reporting was limited in ${countryName} this period. No significant validated security events were recorded, and no further analysis is warranted.`;
+    const shortReport = opts.coverageUnconfirmed
+      ? `No validated security event is on file for ${countryName} this period, but collection coverage could not be confirmed, so the absence of records cannot be read as a quiet week. ${countryName} is Not Assessed for this period until coverage is restored and a full reporting window has been observed.`
+      : `Reporting was limited in ${countryName} this period. No significant validated security events were recorded, and no further analysis is warranted.`;
     claims.push(
       makeClaim({
         claimText: shortReport,
         section: "Short Report",
-        claimType: "Confirmed fact",
-        confidence: 90,
+        claimType: opts.coverageUnconfirmed ? "Assessment" : "Confirmed fact",
+        confidence: opts.coverageUnconfirmed ? 60 : 90,
       }),
     );
     sectionWordCounts["Short Report"] = countWords(shortReport);

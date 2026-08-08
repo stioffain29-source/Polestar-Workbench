@@ -882,11 +882,11 @@ function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
 
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
-  drawSectionHeading(ctx, "Top 3 Developments");
+  // A week with no developments renders NO "Top 3 Developments" section at all
+  // — a headline section with nothing in it reads as a contradiction.
   const topThree = d.topThree.slice(0, 3);
-  if (topThree.length === 0) {
-    renderProse(ctx, d.emptyLocationFallback);
-  } else {
+  if (topThree.length > 0) {
+    drawSectionHeading(ctx, "Top 3 Developments");
     for (const item of topThree) drawStructuredItemCard(ctx, item, true, true);
   }
 
@@ -928,11 +928,10 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
 
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
-  drawSectionHeading(ctx, "Top 3 Developments");
+  // No developments → omit the section entirely (matches the on-screen body).
   const topThree = d.topThree.slice(0, 3);
-  if (topThree.length === 0) {
-    renderProse(ctx, d.emptyLocationFallback);
-  } else {
+  if (topThree.length > 0) {
+    drawSectionHeading(ctx, "Top 3 Developments");
     for (const it of topThree) drawStructuredItemCard(ctx, it, true);
     ctx.y += 4;
   }
@@ -1122,6 +1121,9 @@ export async function exportCountryReportPdf(
         end.setDate(end.getDate() - 6);
         return end;
       })(),
+      // Mirror the on-screen build: a coverage-problem week renders every
+      // empty-week surface as "Not Assessed" rather than confirmed quiet.
+      coverageUnconfirmed: extras.coverage?.state === "coverage-problem",
     });
     // Surface the §33 fail-closed gate result in headless runs too (the
     // on-screen page blocks the PDF on a critical failure; the headless font
