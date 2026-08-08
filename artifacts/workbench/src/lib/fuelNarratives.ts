@@ -9,8 +9,19 @@
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 import { reportWindowDefaultDays } from "./reportWindow";
 import { stripWireCruft } from "./incidentTitle";
+import {
+  aggregateIncidentSignificance,
+  compareIncidentSignificance,
+  incidentSeverityRank,
+} from "@workspace/country-engine";
+import { deriveIncidentCountry } from "./shippingCountry";
+import { matchesTopicIncident } from "./topicIncidentMatching";
 
 function titleCase(s: string): string {
+  // Preserve canonical initialisms returned by the shared incident-location
+  // resolver. Rendering "UAE" as "Uae" makes a correct location label look
+  // like an unreviewed raw-source value.
+  if (["UAE", "UK", "US"].includes(s)) return s;
   return s
     .toLowerCase()
     .split(/\s+/)
@@ -22,14 +33,6 @@ function haystack(i: TopicFastFactsIncident): string {
   return [i.title ?? "", i.summary ?? ""].join(" ").toLowerCase();
 }
 
-const HIGHLIGHT_SEV_RANK: Record<string, number> = {
-  insignificant: 1,
-  low: 2,
-  moderate: 3,
-  high: 4,
-  extreme: 5,
-};
-
 // An incident whose own text says the situation is over — extinguished,
 // contained, restored, resumed, reopened, lifted — is reported ONLY as
 // historical colour, never as live pressure. Counting a resolved event at
@@ -40,43 +43,15 @@ const HIGHLIGHT_SEV_RANK: Record<string, number> = {
 // severity. Down-weighting resolved records (not dropping them outright —
 // they still count as reporting volume, just not as unresolved pressure)
 // keeps the ranking honest to current state rather than raw headline count.
-const RESOLVED_RE =
-  /\b(extinguish\w*|contained|containment|restored|resum\w*|reopen\w*|re-open\w*|lifted|ended?|over|back online|back in operation|resolved|normali[sz]\w*)\b/i;
-function resolvedDiscount(i: TopicFastFactsIncident): number {
-  return RESOLVED_RE.test(haystack(i)) ? 0.3 : 1;
-}
-
 // Weighted pressure score for one country's incident set: sum of each
 // incident's severity rank, discounted when the incident's own text marks
 // it as resolved. Replaces a raw incident-count ranking, which let a country
 // with many low-severity or already-resolved records outrank a country (or
 // the standing Gulf/Hormuz chokepoint watch) carrying fewer but materially
 // more severe, still-live incidents.
-function countryPressureScore(items: TopicFastFactsIncident[]): number {
-  return items.reduce((sum, i) => {
-    const sev = HIGHLIGHT_SEV_RANK[(i.severity ?? "").toLowerCase()] ?? 1;
-    return sum + sev * resolvedDiscount(i);
-  }, 0);
-}
-
-/**
- * Normalise a raw country field for use as a regional-highlight key.
- * Some upstream records carry combined values like "United Arab
- * Emirates; Iran" or "Saudi Arabia / Yemen"; we split on `;` / `/` /
- * `,` / `&` and pick the first usable country so the highlight row
- * is anchored on one place. Returns null when nothing usable remains.
- */
-function normaliseCountry(c: string | null | undefined): string | null {
-  if (!c) return null;
-  const parts = c.split(/\s*[;/,&]\s*|\s+\bvs?\.?\b\s+/i);
-  for (const raw of parts) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    const lc = trimmed.toLowerCase();
-    if (lc === "unknown" || lc === "n/a" || lc === "global" || lc === "international") continue;
-    return trimmed;
-  }
-  return null;
+/** The single incident-country rule used in Fuel Watch. */
+function incidentCountry(i: TopicFastFactsIncident): string | null {
+  return deriveIncidentCountry(i);
 }
 
 // Operational issue families, in priority order. Each family carries:
@@ -190,7 +165,7 @@ export function buildFuelRegionalHighlights(opts: {
 
   const byCountry = new Map<string, TopicFastFactsIncident[]>();
   for (const i of window) {
-    const key = normaliseCountry(i.country);
+    const key = incidentCountry(i);
     if (!key) continue;
     const arr = byCountry.get(key) ?? [];
     arr.push(i);
@@ -198,10 +173,11 @@ export function buildFuelRegionalHighlights(opts: {
   }
   if (byCountry.size === 0) return null;
 
-  // Rank by weighted pressure score (severity, discounted for resolved
-  // incidents), not raw incident count — see countryPressureScore() above.
+  // Rank by shared real-world significance rather than raw record volume.
   const ranked = Array.from(byCountry.entries()).sort(
-    (a, b) => countryPressureScore(b[1]) - countryPressureScore(a[1]),
+    (a, b) =>
+      aggregateIncidentSignificance(b[1]) -
+      aggregateIncidentSignificance(a[1]),
   );
   const lead = ranked.slice(0, 3);
 
@@ -236,8 +212,8 @@ export function buildFuelRegionalHighlights(opts: {
     const [country, items] = lead[idx];
     const fam = familyFor(items);
     const phrase = fam?.phrase ?? "fuel-operational reporting";
-    // normaliseCountry() preserves original case ("India", "Pakistan");
-    // overlay keys are lowercase, so lookup must lowercase the country.
+    // The shared incident-country utility returns a canonical label; overlay
+    // keys remain lowercase.
     const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
     const why = overlay?.why
       ?? fam?.why
@@ -274,9 +250,6 @@ export function buildFuelRegionalHighlights(opts: {
 // escalation that has since gone quiet is reported as easing, not as live.
 // ---------------------------------------------------------------------------
 
-const GULF_CHOKEPOINT_RE =
-  /\b(strait of hormuz|hormuz|persian gulf|arabian gulf|bab[- ]?el[- ]?mandeb|red sea)\b/i;
-
 // A genuine chokepoint INCIDENT described in the body even when the headline
 // itself doesn't name the chokepoint — e.g. a corporate statement titled
 // "ADNOC issues statement clarifying attacks on facilities" that is entirely
@@ -287,17 +260,6 @@ const GULF_CHOKEPOINT_RE =
 // SPR story that merely name-drops "Persian Gulf" grades as market colour
 // still does not qualify — preserving the precision-first design the
 // title-only rule was built for.
-const GULF_CHOKEPOINT_BODY_INCIDENT_RE = (() => {
-  const loc =
-    "(?:strait of hormuz|hormuz|persian gulf|arabian gulf|bab[- ]?el[- ]?mandeb|red sea)";
-  const verb =
-    "(?:attack\\w*|struck|strike\\w*|missile\\w*|drone\\w*|explosion|blast\\w*|hit|hits|closure|closed|shut|blockad\\w*|disrupt\\w*|sabotag\\w*|transiting|transit\\w*)";
-  return new RegExp(
-    `\\b${loc}\\b.{0,100}\\b${verb}\\b|\\b${verb}\\b.{0,100}\\b${loc}\\b`,
-    "i",
-  );
-})();
-
 // Reopen / resumed-transit vocabulary. Shared so the theme blob and the
 // per-record temporal test below agree on what counts as a "reopening".
 const GULF_REOPEN_RE =
@@ -318,14 +280,6 @@ function gulfFmtDay(key: string): string {
   if (!m) return key;
   return `${parseInt(m[3], 10)} ${GULF_MONTHS[parseInt(m[2], 10) - 1]} ${m[1]}`;
 }
-
-const GULF_SEV_RANK: Record<string, number> = {
-  insignificant: 1,
-  low: 2,
-  moderate: 3,
-  high: 4,
-  extreme: 5,
-};
 
 export interface FuelGulfWatchItem {
   title: string;
@@ -397,19 +351,17 @@ export function buildFuelGulfChokepointWatch(opts: {
   const currentEndKey =
     periodEndKey && periodEndKey > issueKey ? periodEndKey : issueKey;
 
-  // 1. Select fuel chokepoint records within the current-period window. Match on
-  //    the TITLE ONLY (not the summary): a genuine Gulf/Hormuz chokepoint story
-  //    names the chokepoint in its headline, whereas a domestic pump-price cut,
-  //    an SPR-withdrawal note or a fuel-levy debate merely MENTIONS Hormuz as
-  //    background market colour in its body. Title-matching keeps the section
-  //    precision-first so those passing mentions never masquerade as anchors.
-  //    A genuine Gulf/Hormuz chokepoint event (a tanker struck in the strait, a
-  //    crude reroute) is often filed by ingestion under the `shipping` topic
-  //    rather than `fuel`, and those rows already surface in the Fuel Watch
-  //    Producer/Buyer Actions table via the cross-read. Admit shipping-topic
-  //    rows here too — gated on the SAME fuel-market signal the cross-read uses
-  //    — so a current-week chokepoint item shown elsewhere in the report can
-  //    never be contradicted by a stale "no fresh reporting" line here.
+  // 1. Select genuine fuel chokepoint incidents within the current-period
+  //    window. The shared matcher requires both a Gulf location and concrete
+  //    event evidence, and rejects fiscal or price stories that only name the
+  //    chokepoint as background market colour. A genuine event (a tanker
+  //    struck in the strait, a crude reroute) is often filed by ingestion under
+  //    the shipping topic rather than fuel, and those rows already surface in
+  //    the Fuel Watch Producer/Buyer Actions table via the cross-read.
+  //    Admit shipping-topic rows here too — gated on the SAME fuel-market
+  //    signal the cross-read uses — so a current-week chokepoint item shown
+  //    elsewhere in the report can never be contradicted by a stale
+  //    "no fresh reporting" line here.
   const matched = opts.incidents
     .filter(
       (i) =>
@@ -422,9 +374,7 @@ export function buildFuelGulfChokepointWatch(opts: {
         x.key !== null && x.key >= currentStartKey && x.key <= currentEndKey,
     )
     .filter(
-      ({ i }) =>
-        GULF_CHOKEPOINT_RE.test(i.title ?? "") ||
-        GULF_CHOKEPOINT_BODY_INCIDENT_RE.test(i.summary ?? ""),
+      ({ i }) => matchesTopicIncident("gulf-chokepoint", i),
     );
   if (matched.length === 0) return null;
 
@@ -436,12 +386,12 @@ export function buildFuelGulfChokepointWatch(opts: {
   const rankAndDedupe = (
     arr: { i: TopicFastFactsIncident; key: string }[],
   ): Kept[] => {
-    const ranked = arr.slice().sort((a, b) => {
-      const sa = GULF_SEV_RANK[(a.i.severity ?? "").toLowerCase()] ?? 0;
-      const sb = GULF_SEV_RANK[(b.i.severity ?? "").toLowerCase()] ?? 0;
-      if (sb !== sa) return sb - sa;
-      return b.key.localeCompare(a.key);
-    });
+    const ranked = arr.slice().sort((a, b) =>
+      compareIncidentSignificance(
+        { ...a.i, occurredAt: a.key },
+        { ...b.i, occurredAt: b.key },
+      ),
+    );
     const kept: Kept[] = [];
     const keptTokens: Set<string>[] = [];
     for (const { i, key } of ranked) {
@@ -463,7 +413,7 @@ export function buildFuelGulfChokepointWatch(opts: {
       title,
       date: key,
       severity: (i.severity ?? "").toLowerCase(),
-      country: normaliseCountry(i.country),
+      country: incidentCountry(i),
     }));
   const toLines = (kept: Kept[]): string[] =>
     kept
@@ -528,18 +478,18 @@ export function buildFuelGulfChokepointWatch(opts: {
       );
     }
     const anchor = currentKept[0];
-    const anchorSevRank =
-      GULF_SEV_RANK[(anchor.i.severity ?? "").toLowerCase()] ?? 0;
+    const anchorSevRank = incidentSeverityRank(anchor.i.severity);
     if (hasKinetic && anchorSevRank >= 4) {
       // Ground the anchor sentence in severity and location rather than just
       // re-quoting the headline as if repetition were analysis — the title
       // is still cited (traceability), but as evidence for a stated claim,
       // not as the claim itself.
-      const anchorCountry = normaliseCountry(anchor.i.country);
+      const anchorCountry = incidentCountry(anchor.i);
       const anchorSevLabel = titleCase(anchor.i.severity ?? "");
       const locationClause = anchorCountry ? ` near ${anchorCountry}` : "";
+      const article = /^[aeiou]/i.test(anchorSevLabel) ? "an" : "a";
       p1.push(
-        `Pressure peaked on ${gulfFmtDay(anchor.key)} with a ${anchorSevLabel.toLowerCase()}-severity incident${locationClause}, the period's most serious chokepoint event: ${anchor.title}.`,
+        `Pressure peaked on ${gulfFmtDay(anchor.key)} with ${article} ${anchorSevLabel.toLowerCase()}-severity incident${locationClause}, the period's most serious chokepoint event: ${anchor.title}.`,
       );
     }
     const reopenAfterAnchor = currentMatched.some(
@@ -883,11 +833,10 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     // generic label "Infrastructure operator" made two unrelated events
     // (e.g. Saudi tankers rerouting vs a Kuwaiti pipeline discussion) show
     // up as identical, undifferentiated rows in the Market and Operator
-    // Responses table. The incident's own country stamp is already sourced
-    // data (not a fabricated actor name), so use it to at least tell rows
-    // apart when no named company or government body is identified.
-    const c = (i.country ?? "").trim();
-    if (c && !/^unknown$/i.test(c)) return `${c} infrastructure operator`;
+    // Responses table. Use the cross-checked incident location rather than
+    // the raw field, which can be a vessel flag state or source geography.
+    const c = incidentCountry(i);
+    if (c) return `${c} infrastructure operator`;
     return "Infrastructure operator";
   }
   if (category === "Market / supply signal") return "Market";
@@ -1052,6 +1001,9 @@ export function buildFuelProducerBuyerActions(opts: {
     // does not carry it. WHEN is the date line under the cell.
     const headline = i.title.trim().replace(/\.$/, "");
     const sentenceCased = sentenceCaseHeadline(headline);
+    // This is a source-facing location suffix, not an actor label. Retain the
+    // supplied country when the headline has no usable place cue; actor and
+    // regional ranking paths use the stricter incidentCountry() derivation.
     const action = sentenceCased + actionPlaceSuffix(sentenceCased, i.country);
     const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;
@@ -1175,7 +1127,7 @@ export function buildFuelOperationalRead(opts: {
   // Country roll-up for the closing line ("strongest operational signal").
   const byCountry = new Map<string, number>();
   for (const i of window) {
-    const k = normaliseCountry(i.country);
+    const k = incidentCountry(i);
     if (!k) continue;
     byCountry.set(k, (byCountry.get(k) ?? 0) + 1);
   }

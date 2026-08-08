@@ -6,6 +6,7 @@ export * from "./classify";
 export * from "./attribution";
 export * from "./eventDate";
 export * from "./severity";
+export * from "./incidentSignificance";
 export * from "./impact";
 export * from "./dedupe";
 export * from "./engine";

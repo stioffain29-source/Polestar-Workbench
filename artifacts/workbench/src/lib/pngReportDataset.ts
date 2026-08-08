@@ -43,8 +43,12 @@ import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSigna
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { classifyFireCause } from "./countryFireCause";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
-import { scoreClusterValue } from "./countryTopValue";
-import { buildJakartaBrief, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
+import {
+  compareIncidentValueClusters,
+  scoreClusterValue,
+} from "./countryTopValue";
+import { compareIncidentSignificance } from "@workspace/country-engine";
+import { buildJakartaBrief, buildJakartaPolestarView, jakartaThemeForCategory, type JakartaTheme, type JakartaTacticalBrief } from "./jakartaBrief";
 import { buildJakartaCorridorStatuses } from "./jakartaCorridors";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
 
@@ -1178,10 +1182,20 @@ export function isRetrospectiveItem(item: PngReportItem): boolean {
 }
 
 function sortBySeverityThenRecency(a: PngReportItem, b: PngReportItem): number {
-  if (b.severityRank !== a.severityRank) return b.severityRank - a.severityRank;
-  const da = (a.incidentDate ?? a.reportedDate).getTime();
-  const db = (b.incidentDate ?? b.reportedDate).getTime();
-  return db - da;
+  return compareIncidentSignificance(
+    {
+      severity: ["", "insignificant", "low", "moderate", "high", "extreme"][a.severityRank] ?? "",
+      title: a.title,
+      summary: a.summary,
+      occurredAt: (a.incidentDate ?? a.reportedDate).toISOString(),
+    },
+    {
+      severity: ["", "insignificant", "low", "moderate", "high", "extreme"][b.severityRank] ?? "",
+      title: b.title,
+      summary: b.summary,
+      occurredAt: (b.incidentDate ?? b.reportedDate).toISOString(),
+    },
+  );
 }
 
 // Categories that are NOT a conflict/security development: accidental blasts,
@@ -1210,8 +1224,8 @@ function leadSecurityTier(it: PngReportItem): number {
 // separately at display time (see selectTopStoryClusters), so the hazard is never
 // dropped, it simply never leads.
 function compareClusterByValue(a: PngReportItem[], b: PngReportItem[]): number {
-  const valueDelta = scoreClusterValue(b) - scoreClusterValue(a);
-  if (valueDelta !== 0) return valueDelta;
+  const incidentDelta = compareIncidentValueClusters(a, b);
+  if (incidentDelta !== 0) return incidentDelta;
   return sortBySeverityThenRecency(a[0], b[0]);
 }
 
@@ -1306,8 +1320,9 @@ export function selectTopStoryClusters(
         (c) => !picked.includes(c) && c[0].severityRank >= 3 && distinctStory(c),
       )
       .sort((a, b) => {
-        if (b[0].severityRank !== a[0].severityRank) return b[0].severityRank - a[0].severityRank;
-        return scoreClusterValue(b) - scoreClusterValue(a);
+        const incidentDelta = compareIncidentValueClusters(a, b);
+        if (incidentDelta !== 0) return incidentDelta;
+        return sortBySeverityThenRecency(a[0], b[0]);
       })[0];
     if (candidate) {
       const candTheme = jakartaThemeForCategory(candidate[0].category);
@@ -2223,7 +2238,9 @@ export function buildStructuredReportDataset(
       bluf = n.bluf;
       executiveSummary = n.currentSituation;
       outlook = n.outlook;
-      polestarView = n.polestarView;
+      polestarView = config.jakartaProse
+        ? buildJakartaPolestarView(windowItems)
+        : n.polestarView;
       // Top-3 SELECTION comes from the engine; reorder the already-built
       // PngReportItem cards to match (engine eventId === PngReportItem.id) so the
       // card render keeps working while the choice is the engine's. Any engine

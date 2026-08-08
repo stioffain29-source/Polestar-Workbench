@@ -12,10 +12,8 @@ import { acceptedCountryTokens, competingSupersetTokens } from "./countryMatch";
 import { resolveReportWindow } from "./reportWindow";
 import type { CountryFastFactsIncident } from "./countryFastFacts";
 import type { CountryBaseline } from "./countryBaselines";
+import { incidentSeverityRank } from "@workspace/country-engine";
 
-const SEV_RANK: Record<string, number> = {
-  insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5,
-};
 const SEV_LABEL: Record<string, string> = {
   insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme",
 };
@@ -327,7 +325,7 @@ export function buildWatchlistBreakdown(
     let latestMs = -Infinity;
     for (const r of matched90) {
       const k = (r.severity ?? "").toLowerCase();
-      const rank = SEV_RANK[k] ?? 0;
+      const rank = incidentSeverityRank(r.severity);
       if (rank > worstRank) {
         worstRank = rank;
         worstKey = k;
@@ -681,4 +679,3 @@ export function computeCountrySourceSignals(opts: {
   );
   return { country, topic, specialist };
 }
-
