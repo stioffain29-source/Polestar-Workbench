@@ -136,9 +136,24 @@ const JAKARTA_STRONG_TOKENS = ["jabodetabek", "dki jakarta", "dki", "greater jak
 // elsewhere that merely references "Jakarta" (the government) is not pulled in.
 // Greater-Jakarta ring towns (Bekasi, Depok, Tangerang, Bogor, …) are scoped IN
 // by the district gazetteer in step 1 BEFORE this list is ever consulted.
-const NON_JAKARTA_ID_LOCALITIES = Object.entries(INDONESIA_PROVINCE_BY_CITY)
-  .filter(([, province]) => province !== "DKI Jakarta")
-  .map(([locality]) => locality);
+//
+// Indonesian Papua is DELIBERATELY excluded from INDONESIA_PROVINCE_BY_CITY
+// (see indonesiaExtract.ts) because it has its own West Papua brief and never
+// carries country "Indonesia". That means a Papua story is invisible to this
+// list even though it is definitely not Jakarta — e.g. "Indonesian Forces Hunt
+// Papua Separatists After Four Road Workers Killed" routinely also mentions
+// "Jakarta" (the national government/military response), which used to let it
+// pass the bare-"jakarta" fallback below and get mis-filed as a Jakarta-city
+// "insurgency" development. Add the bare region token explicitly so any Papua
+// mention blocks the fallback the same way a named ID city does. A single
+// "papua" word-boundary match also covers every province variant ("Papua
+// Barat", "Papua Tengah", "West Papua", ...) since hasWord is a substring match.
+const NON_JAKARTA_ID_LOCALITIES = [
+  ...Object.entries(INDONESIA_PROVINCE_BY_CITY)
+    .filter(([, province]) => province !== "DKI Jakarta")
+    .map(([locality]) => locality),
+  "papua",
+];
 
 /**
  * Decide whether a record belongs to the Jakarta city brief. Precision-first,
