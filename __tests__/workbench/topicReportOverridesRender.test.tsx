@@ -6,7 +6,9 @@
  *   1. Fast Facts tile overrides (label/value/note, keyed by AUTO label) show
  *      in every topic preview, and CLEARING the override reverts to auto.
  *   2. The fuel Gulf & Hormuz Chokepoint Watch read honours
- *      panelReads["gulf-hormuz"] (blank = auto).
+ *      panelReads["gulf-hormuz"] ONLY while its recorded baseline still equals
+ *      the live generated read (blank = auto; missing/mismatched baseline =
+ *      stale, auto text renders instead of the frozen override).
  *   3. Energy Market Prices row overrides replace value/change; a non-numeric
  *      value override is ignored (no garbage in the card).
  *   4. pruneTopicSectionOverrides drops blank entries so cleared overrides are
@@ -19,9 +21,11 @@ import {
   applyFastFactOverrides,
   applyMarketPriceOverrides,
   pruneTopicSectionOverrides,
+  resolvePanelRead,
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "../../artifacts/workbench/src/lib/topicSectionOverrides";
+import { buildFuelWatchReportData } from "../../artifacts/workbench/src/lib/fuelWatchReport";
 import FlashpointReportPreview from "../../artifacts/workbench/src/components/FlashpointReportPreview";
 import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
 import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
@@ -155,17 +159,70 @@ describe("fuel Gulf & Hormuz Chokepoint Watch read override", () => {
       sectionOverrides: ov,
     } as never);
 
-  it("override shows; blank reverts to auto", () => {
+  // The live generated read — computed through the SAME builder the preview
+  // uses (hardNumbers is null so the render issue date is ISSUE_DATE).
+  const autoRead =
+    buildFuelWatchReportData(
+      { issueDate: ISSUE_DATE, hardNumbers: null },
+      incidents as never,
+    ).incidentData.gulfChokepointWatch?.read ?? "";
+
+  it("override bound to the current auto read shows; blank reverts to auto", () => {
     const base = renderToStaticMarkup(el());
     expect(base).not.toContain(OV_VALUE);
+    expect(autoRead).not.toBe("");
     const withOv = renderToStaticMarkup(
-      el({ panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE } }),
+      el({
+        panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE },
+        panelReadBases: { [PANEL_READ_GULF_HORMUZ]: autoRead },
+      }),
     );
     expect(withOv).toContain(OV_VALUE);
     const cleared = renderToStaticMarkup(
       el({ panelReads: { [PANEL_READ_GULF_HORMUZ]: "   " } }),
     );
     expect(cleared).toBe(base);
+  });
+
+  it("a stale override (missing or outdated baseline) is IGNORED — the live text renders", () => {
+    const base = renderToStaticMarkup(el());
+    // Legacy override saved before the baseline guard existed → stale.
+    const legacy = renderToStaticMarkup(
+      el({ panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE } }),
+    );
+    expect(legacy).not.toContain(OV_VALUE);
+    expect(legacy).toBe(base);
+    // Baseline recorded against an earlier week's read → data moved on → stale.
+    const stale = renderToStaticMarkup(
+      el({
+        panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE },
+        panelReadBases: {
+          [PANEL_READ_GULF_HORMUZ]: "An earlier week's generated read.",
+        },
+      }),
+    );
+    expect(stale).not.toContain(OV_VALUE);
+    expect(stale).toBe(base);
+  });
+
+  it("resolvePanelRead reports staleness so the editor can badge it", () => {
+    const bound = resolvePanelRead(
+      {
+        panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE },
+        panelReadBases: { [PANEL_READ_GULF_HORMUZ]: autoRead },
+      },
+      PANEL_READ_GULF_HORMUZ,
+      autoRead,
+    );
+    expect(bound).toEqual({ text: OV_VALUE, overrideApplied: true, overrideStale: false });
+    const legacy = resolvePanelRead(
+      { panelReads: { [PANEL_READ_GULF_HORMUZ]: OV_VALUE } },
+      PANEL_READ_GULF_HORMUZ,
+      autoRead,
+    );
+    expect(legacy).toEqual({ text: autoRead, overrideApplied: false, overrideStale: true });
+    const blank = resolvePanelRead({}, PANEL_READ_GULF_HORMUZ, autoRead);
+    expect(blank).toEqual({ text: autoRead, overrideApplied: false, overrideStale: false });
   });
 });
 
@@ -265,6 +322,7 @@ describe("pruneTopicSectionOverrides drops blank entries", () => {
         "Highest Severity": { value: "High" },
       },
       panelReads: { [PANEL_READ_GULF_HORMUZ]: "  " },
+      panelReadBases: { [PANEL_READ_GULF_HORMUZ]: "orphaned baseline" },
       marketPriceOverrides: {
         "energy:brent": { value: "", change: "" },
         "energy:wti": { change: "steady" },
@@ -274,6 +332,20 @@ describe("pruneTopicSectionOverrides drops blank entries", () => {
       excludedIncidentIds: ["7"],
       fastFactOverrides: { "Highest Severity": { value: "High" } },
       marketPriceOverrides: { "energy:wti": { change: "steady" } },
+    });
+  });
+
+  it("keeps the baseline for a surviving panel-read override, drops orphans", () => {
+    const pruned = pruneTopicSectionOverrides({
+      panelReads: { [PANEL_READ_GULF_HORMUZ]: "kept override" },
+      panelReadBases: {
+        [PANEL_READ_GULF_HORMUZ]: "its baseline",
+        "some-retired-panel": "orphaned baseline",
+      },
+    });
+    expect(pruned).toEqual({
+      panelReads: { [PANEL_READ_GULF_HORMUZ]: "kept override" },
+      panelReadBases: { [PANEL_READ_GULF_HORMUZ]: "its baseline" },
     });
   });
 

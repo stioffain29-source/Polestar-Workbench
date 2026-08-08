@@ -65,6 +65,7 @@ import {
   topicSectionKeys,
   pruneTopicSectionOverrides,
   PANEL_READ_GULF_HORMUZ,
+  resolvePanelRead,
   marketOperatorRowKey,
   type TopicSectionOverrides,
   type FastFactOverride,
@@ -527,6 +528,7 @@ export default function ReportEditor() {
   // use, so the override editor lists exactly the bullets/rows that render.
   const fuelOverridePanels = useMemo<{
     gulfLines: string[];
+    gulfRead: string;
     producerRows: ProducerBuyerActionRow[];
   } | null>(() => {
     if (form.topic !== "fuel" || !form.issueDate) return null;
@@ -543,6 +545,10 @@ export default function ReportEditor() {
         gulfLines: gulf
           ? [...gulf.currentItemLines, ...gulf.standingItemLines]
           : [],
+        // The live AUTO read — recorded as the staleness baseline whenever the
+        // owner edits the panel-read override, and compared against any saved
+        // baseline to flag an override the report no longer applies.
+        gulfRead: gulf?.read ?? "",
         producerRows: d.incidentData.producerBuyerActions,
       };
     } catch {
@@ -2060,8 +2066,11 @@ export default function ReportEditor() {
           )}
 
           {/* Fuel Watch: the Gulf & Hormuz Chokepoint Watch "read" paragraph
-              is owner-editable (blank = live auto text). Preview and PDF pick
-              the override through the same pickRead call. */}
+              is owner-editable (blank = live auto text). Preview and PDF apply
+              the override through the same resolvePanelRead call, which only
+              honours it while the auto text still equals the baseline captured
+              here at edit time — so a saved paragraph can never silently
+              outrank a later week's fresh reporting. */}
           {form.topic === "fuel" && (
             <Field label="Gulf & Hormuz Chokepoint Watch — Read (blank = auto)">
               <Textarea
@@ -2074,10 +2083,29 @@ export default function ReportEditor() {
                       ...(prev.panelReads ?? {}),
                       [PANEL_READ_GULF_HORMUZ]: e.target.value,
                     },
+                    // Bind the override to the auto text it was written
+                    // against. resolvePanelRead stops applying it the moment
+                    // the generated read changes.
+                    panelReadBases: {
+                      ...(prev.panelReadBases ?? {}),
+                      [PANEL_READ_GULF_HORMUZ]: fuelOverridePanels?.gulfRead ?? "",
+                    },
                   }))
                 }
                 className="rounded-sm"
               />
+              {resolvePanelRead(
+                sectionOverrides,
+                PANEL_READ_GULF_HORMUZ,
+                fuelOverridePanels?.gulfRead ?? "",
+              ).overrideStale && (
+                <p className="mt-1 text-[12px] leading-snug text-amber-700">
+                  Out of date — this saved text was written against an earlier
+                  week's generated read, so the report is showing the live
+                  generated text instead. Edit the box to re-apply it this
+                  week, or clear it to keep following the live text.
+                </p>
+              )}
             </Field>
           )}
 
