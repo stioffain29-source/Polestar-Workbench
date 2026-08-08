@@ -5,10 +5,12 @@ import {
   type CountryNarrative,
 } from "@workspace/country-engine/narrative";
 import {
+  checkNoOutOfScopeLocalityEvents,
   runQualityGate,
   type QualityGateReport,
   type MapPoint,
 } from "@workspace/country-engine/gate";
+import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -93,6 +95,16 @@ function checkNames(r: ReturnType<typeof runQualityGate>): string[] {
   return r.failures.filter((f) => f.severity === "critical").map((f) => f.check);
 }
 
+const JAKARTA_LOCALITY_SCOPE = {
+  label: "Jakarta",
+  isInScope: (event: CanonicalEvent) =>
+    isJakartaScoped(
+      event.eventTitle,
+      event.eventSummary,
+      event.district ?? event.city ?? event.provinceOrState,
+    ),
+};
+
 // ---------------------------------------------------------------------------
 // Happy path
 // ---------------------------------------------------------------------------
@@ -108,6 +120,107 @@ describe("runQualityGate — passing report", () => {
     expect(result.failures.filter((f) => f.severity === "critical")).toEqual(
       [],
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §33 — locality scope
+// ---------------------------------------------------------------------------
+
+describe("checkNoOutOfScopeLocalityEvents (§33)", () => {
+  it("returns a critical failure for a Papua event in the Jakarta locality scope", () => {
+    const jakartaEvent = makeEvent({
+      physicalCountry: "Indonesia",
+      city: "Central Jakarta",
+      eventTitle: "Flooding disrupts traffic in Central Jakarta",
+      eventSummary: "Commuters faced delays near major roads in Central Jakarta.",
+    });
+    const papuaEvent = makeEvent({
+      physicalCountry: "Indonesia",
+      city: "Jakarta",
+      eventTitle:
+        "Indonesian Forces Hunt Papua Separatists After Four Road Workers Killed",
+      eventSummary:
+        "Jakarta has ordered additional troops to Papua after separatists killed four road workers in the highlands.",
+    });
+    const failures = checkNoOutOfScopeLocalityEvents(
+      baseReport([jakartaEvent, papuaEvent], {
+        countryName: "Indonesia",
+        localityScope: JAKARTA_LOCALITY_SCOPE,
+      }),
+    );
+
+    expect(failures).toEqual([
+      expect.objectContaining({
+        check: "no_out_of_scope_locality_event",
+        severity: "critical",
+        eventId: papuaEvent.eventId,
+        message: `Included event ${papuaEvent.eventId} is outside the Jakarta geographic scope.`,
+      }),
+    ]);
+  });
+
+  it("returns no failures when every included event is Jakarta-scoped", () => {
+    const report = baseReport(
+      [
+        makeEvent({
+          physicalCountry: "Indonesia",
+          city: "Central Jakarta",
+          eventTitle: "Flooding disrupts traffic in Central Jakarta",
+          eventSummary: "Commuters faced delays near major roads in Central Jakarta.",
+        }),
+        makeEvent({
+          physicalCountry: "Indonesia",
+          city: "South Jakarta",
+          eventTitle: "Police respond to robbery in South Jakarta",
+          eventSummary: "Police increased patrols in South Jakarta after a robbery.",
+        }),
+        makeEvent({
+          physicalCountry: "Indonesia",
+          city: null,
+          provinceOrState: "Greater Jakarta (Jabodetabek)",
+          eventTitle: "Flooding disrupts roads in Tangerang",
+          eventSummary: "Authorities warned of transport disruption in Tangerang.",
+        }),
+      ],
+      { countryName: "Indonesia", localityScope: JAKARTA_LOCALITY_SCOPE },
+    );
+
+    expect(checkNoOutOfScopeLocalityEvents(report)).toEqual([]);
+  });
+
+  it("is a no-op when localityScope is undefined", () => {
+    const report = baseReport([
+      makeEvent({
+        eventTitle:
+          "Indonesian Forces Hunt Papua Separatists After Four Road Workers Killed",
+        eventSummary:
+          "Jakarta has ordered additional troops to Papua after separatists killed four road workers in the highlands.",
+        city: "Jakarta",
+      }),
+    ]);
+
+    expect(checkNoOutOfScopeLocalityEvents(report)).toEqual([]);
+  });
+
+  it("fails the overall gate for an out-of-scope locality event", () => {
+    const papuaEvent = makeEvent({
+      physicalCountry: "Indonesia",
+      city: "Jakarta",
+      eventTitle:
+        "Indonesian Forces Hunt Papua Separatists After Four Road Workers Killed",
+      eventSummary:
+        "Jakarta has ordered additional troops to Papua after separatists killed four road workers in the highlands.",
+    });
+    const result = runQualityGate(
+      baseReport([papuaEvent], {
+        countryName: "Indonesia",
+        localityScope: JAKARTA_LOCALITY_SCOPE,
+      }),
+    );
+
+    expect(result.passed).toBe(false);
+    expect(checkNames(result)).toContain("no_out_of_scope_locality_event");
   });
 });
 

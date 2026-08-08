@@ -1039,6 +1039,7 @@ export default function CountryReport() {
       }
     : null;
 
+  const isJakarta = effective?.name.trim().toLowerCase() === "jakarta";
   const coverUrl = effective ? countryCoverUrl(effective.name) : undefined;
   const periodLabel = active.periodLabel;
 
@@ -1220,6 +1221,19 @@ export default function CountryReport() {
         ...pngDataset.gateReport,
         narrative: patched,
         sectionWordCounts: patched.sectionWordCounts,
+        ...(isJakarta
+          ? {
+              localityScope: {
+                label: "Jakarta",
+                isInScope: (e) =>
+                  isJakartaScoped(
+                    e.eventTitle,
+                    e.eventSummary,
+                    e.district ?? e.city ?? e.provinceOrState,
+                  ),
+              },
+            }
+          : {}),
       });
       // whatChanged is analyst-editable but not a §31 narrative section — still
       // scan the edited text for §30 banned phrases so no overlay escapes the
@@ -1272,7 +1286,6 @@ export default function CountryReport() {
   // Analyst-placed incident map node, rendered at the chosen placement slot.
   // Jakarta uses a corridor & access schematic (operating-exposure graphic)
   // instead of the numbered incident-dot map; all other theatres are unchanged.
-  const isJakarta = effective.name.trim().toLowerCase() === "jakarta";
   // City reports (Jakarta today; Manila/Bangkok planned) are framed as CITY, not
   // COUNTRY, reports — driven by the shared reportKind registry.
   const isCity = isCityReport(effective.name);

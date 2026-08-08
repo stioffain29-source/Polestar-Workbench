@@ -54,6 +54,12 @@ export interface QualityGateReport {
   hasPriorData: boolean;
   // The report country (physical-country check, §33 DATA).
   countryName: string;
+  // Optional sub-national boundary for city / locality reports. Unset for
+  // country-level reports, which leaves the locality check inactive.
+  localityScope?: {
+    label: string;
+    isInScope: (event: CanonicalEvent) => boolean;
+  };
   // The reporting window [startISO, endISO] inclusive, if known.
   reportingWindow?: { start: string; end: string } | null;
 }
@@ -109,6 +115,27 @@ export function checkNoForeignIncludedEvents(
         check: "no_foreign_included_event",
         severity: "critical",
         message: `Included event ${e.eventId} physically occurred in "${e.physicalCountry}", not ${report.countryName}.`,
+        eventId: e.eventId,
+      });
+    }
+  }
+  return failures;
+}
+
+/** DATA — included events must fall within an optional locality report scope. */
+export function checkNoOutOfScopeLocalityEvents(
+  report: QualityGateReport,
+): GateFailure[] {
+  const localityScope = report.localityScope;
+  if (!localityScope) return [];
+
+  const failures: GateFailure[] = [];
+  for (const e of report.included) {
+    if (!localityScope.isInScope(e)) {
+      failures.push({
+        check: "no_out_of_scope_locality_event",
+        severity: "critical",
+        message: `Included event ${e.eventId} is outside the ${localityScope.label} geographic scope.`,
         eventId: e.eventId,
       });
     }
@@ -541,6 +568,7 @@ export function checkRecommendationsLinked(
 
 const ALL_CHECKS: ((r: QualityGateReport) => GateFailure[])[] = [
   checkNoForeignIncludedEvents,
+  checkNoOutOfScopeLocalityEvents,
   checkNoIncludedDuplicates,
   checkTopDevelopmentsReferenced,
   checkDatesWithinWindow,
