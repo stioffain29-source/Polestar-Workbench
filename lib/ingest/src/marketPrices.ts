@@ -34,11 +34,12 @@ const changePct = (series: Series, asOf: string, value: number): string | null =
 //   * Brent crude — Yahoo BZ=F  (fallback FRED DCOILBRENTEU), USD/bbl, daily
 //   * WTI crude   — Yahoo CL=F  (fallback FRED DCOILWTICO),   USD/bbl, daily
 //   * Jet fuel    — FRED DJFUELUSGULF (U.S. Gulf Coast kerosene-type jet fuel,
-//     EIA), USD/gal. This is the REAL jet-fuel price, not a proxy. The EIA
-//     series publishes WEEKLY, so the jet "as of" date usually sits a few
-//     business days behind the daily Brent/WTI close — that lag is inherent to
-//     the only honest free jet-fuel feed and is surfaced via jetDataNote, never
-//     papered over with a daily distillate stand-in.
+//     EIA), USD/gal, itself a DAILY series (not the weekly WJFUELUSGULF
+//     variant). This is the REAL jet-fuel price, not a proxy. EIA's own
+//     publication of it still trails the daily Brent/WTI close by a few
+//     business days — that lag is inherent to the only honest free jet-fuel
+//     feed and is surfaced via jetDataNote, never papered over with a daily
+//     distillate stand-in.
 //
 // FRED's fredgraph.csv and Yahoo's chart endpoint are both public and need no
 // API key. Every fuel report is priced AS OF THE END OF ITS REPORTING WINDOW
@@ -163,9 +164,9 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
 
   // Crude (Brent/WTI) prefers Yahoo (latest market close) and falls back to
   // FRED. Jet uses the REAL EIA U.S. Gulf Coast jet-fuel series (FRED
-  // DJFUELUSGULF) directly — it publishes weekly, so its latest point lags the
-  // daily crude close by a few days, but it is the genuine jet price, not a
-  // daily distillate proxy. All run in parallel.
+  // DJFUELUSGULF) directly — a daily series whose EIA publication still lags
+  // the daily crude close by a few days, but it is the genuine jet price, not
+  // a daily distillate proxy. All run in parallel.
   const [brent, wti, jet] = await Promise.all([
     safe(
       "BZ=F",

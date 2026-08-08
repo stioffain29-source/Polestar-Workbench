@@ -1046,7 +1046,8 @@ export async function exportTopicReportPdf(
       );
       // Jet-fuel lag note — mirror the preview (ReportPreview.tsx) so the PDF
       // also explains why the jet "as of" date trails the daily Brent/WTI close
-      // (EIA U.S. Gulf Coast jet fuel publishes weekly). Keeps screen == PDF.
+      // (EIA's publication of the daily U.S. Gulf Coast jet fuel series itself
+      // lags by a few business days). Keeps screen == PDF.
       if (fuelData.marketData.jetDataNote) {
         renderProse(ctx, fuelData.marketData.jetDataNote);
       }

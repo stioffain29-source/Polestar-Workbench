@@ -362,10 +362,12 @@ export function buildFuelWatchReportData(
   // Jet-fuel lag note. The reporting period ends on the freshest market
   // close the report carries (fuelMarketLatestDate — usually Brent/WTI from
   // the daily futures feed). The jet figure is the REAL EIA Gulf Coast
-  // jet-fuel series, which publishes weekly, so its latest point usually
-  // lands a few days inside the period. When it does, surface an in-period
-  // note so the jet chart's earlier "Latest" date is explained, not
-  // perceived as a mismatch.
+  // jet-fuel series (FRED DJFUELUSGULF, itself a DAILY series, not the
+  // weekly WJFUELUSGULF variant), but EIA's own publication of it still
+  // trails the daily crude futures close by a few business days, so its
+  // latest point usually lands a few days inside the period. When it does,
+  // surface an in-period note so the jet chart's earlier "Latest" date is
+  // explained, not perceived as a mismatch.
   const periodEnd = fuelMarketLatestDate(report.hardNumbers);
   const jetDates: string[] = [];
   const pushJet = (raw: string | undefined | null) => {
@@ -382,7 +384,7 @@ export function buildFuelWatchReportData(
   if (periodEnd && jetLatest && jetLatest < periodEnd) {
     jetDataNote =
       `Jet fuel latest available ${formatFuelNoteDate(jetLatest)} ` +
-      `(weekly EIA U.S. Gulf Coast series); ` +
+      `(daily EIA U.S. Gulf Coast series, publication trails the crude close); ` +
       `Brent and WTI run to ${formatFuelNoteDate(periodEnd)} (the period end).`;
   }
 
@@ -489,16 +491,27 @@ export function buildFuelMarketRead(opts: {
   }
 
   if (jetFuel && trajectory.length >= 2) {
-    const first = trajectory[0].value;
-    const last = trajectory[trajectory.length - 1].value;
+    const firstPoint = trajectory[0];
+    const lastPoint = trajectory[trajectory.length - 1];
+    const first = firstPoint.value;
+    const last = lastPoint.value;
     const pct = first !== 0 ? ((last - first) / first) * 100 : 0;
+    // Direction wording must always agree with the sign of pct — a small
+    // negative move can never be described as "holding above" the earlier
+    // reading, and vice versa. The trajectory's first point is simply the
+    // earliest of the trailing observations the chart carries (it can sit
+    // before the reporting period when the underlying series has a
+    // reporting lag), so the sentence cites the actual dates rather than
+    // implying it is the period start.
     let dir: string;
-    if (pct >= 3) dir = "rising over the period";
-    else if (pct <= -3) dir = "easing over the period";
-    else dir = "holding above the start of the period";
+    if (pct >= 3) dir = "rising over this window";
+    else if (pct <= -3) dir = "easing over this window";
+    else if (pct > 0) dir = "holding modestly above its earlier reading";
+    else if (pct < 0) dir = "holding modestly below its earlier reading";
+    else dir = "flat against its earlier reading";
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
     parts.push(
-      `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} versus ${first.toFixed(3)} at the start (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
+      `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} on ${formatAsOfDate(lastPoint.date)} versus ${first.toFixed(3)} on ${formatAsOfDate(firstPoint.date)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
     );
   } else if (jetFuel) {
     const jv = numVal(jetFuel);
