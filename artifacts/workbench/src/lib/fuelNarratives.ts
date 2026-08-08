@@ -14,7 +14,7 @@ import {
   compareIncidentSignificance,
   incidentSeverityRank,
 } from "@workspace/country-engine";
-import { deriveIncidentCountry } from "./shippingCountry";
+import { deriveIncidentCountry, deriveFlagState } from "./shippingCountry";
 import { matchesTopicIncident } from "./topicIncidentMatching";
 
 function titleCase(s: string): string {
@@ -837,6 +837,11 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     // the raw field, which can be a vessel flag state or source geography.
     const c = incidentCountry(i);
     if (c) return `${c} infrastructure operator`;
+    // No incident-location country. A flag state still differentiates the row
+    // ("6 Saudi-flagged oil carriers reroute" → "Saudi Arabia-flagged
+    // operator") without pretending the event happened in that country.
+    const flag = deriveFlagState(i);
+    if (flag) return `${flag}-flagged operator`;
     return "Infrastructure operator";
   }
   if (category === "Market / supply signal") return "Market";

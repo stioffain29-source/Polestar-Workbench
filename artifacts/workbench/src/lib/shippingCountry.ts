@@ -68,10 +68,12 @@ const CITY_COUNTRY_CUES: Array<[RegExp, string]> = [
   [/\btehran\b/i, "Iran"],
   [/\bmuscat\b/i, "Oman"],
   [/\babu dhabi\b|\bdubai\b/i, "UAE"],
-  [/\briyadh\b|\bjeddah\b/i, "Saudi Arabia"],
+  [/\briyadh\b|\bjeddah\b|\bjazan\b|\byanbu\b|\bras tanura\b/i, "Saudi Arabia"],
   [/\bdoha\b/i, "Qatar"],
   [/\bsana'?a\b|\baden\b/i, "Yemen"],
-  [/\bbaghdad\b|\bbasra\b/i, "Iraq"],
+  [/\bbaghdad\b|\bbasra\b|\bbaiji\b|\bkirkuk\b/i, "Iraq"],
+  [/\babadan\b|\bbandar abbas\b/i, "Iran"],
+  [/\bfujairah\b/i, "UAE"],
   [/\bnew delhi\b|\bmumbai\b|\bjamnagar\b/i, "India"],
   [/\bislamabad\b|\bkarachi\b/i, "Pakistan"],
   [/\bmanila\b/i, "Philippines"],
@@ -91,19 +93,113 @@ const COUNTRY_CONTEXT_CUES: Array<[RegExp, string]> = [
   [/\b(?:strait of )?hormuz\b/i, "Iran"],
 ];
 
-function findCountryCue(text: string): string | null {
-  return findCountryInText(text) ?? CITY_COUNTRY_CUES.find(([re]) => re.test(text))?.[1] ?? null;
+// Adjectival / demonym forms. "Iraqi authorities extinguished a refinery
+// fire" names the country as clearly as "Iraq" does, but `\bIraq\b` cannot
+// match "Iraqi". Deliberately excluded: "American" (Latin American, American
+// Airlines), "Korean" (North/South ambiguity), "Congolese" (two Congos).
+const COUNTRY_DEMONYMS: Array<[RegExp, string]> = [
+  [/\bsaudi\b/i, "Saudi Arabia"],
+  [/\bemirati\b/i, "UAE"],
+  [/\bomani\b/i, "Oman"],
+  [/\bqatari\b/i, "Qatar"],
+  [/\bbahraini\b/i, "Bahrain"],
+  [/\bkuwaiti\b/i, "Kuwait"],
+  [/\bjordanian\b/i, "Jordan"],
+  [/\biraqi\b/i, "Iraq"],
+  [/\byemeni\b/i, "Yemen"],
+  [/\bisraeli\b/i, "Israel"],
+  [/\blebanese\b/i, "Lebanon"],
+  [/\bsyrian\b/i, "Syria"],
+  [/\bturkish\b/i, "Turkey"],
+  [/\biranian\b/i, "Iran"],
+  [/\bsingaporean\b/i, "Singapore"],
+  [/\bmalaysian\b/i, "Malaysia"],
+  [/\bindonesian\b/i, "Indonesia"],
+  [/\bthai\b/i, "Thailand"],
+  [/\bvietnamese\b/i, "Vietnam"],
+  [/\bphilippine\b|\bfilipino\b/i, "Philippines"],
+  [/\bcambodian\b/i, "Cambodia"],
+  [/\bburmese\b/i, "Myanmar"],
+  [/\bindian\b/i, "India"],
+  [/\bpakistani\b/i, "Pakistan"],
+  [/\bbangladeshi\b/i, "Bangladesh"],
+  [/\bsri lankan\b/i, "Sri Lanka"],
+  [/\bchinese\b/i, "China"],
+  [/\btaiwanese\b/i, "Taiwan"],
+  [/\bjapanese\b/i, "Japan"],
+  [/\baustralian\b/i, "Australia"],
+  [/\bafghan\b/i, "Afghanistan"],
+  [/\balgerian\b/i, "Algeria"],
+  [/\bbrazilian\b/i, "Brazil"],
+  [/\begyptian\b/i, "Egypt"],
+  [/\bethiopian\b/i, "Ethiopia"],
+  [/\bfrench\b/i, "France"],
+  [/\bgerman\b/i, "Germany"],
+  [/\bgreek\b/i, "Greece"],
+  [/\bitalian\b/i, "Italy"],
+  [/\bkenyan\b/i, "Kenya"],
+  [/\blibyan\b/i, "Libya"],
+  [/\bmexican\b/i, "Mexico"],
+  [/\bmoroccan\b/i, "Morocco"],
+  [/\bnigerian\b/i, "Nigeria"],
+  [/\bpalestinian\b/i, "Palestine"],
+  [/\brussian\b/i, "Russia"],
+  [/\bsomali\b/i, "Somalia"],
+  [/\bsouth african\b/i, "South Africa"],
+  [/\bspanish\b/i, "Spain"],
+  [/\bsudanese\b/i, "Sudan"],
+  [/\bukrainian\b/i, "Ukraine"],
+  [/\bbritish\b/i, "United Kingdom"],
+  [/\bvenezuelan\b/i, "Venezuela"],
+];
+
+// A demonym attached to a vessel or flag descriptor ("Saudi-flagged oil
+// carriers", "Saudi oil tanker", "Panama-registered vessel") describes the
+// ship, not where the event happened. Mask those spans before scanning for
+// demonyms so flag states never leak into the incident-country bucket.
+const FLAG_DESCRIPTOR_RE =
+  /\b[\w'’]+[- ](?:flagged|registered|owned|operated)\b|\b[\w'’]+\s+(?:oil\s+|lng\s+|crude\s+|gas\s+)?(?:tankers?|vessels?|ships?|carriers?|freighters?|bulkers?|boats?)\b/gi;
+
+function maskFlagDescriptors(text: string): string {
+  return text.replace(FLAG_DESCRIPTOR_RE, " ");
 }
 
-function countryMatchesText(country: string, text: string): boolean {
+function findCountryDemonym(text: string): string | null {
+  if (!text) return null;
+  const masked = maskFlagDescriptors(text);
+  return COUNTRY_DEMONYMS.find(([re]) => re.test(masked))?.[1] ?? null;
+}
+
+// Vessel context is the only situation in which the raw `country` field can
+// plausibly carry a flag state rather than the event location. Land incidents
+// (refinery halts, depot fires, policy moves) have no flag to leak.
+const VESSEL_CONTEXT_RE =
+  /\b(?:tankers?|vessels?|ships?|carriers?|freighters?|bulkers?|boats?|cargo(?:es)?|flagged|registered)\b/i;
+
+export function hasVesselContext(text: string): boolean {
+  return VESSEL_CONTEXT_RE.test(text);
+}
+
+function findCountryCue(text: string): string | null {
+  return (
+    findCountryInText(text) ??
+    CITY_COUNTRY_CUES.find(([re]) => re.test(text))?.[1] ??
+    findCountryDemonym(text)
+  );
+}
+
+function countryNamedInText(country: string, text: string): boolean {
   const aliases = Object.entries(COUNTRY_ALIASES)
     .filter(([, value]) => value.toLowerCase() === country.toLowerCase())
     .map(([key]) => key)
     .concat(country);
-  if (aliases.some((candidate) => {
+  return aliases.some((candidate) => {
     const escaped = candidate.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
     return new RegExp(`\\b${escaped}\\b`, "i").test(text);
-  })) return true;
+  });
+}
+
+function countryContextCueInText(country: string, text: string): boolean {
   return COUNTRY_CONTEXT_CUES.some(
     ([re, cueCountry]) =>
       cueCountry.toLowerCase() === country.toLowerCase() && re.test(text),
@@ -130,13 +226,25 @@ export function deriveIncidentCountry(i: CountrySource): string | null {
   // 2. A country named directly in title/summary is an event-location signal
   // even when the source row leaves `country` blank.
   const fromProse = findCountryCue(eventBlob);
-  // 3. country field, only if corroborated by event prose or an unambiguous
-  // city cue. Strip "Unknown" so it never wins this check.
+  // 3. country field. Strip "Unknown" so it never wins this check.
   const raw = (i.country ?? "").split(/[;,]/)[0].trim();
   if (raw && !/^unknown$/i.test(raw)) {
     const c = canonical(raw);
     if (fromProse && fromProse.toLowerCase() === c.toLowerCase()) return c;
-    if (countryMatchesText(c, eventBlob)) return c;
+    // Named directly in the event prose: strongest corroboration.
+    if (countryNamedInText(c, eventBlob)) return c;
+    if (!fromProse) {
+      // Ambiguous geographic context (e.g. Hormuz) can only validate the raw
+      // field when the prose names no other country. A country named in the
+      // title ("Kuwait discusses oil pipeline ... bypass Strait of Hormuz")
+      // must outrank a raw field that only a context cue supports.
+      if (countryContextCueInText(c, eventBlob)) return c;
+      // No vessel in the story means the raw field cannot be a flag state —
+      // a refinery halt or depot fire has no flag to leak. Trust it. This is
+      // what keeps "Jazan Refinery halted, 400,000 bpd offline" attributed
+      // to Saudi Arabia when the prose never repeats the country name.
+      if (!hasVesselContext(eventBlob)) return c;
+    }
   }
   return fromProse;
 }
