@@ -4,6 +4,7 @@ import {
   applyMarketPriceOverrides,
   applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
+  resolvePanelRead,
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
@@ -671,7 +672,6 @@ export default function ReportPreview({
 }) {
   const show = makeSectionGate(hiddenSections);
   const ffOverrides = sectionOverrides?.fastFactOverrides;
-  const panelReads = sectionOverrides?.panelReads ?? {};
   void canonicalTopic; void format; void parseISO;
   const resolvedTitle = report.topic
     ? resolveReportTitle(report.topic, report.title)
@@ -1000,7 +1000,9 @@ export default function ReportPreview({
               const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
               return (
                 <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
-                  <Paragraphs text={pickRead(panelReads[PANEL_READ_GULF_HORMUZ], gulf.read)} />
+                  {/* Staleness-guarded override — same resolvePanelRead the PDF
+                      exporter uses, so preview == PDF. */}
+                  <Paragraphs text={resolvePanelRead(sectionOverrides, PANEL_READ_GULF_HORMUZ, gulf.read).text} />
                   {currentLines.length > 0 && (
                     <ul
                       className="list-disc pl-5 space-y-1.5"
