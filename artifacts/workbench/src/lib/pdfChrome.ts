@@ -679,11 +679,41 @@ export function drawBulletSection(
   };
   applyProseStyle();
 
-  for (const b of bullets) {
+  // Pre-measure every bullet's block height, then simulate pagination
+  // ahead of drawing anything. This lets us apply widow control: if the
+  // naive per-item page-break check would leave ONLY the final bullet
+  // stranded alone at the top of a new page, pull the second-to-last
+  // bullet along with it instead, so the list never ends with a single
+  // orphaned line separated from the rest of its own section.
+  const blockHeights = bullets.map(
+    (b) => pdf.splitTextToSize(b, CW - bulletIndent).length * lineH + gapBetween,
+  );
+  let simY = ctx.y;
+  let forcedBreakBefore = -1;
+  for (let idx = 0; idx < blockHeights.length; idx++) {
+    if (simY + blockHeights[idx] > ctx.H - ctx.BOTTOM) {
+      forcedBreakBefore = idx;
+      break;
+    }
+    simY += blockHeights[idx];
+  }
+  // Widow control: a break landing right before the LAST bullet (with at
+  // least one bullet already placed before it) would strand that single
+  // bullet alone on the next page — move the break one bullet earlier so
+  // the final two bullets land together.
+  if (forcedBreakBefore === bullets.length - 1 && forcedBreakBefore > 0) {
+    forcedBreakBefore -= 1;
+  }
+
+  bullets.forEach((b, idx) => {
     const lines: string[] = pdf.splitTextToSize(b, CW - bulletIndent);
-    const blockH = lines.length * lineH + gapBetween;
-    // Keep a bullet together with its first line; otherwise page break first.
-    if (ctx.y + blockH > ctx.H - ctx.BOTTOM) {
+    const blockH = blockHeights[idx];
+    // Break exactly at the simulated point (widow-adjusted), or fall back
+    // to a plain fit check for any bullet the simulation didn't reach
+    // (e.g. an unusually long tail after an earlier forced break).
+    const needsBreak =
+      idx === forcedBreakBefore || ctx.y + blockH > ctx.H - ctx.BOTTOM;
+    if (needsBreak) {
       newPage(ctx);
       applyProseStyle();
     }
@@ -699,7 +729,7 @@ export function drawBulletSection(
       ctx.y += lineH;
     }
     ctx.y += gapBetween;
-  }
+  });
   ctx.y += 6;
 }
 

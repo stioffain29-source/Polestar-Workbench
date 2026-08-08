@@ -819,6 +819,13 @@ const DEDUPE_STOP = new Set([
   "says", "say", "said", "now", "new", "via", "per", "out", "off", "near",
   "could", "may", "will", "would", "this", "that", "are", "was", "has",
   "have", "its", "his", "her", "their", "not", "but", "yet", "all",
+  // Generic fuel-report vocabulary that recurs across unrelated stories in
+  // this section (every headline here is fuel-adjacent by construction) and
+  // would otherwise inflate overlap between genuinely different incidents —
+  // e.g. two different airlines both cutting capacity "amid major fuel
+  // crisis 2026" sharing only that boilerplate. Stripped so overlap reflects
+  // the story's actual subject (actor, target, action), not its beat.
+  "fuel", "crisis", "major",
 ]);
 function sigTokens(s: string): Set<string> {
   return new Set(
@@ -846,8 +853,18 @@ function nearDuplicate(a: Set<string>, b: Set<string>): boolean {
   const jaccard = overlap / (a.size + b.size - overlap);
   // Same story when the titles share a strong block of distinctive content
   // words (absolute overlap AND a high similarity ratio), or when most of
-  // the shorter title's content is contained in the other.
-  return (overlap >= 4 && jaccard >= 0.4) || overlap >= Math.ceil(0.7 * smaller);
+  // the shorter title's content is contained in the other. The containment
+  // bar is 0.55, not 0.7: two independent wire rewrites of the same
+  // incident (e.g. "Houthis claim missile attack on Saudi oil tanker" vs
+  // "Houthis claim fresh attack on Saudi oil tanker; oil rebounds...")
+  // typically share ~55-65% of the shorter title's distinctive tokens once
+  // each outlet adds its own market-reaction framing — 0.7 was tuned tight
+  // enough to let two genuinely different actors' actions stand apart, but
+  // it also let true syndicated duplicates of the same attack survive as
+  // separate rows. 0.55 still keeps unrelated same-beat stories (different
+  // actors, different chokepoint events) below the bar — see the fixture
+  // pairs in fuelGulfChokepointWatch.test.ts, all well under 0.4.
+  return (overlap >= 4 && jaccard >= 0.4) || overlap >= Math.ceil(0.55 * smaller);
 }
 
 // Fuel-market topical guard for cross-topic action rows. A shipping-topic
@@ -1069,7 +1086,19 @@ export function buildFuelOperationalRead(opts: {
     if (!k) continue;
     byCountry.set(k, (byCountry.get(k) ?? 0) + 1);
   }
-  const topCountries = Array.from(byCountry.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  // Only surface a "most activity" claim when there is an actual repeat
+  // concentration to point to (2+ incidents) that clearly leads the next
+  // country, or a genuine tie among 2+ counted countries. A single incident
+  // trivially "leads" an empty field and reads as an unsupported claim when
+  // no other incidents are shown to back it up, so a lone leader with only
+  // one incident is dropped rather than named.
+  const sortedCountries = Array.from(byCountry.entries()).sort((a, b) => b[1] - a[1]);
+  const topCount = sortedCountries[0]?.[1] ?? 0;
+  const runnerUpCount = sortedCountries[1]?.[1] ?? 0;
+  const topCountries =
+    topCount >= 2 || topCount === runnerUpCount
+      ? sortedCountries.filter(([, n]) => n === topCount).slice(0, 3)
+      : [];
 
   const ordered = Array.from(counts.values()).sort((a, b) => b.items.length - a.items.length);
 
