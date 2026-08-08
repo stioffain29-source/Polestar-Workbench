@@ -28,6 +28,10 @@ args = "topic-font-audit"
 task = "workflow.run"
 args = "country-brief-sweep"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "prod-backfill"
+
 [[workflows.workflow]]
 name = "pdf-fonts"
 author = "agent"
@@ -57,6 +61,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash artifacts/workbench/scripts/verifyCountryBriefs.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "prod-backfill"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash /tmp/prod_chain.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
