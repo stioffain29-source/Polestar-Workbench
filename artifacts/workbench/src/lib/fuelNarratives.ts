@@ -22,6 +22,43 @@ function haystack(i: TopicFastFactsIncident): string {
   return [i.title ?? "", i.summary ?? ""].join(" ").toLowerCase();
 }
 
+const HIGHLIGHT_SEV_RANK: Record<string, number> = {
+  insignificant: 1,
+  low: 2,
+  moderate: 3,
+  high: 4,
+  extreme: 5,
+};
+
+// An incident whose own text says the situation is over — extinguished,
+// contained, restored, resumed, reopened, lifted — is reported ONLY as
+// historical colour, never as live pressure. Counting a resolved event at
+// full weight let a country top the "clearest pressure point" ranking on
+// the strength of an incident that was no longer actually happening (e.g. a
+// refinery fire logged as "contained" the same week it started), while a
+// standing chokepoint disruption elsewhere in the window carried more real
+// severity. Down-weighting resolved records (not dropping them outright —
+// they still count as reporting volume, just not as unresolved pressure)
+// keeps the ranking honest to current state rather than raw headline count.
+const RESOLVED_RE =
+  /\b(extinguish\w*|contained|containment|restored|resum\w*|reopen\w*|re-open\w*|lifted|ended?|over|back online|back in operation|resolved|normali[sz]\w*)\b/i;
+function resolvedDiscount(i: TopicFastFactsIncident): number {
+  return RESOLVED_RE.test(haystack(i)) ? 0.3 : 1;
+}
+
+// Weighted pressure score for one country's incident set: sum of each
+// incident's severity rank, discounted when the incident's own text marks
+// it as resolved. Replaces a raw incident-count ranking, which let a country
+// with many low-severity or already-resolved records outrank a country (or
+// the standing Gulf/Hormuz chokepoint watch) carrying fewer but materially
+// more severe, still-live incidents.
+function countryPressureScore(items: TopicFastFactsIncident[]): number {
+  return items.reduce((sum, i) => {
+    const sev = HIGHLIGHT_SEV_RANK[(i.severity ?? "").toLowerCase()] ?? 1;
+    return sum + sev * resolvedDiscount(i);
+  }, 0);
+}
+
 /**
  * Normalise a raw country field for use as a regional-highlight key.
  * Some upstream records carry combined values like "United Arab
@@ -161,7 +198,11 @@ export function buildFuelRegionalHighlights(opts: {
   }
   if (byCountry.size === 0) return null;
 
-  const ranked = Array.from(byCountry.entries()).sort((a, b) => b[1].length - a[1].length);
+  // Rank by weighted pressure score (severity, discounted for resolved
+  // incidents), not raw incident count — see countryPressureScore() above.
+  const ranked = Array.from(byCountry.entries()).sort(
+    (a, b) => countryPressureScore(b[1]) - countryPressureScore(a[1]),
+  );
   const lead = ranked.slice(0, 3);
 
   // Country-specific overlays so secondary countries never reuse the
@@ -837,7 +878,18 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     if (t.includes(a.toLowerCase())) return a;
   }
   if (category === "Government / policy action") return "Government / policy";
-  if (category === "Infrastructure / routing action") return "Infrastructure operator";
+  if (category === "Infrastructure / routing action") {
+    // No named corporate actor matched above. Falling back to the bare
+    // generic label "Infrastructure operator" made two unrelated events
+    // (e.g. Saudi tankers rerouting vs a Kuwaiti pipeline discussion) show
+    // up as identical, undifferentiated rows in the Market and Operator
+    // Responses table. The incident's own country stamp is already sourced
+    // data (not a fabricated actor name), so use it to at least tell rows
+    // apart when no named company or government body is identified.
+    const c = (i.country ?? "").trim();
+    if (c && !/^unknown$/i.test(c)) return `${c} infrastructure operator`;
+    return "Infrastructure operator";
+  }
   if (category === "Market / supply signal") return "Market";
   return "—";
 }
