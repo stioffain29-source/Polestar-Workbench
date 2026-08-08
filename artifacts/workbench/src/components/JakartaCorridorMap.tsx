@@ -127,6 +127,11 @@ export interface JakartaCorridorMapProps {
   incidents: CountryFastFactsIncident[];
   issueDate?: string;
   domId?: string;
+  // True when the weekly coverage determination is a coverage problem. Zones
+  // without live elevation then render "Not assessed" instead of their
+  // standing rating (e.g. "Monitored"), because a collection gap cannot
+  // support an active watch claim.
+  coverageUnconfirmed?: boolean;
 }
 
 /**
@@ -155,8 +160,12 @@ export default function JakartaCorridorMap({
   incidents,
   issueDate,
   domId,
+  coverageUnconfirmed = false,
 }: JakartaCorridorMapProps) {
-  const model = useMemo(() => buildJakartaPostureModel(incidents), [incidents]);
+  const model = useMemo(
+    () => buildJakartaPostureModel(incidents, coverageUnconfirmed),
+    [incidents, coverageUnconfirmed],
+  );
   const rangeLabel = useMemo(() => periodLabel(issueDate), [issueDate]);
 
   const drawKey = useMemo(

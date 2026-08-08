@@ -425,13 +425,11 @@ export default function PngCountryReportBody({
         {mapAt("after-bluf")}
         {photoAt("after-bluf")}
 
-        {show("top-3") && (
+        {/* A week with no developments renders NO Top-3 section at all — a
+            headline section with nothing in it reads as a contradiction. */}
+        {show("top-3") && topThree.length > 0 && (
           <Section title="Top 3 Developments">
-            {topThree.length === 0 ? (
-              <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-            ) : (
-              <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
-            )}
+            <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
           </Section>
         )}
         {mapAt("after-top3")}
@@ -483,18 +481,15 @@ export default function PngCountryReportBody({
       {mapAt("after-bluf")}
       {photoAt("after-bluf")}
 
-      {/* 2. Top 3 Developments — at most three tiles */}
-      {show("top-3") && (
+      {/* 2. Top 3 Developments — at most three tiles. No developments → the
+          section is omitted entirely rather than rendered around a filler line. */}
+      {show("top-3") && topThree.length > 0 && (
         <Section title="Top 3 Developments">
-          {topThree.length === 0 ? (
-            <EmptyNote>{d.emptyLocationFallback}</EmptyNote>
-          ) : (
-            <div>
-              {topThree.map((it) => (
-                <ItemCard key={it.id} item={it} suppressEmptyLocation />
-              ))}
-            </div>
-          )}
+          <div>
+            {topThree.map((it) => (
+              <ItemCard key={it.id} item={it} suppressEmptyLocation />
+            ))}
+          </div>
         </Section>
       )}
       {mapAt("after-top3")}

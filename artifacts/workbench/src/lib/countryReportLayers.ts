@@ -574,7 +574,7 @@ export function computeCountryCoverageStatus(opts: {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `No active collection source is currently attributed to ${name}, so an empty 7-day window cannot be read as quiet. Treat the operating picture as unconfirmed and widen local-source coverage. The 30 / 90-day context sections below carry the standing risk pattern.`,
+      detail: `No active collection source is currently attributed to ${name}, so an empty 7-day window cannot be read as quiet. The operating picture for ${name} this week is Not Assessed.`,
     };
   }
 
@@ -586,7 +586,7 @@ export function computeCountryCoverageStatus(opts: {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `${n} of ${of} collection source${of === 1 ? "" : "s"} feeding ${name} ${n === 1 ? "is" : "are"} currently failing or out of date, so the empty 7-day window reflects a coverage problem rather than confirmed quiet. The operating picture is unconfirmed; read the 30 / 90-day context sections below for the standing risk pattern.`,
+      detail: `${n} of ${of} collection source${of === 1 ? "" : "s"} feeding ${name} ${n === 1 ? "is" : "are"} currently failing or out of date, so the empty 7-day window reflects a coverage problem rather than confirmed quiet. The operating picture for ${name} this week is Not Assessed.`,
     };
   }
 
@@ -594,15 +594,18 @@ export function computeCountryCoverageStatus(opts: {
   // hold nothing at all). Healthy-but-silent collection cannot confirm a quiet
   // week, so this is a coverage problem, not genuine quiet.
   if (daysSinceLatest === null || daysSinceLatest > RECORD_STALE_DAYS) {
+    // "Sources report healthy" next to "no record on file" reads as a
+    // contradiction. A feed that runs but never delivers material about the
+    // location is NOT effective coverage of it, so say exactly that.
     const ageClause =
       daysSinceLatest === null
-        ? `no record is on file for ${name} across the 90-day window`
+        ? `nothing they have delivered in the past 90 days concerns ${name} itself. A running feed that never mentions the location is not effective coverage of it`
         : `the most recent record on file for ${name} is ${daysSinceLatest} days old`;
     return {
       state: "coverage-problem",
       showBanner: true,
       title: "Coverage warning",
-      detail: `Collection sources feeding ${name} report healthy, but ${ageClause}, so the empty 7-day window cannot be confirmed as quiet. Treat the operating picture as unconfirmed; read the 30 / 90-day context sections below for the standing risk pattern.`,
+      detail: `The collection sources feeding ${name} are running, but ${ageClause}, so the empty 7-day window cannot be confirmed as quiet. The operating picture for ${name} this week is Not Assessed.`,
     };
   }
 
@@ -615,7 +618,7 @@ export function computeCountryCoverageStatus(opts: {
     state: "coverage-problem",
     showBanner: true,
     title: "Coverage warning",
-    detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 7-day window. In a high-threat operating environment an empty week is read as a collection gap, not a quiet one — the operating picture is unconfirmed. Work the standing pattern in the 30 / 90-day context sections below.`,
+    detail: `All collection sources feeding ${name} report healthy, but no qualifying incident cleared the wire in the 7-day window. In a high-threat operating environment an empty week is read as a collection gap, not a quiet one. The operating picture for ${name} this week is Not Assessed.`,
   };
 }
 

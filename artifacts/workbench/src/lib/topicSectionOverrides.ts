@@ -71,8 +71,18 @@ export interface TopicSectionOverrides extends CountrySectionOverrides {
   fastFactOverrides?: Record<string, FastFactOverride>;
   /** Free-text overrides for hard-wired panels, keyed by the panel's stable
    *  section key (currently: "gulf-hormuz" — the Fuel Watch Gulf and Hormuz
-   *  Chokepoint Watch read). Blank/absent = live auto text (pickRead). */
+   *  Chokepoint Watch read). Blank/absent = live auto text. Applied through
+   *  resolvePanelRead, which refuses a stale override (see panelReadBases). */
   panelReads?: Record<string, string>;
+  /** Staleness baseline for panelReads: the AUTO (generated) text the analyst
+   *  saw when the override was written, keyed identically. resolvePanelRead
+   *  applies an override ONLY while the live auto text still equals this
+   *  baseline — once the underlying data moves on, the frozen override is
+   *  ignored (the report falls back to the live text) and the editor flags it
+   *  for re-binding. An override with NO baseline (saved before this guard
+   *  existed) is treated as stale for the same reason: it cannot prove it was
+   *  written against the current data. */
+  panelReadBases?: Record<string, string>;
   /** Market Prices table row overrides keyed "group:key". */
   marketPriceOverrides?: Record<string, MarketPriceOverride>;
   /** Fuel Gulf/Hormuz bullet overrides keyed by the bullet's AUTO line. */
@@ -83,6 +93,47 @@ export interface TopicSectionOverrides extends CountrySectionOverrides {
 
 /** Stable panel key for the Fuel Watch Gulf & Hormuz Chokepoint Watch read. */
 export const PANEL_READ_GULF_HORMUZ = "gulf-hormuz";
+
+export interface PanelReadResolution {
+  /** The text the surface should render. */
+  text: string;
+  /** True when a non-blank analyst override is the rendered text. */
+  overrideApplied: boolean;
+  /** True when a non-blank analyst override exists but was IGNORED because the
+   *  live auto text no longer matches the baseline it was written against (or
+   *  no baseline was recorded). The surface renders the live auto text. */
+  overrideStale: boolean;
+}
+
+/**
+ * Resolve a hard-wired panel read with staleness protection. A non-blank
+ * analyst override replaces the generated text ONLY while the generated text
+ * still equals the baseline captured when the override was saved. The moment
+ * fresh data changes the generated read, the frozen override stops applying —
+ * a week-old paragraph must never silently outrank this week's reporting.
+ * Blank/absent override → live auto text, exactly like pickRead.
+ */
+export function resolvePanelRead(
+  overrides:
+    | Pick<TopicSectionOverrides, "panelReads" | "panelReadBases">
+    | null
+    | undefined,
+  key: string,
+  auto: string | null | undefined,
+): PanelReadResolution {
+  const liveText = auto ?? "";
+  const override = (overrides?.panelReads?.[key] ?? "").trim();
+  if (!override) {
+    return { text: liveText, overrideApplied: false, overrideStale: false };
+  }
+  const base = overrides?.panelReadBases?.[key];
+  const bound =
+    typeof base === "string" && base.trim() === liveText.trim();
+  if (!bound) {
+    return { text: liveText, overrideApplied: false, overrideStale: true };
+  }
+  return { text: override, overrideApplied: true, overrideStale: false };
+}
 
 /**
  * Apply Fast Facts overrides to a computed card list. Works on every card
@@ -426,6 +477,13 @@ export function pruneTopicSectionOverrides(
     if ((v ?? "").trim()) pr[k] = v;
   }
   if (Object.keys(pr).length) out.panelReads = pr;
+  // A baseline is only meaningful while its override survives; a cleared
+  // override drops its baseline too so the stored jsonb never accretes.
+  const prb: Record<string, string> = {};
+  for (const [k, v] of Object.entries(ov.panelReadBases ?? {})) {
+    if (pr[k] !== undefined && typeof v === "string") prb[k] = v;
+  }
+  if (Object.keys(prb).length) out.panelReadBases = prb;
   const mp: Record<string, MarketPriceOverride> = {};
   for (const [k, v] of Object.entries(ov.marketPriceOverrides ?? {})) {
     const value = (v.value ?? "").trim();

@@ -272,12 +272,15 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
 describe("PngCountryReportBody — country brief render, quiet window", () => {
   const html = renderToStaticMarkup(<PngCountryReportBody dataset={build([])} />);
 
-  // §27: a sparse (quiet) week returns a short report. The framing sections
-  // (Bottom Line, Top 3, Incident Details) still render honest empty notes, but
-  // the analytical sections (Current Situation, Operational Impact, Recommended
-  // Actions, Outlook, Polestar View) are OMITTED rather than padded with filler.
-  const RETAINED = ["Bottom Line Up Front", "Top 3 Developments"];
+  // §27: a sparse (quiet) week returns a short report. The Bottom Line still
+  // renders (as the honest short-report text), but Top 3 Developments is
+  // OMITTED entirely when there are no developments — a headline section with
+  // nothing in it reads as a contradiction — and the analytical sections
+  // (Current Situation, Operational Impact, Recommended Actions, Outlook,
+  // Polestar View) are OMITTED rather than padded with filler.
+  const RETAINED = ["Bottom Line Up Front"];
   const OMITTED = [
+    "Top 3 Developments",
     "Current Situation",
     "Operational Impact",
     "Recommended Actions",

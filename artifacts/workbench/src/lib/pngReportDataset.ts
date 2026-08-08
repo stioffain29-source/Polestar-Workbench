@@ -957,6 +957,11 @@ export interface BuildArgs {
   // is flagged occurredOutOfWindow and dropped from the period's trend/severity
   // aggregates. Omitted → occurredOutOfWindow is always false (render unchanged).
   windowStart?: Date;
+  // True when computeCountryCoverageStatus determined the weekly window is a
+  // coverage problem (state "coverage-problem"). Every empty-week surface then
+  // reads "Not Assessed" instead of implying a confirmed quiet week. Omitted →
+  // false (render unchanged).
+  coverageUnconfirmed?: boolean;
 }
 
 // Rulebook "Other security" default — used ONLY for a residual row that somehow
@@ -1674,6 +1679,7 @@ export function buildStructuredReportDataset(
       countryName: config.countryName,
       priorPeriodEvents: priorEngineResult ? priorEngineResult.included : null,
       windowStart: args.windowStart ? args.windowStart.toISOString() : null,
+      coverageUnconfirmed: args.coverageUnconfirmed ?? false,
     },
   );
   // Credible map points for INCLUDED events only (§23). Never Unknown /
@@ -2071,6 +2077,7 @@ export function buildStructuredReportDataset(
       corridorStatuses: statuses,
       previousWindowItems,
       hasBaseline: hasPreviousWindow,
+      coverageUnconfirmed: args.coverageUnconfirmed ?? false,
     });
     // NOTE: the Jakarta BLUF / Executive Summary / Outlook / Polestar builders
     // are no longer consumed — the engine narrative block below is the sole
@@ -2085,8 +2092,9 @@ export function buildStructuredReportDataset(
   if (windowItems.length === 0) {
     reportingConfidence = {
       level: "Low",
-      rationale:
-        "No fresh open-source reporting was identified this period, so this assessment rests on standing context rather than current signals.",
+      rationale: args.coverageUnconfirmed
+        ? "Collection coverage could not be confirmed this period, so current conditions are Not Assessed; this assessment rests on standing context only."
+        : "No fresh open-source reporting was identified this period, so this assessment rests on standing context rather than current signals.",
     };
   } else {
     const sourceCount = new Set(windowItems.map((it) => it.source).filter(Boolean)).size;
@@ -2339,7 +2347,9 @@ export function buildStructuredReportDataset(
     otherNationalHadFeatured,
     otherNationalTruncated,
     otherBucketLabel: config.otherBucketLabel,
-    emptyLocationFallback: config.emptyLocationFallback,
+    emptyLocationFallback: args.coverageUnconfirmed
+      ? `${config.emptyLocationFallback} Collection coverage for the period could not be confirmed, so this absence is Not Assessed rather than confirmed quiet.`
+      : config.emptyLocationFallback,
     featuredAboveNote: PNG_FEATURED_ABOVE_NOTE,
     businessImpactEmptyNote: config.businessImpactEmptyNote,
     businessImpact,

@@ -16,6 +16,10 @@ import {
   buildFuelGulfChokepointWatch,
   buildFuelRegionalHighlights,
 } from "@/lib/fuelNarratives";
+import { computeCountryCoverageStatus } from "@/lib/countryReportLayers";
+import { buildJakartaPostureZones } from "@/lib/jakartaOperatingPosture";
+import { buildJakartaCorridorStatuses } from "@/lib/jakartaCorridors";
+import { findBannedPhrases } from "../../lib/country-engine/src/bannedPhrases";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TopicFastFactsIncident } from "@/lib/topicFastFacts";
@@ -65,6 +69,62 @@ describe("systemic report utilities — historical data regressions", () => {
     ).toBe("Indonesia");
     expect(deriveIncidentCountry({ country: "Unknown", title: "Unattributed event" })).toBeNull();
     expect(LOCATION_NOT_IDENTIFIED).toBe("Location not identified");
+  });
+
+  it("trusts the raw country field for land incidents with no vessel in the story", () => {
+    // Jazan regression: the record's own country field said Saudi Arabia but
+    // the prose never repeated it, so the record was dropped and Iraq ranked
+    // first in Regional Highlights by default.
+    expect(
+      deriveIncidentCountry({
+        country: "Saudi Arabia",
+        title: "Jazan Refinery reported halted, 400,000 bpd offline",
+        summary: "Fuel market impact identified as refinery outage continues.",
+      }),
+    ).toBe("Saudi Arabia");
+    // A vessel story must NOT get the same trust — the raw field can be a flag.
+    expect(
+      deriveIncidentCountry({
+        country: "Saudi Arabia",
+        title: "6 Saudi-flagged oil carriers reroute around Africa, avoiding Bab el-Mandeb",
+      }),
+    ).toBeNull();
+  });
+
+  it("recognises demonyms and refinery-city cues as event-location signals", () => {
+    expect(
+      deriveIncidentCountry({
+        title: "Iraqi authorities extinguish refinery fire at Baiji oil complex",
+      }),
+    ).toBe("Iraq");
+    expect(deriveIncidentCountry({ location: "Jazan" , title: "Refinery halt"})).toBe("Saudi Arabia");
+    expect(deriveIncidentCountry({ location: "Baiji", title: "Refinery fire" })).toBe("Iraq");
+    // Demonym attached to a vessel is a flag descriptor, not a location.
+    expect(
+      deriveIncidentCountry({
+        title: "Houthis claim missile attack on Saudi oil tanker in Red Sea",
+      }),
+    ).toBeNull();
+  });
+
+  it("lets a country named in the title outrank a raw field backed only by a Hormuz cue", () => {
+    // Kuwait regression: raw country carried Iran (from Hormuz geography) and
+    // the actor row rendered as "Iran infrastructure operator" even though the
+    // title names Kuwait as the acting country.
+    expect(
+      deriveIncidentCountry({
+        country: "Iran",
+        title: "Kuwait discusses oil pipeline with Arab neighbors to bypass Strait of Hormuz: Minister",
+      }),
+    ).toBe("Kuwait");
+    // With no other country in the prose, the Hormuz cue still validates Iran.
+    expect(
+      deriveIncidentCountry({
+        country: "Iran",
+        location: "Strait of Hormuz",
+        title: "Authorities report disruption near Hormuz",
+      }),
+    ).toBe("Iran");
   });
 
   it("keeps fiscal knock-on stories out of the live Hormuz incident watch", () => {
@@ -183,5 +243,94 @@ describe("systemic report utilities — historical data regressions", () => {
         `[historical-report-validation] ${issueDate} countryTagged=${countries.length} gulfMatches=${gulf.length} regionalHighlights=${Boolean(highlights)} currentGulfItems=${watch?.currentItems.length ?? 0}`,
       );
     }
+  });
+});
+
+describe("empty-week Not-Assessed propagation — coverage contradiction regressions", () => {
+  const EMPTY_LAYERS = {
+    current: [],
+    thirtyDay: [],
+    ninetyDay: [],
+    windowLabel: "3–9 August 2026",
+  };
+  const HEALTHY_JAKARTA_SOURCE = {
+    name: "Jakarta Flashpoint Wire",
+    topic: "flashpoint",
+    status: "ok",
+    lastSuccessAt: "2026-08-09T00:00:00.000Z",
+    lastFailureAt: null,
+  };
+
+  it("healthy-but-silent feeds are never described as effective coverage, and no banner promises context sections", () => {
+    const healthy = computeCountryCoverageStatus({
+      layers: EMPTY_LAYERS,
+      sources: [HEALTHY_JAKARTA_SOURCE],
+      issueDate: "2026-08-09",
+      countryName: "Jakarta",
+    });
+    expect(healthy.state).toBe("coverage-problem");
+    // The old wording put "sources healthy" next to "no record on file" with no
+    // reconciliation — the fix must say the running-but-silent feed is NOT
+    // effective coverage, and must close with the Not Assessed posture.
+    expect(healthy.detail).toMatch(/not effective coverage/i);
+    expect(healthy.detail).toMatch(/Not Assessed/);
+    expect(healthy.detail).not.toMatch(/context sections/i);
+
+    const noSource = computeCountryCoverageStatus({
+      layers: EMPTY_LAYERS,
+      sources: [],
+      issueDate: "2026-08-09",
+      countryName: "Jakarta",
+    });
+    expect(noSource.state).toBe("coverage-problem");
+    expect(noSource.detail).toMatch(/Not Assessed/);
+    expect(noSource.detail).not.toMatch(/context sections/i);
+  });
+
+  it("an unconfirmed empty week reads Not Assessed across BLUF, confidence, crime line, map caption and operating picture", () => {
+    const ds = buildJakartaReportDataset({
+      windowIncidents: [],
+      thirtyDay: [],
+      ninetyDay: [],
+      baselineWatchlist: [],
+      periodLabel: "3–9 August 2026",
+      coverageUnconfirmed: true,
+    });
+    // BLUF: no "quiet week" claim, no "no further analysis" claim, no banned phrase.
+    expect(ds.bluf).toMatch(/Not Assessed/);
+    expect(ds.bluf).not.toMatch(/no further analysis is warranted/i);
+    expect(findBannedPhrases(ds.bluf)).toEqual([]);
+    // No developments → the Top 3 list is empty (renderers omit the section).
+    expect(ds.topThree).toHaveLength(0);
+    expect(ds.reportingConfidence.rationale).toMatch(/Not Assessed/);
+    const tactical = ds.jakartaTacticalBrief;
+    expect(tactical).toBeDefined();
+    expect(tactical!.operatingPicture.rows).toHaveLength(0);
+    expect(tactical!.operatingPicture.emptyNote).toMatch(/could not be confirmed/i);
+    expect(tactical!.crimeEscalationWatch.crime).toMatch(/Not Assessed/);
+    expect(tactical!.mapCaption).toMatch(/Not assessed/);
+  });
+
+  it("without the coverage flag the legacy quiet-week wording is byte-identical", () => {
+    const ds = buildJakartaReportDataset({
+      windowIncidents: [],
+      thirtyDay: [],
+      ninetyDay: [],
+      baselineWatchlist: [],
+      periodLabel: "3–9 August 2026",
+    });
+    expect(ds.bluf).toMatch(/no further analysis is warranted/i);
+    expect(ds.jakartaTacticalBrief!.crimeEscalationWatch.crime).not.toMatch(/Not Assessed/);
+  });
+
+  it("posture zones fall to Not assessed under unconfirmed coverage instead of Monitored", () => {
+    const { statuses } = buildJakartaCorridorStatuses([]);
+    const rated = buildJakartaPostureZones(statuses, false);
+    const unassessed = buildJakartaPostureZones(statuses, true);
+    expect(unassessed.length).toBeGreaterThan(0);
+    // With the flag every quiet zone is Not assessed…
+    for (const zone of unassessed) expect(zone.rating).toBe("not-assessed");
+    // …whereas without it the standing ratings still apply (the flag is the only lever).
+    expect(rated.some((zone) => zone.rating !== "not-assessed")).toBe(true);
   });
 });

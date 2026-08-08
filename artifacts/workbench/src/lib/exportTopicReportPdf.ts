@@ -64,6 +64,7 @@ import {
   applyMarketPriceOverrides,
   applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
+  resolvePanelRead,
   PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
@@ -801,7 +802,6 @@ export async function exportTopicReportPdf(
 ): Promise<void> {
   const show = makeSectionGate(options.hiddenSections);
   const ffOverrides = options.sectionOverrides?.fastFactOverrides;
-  const panelReads = options.sectionOverrides?.panelReads ?? {};
   const topicLabel = topicLabels[data.topic] ?? data.topic;
   // Canonical naming: cover title, running header and subtitle use the
   // canonical topic name. Regional words live in scope, not the title.
@@ -1120,10 +1120,13 @@ export async function exportTopicReportPdf(
       const gbOverrides = options.sectionOverrides?.gulfBulletOverrides;
       const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
       const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
+      // Staleness-guarded override: a saved panel read applies only while the
+      // generated read still equals the baseline it was written against, so a
+      // frozen week-old paragraph can never outrank this week's reporting.
       drawSectionWithProse(
         ctx,
         "Gulf and Hormuz Chokepoint Watch",
-        pickRead(panelReads[PANEL_READ_GULF_HORMUZ], gulf.read),
+        resolvePanelRead(options.sectionOverrides, PANEL_READ_GULF_HORMUZ, gulf.read).text,
       );
       if (currentLines.length > 0) {
         renderProse(ctx, currentLines.map((l) => `\u2022  ${l}`).join("\n"));
