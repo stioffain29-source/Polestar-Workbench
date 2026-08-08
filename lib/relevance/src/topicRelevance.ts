@@ -1046,6 +1046,9 @@ const FP_COURT_UNREST_KEEP_RE = new RegExp(
 );
 
 const SHIPPING_EXCLUDE: RegExp[] = [
+  // Cruise-line passenger illness is neither a maritime-security incident nor
+  // a shipping disruption, even when a headline uses "attacked" figuratively.
+  /\b(cruise ship|cruise liner|cruise vessel)\b[^.]{0,60}\b(stomach virus|norovirus|gastroenteritis|gastrointestinal illness|food poisoning)\b/,
   /\bfao\b/,
   /\bfood price (index|inflation|increase|rise|surge)/,
   /\bfood (prices|inflation|security|crisis|insecurity)\b/,
@@ -1533,6 +1536,20 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(planning (?:refused|rejected|denied)|moratorium|grid (?:connection|access) (?:block|refus|denied)|water (?:constraint|shortage|scarcity)|community (?:opposition|objection)|environmental (?:review|objection)|permit (?:refused|denied)) .{0,50}(data cent(?:re|er)s?|server farm|hyperscale|colocation|cloud region)/,
   ],
   shipping: [
+    // Security-action verbs commonly precede the vessel object in headlines
+    // ("Houthis attacked Saudi oil tankers"). Permit up to four intervening
+    // determiner/adjective words while keeping the object maritime-specific.
+    /\b(attack(?:s|ed|ing)?|struck|hit|target(?:ed|ing)?|damag(?:ed|ing)|disabl(?:ed|ing))\b\s+(?:[\w'-]+\s+){0,4}(vessels?|tankers?|ships?|cargo ships?|container ships?|bulk carriers?)\b/,
+    // Passive maritime-incident constructions in either order, including
+    // "merchant vessel ... came under attack" and "was seized ... tanker".
+    /\b(vessels?|tankers?|ships?|cargo ships?|container ships?|bulk carriers?)\b[^.]{0,40}\b(came under attack|(?:was|were|is|are) (attacked|struck|hit|hijacked|seized|boarded))\b/,
+    /\b(came under attack|(?:was|were|is|are) (attacked|struck|hit|hijacked|seized|boarded))\b[^.]{0,40}\b(vessels?|tankers?|ships?|cargo ships?|container ships?|bulk carriers?)\b/,
+    // A vessel loss is security-relevant only when paired with hostile-action
+    // evidence or a tracked maritime-security theatre, avoiding routine
+    // accident and business coverage.
+    /\b(vessels?|tankers?|ships?|cargo ships?|container ships?|bulk carriers?)\b[^.]{0,60}\b(sank|sinking|sunk|lost)\b[^.]{0,90}\b(struck by|after being (struck|hit|attacked|targeted|damaged)|missile|drone|explosive|suicide|houthi|red sea|yemen|bab[- ]el[- ]mandeb|strait of hormuz)\b/,
+    // Common asymmetric-attack wording in Red Sea incident reporting.
+    /\bstruck by (an? )?(explosive[- ]laden|drone|missile|suicide) (boat|drone|vessel|craft)\b/,
     /\b(vessel|tanker|ship|cargo ship|container ship|bulk carrier) (attack|attacked|seizure|seized|boarding|missile|drone|fire|sinking|collision|adrift)/,
     // UKMTO-style casualty advisories phrase it as "vessel ON fire" /
     // "tanker ablaze" — the adjacent "vessel fire" phrase above misses the
