@@ -236,6 +236,27 @@ export function buildFuelRegionalHighlights(opts: {
 const GULF_CHOKEPOINT_RE =
   /\b(strait of hormuz|hormuz|persian gulf|arabian gulf|bab[- ]?el[- ]?mandeb|red sea)\b/i;
 
+// A genuine chokepoint INCIDENT described in the body even when the headline
+// itself doesn't name the chokepoint — e.g. a corporate statement titled
+// "ADNOC issues statement clarifying attacks on facilities" that is entirely
+// about vessels struck while transiting Hormuz, but never says "Hormuz" in
+// the title. Title-only matching (below) silently drops these. This pattern
+// stays narrow on purpose: it requires the chokepoint name to co-occur
+// closely with an actual incident/closure verb, so a domestic pump-price or
+// SPR story that merely name-drops "Persian Gulf" grades as market colour
+// still does not qualify — preserving the precision-first design the
+// title-only rule was built for.
+const GULF_CHOKEPOINT_BODY_INCIDENT_RE = (() => {
+  const loc =
+    "(?:strait of hormuz|hormuz|persian gulf|arabian gulf|bab[- ]?el[- ]?mandeb|red sea)";
+  const verb =
+    "(?:attack\\w*|struck|strike\\w*|missile\\w*|drone\\w*|explosion|blast\\w*|hit|hits|closure|closed|shut|blockad\\w*|disrupt\\w*|sabotag\\w*|transiting|transit\\w*)";
+  return new RegExp(
+    `\\b${loc}\\b.{0,100}\\b${verb}\\b|\\b${verb}\\b.{0,100}\\b${loc}\\b`,
+    "i",
+  );
+})();
+
 // Reopen / resumed-transit vocabulary. Shared so the theme blob and the
 // per-record temporal test below agree on what counts as a "reopening".
 const GULF_REOPEN_RE =
@@ -359,7 +380,11 @@ export function buildFuelGulfChokepointWatch(opts: {
       (x): x is { i: TopicFastFactsIncident; key: string } =>
         x.key !== null && x.key >= currentStartKey && x.key <= currentEndKey,
     )
-    .filter(({ i }) => GULF_CHOKEPOINT_RE.test(i.title ?? ""));
+    .filter(
+      ({ i }) =>
+        GULF_CHOKEPOINT_RE.test(i.title ?? "") ||
+        GULF_CHOKEPOINT_BODY_INCIDENT_RE.test(i.summary ?? ""),
+    );
   if (matched.length === 0) return null;
 
   const currentMatched = matched;
@@ -447,6 +472,15 @@ export function buildFuelGulfChokepointWatch(opts: {
         ? "The Strait of Hormuz and wider Gulf were this reporting period's dominant fuel-route risk, with a marked concentration of chokepoint reporting."
         : "The Strait of Hormuz and wider Gulf featured in this reporting period's fuel-route reporting.",
     );
+    // Quantify the concentration with real, already-deduped counts rather than
+    // leaving "marked concentration" as an unsupported adjective — this is the
+    // same currentKept/distinctCurrentDays data already used to gate
+    // broadCoverage above, so no new figure is introduced.
+    if (currentKept.length >= 2) {
+      p1.push(
+        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window.`,
+      );
+    }
     if (hasClosure) {
       p1.push(
         "Coverage centred on Hormuz closure and shipping disruption, forcing dependent crude and product flows onto longer, costlier routes and lifting the war-risk premium.",
@@ -456,8 +490,15 @@ export function buildFuelGulfChokepointWatch(opts: {
     const anchorSevRank =
       GULF_SEV_RANK[(anchor.i.severity ?? "").toLowerCase()] ?? 0;
     if (hasKinetic && anchorSevRank >= 4) {
+      // Ground the anchor sentence in severity and location rather than just
+      // re-quoting the headline as if repetition were analysis — the title
+      // is still cited (traceability), but as evidence for a stated claim,
+      // not as the claim itself.
+      const anchorCountry = normaliseCountry(anchor.i.country);
+      const anchorSevLabel = titleCase(anchor.i.severity ?? "");
+      const locationClause = anchorCountry ? ` near ${anchorCountry}` : "";
       p1.push(
-        `Pressure peaked on ${gulfFmtDay(anchor.key)} with the period's most serious chokepoint incident: ${anchor.title}.`,
+        `Pressure peaked on ${gulfFmtDay(anchor.key)} with a ${anchorSevLabel.toLowerCase()}-severity incident${locationClause}, the period's most serious chokepoint event: ${anchor.title}.`,
       );
     }
     const reopenAfterAnchor = currentMatched.some(
