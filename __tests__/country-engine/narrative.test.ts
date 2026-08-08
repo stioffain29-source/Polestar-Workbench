@@ -682,6 +682,37 @@ describe("buildOperationalImpact (§19)", () => {
     expect(value).toHaveLength(1);
     expect(countWords(value[0].text)).toBeLessThanOrEqual(50);
   });
+
+  it("never emits a blank entry when the repetition guard consumes a category's only sentence", () => {
+    // Regression: a category can look non-empty at the top of the loop (it has
+    // an assessed-but-not-confirmed event) yet end up with nothing to say once
+    // the cross-category repetition guard has already used that exact fixed
+    // sentence for an earlier category. Previously this pushed an entry with
+    // text: "" (rendered as a bare, empty bullet in the PDF).
+    const sameAssessedSentence = "This reporting sits near routes or areas in active use.";
+    const first = makeEvent({
+      issueCategory: "Violent crime",
+      confirmedOperationalEffect: null,
+      assessedOperationalRelevance: sameAssessedSentence,
+    });
+    const second = makeEvent({
+      issueCategory: "Civil unrest",
+      confirmedOperationalEffect: null,
+      assessedOperationalRelevance: sameAssessedSentence,
+    });
+    const map = new Map([
+      ["Violent crime", [first]],
+      ["Civil unrest", [second]],
+    ] as const);
+    const { value } = buildOperationalImpact(map as any);
+    // Only the first category keeps the sentence; the second must be skipped
+    // entirely rather than emitted with empty text.
+    expect(value).toHaveLength(1);
+    expect(value[0].category).toBe("Violent crime");
+    for (const entry of value) {
+      expect(entry.text.trim().length).toBeGreaterThan(0);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
