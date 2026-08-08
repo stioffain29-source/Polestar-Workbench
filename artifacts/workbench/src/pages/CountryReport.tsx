@@ -654,6 +654,10 @@ export default function CountryReport() {
         if (isNaN(end.getTime())) end = new Date();
         return startOfDay(subDays(end, 6));
       })(),
+      // Empty-week coverage determination: when the week is a coverage problem
+      // every empty-week surface (BLUF, tactical brief, confidence, posture)
+      // reads "Not Assessed" instead of implying a confirmed quiet week.
+      coverageUnconfirmed: coverage.state === "coverage-problem",
     };
     switch (structuredTheatre) {
       case "westPapua":
@@ -674,7 +678,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country]);
+  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -1297,6 +1301,7 @@ export default function CountryReport() {
       <JakartaCorridorMap
         incidents={windowIncidents as CountryFastFactsIncident[]}
         issueDate={issueDate}
+        coverageUnconfirmed={coverage.state === "coverage-problem"}
       />
       {jakartaMapCaption
         ? jakartaMapCaption.split(/\n+/).map((p, i) => (

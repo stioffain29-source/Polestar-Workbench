@@ -229,11 +229,14 @@ const NOT_POPULATED_HEADINGS = [
   "Polestar View",
 ];
 
-// Every structured-brief section heading, in render order. Each must be followed
-// by a non-empty body (never immediately by another heading = an empty section).
+// Every structured-brief section heading expected on the EMPTY-data path, in
+// render order. Each must be followed by a non-empty body (never immediately by
+// another heading = an empty section). "Top 3 Developments" is deliberately NOT
+// here: with zero developments the section is omitted entirely rather than
+// rendered around a filler line (a headline section with nothing in it reads as
+// a contradiction).
 const ALL_HEADINGS = [
   "Bottom Line Up Front",
-  "Top 3 Developments",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",
@@ -257,6 +260,11 @@ describe.each(THEATRES)(
           count: 1,
         });
       }
+    });
+
+    it("omits the Top 3 Developments section entirely when there are no developments", async () => {
+      const text = await briefPdfText(name);
+      expect(text).not.toContain("TOP 3 DEVELOPMENTS");
     });
 
     it("emits every section heading followed by a non-empty body, never another heading", async () => {

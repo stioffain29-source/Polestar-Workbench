@@ -689,6 +689,7 @@ function rankedLiveStatuses(statuses: JakartaCorridorStatus[]): JakartaCorridorS
  */
 export function buildJakartaOperatingPicture(
   statuses: JakartaCorridorStatus[],
+  coverageUnconfirmed = false,
 ): JakartaOperatingPicture {
   const rows = rankedLiveStatuses(statuses)
     .map((status) => ({
@@ -705,8 +706,9 @@ export function buildJakartaOperatingPicture(
 
   return {
     rows,
-    emptyNote:
-      "No area-specific operational driver was identified this period; continue routine pre-departure checks for time-critical movement.",
+    emptyNote: coverageUnconfirmed
+      ? "Collection coverage for this period could not be confirmed, so no area-specific assessment is made this week. Apply standing movement controls and treat conditions on the ground as unverified until coverage is restored."
+      : "No area-specific operational driver was identified this period; continue routine pre-departure checks for time-critical movement.",
   };
 }
 
@@ -735,12 +737,18 @@ function jakartaControlJudgement(items: PngReportItem[]): string {
   return `Polestar judges that the immediate control problem is ${theme} in ${area}, not a city-wide deterioration.`;
 }
 
-function compactCrimeLine(items: PngReportItem[]): string {
+function compactCrimeLine(
+  items: PngReportItem[],
+  coverageUnconfirmed = false,
+): string {
   const crimeItems = items.filter(
     (item) => jakartaThemeForCategory(item.category) === "crime",
   );
   const judgement = jakartaControlJudgement(items);
   if (crimeItems.length === 0) {
+    if (coverageUnconfirmed) {
+      return `${judgement} Crime conditions this period are Not Assessed — collection coverage could not be confirmed, so the absence of fresh crime reporting is not evidence of a quiet week. The standing pattern remains the working assumption until coverage is restored.`;
+    }
     return `${judgement} No fresh crime-specific reporting this period — standing pattern continues to apply.`;
   }
   const crimeTypes = extractLabels(crimeItems, CRIME_GROUPS, 2);
@@ -796,9 +804,10 @@ function compactEscalationTriggers(statuses: JakartaCorridorStatus[]): string {
 export function buildJakartaCrimeEscalationWatch(
   items: PngReportItem[],
   statuses: JakartaCorridorStatus[],
+  coverageUnconfirmed = false,
 ): JakartaCrimeEscalationWatch {
   return {
-    crime: compactCrimeLine(items),
+    crime: compactCrimeLine(items, coverageUnconfirmed),
     escalationTriggers: compactEscalationTriggers(statuses),
   };
 }
@@ -844,9 +853,15 @@ export function buildJakartaRecommendedActions(
       ];
 }
 
-function buildJakartaMapCaption(statuses: JakartaCorridorStatus[]): string {
+function buildJakartaMapCaption(
+  statuses: JakartaCorridorStatus[],
+  coverageUnconfirmed = false,
+): string {
   const names = rankedLiveStatuses(statuses).map((status) => status.area.name);
   if (names.length === 0) {
+    if (coverageUnconfirmed) {
+      return "Map panel shows Jakarta's standing movement and access exposure only. Collection coverage for this period could not be confirmed, so area postures are shown as Not assessed rather than rated.";
+    }
     return "Map panel shows Jakarta's standing movement and access exposure; no area-specific operational driver was identified this period.";
   }
   return `Map panel highlights the live operating drivers in ${joinList(names)}; it is an exposure guide, not a city-wide risk rating.`;
@@ -855,12 +870,17 @@ function buildJakartaMapCaption(statuses: JakartaCorridorStatus[]): string {
 export function buildJakartaTacticalBrief(
   statuses: JakartaCorridorStatus[],
   windowItems: PngReportItem[] = [],
+  coverageUnconfirmed = false,
 ): JakartaTacticalBrief {
   return {
-    operatingPicture: buildJakartaOperatingPicture(statuses),
-    crimeEscalationWatch: buildJakartaCrimeEscalationWatch(windowItems, statuses),
+    operatingPicture: buildJakartaOperatingPicture(statuses, coverageUnconfirmed),
+    crimeEscalationWatch: buildJakartaCrimeEscalationWatch(
+      windowItems,
+      statuses,
+      coverageUnconfirmed,
+    ),
     recommendedActions: buildJakartaRecommendedActions(statuses, windowItems),
-    mapCaption: buildJakartaMapCaption(statuses),
+    mapCaption: buildJakartaMapCaption(statuses, coverageUnconfirmed),
   };
 }
 
@@ -877,6 +897,9 @@ export interface JakartaBriefInput {
   // Optional so existing callers/tests keep working; absent → no trend asserted.
   previousWindowItems?: PngReportItem[];
   hasBaseline?: boolean;
+  // True when the weekly coverage determination is a coverage problem. Empty
+  // sections then say Not Assessed instead of implying a confirmed quiet week.
+  coverageUnconfirmed?: boolean;
 }
 
 export interface JakartaBriefOverrides {
@@ -890,6 +913,7 @@ export function buildJakartaBrief(input: JakartaBriefInput): JakartaBriefOverrid
     tactical: buildJakartaTacticalBrief(
       input.corridorStatuses ?? [],
       input.windowItems,
+      input.coverageUnconfirmed ?? false,
     ),
   };
 }

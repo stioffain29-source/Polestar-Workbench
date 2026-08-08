@@ -394,13 +394,22 @@ function buildPostureMarkers(
 // render the identical seven-zone rating/reason/action set.
 export function buildJakartaPostureZones(
   statuses: JakartaCorridorStatus[],
+  coverageUnconfirmed = false,
 ): JakartaPostureZone[] {
   const byArea = new Map<string, JakartaCorridorStatus>();
   for (const s of statuses) byArea.set(s.area.id, s);
 
   return JAKARTA_POSTURE_ZONES.map((z) => {
     const st = byArea.get(z.corridorAreaId) ?? null;
-    const rating: JakartaExposureLevel = st ? st.displayExposure : "not-assessed";
+    // When the weekly coverage determination is a coverage problem, a zone
+    // without live elevation cannot honestly be rated at all — "Monitored"
+    // would assert a watch that the collection gap does not support — so it
+    // shows "Not assessed". A zone elevated by real reporting keeps its rating.
+    const rating: JakartaExposureLevel = !st
+      ? "not-assessed"
+      : coverageUnconfirmed && !st.elevated
+        ? "not-assessed"
+        : st.displayExposure;
     const elevated = st ? st.elevated : false;
     return {
       ...z,
@@ -414,10 +423,11 @@ export function buildJakartaPostureZones(
 
 export function buildJakartaPostureModel(
   incidents: CountryFastFactsIncident[],
+  coverageUnconfirmed = false,
 ): JakartaPostureModel {
   const corridor = buildJakartaCorridorStatuses(incidents);
   return {
-    zones: buildJakartaPostureZones(corridor.statuses),
+    zones: buildJakartaPostureZones(corridor.statuses, coverageUnconfirmed),
     map: buildJakartaMapModel(incidents),
     markers: buildPostureMarkers(incidents),
   };
