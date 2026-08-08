@@ -1332,6 +1332,12 @@ export function buildOperationalImpact(
       );
     }
 
+    // The repetition guard above can consume the only candidate sentence for
+    // this category (already used by an earlier category), leaving nothing
+    // left to say even though the category looked non-empty at the top of the
+    // loop. Skip rather than emit a blank bullet.
+    if (parts.length === 0) continue;
+
     value.push({
       category,
       text: capWords(parts.join(" "), OPERATIONAL_IMPACT_MAX_WORDS),
