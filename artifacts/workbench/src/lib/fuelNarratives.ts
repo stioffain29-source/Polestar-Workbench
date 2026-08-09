@@ -15,6 +15,7 @@ import {
   incidentSeverityRank,
 } from "@workspace/country-engine";
 import { deriveIncidentCountry, deriveFlagState } from "./shippingCountry";
+import { joinWithAnd } from "./proseLists";
 import { matchesTopicIncident } from "./topicIncidentMatching";
 
 function titleCase(s: string): string {
@@ -430,7 +431,11 @@ export function buildFuelGulfChokepointWatch(opts: {
     const b = sorted[sorted.length - 1];
     return a === b ? gulfFmtDay(a) : `${gulfFmtDay(a)} \u2013 ${gulfFmtDay(b)}`;
   };
-  const currentKeys = currentMatched.map((x) => x.key);
+  // Range label and every stated figure below derive from currentKept — the
+  // SAME deduped set the bullets are drawn from — never from the wider
+  // pre-dedupe pool, so the prose can never claim activity the list of
+  // incidents beneath it does not show.
+  const currentKeys = currentKept.map((x) => x.key);
   const rangeLabel = spanLabel(currentKeys);
 
   // 3. Theme detection over the CURRENT matched set only — the prose leads with
@@ -451,8 +456,12 @@ export function buildFuelGulfChokepointWatch(opts: {
     /\b(bypass|pipeline|alternative route|skirt|reroute|diversion)\b/.test(
       currentBlob,
     );
-  const distinctCurrentDays = new Set(currentMatched.map((x) => x.key)).size;
+  const distinctCurrentDays = new Set(currentKept.map((x) => x.key)).size;
   const broadCoverage = currentKept.length >= 4 && distinctCurrentDays >= 3;
+  // How many of the counted incidents actually render as bullets. When the
+  // list is capped, the prose must SAY it lists a subset — "14 incidents"
+  // above six bullets otherwise reads as a self-contradiction.
+  const shownCount = Math.min(currentKept.length, maxItems);
 
   // 4. Compose deterministic, no-fabrication prose. Current period leads.
   const p1: string[] = [];
@@ -468,8 +477,12 @@ export function buildFuelGulfChokepointWatch(opts: {
     // same currentKept/distinctCurrentDays data already used to gate
     // broadCoverage above, so no new figure is introduced.
     if (currentKept.length >= 2) {
+      const listedNote =
+        currentKept.length > shownCount
+          ? `; the ${shownCount} most significant are listed below`
+          : "";
       p1.push(
-        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window.`,
+        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window${listedNote}.`,
       );
     }
     if (hasClosure) {
@@ -1168,7 +1181,7 @@ export function buildFuelOperationalRead(opts: {
 
   const where =
     topCountries.length > 0
-      ? ` ${topCountries.map(([c]) => titleCase(c)).join(", ")} carr${topCountries.length === 1 ? "ies" : "y"} the most activity this week.`
+      ? ` ${joinWithAnd(topCountries.map(([c]) => titleCase(c)))} carr${topCountries.length === 1 ? "ies" : "y"} the most activity this week.`
       : "";
 
   const closingPara = `${watchLines.join(" ")}${where}`.trim();
