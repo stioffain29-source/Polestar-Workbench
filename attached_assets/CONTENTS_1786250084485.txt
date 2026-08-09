@@ -1,0 +1,10 @@
+__tests__/workbench/fuelCanonicalFacts.property.test.ts
+__tests__/workbench/prosePassthroughTestHelpers.ts
+__tests__/workbench/reportProseOverridePdf.test.ts
+__tests__/workbench/reportProseOverridePreview.test.tsx
+artifacts/workbench/scripts/generateSystemicFixPdfs.ts
+artifacts/workbench/src/components/ReportPreview.tsx
+artifacts/workbench/src/lib/exportTopicReportPdf.ts
+artifacts/workbench/src/lib/fuelCanonicalFacts.ts
+artifacts/workbench/src/lib/fuelNarratives.ts
+artifacts/workbench/src/lib/fuelWatchReport.ts
