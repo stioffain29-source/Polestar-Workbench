@@ -411,6 +411,30 @@ export function buildFuelReportFacts(opts: {
     for (const s of CONDITION_SIGNALS) if (s.re.test(hay)) signalSet.add(s.key);
   }
 
+  // Confidence hedge on the OVERALL call (demote-only, never up-rates):
+  // a High/Extreme overall read is not supportable when the evidence base is
+  // low-confidence, the crude complex is falling and no live shortage or
+  // unrest condition was observed this window — a single contained event on
+  // thin reporting must not headline the report as High. One tier down.
+  const crudeDirectionCalc = directionForPct(avgCrudePctChange);
+  if (
+    overallSeverity &&
+    SEV_RANK[overallSeverity] >= SEV_RANK.high &&
+    evidenceConfidence === "low" &&
+    crudeDirectionCalc === "falling" &&
+    !signalSet.has("shortage") &&
+    !signalSet.has("unrest")
+  ) {
+    const order: SeverityTier[] = [
+      "insignificant",
+      "low",
+      "moderate",
+      "high",
+      "extreme",
+    ];
+    overallSeverity = order[SEV_RANK[overallSeverity] - 2] ?? "moderate";
+  }
+
   return {
     issueDate: opts.issueDate,
     incidentCount: records.length,

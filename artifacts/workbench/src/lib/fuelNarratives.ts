@@ -91,7 +91,7 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     test: [/\b(refinery|refineries) (outage|disruption|fire|attack|halt|maintenance|shutdown|closure)/],
     phrase: "refinery disruption and supply-side outage",
     why: "Refinery outage typically tightens regional crack spreads and pushes downstream pump and bunker prices up within days.",
-    opMeaning: "Affected grades go on allocation first; commercial buyers usually feel it before the published pump price moves.",
+    opMeaning: "Where output is actually curtailed, affected grades typically go on allocation first — commercial buyers tend to feel it before the published pump price moves.",
     watch: "Watch for restart timelines, force-majeure declarations and follow-on import announcements.",
   },
   {

@@ -152,6 +152,47 @@ describe("buildFuelReportFacts", () => {
     expect(["insignificant", "low", "moderate"]).toContain(f.overallSeverity);
   });
 
+  it("overall severity is hedged one tier down on low confidence + falling crude + no live shortage/unrest", () => {
+    // A single contained high-severity event, thin reporting (<3 records →
+    // low confidence), crude falling, no shortage/unrest condition observed:
+    // the OVERALL call must not headline High.
+    const hedged = facts(
+      [
+        inc({
+          title: "Refinery fire halts fuel supply at Baiji plant",
+          summary: "Fire at the refinery disrupted fuel supply; contained.",
+          severity: "high",
+          country: "Iraq",
+        }),
+      ],
+      hardNumbers({
+        brent: { value: 66, change: "-7.0%" },
+        wti: { value: 63, change: "-6.5%" },
+      }),
+    );
+    expect(hedged.evidenceConfidence).toBe("low");
+    expect(hedged.market.crudeDirection).toBe("falling");
+    expect(hedged.overallSeverity).toBe("moderate");
+
+    // Same event with a live shortage condition keeps the High call.
+    const kept = facts(
+      [
+        inc({
+          title: "Refinery fire halts fuel supply at Baiji plant",
+          summary: "Fuel shortage reported as the refinery outage bites.",
+          severity: "high",
+          country: "Iraq",
+        }),
+      ],
+      hardNumbers({
+        brent: { value: 66, change: "-7.0%" },
+        wti: { value: 63, change: "-6.5%" },
+      }),
+    );
+    expect(kept.currentConditionSignals).toContain("shortage");
+    expect(kept.overallSeverity).toBe("high");
+  });
+
   it("pressure is distributed when no country clears the leader margin", () => {
     const f = facts([
       inc({ country: "Pakistan", severity: "moderate" }),

@@ -214,6 +214,11 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
           "FIXED FACTS (pre-calculated deterministically from the report's data — AUTHORITATIVE):",
           facts,
           "You may explain these values and their operational meaning, but you must NEVER recalculate, round differently, contradict or replace them. Trend/direction wording must match the stated direction exactly. Never state numeric incident counts in prose regardless of these values.",
+          "STYLE RULES for these facts:",
+          '- Express direction with natural verbs — "fell", "eased", "rose", "climbed", "was flat". Never interpolate the raw direction word into a sentence (e.g. never write "moved falling" or "all moved falling"; write "all fell").',
+          "- Never reproduce the country list as a bare enumeration with a shared verb (e.g. \"Iraq, Saudi Arabia carry...\"). If a country matters, give it its own clause grounded in what actually happened there.",
+          "- Downstream impacts (aviation fuel supply, airport resupply, road distribution) may be stated as CURRENT effects only when a listed observed condition directly supports them; otherwise frame them conditionally or as watch items (\"if the outage extends...\", \"would come under pressure\").",
+          "- Operational consequences that follow from an event type but were not reported (allocation, rationing, pass-through) must be framed as typical/conditional, never asserted as fact for this window.",
           "",
         ]
       : []),
