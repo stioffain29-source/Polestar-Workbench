@@ -239,6 +239,15 @@ const CONDITION_SIGNALS: { key: string; re: RegExp }[] = [
  * unfiltered list — the fuel window + relevance filter is applied here so all
  * consumers are guaranteed to be counting the same records.
  */
+/**
+ * True when a title is a raw social-media post capture (handle-prefixed X or
+ * Instagram text, e.g. "@user: went boom" or "RT @user ..."), which must never
+ * be presented as a report headline.
+ */
+export function isSocialPostTitle(title: string): boolean {
+  return /^\s*(?:RT\s+)?@[\w.]{2,}\s*[::]/i.test(title ?? "");
+}
+
 export function buildFuelReportFacts(opts: {
   issueDate: string;
   hardNumbers: unknown;
@@ -312,22 +321,35 @@ export function buildFuelReportFacts(opts: {
 
   // Highest-priority incident: highest EFFECTIVE severity, ties broken by
   // recency, then stable by title. Documented, single rule.
+  //
+  // Raw social-media post titles (handle-prefixed X/Instagram captures, e.g.
+  // "@user: ...") must never headline the report: they are unedited post
+  // text, not reporting. They are deprioritised BELOW every news-titled
+  // record regardless of severity, and used only when the window contains
+  // nothing else.
+  const pick = (a: FuelReportFactsIncident, b: FuelReportFactsIncident) => {
+    const ra = SEV_RANK[a.effectiveSeverity] ?? 0;
+    const rb = SEV_RANK[b.effectiveSeverity] ?? 0;
+    return (
+      ra > rb ||
+      (ra === rb && a.occurredAt > b.occurredAt) ||
+      (ra === rb && a.occurredAt === b.occurredAt && a.title < b.title)
+    );
+  };
   let highestPriorityIncident: FuelReportFactsIncident | null = null;
   for (const r of records) {
-    if (!highestPriorityIncident) {
+    if (isSocialPostTitle(r.title)) continue;
+    if (!highestPriorityIncident || pick(r, highestPriorityIncident)) {
       highestPriorityIncident = r;
-      continue;
     }
-    const a = SEV_RANK[r.effectiveSeverity] ?? 0;
-    const b = SEV_RANK[highestPriorityIncident.effectiveSeverity] ?? 0;
-    if (
-      a > b ||
-      (a === b && r.occurredAt > highestPriorityIncident.occurredAt) ||
-      (a === b &&
-        r.occurredAt === highestPriorityIncident.occurredAt &&
-        r.title < highestPriorityIncident.title)
-    ) {
-      highestPriorityIncident = r;
+  }
+  if (!highestPriorityIncident) {
+    // Social-only window: fall back, but the consumer still gets a flag via
+    // isSocialPostTitle to decide how to phrase it.
+    for (const r of records) {
+      if (!highestPriorityIncident || pick(r, highestPriorityIncident)) {
+        highestPriorityIncident = r;
+      }
     }
   }
 

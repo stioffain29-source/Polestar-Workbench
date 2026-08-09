@@ -193,6 +193,39 @@ describe("buildFuelReportFacts", () => {
     expect(kept.overallSeverity).toBe("high");
   });
 
+  it("raw social-media post titles never headline as the highest-priority incident", () => {
+    // The X post carries the highest severity, but a handle-prefixed raw post
+    // must be deprioritised below every news-titled record.
+    const f = facts([
+      inc({
+        title: "@_A_khalifa: fuel prices going crazy after the strait closed",
+        summary: "Raw social post about fuel supply.",
+        severity: "extreme",
+        country: "UAE",
+      }),
+      inc({
+        title: "Refinery fire disrupts fuel supply near port",
+        summary: "News-reported fuel supply disruption.",
+        severity: "moderate",
+        country: "Iraq",
+      }),
+    ]);
+    expect(f.highestPriorityIncident?.title).toBe(
+      "Refinery fire disrupts fuel supply near port",
+    );
+
+    // Social-only window still yields a pick (consumer can flag it).
+    const onlySocial = facts([
+      inc({
+        title: "RT @poster: fuel shortage at every station",
+        summary: "Raw social post about a fuel shortage.",
+        severity: "high",
+        country: "UAE",
+      }),
+    ]);
+    expect(onlySocial.highestPriorityIncident).not.toBeNull();
+  });
+
   it("pressure is distributed when no country clears the leader margin", () => {
     const f = facts([
       inc({ country: "Pakistan", severity: "moderate" }),
