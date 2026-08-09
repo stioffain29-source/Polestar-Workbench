@@ -46,6 +46,11 @@ export interface GenerateReportProseInput {
   basisDays: number;
   issueDate: string;
   incidents: ProseIncidentInput[];
+  /** Pre-calculated FIXED FACTS block (fuel): canonical counts, rankings and
+   *  market directions computed deterministically by the client's facts
+   *  builder. The model must treat these as authoritative — it may explain
+   *  them, never recalculate or contradict them. */
+  facts?: string | null;
 }
 
 export type ReportProseOutcome =
@@ -140,6 +145,7 @@ export function computeReportProseFingerprint(input: {
   issueDate: string;
   basisDays: number;
   incidents: ProseIncidentInput[];
+  facts?: string | null;
 }): string {
   const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
@@ -150,6 +156,10 @@ export function computeReportProseFingerprint(input: {
     title: input.title,
     issueDate: input.issueDate,
     basisDays: input.basisDays,
+    // The FIXED FACTS block is part of the grounding: when the calculated
+    // facts change (market direction flips, leader changes), the cached
+    // prose is stale and must regenerate.
+    facts: input.facts ?? "",
     ids,
   });
   return createHash("sha256").update(payload).digest("hex");
@@ -194,10 +204,19 @@ Return ONLY the JSON object.`;
 }
 
 function buildUserPrompt(input: GenerateReportProseInput): string {
+  const facts = (input.facts ?? "").trim();
   return [
     `REPORT: ${input.title || metaFor(input.topic).label}`,
     `REPORTING WINDOW: ${input.periodWord} (rolling ${input.basisDays}-day window ending ${input.issueDate})`,
     "",
+    ...(facts
+      ? [
+          "FIXED FACTS (pre-calculated deterministically from the report's data — AUTHORITATIVE):",
+          facts,
+          "You may explain these values and their operational meaning, but you must NEVER recalculate, round differently, contradict or replace them. Trend/direction wording must match the stated direction exactly. Never state numeric incident counts in prose regardless of these values.",
+          "",
+        ]
+      : []),
     "INCIDENTS (the ONLY source of this-window facts):",
     incidentBlock(input.incidents),
   ].join("\n");

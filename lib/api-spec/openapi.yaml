@@ -4049,6 +4049,10 @@ components:
         basisDays: { type: integer }
         issueDate: { type: string }
         force: { type: boolean }
+        # Pre-calculated FIXED FACTS block (fuel): canonical counts, rankings,
+        # market directions the model must treat as authoritative — it may
+        # explain them but never recalculate or contradict them.
+        facts: { type: string }
         incidents:
           type: array
           items: { $ref: "#/components/schemas/ProseIncidentInput" }

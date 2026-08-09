@@ -91,6 +91,10 @@ import {
   type ProducerBuyerActionRow,
 } from "./fuelNarratives";
 import { pickRead } from "./pickRead";
+import {
+  assertFuelReportConsistent,
+  resolveFuelEffectiveSections,
+} from "./fuelReportConsistency";
 import { assertCargoReportValid } from "./cargoReportValidation";
 import {
   buildCargoSecurityRead,
@@ -860,11 +864,18 @@ export async function exportTopicReportPdf(
   // the deterministic prose draft so the Gulf & Hormuz Chokepoint Watch it
   // carries can drive the lead narrative (Hormuz rows are topic=shipping and
   // never survive the fuel topic filter below).
+  // Fuel Watch is market-anchored: the effective report date is the latest
+  // market close it carries (falling back to the stored issue date), exactly
+  // as the on-screen preview computes it — so the facts object, the incident
+  // window and the consistency gate are IDENTICAL in preview and PDF.
+  const fuelIssueDate = isFuel
+    ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
+    : data.issueDate;
   const fuelData = isFuel
     ? buildFuelWatchReportData(
         {
           title: data.title,
-          issueDate: data.issueDate,
+          issueDate: fuelIssueDate,
           author: data.author,
           executiveSummary: data.executiveSummary,
           situation: data.situation,
@@ -1011,6 +1022,23 @@ export async function exportTopicReportPdf(
     ) {
       throw new FuelRequiredDataMissingError(
         fuelData.validation.missingRequired,
+      );
+    }
+
+    // HARD consistency gate (mirrors the cargo gate): the FINAL effective
+    // narrative (analyst edit -> AI -> deterministic, the exact text this
+    // exporter renders below) must not contradict the canonical facts —
+    // market direction, primary pressure point, counts, overall severity,
+    // current-condition claims. Fail-closed unless the caller opts out.
+    if (!options.allowValidationFailures) {
+      assertFuelReportConsistent(
+        fuelData.facts,
+        resolveFuelEffectiveSections({
+          report: data,
+          aiProse,
+          proseDraft,
+          fuelData,
+        }),
       );
     }
 

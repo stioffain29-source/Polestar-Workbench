@@ -5597,6 +5597,7 @@ export const GenerateReportProseBody = zod.object({
   "basisDays": zod.number(),
   "issueDate": zod.string(),
   "force": zod.boolean().optional(),
+  "facts": zod.string().optional(),
   "incidents": zod.array(zod.object({
   "id": zod.string().nullish(),
   "topic": zod.string().nullish(),

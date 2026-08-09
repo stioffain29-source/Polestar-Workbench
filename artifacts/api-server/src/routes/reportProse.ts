@@ -91,6 +91,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     issueDate: body.issueDate,
     basisDays: body.basisDays,
     incidents,
+    facts: body.facts ?? null,
   });
 
   const [existing] = await db
@@ -123,6 +124,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     basisDays: body.basisDays,
     issueDate: body.issueDate,
     incidents,
+    facts: body.facts ?? null,
   });
 
   if (!outcome.ok) {

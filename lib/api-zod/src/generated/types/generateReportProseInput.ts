@@ -14,5 +14,6 @@ export interface GenerateReportProseInput {
   basisDays: number;
   issueDate: string;
   force?: boolean;
+  facts?: string;
   incidents: ProseIncidentInput[];
 }

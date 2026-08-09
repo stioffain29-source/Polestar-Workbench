@@ -785,7 +785,7 @@ export async function runNewsTopicIngest(
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`), a.sourceUrl);
+    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance(topic, {

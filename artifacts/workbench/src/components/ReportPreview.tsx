@@ -47,6 +47,10 @@ import {
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
+import {
+  validateFuelReportConsistency,
+  resolveFuelEffectiveSections,
+} from "@/lib/fuelReportConsistency";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportSection } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
@@ -813,6 +817,70 @@ export default function ReportPreview({
     aiProse?.executiveSummary,
     proseDraft.executiveSummary,
   );
+
+  // Fuel Watch HARD consistency gate — the SAME facts + resolved effective
+  // text the PDF exporter throws on (assertFuelReportConsistent), so preview
+  // == PDF: a contradictory report shows a blocking panel here and cannot be
+  // exported. A clean report passes by construction and renders normally.
+  const fuelIssues =
+    isFuel && fuelData
+      ? validateFuelReportConsistency(
+          fuelData.facts,
+          resolveFuelEffectiveSections({
+            report: {
+              executiveSummary: report.executiveSummary,
+              situation: report.situation,
+              whatHappened: report.whatHappened,
+              whatMatters: report.whatMatters,
+              polestarView: report.polestarView,
+              fuelMarketRead: report.fuelMarketRead,
+              fuelOperationalRead: report.fuelOperationalRead,
+              fuelRegionalHighlights: report.fuelRegionalHighlights,
+            },
+            aiProse,
+            proseDraft,
+            fuelData,
+          }),
+        )
+      : [];
+  if (fuelIssues.length > 0) {
+    return (
+      <div
+        className="print-report bg-white"
+        style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
+        data-fuel-validation-blocked="true"
+      >
+        <div style={{ border: "2px solid #A33232", padding: 24 }}>
+          <div
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 700,
+              fontSize: 20,
+              color: "#A33232",
+              marginBottom: 12,
+            }}
+          >
+            Fuel Watch consistency gate failed — export blocked
+          </div>
+          <p style={{ fontSize: 13, marginBottom: 16 }}>
+            The narrative below contradicts the report's calculated facts.
+            Fix the flagged sections (or clear the analyst override so the
+            data-driven text flows) and the report will render and export
+            normally.
+          </p>
+          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
+            {fuelIssues.map((issue, i) => (
+              <li key={i}>
+                <span style={{ fontWeight: 700 }}>[{issue.code}]</span>{" "}
+                <span style={{ fontWeight: 600 }}>{issue.section}:</span>{" "}
+                {issue.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>

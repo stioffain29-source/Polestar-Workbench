@@ -159,6 +159,10 @@ function familyFor(items: TopicFastFactsIncident[]): IssueFamily | null {
 export function buildFuelRegionalHighlights(opts: {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
+  /** Canonical pressure decision from buildFuelReportFacts. When distributed,
+   *  no country may be crowned "the clearest pressure point" — the lead
+   *  paragraph uses spread phrasing instead (single-source-of-truth rule). */
+  pressure?: { distributed: boolean; primaryCountry: string | null };
 }): string | null {
   const window = filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
   if (window.length === 0) return null;
@@ -224,7 +228,18 @@ export function buildFuelRegionalHighlights(opts: {
     const recordsClause = "Recent activity points to";
     let opener: string;
     if (idx === 0) {
-      opener = `${titleCase(country)} is the clearest pressure point right now.`;
+      // Leader phrasing is only allowed when the canonical facts ranked this
+      // country the unique primary pressure point. A distributed picture (or
+      // a facts leader that disagrees with the local sort) gets spread
+      // phrasing so this section can never contradict the facts object.
+      const factsLeader = opts.pressure
+        ? !opts.pressure.distributed &&
+          (opts.pressure.primaryCountry ?? "").toLowerCase() ===
+            country.toLowerCase()
+        : true;
+      opener = factsLeader
+        ? `${titleCase(country)} is the clearest pressure point right now.`
+        : `${titleCase(country)} is one of several pressure points right now, with activity spread across the region rather than concentrated in one theatre.`;
     } else if (idx === 1) {
       opener = `${titleCase(country)} is a secondary but credible concern.`;
     } else {

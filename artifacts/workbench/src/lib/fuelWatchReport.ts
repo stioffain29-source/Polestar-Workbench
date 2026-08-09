@@ -35,7 +35,16 @@ import {
   type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
+import {
+  buildFuelReportFacts,
+  directionForPct,
+  type FuelReportFacts,
+  type MarketDirection,
+} from "./fuelReportFacts";
 import { format, parseISO } from "date-fns";
+
+export type { FuelReportFacts };
+export { buildFuelReportFacts, serialiseFuelFactsForPrompt } from "./fuelReportFacts";
 
 export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 
@@ -165,6 +174,9 @@ export interface FuelWatchReportData {
   incidentData: FuelIncidentData;
   narrativeData: FuelNarrativeData;
   validation: FuelValidation;
+  /** Canonical calculated facts — the single quantitative authority every
+   *  narrative surface and the consistency gate read from. */
+  facts: FuelReportFacts;
 }
 
 /**
@@ -295,9 +307,21 @@ export function buildFuelWatchReportData(
   // Related-incident filtering uses the topic window + topic-relevance
   // filter so a hiking story that happens to say "fuel" is dropped.
   const fuelIncidents = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
+  // Canonical facts — computed ONCE from the same filtered set + parsed
+  // market data. Market Read direction wording, the AI prompt's fixed-facts
+  // block and the consistency gate all read from this object.
+  const facts = buildFuelReportFacts({
+    issueDate: report.issueDate,
+    hardNumbers: report.hardNumbers,
+    incidents,
+  });
   const regionalHighlights = buildFuelRegionalHighlights({
     issueDate: report.issueDate,
     incidents,
+    pressure: {
+      distributed: facts.pressure.distributed,
+      primaryCountry: facts.pressure.primary?.country ?? null,
+    },
   });
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
@@ -389,6 +413,7 @@ export function buildFuelWatchReportData(
   }
 
   return {
+    facts,
     reportMeta: {
       ...(report.id !== undefined ? { id: report.id } : {}),
       title: report.title ?? "",
@@ -412,6 +437,7 @@ export function buildFuelWatchReportData(
         wti,
         jetFuel,
         trajectory: trajectoryPoints,
+        facts,
       }),
       jetDataNote,
     },
@@ -474,8 +500,12 @@ export function buildFuelMarketRead(opts: {
   wti: FuelDataCard | null;
   jetFuel: FuelDataCard | null;
   trajectory: JetFuelPricePoint[];
+  /** Canonical facts — the ONLY source of direction wording. When absent
+   *  (legacy callers/tests) directions fall back to the same shared rule
+   *  applied to locally computed pcts. */
+  facts?: FuelReportFacts;
 }): string | null {
-  const { brent, wti, jetFuel, trajectory } = opts;
+  const { brent, wti, jetFuel, trajectory, facts } = opts;
   if (!brent && !wti && !jetFuel) return null;
   const b = numVal(brent);
   const w = numVal(wti);
@@ -496,19 +526,37 @@ export function buildFuelMarketRead(opts: {
     const first = firstPoint.value;
     const last = lastPoint.value;
     const pct = first !== 0 ? ((last - first) / first) * 100 : 0;
-    // Direction wording must always agree with the sign of pct — a small
-    // negative move can never be described as "holding above" the earlier
-    // reading, and vice versa. The trajectory's first point is simply the
-    // earliest of the trailing observations the chart carries (it can sit
-    // before the reporting period when the underlying series has a
-    // reporting lag), so the sentence cites the actual dates rather than
-    // implying it is the period start.
+    // Direction wording is selected from the CALCULATED direction — the one
+    // shared rule in fuelReportFacts (directionForPct) — never re-judged
+    // here. When a facts object is supplied, the jet indicator's direction
+    // is read straight from it (same trajectory, same rule); otherwise the
+    // rule is applied to the locally computed pct. The trajectory's first
+    // point is simply the earliest trailing observation the chart carries,
+    // so the sentence cites the actual dates rather than implying it is the
+    // period start.
+    const jetDirection: MarketDirection | null =
+      facts?.market.indicators.find((m) => m.key === "jet")?.direction ??
+      directionForPct(pct);
     let dir: string;
-    if (pct >= 3) dir = "rising over this window";
-    else if (pct <= -3) dir = "easing over this window";
-    else if (pct > 0) dir = "holding modestly above its earlier reading";
-    else if (pct < 0) dir = "holding modestly below its earlier reading";
-    else dir = "flat against its earlier reading";
+    switch (jetDirection) {
+      case "rising":
+        dir = "rising over this window";
+        break;
+      case "falling":
+        dir = "easing over this window";
+        break;
+      case "unchanged":
+        dir = "flat against its earlier reading";
+        break;
+      default:
+        dir =
+          pct > 0
+            ? "holding modestly above its earlier reading"
+            : pct < 0
+              ? "holding modestly below its earlier reading"
+              : "flat against its earlier reading";
+        break;
+    }
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
     parts.push(
       `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} on ${formatAsOfDate(lastPoint.date)} versus ${first.toFixed(3)} on ${formatAsOfDate(firstPoint.date)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
@@ -535,14 +583,23 @@ export function buildFuelMarketRead(opts: {
   const changePcts = [parseChangePct(brent?.change), parseChangePct(wti?.change)].filter(
     (v): v is number => v !== null,
   );
-  const avgChangePct = changePcts.length
-    ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
-    : null;
+  const avgChangePct = facts
+    ? facts.market.avgCrudePctChange
+    : changePcts.length
+      ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
+      : null;
+  // Paragraph 2 wording is selected from the calculated crude direction
+  // (same shared rule); the ±3pp band keeps the STRONG relief/pressure
+  // paragraphs for material moves while the neutral paragraph covers the
+  // stable band — wording can never oppose the calculated direction.
+  const crudeDirection = facts
+    ? facts.market.crudeDirection
+    : directionForPct(avgChangePct);
   let para2: string;
-  if (avgChangePct !== null && avgChangePct <= -3) {
+  if (avgChangePct !== null && crudeDirection === "falling" && avgChangePct <= -3) {
     para2 =
       "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
-  } else if (avgChangePct !== null && avgChangePct >= 3) {
+  } else if (avgChangePct !== null && crudeDirection === "rising" && avgChangePct >= 3) {
     para2 =
       "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
   } else {

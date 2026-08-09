@@ -1,0 +1,197 @@
+Fix the Fuel Watch generation system at root cause. Do not patch individual sentences, hard-code current figures, create incident-specific exceptions, or tune the report only to the present dataset.
+
+The underlying problem is that report sections are independently interpreting the data. This allows the Executive Summary, Situation, Regional Highlights, What Matters and Polestar View to produce different rankings, counts, severity judgments and descriptions of the same evidence.
+
+Inspect the full pipeline and replace this behaviour with a single-source-of-truth architecture.
+
+REQUIRED BEHAVIOUR
+
+1. Build one canonical report facts object
+
+After filtering the source records to the reporting period, calculate one structured facts object containing all report-level findings.
+
+This must include dynamically calculated:
+
+* Qualifying incident records
+* Incident count
+* Distinct incident dates
+* Countries represented
+* Routes and chokepoints represented
+* Incident locations
+* Actor, operator and asset attributes
+* Severity distribution
+* Highest-priority incident
+* Primary pressure point
+* Secondary pressure points
+* Market indicator values
+* Previous indicator values
+* Absolute and percentage changes
+* Direction of movement
+* Overall report severity
+* Evidence confidence
+* Current conditions
+* Watch indicators
+
+All downstream sections must use this same object. No section may independently count, rank, classify or reinterpret the underlying data.
+
+2. Make calculations deterministic
+
+Counts, dates, rankings, percentage changes, trend directions and severity must be calculated in code before narrative generation.
+
+The language model must receive these values as fixed facts. It may explain them but must not recalculate, replace or contradict them.
+
+Do not hard-code any current value. The logic must work when prices, counts, dates, countries, incidents and rankings change in future reports.
+
+3. Generate market language from the actual direction
+
+For every market indicator, calculate direction from the current and comparison values.
+
+The narrative must select wording from the calculated result:
+
+* Current value greater than comparison value: rising
+* Current value lower than comparison value: falling
+* Current value equal to comparison value: unchanged
+* Change within a configured neutral threshold: broadly stable
+
+The generated prose must never describe a falling measure as rising, firming or not retreating. This validation must operate against whatever figures are present in the current dataset, not against a fixed example.
+
+4. Calculate report rankings once
+
+Define and document the scoring method used to select:
+
+* Primary pressure point
+* Secondary pressure points
+* Highest-priority incident
+* Overall severity
+
+Calculate each result once and store it in the canonical facts object.
+
+Every section referring to the leading country, route, incident or risk must use that stored result. Different sections cannot independently decide which country or issue “carries the most weight.”
+
+If the evidence does not support a unique leader, state that the pressure is distributed rather than forcing a ranking.
+
+5. Keep geography and relevance separate
+
+Store these separately for every incident:
+
+* Physical incident location
+* Affected maritime route or corridor
+* Country
+* Wider regional relevance
+
+Narrative generation must preserve the physical location. An incident may contribute to wider regional risk without being relocated to another chokepoint or body of water.
+
+6. Preserve entity fields
+
+Actor, claimant, vessel flag, vessel owner, vessel operator, infrastructure operator, country and incident location must remain separate fields throughout ingestion, aggregation and rendering.
+
+Never infer one field from another. A claimant’s nationality must not overwrite a vessel flag, operator nationality or incident location.
+
+Use neutral labels such as “operator not identified” when the source data does not identify the operator. Do not manufacture a label from another entity field.
+
+7. Derive narrative counts from the rendered record set
+
+The incident list shown in the report and all narrative counts must use the same filtered incident array.
+
+The following must always reconcile dynamically:
+
+* Total qualifying incidents
+* Number of distinct incident dates
+* Country totals
+* Route totals
+* Severity totals
+* Displayed incident records
+
+Do not let the language model generate numerical summaries. Supply the calculated values directly.
+
+8. Separate current evidence from watch indicators
+
+Current Situation and What Happened may only contain conditions supported by qualifying evidence from the reporting period.
+
+Potential developments such as shortages, rationing, allocation cuts, subsidy changes, forecourt disruption or force majeure belong under Watch Next unless they are present in the current evidence.
+
+The system must distinguish:
+
+* Observed
+* Reported
+* Assessed
+* Potential
+
+These must not be blended.
+
+9. Make severity consistent
+
+Use only:
+
+Insignificant, Low, Moderate, High, Extreme.
+
+Calculate overall severity once. Every section must use the same value and capitalisation.
+
+If evidence confidence is insufficient for the calculated severity, flag the report for analyst review. Do not publish confident severity language followed by wording that says the report is only a rough guide.
+
+10. Add a consistency gate before PDF generation
+
+Before rendering, validate the complete report against the canonical facts object.
+
+The report must fail validation if:
+
+* Any section gives a different primary pressure point
+* Narrative incident counts differ from the filtered records
+* Distinct-date counts differ from the records
+* Country, route or severity totals do not reconcile
+* Trend wording conflicts with calculated direction
+* An incident is assigned to the wrong physical location
+* Entity fields have contaminated one another
+* Current-condition claims lack supporting evidence
+* Severity differs between sections
+* Any narrative number is not traceable to a calculated field
+* The Executive Summary introduces facts absent from the canonical object
+
+Return specific validation errors identifying the section, conflicting statement, canonical value and source field.
+
+11. Replace example-based tests with parameterised tests
+
+Do not write regression tests tied to today’s figures or incidents.
+
+Create parameterised tests that supply multiple changing datasets and prove that:
+
+* Positive, negative, zero and near-zero market movements always produce the correct direction
+* Changing the leading country updates every relevant section consistently
+* Changing incident quantities automatically updates all counts
+* Changing incident dates automatically updates the distinct-day total
+* Changing severity updates every section
+* Changing location does not alter actor, operator or asset attributes
+* Changing the claimant does not change vessel flag or location
+* Potential conditions remain under Watch Next unless supported as current evidence
+* No generated section can override canonical calculated facts
+
+Include randomized or property-based tests where practical so the checks are not dependent on predetermined values.
+
+12. Trace and correct the actual source of failure
+
+Identify:
+
+* Where report sections currently receive their data
+* Which sections independently calculate or infer facts
+* Where free-form model output can override structured values
+* Where entity fields are being mixed
+* Where counts and rankings are generated
+* Where validation is currently absent
+
+Refactor the shared generation path. Do not solve this through additional prose instructions alone.
+
+DELIVERABLES
+
+Provide:
+
+* Root-cause explanation
+* Architecture changes made
+* Files and functions changed
+* Canonical facts-object schema
+* Deterministic calculation rules
+* Consistency validation rules
+* Parameterised test coverage
+* Test results
+* A regenerated report showing that every section reconciles
+
+Do not declare completion based on improved wording. Completion requires automated proof that future reports remain internally consistent when the underlying figures, incidents, dates, locations and rankings change.

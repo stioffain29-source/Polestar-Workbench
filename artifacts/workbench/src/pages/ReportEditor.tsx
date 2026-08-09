@@ -102,6 +102,8 @@ import {
   buildHardNumbersFromForm,
   fuelMarketFormFromData,
   fuelMarketLatestDate,
+  buildFuelReportFacts,
+  serialiseFuelFactsForPrompt,
   resolveFuelPeriodEnd,
   EMPTY_FUEL_MARKET_FORM,
   type FuelMarketFormState,
@@ -779,6 +781,23 @@ export default function ReportEditor() {
     form.topic,
     form.issueDate,
   ]);
+  // Fuel only: the canonical FIXED FACTS block for the AI prompt — computed by
+  // the SAME facts builder the preview/PDF consistency gate reads (same
+  // market-anchored issue date), so the model is handed the exact values the
+  // gate will later enforce. Part of the prose cache key: a direction flip or
+  // leader change regenerates the narrative.
+  const proseFacts = useMemo(() => {
+    if (form.topic !== "fuel" || !form.issueDate) return null;
+    const hn = hardNumbersEdited ?? report?.hardNumbers;
+    const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
+    return serialiseFuelFactsForPrompt(
+      buildFuelReportFacts({
+        issueDate: renderIssueDate,
+        hardNumbers: hn,
+        incidents: incidentsForExport,
+      }),
+    );
+  }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport]);
   const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
   const prosePeriodWord =
     reportCadence(form.topic) === "monthly" ? "this month" : "this week";
@@ -808,6 +827,7 @@ export default function ReportEditor() {
       issueDate: form.issueDate,
       basisDays: proseBasisDays,
       incidents: proseGrounding,
+      facts: proseFacts,
     });
     if (key === lastProseKey.current) return;
     lastProseKey.current = key;
@@ -822,6 +842,7 @@ export default function ReportEditor() {
           basisDays: proseBasisDays,
           issueDate: form.issueDate,
           incidents: proseGrounding,
+          ...(proseFacts ? { facts: proseFacts } : {}),
           force: false,
         },
       },
@@ -843,7 +864,7 @@ export default function ReportEditor() {
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, proseEnabled, form.topic, form.title, form.issueDate, proseBasisDays, prosePeriodWord, proseGrounding, incidents]);
+  }, [id, proseEnabled, form.topic, form.title, form.issueDate, proseBasisDays, prosePeriodWord, proseGrounding, proseFacts, incidents]);
 
   // AI narrative handed to the preview + PDF as the fallback layer. The full
   // 7-section result is structurally compatible with the 4-field
