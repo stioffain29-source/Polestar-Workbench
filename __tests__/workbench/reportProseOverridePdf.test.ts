@@ -248,7 +248,7 @@ describe("saved prose overrides reach the exported PDF (headless pass-through)",
     expectAllSentinels(text, CARGO_SENTINELS);
   });
 
-  it("fuel: every editable fuel read renders the saved override with real market data (no missing-data opt-out)", async () => {
+  it("fuel: legacy saved reads cannot override canonical facts with real market data", async () => {
     const data = buildHeadlessReportData(FUEL_REPORT);
     // No allowMissingMarketData: the hardNumbers fixture must satisfy the
     // Brent/WTI/jet fail-closed gate, mirroring a real export.
@@ -261,7 +261,11 @@ describe("saved prose overrides reach the exported PDF (headless pass-through)",
         {},
       ),
     );
-    expectAllSentinels(text, FUEL_SENTINELS);
+    for (const sentinel of Object.values(FUEL_SENTINELS)) {
+      expect(text).not.toContain(sentinel.split(" ")[0]);
+    }
+    expect(text).toContain("Overall severity: High");
+    expect(text).toContain("Indonesia is the primary pressure point");
   });
 });
 

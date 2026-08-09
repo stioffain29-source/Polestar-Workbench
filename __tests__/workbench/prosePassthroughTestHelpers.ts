@@ -283,10 +283,9 @@ export const CARGO_INCIDENTS = [
 ];
 
 // ---------------------------------------------------------------------------
-// Fuel Watch — the three fuel-specific editable reads (pickRead: editor text
-// replaces the generated read outright). hardNumbers carries Brent + WTI +
-// jet fuel so the exporter's fail-closed market-data gate passes without
-// allowMissingMarketData.
+// Fuel Watch — legacy saved read fields are intentionally supplied as
+// contradiction sentinels. The canonical-facts architecture must exclude them
+// from both preview and PDF output. hardNumbers keeps the market-data gate valid.
 // ---------------------------------------------------------------------------
 export const FUEL_SENTINELS: Record<string, string> = {
   fuelMarketRead: "ZZ-FUEL-MARKET-READ-OVERRIDE-ZZ saved analyst text.",
@@ -438,9 +437,9 @@ export const CONFLICT_GATED_SECTIONS: GatedSection[] = [
 ];
 
 export const FUEL_GATED_SECTIONS: GatedSection[] = [
-  { key: "market-read", heading: "Market Read", sentinelToken: "ZZ-FUEL-MARKET-READ-OVERRIDE-ZZ" },
-  { key: "operational-read", heading: "Operational Read", sentinelToken: "ZZ-FUEL-OPERATIONAL-READ-OVERRIDE-ZZ" },
-  { key: "regional-highlights", heading: "Regional Highlights", sentinelToken: "ZZ-FUEL-REGIONAL-READ-OVERRIDE-ZZ" },
+  { key: "market-read", heading: "Market Read", sentinelToken: "" },
+  { key: "operational-read", heading: "Operational Read", sentinelToken: "" },
+  { key: "regional-highlights", heading: "Regional Highlights", sentinelToken: "" },
 ];
 
 export const ENERGY_GATED_SECTIONS: GatedSection[] = [

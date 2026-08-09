@@ -15,7 +15,9 @@ import {
   incidentSeverityRank,
 } from "@workspace/country-engine";
 import { deriveIncidentCountry, deriveFlagState } from "./shippingCountry";
+import { joinWithAnd } from "./proseLists";
 import { matchesTopicIncident } from "./topicIncidentMatching";
+import type { CanonicalFuelIncident } from "./fuelCanonicalFacts";
 
 function titleCase(s: string): string {
   // Preserve canonical initialisms returned by the shared incident-location
@@ -159,7 +161,7 @@ function familyFor(items: TopicFastFactsIncident[]): IssueFamily | null {
 export function buildFuelRegionalHighlights(opts: {
   issueDate: string;
   incidents: TopicFastFactsIncident[];
-  /** Canonical pressure decision from buildFuelReportFacts. When distributed,
+  /** Canonical pressure decision from the report facts. When distributed,
    *  no country may be crowned "the clearest pressure point" — the lead
    *  paragraph uses spread phrasing instead (single-source-of-truth rule). */
   pressure?: { distributed: boolean; primaryCountry: string | null };
@@ -253,16 +255,10 @@ export function buildFuelRegionalHighlights(opts: {
 // ---------------------------------------------------------------------------
 // Gulf & Hormuz Chokepoint Watch
 //
-// A standing chokepoint view that looks back further than the 7-day market
-// window (default 60 days) so a Gulf/Hormuz escalation that fell just outside
-// the reporting week is still surfaced. The selector is DELIBERATELY NARROW:
-// bare OPEC / Saudi / Israel market chatter is excluded because it floods the
-// window with generic oil-market noise; only genuine Strait-of-Hormuz /
-// Persian-Gulf / Arabian-Gulf / Red-Sea / Bab-el-Mandeb chokepoint vocabulary
-// qualifies. STRICT no-fabrication: prose is theme-detected from the matched
-// records ONLY, cites real dated anchor events, carries no numeric counts, and
-// never asserts a "currently rising" trend the data does not support — an
-// escalation that has since gone quiet is reported as easing, not as live.
+// This section is now a canonical subset view: it receives only Fuel Watch's
+// qualifying incident array and selects rows the canonical route classifier
+// has already identified as chokepoint-relevant. It cannot add shipping-topic
+// or out-of-window rows that are absent from the report-level total.
 // ---------------------------------------------------------------------------
 
 // A genuine chokepoint INCIDENT described in the body even when the headline
@@ -329,20 +325,10 @@ function shiftDayKey(key: string, deltaDays: number): string {
 }
 
 /**
- * Build the Gulf & Hormuz Chokepoint Watch section from the fuel incident
- * set. Returns null when no genuine chokepoint reporting falls within THIS
- * reporting period, so the caller omits the section entirely (no placeholder,
- * no older/standing-context fallback material of any kind).
- *
- * The section is anchored on the report ISSUE DATE (the same window the rest
- * of the report uses), NOT the market-close date, and is scoped strictly to
- * that current-period window (extended to the market close if that lands
- * slightly later). Records outside the current period are excluded entirely
- * — never shown, never referenced in prose — so the section only ever
- * reflects this reporting period's activity.
- *
- * Both the on-screen preview and the PDF receive the identical raw incident
- * array and this function is fully deterministic, so screen == PDF.
+ * Build the Gulf & Hormuz Chokepoint Watch from the report's canonical
+ * qualifying set. Production callers pass that exact array, making every
+ * Chokepoint Watch count a bounded subset of incidentCount. The raw-input
+ * compatibility path remains only for direct legacy unit callers.
  */
 export function buildFuelGulfChokepointWatch(opts: {
   /** Report issue date (drives the current-period window). */
@@ -350,6 +336,9 @@ export function buildFuelGulfChokepointWatch(opts: {
   /** The market-close date, used only to extend the current end if later. */
   periodEnd?: string;
   incidents: TopicFastFactsIncident[];
+  /** The Fuel Watch canonical incident universe. Production callers must use
+   * this rather than independently selecting from the raw incident feed. */
+  qualifyingIncidents?: CanonicalFuelIncident[];
   maxItems?: number;
 }): FuelGulfChokepointWatch | null {
   const maxItems = opts.maxItems ?? 6;
@@ -366,31 +355,30 @@ export function buildFuelGulfChokepointWatch(opts: {
   const currentEndKey =
     periodEndKey && periodEndKey > issueKey ? periodEndKey : issueKey;
 
-  // 1. Select genuine fuel chokepoint incidents within the current-period
-  //    window. The shared matcher requires both a Gulf location and concrete
-  //    event evidence, and rejects fiscal or price stories that only name the
-  //    chokepoint as background market colour. A genuine event (a tanker
-  //    struck in the strait, a crude reroute) is often filed by ingestion under
-  //    the shipping topic rather than fuel, and those rows already surface in
-  //    the Fuel Watch Producer/Buyer Actions table via the cross-read.
-  //    Admit shipping-topic rows here too — gated on the SAME fuel-market
-  //    signal the cross-read uses — so a current-week chokepoint item shown
-  //    elsewhere in the report can never be contradicted by a stale
-  //    "no fresh reporting" line here.
-  const matched = opts.incidents
-    .filter(
-      (i) =>
-        i.topic === "fuel" ||
-        (i.topic === "shipping" && FUEL_ACTION_TOPICAL_RE.test(haystack(i))),
-    )
-    .map((i) => ({ i, key: gulfDayKey(i.occurredAt) }))
-    .filter(
-      (x): x is { i: TopicFastFactsIncident; key: string } =>
-        x.key !== null && x.key >= currentStartKey && x.key <= currentEndKey,
-    )
-    .filter(
-      ({ i }) => matchesTopicIncident("gulf-chokepoint", i),
-    );
+  // 1. Production selection is deliberately a filter over the canonical
+  //    qualifying array, using routeOrChokepoint — the route classification
+  //    already calculated in fuelCanonicalFacts. It neither re-windows nor
+  //    re-applies a second Gulf matcher, so this count can never exceed the
+  //    canonical incidentCount. The raw path is retained strictly for direct
+  //    legacy unit callers that do not build report facts first.
+  const matched = opts.qualifyingIncidents
+    ? opts.qualifyingIncidents
+        .filter((i) => i.routeOrChokepoint !== null)
+        .map((i) => ({ i: i.raw, key: i.date }))
+    : opts.incidents
+        .filter(
+          (i) =>
+            i.topic === "fuel" ||
+            (i.topic === "shipping" && FUEL_ACTION_TOPICAL_RE.test(haystack(i))),
+        )
+        .map((i) => ({ i, key: gulfDayKey(i.occurredAt) }))
+        .filter(
+          (x): x is { i: TopicFastFactsIncident; key: string } =>
+            x.key !== null && x.key >= currentStartKey && x.key <= currentEndKey,
+        )
+        .filter(
+          ({ i }) => matchesTopicIncident("gulf-chokepoint", i),
+        );
   if (matched.length === 0) return null;
 
   const currentMatched = matched;
@@ -445,7 +433,11 @@ export function buildFuelGulfChokepointWatch(opts: {
     const b = sorted[sorted.length - 1];
     return a === b ? gulfFmtDay(a) : `${gulfFmtDay(a)} \u2013 ${gulfFmtDay(b)}`;
   };
-  const currentKeys = currentMatched.map((x) => x.key);
+  // Range label and every stated figure below derive from currentKept — the
+  // SAME deduped set the bullets are drawn from — never from the wider
+  // pre-dedupe pool, so the prose can never claim activity the list of
+  // incidents beneath it does not show.
+  const currentKeys = currentKept.map((x) => x.key);
   const rangeLabel = spanLabel(currentKeys);
 
   // 3. Theme detection over the CURRENT matched set only — the prose leads with
@@ -466,8 +458,12 @@ export function buildFuelGulfChokepointWatch(opts: {
     /\b(bypass|pipeline|alternative route|skirt|reroute|diversion)\b/.test(
       currentBlob,
     );
-  const distinctCurrentDays = new Set(currentMatched.map((x) => x.key)).size;
+  const distinctCurrentDays = new Set(currentKept.map((x) => x.key)).size;
   const broadCoverage = currentKept.length >= 4 && distinctCurrentDays >= 3;
+  // How many of the counted incidents actually render as bullets. When the
+  // list is capped, the prose must SAY it lists a subset — "14 incidents"
+  // above six bullets otherwise reads as a self-contradiction.
+  const shownCount = Math.min(currentKept.length, maxItems);
 
   // 4. Compose deterministic, no-fabrication prose. Current period leads.
   const p1: string[] = [];
@@ -483,8 +479,12 @@ export function buildFuelGulfChokepointWatch(opts: {
     // same currentKept/distinctCurrentDays data already used to gate
     // broadCoverage above, so no new figure is introduced.
     if (currentKept.length >= 2) {
+      const listedNote =
+        currentKept.length > shownCount
+          ? `; the ${shownCount} most significant are listed below`
+          : "";
       p1.push(
-        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window.`,
+        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window${listedNote}.`,
       );
     }
     if (hasClosure) {
@@ -1183,7 +1183,7 @@ export function buildFuelOperationalRead(opts: {
 
   const where =
     topCountries.length > 0
-      ? ` ${topCountries.map(([c]) => titleCase(c)).join(", ")} carr${topCountries.length === 1 ? "ies" : "y"} the most activity this week.`
+      ? ` ${joinWithAnd(topCountries.map(([c]) => titleCase(c)))} carr${topCountries.length === 1 ? "ies" : "y"} the most activity this week.`
       : "";
 
   const closingPara = `${watchLines.join(" ")}${where}`.trim();

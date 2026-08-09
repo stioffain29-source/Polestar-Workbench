@@ -7,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { jsPDF } from "jspdf";
 
-const OUT_FUEL = "/home/user/workspace/fuel-watch-systemic-fix.pdf";
-const OUT_JAKARTA = "/home/user/workspace/jakarta-systemic-fix.pdf";
+const OUT_FUEL = process.env.FUEL_WATCH_OUT ?? "/home/user/workspace/fuel-watch-systemic-fix.pdf";
+const OUT_JAKARTA = process.env.JAKARTA_WATCH_OUT ?? "/home/user/workspace/jakarta-systemic-fix.pdf";
 
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -137,5 +137,6 @@ await exportCountryReportPdf(
   OUT_JAKARTA,
 );
 
+console.log(`Fuel Watch consistency gate: PASS (canonical pre-render validation completed).`);
 console.log(`Wrote ${OUT_FUEL}`);
 console.log(`Wrote ${OUT_JAKARTA}`);

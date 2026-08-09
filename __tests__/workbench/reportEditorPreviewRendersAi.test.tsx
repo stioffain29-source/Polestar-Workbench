@@ -378,9 +378,13 @@ const EXPECTED_SENTINELS: Record<string, string[]> = {
   cargo_watch: [AI_SECTIONS.whatMatters, AI_SECTIONS.polestarView],
   energy: [AI_SECTIONS.whatMatters, AI_SECTIONS.polestarView],
   fertiliser: [AI_SECTIONS.whatMatters, AI_SECTIONS.polestarView],
-  fuel: [AI_SECTIONS.whatMatters, AI_SECTIONS.polestarView],
 };
 
+// Fuel Watch is deliberately absent: its analytical sections are
+// non-overridable deterministic projections of the canonical facts object
+// (fuelCanonicalFacts), so the AI narrative never surfaces there. That
+// behaviour is covered by reportProseOverridePreview/Pdf and
+// fuelCanonicalFacts.property tests.
 const TOPICS = [
   "conflict",
   "shipping",
@@ -389,7 +393,6 @@ const TOPICS = [
   "cargo_watch",
   "energy",
   "fertiliser",
-  "fuel",
 ] as const;
 
 describe("ReportEditor — live preview surfaces the AI narrative for every topic", () => {

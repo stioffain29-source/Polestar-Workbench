@@ -111,14 +111,18 @@ describe("saved prose overrides reach the on-screen preview", () => {
     expectAllSentinels(html, CARGO_SENTINELS);
   });
 
-  it("fuel preview renders every saved fuel read override", () => {
+  it("fuel preview rejects every saved fuel read override in favour of canonical facts", () => {
     const html = renderToStaticMarkup(
       createElement(ReportPreview, {
         report: FUEL_REPORT,
         incidents: FUEL_INCIDENTS,
       } as never),
     );
-    expectAllSentinels(html, FUEL_SENTINELS);
+    for (const sentinel of Object.values(FUEL_SENTINELS)) {
+      expect(html).not.toContain(sentinel.split(" ")[0]);
+    }
+    expect(html).toContain("Overall severity: High");
+    expect(html).toContain("Indonesia is the primary pressure point");
   });
 });
 

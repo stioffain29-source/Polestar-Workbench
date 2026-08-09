@@ -24,29 +24,40 @@ import {
   type TopicFastFactsIncident,
 } from "./topicFastFacts";
 import {
-  buildFuelRegionalHighlights,
   buildFuelProducerBuyerActions,
-  buildFuelOperationalRead,
   buildFuelGulfChokepointWatch,
-  topUpFuelBullets,
   FUEL_DEFAULT_WATCH_NEXT,
-  FUEL_DEFAULT_IMPLICATIONS,
   type ProducerBuyerActionRow,
   type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
 import {
-  buildFuelReportFacts,
-  directionForPct,
-  type FuelReportFacts,
-  type MarketDirection,
-} from "./fuelReportFacts";
+  buildFuelCanonicalFacts,
+  buildFuelCanonicalSections,
+  type FuelCanonicalFacts,
+  type FuelCanonicalRenderableSections,
+  type FuelCanonicalSections,
+  type FuelConsistencyError,
+  validateFuelReportConsistency,
+} from "./fuelCanonicalFacts";
 import { format, parseISO } from "date-fns";
 
-export type { FuelReportFacts };
+export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
+
+// Retained for the editor/AI-prompt plumbing (ReportEditor fingerprint +
+// api-server FIXED FACTS block), which reads the serialised facts through
+// this module.
+export type { FuelReportFacts } from "./fuelReportFacts";
 export { buildFuelReportFacts, serialiseFuelFactsForPrompt } from "./fuelReportFacts";
 
-export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
+/** Kept local to make the canonical builder's validation call explicit in this
+ * module; renderers call assertFuelReportConsistent before their first draw. */
+function validateFuelCanonicalSections(
+  facts: FuelCanonicalFacts,
+  sections: FuelCanonicalRenderableSections,
+): FuelConsistencyError[] {
+  return validateFuelReportConsistency(facts, sections);
+}
 
 /** Format a bare/leading ISO date as e.g. "26 May 2026" for prose notes. */
 function formatFuelNoteDate(iso: string): string {
@@ -136,9 +147,8 @@ export interface FuelIncidentData {
    *  Never repeats the Related Incidents table. Null when the window
    *  carries no usable fuel-relevant records. */
   operationalRead: string | null;
-  /** Standing Gulf/Hormuz chokepoint view (wider lookback than the 7-day
-   *  market window). Null when no chokepoint reporting falls in the lookback,
-   *  so the section is omitted rather than padded. */
+  /** Canonical-subset Gulf/Hormuz chokepoint view. Null when no qualifying
+   *  canonical record is chokepoint-relevant, so the section is omitted. */
   gulfChokepointWatch: FuelGulfChokepointWatch | null;
 }
 
@@ -150,6 +160,8 @@ export interface FuelNarrativeData {
   implications?: string | null;
   polestarView?: string | null;
   watchNext?: string | null;
+  /** Five non-overridable analytical sections generated from canonicalFacts. */
+  canonicalSections: FuelCanonicalSections;
 }
 
 export interface FuelValidation {
@@ -166,6 +178,8 @@ export interface FuelValidation {
   missingRequired: string[];
   errors: string[];
   warnings: string[];
+  /** Pre-render reconciliation errors; empty means the canonical prose passed. */
+  consistencyErrors: FuelConsistencyError[];
 }
 
 export interface FuelWatchReportData {
@@ -173,10 +187,9 @@ export interface FuelWatchReportData {
   marketData: FuelMarketData;
   incidentData: FuelIncidentData;
   narrativeData: FuelNarrativeData;
+  /** The only facts object Fuel Watch sections are allowed to consume. */
+  canonicalFacts: FuelCanonicalFacts;
   validation: FuelValidation;
-  /** Canonical calculated facts — the single quantitative authority every
-   *  narrative surface and the consistency gate read from. */
-  facts: FuelReportFacts;
 }
 
 /**
@@ -307,38 +320,30 @@ export function buildFuelWatchReportData(
   // Related-incident filtering uses the topic window + topic-relevance
   // filter so a hiking story that happens to say "fuel" is dropped.
   const fuelIncidents = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
-  // Canonical facts — computed ONCE from the same filtered set + parsed
-  // market data. Market Read direction wording, the AI prompt's fixed-facts
-  // block and the consistency gate all read from this object.
-  const facts = buildFuelReportFacts({
-    issueDate: report.issueDate,
-    hardNumbers: report.hardNumbers,
-    incidents,
-  });
-  const regionalHighlights = buildFuelRegionalHighlights({
+  // Canonical facts are built exactly once from the same filtered incident array
+  // that all report counts and analytical sections consume.
+  const canonicalFacts = buildFuelCanonicalFacts({
     issueDate: report.issueDate,
     incidents,
-    pressure: {
-      distributed: facts.pressure.distributed,
-      primaryCountry: facts.pressure.primary?.country ?? null,
-    },
+    qualifyingIncidents: fuelIncidents,
+    marketCards: fastFactsCards,
+    watchIndicators: FUEL_DEFAULT_WATCH_NEXT,
   });
+  const canonicalSections = buildFuelCanonicalSections(canonicalFacts);
+  const regionalHighlights = canonicalSections.regionalHighlights;
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
     incidents,
   });
-  const operationalRead = buildFuelOperationalRead({
-    issueDate: report.issueDate,
-    incidents,
-  });
-  // Gulf/Hormuz chokepoint watch is anchored on the report ISSUE DATE (the same
-  // window as the rest of the report), splitting current-period activity from
-  // older standing context. fuelMarketLatestDate is passed only to extend the
-  // current end when the market close lands a day or two after the issue date.
+  const operationalRead = canonicalSections.operationalRead;
+  // Gulf/Hormuz Chokepoint Watch is a filtered subset of the canonical
+  // qualifying records. Do not pass the full raw incident feed here: doing so
+  // previously let its independent count exceed the report-wide total.
   const gulfChokepointWatch = buildFuelGulfChokepointWatch({
     issueDate: report.issueDate,
     periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? undefined,
     incidents,
+    qualifyingIncidents: canonicalFacts.qualifyingIncidents,
   });
 
   // Validation. The fail-closed export gate is keyed on market data
@@ -412,8 +417,15 @@ export function buildFuelWatchReportData(
       `Brent and WTI run to ${formatFuelNoteDate(periodEnd)} (the period end).`;
   }
 
+  // The builder validates its own deterministic section payload. Exporters run
+  // the same gate again immediately before rendering so no later caller can
+  // substitute contradictory prose.
+  const consistencyErrors = validateFuelCanonicalSections(canonicalFacts, {
+    ...canonicalSections,
+    gulfAndHormuzChokepointWatch: gulfChokepointWatch?.read,
+  });
+
   return {
-    facts,
     reportMeta: {
       ...(report.id !== undefined ? { id: report.id } : {}),
       title: report.title ?? "",
@@ -432,13 +444,7 @@ export function buildFuelWatchReportData(
       policyIndicators: parsed.policy,
       routeIndicators: parsed.routes,
       fastFactsCards,
-      marketRead: buildFuelMarketRead({
-        brent,
-        wti,
-        jetFuel,
-        trajectory: trajectoryPoints,
-        facts,
-      }),
+      marketRead: canonicalSections.marketRead,
       jetDataNote,
     },
     incidentData: {
@@ -449,17 +455,18 @@ export function buildFuelWatchReportData(
       gulfChokepointWatch,
     },
     narrativeData: {
-      executiveSummary: report.executiveSummary,
-      situation: report.situation,
-      whatHappened: report.whatHappened,
-      whatMatters: report.whatMatters,
-      // Top up the bullet sections to a useful minimum so a thinly saved
-      // report does not render a one-line Watch Next / two-line Implications.
-      // Stored content always leads; defaults only fill the gap.
-      implications: topUpFuelBullets(report.implications, FUEL_DEFAULT_IMPLICATIONS, 4, 6),
-      polestarView: report.polestarView,
-      watchNext: topUpFuelBullets(report.watchNext, FUEL_DEFAULT_WATCH_NEXT, 5, 5),
+      // These five analytical sections are never sourced from a report field or
+      // model response. They are deterministic projections of canonicalFacts.
+      executiveSummary: canonicalSections.executiveSummary,
+      situation: canonicalSections.situation,
+      whatHappened: canonicalSections.whatHappened,
+      whatMatters: canonicalSections.whatMatters,
+      implications: canonicalSections.implications,
+      polestarView: canonicalSections.polestarView,
+      watchNext: canonicalSections.watchNext,
+      canonicalSections,
     },
+    canonicalFacts,
     validation: {
       hasPrices,
       hasBrent,
@@ -473,6 +480,7 @@ export function buildFuelWatchReportData(
       missingRequired,
       errors,
       warnings,
+      consistencyErrors,
     },
   };
 }
@@ -500,12 +508,8 @@ export function buildFuelMarketRead(opts: {
   wti: FuelDataCard | null;
   jetFuel: FuelDataCard | null;
   trajectory: JetFuelPricePoint[];
-  /** Canonical facts — the ONLY source of direction wording. When absent
-   *  (legacy callers/tests) directions fall back to the same shared rule
-   *  applied to locally computed pcts. */
-  facts?: FuelReportFacts;
 }): string | null {
-  const { brent, wti, jetFuel, trajectory, facts } = opts;
+  const { brent, wti, jetFuel, trajectory } = opts;
   if (!brent && !wti && !jetFuel) return null;
   const b = numVal(brent);
   const w = numVal(wti);
@@ -526,37 +530,19 @@ export function buildFuelMarketRead(opts: {
     const first = firstPoint.value;
     const last = lastPoint.value;
     const pct = first !== 0 ? ((last - first) / first) * 100 : 0;
-    // Direction wording is selected from the CALCULATED direction — the one
-    // shared rule in fuelReportFacts (directionForPct) — never re-judged
-    // here. When a facts object is supplied, the jet indicator's direction
-    // is read straight from it (same trajectory, same rule); otherwise the
-    // rule is applied to the locally computed pct. The trajectory's first
-    // point is simply the earliest trailing observation the chart carries,
-    // so the sentence cites the actual dates rather than implying it is the
-    // period start.
-    const jetDirection: MarketDirection | null =
-      facts?.market.indicators.find((m) => m.key === "jet")?.direction ??
-      directionForPct(pct);
+    // Direction wording must always agree with the sign of pct — a small
+    // negative move can never be described as "holding above" the earlier
+    // reading, and vice versa. The trajectory's first point is simply the
+    // earliest of the trailing observations the chart carries (it can sit
+    // before the reporting period when the underlying series has a
+    // reporting lag), so the sentence cites the actual dates rather than
+    // implying it is the period start.
     let dir: string;
-    switch (jetDirection) {
-      case "rising":
-        dir = "rising over this window";
-        break;
-      case "falling":
-        dir = "easing over this window";
-        break;
-      case "unchanged":
-        dir = "flat against its earlier reading";
-        break;
-      default:
-        dir =
-          pct > 0
-            ? "holding modestly above its earlier reading"
-            : pct < 0
-              ? "holding modestly below its earlier reading"
-              : "flat against its earlier reading";
-        break;
-    }
+    if (pct >= 3) dir = "rising over this window";
+    else if (pct <= -3) dir = "easing over this window";
+    else if (pct > 0) dir = "holding modestly above its earlier reading";
+    else if (pct < 0) dir = "holding modestly below its earlier reading";
+    else dir = "flat against its earlier reading";
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
     parts.push(
       `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} on ${formatAsOfDate(lastPoint.date)} versus ${first.toFixed(3)} on ${formatAsOfDate(firstPoint.date)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
@@ -583,23 +569,14 @@ export function buildFuelMarketRead(opts: {
   const changePcts = [parseChangePct(brent?.change), parseChangePct(wti?.change)].filter(
     (v): v is number => v !== null,
   );
-  const avgChangePct = facts
-    ? facts.market.avgCrudePctChange
-    : changePcts.length
-      ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
-      : null;
-  // Paragraph 2 wording is selected from the calculated crude direction
-  // (same shared rule); the ±3pp band keeps the STRONG relief/pressure
-  // paragraphs for material moves while the neutral paragraph covers the
-  // stable band — wording can never oppose the calculated direction.
-  const crudeDirection = facts
-    ? facts.market.crudeDirection
-    : directionForPct(avgChangePct);
+  const avgChangePct = changePcts.length
+    ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
+    : null;
   let para2: string;
-  if (avgChangePct !== null && crudeDirection === "falling" && avgChangePct <= -3) {
+  if (avgChangePct !== null && avgChangePct <= -3) {
     para2 =
       "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
-  } else if (avgChangePct !== null && crudeDirection === "rising" && avgChangePct >= 3) {
+  } else if (avgChangePct !== null && avgChangePct >= 3) {
     para2 =
       "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
   } else {

@@ -397,6 +397,11 @@ function incidentsFor(topic: string): Array<Record<string, unknown>> {
 // Every preview renders whatMatters and polestarView from the resolved prose,
 // so they are the portable cross-topic assertion: the analyst edit must show
 // and the corresponding AI sentinel must NOT.
+// Fuel Watch is deliberately absent: its analytical sections are
+// non-overridable deterministic projections of the canonical facts object
+// (fuelCanonicalFacts), so neither analyst edits nor AI narrative surface
+// there. That behaviour is covered by reportProseOverridePreview/Pdf and
+// fuelCanonicalFacts.property tests.
 const TOPICS = [
   "conflict",
   "shipping",
@@ -405,7 +410,6 @@ const TOPICS = [
   "cargo_watch",
   "energy",
   "fertiliser",
-  "fuel",
 ] as const;
 
 describe("ReportEditor — a saved analyst edit outranks the AI narrative in the preview", () => {

@@ -47,10 +47,6 @@ import {
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
-import {
-  validateFuelReportConsistency,
-  resolveFuelEffectiveSections,
-} from "@/lib/fuelReportConsistency";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportSection } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
@@ -807,43 +803,27 @@ export default function ReportPreview({
         ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
         : incidents,
     ),
-    // Fuel: the Gulf & Hormuz Chokepoint Watch from the SAME payload the
-    // preview renders below, so the lead narrative can name a live Gulf story
-    // (Hormuz rows are topic=shipping and never survive the fuel filter).
+    // Fuel: the canonical-subset Gulf & Hormuz Chokepoint Watch from the same
+    // payload rendered below. It cannot introduce records outside Fuel Watch's
+    // qualifying incident set.
     fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
-  const execText = resolveSimpleProse(
-    report.executiveSummary,
-    aiProse?.executiveSummary,
-    proseDraft.executiveSummary,
-  );
+  // Fuel Watch has no analyst/AI precedence for its analytical sections.
+  // The canonical facts object remains the only source for every rendered claim.
+  const execText = fuelData
+    ? fuelData.narrativeData.canonicalSections.executiveSummary
+    : resolveSimpleProse(
+        report.executiveSummary,
+        aiProse?.executiveSummary,
+        proseDraft.executiveSummary,
+      );
 
-  // Fuel Watch HARD consistency gate — the SAME facts + resolved effective
-  // text the PDF exporter throws on (assertFuelReportConsistent), so preview
-  // == PDF: a contradictory report shows a blocking panel here and cannot be
-  // exported. A clean report passes by construction and renders normally.
-  const fuelIssues =
-    isFuel && fuelData
-      ? validateFuelReportConsistency(
-          fuelData.facts,
-          resolveFuelEffectiveSections({
-            report: {
-              executiveSummary: report.executiveSummary,
-              situation: report.situation,
-              whatHappened: report.whatHappened,
-              whatMatters: report.whatMatters,
-              polestarView: report.polestarView,
-              fuelMarketRead: report.fuelMarketRead,
-              fuelOperationalRead: report.fuelOperationalRead,
-              fuelRegionalHighlights: report.fuelRegionalHighlights,
-            },
-            aiProse,
-            proseDraft,
-            fuelData,
-          }),
-        )
-      : [];
-  if (fuelIssues.length > 0) {
+  // Fuel Watch HARD consistency gate — the SAME reconciliation errors the PDF
+  // exporter throws on (assertFuelReportConsistent), surfaced here as a
+  // blocking panel so preview == PDF: a contradictory payload can neither be
+  // previewed as clean nor exported. A clean report passes by construction.
+  const fuelConsistencyErrors = fuelData?.validation.consistencyErrors ?? [];
+  if (fuelConsistencyErrors.length > 0) {
     return (
       <div
         className="print-report bg-white"
@@ -863,17 +843,16 @@ export default function ReportPreview({
             Fuel Watch consistency gate failed — export blocked
           </div>
           <p style={{ fontSize: 13, marginBottom: 16 }}>
-            The narrative below contradicts the report's calculated facts.
-            Fix the flagged sections (or clear the analyst override so the
-            data-driven text flows) and the report will render and export
+            The rendered sections contradict the report's calculated facts.
+            Fix the flagged sections and the report will render and export
             normally.
           </p>
           <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
-            {fuelIssues.map((issue, i) => (
+            {fuelConsistencyErrors.map((issue, i) => (
               <li key={i}>
-                <span style={{ fontWeight: 700 }}>[{issue.code}]</span>{" "}
-                <span style={{ fontWeight: 600 }}>{issue.section}:</span>{" "}
-                {issue.message}
+                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
+                {issue.conflictingStatement} — canonical value{" "}
+                {issue.canonicalValue} ({issue.sourceField})
               </li>
             ))}
           </ul>
@@ -1054,11 +1033,11 @@ export default function ReportPreview({
               )}
             </Section>
 
-            <NarrativeSection hidden={!show("market-read")} title="Market Read" text={pickRead(report.fuelMarketRead, fuelData.marketData.marketRead)} />
-            <NarrativeSection hidden={!show("situation")} title="Situation" text={resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)} />
-            <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)} />
-            <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={pickRead(report.fuelOperationalRead, fuelData.incidentData.operationalRead)} />
-            <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={pickRead(report.fuelRegionalHighlights, fuelData.incidentData.regionalHighlights)} />
+            <NarrativeSection hidden={!show("market-read")} title="Market Read" text={fuelData.narrativeData.canonicalSections.marketRead} />
+            <NarrativeSection hidden={!show("situation")} title="Situation" text={fuelData.narrativeData.canonicalSections.situation} />
+            <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={fuelData.narrativeData.canonicalSections.whatHappened} />
+            <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={fuelData.narrativeData.canonicalSections.operationalRead} />
+            <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={fuelData.narrativeData.canonicalSections.regionalHighlights} />
             {fuelData.incidentData.gulfChokepointWatch && (() => {
               // Owner per-bullet overrides (rewrite/suppress; blank = auto),
               // applied identically in the PDF exporter so preview == PDF.
@@ -1119,10 +1098,10 @@ export default function ReportPreview({
                 </Section>
               ) : null;
             })()}
-            <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)} />
+            <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={fuelData.narrativeData.canonicalSections.whatMatters} />
             <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelData.narrativeData.implications} />
             <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />
-            <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)} />
+            <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelData.narrativeData.canonicalSections.polestarView} />
           </>
         ) : (
           <>
