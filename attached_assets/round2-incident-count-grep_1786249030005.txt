@@ -1,0 +1,34 @@
+COMMAND: rg -in "incidents?|qualifying" fuel-watch-canonical-proof-round2.txt
+--- ALL MATCHING LINES ---
+6:Fuel Watch records 182 qualifying incidents across 7 distinct reporting days. Overall severity: Extreme. UAE
+23:Incident reporting
+31:Current, non-potential evidence covers 168 of the reporting period's 182 qualifying incidents. UAE is the
+32:primary pressure point. The highest-priority incident is "@_A_khalifa: Those Iranian bastards from the
+37:Current, non-potential evidence covers 168 of the reporting period's 182 qualifying incidents. UAE is the
+38:primary pressure point. The highest-priority incident is "@_A_khalifa: Those Iranian bastards from the
+42:Operational Read: 182 qualifying incidents across 7 distinct days. UAE is the primary pressure point. Overall
+49:concentration of chokepoint reporting. 97 distinct chokepoint incidents were logged across 5 separate days
+52:premium. Pressure peaked on 4 May 2026 with an extreme-severity incident near UAE, the period's most
+80:Hormuz. the incident has
+155:What Matters: UAE is the primary pressure point. The report contains 182 qualifying incidents; route and
+161:Reported: verify supplier, route and stock exposure against the 182 qualifying incidents.
+176:assessed position is based on the qualifying evidence in this reporting period.
+
+COMMAND: rg -in "[0-9][0-9,]*[^\\n]{0,160}(incidents?|qualifying)|((incidents?|qualifying)[^\\n]{0,160}[0-9][0-9,]*)" fuel-watch-canonical-proof-round2.txt
+--- NUMERIC INCIDENT / QUALIFYING CLAIM LINES ---
+6:Fuel Watch records 182 qualifying incidents across 7 distinct reporting days. Overall severity: Extreme. UAE
+31:Current, non-potential evidence covers 168 of the reporting period's 182 qualifying incidents. UAE is the
+37:Current, non-potential evidence covers 168 of the reporting period's 182 qualifying incidents. UAE is the
+42:Operational Read: 182 qualifying incidents across 7 distinct days. UAE is the primary pressure point. Overall
+49:concentration of chokepoint reporting. 97 distinct chokepoint incidents were logged across 5 separate days
+52:premium. Pressure peaked on 4 May 2026 with an extreme-severity incident near UAE, the period's most
+155:What Matters: UAE is the primary pressure point. The report contains 182 qualifying incidents; route and
+161:Reported: verify supplier, route and stock exposure against the 182 qualifying incidents.
+
+COMMAND: rg -in -C 1 "[0-9][0-9,]*\\s+distinct\\s+chokepoint incidents?" fuel-watch-canonical-proof-round2.txt
+--- CHOKEPOINT COUNT CONTEXT ---
+48-The Strait of Hormuz and wider Gulf were this reporting period's dominant fuel-route risk, with a marked
+49:concentration of chokepoint reporting. 97 distinct chokepoint incidents were logged across 5 separate days
+50-in the window; the 6 most significant are listed below. Coverage centred on Hormuz closure and shipping
+
+--- OBSOLETE PHRASING / OLD COUNT CHECK (no output expected) ---
