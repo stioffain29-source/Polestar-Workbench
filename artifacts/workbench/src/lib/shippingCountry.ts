@@ -249,20 +249,65 @@ export function deriveIncidentCountry(i: CountrySource): string | null {
   return fromProse;
 }
 
+// Armed / militant groups whose ORIGIN country the ingest sometimes stamps
+// into the raw `country` field of a story about an attack. When such a group
+// is named in the prose and the raw field is its home country, the field is
+// describing the ATTACKER's origin — never the vessel's flag. ("Houthis
+// attacked Saudi oil tanker" + country=Yemen must not read "Yemen-flagged".)
+const ACTOR_ORIGIN_GROUPS: Array<[RegExp, string]> = [
+  [/\bhouthis?\b|\bansar\s+allah\b/i, "Yemen"],
+  [/\bhezbollah\b/i, "Lebanon"],
+  [/\bhamas\b/i, "Palestine"],
+  [/\birgc\b|\brevolutionary\s+guard\b/i, "Iran"],
+  [/\bal[- ]shabaab\b/i, "Somalia"],
+  [/\btaliban\b/i, "Afghanistan"],
+  [/\bpkk\b/i, "Turkey"],
+];
+
+// A flag stated IN the prose itself is the strongest possible flag evidence:
+// "Saudi oil tanker", "Saudi-flagged carriers", "Panama-registered vessel".
+// Reuses the same descriptor spans that maskFlagDescriptors strips when
+// deriving the incident location — the two functions are exact complements:
+// what the location pass throws away is precisely what the flag pass keeps.
+function findFlagDescriptorCountry(text: string): string | null {
+  if (!text) return null;
+  const spans = text.match(FLAG_DESCRIPTOR_RE) ?? [];
+  for (const span of spans) {
+    const demonym = COUNTRY_DEMONYMS.find(([re]) => re.test(span))?.[1];
+    if (demonym) return canonical(demonym);
+    const named = findCountryInText(span);
+    if (named) return named;
+  }
+  return null;
+}
+
 /**
- * Flag state of the vessel, if one is recorded separately from the incident
- * country. Returns the raw `country` value when it does NOT match the derived
- * incident country — that mismatch is the signal that the `country` field is
- * being used as a flag state, not as an event location.
+ * Flag state of the vessel. Evidence order:
+ *   1. A flag descriptor in the prose ("Saudi oil tanker") — outranks the raw
+ *      field, which ingest sometimes stamps with an attacker's origin.
+ *   2. The raw `country` field, ONLY when it is not an actor-origin echo,
+ *      does not match the derived incident country, and is not mentioned in
+ *      the text as a place. That mismatch is the signal the field is being
+ *      used as a flag state, not as an event location.
  */
 export function deriveFlagState(i: CountrySource): string | null {
+  const eventBlob = `${i.title ?? ""} ${i.summary ?? ""} ${i.location ?? ""}`;
+  const fromProse = findFlagDescriptorCountry(eventBlob);
+  if (fromProse) return fromProse;
   const raw = (i.country ?? "").split(/[;,]/)[0].trim();
   if (!raw || /^unknown$/i.test(raw)) return null;
   const flag = canonical(raw);
+  if (
+    ACTOR_ORIGIN_GROUPS.some(
+      ([re, origin]) =>
+        origin.toLowerCase() === flag.toLowerCase() && re.test(eventBlob),
+    )
+  ) {
+    return null;
+  }
   const incident = deriveIncidentCountry(i);
   if (incident && incident.toLowerCase() === flag.toLowerCase()) return null;
   // Only surface the flag when the event text does NOT mention it as a place.
-  const eventBlob = `${i.title ?? ""} ${i.summary ?? ""} ${i.location ?? ""}`;
   const re = new RegExp(`\\b${flag.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
   if (re.test(eventBlob)) return null;
   return flag;
