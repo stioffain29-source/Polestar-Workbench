@@ -33,7 +33,7 @@ const SRC = (p: string) => resolvePath(WORKBENCH, "src", p);
 const CANONICAL_SECTIONS = [
   "Bottom Line Up Front",
   "Top 3 Developments",
-  "Operating Picture This Week",
+  "Area Situation This Week",
   "Crime & Escalation Watch",
   "Recommended Actions",
 ];

@@ -436,7 +436,7 @@ export default function PngCountryReportBody({
         {photoAt("after-top3")}
 
         {show("operational-impact") && (
-          <Section title="Operating Picture This Week">
+          <Section title="Area Situation This Week">
             {operatingPicture.rows.length > 0 ? (
               <OperatingPictureTable rows={operatingPicture.rows} />
             ) : (

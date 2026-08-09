@@ -890,7 +890,7 @@ function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
     for (const item of topThree) drawStructuredItemCard(ctx, item, true, true);
   }
 
-  drawSectionHeading(ctx, "Operating Picture This Week");
+  drawSectionHeading(ctx, "Area Situation This Week");
   if (tactical.operatingPicture.rows.length > 0) {
     drawJakartaOperatingPictureTable(ctx, tactical.operatingPicture.rows);
   } else {

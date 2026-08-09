@@ -1225,19 +1225,11 @@ export default function CountryReport() {
         ...pngDataset.gateReport,
         narrative: patched,
         sectionWordCounts: patched.sectionWordCounts,
-        ...(isJakarta
-          ? {
-              localityScope: {
-                label: "Jakarta",
-                isInScope: (e) =>
-                  isJakartaScoped(
-                    e.eventTitle,
-                    e.eventSummary,
-                    e.district ?? e.city ?? e.provinceOrState,
-                  ),
-              },
-            }
-          : {}),
+        // localityScope rides in on pngDataset.gateReport (Jakarta only) and
+        // already carries the raw-source-row fallback — a merged/translated
+        // canonical title can lose its Jakarta token even though the source
+        // row passed isJakartaScoped, so re-defining a canonical-fields-only
+        // predicate here would reinstate that false fail on analyst edits.
       });
       // whatChanged is analyst-editable but not a §31 narrative section — still
       // scan the edited text for §30 banned phrases so no overlay escapes the

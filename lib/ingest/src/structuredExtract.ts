@@ -65,7 +65,7 @@ const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: st
     // the existing Pacific-brief classification is unaffected.
     re: /\b(terroris\w*|terror (?:attack|cell|plot|suspect|network)|suicide bomb\w*|bomb blast|car bomb|truck bomb|letter bomb|pipe bomb|improvised explosive(?: device)?|roadside bomb|jihadist|extremist (?:attack|cell|network)|teroris\w*|bom bunuh diri|ledakan bom|serangan bom|bom rakitan|densus 88|jaringan teroris)\b/i,
     category: "Terrorism / militancy",
-    impact: "Terrorism-related security threat; review physical security, access control and emergency procedures at exposed sites.",
+    impact: "Terrorism-related security threat; review physical security, access control and emergency procedures at high-visibility locations.",
   },
   {
     // Extended with the armed-robbery vocab the Pacific briefs were missing:

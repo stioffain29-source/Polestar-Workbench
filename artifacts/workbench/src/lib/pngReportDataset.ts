@@ -2311,12 +2311,32 @@ export function buildStructuredReportDataset(
         ? {
             localityScope: {
               label: "Jakarta",
-              isInScope: (e: CanonicalEvent) =>
-                isJakartaScoped(
-                  e.eventTitle,
-                  e.eventSummary,
-                  e.district ?? e.city ?? e.provinceOrState,
-                ),
+              // The canonical eventTitle can be a merged/translated title that
+              // no longer carries a Jakarta token even though the underlying
+              // SOURCE row passed isJakartaScoped on its raw fields (every row
+              // fed to the jakarta engine already did — CountryReport.tsx /
+              // countryReportData.ts select on raw title+summary+location). So
+              // check the canonical fields first, then fall back to the source
+              // row's raw fields before failing the event out of scope.
+              isInScope: (e: CanonicalEvent) => {
+                if (
+                  isJakartaScoped(
+                    e.eventTitle,
+                    e.eventSummary,
+                    e.district ?? e.city ?? e.provinceOrState,
+                  )
+                ) {
+                  return true;
+                }
+                const src = windowItems.find((it) => String(it.id) === String(e.eventId));
+                return src
+                  ? isJakartaScoped(
+                      src.rawTitle?.trim() || src.title,
+                      src.summary,
+                      src.location ?? src.province,
+                    )
+                  : false;
+              },
             },
           }
         : {}),
