@@ -524,6 +524,15 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // NOTE: no bare "warns of criminal charges" — "police warn of criminal
   // charges as protesters defy ban" is live enforcement, in scope.
   /\b(riot|protest|unrest) hoax(es)?\b|\bwarns? of criminal charges\b[^.!?]{0,50}\b(hoax\w*|fake|misinformation|disinformation|rumou?rs?)\b/i,
+  // Feel-good outcome story — "Two Iranian female footballers granted
+  // Australian citizenship after protest". The protest is background to an
+  // immigration OUTCOME, not a live public-order event, yet the bare word
+  // "protest" would title-rescue it. Bound to the grant→citizenship→after
+  // frame so a protest that ERUPTS over a citizenship decision ("Protests
+  // erupt after government grants citizenship…") is never matched (wrong
+  // order) and a live "protesters demand citizenship" rally is untouched
+  // (no grant verb).
+  /\b(grants?|granted|awards?|awarded|confers?|conferred)\b[^.!?]{0,60}\bcitizenship\b[^.!?]{0,60}\bafter\b[^.!?]{0,30}\b(protests?|appeal|campaign|plea)\b/i,
   // News-digest / edition slop — "Sri Lanka Latest Breaking News and
   // Headlines - Print Edition …".
   /\blatest breaking news and headlines\b|\bprint edition\b/i,
