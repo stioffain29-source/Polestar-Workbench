@@ -152,4 +152,5 @@
 - [Headless exporter row pass-through](headless-report-prose-columns.md) — headless exporter now SPREADS the whole report row (buildHeadlessReportData); never hand-map fields again; parity suites + pdfChrome-stub prose recording documented there.
 - [32 MB non-chunked response cap](response-32mb-chunk-cap.md) — prod all-zero UI with 200s = big JSON killed by GFE's 32 MB Content-Length cap; compression() in app.ts is the guard (chunked+~4x smaller), never remove; dashboard 1-year fetch still grows unbounded.
 - [Country-engine §7 gate tuning](country-engine-gate-tuning.md) — tune via targeted soft exclusion rules + companion overrides, never band-wide; verify with dry-run replay and inspect includedLost.
+- [Ingest run watchdog](ingest-watchdog.md) — recurring prod staleness = one hung stage held the advisory lock forever (no run deadline); watchdog + stage markers fix it; replshield 307 blocks external admin curls on private deploys.
 - [Task-agent DB writes lost on merge](task-agent-db-writes.md) — only code merges; DB row content must come from main agent or marker-gated boot migrations; PROD_DATABASE_URL IS writable from workspace.

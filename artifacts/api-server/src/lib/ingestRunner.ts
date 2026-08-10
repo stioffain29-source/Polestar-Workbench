@@ -88,6 +88,28 @@ import { logger } from "./logger";
 // every instance so they contend on the same lock.
 const INGEST_LOCK_KEY = 0x506f6c65;
 
+// Hard watchdog on every locked ingest pass. Root cause of the recurring
+// "map empty past 24h" prod outages: one stage of the multi-minute chain
+// hung forever on an external call (no per-run deadline existed), the
+// advisory lock stayed held, and every 12h interval tick logged
+// "scheduled ingest skipped (already running)" until the next republish
+// restarted the process. On a Reserved VM a stuck promise lives for weeks.
+// The watchdog rejects the run after INGEST_WATCHDOG_MINUTES (default 90 —
+// comfortably above the slowest observed full run, which stretches when
+// Google News throttles the prod egress IP), releases the lock, and names
+// the last stage reached so the culprit is in the log, not a mystery.
+const INGEST_WATCHDOG_MS =
+  Math.max(10, Number(process.env.INGEST_WATCHDOG_MINUTES ?? 90) || 90) *
+  60_000;
+
+// Last stage the full chain reached — read by the watchdog error so a
+// timed-out run reports WHERE it hung. Coarse by design (one mutable string;
+// only one locked run exists globally at a time).
+let currentIngestStage = "idle";
+function markIngestStage(stage: string): void {
+  currentIngestStage = stage;
+}
+
 // Social-promote regression alarm. The DB→DB social promote pass runs against
 // the writable production DB on every boot/timer; with the tightened
 // corroboration gate it should mint 0 (occasionally 1) incident per run. A run
@@ -621,8 +643,33 @@ async function withIngestLock<T>(
     );
     locked = lockRes.rows[0]?.locked === true;
     if (!locked) return { ran: false, reason: "locked" };
-    const value = await fn();
-    return { ran: true, value };
+    // Reset per run so a later, unrelated locked pass that times out doesn't
+    // report a stale stage name from a previous full chain.
+    markIngestStage("(run start)");
+    // Race the run against the hard watchdog. If fn() never settles (a stage
+    // hung on an external call) the watchdog rejects, the finally block below
+    // releases the advisory lock, and the next interval tick can run. The
+    // abandoned promise may keep doing idempotent DB writes in the background;
+    // that is harmless and vastly better than a permanently-held lock.
+    let watchdogTimer: NodeJS.Timeout | undefined;
+    try {
+      const value = await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) => {
+          watchdogTimer = setTimeout(() => {
+            reject(
+              new Error(
+                `ingest watchdog: run exceeded ${Math.round(INGEST_WATCHDOG_MS / 60_000)} minutes — last stage reached: ${currentIngestStage}`,
+              ),
+            );
+          }, INGEST_WATCHDOG_MS);
+          watchdogTimer.unref?.();
+        }),
+      ]);
+      return { ran: true, value };
+    } finally {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+    }
   } finally {
     if (locked && !clientBroken) {
       try {
@@ -663,6 +710,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // rest of the chain — it just reports the error in its summary.
     let strikes: StrikesIngestSummary;
     try {
+      markIngestStage("runStrikesIngest");
       strikes = await runStrikesIngest({ commit: true });
     } catch (err) {
       logger.error({ err }, "strikes ingest failed");
@@ -676,6 +724,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // ICC/Cloudflare outage can never fail the rest of the chain.
     let iccPiracy: IccPiracySummary;
     try {
+      markIngestStage("runIccPiracyIngest");
       iccPiracy = await runIccPiracyIngest({ commit: true });
       logger.info(
         {
@@ -697,6 +746,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // the wider ingest chain.
     let ukmtoOfficial: UkmtoIngestSummary;
     try {
+      markIngestStage("runUkmtoIngest");
       ukmtoOfficial = await runUkmtoIngest({ commit: true });
       logger.info(
         {
@@ -714,6 +764,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     }
     let centcomOfficial: CentcomIngestSummary;
     try {
+      markIngestStage("runCentcomIngest");
       centcomOfficial = await runCentcomIngest({ commit: true });
       logger.info(
         {
@@ -730,6 +781,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     }
     let partnerOfficial: MaritimePartnerProductsIngestSummary;
     try {
+      markIngestStage("runMaritimePartnerProductsIngest");
       partnerOfficial = await runMaritimePartnerProductsIngest({ commit: true });
       logger.info(
         {
@@ -761,6 +813,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // fail the incident ingest — it just leaves display_title null and the UI
     // falls back to the original title.
     try {
+      markIngestStage("runTitleTranslation");
       const titles = await runTitleTranslation({ commit: true });
       logger.info(
         {
@@ -778,21 +831,27 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // table; running them one after another mirrors scrape:prod. Each is isolated
     // in its own try so a DB or unexpected failure in one topic can never abort
     // the rest of the chain (mirrors strikes / market prices below).
+    markIngestStage("runIncidentIngest:flashpoint");
     const flashpoint = await runIncidentIngest("flashpoint", () =>
       runFlashpointIngest({ commit: true }),
     );
+    markIngestStage("runIncidentIngest:cargo_watch");
     const cargoWatch = await runIncidentIngest("cargo_watch", () =>
       runCargoWatchIngest({ commit: true }),
     );
+    markIngestStage("runIncidentIngest:shipping");
     const shipping = await runIncidentIngest("shipping", () =>
       runShippingIngest({ commit: true }),
     );
+    markIngestStage("runIncidentIngest:energy");
     const energy = await runIncidentIngest("energy", () =>
       runEnergyIngest({ commit: true }),
     );
+    markIngestStage("runIncidentIngest:fertiliser");
     const fertiliser = await runIncidentIngest("fertiliser", () =>
       runFertiliserIngest({ commit: true }),
     );
+    markIngestStage("runIncidentIngest:fuel");
     const fuel = await runIncidentIngest("fuel", () =>
       runFuelIngest({ commit: true }),
     );
@@ -800,11 +859,13 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // + build-out / planning risk). Its analyst-maintained facility REGISTRY is
     // a SEPARATE table and never touched here; this pass only writes news
     // incidents under topic=data_centres.
+    markIngestStage("runIncidentIngest:data_centres");
     const dataCentres = await runIncidentIngest("data_centres", () =>
       runDataCentresIngest({ commit: true }),
     );
     // War / armed conflict / insurgency / armed crime — a SEPARATE topic from
     // flashpoint (which stays activism / protests / strikes / civil disorder).
+    markIngestStage("runIncidentIngest:conflict");
     const conflict = await runIncidentIngest("conflict", () =>
       runConflictIngest({ commit: true }),
     );
@@ -817,6 +878,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // re-scored by this pass; it only groups existing rows.
     if (process.env.CONFLICT_CLUSTER_ENABLED !== "false") {
       try {
+        markIngestStage("runConflictClustering");
         const cluster = await runConflictClustering({ commit: true });
         for (const line of cluster.logLines) logger.info({ pass: "conflict-cluster" }, line);
       } catch (err) {
@@ -827,6 +889,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // briefs (unrest, crime, natural hazard, fire, haze, transport, government,
     // labour, terrorism). Runs BEFORE the West Papua extract backfill below so
     // any rows this pass diverts to "West Papua" get structured this same run.
+    markIngestStage("runIncidentIngest:indonesia_local");
     const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
       runIndonesiaLocalIngest({ commit: true }),
     );
@@ -834,6 +897,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // territories. Classified/scored across protest, crime, terrorism, civil
     // unrest, transport disruption and security incidents; West Papua rows are
     // diverted to their own tag (never Indonesia) by the Papua-first aliases.
+    markIngestStage("runIncidentIngest:apac_local");
     const apacLocal = await runIncidentIngest("apac_local", () =>
       runApacLocalIngest({ commit: true }),
     );
@@ -848,6 +912,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // countries; idempotent + converging (a filled row is never re-touched).
     // Isolated in its own try so an error can never fail the incident ingest.
     try {
+      markIngestStage("runPngExtractBackfill");
       const png = await runPngExtractBackfill({ commit: true, onlyNull: true });
       logger.info(
         {
@@ -866,6 +931,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // PNG enrichment). Idempotent + converging onlyNull pass; isolated in its
     // own try so a failure can never fail the incident ingest.
     try {
+      markIngestStage("runWestPapuaExtractBackfill");
       const wp = await runWestPapuaExtractBackfill({ commit: true, onlyNull: true });
       logger.info(
         {
@@ -899,6 +965,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // `scrape:resolve-urls --commit --limit=<large> --concurrency=<n>` (see
     // replit.md) — for prod it must run inside the deployment runtime.
     try {
+      markIngestStage("runResolveGoogleNewsUrls");
       const urls = await runResolveGoogleNewsUrls({ commit: true, limit: 300 });
       logger.info(
         {
@@ -916,6 +983,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // can never fail the incident ingest — it just reports the error.
     let marketPrices: MarketPriceSummary;
     try {
+      markIngestStage("runMarketPricesIngest");
       marketPrices = await runMarketPricesIngest({ commit: true });
     } catch (err) {
       logger.error({ err }, "market price ingest failed");
@@ -926,6 +994,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // the incident ingest — a failed series just leaves its prior row untouched.
     let marketSnapshot: MarketSnapshotSummary;
     try {
+      markIngestStage("runMarketSnapshotIngest");
       marketSnapshot = await runMarketSnapshotIngest({ commit: true });
     } catch (err) {
       logger.error({ err }, "market snapshot ingest failed");
@@ -939,6 +1008,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // never fail the incident ingest.
     let maritimeMovement: MaritimeMovementSummary;
     try {
+      markIngestStage("runMaritimeMovementIngest");
       maritimeMovement = await runMaritimeMovementIngest({ commit: true });
       logger.info(
         {
@@ -962,6 +1032,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // outage can never fail the incident ingest.
     let corroboration: ReliefWebCorroborationSummary;
     try {
+      markIngestStage("runReliefWebCorroboration");
       corroboration = await runReliefWebCorroboration({ commit: true });
       logger.info(
         {
@@ -983,6 +1054,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // in its own try so a ReliefWeb outage can never fail the wider ingest.
     let reliefwebReports: ReliefWebReportsSummary;
     try {
+      markIngestStage("runReliefWebReportsIngest");
       reliefwebReports = await runReliefWebReportsIngest({ commit: true });
       logger.info(
         {
@@ -1007,6 +1079,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // scraper/network failure can never fail the wider ingest.
     let kammiSource: KammiSourceSummary;
     try {
+      markIngestStage("runKammiSourceIngest");
       kammiSource = await runKammiSourceIngest({ commit: true });
       logger.info(
         {
@@ -1030,6 +1103,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // so an Apify/network failure can never fail the wider ingest.
     let facebookOsint: FacebookOsintSummary;
     try {
+      markIngestStage("runFacebookOsintIngest");
       facebookOsint = await runFacebookOsintIngest({ commit: true });
       logger.info(
         {
@@ -1056,6 +1130,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // the wider ingest.
     let socialPromote: SocialPromoteSummary;
     try {
+      markIngestStage("runSocialPromote");
       socialPromote = await runSocialPromote({ commit: true });
       reportSocialPromoteResult(logger, socialPromote);
     } catch (err) {
@@ -1070,6 +1145,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // in its own try so a GDELT outage or budget cap can never fail the ingest.
     let gdeltEnrich: GdeltEnrichSummary;
     try {
+      markIngestStage("runGdeltEnrich");
       gdeltEnrich = await runGdeltEnrich({ commit: true });
       logger.info(
         {
@@ -1096,6 +1172,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // try so a GDELT outage or budget cap can never fail the wider ingest.
     let gdeltStructured: GdeltStructuredSummary;
     try {
+      markIngestStage("runGdeltStructuredIngest");
       gdeltStructured = await runGdeltStructuredIngest({ commit: true });
       logger.info(
         {
@@ -1123,6 +1200,7 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // never fail the wider ingest.
     let gdeltPromote: GdeltPromoteSummary;
     try {
+      markIngestStage("runGdeltPromote");
       gdeltPromote = await runGdeltPromote({ commit: true });
       logger.info(
         {
