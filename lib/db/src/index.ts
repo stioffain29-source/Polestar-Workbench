@@ -10,7 +10,19 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// keepAlive + timeouts are the guard against the recurring ingest hang: Neon
+// can kill a backend mid-run ("terminating connection due to administrator
+// command"); without TCP keepalive a query issued on that half-dead socket
+// never settles, so the awaiting stage hangs forever. query_timeout makes any
+// single query reject after 5 minutes (generous — chunked backfills stay well
+// under it) so the caller's try/catch can log and move on instead of wedging.
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 30_000,
+  connectionTimeoutMillis: 30_000,
+  query_timeout: 300_000,
+});
 
 // A pooled connection can be dropped by the server at any time — idle timeout,
 // failover, or "terminating connection due to administrator command" during a

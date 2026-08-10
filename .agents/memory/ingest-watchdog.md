@@ -22,6 +22,19 @@ stage in `runIngestOnce`, incident topics as `runIncidentIngest:<topic>`),
 the finally releases the lock, and the next tick can run. The abandoned run
 may keep writing in the background — idempotent, harmless.
 
+**True root cause (found Aug 2026, after the watchdog):** the shared pg Pool
+had NO keepAlive/query_timeout. Neon kills backends mid-run ("terminating
+connection due to administrator command", ~3 min in on a bad morning); a query
+issued on that half-dead socket never settles → the awaiting stage (a plain
+`db.select` dedupe, NOT an external call) hangs forever. Fix in
+`lib/db/src/index.ts`: `keepAlive:true`, `connectionTimeoutMillis:30s`,
+`query_timeout:300s` (client-side; deliberately no server statement_timeout so
+long boot migrations survive). Watchdog stays as the backstop.
+
+**Backfill reality after an outage:** Google News feeds are rank-capped, so
+most of a >24h gap never comes back from feeds; GDELT structured (date-ranged)
+recovers some flashpoint-family events once its stage completes.
+
 **How to apply / diagnose next time:** read the watchdog error's stage name in
 deployment logs; corroborate with `sources.last_success_at` ordering (the
 stage after the last-touched source is the culprit).
