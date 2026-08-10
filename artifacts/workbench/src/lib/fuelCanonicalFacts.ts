@@ -365,7 +365,10 @@ export function validateFuelReportConsistency(facts: FuelCanonicalFacts, section
         ));
       }
     }
-    const locationClaim = body.match(/highest-priority incident is [\s\S]*? at (.+?)\. Overall severity:/i)?.[1]?.trim();
+    // Anchor on the CLOSING title quote (greedy prefix takes the last one) so
+    // an " at " inside the incident title ("Fire at Baiji oil complex…") can't
+    // shift the capture off the actual location slot the builder emits.
+    const locationClaim = body.match(/highest-priority incident is [\s\S]*” at (.+?)\. Overall severity:/i)?.[1]?.trim();
     if (locationClaim && locationClaim !== (facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN)) errors.push(err(section, locationClaim, facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN, "qualifyingIncidents[].physicalLocation"));
     for (const indicator of directions) {
       const name = indicator.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

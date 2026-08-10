@@ -450,3 +450,29 @@ describe("validateFuelReportConsistency — the gate catches seeded contradictio
     }
   });
 });
+
+// Regression: an " at " INSIDE the highest-priority incident title must not
+// shift the validator's location capture off the actual location slot.
+describe("validateFuelReportConsistency — title containing ' at '", () => {
+  it("does not flag the builder's own Situation line", () => {
+    const { buildFuelCanonicalFacts, buildFuelCanonicalSections, validateFuelReportConsistency } =
+      jest.requireActual("../fuelCanonicalFacts");
+    const incident = {
+      id: "x1",
+      topic: "fuel",
+      country: "Iraq",
+      severity: "high",
+      occurredAt: "2026-08-08T10:00:00Z",
+      title: "Fire breaks out at Baiji oil complex, state news agency says",
+      summary: "A fire broke out at the Baiji refinery complex.",
+    };
+    const facts = buildFuelCanonicalFacts({
+      issueDate: "2026-08-10",
+      incidents: [incident],
+      marketCards: [],
+    });
+    const sections = buildFuelCanonicalSections(facts);
+    const errors = validateFuelReportConsistency(facts, sections);
+    expect(errors.filter((e: { sourceField: string }) => e.sourceField.includes("physicalLocation"))).toEqual([]);
+  });
+});
