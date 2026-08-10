@@ -773,3 +773,10 @@ id = "DOwySQxi5F-1J77ZHG_SH"
 uri = "file://screenshots/jakarta-brief-proof.pdf"
 type = "pdf"
 title = "Jakarta City Brief — freshly exported proof PDF"
+
+[[outputs]]
+id = "JDXFnNjL9g9n1FvpGw5sp"
+uri = "file://docs/dev-handover-audit.pdf"
+type = "pdf"
+title = "Workbench Developer Handover Audit"
+description = "Up-to-date technical audit of the Polestar Advisory Workbench for developer handover — architecture, pipeline, reports, deployment, QA, and open items. Source markdown at docs/dev-handover-audit.md."
