@@ -35,3 +35,5 @@ so the **local** projections were the inconsistent ones.
   window-membership — it uses `parseISO` (local midnight) and is a SEPARATE,
   working concern. The clamp fix returns the same value as before for this case,
   so which incidents render is unchanged.
+
+**Window end is end-of-day (2026-08-10 fix):** `filterIncidentsToWindow` used `end = parseISO(issueDate)` = midnight UTC, so anything occurring ON the issue date after 00:00 UTC silently fell outside every report window (same-day advisories vanished from the flashpoint Forecast). Fixed by extending endMs to 23:59:59.999 of the issue date — the window is documented inclusive of the issue date. Don't revert to bare `end.getTime()`.

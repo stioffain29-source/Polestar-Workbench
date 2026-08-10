@@ -491,6 +491,62 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // name sit between ("march into hockey semis"). Genuine protest marches go
   // "to parliament / the streets", never "into the semis", so this is safe.
   /\bmarch(es|ed|ing)? (in)?to (the )?(\w+ )?(final|finals|semi|semis|semi-?finals?|quarter-?finals?|last \d+|knockout|play-?offs?|title|trophy|round of \d+)\b/,
+  // Sports progression variant — "Favourites Thailand march on with a perfect
+  // record in the Asean Hyundai Cup semifinals". "march on" bound to
+  // tournament vocabulary; a protest "march on parliament" never mentions a
+  // cup/semifinal/group letter.
+  /\bmarch(es|ed|ing)? on\b[^.!?]{0,60}\b(cup|semi-?finals?|quarter-?finals?|group [a-h]\b|perfect record|unbeaten|tournament|fixtures?|standings)\b/i,
+  // Named basketball/sports league game logistics — "PBA game delayed by roof
+  // leaks". League acronym bound to game/match vocabulary.
+  /\b(pba|nba|kbl|nbl|wnba|mlb|nfl|nhl|ipl|bbl|psl) (game|games|match|matches|finals?|season|playoffs?|import|draft)\b/i,
+  // Military-cooperation PR copy — "32nd Military Police Company Strengthens
+  // Relationship with PNG Defence Force During Tamiok Strike 2026" (a named
+  // joint exercise, not industrial action). The strengthens-ties frame is
+  // pure defence-diplomacy copy and never appears in a protest headline.
+  /\bstrengthens? (its |their )?(relationship|ties|partnership|cooperation|interoperability|bonds?)\b/i,
+  // Foreign-politician rhetorical "protest" — "U.S. Republicans Protest South
+  // Korea's Network Law". US political actors objecting to a law is speech,
+  // not APAC public order. Bound to the US qualifier so APAC opposition
+  // walkouts are untouched.
+  /\b(u\.?s\.?|american) (republicans?|democrats?|senators?|lawmakers?|congress(?:men|women|man|woman)?)\b[^.!?]{0,30}\bprotests?\b/i,
+  // Diplomatic objection framing — "India Says It Doesn't Endorse Hasina's
+  // Remarks", state-to-state statement copy, never a live-event headline.
+  /\bsays? (it|they|he|she) (do(es)?n'?t|does not|won'?t|will not) (endorse|support|recogni[sz]e|accept)\b/i,
+  // Riot-gear PROCUREMENT copy — "Nepal Police to get new riot control gear".
+  // Equipment acquisition after past unrest, not a live event.
+  /\b(get|gets|getting|buy|buys|purchas\w*|procur\w*|acquir\w*|receiv\w*|upgrad\w*|order(s|ed|ing)?)\b[^.!?]{0,30}\briot[- ](control )?(gear|equipment|shields?|vehicles?|vans?|trucks?)\b/i,
+  // Politician BACKS/defends an enforcement crackdown — a statement of
+  // support, not a public-order event ("EDUCATION MINISTER BACKS POLICE
+  // CRACKDOWN ON VIOLENT STUDENTS").
+  /\b(backs?|backed|backing|endorses?|endorsed|supports?|supported|defends?|defended|praises?|praised|applauds?|hails?)\b[^.!?]{0,25}\b(police |security |military )?(crackdowns?|clampdowns?)\b/i,
+  // Hoax / misinformation-warning copy — "Warns of Criminal Charges Over
+  // August Riot Hoaxes". The event is a hoax; the story is a legal warning.
+  // NOTE: no bare "warns of criminal charges" — "police warn of criminal
+  // charges as protesters defy ban" is live enforcement, in scope.
+  /\b(riot|protest|unrest) hoax(es)?\b|\bwarns? of criminal charges\b[^.!?]{0,50}\b(hoax\w*|fake|misinformation|disinformation|rumou?rs?)\b/i,
+  // News-digest / edition slop — "Sri Lanka Latest Breaking News and
+  // Headlines - Print Edition …".
+  /\blatest breaking news and headlines\b|\bprint edition\b/i,
+  // Road-accident colour — "Mad scramble for pigs after delivery truck flips
+  // in Bukidnon" — a cargo spill scramble, not disorder.
+  /\bscramble for (pigs?|goods|groceries|cargo|fuel|rice|chickens?|livestock)\b|\b(delivery |cargo |livestock )?truck (flips?|flipped|overturn\w*)\b/i,
+  // Animal-cruelty outrage copy — "Brutal killing of Chinese dog and her pups
+  // sparks outrage". Public anger online, not public disorder.
+  /\b(killing|abuse|torture|beating|poisoning) of\b[^.!?]{0,30}\b(dogs?|cats?|pupp(?:y|ies)|pups?|kittens?|animals?|monkeys?|elephants?)\b/i,
+  /\b(dogs?|cats?|pupp(?:y|ies)|pups?|kittens?|strays?)\b[^.!?]{0,40}\bsparks? (outrage|anger|fury|backlash)\b/i,
+  // Technology-demo "demonstration" homonym — "Cross-Border Rail
+  // Demonstration Test", demo flights/runs/plants. Corporate PR, not protest.
+  /\bdemonstration (tests?|flights?|runs?|projects?|plants?|lines?|units?|vessels?|farms?)\b/i,
+  // Anticipatory "urges calm" anxiety copy — "Jakarta governor urges calm as
+  // fear of August riot repeat unnerves shopping malls". An official calming
+  // rumours/fears is not a live event; bound to the fear/rumour context so
+  // "urges calm as clashes continue" (live unrest) is untouched.
+  /\burges? calm\b[^.!?]{0,60}\b(fear|fears|rumou?rs?|hoax\w*|anxiet\w*|unnerv\w*|speculation|repeat)\b/i,
+  // Drills "spurring <nationality> Protest" (singular, no protesters) — the
+  // state objection sense: "Defense Drills Near Disputed Islets Spurring
+  // Japanese Protest". Real street reaction reads "sparks protests"/"protesters",
+  // which stays untouched (plural/agent forms not matched).
+  /\b(spurr?ing|prompting|drawing|triggering|sparking) (a )?(japanese|chinese|s(outh)? ?korean|north ?korean|korean|indian|philippine|malaysian|vietnamese|taiwanese|indonesian|thai) protest\b(?!\w|ers)/i,
   // "play football / cricket / …" is unambiguous sports colour. "'We're here to
   // play football', Iran downplays protest ahead New Zealand opener" is a World
   // Cup fixture, not the security-relevant unrest this monitor tracks.
@@ -599,7 +655,16 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // "protesters" in unrelated summary copy) can reach the keep path first.
   // Title-only and verb-bound, so "protesters file past parliament" or a
   // genuine demonstration headline is untouched.
-  /\b(files?|filed|lodges?|lodged|registers?|registered) (a |an |its |another )?(formal |official |diplomatic |strong |stern |strongly[- ]worded )?protests?\b/i,
+  // Adjectives include fresh/renewed/new and an optional UN object — "Malaysia
+  // files fresh UN protest over Philippines' Sabah waters claim" is a state
+  // démarche at the UN, not a street event.
+  // Three diplomatic shapes: (1) verb directly followed by "protest" with NO
+  // article ("China Files Protest…" wire caps), (2) any register adjective
+  // ("filed a formal protest"), (3) a UN object ("files fresh UN protest").
+  // A bare verb + article + protest ("workers lodged a protest demanding
+  // wages", "residents file a protest") is REAL street action and must NOT
+  // match — only the no-article, adjective, or UN forms are diplomatic.
+  /\b(files?|filed|lodges?|lodged|registers?|registered) (?:(?:a |an |its |another )?(?:(?:formal |official |diplomatic |strong |stern |strongly[- ]worded |fresh |renewed |new )+(?:un |u\.n\. )?|(?:un |u\.n\. ))|(?=protests?\b))protests?\b/i,
   // Criminal-syndicate enforcement colour — "'Counter-setting syndicate'
   // active at Johor border, KLIA despite crackdown". A crime-syndicate story
   // is law enforcement, not civil unrest; the bare word "crackdown" would
@@ -1722,13 +1787,13 @@ const FP_POS_VIOLENCE =
 const FP_NEG_GESTURE =
   /\b(resign\w*|quit|return\w*|withdraw\w*|step(ped)? down|boycott\w*|refus\w*|declin\w*|skip\w*|hand\w* back|wore? black|donat\w*|exit\w*) .{0,35}\bin protest\b|\bin protest\b.{0,30}(resign\w*|return\w*|withdraw\w*|boycott\w*|quit|step(ped)? down)\b|\b(act|sign|mark|token|gesture|instant act|form|means|way|expression) of protest\b|\bas a (?:silent |symbolic )?protest\b/i;
 const FP_NEG_DIPLOMATIC =
-  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(a |an |its |strong |formal |official |diplomatic |written |stern |firm )*(protest|d[eé]marche|note verbale)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b[^.]{0,25}\bprotest\b|\bprotest\b[^.]{0,25}\b(via|through|with)\b[^.]{0,15}\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b|\bbilateral (relations|ties|relationship)\b/i;
+  /\b(lodge[sd]?|filing|file[sd]?|issue[sd]?|issuing|register(s|ed|ing)?|submit\w*|deliver\w*|convey\w*|hand(s|ed)? over|raise[sd]?|made? (a|an|its)|sends? (a |an |its )?(formal |strong |diplomatic )?)\s+(?:(?:a |an |its )?(?:strong |formal |official |diplomatic |written |stern |firm |fresh |renewed )+(?:un |u\.n\. )?(protest|d[eé]marche|note verbale)|(?:a |an |its )?(?:un |u\.n\. )protests?|(?:a |an |its )?(d[eé]marche|note verbale)|(?=protests?\b)protests?)\b|\bprotest (note|letter|d[eé]marche)\b|\b(diplomatic|formal|official|strong|stern|written|firm) protest\b|\bsummon\w*\b[^.]{0,60}\b(ambassador|envoy|diplomat|high commissioner|charg[eé] d|embassy|consul|deputy chief of mission)\b[^.]{0,40}\bprotest\b|\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b[^.]{0,25}\bprotest\b|\bprotest\b[^.]{0,25}\b(via|through|with)\b[^.]{0,15}\b(dfa|department of foreign affairs|foreign ministry|ministry of foreign affairs|foreign office|state department)\b|\bbilateral (relations|ties|relationship)\b/i;
 const FP_NEG_INTERSTATE_NAT =
   "(india|indian|pakistan|pakistani|bangladesh|bangladeshi|nepal|nepali|nepalese|sri lanka|sri lankan|bhutan|maldives|china|chinese|beijing|taiwan|taiwanese|thailand|thai|cambodia|cambodian|laos|vietnam|vietnamese|myanmar|burma|philippines|philippine|filipino|indonesia|indonesian|malaysia|malaysian|singapore|brunei|japan|japanese|tokyo|seoul|south korea|north korea|korea|korean|afghanistan|iran|russia|russian|canada|canadian|israel|israeli)";
 const FP_NEG_INTERSTATE_TERR =
   "(lipulekh|kalapani|limpiyadhura|arunachal|aksai chin|doklam|kashmir|tawang|south china sea|west philippine sea|senkaku|spratly|scarborough|panatag|bajo de masinloc|masinloc|sabah|disputed (border|island|islets|temple|territory|waters|shoal)|border (dispute|area|encroach)|sanctions|missile launch|aircraft incursion|naval activit|maritime law|textbook|floating structure|territorial|(nuclear|missile|submarine|hypersonic|weapons?|rocket|torpedo|defen[cs]e|military) (test|trial|drill|exercise|manoeuvre|maneuver|war ?game)s?)";
 const FP_NEG_INTERSTATE = new RegExp(
-  `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (a |another |formal |strong |diplomatic )*protest\\b`,
+  `\\b${FP_NEG_INTERSTATE_NAT}\\b(?:\\s+\\w+){0,2}\\s+protest(s|ed|ing)?\\b\\s*(to|over|against|with|at)?\\s*(the\\s+)?(${FP_NEG_INTERSTATE_NAT}|${FP_NEG_INTERSTATE_TERR})|\\bprotest(s|ed|ing)?\\s+(to|with)\\s+(the\\s+)?${FP_NEG_INTERSTATE_NAT}\\b|\\b(files?|lodge[sd]?|registers?) (?:(?:a |an |another )?(?:formal |strong |diplomatic |official |stern |written |fresh |renewed )+(?:un |u\\.n\\. )?|(?:a |an |another )?(?:un |u\\.n\\. )|(?=protests?\\b))protests?\\b`,
   "i",
 );
 // Interstate protest EXCHANGE — a state (or its capital, metonymically)
@@ -2436,6 +2501,17 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
         return { relevant: true, reason: `kept: ambiguous token (political rally) + political context (/${pol.source}/)` };
       }
       return { relevant: false, reason: "dropped: ambiguous token (rally/strike) without public-order cue" };
+    }
+    // 5. Scheduled national election — a dated presidential/general/
+    //    parliamentary vote is a standing unrest trigger the desk warns on
+    //    ("Presidential election at the Jatiya Sangsad: scheduled vote on
+    //    20 August"). Precision-first: requires BOTH the election noun AND an
+    //    explicit scheduling phrase, so routine campaign coverage stays out.
+    if (
+      /\b(presidential|general|parliamentary|national|gubernatorial) elections?\b/.test(text) &&
+      /\b(scheduled (vote|for|on)|vote (scheduled|set) (for|on)|scheduled vote|set for \d{1,2}|to be held on)\b/i.test(text)
+    ) {
+      return { relevant: true, reason: "kept: scheduled national election (dated vote)" };
     }
     return { relevant: false, reason: "dropped: no flashpoint public-order signal" };
   }

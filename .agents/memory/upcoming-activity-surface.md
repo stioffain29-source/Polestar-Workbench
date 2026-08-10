@@ -68,3 +68,5 @@ every other structured theatre stays byte-identical (`[]`). Screen (`PngCountryR
 and headless PDF (`exportCountryReportPdf`) render the identical section, order, formatter
 (`upcomingSignalLine`) and caption; both guard `d.upcomingSignals ?? []` for legacy/
 hand-built dataset fixtures.
+
+**Forecast DATE column (2026-08-10):** ForecastFutureRow now carries `date` — an EXPLICITLY STATED "on/set for/through DD Month" lifted verbatim from title/summary (FORECAST_DATE_RE in flashpointReportDataset), null → "—". Still no guessed dates. Preview + jsPDF forecast tables both render the DATE column; keep them in lockstep. Scheduled national elections (election noun + explicit scheduling phrase) are a flashpoint KEEP cue now.

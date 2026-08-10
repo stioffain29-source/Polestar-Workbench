@@ -495,7 +495,8 @@ export default function FlashpointReportPreview({
               <table className="w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: NAVY, color: "#FFFFFF" }}>
-                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "18%" }}>COUNTRY</th>
+                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "12%" }}>DATE</th>
+                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "16%" }}>COUNTRY</th>
                     <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "28%" }}>SIGNAL</th>
                     <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em" }}>OPERATIONAL MEANING</th>
                   </tr>
@@ -503,6 +504,7 @@ export default function FlashpointReportPreview({
                 <tbody>
                   {ds.forecastFuture.map((r, idx) => (
                     <tr key={idx} style={{ borderTop: `1px solid ${POLAR}` }}>
+                      <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.date ?? "\u2014"}</td>
                       <td className="px-2 py-2 align-top" style={{ color: NAVY, fontWeight: 700 }}>{r.country}</td>
                       <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.signal}</td>
                       <td className="px-2 py-2 align-top" style={{ color: DUSK }}>{r.meaning}</td>

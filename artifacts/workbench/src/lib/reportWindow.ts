@@ -99,7 +99,12 @@ export function filterIncidentsToWindow<T extends { occurredAt: string; topic?: 
 ): T[] {
   const { start, end } = resolveReportWindow(topic, issueDate);
   const startMs = start.getTime();
-  const endMs = end.getTime();
+  // `end` is midnight (local, per parseISO — window filter is deliberately
+  // local, see report-date tz notes) of the issue date; the window is
+  // documented as INCLUSIVE of the issue date, so extend to the end of that
+  // day. Without this, any record occurring ON the issue date after midnight
+  // (e.g. a same-day advisory) silently falls outside every report window.
+  const endMs = end.getTime() + 24 * 60 * 60 * 1000 - 1;
   return incidents.filter((i) => {
     if (opts.byTopic && i.topic !== topic) return false;
     try {

@@ -350,9 +350,10 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   if (rows.length === 0) return;
   const { pdf, MX, CW } = ctx;
   const rowH = 20;
-  const colCountryW = 100;
-  const colSignalW = 160;
-  const colMeaningW = CW - colCountryW - colSignalW;
+  const colDateW = 60;
+  const colCountryW = 90;
+  const colSignalW = 150;
+  const colMeaningW = CW - colDateW - colCountryW - colSignalW;
 
   const drawHeader = () => {
     setFill(pdf, NAVY);
@@ -365,11 +366,12 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
     pdf.setFontSize(7);
-    pdf.text("COUNTRY", MX + 6, ctx.y + 13);
-    pdf.text("SIGNAL", MX + colCountryW + 6, ctx.y + 13);
+    pdf.text("DATE", MX + 6, ctx.y + 13);
+    pdf.text("COUNTRY", MX + colDateW + 6, ctx.y + 13);
+    pdf.text("SIGNAL", MX + colDateW + colCountryW + 6, ctx.y + 13);
     pdf.text(
       "OPERATIONAL MEANING",
-      MX + colCountryW + colSignalW + 6,
+      MX + colDateW + colCountryW + colSignalW + 6,
       ctx.y + 13,
     );
     ctx.y += rowH;
@@ -394,7 +396,12 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
       sanitize(r.country),
       colCountryW - 8,
     );
+    const dateLines: string[] = pdf.splitTextToSize(
+      sanitize(r.date ?? "\u2014"),
+      colDateW - 8,
+    );
     const lines = Math.max(
+      dateLines.length,
       countryLines.length,
       signalLines.length,
       meaningLines.length,
@@ -414,17 +421,20 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
 
     const textOpts = { lineHeightFactor: 1.4 };
     setText(pdf, NAVY);
+    setRoboto(pdf, "regular");
+    pdf.text(dateLines, MX + 6, ctx.y + 14, textOpts);
+
     setRoboto(pdf, "bold");
-    pdf.text(countryLines, MX + 6, ctx.y + 14, textOpts);
+    pdf.text(countryLines, MX + colDateW + 6, ctx.y + 14, textOpts);
 
     setRoboto(pdf, "regular");
     setText(pdf, NAVY);
-    pdf.text(signalLines, MX + colCountryW + 6, ctx.y + 14, textOpts);
+    pdf.text(signalLines, MX + colDateW + colCountryW + 6, ctx.y + 14, textOpts);
 
     setText(pdf, DUSK);
     pdf.text(
       meaningLines,
-      MX + colCountryW + colSignalW + 6,
+      MX + colDateW + colCountryW + colSignalW + 6,
       ctx.y + 14,
       textOpts,
     );

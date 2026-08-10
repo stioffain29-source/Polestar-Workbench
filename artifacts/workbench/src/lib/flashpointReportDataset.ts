@@ -76,6 +76,30 @@ export interface ForecastFutureRow {
   country: string;
   signal: string;
   meaning: string;
+  // Explicitly STATED event date lifted verbatim from the source text
+  // ("set for 13 August", "through 16 August"). Never inferred — when the
+  // text states no date this stays null and the table renders "—".
+  date: string | null;
+}
+
+// Lift an explicitly stated future date out of the announcement text. Only a
+// literal "on/set for/until/through/by/from <day> <month>" (or "<month> <day>")
+// qualifies — no guessing, per the no-fabrication rule in upcomingSignals.ts.
+const FORECAST_MONTH =
+  "(january|february|march|april|may|june|july|august|september|october|november|december)";
+const FORECAST_DATE_RE = new RegExp(
+  `\\b(?:on|set for|until|through|by|from|starting)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s+${FORECAST_MONTH}\\b` +
+    `|\\b(?:on|set for|until|through|by|from|starting)\\s+${FORECAST_MONTH}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`,
+  "i",
+);
+function explicitForecastDate(r: { title?: string | null; summary?: string | null }): string | null {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  const m = FORECAST_DATE_RE.exec(text);
+  if (!m) return null;
+  const day = m[1] ?? m[4];
+  const month = m[2] ?? m[3];
+  if (!day || !month) return null;
+  return `${parseInt(day, 10)} ${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()}`;
 }
 
 export interface FlashpointReportDataset {
@@ -1208,7 +1232,7 @@ export function buildFlashpointReportDataset(
     const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
     if (seenForecast.has(key)) continue;
     seenForecast.add(key);
-    forecastFuture.push({ country, signal, meaning: forecastMeaningFor(r) });
+    forecastFuture.push({ country, signal, meaning: forecastMeaningFor(r), date: explicitForecastDate(r) });
     if (forecastFuture.length >= 6) break;
   }
   const forecastRead = buildForecastRead({
