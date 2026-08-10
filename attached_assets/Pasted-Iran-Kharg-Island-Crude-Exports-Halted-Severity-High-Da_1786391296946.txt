@@ -1,0 +1,45 @@
+Iran: Kharg Island Crude Exports Halted
+
+Severity: High
+
+Date: Operations reportedly halted from 31 July 2026
+Latest confirmation: 7 August 2026, 12:29 UTC
+Location: Kharg Island, Bushehr Province, Iran
+
+Narrative
+
+Crude-export operations at Kharg Island, which handles approximately 90 percent of Iran’s crude exports, have reportedly halted under the renewed United States maritime blockade. Shipping and satellite analysis indicated that no tankers had loaded at the facility since 31 July, with all three loading bays remaining empty for a sustained period.
+
+Approximately 16 to 17 tankers were positioned near the island without transmitting Automatic Identification System data. These vessels remained stationary rather than approaching the loading facilities or attempting to depart Iranian waters.
+
+Incident Details
+
+The interruption followed the reimposition of the United States blockade in mid-July. Kharg Island previously continued operating through periods of military escalation by loading sanctioned vessels and using tankers as floating storage. The present absence of loading activity indicates that enforcement is now restricting Iran’s ability both to dispatch crude and return empty tankers to the terminal.
+
+The description of the terminal “going dark” does not indicate a power failure or attack. It refers to the absence of visible loading operations and the concentration of tankers operating without AIS transmissions.
+
+Current Situation
+
+No renewed loading or crude departures have been independently confirmed. Previously exported cargoes remain in transit to Asian customers, allowing Iran to retain some delayed revenue, but its current export pipeline appears substantially disrupted.
+
+Negotiations between Iran and Oman over navigation arrangements in the Strait of Hormuz remain unresolved. Iran is demanding sanctions relief, compensation and the removal of the blockade before permitting wider access through the Strait.
+
+Operational Impact
+
+The halt removes a significant volume of Iranian crude from near term supply and increases upward pressure on global oil prices. Continued disruption could force Iran to reduce production as storage capacity fills.
+
+The concentration of dark tankers creates additional collision, sanctions and interdiction exposure for commercial operators. AIS information alone cannot provide reliable situational awareness around Kharg Island or within Iranian controlled waters.
+
+Polestar View
+
+The shutdown represents a significant escalation in economic pressure on Tehran and strengthens the importance of Kharg Island within the wider Hormuz negotiations. However, the absence of visible loading should not be interpreted as permanent closure. Iran has previously resumed operations rapidly and may use covert loading, ship to ship transfers or controlled departures to bypass enforcement.
+
+Energy and shipping operators should treat any renewed tanker movement at Kharg as an early indicator of either a blockade breach or diplomatic progress.
+
+Outlook: 24–72 Hours
+
+Kharg Island is likely to remain largely inactive while the United States and Iran exchange incompatible demands. Limited covert movement remains possible, but a sustained return to normal exports is unlikely without an easing of the blockade or agreement over Hormuz access.
+
+Recommendations
+
+Companies should verify vessel identity and movements using satellite and commercial maritime intelligence rather than relying solely on AIS. Charterers should review sanctions exposure, diversion provisions and insurance coverage before accepting voyages involving Iranian waters, ports or suspected dark fleet vessels.

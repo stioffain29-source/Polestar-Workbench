@@ -1525,6 +1525,16 @@ const REQUIRED: Record<string, RegExp[]> = {
     // attack, sanctions or supply-side event). Plain "oil prices rose"
     // commentary is intentionally excluded — it belongs in market notes.
     /\b(oil|crude) (shortage|supply (cut|halt|disruption|squeeze)|export ban|export halt|embargo|sanctions|outage|attack|sabotage|spill)/,
+    // Crude EXPORT disruption (Kharg gap, Aug 2026): exports stalling/halting,
+    // an oil/export terminal going idle, or the Kharg terminal itself in an
+    // oil/export context. Precision-first — bare "Kharg" (maps, explainers)
+    // does not qualify without an operational companion elsewhere in text.
+    /\b(oil|crude) exports? .{0,30}(stall|stalled|halt|halted|blocked|suspended|squeez|disrupt|idle|resume)/,
+    /\b(stall|halt|squeez|disrupt|block|restrict)\w* .{0,30}(oil|crude) exports?\b/,
+    /\b(oil|crude|export|loading) terminal .{0,40}(idle|idled|halt|halted|standstill|shut|blockade|suspend|attack|resume)/,
+    /\bkharg\b.{0,60}(oil|crude|tanker|terminal|export|blockade|loading)/i,
+    /\b(oil|crude|tanker|terminal|export|blockade|loading).{0,60}\bkharg\b/i,
+    /\bfloating storage\b.{0,40}(crude|oil|tanker|blockade|sanction)/,
     /\b(subsidy|subsidies|levy|levies|duty|excise|tax) .{0,30}(fuel|petrol|diesel|gas|lpg|kerosene|jet fuel)/,
     /\b(fuel|petrol|diesel|gas|lpg|kerosene|jet fuel) .{0,30}(subsidy|levy|duty|excise|tax) (cut|hike|raise|removal|removed|reform|reintroduce)/,
     /\btanker (driver|drivers|strike|shortage|attack|convoy|blockade)/,

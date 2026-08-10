@@ -363,6 +363,11 @@ export const FUEL_CONFIG: NewsTopicConfig = {
   feeds: [
     ...countryFeeds(SOUTH_APAC, FUEL_TERMS),
     { label: "Refinery disruption (region)", q: `(refinery OR "fuel depot" OR pipeline) (fire OR outage OR shutdown OR attack OR explosion OR blast OR maintenance OR halt) (India OR Pakistan OR Iran OR Iraq OR "Saudi Arabia" OR UAE)`, defaultCountry: "Unknown" },
+    // Crude EXPORT disruption — loading terminals, blockades, floating
+    // storage. The refinery feed above never fetched stories like the Kharg
+    // Island export halt (Aug 2026): a terminal going idle is neither a
+    // refinery nor a depot event, so the whole class was invisible.
+    { label: "Crude export disruption (Gulf)", q: `("crude exports" OR "oil exports" OR "export terminal" OR "oil terminal" OR Kharg) (halt OR halted OR stall OR stalled OR suspended OR idle OR blockade OR disrupted OR resume) (Iran OR Iraq OR "Saudi Arabia" OR UAE OR Kuwait OR Qatar OR Oman)`, defaultCountry: "Unknown" },
   ],
   allow: [
     "fuel shortage",
@@ -403,6 +408,15 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     "tanker driver",
     "oil supply cut",
     "crude supply",
+    // Crude EXPORT disruption class (Kharg gap, Aug 2026)
+    "crude export",
+    "oil export",
+    "export terminal",
+    "oil terminal",
+    "loading terminal",
+    "kharg",
+    "floating storage",
+    "tanker loading",
   ],
   deny: [
     ...COMMON_DENY,

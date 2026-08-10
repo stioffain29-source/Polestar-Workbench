@@ -213,3 +213,5 @@ the published app also defaults to All Time and shows the rich set. Before
 "fixing" anything, screenshot the All Time view (dev AND the live prod URL) and
 diff dev vs prod counts — the answer is almost always "working as intended, user
 was on the 30D filter."
+
+**Fuel topic had the same class of gap (Kharg, Aug 2026):** Fuel Watch's live feed only asked for refinery/depot/pipeline incidents — a crude EXPORT terminal going idle (Kharg blockade halt) was invisible though FT/Reuters covered it. Fix pattern is identical to cargo: add the vocabulary class in LOCKSTEP across the Google News feed query, the ingest allow list, and the relevance REQUIRED patterns (+ version bump), then verify by triggering a live ingest and checking rows land relevant.
