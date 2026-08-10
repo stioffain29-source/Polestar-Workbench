@@ -240,7 +240,7 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
 // content. Kept distinct from the Watch Next bullet line.
 export function forecastMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Possible road closures and venue-access friction around party offices, courts and city centres.";
+  if (/\b(pti|imran|adiala|tehreek|ttap)\b/.test(text)) return "Possible road closures and difficult access around party offices, courts and city centres.";
   if (/\bsection\s*144\b|assembly ban|curfew/.test(text)) return "Review site access and staff movement in the affected area.";
   if (/\b(chemist|pharmacist)s?\b/.test(text)) return "Possible pharmacy supply disruption; check whether it affects your suppliers.";
   if (/(union|samsung|labour|labor).*(injunct|strike|walkout)/.test(text)) return "Possible sectoral disruption pending the court ruling.";
@@ -249,14 +249,14 @@ export function forecastMeaningFor(r: UpcomingSignalInput): string {
   if (/\b(dowry|family|kin)\b/.test(text)) return "Localised protest at official premises; brief venue security.";
   if (/\bhearing|court|trial|bail|verdict\b/.test(text)) return "The ruling could prompt gatherings near the court; watch the outcome.";
   if (/\bblockade|roadblock|highway|motorway\b/.test(text)) return "Check against the routes the business uses and plan alternatives.";
-  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Possible supply and sectoral disruption; check whether named sites are affected.";
+  if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return "Possible supply and industry disruption; check whether named sites are affected.";
   return "Confirm the details, expected turnout and operating impact.";
 }
 
 export function operationalMeaningFor(r: UpcomingSignalInput): string {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`.toLowerCase();
-  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "possible supply and sectoral disruption; check whether named sites are affected.";
-  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "possible road closures and venue-access friction near the named location.";
+  if (/\b(strike|walkout|stoppage|shutdown)\b/.test(text)) return "possible supply and industry disruption; check whether named sites are affected.";
+  if (/\b(rally|march|protest|demonstration|sit[- ]?in)\b/.test(text)) return "possible road closures and difficult access near the named location.";
   if (/\b(hearing|court|trial|bail|indict)\b/.test(text)) return "the ruling could prompt gatherings near the court; watch the outcome.";
   if (/\b(blockade|roadblock|highway|motorway)\b/.test(text)) return "check against the routes the business uses and plan alternatives.";
   if (/\b(curfew|section\s*144|lockdown|assembly ban)\b/.test(text)) return "review site access and staff movement in the affected area.";

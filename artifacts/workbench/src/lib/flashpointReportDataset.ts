@@ -1316,10 +1316,10 @@ export function buildFlashpointReportDataset(
     noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? " was" : "s were"} excluded for lack of a civil-unrest hook.`);
   }
   if (dedupedDropped > 0) {
-    noteParts.push(`${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? " was" : "s were"} collapsed via two-pass title and topic-signature dedupe.`);
+    noteParts.push(`${dedupedDropped} duplicate report${dedupedDropped === 1 ? "" : "s"} of the same stories ${dedupedDropped === 1 ? "was" : "were"} removed.`);
   }
   if (weakDropped > 0) {
-    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — retrospective accountability and legal-aftermath reporting (charge recommendations, probes, arrests over past events), post-event normalisation, sports, defence-procurement, legislative-process and stock-photo items that carry the protest or strike keywords but no live public-order signal.`);
+    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — stories about past events (court cases, probes, arrests over earlier incidents), sports, procurement, legislative-process and stock-photo items that use protest or strike wording without any live event.`);
   }
   const dataNote = noteParts.length > 0
     ? noteParts.join(" ")
@@ -1417,15 +1417,15 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   const sectoral = rows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|wage|salary|pay|metro bus|pension)\b/i.test(text(r)));
   const student = rows.filter((r) => /\b(student|university|campus|college|faculty|vc|exam[- ]board)\b/i.test(text(r)));
   const drivers: string[] = [];
-  if (political.length > 0) drivers.push("named opposition mobilisation");
-  if (sectoral.length > 0) drivers.push("sectoral chamber and union action");
+  if (political.length > 0) drivers.push("opposition party protests");
+  if (sectoral.length > 0) drivers.push("union and trade-group action");
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
     ? `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}, rated ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate"} severity.`
     : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
   const driverLine = drivers.length > 0
     ? `Most of the reported events came from ${joinList(drivers)}.`
-    : `The reported events came from routine background organising rather than any single named campaign.`;
+    : `The reported events are routine local organising rather than any single campaign.`;
   const operational = `The locations named in the incidents are mainly city-centre commercial districts, court complexes, party and ministry offices and the main roads nearby. Where protests fall on staff routes or near sites, movement and access are the first things affected.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${driverLine}\n\n${operational}`;
@@ -1450,9 +1450,9 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
     ? `The most serious civil-unrest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
     : `Civil unrest across ${windowLabel} was limited, with no single standout event.`;
   const postureLine = postureBits.length > 0
-    ? `How the authorities are responding is the key point in these records: ${joinList(postureBits)}.`
+    ? `The police response is the main thing to watch: ${joinList(postureBits)}.`
     : `Reports this week do not mention curfews, mass arrests or crackdowns. The police response so far looks measured rather than escalating.`;
-  const operational = `For businesses, the enforcement steps in the record — crackdowns and any curfew orders — matter more than the raw number of protests, because they mark where staff movement and venue access are most exposed. Where enforcement is concentrated in one city or district, road closures and venue-access restrictions on the day are a realistic possibility to plan for.`;
+  const operational = `For businesses, what the police do — arrests, crackdowns, curfews — matters more than how many protests there are, because that is where roads close and buildings become hard to reach. If enforcement is concentrated in one city or district, plan for road closures and blocked access on the day.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -1843,7 +1843,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
   const spread = subregionSpread(ctx.countryRows);
   if (spread.regions.length >= 2 && lead) {
     lines.push(
-      `What matters most this week is that activity is spread across ${joinList(spread.regions)} rather than concentrated in a single capital. ${lead.label} carries the most events, but the exposure is spread across several countries.`,
+      `What matters most this week is that activity is spread across ${joinList(spread.regions)} rather than concentrated in a single capital. ${lead.label} has the most events, but several countries are affected.`,
     );
   } else if (lead) {
     lines.push(
@@ -1856,7 +1856,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
   }
   if (ctx.activismRows.length > 0 && ctx.unrestRows.length > 0) {
     lines.push(
-      `Protests and civil unrest appear side by side in the window: organised action alongside enforcement steps on the record.`,
+      `This week has both organised protests and police enforcement against them.`,
     );
   } else if (ctx.activismRows.length > 0) {
     lines.push(
@@ -2056,12 +2056,14 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const hasEnforcement = ctx.unrestRows.some((r) => /\b(curfew|tear[- ]?gas|baton|water cannon|arrest|detention|section\s*144|crackdown|lockdown|martial law)\b/i.test(text(r)));
 
   const driverBits: string[] = [];
-  if (political) driverBits.push("named opposition mobilisation");
-  if (sectoral) driverBits.push("sectoral chamber and union action");
-  if (hasEnforcement) driverBits.push("visible state enforcement");
-  const driverLine = driverBits.length > 0
-    ? `Activity is being shaped by ${joinList(driverBits)}.`
-    : `Activity is running on steady background organising rather than any single named driver.`;
+  if (political) driverBits.push("opposition party protests");
+  if (sectoral) driverBits.push("union and trade-group action");
+  if (hasEnforcement) driverBits.push("police enforcement");
+  const driverLine = driverBits.length > 1
+    ? `The main drivers are ${joinList(driverBits)}.`
+    : driverBits.length === 1
+      ? `The main driver is ${driverBits[0]}.`
+      : `No single campaign is driving the week's activity.`;
 
   const geoLine = spread.regions.length >= 2 && lead
     ? `Activity is regional rather than confined to one country: it spans ${joinList(spread.regions)}, with ${lead.label} seeing the most.`
@@ -2099,8 +2101,8 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const opener = `This week ${volClause}${sevClause}. ${driverLine}`;
 
   const closing = hasEnforcement
-    ? `Bottom line: enforcement is on the record alongside organising, so the coming period is one to plan around rather than treat as quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
-    : `Bottom line: activity is organising-led on the current record, with no enforcement among the incidents. Detailed activism, civil-unrest, forecast and country sections follow.`;
+    ? `Bottom line: police are already making arrests or breaking up some of these protests, so plan for disruption in the coming week rather than assuming it stays quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
+    : `Bottom line: these are organised protests with no police crackdowns reported so far. Detailed activism, civil-unrest, forecast and country sections follow.`;
 
   return `${opener}\n\n${geoLine} ${severityLine}\n\n${closing}`;
 }
@@ -2135,6 +2137,16 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
   /\boperating posture\b/i,
   /\bthe sharper case\b/i,
   /\bareas the business uses\b/i,
+  /\bsectoral chamber\b/i,
+  /\bnamed opposition mobilisation\b/i,
+  /\bvisible state enforcement\b/i,
+  /\bvenue-access friction\b/i,
+  /\bexposure is spread\b/i,
+  /\bcarries the most events\b/i,
+  /\bon the record alongside\b/i,
+  /\bis being shaped by\b/i,
+  /\btopic-signature dedupe\b/i,
+  /\bbackground organising\b/i,
 ];
 
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {

@@ -372,7 +372,14 @@ export function validateFuelReportConsistency(facts: FuelCanonicalFacts, section
     if (locationClaim && locationClaim !== (facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN)) errors.push(err(section, locationClaim, facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN, "qualifyingIncidents[].physicalLocation"));
     for (const indicator of directions) {
       const name = indicator.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const nearby = new RegExp(`${name}.{0,80}`, "i").exec(body)?.[0] ?? "";
+      // Stop the window at a clause boundary (semicolon or full stop) so a
+      // multi-indicator sentence ("Brent crude is rising; Jet fuel is
+      // falling.") can't leak the NEXT indicator's direction word into this
+      // indicator's check — that false-blocked the whole fuel report
+      // whenever the indicators genuinely diverged. Colons deliberately do
+      // NOT stop the window: "Brent crude: rising" is a same-indicator
+      // label-to-predicate form and must stay checkable.
+      const nearby = new RegExp(`${name}[^.;]{0,80}`, "i").exec(body)?.[0] ?? "";
       if (indicator.direction === "falling" && /\b(rising|firming|not retreating)\b/i.test(nearby)) errors.push(err(section, nearby, "falling", `marketIndicators.${indicator.label}.direction`));
       if (indicator.direction === "rising" && /\b(falling|easing|retreating)\b/i.test(nearby)) errors.push(err(section, nearby, "rising", `marketIndicators.${indicator.label}.direction`));
     }

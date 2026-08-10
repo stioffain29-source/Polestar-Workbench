@@ -476,3 +476,38 @@ describe("validateFuelReportConsistency — title containing ' at '", () => {
     expect(errors.filter((e: { sourceField: string }) => e.sourceField.includes("physicalLocation"))).toEqual([]);
   });
 });
+
+describe("validateFuelReportConsistency — indicator direction clause scoping", () => {
+  const { buildFuelCanonicalFacts, validateFuelReportConsistency } =
+    jest.requireActual("../fuelCanonicalFacts");
+  const divergingFacts = () =>
+    buildFuelCanonicalFacts({
+      issueDate: "2026-08-10",
+      incidents: [],
+      marketCards: [
+        { label: "Brent crude", value: 84, change: "+5.0%" },
+        { label: "WTI crude", value: 80, change: "+4.0%" },
+        { label: "Jet fuel", value: 95, change: "-3.0%" },
+      ],
+    });
+
+  it("passes a semicolon-separated multi-indicator sentence with genuinely diverging directions", () => {
+    const facts = divergingFacts();
+    const errors = validateFuelReportConsistency(facts, {
+      marketRead: "Brent crude is rising; WTI crude is rising; Jet fuel is falling.",
+    });
+    expect(
+      errors.filter((e: { sourceField: string }) => e.sourceField.startsWith("marketIndicators")),
+    ).toEqual([]);
+  });
+
+  it("still rejects a colon label-to-predicate contradiction in the same clause", () => {
+    const facts = divergingFacts();
+    const errors = validateFuelReportConsistency(facts, {
+      marketRead: "Brent crude: falling on the week.",
+    });
+    expect(
+      errors.some((e: { sourceField: string }) => e.sourceField === "marketIndicators.Brent crude.direction"),
+    ).toBe(true);
+  });
+});
