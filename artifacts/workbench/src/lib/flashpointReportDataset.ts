@@ -1519,7 +1519,7 @@ function buildForecastRead(opts: {
       : ``;
     const contained = sevInc ? containedVenueNote(sevInc) : null;
     lines.push(
-      `${lead.label} had the most events this week, but the most serious single incident was in ${sevCountry}: ${shortSignalLabel(sevInc)}, rated ${sevHs.label}${tableClause}.${contained ? ` ${contained}` : ""} More events does not mean more serious events. Expect frequent, mostly lower-level disruption in ${lead.label}, and watch ${sevCountry} for how that incident develops.`,
+      `${lead.label} had the most events this week, but the most serious single incident was in ${sevCountry}: ${shortSignalLabel(sevInc)}, rated ${sevHs.label}${tableClause}.${contained ? ` ${contained}` : ""} Expect frequent, mostly lower-level disruption in ${lead.label}, and watch ${sevCountry} for how that incident develops.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
