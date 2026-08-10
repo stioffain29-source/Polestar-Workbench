@@ -196,7 +196,10 @@ const SEV_HEX: Record<string, string> = {
 };
 
 function sevKey(s: string | null | undefined): string {
-  return (s ?? "").toLowerCase();
+  const k = (s ?? "").toLowerCase();
+  // Canonical tier is "moderate"; tolerate the "medium" synonym so a
+  // mis-labelled row still gets the amber chip instead of falling back grey.
+  return k === "medium" ? "moderate" : k;
 }
 
 function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label: string } {
