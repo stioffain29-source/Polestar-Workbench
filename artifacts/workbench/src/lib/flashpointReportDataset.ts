@@ -1585,14 +1585,14 @@ function buildRegionalCountryRead(opts: {
   // under-reads the cycle even when Pakistan is the largest single
   // bucket.
   const spread = subregionSpread(countryRows);
-  const regionList = spread.regions
-    .map((r) => {
-      const arr = spread.byRegion.get(r) ?? [];
-      const top = arr[0];
-      return top ? `${r} (led by ${top.label})` : r;
-    });
+  // Name each region once and each leading country once. The old form
+  // repeated "(led by X)" after every region, which read as boilerplate
+  // when three or four regions were active — an owner-flagged defect.
+  const otherLeaders = spread.regions
+    .map((r) => (spread.byRegion.get(r) ?? [])[0]?.label)
+    .filter((l): l is string => Boolean(l) && l !== lead.label);
   const headline = spread.regions.length >= 2
-    ? `This week activity spans ${joinList(regionList)}. The incidents are separate and driven by different local issues rather than a shared regional campaign; ${lead.label} recorded the most events, but businesses with a presence in several APAC capitals should plan around each country's own protest calendar rather than a single regional trend.`
+    ? `Activity this week is spread across ${joinList(spread.regions)}. ${lead.label} recorded the most events${otherLeaders.length > 0 ? `, with ${joinList(otherLeaders)} the busiest countries elsewhere` : ""}. The incidents are separate and driven by different local issues rather than a shared regional campaign, so businesses with a presence in several APAC capitals should plan around each country's own protest calendar rather than a single regional trend.`
     : `This week activity centres on ${lead.label}, with the wider APAC region quieter than usual. Treat that as a feature of a quiet week rather than a lasting shift.`;
   // Per-country operational breakdown using the dataset's own bucket
   // tags. This gives the reader a genuine country-level read on what
