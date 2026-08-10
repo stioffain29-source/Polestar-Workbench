@@ -1,0 +1,61 @@
+Fix the weekly Flashpoint prose at the source.
+
+This week’s report produced several sections in awkward, abstract and sometimes nonsensical English. Do not simply rewrite the current report or hard code replacement sentences. Find every prompt, template and generation path used for weekly Flashpoint prose and apply the following rules to all future reports.
+
+1. Use plain, easy to read English.
+
+2. Use short, direct sentences with a clear subject.
+
+3. Explain the event, its likely business impact and the action required.
+
+4. Avoid abstract phrases such as:
+
+“the week reads as”
+
+“the practical weight sits”
+
+“the picture is led by”
+
+“activity is being driven by”
+
+“two different readings sit side by side”
+
+“on the reported record”
+
+“weighted towards”
+
+“operating posture”
+
+“the sharper case”
+
+“where events fall on the areas the business uses”
+
+5. Do not insert article headlines into sentences. Rewrite the information as normal prose.
+
+6. Do not confuse the number of events with their severity. State clearly when one country has more events but another has a more serious incident.
+
+7. Keep contained incidents in context. For example, the Sri Lanka unrest occurred inside prisons. Although serious, it did not indicate wider public disorder or a broader threat to business operations.
+
+8. Avoid repeating the same point across the overview, business impact, outlook and Polestar View.
+
+9. Business impact must explain practical consequences such as road closures, public transport delays, staff travel disruption, restricted site access and the need to update staff.
+
+10. The Polestar View must provide useful advice. It should state the appropriate risk level, identify where disruption is most likely and explain what businesses should do. Do not simply repeat the incident summary.
+
+11. Recommendations must be clear and actionable. Examples include:
+
+Monitor local news and social media for updates.
+
+Review staff travel routes in affected cities.
+
+Check site access arrangements.
+
+Confirm who will contact staff if conditions change.
+
+Avoid confirmed protest locations.
+
+12. Do not add wider claims or implications that are not supported by the source material.
+
+Add these rules to the shared Flashpoint generation instructions so they apply consistently to every prose section. Add a regression check that rejects or flags abstract phrasing, copied headlines, duplicated analysis and unsupported escalation.
+
+Use the 4 to 10 August 2026 Flashpoint input as a test case. Generate a fresh preview and confirm that every section is clear, natural and understandable on the first reading. Show me the files changed and the new generated prose so I can verify the fix.

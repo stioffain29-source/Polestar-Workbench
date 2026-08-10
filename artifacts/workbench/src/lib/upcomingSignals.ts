@@ -197,6 +197,14 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
   if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return withCity("Family-led sit-in at official premises");
   if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return withCity("Fuel / levy political challenge");
   if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return withCity("Road blockade / sit-in");
+  if (
+    /\b(prison|jail|detention|correctional|remand)s?\b[^.]{0,25}\b(riot|riots|unrest|mutiny|clash|clashes|uprising|violence)\b/.test(text) ||
+    /\b(riot|riots|unrest|mutiny|uprising)\b[^.]{0,25}\b(prison|jail|inmate)/.test(text) ||
+    /\binmates?\b[^.]{0,30}\b(riot|clash|killed|dead|injured)\b/.test(text)
+  ) {
+    return withCity("Prison riot / unrest");
+  }
+  if (/\b(riot|rioting|looting|mob violence)\b/.test(text)) return withCity("Riot / public disorder");
   if (/\bstrike|walkout|stoppage|shutdown\b/.test(text)) return withCity("Sectoral strike notice");
   if (/\brally|march|protest|demonstration\b/.test(text)) {
     // Pull the trigger keyword instead of a bare "Protest mobilisation".

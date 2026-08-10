@@ -715,6 +715,17 @@ const SAME_EVENT_GENERIC = new Set([
   "attempts", "bid", "scheme",
   // modals / generic connectives that survive the stop-word filter
   "should", "would", "could", "without", "still", "again",
+  // state-response angle vocabulary. "Troops deployed to contain prison
+  // unrest" and "Three dead in prison riots" are the SAME story seen from
+  // the response side vs the casualty side; the response verbs/actors name
+  // neither a place nor a grievance, so they must not anchor a match or
+  // read as a distinguishing subject (client-flagged duplicate, Aug 2026).
+  "troop", "troops", "soldier", "soldiers", "military", "army",
+  "deploy", "deploys", "deployed", "deployment", "contain", "contains",
+  "contained", "containing", "boost", "boosts", "boosted", "tighten",
+  "tightens", "tightened", "security", "suppress", "suppresses",
+  "suppressed", "growing", "grows", "spreads", "spreading", "erupt",
+  "erupts", "erupted",
 ]);
 
 function singulariseToken(t: string): string {
@@ -862,7 +873,20 @@ function clusterSameEvent<
         if (countryToks[i].has(t) || countryToks[j].has(t)) continue;
         shared++;
       }
-      if (shared >= 2) parent[find(i)] = find(j);
+      if (shared >= 2) { parent[find(i)] = find(j); continue; }
+      // Facility-class fold: two same-country rows inside the window that
+      // both centre on a PRISON/JAIL event are one story arc even when the
+      // headlines share only that single anchor (casualty angle vs response
+      // angle). Requires an EXPLICIT matching country (never Unknown) and no
+      // mutually-exclusive subjects, so different countries' prison riots
+      // and genuinely different subjects stay apart.
+      const na = (rows[i].country ?? "").trim().toLowerCase();
+      const nb = (rows[j].country ?? "").trim().toLowerCase();
+      const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
+      const facility = (s: Set<string>) => s.has("prison") || s.has("jail");
+      if (explicitSameCountry && facility(anchors[i]) && facility(anchors[j])) {
+        parent[find(i)] = find(j);
+      }
     }
   }
   const best = new Map<number, T>();
@@ -1397,11 +1421,11 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   if (sectoral.length > 0) drivers.push("sectoral chamber and union action");
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
-    ? `Across ${windowLabel} the activism picture is led by "${lead.title}", which falls in the ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "moderate"} severity band.`
-    : `Across ${windowLabel} no single event stands out, though the underlying organising activity is clearly continuing.`;
+    ? `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}, rated ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate"} severity.`
+    : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
   const driverLine = drivers.length > 0
-    ? `Activity is being driven by ${joinList(drivers)}.`
-    : `Activity is running on steady background organising rather than any single named driver.`;
+    ? `Most of the reported events came from ${joinList(drivers)}.`
+    : `The reported events came from routine background organising rather than any single named campaign.`;
   const operational = `The locations named in the incidents are mainly city-centre commercial districts, court complexes, party and ministry offices and the main roads nearby. Where protests fall on staff routes or near sites, movement and access are the first things affected.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${driverLine}\n\n${operational}`;
@@ -1421,12 +1445,13 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (hasCurfew) postureBits.push("statutory restrictions are already in play");
   if (hasCrackdown) postureBits.push("police have already used force or made arrests at demonstrations");
   if (hasRiotClash) postureBits.push("street-level disorder is on the record");
+  const containedNote = lead ? containedVenueNote(lead) : null;
   const headline = lead
-    ? `The civil-unrest picture across ${windowLabel} centres on "${lead.title}", the most significant event reported.`
-    : `The civil-unrest picture across ${windowLabel} sits behind the protest activity rather than ahead of it, with no single standout event.`;
+    ? `The most serious civil-unrest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+    : `Civil unrest across ${windowLabel} was limited, with no single standout event.`;
   const postureLine = postureBits.length > 0
     ? `How the authorities are responding is the key point in these records: ${joinList(postureBits)}.`
-    : `On the reported record the authorities' response reads as measured rather than escalating — no curfews, mass arrests or crackdowns are among the incidents.`;
+    : `Reports this week do not mention curfews, mass arrests or crackdowns. The police response so far looks measured rather than escalating.`;
   const operational = `For businesses, the enforcement steps in the record — crackdowns and any curfew orders — matter more than the raw number of protests, because they mark where staff movement and venue access are most exposed. Where enforcement is concentrated in one city or district, road closures and venue-access restrictions on the day are a realistic possibility to plan for.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
@@ -1492,8 +1517,9 @@ function buildForecastRead(opts: {
     const tableClause = sevLeadsTable
       ? `, which is why it leads the forward-looking table even though it is not the busiest country`
       : ``;
+    const contained = sevInc ? containedVenueNote(sevInc) : null;
     lines.push(
-      `Two different readings sit side by side here. By volume, ${lead.label} shows the most activity in the window. On severity, the sharper case is ${sevCountry}, where ${shortSignalLabel(sevInc)} was rated ${sevHs.label}${tableClause}. More events is not the same as more serious ones: watch ${lead.label} for the frequency of disruption and ${sevCountry} for its severity.`,
+      `${lead.label} had the most events this week, but the most serious single incident was in ${sevCountry}: ${shortSignalLabel(sevInc)}, rated ${sevHs.label}${tableClause}.${contained ? ` ${contained}` : ""} More events does not mean more serious events. Expect frequent, mostly lower-level disruption in ${lead.label}, and watch ${sevCountry} for how that incident develops.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
@@ -1513,11 +1539,11 @@ function buildForecastRead(opts: {
   }
   if (activismShare >= 0.6) {
     lines.push(
-      `The window is weighted towards protests and organised action rather than open disorder. Where those gatherings fall on commercial districts or main roads, localised disruption is the realistic exposure to plan for.`,
+      `Most of this week's events were protests and organised action rather than open disorder. Where gatherings take place in commercial districts or on main roads, expect localised road closures and slower staff travel rather than wider disruption.`,
     );
   } else if (unrestShare >= 0.6) {
     lines.push(
-      `The window is weighted towards civil unrest and enforcement rather than fresh organising, which is the more disruptive of the two profiles where it lands on staff routes and sites.`,
+      `Most of this week's events involved civil unrest and police enforcement rather than fresh organising. That kind of activity is more disruptive where it happens near staff routes and business sites.`,
     );
   } else {
     lines.push(
@@ -1949,6 +1975,28 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
 
 
 
+// Some serious incidents happen inside a closed facility (a prison riot, a
+// detention-centre clash). Rule: keep contained incidents in context — a
+// serious event inside a prison is not evidence of wider public disorder and
+// must never be written up as a broader threat to business operations.
+function containedVenueNote(r: EnrichedIncident): string | null {
+  const t = `${r.title ?? ""} ${r.summary ?? ""}`;
+  // A rally OUTSIDE a jail (e.g. outside Adiala) is street protest, not a
+  // contained event — never hedge those.
+  if (/\b(outside|near|in front of|at the gates?)\b[^.]{0,30}\b(prison|jail|detention)/i.test(t)) return null;
+  // Require an explicit in-facility unrest cue, not just the facility noun:
+  // "prison riot", "jail unrest", "inmates clash" — not transfers, court
+  // items or policy stories that merely mention a prison.
+  const inFacility =
+    /\b(prison|jail|detention centre|detention center|correctional|remand)s?\b[^.]{0,25}\b(riot|riots|unrest|mutiny|clash|clashes|uprising|violence)\b/i.test(t) ||
+    /\b(riot|riots|unrest|mutiny|uprising)\b[^.]{0,25}\b(prison|jail|inmate)/i.test(t) ||
+    /\binmates?\b[^.]{0,30}\b(riot|clash|killed|dead|injured)\b/i.test(t);
+  if (inFacility) {
+    return `This happened inside a prison rather than on the streets, so it does not point to wider public disorder or a broader risk to business operations.`;
+  }
+  return null;
+}
+
 function buildPolestarView(ctx: AutoCtx): string {
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r))).length;
@@ -1961,17 +2009,22 @@ function buildPolestarView(ctx: AutoCtx): string {
   // of the week, not a repeat of the What Matters, Implications or Watch Next
   // sections. It deliberately stops after the verdict so it does not restate
   // the same disruption points those sections already make.
+  // Rule for this section: give useful advice. State the appropriate risk
+  // level, say where disruption is most likely, and say what to do. Never
+  // just repeat the incident summary.
+  const lead = ctx.countryRows[0];
+  const where = lead ? lead.label : "the busiest cities in the region";
   let verdict: string;
   if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: several separate organising efforts are running alongside enforcement steps in the records — a mobilised week rather than a quiet one.`;
+    verdict = `Polestar's view: this was an active week and the risk level is elevated. Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
   } else if (mobVectors >= 2) {
-    verdict = `Polestar's view: the picture is broadly mobilised but not escalating on the record. Several organising efforts are active; no visible enforcement is among the incidents.`;
+    verdict = `Polestar's view: the risk level is moderate. Several protest campaigns are active, but reports show no police crackdowns or curfews. Disruption is most likely in ${where}, around city-centre gatherings. Monitor local news and social media for fresh protest calls and review staff travel routes in the affected cities.`;
   } else if (hasEnforcement) {
-    verdict = `Polestar's view: enforcement is the leading feature of the week, appearing in the records ahead of fresh organising.`;
+    verdict = `Polestar's view: the risk level is moderate. The main feature this week is police enforcement — arrests, curfews or similar orders — rather than new protest campaigns. Enforcement is what disrupts staff movement and site access on the day. Check site access arrangements in ${where} and be ready to update staff quickly if fresh orders are issued.`;
   } else if (mobVectors >= 1) {
-    verdict = `Polestar's view: activity is live but contained — organising under way with no enforcement response on the record.`;
+    verdict = `Polestar's view: the risk level is low. Protest activity is running at a low level and no police enforcement was reported. Monitor local news in ${where} for new protest announcements; no other action is needed now.`;
   } else {
-    verdict = `Polestar's view: a quiet week on the record rather than a lasting shift.`;
+    verdict = `Polestar's view: the risk level is low. This was a quiet week with minimal reported activity and no enforcement action. Routine monitoring is enough for now.`;
   }
 
   return verdict;
@@ -2017,10 +2070,10 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
       : `Few events could be tied to a specific country this week — read the picture from the type of activity rather than where it is happening.`;
 
   const severityLine = hs.key === "high" || hs.key === "extreme"
-    ? `The most serious incidents sit toward the upper end of the protest and public-order range rather than the armed-conflict tail (which sits out of scope for Flashpoint), which keeps the focus squarely on protest disruption rather than armed violence.`
+    ? `The most serious incidents are protest and public-order events, not armed conflict. The main business risk is disruption to staff travel and site access rather than direct violence.`
     : hs.key
-      ? `The most serious incidents sit in the lower-to-middle protest and public-order range, with no armed-conflict reporting (out of scope for Flashpoint). That keeps the focus on disruption rather than direct physical-safety risk.`
-      : `Few incidents carry a severity grade this week; read the picture from the type of activity rather than a top-line severity number.`;
+      ? `The most serious incidents sit in the low-to-middle range. The main business risk is disruption to staff travel and site access, not physical safety.`
+      : `Few incidents carry a severity grade this week, so judge the week by the type of activity reported.`;
   void hs;
 
   // Sharp operational opener: lead with the judgement, then name the
@@ -2039,11 +2092,11 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   // (Moderate+) and in a different country; otherwise just report the
   // ceiling. A "highest" that is still Low is not an escalation.
   const sevClause = sevInc && sevCountry && lead && sevCountry !== lead.label && sevElevated
-    ? `, while the sharpest single escalation is in ${sevCountry} — ${shortSignalLabel(sevInc)}, rated ${hs.label}`
+    ? `, while the most serious single incident was in ${sevCountry} — ${shortSignalLabel(sevInc)}, rated ${hs.label}`
     : hs.key
-      ? `, with the most serious reaching ${hs.label} on the protest and public-order range`
+      ? `, with the most serious incident rated ${hs.label}`
       : ``;
-  const opener = `The week's picture: ${volClause}${sevClause}. ${driverLine}`;
+  const opener = `This week ${volClause}${sevClause}. ${driverLine}`;
 
   const closing = hasEnforcement
     ? `Bottom line: enforcement is on the record alongside organising, so the coming period is one to plan around rather than treat as quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
@@ -2065,6 +2118,25 @@ export const FLASHPOINT_SEV_LABEL = SEV_LABEL;
 //      different country.
 //   3. Related Incidents never repeats a row already surfaced in the rendered
 //      Activism / Civil Unrest tables.
+// Abstract analyst-speak the client has explicitly banned from Flashpoint
+// prose (Aug 2026). Checked over every auto-generated section by
+// validateFlashpointReportDataset, and mirrored as instructions in the AI
+// prose prompt (api-server reportProse.ts). Keep the two lists aligned.
+export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
+  /\bthe week reads as\b/i,
+  /\b(record|picture|period|window|activity) reads as\b/i,
+  /\breads this period as\b/i,
+  /\bpractical weight\b/i,
+  /\bpicture is led by\b/i,
+  /\bactivity is being driven by\b/i,
+  /\breadings sit side by side\b/i,
+  /\bon the reported record\b/i,
+  /\bweighted towards\b/i,
+  /\boperating posture\b/i,
+  /\bthe sharper case\b/i,
+  /\bareas the business uses\b/i,
+];
+
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
   const errors: string[] = [];
 
@@ -2112,6 +2184,42 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
     errors.push(
       `Related Incidents repeats already-shown incidents: ${dupes.map((r) => r.id).join(", ")}`,
     );
+  }
+
+  // 4. Prose quality gate. Client-mandated (Aug 2026): no abstract
+  //    analyst-speak, no article headlines pasted into sentences, no
+  //    paragraph duplicated across sections.
+  const proseSections: Array<[string, string]> = [
+    ["Executive Summary", ds.autoExecutiveSummary],
+    ["Activism read", ds.activismRead],
+    ["Civil Unrest read", ds.civilUnrestRead],
+    ["Forecast read", ds.forecastRead],
+    ["Regional/Country read", ds.regionalCountryRead],
+    ["What Matters", ds.autoWhatMatters],
+    ["Implications", ds.autoImplications],
+    ["Watch Next", ds.autoWatchNext],
+    ["Polestar View", ds.autoPolestarView],
+  ];
+  for (const [name, text] of proseSections) {
+    for (const re of FLASHPOINT_BANNED_PROSE_RE) {
+      const m = text.match(re);
+      if (m) errors.push(`${name} contains banned phrasing "${m[0]}"`);
+    }
+    // A double-quoted span of 25+ chars is almost always a pasted headline.
+    const q = text.match(/"([^"]{25,})"/);
+    if (q) errors.push(`${name} pastes a quoted headline into prose: "${q[1].slice(0, 60)}..."`);
+  }
+  // No paragraph may appear verbatim in two different sections.
+  const seenPara = new Map<string, string>();
+  for (const [name, text] of proseSections) {
+    for (const p of text.split("\n\n").map((s) => s.trim()).filter((s) => s.length >= 60)) {
+      const priorSection = seenPara.get(p);
+      if (priorSection && priorSection !== name) {
+        errors.push(`Paragraph duplicated across "${priorSection}" and "${name}": "${p.slice(0, 60)}..."`);
+      } else if (!priorSection) {
+        seenPara.set(p, name);
+      }
+    }
   }
 
   return errors;

@@ -34,7 +34,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
-export const REPORT_PROSE_PROMPT_VERSION = "v1";
+export const REPORT_PROSE_PROMPT_VERSION = "v2";
 
 export { isLlmAvailable, MAX_PROSE_INCIDENTS_ACCEPTED };
 export type { ProseIncidentInput };
@@ -186,6 +186,17 @@ WRITING RULES:
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the situation — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
 
+PLAIN-ENGLISH RULES — mandatory:
+- Use plain, easy-to-read English. Short, direct sentences with a clear subject. Every sentence must be understandable on first reading by a non-specialist.
+- For each significant development: explain the event, its likely business impact, and the action required.
+- BANNED phrasings — never use these or close variants: "the week reads as", "reads as", "the practical weight sits", "the picture is led by", "the picture", "activity is being driven by", "two different readings sit side by side", "on the reported record", "weighted towards", "operating posture", "the sharper case", "where events fall on the areas the business uses".
+- Never copy an article headline into a sentence. Rewrite the information as normal prose.
+- Never confuse the number of events with their severity. If one country has more events but another has a more serious incident, state both plainly.
+- Keep contained incidents in context. An event inside a prison or other closed facility, however serious, is not evidence of wider public disorder — say so explicitly.
+- The same incident must carry ONE severity rating everywhere it is mentioned; never give one event two different ratings.
+- Business impact must name practical consequences: road closures, public-transport delays, staff travel disruption, restricted site access, the need to update staff.
+- Do not add wider claims or implications that the incident records do not support.
+
 Return STRICT JSON with EXACTLY these keys and no others:
 {
   "executiveSummary": string,  // 2-4 sentences: the headline judgement for this window — the dominant theme and what it means for operations now.
@@ -194,7 +205,7 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "whatMatters": string,       // Why it matters for staff movement, site access, supply or continuity, and where to focus attention.
   "implications": string[],    // 4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash.
   "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
-  "polestarView": string       // The bottom-line analyst judgement and the recommended operating posture.${
+  "polestarView": string       // The bottom-line analyst judgement with useful advice: state the appropriate risk level, where disruption is most likely, and what to do. Do not repeat the incident summary.${
     polestarViewMinWords
       ? ` MUST be at least ${polestarViewMinWords} words (aim for ${polestarViewMinWords}-${polestarViewMinWords + 40}): cover the overall judgement, what the data does and does not support, reporting limitations, the near-term outlook and your confidence level, each as its own sentence.`
       : ""

@@ -44,6 +44,7 @@ import {
 import { aiOr, type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
+  isGenericFlashpointProse,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
@@ -678,13 +679,16 @@ export async function exportFlashpointReportPdf(
 
   // Editor-authored analyst sections. Editor text wins only when it
   // carries substance; thin stubs get the auto-prose appended.
+  // Mirror FlashpointReportPreview.pickProse exactly: recognised generic
+  // seed text is always replaced by the data-driven auto-prose so the PDF
+  // can never show boilerplate the preview suppresses.
   const pickProse = (
     editor: string | null | undefined,
     auto: string,
   ): string => {
     const t = (editor ?? "").trim();
+    if (!t || isGenericFlashpointProse(t)) return auto;
     if (t.length >= 240) return t;
-    if (t.length === 0) return auto;
     return `${t}\n\n${auto}`;
   };
   if (show("what-matters")) {

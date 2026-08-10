@@ -605,8 +605,8 @@ const FLASHPOINT: ReportPack = {
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {
-    const where = countries ? ` Repeat activity in ${countries} is where staff-movement risk is most likely.` : "";
-    return `The practical concern is staff movement, site access and staff communications where these events fall on the areas the business uses.${where}`;
+    const where = countries ? ` Repeat activity in ${countries} makes staff-travel disruption most likely there.` : "";
+    return `The practical concerns are staff movement, site access and keeping staff informed in the affected cities.${where}`;
   },
   implications: () =>
     "Keep journey plans ready to adjust, review site-access and shelter procedures, and confirm escalation contacts with country leads.",
@@ -614,7 +614,7 @@ const FLASHPOINT: ReportPack = {
     "Track named, dated protest calls, announced strike notices and scheduled hearings reported this week.",
   polestarView: ({ lead }) => {
     const tail = lead ? ` ${lead} carries the most activity.` : "";
-    return `The week reads as protest and public-order disruption to plan around rather than a single headline event.${tail}`;
+    return `This week's activity is protest and public-order disruption to plan around rather than a single major event.${tail}`;
   },
   zeroExec: "Flashpoint reporting was quiet this week. Read that as a gap in reporting, not proof that the streets are calm.",
   zeroSituation: "Protest and public-order disruption risk on transport hubs and central business districts persists whether or not new reporting lands.",
@@ -739,8 +739,8 @@ const PROTESTS: ReportPack = {
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {
-    const where = countries ? ` Concentration in ${countries} is where the practical weight sits.` : "";
-    return `The practical concern is staff movement, site access and staff communications where these events fall on the areas the business uses.${where}`;
+    const where = countries ? ` Most disruption is likely in ${countries}.` : "";
+    return `The practical concerns are staff movement, site access and keeping staff informed in the affected cities.${where}`;
   },
   implications: () =>
     "Review staff movement plans, journey plans for affected cities, site-access controls and standing communication contacts.",
@@ -748,7 +748,7 @@ const PROTESTS: ReportPack = {
     "Track named, dated protest calls, university and union announcements and scheduled hearings reported this week.",
   polestarView: ({ lead }) => {
     const tail = lead ? ` ${lead} carries the most activity.` : "";
-    return `The week reads as public-order disruption to plan around rather than a single headline event.${tail}`;
+    return `This week's activity is public-order disruption to plan around rather than a single major event.${tail}`;
   },
   zeroExec: "Public-order reporting was quiet this week. Read that as a gap in reporting rather than calm streets.",
   zeroSituation: "Risk to transport, access and central business districts persists whether or not new reporting lands.",
