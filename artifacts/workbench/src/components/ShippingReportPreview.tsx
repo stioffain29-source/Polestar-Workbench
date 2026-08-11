@@ -39,7 +39,6 @@ import {
 } from "@/lib/maritimeIntelligence";
 import {
   MARITIME_CONF_LABEL,
-  MARITIME_POLESTAR_SUBSECTIONS,
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
 } from "@/lib/maritimeReportView";
@@ -575,9 +574,6 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
     movementSnapshot,
     chokepointCards,
     confirmedIncidents,
-    keyRiskIndicators,
-    businessImpact,
-    watchNext,
   } = board;
   const execCards: KpiCard[] = maritimeExecCards(board);
   return (
@@ -627,28 +623,13 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
         </p>
       )}
 
-      <div className="rounded-sm" style={{ background: NAVY, padding: 16, marginTop: 12 }}>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 8 }}>
-          Polestar View
-        </div>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[0]}</div>
-        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 13, lineHeight: 1.6, fontWeight: 300, margin: "0 0 6px 0" }}>{risk.rationale}</p>
-        <ul style={{ listStyle: "none", padding: 0, margin: "0 0 10px 0" }}>
-          {keyRiskIndicators.map((k, i) => (
-            <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {k}</li>
-          ))}
-        </ul>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[1]}</div>
-        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{businessImpact.join(", ")}</p>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[2]}</div>
-        <p style={{ color: "#fff", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6, margin: "0 0 8px 0" }}>{MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}</p>
-        <div className="uppercase" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.12em", marginBottom: 4 }}>{MARITIME_POLESTAR_SUBSECTIONS[3]}</div>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-          {watchNext.map((w, i) => (
-            <li key={i} style={{ color: "#dfe1f0", fontFamily: "Roboto, sans-serif", fontSize: 12, lineHeight: 1.6 }}>&middot; {w}</li>
-          ))}
-        </ul>
-      </div>
+      {/* The board's internal Polestar View / Watch Next block is NOT rendered
+          in the report — the report has exactly one Polestar View and one
+          Watch Next (the standalone sections). Assessment + confidence live on
+          the chokepoint cards; business impact is in the KPI strip. */}
+      <p className="text-[12px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontStyle: "italic", marginTop: 10 }}>
+        Assessment confidence: {MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}. {risk.rationale}
+      </p>
     </Section>
   );
 }
@@ -944,7 +925,7 @@ export default function ShippingReportPreview({
               className="uppercase mb-2"
               style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
             >
-              Records by Region
+              Incidents by Region
             </div>
             <HorizontalBarChart rows={ds.regionRows} labelW={180} emptyMessage="No regional classifications reported this week." />
           </div>
@@ -952,7 +933,7 @@ export default function ShippingReportPreview({
             className="uppercase mb-2"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
           >
-            {ds.countryRows.length >= 12 ? "Records by Country (Top 12)" : "Records by Country"}
+            {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
           </div>
           <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries reported this week." />
         </Section>

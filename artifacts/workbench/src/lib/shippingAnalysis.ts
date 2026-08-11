@@ -206,6 +206,42 @@ export function detectChokepoints(i: MaritimeRecordLike): ChokepointKey[] {
   return hits;
 }
 
+// Littoral / adjacent states per chokepoint. Used by the geography veto: an
+// incident with a KNOWN incident country that is not on (or immediately
+// adjacent to) a chokepoint must not be assigned to that chokepoint just
+// because the article mentions it (an Indonesian law-enforcement seizure whose
+// wire copy references Hormuz tensions is an Indonesian event, not a Hormuz
+// security incident).
+const CHOKEPOINT_LITTORALS: Record<ChokepointKey, Set<string>> = {
+  "Strait of Hormuz": new Set(["Iran", "Oman", "UAE", "United Arab Emirates", "Qatar", "Bahrain", "Kuwait", "Saudi Arabia", "Iraq"]),
+  "Gulf of Oman": new Set(["Iran", "Oman", "UAE", "United Arab Emirates", "Pakistan"]),
+  "Arabian / Persian Gulf": new Set(["Iran", "Oman", "UAE", "United Arab Emirates", "Qatar", "Bahrain", "Kuwait", "Saudi Arabia", "Iraq"]),
+  "Red Sea": new Set(["Yemen", "Saudi Arabia", "Egypt", "Sudan", "Eritrea", "Djibouti", "Jordan", "Israel"]),
+  "Bab el-Mandeb": new Set(["Yemen", "Djibouti", "Eritrea"]),
+  "Suez Canal": new Set(["Egypt"]),
+  "Gulf of Aden": new Set(["Yemen", "Somalia", "Djibouti", "Oman"]),
+  "Singapore Strait": new Set(["Singapore", "Indonesia", "Malaysia"]),
+  "Malacca Strait": new Set(["Malaysia", "Indonesia", "Singapore", "Thailand"]),
+};
+
+/**
+ * Chokepoint detection with a geography veto. When the incident country is
+ * KNOWN, a chokepoint mention only survives if that country borders the
+ * chokepoint. Unknown-country records (most at-sea vessel incidents) keep
+ * every textual hit — the veto only fires on positive contradiction, so it can
+ * never drop a genuine at-sea event. Use this wherever an incident's location
+ * is available; keep plain detectChokepoints for text-only contexts.
+ */
+export function detectChokepointsScoped(
+  i: MaritimeRecordLike,
+  incidentCountry: string | null | undefined,
+): ChokepointKey[] {
+  const hits = detectChokepoints(i);
+  const country = (incidentCountry ?? "").trim();
+  if (!country) return hits;
+  return hits.filter((cp) => CHOKEPOINT_LITTORALS[cp].has(country));
+}
+
 /**
  * Convenience — first chokepoint match, used when picking a single label.
  */
@@ -276,9 +312,64 @@ export function classifyPiracy(i: MaritimeRecordLike): PiracyAct | null {
   // Period tallies / trend retrospectives are not discrete events.
   if (PIRACY_STAT_RE.test(text)) return null;
   for (const r of PIRACY_RULES) {
-    if (r.pattern.test(text)) return r.type;
+    if (!r.pattern.test(text)) continue;
+    // A state missile/drone attack described as "piracy" in a political
+    // statement is NOT a piracy event. The bare "piracy/pirates" word rule
+    // only fires when the record also carries a physical piracy act
+    // (boarding, robbery, hijack, skiff approach) — rhetoric alone cannot
+    // set the incident taxonomy. The specific act rules are unaffected.
+    if (r.type === "Piracy" && STATE_ATTACK_CONTEXT_RE.test(text) && !PIRACY_PHYSICAL_ACT_RE.test(text)) {
+      continue;
+    }
+    return r.type;
   }
   return null;
+}
+
+// State/military attack context — the vocabulary of a missile or drone strike
+// and of political condemnation, none of which appears in genuine piracy
+// reporting (pirates do not fire ballistic missiles).
+const STATE_ATTACK_CONTEXT_RE =
+  /\b(missile|ballistic|drone (strike|attack)|air ?strike|warship|naval forces|state media|condemn(s|ed|ation)?|denounce[sd]?|act of (aggression|war))\b/i;
+// Physical piracy acts that legitimise the bare "piracy" word.
+const PIRACY_PHYSICAL_ACT_RE =
+  /\b(board(ed|ing)?|robber(y|s)|hijack(ed|ing)?|skiff|armed (men|gang|gunmen)|stole|theft|hostage|kidnap)\b/i;
+
+// ---------------------------------------------------------------------------
+// Reported-period parsing — weekly bulletins (ReCAAP etc.) carry their OWN
+// reporting window in the title/summary ("28 July - 3 August"). When that
+// stated period ends before the report window starts, the record is
+// prior-period reporting surfacing on its publication date and must not be
+// counted as an incident of the current window.
+// ---------------------------------------------------------------------------
+const MONTHS: Record<string, number> = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11,
+};
+const PERIOD_RANGE_RE =
+  /\b(\d{1,2})\s*(?:(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\s*)?(?:-|–|—|to|until)\s*(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b/i;
+
+/**
+ * If the record's text states an explicit day-month reporting period, return
+ * the END of that period (UTC, year inferred against `reference`, with a
+ * year-wrap guard). Null when no period is stated.
+ */
+export function statedPeriodEnd(text: string, reference: Date): Date | null {
+  const m = PERIOD_RANGE_RE.exec(text);
+  if (!m) return null;
+  const endDay = parseInt(m[3], 10);
+  const endMonth = MONTHS[(m[4] ?? "").toLowerCase()];
+  if (endMonth == null || !(endDay >= 1 && endDay <= 31)) return null;
+  const year = reference.getUTCFullYear();
+  let end = new Date(Date.UTC(year, endMonth, endDay, 23, 59, 59));
+  // Year-wrap: a stated period more than ~6 months in the future relative to
+  // the reference belongs to the previous year (a late-December reference
+  // citing an early-January period end, and vice versa).
+  if (end.getTime() - reference.getTime() > 183 * 86400000) {
+    end = new Date(Date.UTC(year - 1, endMonth, endDay, 23, 59, 59));
+  }
+  return end;
 }
 
 export const PIRACY_ACTS: PiracyAct[] = [

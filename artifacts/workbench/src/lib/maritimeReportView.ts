@@ -51,7 +51,11 @@ export function maritimeExecCards(
       // subdued red #A33232), matching the L-level chip/value colour.
       accent: MARITIME_RISK_COLOR[risk.level],
     },
-    { label: "Confirmed Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
+    // "Chokepoint Incidents" — this board counts confirmed incidents AT THE
+    // TRACKED STRAITS only, a subset of the report's canonical incident pool.
+    // The label says so, so this card can never read as a rival total to the
+    // Fast Facts "Confirmed Incidents" count.
+    { label: "Chokepoint Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
     {
       label: "Chokepoints Affected",
       // Denominator is the fixed number of tracked board chokepoints. Keeps the
@@ -59,8 +63,13 @@ export function maritimeExecCards(
       value: `${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     },
     {
-      label: "Business Impact",
-      value: namedImpacts.length > 0 ? String(namedImpacts.length) : "\u2014",
+      // A bare number ("Business Impact 8") explains nothing — say what is
+      // being counted, and spell the unit in the value.
+      label: "Business Impact Areas",
+      value:
+        namedImpacts.length > 0
+          ? `${namedImpacts.length} affected`
+          : "\u2014",
     },
   ];
 }

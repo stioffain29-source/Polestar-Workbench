@@ -205,9 +205,12 @@ export function computeMaritimeRisk(confirmed: ClassifiedIncident[]): MaritimeRi
   if (confirmed.length === 0) {
     return {
       level: 1,
-      label: MARITIME_RISK_LABEL[1],
-      // A quiet window can be a reporting gap, so confidence is low by design.
-      rationale: "No confirmed maritime security incidents in the window.",
+      // Zero incidents + low confidence must NOT read as a positive
+      // "Insignificant" risk judgement — a quiet window is at least as likely
+      // to be a reporting gap. Say so explicitly instead of asserting safety.
+      label: "Not assessed",
+      rationale:
+        "No confirmed maritime security incidents in the window \u2014 insufficient reporting to assess a risk level, not a judgement that risk is low.",
       confidence: "low",
     };
   }
@@ -446,9 +449,20 @@ export function formatMovementSummary(t: MovementTheatre): string {
   if (t.containerCount != null) parts.push(`${t.containerCount} container`);
   if (t.lngLpgCount != null) parts.push(`${t.lngLpgCount} LNG/LPG`);
   if (t.anchoredOrWaitingCount != null) parts.push(`${t.anchoredOrWaitingCount} anchored`);
-  if (t.aisDarkOrGapCount != null) parts.push(`${t.aisDarkOrGapCount} AIS-dark`);
+  if (t.aisDarkOrGapCount != null) parts.push(formatAisDark(t));
   if (t.changeVs7DayBaseline) parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
   return parts.join(" \u00b7 ");
+}
+
+// AIS-dark with an explicit denominator and method, so the figure is never a
+// bare unexplained count ("30 AIS-dark" of WHAT?). The denominator is the
+// live-AIS sample for the same theatre snapshot; when the total is not
+// reported the method note alone still scopes the number.
+function formatAisDark(t: MovementTheatre): string {
+  const n = t.aisDarkOrGapCount ?? 0;
+  return t.totalVessels != null
+    ? `${n} of ${t.totalVessels} AIS-dark (live AIS sample)`
+    : `${n} AIS-dark (live AIS sample)`;
 }
 
 /**
@@ -485,7 +499,7 @@ export function formatMovementTotals(t: MovementTheatre): string {
   parts.push(t.totalVessels != null ? `${t.totalVessels} vessels tracked` : "Tracked");
   if (t.aisVisibleCount != null) parts.push(`${t.aisVisibleCount} AIS-visible`);
   if (t.anchoredOrWaitingCount != null) parts.push(`${t.anchoredOrWaitingCount} anchored`);
-  if (t.aisDarkOrGapCount != null) parts.push(`${t.aisDarkOrGapCount} AIS-dark`);
+  if (t.aisDarkOrGapCount != null) parts.push(formatAisDark(t));
   if (t.changeVs7DayBaseline) parts.push(`${t.changeVs7DayBaseline} vs 7-day baseline`);
   return parts.join(" \u00b7 ");
 }

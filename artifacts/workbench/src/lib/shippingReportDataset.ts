@@ -2,7 +2,8 @@ import { format, parseISO, max as dateMax } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import {
-  CHOKEPOINTS, detectChokepoints, classifyPiracy,
+  CHOKEPOINTS, detectChokepoints, detectChokepointsScoped, classifyPiracy,
+  statedPeriodEnd,
   classifyVesselIncident, type VesselIncidentType,
   classifyIssue,
   classifyRegion, REGION_COLOR, type Region,
@@ -54,6 +55,25 @@ export interface EnrichedIncident extends ShippingReportIncident {
 export interface VesselRow extends EnrichedIncident { vesselType: VesselIncidentType }
 export interface PiracyRow extends EnrichedIncident { act: NonNullable<ReturnType<typeof classifyPiracy>> }
 
+/** One reference to a syndicated article folded beneath a canonical incident. */
+export interface SupportingArticle {
+  title: string;
+  source: string | null;
+  sourceUrl: string | null;
+}
+
+/**
+ * A canonical, deduplicated incident: the representative record of one
+ * underlying real-world event, with every other article reporting the same
+ * event folded beneath it as a supporting source. Every incident count,
+ * table and chart in the report reads from this pool — articles are never
+ * presented as additional incidents.
+ */
+export interface CanonicalIncident extends EnrichedIncident {
+  /** Other articles reporting the SAME event (representative excluded). */
+  supportingArticles: SupportingArticle[];
+}
+
 export interface KpiCard {
   label: string;
   value: string;
@@ -82,6 +102,12 @@ export interface ShippingReportDataset {
   /** Short date-range label for the report window (Chokepoint / Vessel / Piracy). */
   thirtyDayShortLabel: string;
   enriched: EnrichedIncident[];
+  /** THE canonical deduplicated incident pool — one row per underlying event,
+   *  syndicated articles folded beneath as supporting sources. Every incident
+   *  count, table and chart reads from this. */
+  canonicalIncidents: CanonicalIncident[];
+  /** Confirmed article records in the window BEFORE event folding. */
+  articleCount: number;
   outOfScopeCount: number;
   fastFacts: KpiCard[];
   /** Count of records in the weekly window whose incident location could not be identified. */
@@ -360,6 +386,80 @@ function dedupeVesselEventsClustered<T extends { title: string; date: Date; seve
   return out;
 }
 
+// --- Canonical incident fold -----------------------------------------------
+// The report's core dataset: fold every article reporting the SAME underlying
+// event into ONE canonical incident carrying its supporting articles. Three
+// member-preserving passes mirror the existing dedupe logic exactly:
+//   1. exact title-key groups (direct republishing),
+//   2. date-bucketed noun-signature groups (reworded syndication),
+//   3. for vessel-typed events, {act, coarse theatre} time-chained clusters
+//      (the ADNOC/UKMTO problem — one seizure under many wires across days).
+// Representative = highest severity, then most recent (same rule as the
+// dedupe helpers). Every incident count, table and chart reads from this.
+function foldCanonical(rows: EnrichedIncident[]): CanonicalIncident[] {
+  const better = (a: EnrichedIncident, b: EnrichedIncident) => {
+    const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
+    const sb = SEV_RANK[sevKey(b.severity)] ?? 0;
+    if (sa !== sb) return sa > sb;
+    return a.date.getTime() >= b.date.getTime();
+  };
+  type Group = { rep: EnrichedIncident; members: EnrichedIncident[] };
+  const addTo = (map: Map<string, Group>, key: string, g: Group) => {
+    const prev = map.get(key);
+    if (!prev) { map.set(key, g); return; }
+    prev.members.push(...g.members);
+    if (better(g.rep, prev.rep)) prev.rep = g.rep;
+  };
+  // Pass 1 — exact title key.
+  const p1 = new Map<string, Group>();
+  let uniq = 0;
+  for (const r of rows) {
+    const k = titleKey(r.title) || `__u${uniq++}`;
+    addTo(p1, k, { rep: r, members: [r] });
+  }
+  // Pass 2 — date-bucketed noun signature over pass-1 representatives.
+  const p2 = new Map<string, Group>();
+  for (const g of p1.values()) addTo(p2, topicSignature(g.rep.title, g.rep.date), g);
+  // Pass 3 — vessel-event clustering: same act + coarse theatre, single-linked
+  // in time (gap ≤ EVENT_GAP_DAYS, span ≤ EVENT_SPAN_DAYS). Non-vessel groups
+  // and no-theatre groups pass through untouched.
+  const DAY = 86_400_000;
+  const byTheatre = new Map<string, Group[]>();
+  const out: Group[] = [];
+  for (const g of p2.values()) {
+    const vt = classifyVesselIncident(g.rep);
+    const region = vt ? coarseRegion(g.rep.title) : "";
+    if (!vt || !region) { out.push(g); continue; }
+    const gk = `${vt.toLowerCase()}|${region}`;
+    const arr = byTheatre.get(gk);
+    if (arr) arr.push(g); else byTheatre.set(gk, [g]);
+  }
+  for (const grp of byTheatre.values()) {
+    const sorted = [...grp].sort((a, b) => a.rep.date.getTime() - b.rep.date.getTime());
+    let cluster: Group | null = null;
+    let prevMs = -Infinity, startMs = -Infinity;
+    for (const g of sorted) {
+      const t = g.rep.date.getTime();
+      if (cluster && t - prevMs <= EVENT_GAP_DAYS * DAY && t - startMs <= EVENT_SPAN_DAYS * DAY) {
+        cluster.members.push(...g.members);
+        if (better(g.rep, cluster.rep)) cluster.rep = g.rep;
+        prevMs = t;
+      } else {
+        if (cluster) out.push(cluster);
+        cluster = { rep: g.rep, members: [...g.members] };
+        startMs = t; prevMs = t;
+      }
+    }
+    if (cluster) out.push(cluster);
+  }
+  return out.map((g) => ({
+    ...g.rep,
+    supportingArticles: g.members
+      .filter((m) => m.id !== g.rep.id)
+      .map((m) => ({ title: m.title, source: m.source ?? null, sourceUrl: m.sourceUrl ?? null })),
+  }));
+}
+
 function dedupeByTitle<T extends { title: string; date: Date; severity: string }>(rows: T[]): T[] {
   // Two-pass: exact-title-key dedupe (catches direct republishing), then
   // date+nouns signature dedupe (catches reworded syndication). Keeps
@@ -504,7 +604,22 @@ export function buildShippingReportDataset(
   // list. The region/country DISTRIBUTION charts keep the broader `enriched`
   // set on purpose (they answer "where did reporting cluster", a different
   // question) and are labelled "Records by …" so the two are never confused.
-  const confirmedIncidents = enriched.filter((r) => isConfirmedOperationalIncident(r));
+  // Prior-period bulletins (ReCAAP weekly digests etc.) state their own
+  // reporting window — when that stated window ends before this report's
+  // window starts, the record is prior-period reporting surfacing on its
+  // publication date and is excluded from the incident pool.
+  const isPriorPeriod = (r: EnrichedIncident) => {
+    const end = statedPeriodEnd(`${r.title} ${r.summary ?? ""}`, win.end);
+    return end !== null && end.getTime() < win.start.getTime();
+  };
+  const confirmedIncidents = enriched
+    .filter((r) => isConfirmedOperationalIncident(r))
+    .filter((r) => !isPriorPeriod(r));
+  // THE canonical incident pool: one row per underlying real-world event,
+  // syndicated articles folded beneath as supporting sources. Every incident
+  // count, table and chart below reads from this — never from raw articles.
+  const canonicalIncidents = sortByDateDesc(foldCanonical(confirmedIncidents));
+  const articleCount = confirmedIncidents.length;
 
   // Chokepoint Watch, Vessel Attacks and Piracy / Armed Robbery are bounded to
   // the SAME report window as every other section. They previously used a
@@ -537,16 +652,22 @@ export function buildShippingReportDataset(
   // Chokepoint". Bab-el-Mandeb (or any chokepoint) is therefore never shown
   // as an affected chokepoint on the strength of an unconfirmed mention.
   const cpCounts = new Map<ChokepointKey, number>();
-  for (const r of enriched30) {
-    if (!isConfirmedOperationalIncident(r)) continue;
-    for (const cp of detectChokepoints(r)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
+  for (const r of canonicalIncidents) {
+    // Geography-vetoed chokepoint assignment: an incident with a known
+    // country only counts against a chokepoint that country actually
+    // borders, so an Indonesian seizure can never inflate Hormuz.
+    for (const cp of detectChokepointsScoped(r, r.incidentCountry)) cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
   }
   let topCp: ChokepointKey | "" = "", topCpN = 0;
   for (const [k, v] of cpCounts) if (v > topCpN) { topCpN = v; topCp = k; }
 
-  // Region counts (weekly window — drives Regional and Country View charts)
+  // Region counts — CANONICAL INCIDENTS, not raw articles. The regional and
+  // country charts previously counted every in-scope news record (hundreds),
+  // which read as if they were incidents alongside the confirmed count of a
+  // dozen. All three tiers are now explicit: articles → canonical incidents,
+  // and the charts count only the latter.
   const regionCounts = new Map<Region, number>();
-  for (const r of enriched) regionCounts.set(r.region, (regionCounts.get(r.region) ?? 0) + 1);
+  for (const r of canonicalIncidents) regionCounts.set(r.region, (regionCounts.get(r.region) ?? 0) + 1);
   let topRegion: Region | "" = "", topRegionN = 0;
   for (const [k, v] of regionCounts) {
     if (k === "Country not identified") continue;
@@ -564,7 +685,7 @@ export function buildShippingReportDataset(
   //      over softer boarding/approach activity so the section stops
   //      visually dominating the report on noisy cycles.
   const vesselAll: VesselRow[] = sortByDateDesc(
-    enriched30
+    canonicalIncidents
       .map((r) => ({ ...r, vesselType: classifyVesselIncident(r) as VesselIncidentType | null }))
       // The "Vessel Attacks" table is for confirmed hostile vessel
       // incidents only. A bare advisory ("Threat" — e.g. a UKMTO
@@ -579,7 +700,10 @@ export function buildShippingReportDataset(
       // social/handle sources before they reach the table or the prose.
       .filter((r) => !isLowCredibilitySource(r)),
   );
-  const vesselDeduped = dedupeByEventKey(dedupeByTitle(vesselAll));
+  // Canonical incidents are already event-folded (title, signature and
+  // theatre-cluster passes), so no further dedupe is applied here — one
+  // underlying event is one row by construction.
+  const vesselDeduped = vesselAll;
   const vesselHostile = vesselDeduped.filter(
     (r) => r.vesselType === "Attack" || r.vesselType === "Seized",
   );
@@ -603,17 +727,16 @@ export function buildShippingReportDataset(
   const vAttackSeize = vesselHostile.length;
 
   const piracyAll: PiracyRow[] = sortByDateDesc(
-    enriched30
-      .filter((r) => !isLowCredibilitySource(r))
+    canonicalIncidents
       .map((r) => ({ ...r, act: classifyPiracy(r) }))
       .filter((r): r is PiracyRow => r.act !== null),
   );
   const PIRACY_TABLE_CAP = 12;
-  const piracyRows: PiracyRow[] = dedupeByTitle(piracyAll).slice(0, PIRACY_TABLE_CAP);
+  const piracyRows: PiracyRow[] = piracyAll.slice(0, PIRACY_TABLE_CAP);
 
   // Highest Severity reads from the confirmed pool so the chip can never be
   // driven by an advisory/claim record the incident tables do not list.
-  const hsAll = highestSeverity(confirmedIncidents);
+  const hsAll = highestSeverity(canonicalIncidents);
   const latestDate = enriched.length > 0 ? dateMax(enriched.map((r) => r.date)) : null;
   // Latest Significant Incident must skip repatriation / crew-return /
   // social-handle / speculative-claim records so the headline can't be
@@ -629,8 +752,8 @@ export function buildShippingReportDataset(
   // never name a claim, threat, advisory or commentary item the table does
   // not also carry. If no confirmed event exists in the window, the card
   // reads "—" rather than falling back to rhetoric or a human-interest row.
-  const latestSig = sortByDateDesc(confirmedIncidents).find((r) => r.severity === "extreme" || r.severity === "high")
-    ?? sortByDateDesc(confirmedIncidents)[0]
+  const latestSig = canonicalIncidents.find((r) => r.severity === "extreme" || r.severity === "high")
+    ?? canonicalIncidents[0]
     ?? null;
 
   // Single, deduplicated Fast Facts grid (7 cards).
@@ -642,7 +765,15 @@ export function buildShippingReportDataset(
     // which dwarfed the visible tables (2 vessel attacks, 0 piracy, 2
     // chokepoint) and collided with the broad "Records by …" charts that use
     // the same word. Distinct label + confirmed count removes both clashes.
-    { label: "Confirmed Incidents", value: String(confirmedIncidents.length) },
+    {
+      label: "Confirmed Incidents",
+      value: String(canonicalIncidents.length),
+      // Make the articles-vs-incidents relationship explicit on the card
+      // itself, so no reader can mistake report volume for incident count.
+      note: articleCount > canonicalIncidents.length
+        ? `Deduplicated from ${articleCount} confirmed reports`
+        : undefined,
+    },
     { label: "Highest Severity", value: hsAll.label, severity: hsAll.key || undefined },
     {
       label: "Main Affected Chokepoint",
@@ -680,9 +811,8 @@ export function buildShippingReportDataset(
     // repatriation / social-handle / speculative-claim record. Page rows
     // are built the same way (cleanEnriched) — the two surfaces must
     // agree.
-    const credible = enriched30
-      .filter((r) => detectChokepoints(r).includes(cp))
-      .filter((r) => isConfirmedOperationalIncident(r));
+    const credible = canonicalIncidents
+      .filter((r) => detectChokepointsScoped(r, r.incidentCountry).includes(cp));
     const hs = highestSeverity(credible);
     const credibleSorted = sortByDateDesc(credible);
     const credibleLatest = credibleSorted[0] ?? null;
@@ -759,7 +889,13 @@ export function buildShippingReportDataset(
 
   // Commercial Impact Read — leads with the operational reason the
   // commercial pressure shows up, before the table of records.
-  const commercialImpactRead = buildCommercialImpactRead(commercialRecords);
+  const commercialImpactRead = buildCommercialImpactRead(
+    commercialRecords,
+    // Cross-signal so an empty commercial table can never claim "no
+    // disruption" while the vessel/chokepoint sections above report attacks
+    // and rerouting pressure in the same window.
+    vesselHostile.length > 0 || cpRanked.length > 0,
+  );
 
   // Region rows in fixed order — "Country not identified" is intentionally
   // excluded from the regional comparison chart so location-unknown records
@@ -774,7 +910,7 @@ export function buildShippingReportDataset(
 
   // Country rows (top 12), only identified countries
   const countryMap = new Map<string, number>();
-  for (const r of enriched) {
+  for (const r of canonicalIncidents) {
     if (r.incidentCountry === null) continue;
     countryMap.set(r.incidentCountry, (countryMap.get(r.incidentCountry) ?? 0) + 1);
   }
@@ -811,7 +947,7 @@ export function buildShippingReportDataset(
   // table is guaranteed to carry the same incident the headline card names —
   // the two surfaces can never disagree. Both seeds are confirmed-operational
   // by construction, and prioritiseRelated dedupes any overlap.
-  const relatedIncidents = prioritiseRelated(enriched, [latestSig, vesselThreatSeed]);
+  const relatedIncidents = prioritiseRelated(canonicalIncidents, [latestSig, vesselThreatSeed]);
 
   // Shipping-specific auto-prose for the four analyst sections. Editor
   // text takes precedence in the exporter and preview; these fallbacks
@@ -838,17 +974,22 @@ export function buildShippingReportDataset(
   // never counted as incident country. The placeholder label is an
   // internal classification only and is intentionally NOT surfaced here.
   const locNote = locationNotIdentifiedCount > 0
-    ? `${locationNotIdentifiedCount} report${locationNotIdentifiedCount === 1 ? "" : "s"} this week could not be tied to a specific country, so ${locationNotIdentifiedCount === 1 ? "it is" : "they are"} left off the country and regional charts to keep the geographic picture accurate. A vessel's flag is never treated as the location of an incident.`
+    ? `${locationNotIdentifiedCount} incident${locationNotIdentifiedCount === 1 ? "" : "s"} this week could not be tied to a specific country, so ${locationNotIdentifiedCount === 1 ? "it is" : "they are"} left off the country and regional charts to keep the geographic picture accurate. A vessel's flag is never treated as the location of an incident.`
     : `A vessel's flag is never treated as the location of an incident.`;
+  // Make the counting basis explicit: articles are collapsed into incidents,
+  // and every count, table and chart in this report uses the incident level.
+  const basisNote = `This report distinguishes news articles from incidents: ${articleCount} confirmed report${articleCount === 1 ? "" : "s"} in the window ${articleCount === 1 ? "describes" : "describe"} ${canonicalIncidents.length} distinct incident${canonicalIncidents.length === 1 ? "" : "s"} after duplicate coverage of the same event is collapsed. All counts, tables and charts use the incident level; duplicate articles are kept only as supporting sources.`;
   const dataNote = outOfScopeCount > 0
-    ? `${outOfScopeCount} shipping report${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East fall outside this report and are not included here. ${locNote}`
-    : locNote;
+    ? `${basisNote} ${outOfScopeCount} shipping report${outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East fall outside this report and are not included here. ${locNote}`
+    : `${basisNote} ${locNote}`;
 
   return {
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: `Reporting period: ${win.label}`,
     thirtyDayShortLabel,
     enriched,
+    canonicalIncidents,
+    articleCount,
     outOfScopeCount,
     fastFacts,
     locationNotIdentifiedCount,
@@ -993,9 +1134,18 @@ function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const vesselThreat30 = ctx.vesselHostile.length + ctx.piracyRows.length;
   const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
 
-  const para1Pressure = cp
-    ? `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.`
-    : `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.`;
+  // Name every chokepoint the report rates High or Extreme, so this closing
+  // judgement can never read "risk is low everywhere" while the front of the
+  // report carries an Extreme rating for the Red Sea (owner-flagged
+  // contradiction). The bottom line must own the same ratings.
+  const elevated = ctx.cpRanked.filter(
+    (r) => r.highestSeverityKey === "high" || r.highestSeverityKey === "extreme",
+  );
+  const elevatedLine = elevated.length > 0
+    ? ` This week's confirmed incidents put ${joinList(elevated.map((r) => `${r.name} at ${r.highestSeverityLabel}`))} — the routes where that risk is live now, not background.`
+    : "";
+
+  const para1Pressure = `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.${elevatedLine}`;
   const para1Vessel = vesselThreat30 > 0
     ? ` The threat to ships — recent attacks, seizures, and piracy or armed robbery — still matters. A quiet spell in this region is normal, not a sign things have improved, so it is better read as a gap in reporting than as a lasting easing.`
     : ` Activity against ships is limited this week, but the threat still matters: these same routes have not been clear for long, so a quiet spell is better read as background noise than as a lasting easing.`;
@@ -1214,8 +1364,17 @@ function buildVesselPiracyRead(opts: {
   return `${vesselSegment} ${piracySegment}\n\n${watch}`;
 }
 
-function buildCommercialImpactRead(commercialRecords: EnrichedIncident[]): string {
+function buildCommercialImpactRead(
+  commercialRecords: EnrichedIncident[],
+  hasUpstreamDisruption: boolean,
+): string {
   if (commercialRecords.length === 0) {
+    // Never claim "no disruption" while the vessel / chokepoint sections in
+    // the SAME report describe attacks or rerouting pressure — that reads as
+    // a contradiction. Say precisely what this section measures instead.
+    if (hasUpstreamDisruption) {
+      return `No record this week met this section's bar for a confirmed commercial impact — a specific port closure, schedule change, or a war-risk or insurance move tied to a named route. That is narrower than the security picture above: the attack and chokepoint pressure described earlier normally takes one to two weeks to show up here as premium changes and surcharges, so expect this section to fill in if that pressure continues.\n\nKeep an eye on new port advisories, schedule delays at the major container and tanker hubs, and any insurance changes tied to specific routes. These are the next signs that commercial pressure is building.`;
+    }
     return `No port, freight, insurance or commercial shipping disruption was reported this week. General market news — new ship orders, vessel sales, fleet finance, earnings, share-price moves — is deliberately left out of this section, so a quiet week here means real disruption was genuinely low rather than simply unreported.\n\nKeep an eye on new port advisories, schedule delays at the major container and tanker hubs, and any insurance changes tied to specific routes. These are the next signs that commercial pressure is building.`;
   }
   const n = commercialRecords.length;

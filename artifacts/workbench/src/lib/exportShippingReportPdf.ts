@@ -806,9 +806,6 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     movementSnapshot,
     chokepointCards,
     confirmedIncidents,
-    keyRiskIndicators,
-    businessImpact,
-    watchNext,
   } = board;
 
   drawSectionHeading(ctx, "Maritime Intelligence");
@@ -902,17 +899,13 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     );
   }
 
-  // Polestar View — Assessment / Business impact / Confidence / Watch next.
-  drawSubtitle(ctx, "Polestar View");
-  renderProse(ctx, risk.rationale);
-  drawMiniBullets(ctx, keyRiskIndicators);
-  renderProse(ctx, `Business impact: ${businessImpact.join("; ")}.`);
+  // The board's internal Polestar View / Watch Next block is NOT rendered in
+  // the report — the report carries exactly one Polestar View and one Watch
+  // Next (the standalone sections). Mirrors the preview byte-for-byte.
   renderProse(
     ctx,
-    `Confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}.`,
+    `Assessment confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}. ${risk.rationale}`,
   );
-  renderProse(ctx, "Watch next:");
-  drawMiniBullets(ctx, watchNext);
 }
 
 // Exporter ------------------------------------------------------------------
@@ -1085,7 +1078,7 @@ export async function exportShippingReportPdf(
       "Regional and Country View",
       pickRead(data.regionalCountryRead, ds.regionalCountryRead),
     );
-    drawHorizontalBarChart(ctx, "Records by Region", ds.regionRows, {
+    drawHorizontalBarChart(ctx, "Incidents by Region", ds.regionRows, {
       labelW: 160,
       emptyMessage: "No regional classifications reported this week.",
     });
