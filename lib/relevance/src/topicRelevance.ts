@@ -390,6 +390,14 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\|\s*photos?\s*\|/,
   /\(\s*photos?\s*\)/,
   /\b(in|look)\s+photos:\s/,
+  // "Best photos of August 6: Hiroshima anniversary … to Imran Khan protest"
+  // — daily photo-roundup wires sweep many countries into one caption, so
+  // whatever country they get stamped with is wrong and the actor words
+  // ("Imran", "protest") mislabel the lead event. A picture set is never an
+  // incident report.
+  /\b(best|top) (photos?|pictures?|images?) of\b/,
+  /\bphotos? of the (day|week)\b/,
+  /\b(day|week) in (photos?|pictures?)\b/,
 
   // Business "strike a deal" — commercial agreement, not industrial action.
   /\bstrik(e|es|ing) (a |the |an |new |fresh |landmark |historic )?(deal|agreement|accord|pact|partnership|bargain|alliance|truce)\b/,
@@ -453,6 +461,9 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   /\|\s*photos?\s*\|/,
   /\(\s*photos?\s*\)/,
   /\b(in|look)\s+photos:\s/,
+  /\b(best|top) (photos?|pictures?|images?) of\b/,
+  /\bphotos? of the (day|week)\b/,
+  /\b(day|week) in (photos?|pictures?)\b/,
   /\b(sports? betting|betting (deal|firm|operator|platform|app|site|partner|sponsor|licen[sc]e|market|odds)|arenaplus|bookmaker|sportsbook|wagering|i?gaming|online casino|pagcor)\b/,
   /\bnot (a |an )?(protest|rally|riot|demonstration|march)\b/,
   // Staged law-enforcement SHOWCASE demonstration — "Drug Smuggling Crackdown

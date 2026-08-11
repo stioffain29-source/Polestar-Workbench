@@ -6,6 +6,7 @@ description: Classes of records the classifier accepts on surface keywords but w
 The Flashpoint topic classifier is intentionally permissive on surface vocabulary (protest, strike, rally, curfew) because it is the single gate into the entire report. The downstream prose builders and Related Incidents must apply a second, stricter filter for *operational* signal. The recurring noise classes are:
 
 - Stock-photo wire captions ("Licensable picture: ... — Reuters Connect", Getty / Alamy / EPA-EFE).
+- Daily photo-roundup galleries ("Best photos of August 6: Hiroshima anniversary in Japan to Imran Khan protest in Pakistan", "Photos of the week: …") — now hard-excluded at RELEVANCE level (both FLASHPOINT_EXCLUDE and FLASHPOINT_TITLE_HARD_EXCLUDE). They sweep many countries into one caption, so the stamped country is arbitrary and actor words (Imran → "PTI street mobilisation") mislabel the lead event.
 - Sports-media protests (French Open prize money, ATP, NBA, etc.). Players-vs-league disputes are not public-order risk.
 - Strikes / rallies that have been *suspended, called off, cancelled, withdrawn, postponed* — the live signal is gone.
 - Retrospective legal process about a past public-order event (SK martial-law trials, perjury sentencings, "ex-spy chief denies allegations", anniversary commentary). Civil unrest must mean *live* public-order risk.
