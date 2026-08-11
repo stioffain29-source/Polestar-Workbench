@@ -28,3 +28,11 @@ severity-demote hedge.
 prose agree. Preview==PDF is free because both render PngCountryReportBody.
 Owner-gated UI can't be e2e'd (Replit Auth vs Clerk harness) — verify via
 renderToStaticMarkup + route round-trip + headless font audit.
+
+## Top 3 Developments curation (Aug 2026)
+- `top3PinnedIds` / `top3ExcludedIds` / `severityOverrides` on CountryReportSectionOverrides. Pins lead the section in pin order; a section exclude drops the auto pick from Top 3 ONLY (falls back to Incident Details, unlike report-wide excludedIncidentIds).
+- `severityOverrides` sets an EXACT tier either direction (owner-requested, supersedes the demote-only rule for analyst-explicit acts) and wins over severityDemotions.
+- Curation applies in buildStructuredReportDataset at BOTH the initial topThree selection AND after the engine replacement path; the final topThree is then RECONCILED against the bucket/strand/incidentDetails arrays (removal-only prune) so nothing renders twice.
+- Renderers (body + headless) render the WHOLE dataset topThree (no slice(0,3)) — the dataset caps autos at max(3, pinned count); >3 only with explicit pins.
+- Headless exportCountryReportPdf loads section_overrides and applies applyIncidentCurations + top3Curation for audit fidelity.
+- **Trap:** the preview builder args live in the pngDataset useMemo in CountryReport.tsx — wiring the headless path but not that memo makes the UI dead while PDFs curate (caught by review once).
