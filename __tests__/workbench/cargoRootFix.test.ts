@@ -188,11 +188,11 @@ describe("weekly matrix labels — clipped to the report window", () => {
     const model = buildCargoPatternModel(rows, { issueDate: "2026-06-24" });
     expect(model.activity.weeks.length).toBeGreaterThan(0);
     const last = model.activity.weeks[model.activity.weeks.length - 1];
-    // Range format "22 Jun–24 Jun" (en-dash), clipped to the 24 Jun issue date —
-    // never the natural Sunday week-end (28 Jun).
+    // Range format "22 Jun–24 Jun*" (en-dash; * marks a partial week clipped to
+    // the issue date) — never the natural Sunday week-end (28 Jun).
     expect(last.label).toContain("24 Jun");
     expect(last.label).not.toContain("28 Jun");
-    expect(last.label).toMatch(/^\d{1,2} \w{3}(\u2013\d{1,2} \w{3})?$/);
+    expect(last.label).toMatch(/^\d{1,2} \w{3}(\u2013\d{1,2} \w{3})?\*?$/);
   });
 });
 

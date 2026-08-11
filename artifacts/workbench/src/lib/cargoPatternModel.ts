@@ -15,6 +15,7 @@ import {
   classifyCargoCategory,
   parseUsdLoss,
   cargoCountry,
+  cargoCountriesFor,
   isCargoRelatedIncident,
   IN_SCOPE_COUNTRIES,
   type CargoIncidentLike,
@@ -96,8 +97,11 @@ export interface CargoPatternCard {
   count: number;
   sharePct: number;
   primaryGeography: string | null;
+  /** Modal severity among members — used on pattern chips / prose. */
   highestSeverityKey: string;
   highestSeverityLabel: string;
+  /** Peak severity among members — used only for pattern-card qualification. */
+  peakSeverityKey: string;
   operationalConcern: string;
   controlAffected: string[];
   watchNext: string;
@@ -817,10 +821,14 @@ function collapseSyndicatedClusters(
 }
 
 function topCountry(primaries: CargoClusterInput[]): string | null {
+  // Same multi-country resolver as the map, Security Read and Country Breakdown
+  // so pattern geography and executive summary cannot contradict route-side prose
+  // by counting only the first stored country token.
   const counts = new Map<string, number>();
   for (const p of primaries) {
-    const c = cargoCountry(toIncidentLike(p));
-    if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+    for (const c of cargoCountriesFor(toIncidentLike(p))) {
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
   }
   let best: string | null = null;
   let bestN = 0;
@@ -831,6 +839,31 @@ function topCountry(primaries: CargoClusterInput[]): string | null {
     }
   }
   return best;
+}
+
+/** Modal severity among members; unknown/blank tiers are ignored. */
+function modalSeverity(primaries: CargoClusterInput[]): {
+  key: string | null;
+  label: string;
+} {
+  const sevCount = new Map<string, number>();
+  for (const p of primaries) {
+    const k = severityKeyOf(p);
+    if (!k || !(k in SEV_RANK)) continue;
+    sevCount.set(k, (sevCount.get(k) ?? 0) + 1);
+  }
+  let key: string | null = null;
+  let bestN = -1;
+  for (const [k, n] of sevCount) {
+    if (
+      n > bestN ||
+      (n === bestN && (SEV_RANK[k] ?? 0) > (SEV_RANK[key ?? ""] ?? 0))
+    ) {
+      bestN = n;
+      key = k;
+    }
+  }
+  return { key, label: key ? (SEV_LABEL[key] ?? key) : "—" };
 }
 
 // Per-cluster raw operational-consequence score (documented weights in
@@ -944,7 +977,7 @@ export function buildCargoPatternModel(
     country: p.country ?? null,
     occurredAt: p.occurredAt,
   }));
-  const extras = buildCargoReportExtras(choroInput);
+  const extras = buildCargoReportExtras(choroInput, issueDate);
   const intensity = buildCargoCountryIntensity(choroInput);
 
   // 3. Repeat-route/facility signal for the consequence score: any country that
@@ -991,6 +1024,12 @@ export function buildCargoPatternModel(
     const members = derived.filter((d) => d.stage === key);
     const meta = STAGE_META[key];
     const hs = highestSeverity(members.map((m) => m.primary));
+    const modal = modalSeverity(members.map((m) => m.primary));
+    // Prefer modal for the stage chip when members exist; fall back to peak.
+    // Never invent High for blank/unknown severity.
+    const sevKeyOut = modal.key ?? hs.key;
+    const sevLabelOut =
+      modal.label !== "—" ? modal.label : hs.label;
     return {
       key,
       label: meta.label,
@@ -999,8 +1038,8 @@ export function buildCargoPatternModel(
         totalUnique > 0
           ? Math.round((members.length / totalUnique) * 100)
           : 0,
-      highestSeverityKey: hs.key,
-      highestSeverityLabel: hs.label,
+      highestSeverityKey: sevKeyOut,
+      highestSeverityLabel: sevLabelOut,
       mainCountry: topCountry(members.map((m) => m.primary)),
       primaryConcern: meta.primaryConcern,
     };
@@ -1034,10 +1073,21 @@ export function buildCargoPatternModel(
           (a[0] === canonicalStage ? -1 : b[0] === canonicalStage ? 1 : 0),
       )[0][0];
       const meta = STAGE_META[stage];
-      const hs = highestSeverity(members.map((m) => m.primary));
+      // Display the MODAL severity so pattern chips agree with the executive
+      // summary's "predominantly Moderate" read. Peak High still qualifies the
+      // card via PATTERN_SEVERITY_FLOOR below.
+      const modal = modalSeverity(members.map((m) => m.primary));
+      const peak = highestSeverity(members.map((m) => m.primary));
       const consequenceMean =
         members.reduce((s, m) => s + m.consequence, 0) / members.length;
       const geo = topCountry(members.map((m) => m.primary));
+      const controls = meta.controlAffected;
+      // Specific watch line: corridor/country + cargo category, not a bare
+      // stage template.
+      const watchBase = meta.watchNext;
+      const watchNext = geo
+        ? `${watchBase.replace(/\.$/, "")} on ${category.toLowerCase()} corridors in ${geo}.`
+        : `${watchBase.replace(/\.$/, "")} for ${category.toLowerCase()}.`;
       return {
         id: `pattern-${stage}-${category}`.replace(/\s+/g, "-").toLowerCase(),
         name: category,
@@ -1048,13 +1098,12 @@ export function buildCargoPatternModel(
             ? Math.round((members.length / totalUnique) * 100)
             : 0,
         primaryGeography: geo,
-        highestSeverityKey: hs.key ?? "low",
-        highestSeverityLabel: hs.label,
+        highestSeverityKey: modal.key ?? peak.key ?? "moderate",
+        highestSeverityLabel: modal.label !== "—" ? modal.label : peak.label,
+        peakSeverityKey: peak.key ?? modal.key ?? "moderate",
         operationalConcern: meta.primaryConcern,
-        controlAffected: meta.controlAffected,
-        watchNext: geo
-          ? `${meta.watchNext} Focus: ${geo}.`
-          : meta.watchNext,
+        controlAffected: controls,
+        watchNext,
         frequency: members.length,
         consequenceMean,
         significance: consequenceMean * members.length,
@@ -1069,7 +1118,7 @@ export function buildCargoPatternModel(
     .filter(
       (p) =>
         p.count >= MIN_PATTERN_INCIDENTS ||
-        (SEV_RANK[p.highestSeverityKey] ?? 0) >= PATTERN_SEVERITY_FLOOR,
+        (SEV_RANK[p.peakSeverityKey] ?? 0) >= PATTERN_SEVERITY_FLOOR,
     )
     .sort((a, b) => b.significance - a.significance)
     .slice(0, MAX_PATTERN_CARDS);
@@ -1091,30 +1140,31 @@ export function buildCargoPatternModel(
 
   // Column labels are CLIPPED to the report window [window.start, issueDate] so a
   // Monday-anchored week never advertises days outside the reporting period
-  // (spec pt4). The label change is DISPLAY-only — bucketing still keys on the
-  // Monday ISO `key`, so weeklyTotals/unconfirmedTotal reconciliation with
-  // totalUnique is unchanged.
+  // (spec pt4). Partial weeks (first/last week truncated to the window) are
+  // marked so the matrix cannot look like a full calendar week. Bucketing still
+  // keys on the Monday ISO `key`.
   const win = resolveReportWindow("cargo_watch", issueDate);
   const winStartMs = win.start.getTime();
   const winEndMs = win.end.getTime();
   const weekRangeLabel = (weekStart: Date): string => {
     const weekEnd = addDays(weekStart, 6);
-    const dispStart =
-      weekStart.getTime() < winStartMs ? win.start : weekStart;
-    const dispEnd = weekEnd.getTime() > winEndMs ? win.end : weekEnd;
+    const clippedStart = weekStart.getTime() < winStartMs;
+    const clippedEnd = weekEnd.getTime() > winEndMs;
+    const dispStart = clippedStart ? win.start : weekStart;
+    const dispEnd = clippedEnd ? win.end : weekEnd;
     const a = format(dispStart, "d MMM");
     const b = format(dispEnd, "d MMM");
-    return a === b ? a : `${a}\u2013${b}`;
+    const range = a === b ? a : `${a}\u2013${b}`;
+    return clippedStart || clippedEnd ? `${range}*` : range;
   };
 
   const weeks: CargoActivityWeek[] = [];
   const weekPos = new Map<string, number>();
   if (datedDerived.length > 0) {
-    const times = datedDerived.map((x) => x.date.getTime());
-    let cursor = startOfWeek(new Date(Math.min(...times)), { weekStartsOn: 1 });
-    const lastStart = startOfWeek(new Date(Math.max(...times)), {
-      weekStartsOn: 1,
-    });
+    // Anchor columns to the REPORT WINDOW Mondays (not the first/last incident)
+    // so the matrix cannot advertise weeks that start before the period label.
+    let cursor = startOfWeek(win.start, { weekStartsOn: 1 });
+    const lastStart = startOfWeek(win.end, { weekStartsOn: 1 });
     while (
       cursor.getTime() <= lastStart.getTime() &&
       weeks.length < ACTIVITY_MATRIX_MAX_WEEKS
@@ -1626,16 +1676,17 @@ function buildAssessment(
         : "";
 
   const situation = leadStage
-    ? `Cargo exposure this period was led by ${leadStage.label.toLowerCase()} activity${geoPhrase}${patternClause}.${limitNote}`
-    : `Cargo exposure this period is spread across the supply chain${geoPhrase}${patternClause}.${limitNote}`;
+    ? `Reported events this period fell mainly in ${leadStage.label.toLowerCase()}${geoPhrase}${patternClause}.${limitNote}`
+    : `Reported events this period were spread across the supply chain${geoPhrase}${patternClause}.${limitNote}`;
 
-  // WHAT MATTERS — three evidence-based findings, each stating a pattern AND why
-  // it matters to a named audience (spec pt4). No incident counts in prose.
+  // WHAT MATTERS — three evidence-based findings focused on AUDIENCE impact,
+  // not a re-statement of the Situation's stage/country lead.
   const audiences = ["cargo owners", "logistics operators", "security teams"];
   const whatMatters: string[] = patterns.slice(0, 3).map((p, i) => {
-    const where = p.primaryGeography ? ` centred on ${p.primaryGeography}` : "";
+    const where = p.primaryGeography ? ` in ${p.primaryGeography}` : "";
     const who = audiences[i % audiences.length];
-    return `${p.name}${where}: this matters because it directly stresses ${p.operationalConcern.toLowerCase()}, raising exposure for ${who}.`;
+    const control = p.controlAffected[0]?.toLowerCase() ?? "custody controls";
+    return `${p.name}${where} is stressing ${control}, which raises near-term loss and delay exposure for ${who}.`;
   });
 
   // IMPLICATIONS — up to three practical implications, each tied to a SPECIFIC
@@ -1653,14 +1704,27 @@ function buildAssessment(
   for (const row of implicationRows.slice(0, 3)) {
     const st = stageForIncident(row.category, `${row.category} ${row.summary}`);
     const stageLabel = (STAGE_META[st]?.label ?? "supply-chain").toLowerCase();
+    const controls = (STAGE_META[st]?.controlAffected ?? []).slice(0, 2);
     const cat = row.category.toLowerCase();
     const where = row.country
       ? ` in ${row.country}`
       : row.location
         ? ` at ${row.location}`
         : "";
+    const controlClause =
+      controls.length >= 2
+        ? `Prioritise ${controls[0].toLowerCase()} and ${controls[1].toLowerCase()}`
+        : controls.length === 1
+          ? `Prioritise ${controls[0].toLowerCase()}`
+          : `Tighten controls`;
+    const windowHint =
+      st === "inland_transport"
+        ? " on night and early-morning runs"
+        : st === "warehouse_depot"
+          ? " on after-hours shifts"
+          : "";
     implications.push(
-      `The reported ${cat}${where} confirms ${stageLabel} as a live exposure point for affected consignments.`,
+      `${controlClause} for ${cat}${where}${windowHint}; the case confirms ${stageLabel} as a live exposure point for affected consignments.`,
     );
     implicationIncidentIds.push(row.id);
   }
@@ -1752,14 +1816,18 @@ function buildPolestarView(args: {
   const modalLabel = (SEV_LABEL[modalKey] ?? modalKey).toLowerCase();
 
   const confidenceWord =
-    totalUnique < 5 ? "low" : totalUnique < 12 ? "moderate" : "moderate to high";
+    totalUnique < 5 ? "low" : totalUnique < 12 ? "moderate" : "moderate";
+  const confidenceBasis =
+    totalUnique < 5
+      ? "reflecting thin open-source coverage and limited enrichment"
+      : "reflecting open-source volume that is often single-source rather than independently corroborated, plus enrichment gaps";
 
-  const judgement = `Cargo-security exposure this period is ${leadStage ? `${leadStage.label.toLowerCase()}-led` : "diffuse"}${geo ? ` and concentrated around ${geo}` : ""}, and most consistent with opportunistic, financially motivated theft, not a coordinated or politically driven campaign.`;
-  const supports = `The data supports a picture of ${patternsPhrase} affecting ${stagePhrase}, with ${modalLabel} severity most common and losses on cargo owners and logistics providers.`;
-  const notSupport = `It does not support claims of an organised cross-border network, a confirmed insider or seal-compromise dimension, or a statistically meaningful surge, none of which the records establish.`;
-  const limits = `Reporting is drawn from open sources with only partial enrichment: loss values, cargo types and movement stage are frequently unstated, so totals and shares are indicative, not exhaustive.`;
-  const outlook = `In the near term, further ${leadStage ? leadStage.label.toLowerCase() : "cargo-security"} incidents of a similar character are likely${geo ? ` in and around ${geo}` : ""}, absent a change in local enforcement or operators' own measures.`;
-  const confidence = `Overall analytical confidence is ${confidenceWord}, reflecting corroborating volume against open-source and enrichment limitations.`;
+  const judgement = `The standing judgement is that reported cargo crime this period remains opportunistic and financially motivated${geo ? `, with the clearest pressure around ${geo}` : ""}, not a coordinated or politically driven campaign.`;
+  const supports = `What the records support is ${patternsPhrase} affecting ${stagePhrase}, with ${modalLabel} severity the most common outcome for cargo owners and logistics providers.`;
+  const notSupport = `They do not establish an organised cross-border network, a confirmed insider or seal-compromise campaign, or a statistically meaningful surge.`;
+  const limits = `Open-source reporting and enrichment remain partial: loss values, cargo types and movement stage are frequently unstated, so totals and shares are indicative, not exhaustive.`;
+  const outlook = `Near-term outlook: further ${leadStage ? leadStage.label.toLowerCase() : "cargo-security"} incidents of a similar character are likely${geo ? ` in and around ${geo}` : ""}, absent a change in local enforcement or operators' own measures.`;
+  const confidence = `Overall analytical confidence is ${confidenceWord}, ${confidenceBasis}.`;
 
   return `${judgement} ${supports} ${notSupport} ${limits} ${outlook} ${confidence}`;
 }

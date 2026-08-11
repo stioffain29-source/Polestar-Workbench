@@ -9,13 +9,14 @@
 //  - The commodity card never reads "Other" — mostStolenCommodity collapses
 //    that to "General Cargo".
 
-import { startOfWeek, addWeeks, parseISO, isValid, format } from "date-fns";
+import { startOfWeek, addWeeks, addDays, parseISO, isValid, format } from "date-fns";
 import {
   classifyCategory,
   mostStolenCommodity,
   totalUsdLoss,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
+import { resolveReportWindow } from "./reportWindow";
 
 export interface CargoReportIncident extends CargoIncidentLike {
   occurredAt: string;
@@ -25,6 +26,10 @@ export interface CargoTrendPoint {
   /** ISO date of the week-start (Monday). */
   date: string;
   count: number;
+  /** True when the labelled week is clipped to the report window (partial week). */
+  partial?: boolean;
+  /** Display range clipped to the report window, e.g. "12 Jul–13 Jul*". */
+  label?: string;
 }
 
 export interface CargoReportExtras {
@@ -36,22 +41,36 @@ export interface CargoReportExtras {
 }
 
 // Bucket in-window cargo incidents into contiguous weekly bins (Monday-start)
-// from the first to the last incident week. Empty intervening weeks are kept
-// at zero so the trend line/bars read as a true time series, not a sparse plot.
-function buildWeeklyTrend(incidents: CargoReportIncident[]): CargoTrendPoint[] {
+// clipped to the Cargo Watch report window so the trend caption cannot claim
+// days before the reporting period starts. Empty intervening weeks stay at
+// zero. Partial first/last weeks are flagged.
+function buildWeeklyTrend(
+  incidents: CargoReportIncident[],
+  issueDate?: string,
+): CargoTrendPoint[] {
   const dates = incidents
     .map((i) => parseISO(i.occurredAt))
     .filter((d) => isValid(d));
   if (dates.length === 0) return [];
 
   const times = dates.map((d) => d.getTime());
-  const first = startOfWeek(new Date(Math.min(...times)), { weekStartsOn: 1 });
-  const last = startOfWeek(new Date(Math.max(...times)), { weekStartsOn: 1 });
+  let first = startOfWeek(new Date(Math.min(...times)), { weekStartsOn: 1 });
+  let last = startOfWeek(new Date(Math.max(...times)), { weekStartsOn: 1 });
+  let winStart: Date | null = null;
+  let winEnd: Date | null = null;
+  if (issueDate) {
+    const win = resolveReportWindow("cargo_watch", issueDate);
+    winStart = win.start;
+    winEnd = win.end;
+    const winFirst = startOfWeek(win.start, { weekStartsOn: 1 });
+    const winLast = startOfWeek(win.end, { weekStartsOn: 1 });
+    if (first.getTime() < winFirst.getTime()) first = winFirst;
+    if (last.getTime() > winLast.getTime()) last = winLast;
+  }
 
   const buckets = new Map<string, number>();
   const keys: string[] = [];
   let cur = first;
-  // Cap at 26 weeks as a defensive guard against a stray far-future date.
   while (cur.getTime() <= last.getTime() && keys.length < 26) {
     const key = format(cur, "yyyy-MM-dd");
     buckets.set(key, 0);
@@ -64,11 +83,36 @@ function buildWeeklyTrend(incidents: CargoReportIncident[]): CargoTrendPoint[] {
     if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
 
-  return keys.map((k) => ({ date: k, count: buckets.get(k) ?? 0 }));
+  return keys.map((k) => {
+    const weekStart = parseISO(k);
+    const weekEnd = addDays(weekStart, 6);
+    let partial = false;
+    let label = format(weekStart, "dd MMM");
+    if (winStart && winEnd) {
+      const clippedStart =
+        weekStart.getTime() < winStart.getTime() ? winStart : weekStart;
+      const clippedEnd =
+        weekEnd.getTime() > winEnd.getTime() ? winEnd : weekEnd;
+      partial =
+        weekStart.getTime() < winStart.getTime() ||
+        weekEnd.getTime() > winEnd.getTime();
+      const a = format(clippedStart, "dd MMM");
+      const b = format(clippedEnd, "dd MMM");
+      label = a === b ? a : `${a}\u2013${b}`;
+      if (partial) label = `${label}*`;
+    }
+    return {
+      date: k,
+      count: buckets.get(k) ?? 0,
+      partial,
+      label,
+    };
+  });
 }
 
 export function buildCargoReportExtras(
   incidents: CargoReportIncident[],
+  issueDate?: string,
 ): CargoReportExtras {
   const usd = totalUsdLoss(incidents);
   const commodity = mostStolenCommodity(incidents);
@@ -78,7 +122,7 @@ export function buildCargoReportExtras(
       if (classifyCategory(i) === commodity) commodityCount += 1;
     }
   }
-  const trend = buildWeeklyTrend(incidents);
+  const trend = buildWeeklyTrend(incidents, issueDate);
   return { usd, commodity, commodityCount, trend };
 }
 

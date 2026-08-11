@@ -18,9 +18,10 @@ export interface CargoTrendChartProps {
   data?: CargoTrendPoint[] | null;
 }
 
-function formatWeek(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
+function formatWeek(point: CargoTrendPoint): string {
+  if (point.label) return point.label;
+  const d = new Date(point.date);
+  if (isNaN(d.getTime())) return point.date;
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const day = d.getUTCDate().toString().padStart(2, "0");
   return `${day} ${months[d.getUTCMonth()]}`;
@@ -49,6 +50,10 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
   const labelIdx = data.length <= 6
     ? data.map((_, i) => i)
     : [0, Math.floor((data.length - 1) / 3), Math.floor((2 * (data.length - 1)) / 3), data.length - 1];
+
+  const hasPartial = data.some((d) => d.partial);
+  const firstLabel = formatWeek(data[0]);
+  const lastLabel = formatWeek(data[data.length - 1]);
 
   return (
     <div style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}>
@@ -90,7 +95,7 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
         {/* X-axis week labels */}
         {labelIdx.map((i) => (
           <text key={i} x={xAt(i)} y={H - padB + 14} fontSize={10} fill={DUSK} textAnchor="middle">
-            {formatWeek(data[i].date)}
+            {formatWeek(data[i])}
           </text>
         ))}
       </svg>
@@ -98,7 +103,10 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           room this last caption line has its descenders sheared in the PDF
           rasterisation. Component-level so preview==PDF. */}
       <div style={{ fontSize: 11, marginTop: 6, paddingBottom: 6, lineHeight: 1.35 }}>
-        In-scope cargo incidents per week, {formatWeek(data[0].date)} to {formatWeek(data[data.length - 1].date)}.
+        In-scope cargo incidents per week, {firstLabel} to {lastLabel}.
+        {hasPartial
+          ? " Weeks marked * are partial (clipped to the reporting period)."
+          : ""}
       </div>
     </div>
   );

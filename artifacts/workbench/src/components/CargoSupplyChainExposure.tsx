@@ -29,7 +29,16 @@ export default function CargoSupplyChainExposure({
 }: CargoSupplyChainExposureProps) {
   // The "unattributed" bucket is not a physical movement position, so it is
   // lifted out of the numbered flow into its own box below.
-  const physical = stages.filter((s) => s.key !== "unattributed");
+  // Hide empty maritime / inland-waterway rows — they consume space without
+  // signal on a land/warehouse-focused report. Other zero stages stay muted.
+  const physical = stages.filter(
+    (s) =>
+      s.key !== "unattributed" &&
+      !(
+        (s.key === "maritime" || s.key === "inland_waterway") &&
+        s.count === 0
+      ),
+  );
   const unattributed = stages.find((s) => s.key === "unattributed") ?? null;
   const last = physical.length - 1;
 
