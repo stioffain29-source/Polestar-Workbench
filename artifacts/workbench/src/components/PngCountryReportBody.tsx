@@ -410,6 +410,12 @@ export default function PngCountryReportBody({
     prose?: Partial<
       Record<"bluf" | "executiveSummary" | "outlook" | "polestarView", ReactNode>
     >;
+    // Top 3 Developments curation chrome: per-card controls (remove from the
+    // section, set severity) rendered inside each tile, and an "add a
+    // development" picker rendered after the tiles. Page-provided and wrapped
+    // .no-print by the page like all other edit chrome.
+    top3ItemControls?: (item: PngReportItem) => ReactNode;
+    top3Extras?: ReactNode;
   } | null;
 }) {
   const d = dataset;
@@ -533,12 +539,16 @@ export default function PngCountryReportBody({
       {/* 2. Top 3 Developments — at most three tiles. No developments → the
           section is omitted entirely rather than rendered around a filler line. */}
       {hiddenStub("top-3")}
-      {show("top-3") && topThree.length > 0 && (
+      {show("top-3") && (topThree.length > 0 || editUi?.top3Extras != null) && (
         <Section title="Top 3 Developments" extras={chrome("top-3")}>
           <div>
             {topThree.map((it) => (
-              <ItemCard key={it.id} item={it} suppressEmptyLocation />
+              <div key={it.id}>
+                <ItemCard item={it} suppressEmptyLocation />
+                {editUi?.top3ItemControls ? editUi.top3ItemControls(it) : null}
+              </div>
             ))}
+            {editUi?.top3Extras ?? null}
           </div>
         </Section>
       )}

@@ -33,6 +33,7 @@ import {
   type KpiCardData,
 } from "./pdfChrome";
 import { COUNTRY_COVER_URLS } from "./coverImages";
+import { applyIncidentCurations } from "./countrySectionOverrides";
 import { upcomingSignalLine } from "./upcomingSignals";
 import { relatedIncidentsLimit } from "./reportWindow";
 import { reportKindLabel } from "./reportKind";
@@ -128,6 +129,11 @@ export interface CountryPdfExtras {
   /** Coverage status for an empty weekly window. Rendered as a banner just
    *  below the data-as-of strip, mirroring the on-screen report. */
   coverage?: CountryCoverageStatus;
+  /** Persisted analyst curation (country_reports.section_overrides). The
+   *  headless export applies the same incident excludes / severity overrides
+   *  and Top-3 pins/removals the on-screen report applies, so audits see the
+   *  curated brief. */
+  sectionOverrides?: import("./countrySectionOverrides").CountrySectionOverrides | null;
 }
 
 const SEV_ORDER = [
@@ -1035,6 +1041,15 @@ export async function exportCountryReportPdf(
   filename: string,
   extras: CountryPdfExtras = {},
 ): Promise<void> {
+  // Apply the analyst's persisted curation (report-wide incident excludes and
+  // exact severity overrides) BEFORE any layer/facts/dataset derivation, so the
+  // headless export sees the same curated pool as the on-screen report.
+  if (extras.sectionOverrides) {
+    incidents = applyIncidentCurations(
+      incidents as Array<PdfIncident & { severity: string }>,
+      extras.sectionOverrides,
+    ) as PdfIncident[];
+  }
   const issueDate = todayLabel();
   const ctx = createCtx({
     kind: `${country.name} ${reportKindLabel(country.name)}`,
@@ -1125,6 +1140,11 @@ export async function exportCountryReportPdf(
         (w) => w.label,
       ),
       periodLabel: active.basisLabel,
+      // Analyst Top-3 pins/removals — same curation the on-screen builder gets.
+      top3Curation: {
+        pinnedIds: extras.sectionOverrides?.top3PinnedIds ?? [],
+        excludedIds: extras.sectionOverrides?.top3ExcludedIds ?? [],
+      },
       // Mirror the on-screen CountryReport window start (issueDate-6, start of
       // day) so the headless PDF's out-of-window flagging matches the in-app
       // DOM-rasterised export. See PngReportItem.occurredOutOfWindow.

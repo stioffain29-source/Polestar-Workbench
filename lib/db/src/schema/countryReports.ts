@@ -27,6 +27,14 @@ export interface CountryReportSectionOverrides {
   hiddenSections?: string[];
   excludedIncidentIds?: string[];
   severityDemotions?: Record<string, string>;
+  /** Analyst-set exact severity per incident id (either direction); wins over
+   *  severityDemotions for the same id. */
+  severityOverrides?: Record<string, string>;
+  /** Top 3 Developments curation — incident ids pinned into the section (in
+   *  pin order) and auto-picked ids removed from it (they fall back to the
+   *  Incident Details buckets). Section-scoped, unlike excludedIncidentIds. */
+  top3PinnedIds?: string[];
+  top3ExcludedIds?: string[];
 }
 
 export const countryReportsTable = pgTable("country_reports", {

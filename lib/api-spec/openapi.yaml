@@ -3597,6 +3597,20 @@ components:
         severityDemotions:
           type: object
           additionalProperties: { type: string }
+        # Analyst-set exact severity per incident id (either direction). Takes
+        # precedence over severityDemotions for the same id.
+        severityOverrides:
+          type: object
+          additionalProperties: { type: string }
+        # Top 3 Developments curation — pin window incidents into the section
+        # (in pin order) and drop auto-selected ones from it (they fall back to
+        # Incident Details). Section-scoped: distinct from excludedIncidentIds.
+        top3PinnedIds:
+          type: array
+          items: { type: string }
+        top3ExcludedIds:
+          type: array
+          items: { type: string }
         # Topic-report analyst overrides (unused by country briefs).
         # fastFactOverrides is keyed by the AUTO tile label; a non-blank
         # label/value/note replaces the computed one, blank/absent = auto.

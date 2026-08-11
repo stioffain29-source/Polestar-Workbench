@@ -263,6 +263,9 @@ export const GetDashboardOverviewResponse = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -1582,6 +1585,9 @@ export const ListReportsResponseItem = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -1916,6 +1922,9 @@ export const GetReportResponse = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -2092,6 +2101,9 @@ export const UpdateReportBody = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -2263,6 +2275,9 @@ export const UpdateReportResponse = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -5026,6 +5041,9 @@ export const ListCountryReportsResponseItem = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -5156,6 +5174,9 @@ export const GetCountryReportResponse = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -5200,6 +5221,9 @@ export const UpdateCountryReportBody = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),
@@ -5240,6 +5264,9 @@ export const UpdateCountryReportResponse = zod.object({
   "hiddenSections": zod.array(zod.string()).optional(),
   "excludedIncidentIds": zod.array(zod.string()).optional(),
   "severityDemotions": zod.record(zod.string(), zod.string()).optional(),
+  "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
+  "top3PinnedIds": zod.array(zod.string()).optional(),
+  "top3ExcludedIds": zod.array(zod.string()).optional(),
   "fastFactOverrides": zod.record(zod.string(), zod.object({
   "label": zod.string().optional(),
   "value": zod.string().optional(),

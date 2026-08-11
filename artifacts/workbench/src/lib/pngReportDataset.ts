@@ -46,6 +46,7 @@ import { isLikelyNonEnglish, stripWireCruft } from "./incidentTitle";
 import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { classifyFireCause } from "./countryFireCause";
+import { applyTopThreeCuration } from "./countrySectionOverrides";
 import { summariseLocationConfidence } from "./countryLocationConfidence";
 import {
   compareIncidentValueClusters,
@@ -962,6 +963,11 @@ export interface BuildArgs {
   // reads "Not Assessed" instead of implying a confirmed quiet week. Omitted →
   // false (render unchanged).
   coverageUnconfirmed?: boolean;
+  // Analyst Top 3 Developments curation (country_reports.section_overrides):
+  // pinned incident ids lead the section (pin order); excluded ids drop an
+  // automatic pick from the section only (the incident falls back to the
+  // Incident Details buckets). Omitted → automatic selection unchanged.
+  top3Curation?: { pinnedIds?: string[]; excludedIds?: string[] };
 }
 
 // Rulebook "Other security" default — used ONLY for a residual row that somehow
@@ -1749,6 +1755,24 @@ export function buildStructuredReportDataset(
   // location buckets so one real-world event never appears both in Top 3 and
   // lower down (weak-evidence duplicates stay in the buckets, shown once).
   for (const id of topSelection.foldMemberIds) topThreeMemberIds.add(id);
+  // Analyst Top-3 curation (pin/remove). A pinned incident joins the section
+  // (and leaves the Incident Details buckets); a section-excluded automatic
+  // pick drops from Top 3 AND releases its whole story cluster back to the
+  // buckets so the incident still appears lower down rather than vanishing.
+  const top3Curation = args.top3Curation;
+  if (top3Curation && ((top3Curation.pinnedIds?.length ?? 0) > 0 || (top3Curation.excludedIds?.length ?? 0) > 0)) {
+    const excludedTopIds = new Set((top3Curation.excludedIds ?? []).map(String));
+    for (const cluster of topClusters) {
+      if (excludedTopIds.has(String(cluster[0].id))) {
+        for (const member of cluster) topThreeMemberIds.delete(member.id);
+      }
+    }
+    topThree = applyTopThreeCuration(topThree, windowItems, {
+      top3PinnedIds: top3Curation.pinnedIds,
+      top3ExcludedIds: top3Curation.excludedIds,
+    });
+    for (const it of topThree) topThreeMemberIds.add(it.id);
+  }
   // Collapse same-story SYNDICATION among the remaining (non-Top-3) records so a
   // single real-world event never appears as two Incident Details cards
   // (reviewer: "two entries covering the same Sambio massacre arrests"). The
@@ -2269,6 +2293,15 @@ export function buildStructuredReportDataset(
       // clustering divergence), keep the previously selected Top-3 rather than
       // showing nothing — but never widen beyond the engine's three.
       topThree = engineTop.length > 0 ? engineTop : topThree.slice(0, n.topThree.length);
+      // Re-apply the analyst Top-3 curation AFTER the engine replaces the
+      // selection, so pins/removals survive the engine path too (the engine
+      // never sees the curation). Pool is the full window card set.
+      if (top3Curation) {
+        topThree = applyTopThreeCuration(topThree, windowItems, {
+          top3PinnedIds: top3Curation.pinnedIds,
+          top3ExcludedIds: top3Curation.excludedIds,
+        });
+      }
       // Operational Impact — per-category engine text (only event-linked, §19).
       operationalImpactOverride =
         n.operationalImpact.length > 0

@@ -63,6 +63,7 @@ export * from './countryReportSectionOverridesFastFactOverrides';
 export * from './countryReportSectionOverridesMarketPriceOverrides';
 export * from './countryReportSectionOverridesPanelReads';
 export * from './countryReportSectionOverridesSeverityDemotions';
+export * from './countryReportSectionOverridesSeverityOverrides';
 export * from './countryReportUpdate';
 export * from './dashboardOverview';
 export * from './dashboardTopicCard';

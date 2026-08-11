@@ -68,6 +68,16 @@ export interface CountrySectionOverrides {
   hiddenSections?: string[];
   excludedIncidentIds?: string[];
   severityDemotions?: Record<string, string>;
+  /** Analyst-set exact severity per incident id (either direction — an explicit
+   *  analyst judgement, unlike the demote-only hedge). Wins over
+   *  severityDemotions for the same id. */
+  severityOverrides?: Record<string, string>;
+  /** Top 3 Developments curation — pinned incident ids render in the section
+   *  (in pin order, ahead of the automatic picks) and top3ExcludedIds drop an
+   *  automatic pick from the section only (the incident falls back to the
+   *  Incident Details buckets). Section-scoped, unlike excludedIncidentIds. */
+  top3PinnedIds?: string[];
+  top3ExcludedIds?: string[];
 }
 
 // Severity ordering (least -> most severe) used for the demote-only guard. The
@@ -106,10 +116,18 @@ export function applyIncidentCurations<
 >(incidents: T[], ov: CountrySectionOverrides | null | undefined): T[] {
   const excluded = new Set((ov?.excludedIncidentIds ?? []).map(String));
   const demotions = ov?.severityDemotions ?? {};
+  const overrides = ov?.severityOverrides ?? {};
   const out: T[] = [];
   for (const inc of incidents) {
     const key = incidentIdKey(inc.id);
     if (key != null && excluded.has(key)) continue;
+    // Explicit analyst severity override (either direction) beats the
+    // demote-only correction for the same incident.
+    const overrideTo = key != null ? overrides[key] : undefined;
+    if (overrideTo && SEVERITY_RANK[overrideTo.trim().toLowerCase()] != null) {
+      out.push({ ...inc, severity: overrideTo });
+      continue;
+    }
     const demoteTo = key != null ? demotions[key] : undefined;
     if (demoteTo && rank(demoteTo) < rank(inc.severity)) {
       out.push({ ...inc, severity: demoteTo });
@@ -118,4 +136,36 @@ export function applyIncidentCurations<
     }
   }
   return out;
+}
+
+/** Curation for the Top 3 Developments selection. Pinned items (looked up in
+ *  the curated window pool by id, in pin order) lead the section; automatic
+ *  picks carrying a top3ExcludedIds entry drop from the section (falling back
+ *  to Incident Details); the list is then capped so it never shrinks below the
+ *  automatic three unless the pool itself is smaller. Pinning more than three
+ *  keeps every pinned item (the analyst's explicit choice wins over the cap). */
+export function applyTopThreeCuration<T extends { id: string }>(
+  autoPicks: T[],
+  pool: T[],
+  ov: CountrySectionOverrides | null | undefined,
+): T[] {
+  const pinnedIds = ov?.top3PinnedIds ?? [];
+  const excludedIds = new Set((ov?.top3ExcludedIds ?? []).map(String));
+  if (pinnedIds.length === 0 && excludedIds.size === 0) return autoPicks;
+  const byId = new Map(pool.map((it) => [String(it.id), it]));
+  const pinned: T[] = [];
+  const seen = new Set<string>();
+  for (const rawId of pinnedIds) {
+    const id = String(rawId);
+    if (seen.has(id)) continue;
+    const item = byId.get(id);
+    if (!item) continue; // pinned incident no longer in the window pool
+    pinned.push(item);
+    seen.add(id);
+  }
+  const autos = autoPicks.filter(
+    (it) => !seen.has(String(it.id)) && !excludedIds.has(String(it.id)),
+  );
+  const cap = Math.max(3, pinned.length);
+  return [...pinned, ...autos].slice(0, cap);
 }

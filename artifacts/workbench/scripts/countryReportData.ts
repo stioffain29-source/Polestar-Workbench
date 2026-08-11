@@ -13,6 +13,7 @@ import {
   db,
   incidentsTable,
   countryBaselinesTable,
+  countryReportsTable,
   reliefwebReportsTable,
 } from "@workspace/db";
 import {
@@ -256,11 +257,17 @@ export async function fetchCountryReportData(slug: string): Promise<{
       `Unknown country slug "${slug}". Supported: ${Object.keys(SLUG_TO_NAME).join(", ")}`,
     );
   }
-  const [all, baseline, situationalReports] = await Promise.all([
+  const [all, baseline, situationalReports, overrideRows] = await Promise.all([
     loadIncidents(),
     loadBaseline(slug),
     loadSituationalReports(meta.name),
+    db
+      .select({ sectionOverrides: countryReportsTable.sectionOverrides })
+      .from(countryReportsTable)
+      .where(sql`lower(${countryReportsTable.slug}) = ${slug.toLowerCase()}`)
+      .limit(1),
   ]);
+  const sectionOverrides = overrideRows[0]?.sectionOverrides ?? null;
   const incidents = filterForCountry(all, meta.name);
   const country: PdfCountry = { name: meta.name, region: meta.region };
   return {
@@ -269,6 +276,7 @@ export async function fetchCountryReportData(slug: string): Promise<{
     extras: {
       baseline,
       situationalReports,
+      sectionOverrides,
     },
   };
 }

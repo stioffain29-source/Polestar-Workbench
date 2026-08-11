@@ -678,7 +678,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state]);
+  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -2142,6 +2142,120 @@ export default function CountryReport() {
                           polestarView: inlineProseEditor("polestarView", pngDataset.polestarView),
                         }
                       : undefined,
+                  // Top 3 Developments curation — remove/pin per card, set an
+                  // exact severity (analyst authority, either direction), and
+                  // add any other window incident into the section.
+                  top3ItemControls: (item) => {
+                    const id = String(item.id);
+                    const pinned = (sectionOverrides.top3PinnedIds ?? []).includes(id);
+                    const overrideTo = sectionOverrides.severityOverrides?.[id] ?? "";
+                    return (
+                      <div
+                        className="no-print"
+                        style={{ display: "flex", gap: 8, alignItems: "center", margin: "-4px 0 10px", justifyContent: "flex-end" }}
+                      >
+                        {pinned && (
+                          <span style={{ fontFamily: ROBOTO, fontSize: 10, color: DUSK, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                            Pinned by analyst
+                          </span>
+                        )}
+                        <select
+                          value={overrideTo}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setSectionOverrides((ov) => {
+                              const next = { ...(ov.severityOverrides ?? {}) };
+                              if (v) next[id] = v;
+                              else delete next[id];
+                              return { ...ov, severityOverrides: next };
+                            });
+                          }}
+                          style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 6px", color: DUSK }}
+                        >
+                          <option value="">Rating: auto ({item.severityLabel})</option>
+                          {Object.keys(SEVERITY_ORDER).map((o) => (
+                            <option key={o} value={o}>
+                              Set rating: {o}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSectionOverrides((ov) => {
+                              const pins = new Set(ov.top3PinnedIds ?? []);
+                              const excl = new Set(ov.top3ExcludedIds ?? []);
+                              if (pins.has(id)) pins.delete(id);
+                              else excl.add(id);
+                              return {
+                                ...ov,
+                                top3PinnedIds: Array.from(pins),
+                                top3ExcludedIds: Array.from(excl),
+                              };
+                            });
+                          }}
+                          style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 8px", color: NAVY, background: "white", cursor: "pointer" }}
+                        >
+                          Remove from Top 3
+                        </button>
+                      </div>
+                    );
+                  },
+                  top3Extras: (() => {
+                    const shown = new Set(
+                      (pngEffectiveDataset?.topThree ?? []).map((it) => String(it.id)),
+                    );
+                    const removed = (sectionOverrides.top3ExcludedIds ?? []).filter(
+                      (id) => !shown.has(String(id)),
+                    );
+                    const candidates = (pngEffectiveDataset?.windowItems ?? []).filter(
+                      (it) => !shown.has(String(it.id)),
+                    );
+                    return (
+                      <div className="no-print" style={{ borderTop: `1px dashed ${POLAR}`, paddingTop: 8, marginTop: 4 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              if (!id) return;
+                              setSectionOverrides((ov) => {
+                                const pins = new Set(ov.top3PinnedIds ?? []);
+                                pins.add(id);
+                                const excl = new Set(ov.top3ExcludedIds ?? []);
+                                excl.delete(id);
+                                return {
+                                  ...ov,
+                                  top3PinnedIds: Array.from(pins),
+                                  top3ExcludedIds: Array.from(excl),
+                                };
+                              });
+                            }}
+                            style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "4px 6px", color: DUSK, maxWidth: 480 }}
+                          >
+                            <option value="">Add a development from this week…</option>
+                            {candidates.map((it) => (
+                              <option key={it.id} value={String(it.id)}>
+                                {(it.developmentTitle ?? it.title).slice(0, 90)}
+                                {it.province ? ` · ${it.province}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          {removed.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSectionOverrides((ov) => ({ ...ov, top3ExcludedIds: [] }))
+                              }
+                              style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 8px", color: DUSK, background: "white", cursor: "pointer" }}
+                            >
+                              Restore removed ({removed.length})
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })(),
                 }
               : null
           }
