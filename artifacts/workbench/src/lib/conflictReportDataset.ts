@@ -237,7 +237,11 @@ function cleanHeadline(text: string): string {
   // defect). The colon form allows a short qualifier before the attribution
   // noun so "X: Pakistan's state media" is caught without touching a colon
   // that introduces real substance.
-  t = t.replace(/:\s*[^:]{0,30}\b(?:police|sources?|officials?|authorities|witnesses|reports?|agency|media|army)\b[^:]{0,20}$/i, "").trim();
+  // END-anchored: the tail after the colon must consist solely of a short
+  // qualifier + attribution noun ("Pakistan's state media", "sources").
+  // Substantive colon clauses ("Police: reports of attack") are untouched
+  // because they do not END in an attribution noun.
+  t = t.replace(/:\s*(?:[\w’'-]+\s+){0,3}(?:police|sources?|officials?|authorities|witnesses|media|agency)\s*$/i, "").trim();
   t = t.replace(/,\s*(?:police|sources?|officials?|authorities|witnesses|reports?|agency|army)(?:\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?))?\s*$/i, "").trim();
   t = t.replace(/,?\s*(?:officials?|police|sources?|authorities|witnesses)\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?)\s*$/i, "").trim();
   t = t.replace(/^[A-Z][A-Za-z'’.&\- ]{2,22}:\s+/, "").trim();
@@ -305,10 +309,17 @@ function topEvents(
         // Casualty/count figures, with number WORDS normalised so "15 killed"
         // and "fifteen killed" still collide.
         const WORD_NUM: Record<string, string> = { two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", fifteen: "15", twenty: "20" };
-        const nums = new Set(
-          (head.match(/\b(\d+|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty)\b/g) ?? [])
-            .map((n) => WORD_NUM[n] ?? n),
-        );
+        // Only numbers in a CASUALTY context count — a shared route/district
+        // number must not merge two distinct same-day events. Scan a ±40-char
+        // window around each casualty verb for figures.
+        const nums = new Set<string>();
+        const CASUALTY_RE = /\b(?:kill(?:s|ed)?|dead|deaths?|died|casualt\w+|injured|wounded)\b/gi;
+        for (let cm = CASUALTY_RE.exec(head); cm; cm = CASUALTY_RE.exec(head)) {
+          const win = head.slice(Math.max(0, cm.index - 40), cm.index + cm[0].length + 40);
+          for (const n of win.match(/\b(\d+|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty)\b/g) ?? []) {
+            nums.add(WORD_NUM[n] ?? n);
+          }
+        }
         const day = !isNaN(i.date.getTime()) ? i.date.toISOString().slice(0, 10) : "";
         for (const p of picked) {
           let inter = 0;

@@ -108,11 +108,15 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     const marchRows = ds.forecastFuture.filter((r) => /civic protest march/i.test(r.signal));
-    if (marchRows.length > 1) {
-      expect(ds.forecastRead).toMatch(/Civic protest marches are confirmed in/);
+    // "Confirmed" wording is reserved for rows with an explicitly stated
+    // future date, so the summary line reads "with confirmed dates" and only
+    // counts dated rows.
+    const datedMarches = marchRows.filter((r) => !!r.date);
+    if (datedMarches.length > 1) {
+      expect(ds.forecastRead).toMatch(/Civic protest marches with confirmed dates are set in/);
       expect(ds.forecastRead).toMatch(/confirm turnout and access impact in each host city/);
     } else {
-      expect(ds.forecastRead).not.toMatch(/Civic protest marches are confirmed in/);
+      expect(ds.forecastRead).not.toMatch(/Civic protest marches with confirmed dates are set in/);
     }
   });
 });

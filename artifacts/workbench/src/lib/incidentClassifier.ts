@@ -143,15 +143,23 @@ function classifyUnrest(t: string): string {
   // shared keyword. Only an explicit protest / public-order cue in the
   // same headline can override this.
   const kineticHit = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid))\b/.test(t);
-  const protestCue = /\b(protest|demonstration|rally|march|sit[- ]?in|riot|public disorder|crackdown|curfew|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|opposition (call|rally|march)|\bpti\b|imran khan|section\s*144|assembly ban|detention of (protesters|activists|students))\b/.test(t);
+  const protestCue = /\b(protest(?:s|ers?|ing)?|demonstrat(?:ion|ions|ors?)|rall(?:y|ies)|march(?:es)?|sit[- ]?ins?|riots?|public disorder|crackdowns?|curfews?|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|opposition (call|rally|march)|\bpti\b|imran khan|section\s*144|assembly ban|detention of (protesters|activists|students))\b/.test(t);
   if (kineticHit && !protestCue) return "Armed group activity";
 
   if (/\b(pti|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144)\b/.test(t)) return "Protest";
-  if (/\b(university|college|campus|student union|student federation|students? (rally|march|protest|gather|stage|boycott))\b/.test(t)) return "Student activism";
+  // "Tribhuvan University Teaching Hospital" is a hospital, not a campus —
+  // neutralise institution-hospital compounds before testing the student cue
+  // so a health-sector protest is not mislabelled Student activism.
+  const tStudent = t.replace(/\b(university|college|campus)\s+(teaching\s+)?hospital\b/g, "hospital");
+  if (/\b(university|college|campus|student union|student federation|students? (rally|march|protest|gather|stage|boycott))\b/.test(tStudent)) return "Student activism";
   if (/\b(sit[- ]?in|encampment|occupation of)\b/.test(t)) return "Sit-in";
   if (/\b(chemist|pharmacist|doctor|nurse|teacher|lawyer|trader|hauliers?|transporters?)s? (strike|walkout|stoppage|shutdown|boycott|protest|demonstrat|rally|march|sit[- ]?in)|sector(al)? (strike|shutdown|walkout|protest|demonstration)|shutter[- ]down|(chemists?|pharmacists?|lawyers?|traders?|transporters?|hauliers?) (associations?|councils?|federations?|unions?|chambers?) (call|announce|stage|hold|begin|launch)\b/.test(t)) return "Strike / labour action";
   if (/\b(strike|labour action|labor action|industrial action|walkout|stoppage|shutdown call)\b/.test(t)) return "Strike / labour action";
-  if (/\b(protest|demonstration|rally|march)\b/.test(t)) return "Protest";
+  // Plural and agent forms MUST match — "Deadly protests…" and "Protesters
+  // gather…" were falling through to "Other operational incident", which
+  // stranded High-severity rows outside every report section (owner-flagged
+  // defect: Pakistan Kashmir protests missing from the protests report).
+  if (/\b(protest(?:s|ers?|ing)?|demonstrat(?:ion|ions|ors?)|rall(?:y|ies)|march(?:es)?)\b/.test(t)) return "Protest";
   if (/\b(curfew|state of emergency|martial law|lockdown imposed)\b/.test(t)) return "Curfew / emergency order";
   if (/\b(crackdown|baton charge|tear[- ]?gas|water cannon|rubber bullet|mass arrest|detention of (protesters|activists|students))\b/.test(t)) return "Crackdown";
   if (/\b(clash|skirmish|brawl)\b/.test(t)) return "Clash";
