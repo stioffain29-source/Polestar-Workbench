@@ -226,7 +226,8 @@ const PACIFIC_CRIME: RegExp =
 // PNG-ONLY broadened operational scope. A Papua New Guinea country brief tracks
 // more than crime/unrest: policing operations, community-policing launches,
 // intelligence/police training, and operational disruption to aviation, ports,
-// roads, fuel, power, telecoms or government stability are all security-relevant
+// roads, fuel, power, water/drought, telecoms or government stability are all
+// security-relevant
 // for PNG even when they carry no protest cue and are not crimes (e.g. a
 // community-policing launch, an intelligence-training course, airport runway
 // works). These cues are accepted ONLY when the resolved country is PNG (see the
@@ -236,7 +237,7 @@ const PACIFIC_CRIME: RegExp =
 // MONITOR stays clean while the PNG country brief (which reads includeIrrelevant)
 // still surfaces them.
 const PNG_OPERATIONAL: RegExp =
-  /\b(community polic\w*|neighbou?rhood watch|crime[- ]?prevention|police (?:operation|patrol|training|recruit\w*|deployment|presence|post|barracks|station|swoop)|joint (?:operation|patrol|task ?force)|intelligence (?:training|unit|sharing|gathering|course|workshop|capabilit\w*)|police training|capacity[- ]?building|correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|manhunt|crackdown|curfew|state of emergency|lockdown|airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft|wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|highway (?:closed|cut|block\w*|landslip|landslide|washed|sealed|reopen\w*|works?|upgrade)|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed|works?|upgrade)|bridge (?:collapse|washed|down|out|works?)|fuel (?:shortage|crisis|outage|supply|ran out|rationing)|power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|telecom\w*|telecommunication\w*|network (?:outage|down|disrupt\w*)|internet (?:outage|down|disrupt\w*|cut)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|parliament\w* (?:standoff|deadlock|impasse))\b/i;
+  /\b(community polic\w*|neighbou?rhood watch|crime[- ]?prevention|police (?:operation|patrol|training|recruit\w*|deployment|presence|post|barracks|station|swoop)|joint (?:operation|patrol|task ?force)|intelligence (?:training|unit|sharing|gathering|course|workshop|capabilit\w*)|police training|capacity[- ]?building|correctional (?:service|institution|facility|officers?)|warders?|prison (?:break|escape|riot|unrest|officers?|inmates?)|jail ?break|arrest(?:ed|s)?|detain(?:ed|ee|ees)?|apprehend\w*|manhunt|crackdown|curfew|state of emergency|lockdown|airport|airstrip|airfield|runway|aviation|air ?services|flights?|aircraft|wharf|jetty|port (?:closure|shut|disrupt\w*|congestion|operations?|security)|harbou?r|highway (?:closed|cut|block\w*|landslip|landslide|washed|sealed|reopen\w*|works?|upgrade)|road (?:closed|cut|block\w*|landslip|landslide|washed|sealed|works?|upgrade)|bridge (?:collapse|washed|down|out|works?)|fuel (?:shortage|crisis|outage|supply|ran out|rationing)|power (?:outage|blackout|cut|failure|shortage|rationing|crisis)|electricity (?:outage|blackout|cut|crisis)|grid (?:failure|down)|water (?:shortage|crisis|outage|supply|cut(?:s|off)?|rationing|restriction|disruption|contamination)|(?<!(?:goal|try|win|title|medal|scoring|premiership|finals|victory|trophy) )drought|dry spell|el ni[nñ]o|water png|eda ranu|reservoir (?:low|level|dry|empty)|telecom\w*|telecommunication\w*|network (?:outage|down|disrupt\w*)|internet (?:outage|down|disrupt\w*|cut)|mobile (?:network|service) (?:down|outage|disrupt\w*)|digicel|vote of no confidence|government (?:shutdown|instability|stability|crisis|standoff)|political (?:crisis|instability|standoff)|public servants? strike|parliament\w* (?:standoff|deadlock|impasse))\b/i;
 
 // Country aliases for in-text matching. Restricted to the 14 APAC
 // targets the Flashpoint Data Coverage Audit calls out, plus Myanmar
@@ -503,7 +504,7 @@ function classify(title: string, summary: string, feedCountry?: string | null): 
   }
 
   // PNG-only broadened operational scope (policing ops, community policing,
-  // intelligence training, aviation/port/road/fuel/power/telecoms/government
+  // intelligence training, aviation/port/road/fuel/power/water/telecoms/government
   // disruption). Gated on isPng (not West Papua) so it never leaks.
   const isPng =
     country === "Papua New Guinea" || country === "West Papua; Papua New Guinea";

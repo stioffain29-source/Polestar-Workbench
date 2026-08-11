@@ -992,6 +992,15 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     // bare Tagalog "baha" is a substring of "bahasa"/"bahay" (house)/"bahagi"
     // (part) and would false-positive, so it is deliberately avoided.
     "bagyo", "lindol", "bulkan", "pagguho", "pagbaha", "bumaha", "binaha",
+    // drought & water-utility disruption — PNG (Post-Courier/RNZ Pacific) and
+    // wider APAC drought / water-supply stories previously had NO vocabulary
+    // here so they were silently dropped despite passing the geographic gate.
+    // Multi-word English phrases keep precision; Bahasa "kekeringan" (drought)
+    // and "krisis air" (water crisis) cover the Indonesian direct outlets.
+    "drought", "dry spell", "water shortage", "water crisis", "water supply",
+    "water rationing", "water restriction", "water cut", "water outage",
+    "water contamination", "el nino", "el niño",
+    "kekeringan", "krisis air",
   ],
   deny: [
     ...COMMON_DENY,
