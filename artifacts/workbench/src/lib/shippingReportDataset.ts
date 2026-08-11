@@ -858,7 +858,9 @@ export function buildShippingReportDataset(
     regionRows,
     countryRows,
     commercialRows: commercialRecords,
-    leadDevelopment: leadDevelopmentIncident ? cleanLeadTitle(leadDevelopmentIncident.title) : null,
+    leadDevelopment: leadDevelopmentIncident
+      ? describeShippingLead(leadDevelopmentIncident)
+      : null,
     chokepointRouteRead,
     vesselPiracyRead,
     commercialImpactRead,
@@ -1020,16 +1022,46 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-// Strip a trailing outlet/masthead segment ("... - News and Statistics",
-// "... | Reuters"): Google-News titles append the source after a final ASCII
-// " - " or " | ". Only a SHORT tail (<= 6 words) is removed so genuine headline
-// content containing a dash survives, and em-dashes (—) are left intact because
-// they separate real clauses rather than the masthead.
-function cleanLeadTitle(title: string): string {
-  const t = title.trim();
-  const m = t.match(/^(.*\S)\s+[-|]\s+(\S[^-|]{0,59})$/);
-  if (m && m[2].trim().split(/\s+/).length <= 6) return m[1].trim();
-  return t;
+// Plain-English paraphrase of the dominant chokepoint development. Never
+// quote or paste article headlines into report sentences (natural-prose
+// standard + Flashpoint-aligned ban on headline paste).
+export function describeShippingLead(r: EnrichedIncident): string {
+  const text = `${r.title} ${r.summary ?? ""}`.toLowerCase();
+  const named = detectChokepoints(r)[0]
+    ?? (Object.entries(CHOKEPOINT_NAME_RE).find(([, re]) => re.test(text))?.[0] as ChokepointKey | undefined);
+  const at = named ? ` around ${named}` : "";
+  if (/\bre-?open(?:ing|s|ed)?\b|\bresume(?:s|d|)\b|\bresumption\b/.test(text)) {
+    return named
+      ? `reports that ${named} may reopen`
+      : "reports that a key chokepoint may reopen";
+  }
+  if (/\bclos(?:e|ed|ing|ure)\b|\bblock(?:ade|ed|ing)?\b|\bshut\b/.test(text)) {
+    return `closure or blockade pressure${at || " on a major route"}`;
+  }
+  if (/\bdivert|diversion|re-?rout/.test(text)) {
+    return `vessel diversion pressure${at || " on major routes"}`;
+  }
+  if (/\badvisor(?:y|ies)\b|\bwarning\b|\bnotice\b/.test(text)) {
+    return `a fresh maritime advisory${at}`;
+  }
+  if (/\battac|\bmissile\b|\bdrone\b|\bstrike\b|\bhit\b/.test(text)) {
+    return `an attack or strike report${at}`;
+  }
+  if (/\bwar[- ]?risk\b|\bpremium\b|\binsurance\b/.test(text)) {
+    return `war-risk insurance pressure${at}`;
+  }
+  if (/\bpiracy\b|\barmed robber|\bboard(?:ed|ing)\b/.test(text)) {
+    return `a piracy or armed-robbery report${at}`;
+  }
+  const issue = (r.issue || "").trim();
+  if (named) {
+    return issue && issue !== "Unclassified maritime record"
+      ? `${issue.toLowerCase()} pressure around ${named}`
+      : `chokepoint pressure around ${named}`;
+  }
+  return issue && issue !== "Unclassified maritime record"
+    ? `${issue.toLowerCase()} pressure on major routes`
+    : "a dominant chokepoint development this week";
 }
 
 // Name-only chokepoint matchers for LEAD-development selection. detectChokepoints
@@ -1129,18 +1161,18 @@ function buildChokepointRouteRead(opts: {
   const cpPhrase = lead
     ? `The busiest route this week is ${lead.name}${lead.highestSeverityKey ? `, where the most serious incident reached ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} comes next.` : ""}`
     : "Little was reported on chokepoints this week, but movement along the routes still deserves attention.";
-  // Name the development driving the cycle so the route read leads with the
-  // dominant headline (e.g. a Strait-of-Hormuz reopening) instead of only
-  // citing severity and count.
+  // Name the development driving the cycle in plain English (e.g. Hormuz
+  // reopening pressure) instead of only citing severity/count — and without
+  // pasting the raw article headline into the sentence.
   const leadLine = leadDevelopment
-    ? ` The development driving the picture this week is the report that "${cleanLeadTitle(leadDevelopment.title)}".`
+    ? ` The main development this week is ${describeShippingLead(leadDevelopment)}.`
     : "";
   const weeklyTransit = weeklyEnriched.filter((r) =>
     TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   ).length;
   const transitLine = weeklyTransit > 0
     ? `This week, reporting pointed specifically to transit problems, diversions or advisory pressure — a closer view of what shippers actually faced.`
-    : `No new transit advisories came through this week, so the picture leans on the broader chokepoint view above for context.`;
+    : `No new transit advisories came through this week, so route risk still rests on the broader chokepoint view above.`;
   const watch = lead
     ? `Keep an eye on new naval advisories for ${lead.name}, any changes to war-risk insurance and what operators say about rerouting. These are the early warning signs of escalation; freight rates follow a few days later.`
     : `Keep an eye on new advisories and any operator decisions to divert — these move ahead of headline freight rates and show where pressure is building.`;

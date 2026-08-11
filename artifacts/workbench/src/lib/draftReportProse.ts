@@ -539,7 +539,7 @@ const SHIPPING: ReportPack = {
       ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with less from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
       : " No single country stands out, and several reports do not pin down a precise location.";
     const headline = leadDevelopment
-      ? `The week was dominated by the report that "${leadDevelopment}". `
+      ? `The week centred on ${leadDevelopment}. `
       : "";
     return `${headline}Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
   },

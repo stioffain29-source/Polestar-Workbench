@@ -136,7 +136,7 @@ function joinCountries(rows: { country: string; count: number }[]): string {
 
 function leadEntry(rows: CargoNarrativeIncident[]): CargoNarrativeIncident | null {
   if (rows.length === 0) return null;
-  // Prefer the most recent operational entry — gives the reader something
+  // Prefer the newest operational entry — gives the reader something
   // concrete and current to anchor the section on.
   const dated = rows
     .map((r) => ({ r, d: recordDate(r) }))
@@ -144,6 +144,26 @@ function leadEntry(rows: CargoNarrativeIncident[]): CargoNarrativeIncident | nul
   if (dated.length === 0) return rows[0];
   dated.sort((a, b) => b.d.getTime() - a.d.getTime());
   return dated[0].r;
+}
+
+// Plain-English lead clause — type + place + date. Never paste article
+// headlines or "Most recent example is \"…\"" (natural-prose standard).
+function describeCargoLead(i: CargoNarrativeIncident): string {
+  const type = classifyIncidentType(i);
+  const typePhrase =
+    type === CARGO_FLOOR_LABEL ? "a cargo security incident" : type.toLowerCase();
+  const country = cargoCountriesFor(i)[0];
+  const loc = classifyLocationType(i);
+  const where = country
+    ? loc !== "—"
+      ? ` on a ${loc.toLowerCase()} in ${country}`
+      : ` in ${country}`
+    : loc !== "—"
+      ? ` on a ${loc.toLowerCase()}`
+      : "";
+  const d = recordDate(i);
+  const when = d ? `, reported ${format(d, "dd MMM yyyy")}` : "";
+  return `${typePhrase}${where}${when}`;
 }
 
 export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]): string {
@@ -155,9 +175,8 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
     return `Little was reported this month on truck hijackings, container theft, in-transit loss, pilferage or convoy attacks. Cargo-security reporting tends to come in bursts, so a quiet month points to a gap in reporting rather than proof that risk on the road has eased.\n\nKeep an eye on insurance underwriter bulletins, transport-association advisories and any operator decisions on convoying or rerouting. Those signals usually move ahead of headline crime reporting on the routes that matter.`;
   }
   const lead = leadEntry(matches)!;
-  const leadDate = recordDate(lead);
   const countryLine = countryPicture(matches, 3, "among these route-side records").line;
-  const intro = `Route-side and convoy cargo risk showed up this month, covering truck hijackings, container theft, in-transit loss and similar crime. The most recent example is "${lead.title}"${leadDate ? `, reported ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const intro = `Route-side and convoy cargo risk showed up this month, covering truck hijackings, container theft, in-transit loss and similar crime. One recent case involved ${describeCargoLead(lead)}.`;
   const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories are the earliest signs that risk on the road is building.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
@@ -330,18 +349,17 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
     return `Little was reported this month on warehouse, depot, terminal or yard incidents. Logistics-hub losses often go unreported until insurance claims are filed, so a quiet month does not change the underlying picture on storage and last-mile facilities.\n\nKeep tracking facility-security bulletins, insurer loss notices and any operator commentary on staffing or perimeter changes. Those are the early indicators that hub-side risk is building on a specific corridor.`;
   }
   const lead = leadEntry(matches)!;
-  const leadDate = recordDate(lead);
   const countryLine = countryPicture(matches, 3, "among these hub-side records").line;
-  const intro = `Logistics-hub risk across warehouses, depots, distribution centres, terminals and bonded storage showed up this month. The most recent example is "${lead.title}"${leadDate ? `, reported ${format(leadDate, "dd MMM yyyy")}` : ""}.`;
+  const intro = `Logistics-hub risk across warehouses, depots, distribution centres, terminals and bonded storage showed up this month. One recent case involved ${describeCargoLead(lead)}.`;
   const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two weeks.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
 
 // Auto-prose for the What Happened section. The section was frequently left
 // blank, leaving a sparse page; this builder narrates the concrete events on
-// the file — the most recent route-side and hub-side lead entries with their
-// dates and countries, the qualifying counts, and any country clustering — so
-// the page carries substance drawn straight from the window's incidents.
+// file — recent route-side and hub-side leads (type, place, date), plus any
+// country clustering — so the page carries substance from the window without
+// pasting article headlines.
 export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]): string {
   const ctx = buildCargoAutoCtx(windowIncidents);
   if (ctx.windowIncidents.length === 0) {
@@ -352,22 +370,14 @@ export function buildCargoWhatHappened(windowIncidents: CargoNarrativeIncident[]
     `Cargo crime was reported this month, split across route-side and logistics-hub losses.`,
   );
 
-  const named = (i: CargoNarrativeIncident): string => {
-    const d = recordDate(i);
-    const country = cargoCountriesFor(i)[0];
-    const where = country ? ` in ${country}` : "";
-    const when = d ? `, reported ${format(d, "dd MMM yyyy")}` : "";
-    return `"${i.title}"${where}${when}`;
-  };
-
   const routeLead = leadEntry(ctx.securityMatches);
   const hubLead = leadEntry(ctx.hubMatches);
   const detail: string[] = [];
   if (routeLead) {
-    detail.push(`Route-side, the most recent example is ${named(routeLead)}.`);
+    detail.push(`Route-side, one recent case involved ${describeCargoLead(routeLead)}.`);
   }
   if (hubLead && hubLead !== routeLead) {
-    detail.push(`Hub-side, the most recent example is ${named(hubLead)}.`);
+    detail.push(`Hub-side, one recent case involved ${describeCargoLead(hubLead)}.`);
   }
   if (detail.length > 0) parts.push(detail.join(" "));
 
