@@ -601,7 +601,7 @@ const FLASHPOINT: ReportPack = {
   },
   whatHappened: ({ types, countries, sev }) => {
     const lead = types ? `Disruption centred on ${types}.` : `Little flashpoint activity came through.`;
-    const geo = countries ? ` Activity concentrated around ${countries}.` : "";
+    const geo = countries ? ` Events clustered around ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
   whatMatters: ({ countries }) => {

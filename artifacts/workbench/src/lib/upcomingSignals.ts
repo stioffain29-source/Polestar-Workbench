@@ -219,21 +219,22 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
       : "civic protest march";
     return withCity(trig.charAt(0).toUpperCase() + trig.slice(1));
   }
-  // Last-resort: clean clip on a word boundary, no ellipsis. Final guard: never
-  // return a bare "Protest mobilisation" — fall back to a generic but
-  // trigger-aware label instead.
-  const t = (r.title ?? "").trim();
-  const candidate = t.length <= 48
-    ? t
-    : (() => {
-        const slice = t.slice(0, 48);
-        const cut = slice.lastIndexOf(" ");
-        return cut > 20 ? slice.slice(0, cut).trim() : slice.trim();
-      })();
-  if (/^\s*protest mobilisation\s*$/i.test(candidate)) {
+  // Last-resort: never paste a clipped raw headline. Fall back to a typed
+  // public-order paraphrase so Flashpoint prose stays plain English even when
+  // no cue-specific rule matched (natural-prose / no-headline-paste standard).
+  if (/\b(curfew|section\s*144|assembly ban|lockdown)\b/.test(text)) {
+    return withCity("Assembly ban / curfew order");
+  }
+  if (/\b(arrest|crackdown|dispers|tear ?gas|baton)\b/.test(text)) {
+    return withCity("Police enforcement action");
+  }
+  if (/\b(blockade|roadblock|highway|motorway|sit[- ]?in)\b/.test(text)) {
+    return withCity("Road blockade / sit-in");
+  }
+  if (/^\s*protest mobilisation\s*$/i.test((r.title ?? "").trim())) {
     return withCity("Civic protest march");
   }
-  return candidate;
+  return withCity("Public-order disruption");
 }
 
 // Forecast-table operational meaning — short, decision-grade phrase keyed off

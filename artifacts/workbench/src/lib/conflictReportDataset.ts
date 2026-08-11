@@ -212,18 +212,19 @@ function impactList(impacts: string[]): string {
 
 // ---------------------------------------------------------------------------
 // Concrete event extraction. The report's substance is the actual incidents —
-// what happened, where and when — so the prose cites the period's standout
-// events by name rather than describing risk in the abstract. Headlines carry
-// the place ("...in Bannu", "...in Khyber Pakhtunkhwa"), so the cleaned
-// headline plus its date is enough; no record counts ever appear.
+// what happened, where and when — so the prose cites standout events as plain
+// paraphrases (type + place + casualty cue + date), NEVER pasted article
+// headlines (natural-prose standard). Ranking still uses cleaned headlines
+// via eventScore / same-event dedupe; only the reader-facing clause is
+// paraphrased.
 // ---------------------------------------------------------------------------
 function isCasualtyEvent(i: ConflictReportIncident): boolean {
   return detectOperationalImpacts(textOf(i)).includes("Casualties reported");
 }
 
-// Tidy a raw news headline for use as an event phrase: drop the trailing
-// "| Source" tail and "– OpEd" marker, strip a leading "Place:" label (the
-// place is named separately), and collapse whitespace.
+// Tidy a raw news headline for RANKING / dedupe only (not for pasting into
+// reader-facing sentences): drop "| Source", OpEd markers, mastheads and
+// attribution tails.
 function cleanHeadline(text: string): string {
   let t = (text ?? "").trim();
   if (!t) return "";
@@ -232,15 +233,7 @@ function cleanHeadline(text: string): string {
   // Trailing publisher masthead ("… : Police - ABC News").
   t = t.replace(/\s+[-–—]\s+[A-Z][\w .&'’]{2,28}$/, "").trim();
   // Trailing attribution tails — "…: sources", "…: Police", "…: Pakistan's
-  // state media", "…, officials say". Headline attribution is cruft inside
-  // flowing prose ("…in Balochistan: sources on 9 Aug" was an owner-flagged
-  // defect). The colon form allows a short qualifier before the attribution
-  // noun so "X: Pakistan's state media" is caught without touching a colon
-  // that introduces real substance.
-  // END-anchored: the tail after the colon must consist solely of a short
-  // qualifier + attribution noun ("Pakistan's state media", "sources").
-  // Substantive colon clauses ("Police: reports of attack") are untouched
-  // because they do not END in an attribution noun.
+  // state media", "…, officials say".
   t = t.replace(/:\s*(?:[\w’'-]+\s+){0,3}(?:police|sources?|officials?|authorities|witnesses|media|agency)\s*$/i, "").trim();
   t = t.replace(/,\s*(?:police|sources?|officials?|authorities|witnesses|reports?|agency|army)(?:\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?))?\s*$/i, "").trim();
   t = t.replace(/,?\s*(?:officials?|police|sources?|authorities|witnesses)\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?)\s*$/i, "").trim();
@@ -248,31 +241,54 @@ function cleanHeadline(text: string): string {
   return t.replace(/\s+/g, " ").trim();
 }
 
-// Lowercase a leading ordinary word so a headline reads naturally mid-sentence
-// ("Police kill five" -> "police kill five"), but leave acronyms (NIA, TTP)
-// untouched.
-function lcFirst(s: string): string {
-  if (!s) return s;
-  const first = s.split(/\s+/)[0] ?? "";
-  if (/^[A-Z]{2,}$/.test(first)) return s;
-  if (PROPER_NOUN_KEEP.has(baseWord(first))) return s; // keep proper nouns
-  if (/^[A-Z][a-z]*$/.test(first)) return s[0]!.toLowerCase() + s.slice(1);
-  return s;
-}
+// Plain-English event clause — category / target cue + place + casualties +
+// date. Never returns a cleaned headline.
+export function describeConflictEvent(i: ConflictEnrichedIncident): string {
+  const blob = `${i.displayTitle ?? i.title} ${i.summary ?? ""} ${i.location ?? ""}`;
+  const cat = classifyConflictCategory(i);
+  let kind: string;
+  if (/\b(army|military|police)\s+(base|camp|post|outpost|barracks|station)\b/i.test(blob)) {
+    kind = "an attack on a military or police base";
+  } else if (cat === "Bombing & Airstrike") {
+    kind = "a bombing or airstrike";
+  } else if (cat === "Abduction & Armed Crime") {
+    kind = "an abduction or armed crime";
+  } else if (cat === "Insurgency") {
+    kind = "an insurgency attack";
+  } else if (
+    detectOperationalImpacts(i).includes("Security-force or government targeting")
+  ) {
+    kind = "an attack on a security-force or government target";
+  } else {
+    kind = "an armed clash";
+  }
 
-// One concrete event clause: cleaned, sentence-cased headline + date, e.g.
-// "four suicide bombers killed as security forces repelled an attack on 15 Jun".
-function eventClause(i: ConflictEnrichedIncident): string {
-  const head = lcFirst(
-    lowerCommonWords(
-      sentenceCaseHeadline(cleanHeadline(i.displayTitle ?? i.title)),
-    ),
-  );
+  const country = (i.country ?? "").trim();
+  const hotspot =
+    country && COUNTRY_HOTSPOTS[country]
+      ? detectHotspots(country, [i]).hits[0]?.label
+      : undefined;
+  const loc = (i.location ?? "").trim();
+  const place =
+    hotspot ||
+    (loc && loc.length > 0 && loc.length <= 40 && !/^unknown$/i.test(loc)
+      ? loc
+      : "");
+  const where = place
+    ? ` near ${place}`
+    : country
+      ? ` in ${country}`
+      : "";
+  const casualty = isCasualtyEvent(i) ? " with casualties reported" : "";
   const when =
     !isNaN(i.date.getTime()) && i.date.getTime() > 0
       ? ` on ${format(i.date, "d MMM")}`
       : "";
-  return `${head}${when}`;
+  return `${kind}${where}${casualty}${when}`;
+}
+
+function eventClause(i: ConflictEnrichedIncident): string {
+  return describeConflictEvent(i);
 }
 
 // The most significant incidents in a theatre: worst severity first, then —
@@ -474,10 +490,9 @@ function mentions(text: string, term: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Headline hygiene for prose. Two jobs: (1) rank a real kinetic event ahead of
-// a political-reaction headline when deciding what to cite (eventScore), and
-// (2) turn a Title-Cased news headline into sentence case so it reads as prose
-// rather than a scraped feed row — while preserving proper nouns and acronyms.
+// Headline hygiene for RANKING only. Rank a real kinetic event ahead of a
+// political-reaction headline when deciding what to cite (eventScore).
+// Reader-facing clauses use describeConflictEvent — never pasted headlines.
 // ---------------------------------------------------------------------------
 
 // Words that signal an actual armed event (used only to order events within a
@@ -500,128 +515,6 @@ function eventScore(i: ConflictEnrichedIncident): number {
   if (isCasualtyEvent(i)) s += 2;
   if (REACTION_LEAD_RE.test(head)) s -= 3;
   return s;
-}
-
-// Generic words that also appear inside region labels but must NOT be treated
-// as proper nouns (so they lower-case normally in a headline).
-const PROPER_NOUN_STOP = new Set([
-  "the", "of", "and", "new", "west", "north", "south", "east", "central",
-  "deep", "hill", "tracts", "border", "state", "region", "province", "valley",
-]);
-// Theatre countries, capitals, demonyms and armed-actor names that the
-// gazetteer does not already cover.
-const PROPER_NOUN_EXTRA = [
-  "india", "pakistan", "myanmar", "burma", "thailand", "bangladesh",
-  "indonesia", "philippines", "nepal", "afghanistan", "afghan", "china",
-  "delhi", "islamabad", "kabul", "dhaka", "manila", "bangkok", "yangon",
-  "naypyidaw", "jakarta", "kathmandu", "naga", "nagas", "kuki", "kukis",
-  "meitei", "meiteis", "hmar", "zomi", "rohingya", "baloch", "pashtun",
-  "pathan", "taliban", "tatmadaw", "arakan", "rakhine",
-  "indian", "pakistani", "burmese", "thai", "filipino", "bangladeshi",
-];
-// Proper nouns that keep their capital when a Title-Cased headline is lowered
-// to sentence case. Built from the sub-national gazetteer + the curated set.
-const PROPER_NOUN_KEEP: Set<string> = (() => {
-  const keep = new Set<string>(PROPER_NOUN_EXTRA);
-  const add = (w: string) => {
-    const lw = w.toLowerCase();
-    if (lw.length > 2 && !PROPER_NOUN_STOP.has(lw)) keep.add(lw);
-  };
-  for (const defs of Object.values(COUNTRY_HOTSPOTS))
-    for (const d of defs)
-      for (const term of d.terms)
-        for (const w of term.split(/[\s-]+/)) add(w);
-  for (const country of Object.keys(COUNTRY_HOTSPOTS))
-    for (const w of country.split(/\s+/)) add(w);
-  return keep;
-})();
-
-function isAcronymToken(w: string): boolean {
-  const letters = w.replace(/[^A-Za-z]/g, "");
-  return letters.length >= 2 && letters === letters.toUpperCase();
-}
-function baseWord(w: string): string {
-  return w
-    .toLowerCase()
-    .replace(/[’']s$/, "")
-    .replace(/[^a-z]/g, "");
-}
-// Convert a Title-Cased headline to sentence case (proper nouns / acronyms
-// preserved). An already-sentence-case headline is returned untouched.
-function sentenceCaseHeadline(t: string): string {
-  if (!t) return t;
-  const tokens = t.split(/(\s+)/);
-  const wordIdx: number[] = [];
-  tokens.forEach((tok, idx) => {
-    if (/[A-Za-z]/.test(tok)) wordIdx.push(idx);
-  });
-  if (wordIdx.length < 5) return t;
-  let titleish = 0;
-  for (const idx of wordIdx)
-    if (/^[("']?[A-Z][a-z]+[’']?[a-z]*[).,:;!?"']?$/.test(tokens[idx]!))
-      titleish++;
-  if (titleish / wordIdx.length < 0.6) return t; // not Title Case → leave alone
-  let first = true;
-  for (const idx of wordIdx) {
-    const w = tokens[idx]!;
-    if (isAcronymToken(w)) {
-      first = false;
-      continue;
-    }
-    if (first) {
-      first = false;
-      continue;
-    }
-    if (PROPER_NOUN_KEEP.has(baseWord(w))) continue;
-    if (/^[A-Z][a-z]/.test(w)) tokens[idx] = w[0]!.toLowerCase() + w.slice(1);
-  }
-  return tokens.join("");
-}
-
-// Common nouns/verbs that news feeds frequently mis-capitalise mid-headline
-// ("four Suicide Bombers killed", "blast at Power Plant"). Sentence-casing only
-// fires on FULLY title-cased headlines, so these slip through in otherwise
-// lower-case headlines. This is an allow-list: only words KNOWN to be common are
-// lowered, so genuine proper nouns are never touched.
-const COMMON_LOWER = new Set<string>([
-  "suicide", "bomber", "bombers", "bombing", "bombings", "attack", "attacks",
-  "attacker", "attackers", "blast", "blasts", "explosion", "explosions",
-  "militant", "militants", "insurgent", "insurgents", "terrorist", "terrorists",
-  "gunman", "gunmen", "soldier", "soldiers", "security", "forces", "force",
-  "police", "army", "troops", "commander", "commanders", "fighter", "fighters",
-  "rebel", "rebels", "killed", "dead", "death", "deaths", "injured", "wounded",
-  "casualties", "hostage", "hostages", "abducted", "kidnapped", "raid", "raids",
-  "ambush", "clash", "clashes", "gunfight", "firefight", "shooting", "shootout",
-  "hospital", "treatment", "highway", "road", "roads", "bridge", "power",
-  "plant", "station", "market", "mosque", "church", "temple", "school",
-  "convoy", "checkpoint", "curfew", "protest", "protests", "rally", "mob",
-  "group", "council", "committee", "men", "man", "woman", "women", "child",
-  "children", "youth", "youths", "family", "families", "people", "village",
-  "villagers", "town", "city", "district", "drone", "supplier", "weapons",
-  "arms", "cache", "grenade", "mine", "mines", "landmine", "shell", "shelling",
-  "airstrike", "airstrikes", "strike", "strikes", "operation", "operations",
-  "foiled", "arrested", "arrest", "seized", "seize", "justice", "ban",
-  "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-  "ten", "dozens",
-]);
-// Lower-case any mid-headline word whose base is a known common word. Never
-// touches the first word (lcFirst owns that), acronyms, or proper nouns.
-function lowerCommonWords(t: string): string {
-  if (!t) return t;
-  const tokens = t.split(/(\s+)/);
-  let first = true;
-  for (let idx = 0; idx < tokens.length; idx++) {
-    const w = tokens[idx]!;
-    if (!/[A-Za-z]/.test(w)) continue;
-    if (first) {
-      first = false;
-      continue;
-    }
-    if (isAcronymToken(w)) continue;
-    if (/^[A-Z][a-z]/.test(w) && COMMON_LOWER.has(baseWord(w)))
-      tokens[idx] = w[0]!.toLowerCase() + w.slice(1);
-  }
-  return tokens.join("");
 }
 
 // Tally which named sub-national hotspots a theatre's incidents reference, by
@@ -773,11 +666,11 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
     const events = topEvents(area.incidents, 2);
     let eventSentence = "";
     if (events.length > 1) {
-      eventSentence = ` The standout events were ${eventClause(
+      eventSentence = ` The standout cases involved ${eventClause(
         events[0],
       )} and ${eventClause(events[1])}, both just before this reporting period.`;
     } else if (events.length === 1) {
-      eventSentence = ` The standout event was ${eventClause(
+      eventSentence = ` The standout case involved ${eventClause(
         events[0],
       )}, just before this reporting period.`;
     }
@@ -838,14 +731,15 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
     opening = `${stem} ${activity} reported across the country, with ${impacts} most exposed.`;
   }
 
-  // Concrete events — real attacks first (eventScore), named with their dates.
+  // Concrete events — real attacks first (eventScore), paraphrased (type /
+  // place / casualty / date), never pasted headlines.
   const events = topEvents(area.incidents, 2);
   let eventSentence = "";
-  const leadIn = ["Recent cases include", "These included", "Notable incidents include"][v];
+  const leadIn = ["Recent cases involved", "These included", "Notable cases involved"][v];
   if (events.length > 1) {
     eventSentence = `${leadIn} ${eventClause(events[0])} and ${eventClause(events[1])}.`;
   } else if (events.length === 1) {
-    eventSentence = `The standout was ${eventClause(events[0])}.`;
+    eventSentence = `The standout case involved ${eventClause(events[0])}.`;
   }
 
   // Brief, honest severity / casualty note — "deadly" only when the casualty
@@ -1070,7 +964,7 @@ function buildSituation(
       pulledInAreas.flatMap((a) => a.incidents),
       1,
     )[0];
-    const evSentence = ev ? ` The standout was ${eventClause(ev)}.` : "";
+    const evSentence = ev ? ` The standout case involved ${eventClause(ev)}.` : "";
     return `No armed activity was reported inside the reporting week, but ${joinList(
       names,
     )} ${
@@ -1105,7 +999,7 @@ function buildSituation(
     1,
   )[0];
   const evSentence = leadEvent
-    ? ` The most serious incident was ${eventClause(leadEvent)}.`
+    ? ` The most serious case involved ${eventClause(leadEvent)}.`
     : "";
   const othersSentence = secondaryClause(areas, othersStart);
   // A high-impact theatre just outside the week is flagged so it is never lost.
@@ -1143,12 +1037,11 @@ function buildOtherWatched(
     const f = focusOf(a);
     return f.hasFocus ? `${a.theatre} (${joinList(f.labels)})` : a.theatre;
   });
-  // Ground the paragraph in one concrete event from the most notable of these
-  // lower-tier theatres — without this it reads as a bare name-list glued to
-  // fixed boilerplate, identical whether one theatre is listed or six.
+  // Ground the paragraph in one concrete paraphrased event from the most
+  // notable of these lower-tier theatres — never a pasted headline.
   const notable = topEvents(areas[0]!.incidents, 1)[0];
   const evClause = notable
-    ? ` The most notable was ${eventClause(notable)} in ${areas[0]!.theatre}.`
+    ? ` The most notable case involved ${eventClause(notable)} in ${areas[0]!.theatre}.`
     : "";
   return `Lower-level activity also showed in ${joinList(parts)}.${evClause} It was quieter there this period, but any of these could worsen quickly on a single clash or attack, so they stay on watch.`;
 }
@@ -1540,6 +1433,16 @@ const GENERIC_CONFLICT_PHRASES = [
   // reports carrying the "record is thinner" / "climb the list" analyst-speak
   // reseed the cleaner reader-facing wording.
   "The record is thinner there this period",
+  // Superseded auto-prose (pre paraphrase / no-headline-paste rewrite). Saved
+  // reports still carrying the old lead-ins (which wrapped cleaned headlines)
+  // reseed the plain type+place+date clauses.
+  "The most serious incident was",
+  "The standout was",
+  "The standout event was",
+  "The standout events were",
+  "Recent cases include",
+  "Notable incidents include",
+  "The most notable was",
 ];
 
 export function isGenericConflictProse(text: string): boolean {

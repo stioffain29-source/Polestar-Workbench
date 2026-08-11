@@ -497,16 +497,21 @@ describe("buildConflictReportDataset — standout event is kinetic, not reaction
   );
 
   it("cites the kinetic event as the Situation standout, not the reaction one", () => {
-    expect(ds.autoSituation).toMatch(/most serious incident was[^.]*base/i);
+    expect(ds.autoSituation).toMatch(
+      /most serious case involved[^.]*military or police base/i,
+    );
     expect(ds.autoSituation).not.toMatch(/vigil/i);
+    // No pasted article headline.
+    expect(ds.autoSituation).not.toContain(KINETIC);
+    expect(ds.autoSituation).not.toContain(REACTION);
   });
 
   it("orders the kinetic event ahead of the reaction event in the lead paragraph", () => {
     const lead = ds.topActivityAreas[0]!;
-    const baseIdx = lead.paragraph.indexOf("army base");
-    const vigilIdx = lead.paragraph.indexOf("vigil");
-    expect(baseIdx).toBeGreaterThan(-1);
-    expect(vigilIdx === -1 || baseIdx < vigilIdx).toBe(true);
+    expect(lead.paragraph).toMatch(/military or police base/i);
+    expect(lead.paragraph).not.toMatch(/vigil/i);
+    expect(lead.paragraph).not.toContain(KINETIC);
+    expect(lead.paragraph).not.toContain(REACTION);
   });
 });
 
