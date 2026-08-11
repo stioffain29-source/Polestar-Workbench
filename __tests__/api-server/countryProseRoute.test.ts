@@ -347,3 +347,76 @@ describe("POST /countries/:slug/prose — regenerate keeps the analyst edit", ()
     ).toBe("stale-fingerprint");
   });
 });
+
+describe("PUT /countries/:slug/prose/edit — no prose row yet", () => {
+  it("mints the row from the edit instead of returning 404 (seamless editing)", async () => {
+    // The country exists but the prose engine has never run for it, so there
+    // is NO country_report_prose row. An analyst edit must still persist: the
+    // route inserts a row from the edit itself, bound to the fingerprint the
+    // client rendered against.
+    stubSelect(
+      new Map<unknown, Rows>([
+        [countryReportsTable, [{ slug: SLUG, name: "Indonesia" }]],
+        [countryReportProseTable, []],
+      ]),
+    );
+    const sections = {
+      executiveSummary: "",
+      situation: "",
+      whatHappened: "",
+      whatMatters: "",
+      implications: [],
+      watchNext: [],
+      polestarView: "",
+      bluf: "Analyst-authored bottom line.",
+      whatChanged: "",
+      outlook: "",
+    };
+    let capturedValues: Record<string, unknown> | null = null;
+    jest.spyOn(db, "insert").mockImplementation(() => {
+      const chain: Record<string, unknown> = {
+        values: (v: Record<string, unknown>) => {
+          capturedValues = v;
+          return chain;
+        },
+        onConflictDoUpdate: () => chain,
+        returning: () =>
+          Promise.resolve([
+            {
+              slug: SLUG,
+              fingerprint: "live-fingerprint",
+              sections,
+              edited: sections,
+              editedFingerprint: "live-fingerprint",
+              model: "analyst-edit",
+              generatedAt: "2026-08-11T00:00:00.000Z",
+            },
+          ]),
+      };
+      return chain as never;
+    });
+
+    const res = await fetch(`${baseUrl}/countries/${SLUG}/prose/edit`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", ...adminAuthHeaders() },
+      body: JSON.stringify({ fingerprint: "live-fingerprint", sections }),
+    });
+    const json = (await res.json()) as Record<string, never>;
+
+    expect(res.status).toBe(200);
+    expect(json.available).toBe(true);
+    expect(json.stale).toBe(false);
+    expect((json.edited as unknown as { bluf: string }).bluf).toBe(
+      "Analyst-authored bottom line.",
+    );
+    expect(capturedValues).not.toBeNull();
+    const v = capturedValues as unknown as {
+      fingerprint: string;
+      editedFingerprint: string;
+      model: string;
+    };
+    expect(v.fingerprint).toBe("live-fingerprint");
+    expect(v.editedFingerprint).toBe("live-fingerprint");
+    expect(v.model).toBe("analyst-edit");
+  });
+});

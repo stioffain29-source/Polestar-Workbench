@@ -208,7 +208,32 @@ router.put("/countries/:slug/prose/edit", async (req, res): Promise<void> => {
     .from(countryReportProseTable)
     .where(eq(countryReportProseTable.slug, slug));
   if (!existing) {
-    res.status(404).json({ error: "No generated prose to edit" });
+    // No generated prose row yet (AI engine unconfigured / never generated).
+    // The analyst can still edit: mint the row from the edit itself, bound to
+    // the fingerprint the client rendered against. `sections` mirrors the edit
+    // (there is no machine text to preserve) and the model marks provenance.
+    const now = new Date();
+    const [row] = await db
+      .insert(countryReportProseTable)
+      .values({
+        slug,
+        fingerprint: body.fingerprint,
+        sections: body.sections,
+        edited: body.sections,
+        editedFingerprint: body.fingerprint,
+        model: "analyst-edit",
+        generatedAt: now,
+      })
+      .returning();
+    res.json({
+      available: true,
+      fingerprint: row.fingerprint,
+      sections: row.sections,
+      edited: row.edited ?? null,
+      stale: false,
+      model: row.model,
+      generatedAt: row.generatedAt,
+    });
     return;
   }
   if (existing.fingerprint !== body.fingerprint) {

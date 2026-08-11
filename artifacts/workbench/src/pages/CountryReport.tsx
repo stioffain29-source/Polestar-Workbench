@@ -687,11 +687,32 @@ export default function CountryReport() {
   // changes (so it can never go stale) or on an explicit Redraft. When the
   // LLM is unavailable the page falls back to the deterministic template.
   const generateProse = useGenerateCountryProse();
+  // Blank draft used when no AI prose row exists yet: the inline editors
+  // prefill from the engine defaults, and blank fields save as "" (= keep
+  // engine text), so seeding empty is exactly "no overrides yet".
+  const EMPTY_PROSE_SECTIONS: CountryProseSections = {
+    executiveSummary: "",
+    situation: "",
+    whatHappened: "",
+    whatMatters: "",
+    implications: [],
+    watchNext: [],
+    polestarView: "",
+    bluf: "",
+    whatChanged: "",
+    outlook: "",
+  };
   const editProse = useEditCountryProse();
   const [proseResult, setProseResult] = useState<CountryProseResult | null>(null);
   const [proseUnavailable, setProseUnavailable] = useState(false);
   const [proseDraft, setProseDraft] = useState<CountryProseSections | null>(null);
   const proseRequestKey = useRef<string | null>(null);
+  // The latest server fingerprint, captured from EVERY generate response —
+  // including `{available:false}` (AI unconfigured), which still carries the
+  // fingerprint of the live data basis. Edits made without any AI prose are
+  // saved against this fingerprint, so editing works even when the prose
+  // engine has never run for this country.
+  const lastFingerprint = useRef<string | null>(null);
   // Busy state is derived from a LOCAL in-flight counter, not the shared React
   // Query mutation's `isPending`. StrictMode double-invokes the prose effect in
   // dev, which can strand the shared mutation in a zombie pending state and
@@ -823,6 +844,7 @@ export default function CountryReport() {
         // engine is unconfigured or the upstream call failed. Treat it exactly
         // like a thrown error: fall back to the deterministic template and show
         // the unavailable hint.
+        lastFingerprint.current = res.fingerprint;
         if (!res.available) {
           setProseResult(null);
           setProseUnavailable(true);
@@ -863,6 +885,7 @@ export default function CountryReport() {
           force: true,
         },
       });
+      lastFingerprint.current = res.fingerprint;
       // 200 {available:false} -> degrade to the template just like a thrown error.
       if (!res.available) {
         setProseResult(null);
@@ -880,9 +903,15 @@ export default function CountryReport() {
   };
 
   // Seed the editable prose draft when entering edit mode; clear on exit.
+  // When no AI prose exists (engine unconfigured, or never generated for this
+  // country) the draft seeds EMPTY: every inline editor then prefills with the
+  // engine default text, and only genuine analyst overrides are stored — so
+  // editing is available regardless of the prose engine's state.
   useEffect(() => {
-    if (editing && proseResult && !proseDraft) {
-      setProseDraft(proseResult.edited ?? proseResult.sections);
+    if (editing && !proseDraft) {
+      setProseDraft(
+        proseResult ? (proseResult.edited ?? proseResult.sections) : { ...EMPTY_PROSE_SECTIONS },
+      );
     }
     if (!editing && proseDraft) setProseDraft(null);
   }, [editing, proseResult, proseDraft]);
@@ -1158,15 +1187,57 @@ export default function CountryReport() {
       // Persist analyst overrides to the AI prose. Bound to the fingerprint the
       // draft was written against — a stale fingerprint (data moved on) is
       // rejected server-side so an edit can never describe an old snapshot.
-      if (proseDraft && proseResult) {
+      // Persist prose overrides whenever the draft holds ANY content — even
+      // when no AI prose row exists yet (the server mints one from the edit).
+      // A draft of all-blank fields means "keep engine text everywhere": skip
+      // the call rather than minting an empty row.
+      const draftHasContent =
+        proseDraft != null &&
+        Object.values(proseDraft).some((v) =>
+          Array.isArray(v)
+            ? v.some((x) => String(x).trim() !== "")
+            : typeof v === "string"
+              ? v.trim() !== ""
+              : v != null && Object.values(v).some((x) => String(x).trim() !== ""),
+        );
+      const proseFp = proseResult?.fingerprint ?? lastFingerprint.current;
+      if (proseDraft && draftHasContent && proseFp) {
         try {
           const res = await editProse.mutateAsync({
             slug,
-            data: { fingerprint: proseResult.fingerprint, sections: proseDraft },
+            data: { fingerprint: proseFp, sections: proseDraft },
           });
           setProseResult(res);
         } catch (err) {
-          console.error("[CountryReport] prose edit save failed", err);
+          // 409 = the stored row's fingerprint predates the live data basis.
+          // Recover seamlessly: refresh the row against the live basis, then
+          // re-apply the analyst's edit to the fresh fingerprint.
+          try {
+            const regen = await generateProse.mutateAsync({
+              slug,
+              data: {
+                region: draft.region ?? "",
+                basisDays: active.basisDays,
+                periodWord,
+                issueDate,
+                incidents: proseIncidents,
+                baseline: baselineContext,
+                variant: proseVariant,
+                force: false,
+              },
+            });
+            lastFingerprint.current = regen.fingerprint;
+            const res = await editProse.mutateAsync({
+              slug,
+              data: { fingerprint: regen.fingerprint, sections: proseDraft },
+            });
+            setProseResult(res);
+          } catch (err2) {
+            console.error("[CountryReport] prose edit save failed", err, err2);
+            window.alert(
+              "Your narrative edits could not be saved (the report data may have changed). The rest of the report was saved — please re-open Edit and try again.",
+            );
+          }
         }
       }
       qc.invalidateQueries({ queryKey: getGetCountryReportQueryKey(slug) });
