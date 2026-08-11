@@ -2630,7 +2630,7 @@ const COUNTRY_COMMERCE_DEMAND_RE =
 // any case, carries a HARD_SECURITY word that rescues it). "clash" itself is
 // still NOT a trigger — the team name / selection idiom is what drops the story.
 const COUNTRY_SPORTS_NOISE_RE =
-  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|badminton|athletics|rugby|netball|cricket|grand final|cup final|league title|test match|friendly match|international friendly|match (?:preview|report|day|recap|highlights?|winner)|matchday|tactical (?:analysis|preview|breakdown|masterclass|battle)|group stage|knockout (?:stage|round)|quarter[- ]?finals?|semi[- ]?finals?|round of \d+|kick[- ]?off|half[- ]?time|full[- ]?time|extra time|stoppage time|man of the match|clean sheet|own goal|penalty shoot[- ]?out|goalkeep\w*|midfield\w*|hat[- ]?trick|top scorer|starting (?:xi|line[- ]?up)|head[- ]?to[- ]?head|\bderby\b|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?|blackhawks|png hunters|(?:squad|team|player|side) selection|selection ahead of|named (?:his|the|their) (?:squad|side|team|line[- ]?up)|sepak ?bola|futsal|bulu ?tangkis|bola voli|bola basket|\btimnas\b|\bliga\b|\bpiala\b|\bpertandingan\b|laga (?:persahabatan|uji coba|kandang|tandang|perdana|pamungkas|hidup mati)|adu penalti|\bkiper\b|\bgelandang\b|\bwasit\b|babak (?:penyisihan|grup|gugur|kualifikasi|pertama|kedua))\b/i;
+  /\b(\d+[- ]\d+ (win|victory|defeat|loss|draw)|football club|\bfc\b|\bpsl\b|premier league|premier soccer league|super league|soccer|tournament|championship|basketball|volleyball|badminton|athletics|rugby|netball|cricket|grand final|cup final|league title|test match|friendly match|international friendly|match (?:preview|report|day|recap|highlights?|winner)|matchday|tactical (?:analysis|preview|breakdown|masterclass|battle)|group stage|knockout (?:stage|round)|quarter[- ]?finals?|semi[- ]?finals?|round of \d+|kick[- ]?off|half[- ]?time|full[- ]?time|extra time|stoppage time|man of the match|clean sheet|own goal|penalty shoot[- ]?out|goalkeep\w*|midfield\w*|hat[- ]?trick|top scorer|starting (?:xi|line[- ]?up)|head[- ]?to[- ]?head|\bderby\b|cross[- ]code coup|maple leafs|\bleafs\b|\bnhl\b|\bnba\b|\bnfl\b|\bmlb\b|playoffs?|blackhawks|png hunters|(?:squad|team|player|side) selection|selection ahead of|named (?:his|the|their) (?:squad|side|team|line[- ]?up)|sepak ?bola|futsal|bulu ?tangkis|bola voli|bola basket|\btimnas\b|\bliga\b|\bpiala\b|\bpertandingan\b|laga (?:persahabatan|uji coba|kandang|tandang|perdana|pamungkas|hidup mati)|adu penalti|\bkiper\b|\bgelandang\b|\bwasit\b|babak (?:penyisihan|grup|gugur|kualifikasi|pertama|kedua)|(?:home|away) (?:clash|fixture|leg|game)|return of \d+ players?|players? ahead of (?:the )?(?:home|away|season|final|clash))\b/i;
 
 // Unambiguous sports-SPECTACLE phrases. A country security report never leads on
 // the World Cup or the Olympics, and these mega-events routinely carry
@@ -2715,6 +2715,55 @@ const COUNTRY_SECURITY_CAPACITY_RE =
 // "wanted man neutralised" (real ops in conflict zones) stay.
 const COUNTRY_POLICE_PROCESS_RE =
   /\bapprehend\w*\b.{0,30}\bsuspect\b|\bsuspect\b.{0,30}\b(?:rescued|held captive|apprehend\w*)\b/i;
+
+// CIVIC / TRANSPORT ADMINISTRATION and ceremonial INFRASTRUCTURE items — a
+// taxi-rank rearrangement, terminal entry change, a police station opened /
+// refurbished / decommissioned, new barracks or vehicle fleet, a road project
+// progressing, an airstrip's first landing, a student training feature, an MP
+// touring district projects, or a funding commitment to aviation / roads.
+// These are governance / infrastructure diary items, not security incidents —
+// a PNG brief led on "NAC introduces new Taxi drop-off arrangements" and
+// "RPNGC OPENS TEN NEW POLICE BARRACKS DUPLEXES". Dropped UNLESS a HARD
+// security signal is present, so "gunmen attack Asaro police station" or an
+// ambush on a road project convoy still survives.
+const COUNTRY_CIVIC_ADMIN_RE = new RegExp(
+  [
+    String.raw`\b(?:taxi|drop[- ]?off arrangements?|car park|parking arrangements?|check[- ]?in)\b`,
+    String.raw`\bterminal (?:entry|exit)\b`,
+    String.raw`\b(?:opens?|opened|commission\w*|decommission\w*|refurbish\w*|new look|handover of)\b.{0,50}\b(?:police station|barracks|duplexes|station|classrooms?|clinic|wards?|market|bridge|terminal|airstrip|fire station)\b`,
+    String.raw`\b(?:police station|barracks|fire station)\b.{0,40}\b(?:opens?|opened|commission\w*|decommission\w*|refurbish\w*|upgrade\w*)\b`,
+    String.raw`\b(?:road|bridge|airport|airstrip|wharf|housing) project\b.{0,50}\b(?:advanc\w*|progress\w*|momentum|launch\w*|underway|completed?)\b`,
+    String.raw`\bfirst landing at\b`,
+    String.raw`\bnew (?:police )?(?:vehicle )?fleet\b`,
+    String.raw`\bstudents? (?:get|gain|receive)\b.{0,40}\b(?:experience|training|exposure)\b`,
+    String.raw`\b(?:mp|governor|minister|member)\b.{0,30}\bvisits? (?:projects?|districts?|sites?)\b`,
+    String.raw`\b(?:backs?|commits?|pledges?|allocates?)\b.{0,10}\bk[\d,.]+\b`,
+    String.raw`\b(?:backs?|commits?|funds?)\b.{0,40}\b(?:lifeline aviation|aviation services?|road maintenance)\b`,
+    String.raw`\b(?:correctional|prison) service reforms?\b`,
+    String.raw`\brehabilitation at the centre\b`,
+    String.raw`\bunder new partnership\b`,
+    String.raw`\b(?:takes? over|hands? over|assumes?)\b.{0,30}\b(?:ministry|portfolio)\b`,
+    String.raw`\b(?:ministry|portfolio)\b.{0,20}\bhandovers?\b`,
+    String.raw`\bpolice (?:recruitment|college|training)\b`,
+    String.raw`\btraining capacity\b`,
+    String.raw`\broad (?:upgrade|maintenance|rehabilitation)\b`,
+    String.raw`\b(?:asphalt|resealing|overlay) (?:project|works?)\b`,
+    String.raw`\binfrastructure (?:investment|push|upgrade)\b`,
+    String.raw`\baviation (?:sector|portfolio|infrastructure)\b`,
+    String.raw`\bcommercial (?:expertise|expansion)\b`,
+    String.raw`\bexpress\w* appreciation\b`,
+    String.raw`\breceives? (?:vital|new)?\s*(?:office|maintenance)? ?equipment\b`,
+    String.raw`\bnew housing\b`,
+  ].join("|"),
+  "i",
+);
+
+// Defence-cooperation / mil-to-mil PR — "X company strengthens relationship
+// with the defence force", expanding medical cooperation, a visiting army band.
+// Partnership colour around an exercise, not an incident. Dropped UNLESS a
+// FRESH attack word is present (same gate as the exercise drop).
+const COUNTRY_DEFENCE_COOPERATION_RE =
+  /\bstrengthens? (?:relationships?|ties|cooperation|partnership)\b|\b(?:expanding|deepening) (?:defen[cs]e|military|medical) cooperation\b|\b(?:army|military|navy) band\b|\bdeliver care during\b/i;
 
 // Scraped-aggregator junk: a YouTube-style video-id signature "(vFetqxZnwf)"
 // left in a syndicated headline — a 9–14 char token from [A-Za-z0-9_-] with
@@ -2931,6 +2980,17 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // apprehended, a captive rescued by police) unless a hard security signal is
   // present (so "police apprehend armed robbery gang" survives).
   if (COUNTRY_POLICE_PROCESS_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop civic / transport ADMIN and ceremonial infrastructure items (taxi
+  // rearrangements, station openings, road-project progress) unless a hard
+  // security signal is present ("gunmen attack police station" survives).
+  if (COUNTRY_CIVIC_ADMIN_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+    return false;
+  }
+  // Drop defence-cooperation / mil-to-mil PR (partnership colour around an
+  // exercise) unless a FRESH attack word is present.
+  if (COUNTRY_DEFENCE_COOPERATION_RE.test(text) && !COUNTRY_FRESH_ATTACK_RE.test(text)) {
     return false;
   }
   // Drop CULTURAL / heritage / spiritual FEATURES (a reflective piece on

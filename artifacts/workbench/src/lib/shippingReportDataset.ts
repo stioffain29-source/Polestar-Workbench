@@ -52,8 +52,8 @@ export interface EnrichedIncident extends ShippingReportIncident {
   issue: string;
 }
 
-export interface VesselRow extends EnrichedIncident { vesselType: VesselIncidentType }
-export interface PiracyRow extends EnrichedIncident { act: NonNullable<ReturnType<typeof classifyPiracy>> }
+export interface VesselRow extends CanonicalIncident { vesselType: VesselIncidentType }
+export interface PiracyRow extends CanonicalIncident { act: NonNullable<ReturnType<typeof classifyPiracy>> }
 
 /** One reference to a syndicated article folded beneath a canonical incident. */
 export interface SupportingArticle {
