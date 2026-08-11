@@ -229,6 +229,17 @@ function cleanHeadline(text: string): string {
   if (!t) return "";
   t = t.split(" | ")[0]!.trim();
   t = t.replace(/\s*[–—-]\s*OpEd\s*$/i, "").trim();
+  // Trailing publisher masthead ("… : Police - ABC News").
+  t = t.replace(/\s+[-–—]\s+[A-Z][\w .&'’]{2,28}$/, "").trim();
+  // Trailing attribution tails — "…: sources", "…: Police", "…: Pakistan's
+  // state media", "…, officials say". Headline attribution is cruft inside
+  // flowing prose ("…in Balochistan: sources on 9 Aug" was an owner-flagged
+  // defect). The colon form allows a short qualifier before the attribution
+  // noun so "X: Pakistan's state media" is caught without touching a colon
+  // that introduces real substance.
+  t = t.replace(/:\s*[^:]{0,30}\b(?:police|sources?|officials?|authorities|witnesses|reports?|agency|media|army)\b[^:]{0,20}$/i, "").trim();
+  t = t.replace(/,\s*(?:police|sources?|officials?|authorities|witnesses|reports?|agency|army)(?:\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?))?\s*$/i, "").trim();
+  t = t.replace(/,?\s*(?:officials?|police|sources?|authorities|witnesses)\s+(?:say|said|reported?|claim(?:s|ed)?|confirm(?:s|ed)?)\s*$/i, "").trim();
   t = t.replace(/^[A-Z][A-Za-z'’.&\- ]{2,22}:\s+/, "").trim();
   return t.replace(/\s+/g, " ").trim();
 }
@@ -281,8 +292,41 @@ function topEvents(
       (a, b) =>
         b.sev - a.sev || b.score - a.score || b.deadly - a.deadly || b.t - a.t,
     )
-    .slice(0, max)
-    .map((x) => x.i);
+    .map((x) => x.i)
+    // Never cite two syndicated copies of the SAME event ("security forces
+    // kill 15 terrorists…" twice was an owner-flagged defect). The upstream
+    // collapse passes miss rewrites with different tails, so apply a local
+    // token-overlap guard between the picked clauses themselves.
+    .filter((function () {
+      const picked: { toks: Set<string>; nums: Set<string>; day: string }[] = [];
+      return (i: ConflictEnrichedIncident) => {
+        const head = cleanHeadline(i.displayTitle ?? i.title).toLowerCase();
+        const toks = new Set(head.split(/[^a-z0-9]+/).filter((w) => w.length > 3));
+        // Casualty/count figures, with number WORDS normalised so "15 killed"
+        // and "fifteen killed" still collide.
+        const WORD_NUM: Record<string, string> = { two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10", fifteen: "15", twenty: "20" };
+        const nums = new Set(
+          (head.match(/\b(\d+|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty)\b/g) ?? [])
+            .map((n) => WORD_NUM[n] ?? n),
+        );
+        const day = !isNaN(i.date.getTime()) ? i.date.toISOString().slice(0, 10) : "";
+        for (const p of picked) {
+          let inter = 0;
+          for (const w of toks) if (p.toks.has(w)) inter++;
+          const union = p.toks.size + toks.size - inter;
+          if (union > 0 && inter / union >= 0.45) return false;
+          // Same day + a shared casualty figure = the same operation reported
+          // in different words ("security forces kill 15 terrorists…" vs
+          // "Pakistan says 15 militants killed…").
+          if (day && p.day === day && nums.size > 0) {
+            for (const n of nums) if (p.nums.has(n)) return false;
+          }
+        }
+        picked.push({ toks, nums, day });
+        return true;
+      };
+    })())
+    .slice(0, max);
 }
 
 // ---------------------------------------------------------------------------
@@ -796,9 +840,13 @@ function buildAreaParagraph(area: ConflictActivityArea, rank: number): string {
   // Brief, honest severity / casualty note — "deadly" only when the casualty
   // signal is real, never on severity rank alone.
   let toll = "";
-  if (deadly) {
+  // Never restate deaths the event clauses already describe — "21 Abu Sayyaf
+  // killed … Some proved lethal." was an owner-flagged defect. The toll line
+  // only fires when the cited events do NOT themselves mention fatalities.
+  const eventsStateDeaths = /\b(kill|killed|kills|dead|deaths?|die[ds]?|fataliti|slain|massacre)/i.test(eventSentence);
+  if (deadly && !eventsStateDeaths) {
     toll = ["Several of these attacks killed people.", "Some proved lethal.", "There were fatalities."][v];
-  } else if (sevRank >= 4) {
+  } else if (!deadly && sevRank >= 4) {
     toll = `Severity reached ${sev}, though no deaths are confirmed.`;
   }
 

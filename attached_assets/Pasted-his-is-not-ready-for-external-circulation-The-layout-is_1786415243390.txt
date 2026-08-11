@@ -1,0 +1,27 @@
+his is not ready for external circulation. The layout is broadly professional, but the data integrity failures undermine the entire report.
+
+The central problem is that three different measures appear to be combined and presented as though they are all incidents:
+
+11 confirmed incidents on page 1.
+43 confirmed incidents in Fast Facts.
+397 regional records in the regional chart.
+
+These appear to represent deduplicated incidents, news articles and raw mentions respectively. The report never distinguishes them.
+
+Other serious shortfalls:
+
+Duplicate reporting is counted as separate attacks. Several ADNOC, UAE and UKMTO headlines concern the same underlying vessel attack. The Saudi tanker rerouting story also appears repeatedly.
+The Indonesian drug seizure is badly misclassified. It is placed in the Strait of Hormuz, labelled a vessel seizure and repeatedly selected as the route’s latest or standout incident. It is an Indonesian maritime law-enforcement event, not a Hormuz security incident.
+Geolocation is unreliable. An incident off southwest Yemen is assigned to the Strait of Hormuz, while another Gulf of Aden attack appears only in the later dataset.
+The piracy classification is unsound. A state missile attack is classified as piracy because UAE statements used that political description. That is not a sufficient basis for the incident taxonomy.
+The reporting window is inconsistent. The ReCAAP item concerns 28 July to 3 August but is included in the 4 to 10 August period, apparently using publication date rather than incident date.
+Risk assessments contradict one another. Red Sea is rated Extreme and Bab el Mandeb Moderate near the front, but the final Polestar View says risk is Low everywhere outside Hormuz.
+Commercial impact contradicts the rest of the report. One section says there was no port, freight, insurance or commercial disruption, despite repeated claims of severe disruption, rerouting, war-risk pressure and six carriers avoiding the Red Sea.
+AIS reporting is incomplete. Entries such as “Tracked · 30 AIS-dark” provide no total, denominator, observation period or methodology. The figures cannot support comparison between chokepoints.
+“Business Impact 8” is unexplained. It looks like a score but may simply be the number of impact labels.
+Confidence ratings have no stated basis. Low confidence plus zero recorded incidents should not automatically produce an Insignificant risk rating.
+The analysis is repetitive. There are two Polestar Views, two Watch Next sections, multiple incident tables and repeated descriptions of the same events.
+The advice is thin. There is only one meaningful business recommendation. There are no decision triggers, escalation thresholds or practical contingency actions.
+There are production faults. “Fast Facts” is orphaned at the bottom of page 4, Watch Next on page 8 is collapsed into a run-on line and appears truncated, and the disclaimer occupies an almost empty final page.
+
+The likely root cause is that the builder is treating articles as incidents and then combining deduplicated incidents, article records and raw regional mentions in the same report. Every section must be generated from one canonical, deduplicated incident dataset. Articles should sit beneath an incident as supporting sources, never become additional incidents.

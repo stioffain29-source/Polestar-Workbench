@@ -1487,6 +1487,17 @@ const CONFLICT_VIOLENCE_OVERRIDE: RegExp =
 // The editorial-label pattern anchors at the start of the haystack (title is
 // first). The metaphor patterns bind a kinetic noun to an abstract-domain noun
 // so a literal ambush/crossfire report is never dropped.
+// Lone-shooter / school-shooting CRIME gate. A school shooting or domestic
+// gun rampage is violent crime, not armed conflict, yet its casualty wording
+// ("kills 7") always trips the violence override — so this must run as its own
+// pre-override check. Gated on the ABSENCE of an armed-group/military actor so
+// a genuine insurgent attack on a school ("militants storm school in
+// Balochistan") is never dropped.
+const CONFLICT_LONE_SHOOTER_RE =
+  /\b(?:school|high school|campus) (?:shooting|shooter|gunman)|(?:student|teen(?:age)?d?) gunman|gunman (?:kills?|killed|shoots?|shot|fires?|fired|goes on|went on)\b[^.]{0,50}\b(?:grandparents?|classmates?|teachers?|school|family|rampage|government office)|\bmass shooting\b/i;
+const CONFLICT_ARMED_ACTOR_RE =
+  /\b(?:insurgen\w*|militant\w*|rebel\w*|separatis\w*|terroris\w*|jihad\w*|taliban|junta|isis|is[- ]k|jemaah|abu sayyaf|\bnpa\b|\bbrn\b|\bttp\b|maoist\w*|naxal\w*|soldier\w*|army|security forces|militia\w*|armed group\w*)/i;
+
 const CONFLICT_HARD_EXCLUDE: RegExp[] = [
   /^\s*(comment|opinion|analysis|editorial|explainer|explained|viewpoint|perspective|column|blog|essay|op[- ]?ed)\b\s*[:|\-–—]/i,
   /\b(ambush|minefield|crossfire|cross[- ]fire|tightrope|powder keg|powder[- ]keg)\b[^.]{0,45}\b(politic\w*|democra\w*|econom\w*|budget|election\w*|elector\w*|diploma\w*|parliament\w*|boardroom|classroom|courtroom|narrative|discourse|debate|identity|ideolog\w*)\b/i,
@@ -2079,6 +2090,9 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
   if (topic === "conflict") {
     const hard = firstMatch(text, CONFLICT_HARD_EXCLUDE);
     if (hard) return { relevant: false, reason: `slop: conflict op-ed/metaphor (/${hard.source}/)` };
+    if (CONFLICT_LONE_SHOOTER_RE.test(text) && !CONFLICT_ARMED_ACTOR_RE.test(text)) {
+      return { relevant: false, reason: "slop: lone-shooter/school-shooting crime (no armed-group actor)" };
+    }
     if (!CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
       const m = firstMatch(text, CONFLICT_EXCLUDE);
       if (m) return { relevant: false, reason: `slop: conflict off-topic (/${m.source}/)` };
@@ -2154,6 +2168,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // longer re-admit the piece as if it were a real kinetic event.
     const hard = firstMatch(text, CONFLICT_HARD_EXCLUDE);
     if (hard) return { relevant: false, reason: `excluded: conflict op-ed/metaphor (/${hard.source}/)` };
+    // Lone-shooter / school-shooting crime — must run BEFORE the violence
+    // override (the casualty wording would otherwise re-admit it).
+    if (CONFLICT_LONE_SHOOTER_RE.test(text) && !CONFLICT_ARMED_ACTOR_RE.test(text)) {
+      return { relevant: false, reason: "excluded: lone-shooter/school-shooting crime (no armed-group actor)" };
+    }
     if (!CONFLICT_VIOLENCE_OVERRIDE.test(text)) {
       const m = firstMatch(text, CONFLICT_EXCLUDE);
       if (m) return { relevant: false, reason: `excluded: conflict off-topic relief/peace (/${m.source}/)` };
