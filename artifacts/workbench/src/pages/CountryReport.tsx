@@ -658,6 +658,12 @@ export default function CountryReport() {
       // every empty-week surface (BLUF, tactical brief, confidence, posture)
       // reads "Not Assessed" instead of implying a confirmed quiet week.
       coverageUnconfirmed: coverage.state === "coverage-problem",
+      // Analyst Top 3 Developments curation — pins lead the section, section
+      // excludes fall back to Incident Details. Persisted in section_overrides.
+      top3Curation: {
+        pinnedIds: sectionOverrides.top3PinnedIds ?? [],
+        excludedIds: sectionOverrides.top3ExcludedIds ?? [],
+      },
     };
     switch (structuredTheatre) {
       case "westPapua":

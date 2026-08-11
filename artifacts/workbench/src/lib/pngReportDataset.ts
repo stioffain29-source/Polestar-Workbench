@@ -2394,7 +2394,30 @@ export function buildStructuredReportDataset(
     escalationIndicators,
     jakartaTacticalBrief,
     whatChanged,
-    topThree,
+    topThree: (() => {
+      // Reconcile the FINAL Top-3 selection (initial pick, engine replacement,
+      // or analyst curation) with Incident Details: one incident must never
+      // render both as a Top-3 tile and as a location-bucket card. The bucket
+      // arrays were built from the INITIAL selection's member ids, so prune
+      // them against the final selection here (removal-only, never re-adds).
+      const finalTopIds = new Set(topThree.map((it) => it.id));
+      const prune = (arr: PngReportItem[]) => {
+        for (let i = arr.length - 1; i >= 0; i--) {
+          if (finalTopIds.has(arr[i].id)) arr.splice(i, 1);
+        }
+      };
+      for (const b of buckets) {
+        prune(b.items);
+        if (b.strands) {
+          prune(b.strands.confirmed);
+          prune(b.strands.police);
+          prune(b.strands.trend);
+        }
+      }
+      prune(otherNational);
+      prune(incidentDetailsItems);
+      return topThree;
+    })(),
     buckets,
     otherNational,
     otherNationalHadFeatured,

@@ -438,7 +438,10 @@ export default function PngCountryReportBody({
   // analyse d.incidentDetailsItems: every window incident NOT promoted into the
   // Top 3 STORY CLUSTERS (so a syndicated re-run of a Top 3 story never reappears
   // here). Operational Impact still draws on the full window.
-  const topThree = d.topThree.slice(0, 3);
+  // The dataset already caps the automatic selection at three; the list only
+  // exceeds three when the analyst explicitly pinned more, and every pinned
+  // development must render (never silently dropped).
+  const topThree = d.topThree;
   const incidentThemes = d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems);
   // Cap the generic Operational Impact list (≤5) and Outlook escalation
   // indicators (≤3). Jakarta returns below with its approved compact layout.

@@ -890,7 +890,7 @@ function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
 
   // A week with no developments renders NO "Top 3 Developments" section at all
   // — a headline section with nothing in it reads as a contradiction.
-  const topThree = d.topThree.slice(0, 3);
+  const topThree = d.topThree;
   if (topThree.length > 0) {
     drawSectionHeading(ctx, "Top 3 Developments");
     for (const item of topThree) drawStructuredItemCard(ctx, item, true, true);
@@ -935,7 +935,7 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
   // No developments → omit the section entirely (matches the on-screen body).
-  const topThree = d.topThree.slice(0, 3);
+  const topThree = d.topThree;
   if (topThree.length > 0) {
     drawSectionHeading(ctx, "Top 3 Developments");
     for (const it of topThree) drawStructuredItemCard(ctx, it, true);
