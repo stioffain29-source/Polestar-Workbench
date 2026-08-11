@@ -219,29 +219,30 @@ function runCount(text: string[], seq: string[]): number {
   return count;
 }
 
-// The four `drawSectionWithProse(..., X || "Not populated.")` sections. Headings
-// are pinned as test-local canonical constants (NOT imported) so a heading rename
-// in renderStructuredBrief diverges from these and fails, instead of the rename
-// being silently absorbed.
-const NOT_POPULATED_HEADINGS = [
+// Post-merge contract (owner ruling, 11 Aug 2026 — five canonical sections):
+// only Bottom Line Up Front keeps a `|| "Not populated."` fallback; every other
+// section is OMITTED when it has no content, mirroring PngCountryReportBody's
+// inclusion gates exactly. Headings are pinned as test-local canonical
+// constants (NOT imported) so a heading rename in renderStructuredBrief
+// diverges from these and fails, instead of being silently absorbed.
+const NOT_POPULATED_HEADINGS = ["Bottom Line Up Front"];
+
+// The full canonical heading vocabulary (current + retired). Used for the
+// "no heading directly followed by another heading" empty-section guard.
+const HEADING_VOCAB = [
   "Bottom Line Up Front",
-  "Outlook: Next Seven Days",
+  "Top 3 Developments",
+  "Current Situation",
+  "Actions & Outlook",
   "Polestar View",
 ];
 
-// Every structured-brief section heading expected on the EMPTY-data path, in
-// render order. Each must be followed by a non-empty body (never immediately by
-// another heading = an empty section). "Top 3 Developments" is deliberately NOT
-// here: with zero developments the section is omitted entirely rather than
-// rendered around a filler line (a headline section with nothing in it reads as
-// a contradiction).
-const ALL_HEADINGS = [
-  "Bottom Line Up Front",
-  "Current Situation",
+// Retired standalone section headings — merged into "Actions & Outlook". If any
+// reappears as a drawSectionHeading, the preview/PDF section model diverged.
+const RETIRED_HEADINGS = [
   "Operational Impact",
   "Recommended Actions",
   "Outlook: Next Seven Days",
-  "Polestar View",
 ];
 
 describe.each(THEATRES)(
@@ -267,15 +268,22 @@ describe.each(THEATRES)(
       expect(text).not.toContain("TOP 3 DEVELOPMENTS");
     });
 
-    it("emits every section heading followed by a non-empty body, never another heading", async () => {
+    it("omits the blanked prose sections instead of drawing them empty, and never retires a heading into view", async () => {
       const text = await briefPdfText(name);
-      const headingSet = new Set(ALL_HEADINGS.map((h) => h.toUpperCase()));
-      for (const heading of ALL_HEADINGS) {
+      // Outlook and Polestar were blanked by the dataset mock, so their
+      // sections must be OMITTED (no filler), matching the on-screen body.
+      expect(text).not.toContain("POLESTAR VIEW");
+      for (const retired of RETIRED_HEADINGS) {
+        expect(text).not.toContain(retired.toUpperCase());
+      }
+    });
+
+    it("never emits a section heading directly followed by another heading (empty section)", async () => {
+      const text = await briefPdfText(name);
+      const headingSet = new Set(HEADING_VOCAB.map((h) => h.toUpperCase()));
+      const rendered = HEADING_VOCAB.filter((h) => text.includes(h.toUpperCase()));
+      for (const heading of rendered) {
         const idx = text.indexOf(heading.toUpperCase());
-        expect({ heading, present: idx >= 0 }).toEqual({
-          heading,
-          present: true,
-        });
         const next = text[idx + 1];
         // The next recorded call must be a real body line — present, non-empty,
         // and NOT itself another section heading (which would mean the section

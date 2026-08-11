@@ -936,68 +936,87 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     ctx.y += 4;
   }
 
-  drawSectionHeading(ctx, "Current Situation");
-  if (d.executiveSummary.trim() !== "") renderProse(ctx, d.executiveSummary);
+  // Current Situation — same inclusion gate as PngCountryReportBody: the
+  // section renders only when it has framing prose, themes, or window items.
   const incidentThemes =
     d.incidentThemesOverride ??
     buildCountryIncidentThemes(d.incidentDetailsItems);
-  if (incidentThemes.length === 0) {
-    if (d.windowItems.length > 0) {
-      renderProse(
-        ctx,
-        d.incidentDetailsItems.length === 0
-          ? "No further incident reporting beyond the developments above this period."
-          : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail.",
-      );
-    } else if (d.executiveSummary.trim() === "") {
-      renderProse(ctx, d.emptyLocationFallback);
-    }
-  } else {
-    for (const group of incidentThemes) {
-      drawJakartaStrandLabel(ctx, group.heading);
-      renderProse(ctx, group.paragraph);
+  if (
+    d.executiveSummary.trim() !== "" ||
+    incidentThemes.length > 0 ||
+    d.windowItems.length > 0
+  ) {
+    drawSectionHeading(ctx, "Current Situation");
+    if (d.executiveSummary.trim() !== "") renderProse(ctx, d.executiveSummary);
+    if (incidentThemes.length === 0) {
+      if (d.windowItems.length > 0) {
+        renderProse(
+          ctx,
+          d.incidentDetailsItems.length === 0
+            ? "No further incident reporting beyond the developments above this period."
+            : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail.",
+        );
+      }
+    } else {
+      for (const group of incidentThemes) {
+        drawJakartaStrandLabel(ctx, group.heading);
+        renderProse(ctx, group.paragraph);
+      }
     }
   }
 
-  drawSectionHeading(ctx, "Operational Impact");
+  // Actions & Outlook — merged block (owner ruling, 11 Aug 2026): Operational
+  // Impact, Recommended Actions and the Outlook render as strands under ONE
+  // section heading. Inclusion gates mirror PngCountryReportBody EXACTLY: each
+  // strand renders only when it has content, and the section renders only when
+  // at least one strand does — no headless-only fallback prose.
   const operationalImpact =
     d.operationalImpactOverride ??
     buildOperationalImpactBullets(d.windowItems).slice(0, 5);
-  if (operationalImpact.length === 0) {
-    renderProse(ctx, d.businessImpactEmptyNote);
-  } else {
-    drawJakartaBulletList(ctx, operationalImpact);
-  }
-
-  drawSectionHeading(ctx, "Recommended Actions");
-  if (d.proseVariant === "operating-risk") {
-    if (d.businessImpact.length === 0) renderProse(ctx, d.businessImpactEmptyNote);
-    else drawJakartaBulletList(ctx, d.businessImpact);
-  } else if (d.recommendedActions.length === 0) {
-    renderProse(ctx, d.businessImpactEmptyNote);
-  } else {
-    for (const group of d.recommendedActions) {
-      drawJakartaStrandLabel(ctx, group.heading);
-      drawJakartaBulletList(ctx, group.actions);
+  const hasActions =
+    d.proseVariant === "operating-risk"
+      ? d.businessImpact.length > 0
+      : d.recommendedActions.length > 0;
+  if (operationalImpact.length > 0 || hasActions || d.outlook.trim() !== "") {
+    drawSectionHeading(ctx, "Actions & Outlook");
+    if (operationalImpact.length > 0) {
+      drawJakartaStrandLabel(ctx, "Operational Impact");
+      drawJakartaBulletList(ctx, operationalImpact);
+    }
+    if (hasActions) {
+      drawJakartaStrandLabel(ctx, "Recommended Actions");
+      if (d.proseVariant === "operating-risk") {
+        drawJakartaBulletList(ctx, d.businessImpact);
+      } else {
+        for (const group of d.recommendedActions) {
+          drawJakartaStrandLabel(ctx, group.heading);
+          drawJakartaBulletList(ctx, group.actions);
+        }
+      }
+    }
+    if (d.outlook.trim() !== "") {
+      drawJakartaStrandLabel(ctx, "Outlook: Next Seven Days");
+      renderProse(ctx, d.outlook);
+      const escalationIndicators = d.escalationIndicators.slice(0, 3);
+      if (escalationIndicators.length > 0) {
+        drawJakartaStrandLabel(ctx, "Escalation Indicators");
+        drawJakartaBulletList(ctx, escalationIndicators);
+      }
+      if ((d.upcomingSignals ?? []).length > 0) {
+        drawJakartaStrandLabel(ctx, "Reported Upcoming Activity");
+        drawJakartaBulletList(ctx, (d.upcomingSignals ?? []).map(upcomingSignalLine));
+        renderProse(
+          ctx,
+          "Forward-looking signals drawn from reporting that announces scheduled or planned activity. Dates shown are announcement dates, not confirmed event dates.",
+        );
+      }
     }
   }
 
-  drawSectionWithProse(ctx, "Outlook: Next Seven Days", d.outlook || "Not populated.");
-  const escalationIndicators = d.escalationIndicators.slice(0, 3);
-  if (escalationIndicators.length > 0) {
-    drawJakartaStrandLabel(ctx, "Escalation Indicators");
-    drawJakartaBulletList(ctx, escalationIndicators);
+  // Polestar View — omitted when empty, matching the on-screen body.
+  if (d.polestarView.trim() !== "") {
+    drawSectionWithProse(ctx, "Polestar View", d.polestarView);
   }
-  if ((d.upcomingSignals ?? []).length > 0) {
-    drawJakartaStrandLabel(ctx, "Reported Upcoming Activity");
-    drawJakartaBulletList(ctx, (d.upcomingSignals ?? []).map(upcomingSignalLine));
-    renderProse(
-      ctx,
-      "Forward-looking signals drawn from reporting that announces scheduled or planned activity. Dates shown are announcement dates, not confirmed event dates.",
-    );
-  }
-
-  drawSectionWithProse(ctx, "Polestar View", d.polestarView || "Not populated.");
 }
 
 function buildKpiCards(facts: CountryFactsBreakdown): KpiCardData[] {

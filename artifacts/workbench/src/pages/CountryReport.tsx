@@ -70,9 +70,9 @@ import type {
 } from "@/components/PngCountryReportBody";
 import type { CountryReportPhoto } from "@workspace/api-client-react";
 import {
-  COUNTRY_SECTION_KEYS,
   COUNTRY_SECTION_LABELS,
   applyIncidentCurations,
+  normalizeHiddenSections,
   type CountrySectionKey,
   type CountrySectionOverrides,
 } from "../lib/countrySectionOverrides";
@@ -947,6 +947,47 @@ export default function CountryReport() {
   const setProseField = (k: keyof CountryProseSections, v: string | string[]) =>
     setProseDraft((d) => (d ? { ...d, [k]: v } : d));
 
+  // In-preview section visibility toggle (replaces the old checkbox panel).
+  const toggleSectionHidden = (key: string, hide: boolean) =>
+    setSectionOverrides((ov) => {
+      const set = new Set(ov.hiddenSections ?? []);
+      if (hide) set.add(key as CountrySectionKey);
+      else set.delete(key as CountrySectionKey);
+      return { ...ov, hiddenSections: Array.from(set) };
+    });
+
+  // Inline prose editor for the preview (fuel direct-edit prefill pattern):
+  // the box shows EXACTLY the text currently rendered (analyst edit if present,
+  // otherwise the engine default). Editing writes the draft; restoring the text
+  // to the engine default stores "" so the auto narrative keeps flowing.
+  const inlineProseEditor = (field: "bluf" | "executiveSummary" | "outlook" | "polestarView", engineDefault: string) => {
+    const draftVal = ((proseDraft?.[field] as string | undefined) ?? "").trim();
+    const value = draftVal !== "" ? (proseDraft?.[field] as string) : engineDefault;
+    return (
+      <textarea
+        className="no-print"
+        value={value}
+        onChange={(e) => {
+          const v = e.target.value;
+          setProseField(field, v.trim() === engineDefault.trim() ? "" : v);
+        }}
+        rows={Math.min(14, Math.max(3, value.split(/\n/).reduce((n, l) => n + Math.ceil(l.length / 90) || 1, 0) + 1))}
+        style={{
+          fontFamily: ROBOTO,
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: DUSK,
+          width: "100%",
+          border: `1px solid ${POLAR}`,
+          padding: 8,
+          margin: "0 0 10px 0",
+          background: "#FBFCFE",
+          resize: "vertical",
+        }}
+      />
+    );
+  };
+
   // Update a single per-incident summary in the live draft (keyed by incident
   // id). Persisted for free because the whole proseDraft is sent on save.
   const setIncidentSummary = (id: string, text: string) =>
@@ -973,7 +1014,15 @@ export default function CountryReport() {
     setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
     setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
     setReportPhotos(country.reportPhotos ?? []);
-    setSectionOverrides((country.sectionOverrides as CountrySectionOverrides | null) ?? {});
+    {
+      const savedOverrides = (country.sectionOverrides as CountrySectionOverrides | null) ?? {};
+      // Normalise pre-merge hidden-section keys to the current 5-key vocabulary
+      // so the checkbox state matches what the body actually hides.
+      setSectionOverrides({
+        ...savedOverrides,
+        hiddenSections: normalizeHiddenSections(savedOverrides.hiddenSections),
+      });
+    }
   }, [country, incidentsData, slug, draftedProse]);
 
   useEffect(() => {
@@ -1139,7 +1188,15 @@ export default function CountryReport() {
       setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
       setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
       setReportPhotos(country.reportPhotos ?? []);
-      setSectionOverrides((country.sectionOverrides as CountrySectionOverrides | null) ?? {});
+      {
+      const savedOverrides = (country.sectionOverrides as CountrySectionOverrides | null) ?? {};
+      // Normalise pre-merge hidden-section keys to the current 5-key vocabulary
+      // so the checkbox state matches what the body actually hides.
+      setSectionOverrides({
+        ...savedOverrides,
+        hiddenSections: normalizeHiddenSections(savedOverrides.hiddenSections),
+      });
+    }
     }
     setBaselineDraft(persistedBaseline ?? EMPTY_BASELINE);
     setBaselineDirty(false);
@@ -1667,8 +1724,14 @@ export default function CountryReport() {
         />
       )}
 
-      {/* 1. Executive Summary */}
+      {/* Edit mode: the rarely-touched setup lives in ONE collapsed drawer so
+          week-to-week editing happens in the preview itself (owner ruling,
+          11 Aug 2026). Section visibility + narrative prose moved in-preview. */}
       {editing && (
+        <details className="no-print" style={{ border: `1px solid ${POLAR}`, borderRadius: 2, padding: 12, marginBottom: 16 }}>
+        <summary style={{ fontFamily: ROBOTO, fontSize: 13, fontWeight: 600, color: NAVY, cursor: "pointer" }}>
+          Report setup &amp; advanced — name, baseline, layout, photos, incident selection
+        </summary>
         <Section title="Report Details">
           <div className="grid md:grid-cols-2 gap-3">
             <input
@@ -1685,9 +1748,7 @@ export default function CountryReport() {
             />
           </div>
         </Section>
-      )}
 
-      {editing && (
         <Section title="Country Baseline">
           <BaselineEditor
             baseline={baselineDraft}
@@ -1696,9 +1757,7 @@ export default function CountryReport() {
             clearing={deleteBaseline.isPending}
           />
         </Section>
-      )}
 
-      {editing && (
         <Section title="Report Layout">
           <div className="grid md:grid-cols-2 gap-3">
             <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>
@@ -1815,39 +1874,8 @@ export default function CountryReport() {
             </div>
           )}
 
-          {/* Section visibility — hide a canonical brief section from BOTH the
-              preview and the PDF (same component). Data is untouched; a hidden
-              section can be shown again by re-ticking it. */}
-          <div style={{ marginTop: 16, borderTop: `1px solid ${POLAR}`, paddingTop: 12 }}>
-            <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, fontWeight: 600, marginBottom: 8 }}>
-              Section visibility
-            </div>
-            <div className="grid md:grid-cols-2 gap-2">
-              {COUNTRY_SECTION_KEYS.map((key) => {
-                const hidden = (sectionOverrides.hiddenSections ?? []).includes(key);
-                return (
-                  <label
-                    key={key}
-                    style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "flex", gap: 8, alignItems: "center" }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!hidden}
-                      onChange={(e) => {
-                        setSectionOverrides((ov) => {
-                          const set = new Set(ov.hiddenSections ?? []);
-                          if (e.target.checked) set.delete(key);
-                          else set.add(key);
-                          return { ...ov, hiddenSections: Array.from(set) };
-                        });
-                      }}
-                    />
-                    {COUNTRY_SECTION_LABELS[key]}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          {/* Section visibility moved in-preview: each rendered section heading
+              carries a Hide control, and hidden sections leave a Show stub. */}
 
           {/* Incident curation — include / exclude and demote-only severity for
               each relevance-passing window incident. STRICT no-fabrication: the
@@ -1919,10 +1947,9 @@ export default function CountryReport() {
             </div>
           )}
         </Section>
-      )}
 
-      {editing && proseDraft && (
-        <Section title="Narrative (editable)">
+        {proseDraft && (
+        <Section title="Narrative (advanced)">
           {pngDataset && pngDataset.proseVariant === "operating-risk" ? (
             // Operating-risk briefs (Indonesia / Jakarta / every generic country)
             // render a deterministic, business-language narrative from the live
@@ -1936,14 +1963,12 @@ export default function CountryReport() {
           ) : (
             <>
               <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
-                AI-generated from this window's incidents. Edits are saved against the current data; if the
-                data later changes, use Redraft to regenerate.
+                Edit the main narrative directly in the preview below — each prose block is an
+                editable box while editing. Only What Changed (not rendered as its own block)
+                lives here. Edits are saved against the current data; if the data later changes,
+                use Redraft to regenerate.
               </div>
-              <BaselineTextField label="Bottom Line Up Front" value={proseDraft.bluf ?? ""} onChange={(v) => setProseField("bluf", v)} />
-              <BaselineTextField label="Executive Summary" value={proseDraft.executiveSummary} onChange={(v) => setProseField("executiveSummary", v)} />
               <BaselineTextField label="What Changed" value={proseDraft.whatChanged ?? ""} onChange={(v) => setProseField("whatChanged", v)} />
-              <BaselineTextField label="Outlook" value={proseDraft.outlook ?? ""} onChange={(v) => setProseField("outlook", v)} />
-              <BaselineTextField label="Polestar View" value={proseDraft.polestarView} onChange={(v) => setProseField("polestarView", v)} />
             </>
           )}
           {pngDataset && pngDataset.windowItems.length > 0 && (
@@ -1965,6 +1990,8 @@ export default function CountryReport() {
             </div>
           )}
         </Section>
+        )}
+        </details>
       )}
 
       {/* EVERY theatre — structured, generic and Jakarta — renders the shared
@@ -1982,6 +2009,71 @@ export default function CountryReport() {
           photoPlacement={photoPlacement}
           photoNode={photoBlock}
           hiddenSections={sectionOverrides.hiddenSections ?? []}
+          editUi={
+            editing
+              ? {
+                  sectionChrome: (key, hidden) =>
+                    hidden ? (
+                      <div
+                        className="no-print"
+                        style={{
+                          fontFamily: ROBOTO,
+                          fontSize: 12,
+                          color: DUSK,
+                          border: `1px dashed ${POLAR}`,
+                          padding: "6px 10px",
+                          margin: "0 0 14px 0",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span>
+                          {COUNTRY_SECTION_LABELS[key as CountrySectionKey] ?? key} — hidden from
+                          this report
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleSectionHidden(key, false)}
+                          style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 8px", color: NAVY, cursor: "pointer" }}
+                        >
+                          Show
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="no-print"
+                        onClick={() => toggleSectionHidden(key, true)}
+                        style={{
+                          fontFamily: ROBOTO,
+                          fontSize: 11,
+                          fontWeight: 400,
+                          letterSpacing: 0,
+                          textTransform: "none",
+                          border: `1px solid ${POLAR}`,
+                          padding: "2px 8px",
+                          color: DUSK,
+                          background: "white",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        Hide section
+                      </button>
+                    ),
+                  prose:
+                    pngDataset && pngDataset.proseVariant !== "operating-risk" && proseDraft
+                      ? {
+                          bluf: inlineProseEditor("bluf", pngDataset.bluf),
+                          executiveSummary: inlineProseEditor("executiveSummary", pngDataset.executiveSummary),
+                          outlook: inlineProseEditor("outlook", pngDataset.outlook),
+                          polestarView: inlineProseEditor("polestarView", pngDataset.polestarView),
+                        }
+                      : undefined,
+                }
+              : null
+          }
         />
       )}
 

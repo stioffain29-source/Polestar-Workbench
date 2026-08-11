@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { format } from "date-fns";
 import { upcomingSignalLine } from "../lib/upcomingSignals";
+import { normalizeHiddenSections } from "../lib/countrySectionOverrides";
 import type {
   PngReportDataset,
   PngReportItem,
@@ -58,7 +59,15 @@ export type CountryPhotoPlacement =
   | "inside-incident-details"
   | "before-polestar";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  extras,
+  children,
+}: {
+  title: string;
+  extras?: ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="report-section">
       <h2
@@ -72,9 +81,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
           borderBottom: `2px solid ${ELECTRIC}`,
           paddingBottom: 6,
           marginBottom: 14,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
         }}
       >
-        {title}
+        <span>{title}</span>
+        {/* Edit-mode chrome only; never rendered outside edit mode so the
+            DOM-rasterised PDF is untouched (chrome is also .no-print). */}
+        {extras ?? null}
       </h2>
       {children}
     </section>
@@ -370,6 +386,7 @@ export default function PngCountryReportBody({
   photoPlacement = "none",
   photoNode = null,
   hiddenSections = [],
+  editUi = null,
 }: {
   dataset: PngReportDataset;
   incidentSummaries?: Record<string, string>;
@@ -381,10 +398,35 @@ export default function PngCountryReportBody({
   // BOTH the on-screen preview and the DOM-rasterised PDF (same component, so
   // they can never disagree). See countrySectionOverrides.ts for the key list.
   hiddenSections?: string[];
+  // In-preview editing chrome, provided by the page ONLY while editing. All
+  // chrome must be wrapped .no-print by the page so the DOM-rasterised PDF
+  // stays byte-identical to the read view.
+  //  - sectionChrome(key, hidden): rendered in the section heading row when
+  //    visible, or as a standalone stub where a hidden section would sit.
+  //  - prose[field]: replaces the rendered <Prose> for that narrative field
+  //    with the page's inline editor.
+  editUi?: {
+    sectionChrome: (key: string, hidden: boolean) => ReactNode;
+    prose?: Partial<
+      Record<"bluf" | "executiveSummary" | "outlook" | "polestarView", ReactNode>
+    >;
+  } | null;
 }) {
   const d = dataset;
-  const hidden = new Set(hiddenSections);
+  // Normalise so persisted pre-merge keys (e.g. "outlook") keep hiding the
+  // merged section that now contains their content.
+  const hidden = new Set<string>(normalizeHiddenSections(hiddenSections));
   const show = (key: string): boolean => !hidden.has(key);
+  // Edit-mode helpers: heading chrome for visible sections, a stub where a
+  // hidden section would sit (so it can be re-shown from the preview), and
+  // inline prose editors replacing the rendered narrative fields.
+  const chrome = (key: string): ReactNode => (editUi ? editUi.sectionChrome(key, false) : null);
+  const hiddenStub = (key: string): ReactNode =>
+    editUi && hidden.has(key) ? editUi.sectionChrome(key, true) : null;
+  const prose = (
+    field: "bluf" | "executiveSummary" | "outlook" | "polestarView",
+    node: ReactNode,
+  ): ReactNode => editUi?.prose?.[field] ?? node;
 
   // Top 3 Developments — at most three tiles. The Incident Details themes below
   // analyse d.incidentDetailsItems: every window incident NOT promoted into the
@@ -419,24 +461,29 @@ export default function PngCountryReportBody({
     const { operatingPicture, crimeEscalationWatch, recommendedActions } = tactical;
     return (
       <IncidentSummaryContext.Provider value={incidentSummaries}>
+        {hiddenStub("bottom-line")}
         {show("bottom-line") && (
-          <Section title="Bottom Line Up Front"><Prose text={d.bluf} /></Section>
+          <Section title="Bottom Line Up Front" extras={chrome("bottom-line")}>
+            <Prose text={d.bluf} />
+          </Section>
         )}
         {mapAt("after-bluf")}
         {photoAt("after-bluf")}
 
         {/* A week with no developments renders NO Top-3 section at all — a
             headline section with nothing in it reads as a contradiction. */}
+        {hiddenStub("top-3")}
         {show("top-3") && topThree.length > 0 && (
-          <Section title="Top 3 Developments">
+          <Section title="Top 3 Developments" extras={chrome("top-3")}>
             <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
           </Section>
         )}
         {mapAt("after-top3")}
         {photoAt("after-top3")}
 
-        {show("operational-impact") && (
-          <Section title="Area Situation This Week">
+        {hiddenStub("current-situation")}
+        {show("current-situation") && (
+          <Section title="Area Situation This Week" extras={chrome("current-situation")}>
             {operatingPicture.rows.length > 0 ? (
               <OperatingPictureTable rows={operatingPicture.rows} />
             ) : (
@@ -455,8 +502,9 @@ export default function PngCountryReportBody({
         )}
         {mapAt("before-outlook")}
 
-        {show("recommended-actions") && (
-          <Section title="Recommended Actions">
+        {hiddenStub("actions-outlook")}
+        {show("actions-outlook") && (
+          <Section title="Recommended Actions" extras={chrome("actions-outlook")}>
             {recommendedActions.length > 0 ? (
               <BulletList items={recommendedActions} />
             ) : (
@@ -473,9 +521,10 @@ export default function PngCountryReportBody({
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
       {/* 1. Bottom Line Up Front */}
+      {hiddenStub("bottom-line")}
       {show("bottom-line") && (
-        <Section title="Bottom Line Up Front">
-          <Prose text={d.bluf} />
+        <Section title="Bottom Line Up Front" extras={chrome("bottom-line")}>
+          {prose("bluf", <Prose text={d.bluf} />)}
         </Section>
       )}
       {mapAt("after-bluf")}
@@ -483,8 +532,9 @@ export default function PngCountryReportBody({
 
       {/* 2. Top 3 Developments — at most three tiles. No developments → the
           section is omitted entirely rather than rendered around a filler line. */}
+      {hiddenStub("top-3")}
       {show("top-3") && topThree.length > 0 && (
-        <Section title="Top 3 Developments">
+        <Section title="Top 3 Developments" extras={chrome("top-3")}>
           <div>
             {topThree.map((it) => (
               <ItemCard key={it.id} item={it} suppressEmptyLocation />
@@ -497,101 +547,109 @@ export default function PngCountryReportBody({
 
       {/* 3. Current Situation — the single prose narrative of the period.
           Uniform across every country brief (owner ruling, 28 Jul 2026): the
-          framing paragraphs lead, followed by the themed analytical paragraphs
-          that used to sit under a separate "Incident Details" heading. There is
-          deliberately NO per-incident card list anywhere in this section — the
-          report reads as analysis, not a feed. The empty note stays
-          no-fabrication-safe: it only claims "no further reporting" when there
-          truly are no leftover incidents; when leftover incidents existed but
-          all fell below the meaningfulness gate it says so honestly instead.
-          The legacy override keys keep working: "current-situation" hides the
-          framing prose, "incident-details" hides the themed paragraphs. */}
-      {((show("current-situation") && d.executiveSummary.trim() !== "") ||
-        (show("incident-details") &&
-          (incidentThemes.length > 0 || d.windowItems.length > 0))) && (
-      <Section title="Current Situation">
-        {show("current-situation") && d.executiveSummary.trim() !== "" && (
-          <Prose text={d.executiveSummary} />
+          framing paragraphs lead, followed by the themed analytical paragraphs.
+          One canonical key gates the whole block (owner ruling, 11 Aug 2026:
+          five sections). There is deliberately NO per-incident card list
+          anywhere in this section — the report reads as analysis, not a feed.
+          The empty note stays no-fabrication-safe: it only claims "no further
+          reporting" when there truly are no leftover incidents. */}
+      {hiddenStub("current-situation")}
+      {show("current-situation") &&
+        (d.executiveSummary.trim() !== "" ||
+          incidentThemes.length > 0 ||
+          d.windowItems.length > 0 ||
+          editUi?.prose?.executiveSummary != null) && (
+      <Section title="Current Situation" extras={chrome("current-situation")}>
+        {prose(
+          "executiveSummary",
+          d.executiveSummary.trim() !== "" ? <Prose text={d.executiveSummary} /> : null,
         )}
-        {show("incident-details") && (
-          <>
-            {incidentThemes.length === 0 ? (
-              d.windowItems.length > 0 ? (
-                <EmptyNote>
-                  {d.incidentDetailsItems.length === 0
-                    ? "No further incident reporting beyond the developments above this period."
-                    : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
-                </EmptyNote>
-              ) : null
-            ) : (
-              incidentThemes.map((g) => (
-                <div key={g.key} style={{ marginBottom: 12 }}>
-                  <StrandLabel>{g.heading}</StrandLabel>
-                  <Prose text={g.paragraph} />
-                </div>
-              ))
-            )}
-            {photoAt("inside-incident-details")}
-          </>
+        {incidentThemes.length === 0 ? (
+          d.windowItems.length > 0 ? (
+            <EmptyNote>
+              {d.incidentDetailsItems.length === 0
+                ? "No further incident reporting beyond the developments above this period."
+                : "Remaining reporting this period was limited to isolated, lower-severity incidents that did not warrant separate detail."}
+            </EmptyNote>
+          ) : null
+        ) : (
+          incidentThemes.map((g) => (
+            <div key={g.key} style={{ marginBottom: 12 }}>
+              <StrandLabel>{g.heading}</StrandLabel>
+              <Prose text={g.paragraph} />
+            </div>
+          ))
         )}
+        {photoAt("inside-incident-details")}
       </Section>
       )}
       {mapAt("after-incident-details")}
-
-      {/* 5. Operational Impact — generic country brief only. */}
-      {show("operational-impact") && operationalImpact.length > 0 && (
-      <Section title="Operational Impact">
-        <BulletList items={operationalImpact} />
-      </Section>
-      )}
-
-      {/* 6. Recommended Actions — generic country brief only. */}
-      {show("recommended-actions") &&
-        (d.proseVariant === "operating-risk"
-          ? d.businessImpact.length > 0
-          : d.recommendedActions.length > 0) && (
-      <Section title="Recommended Actions">
-        {d.proseVariant === "operating-risk" ? (
-          <BulletList items={d.businessImpact} />
-        ) : (
-          d.recommendedActions.map((g) => (
-            <ActionGroup key={g.key} heading={g.heading} actions={g.actions} />
-          ))
-        )}
-      </Section>
-      )}
       {mapAt("before-outlook")}
 
-      {/* 7. Outlook: Next Seven Days — most-likely scenario + escalation
-          indicators. §27: omitted when the engine has no outlook prose. */}
-      {show("outlook") && d.outlook.trim() !== "" && (
-      <Section title="Outlook: Next Seven Days">
-        <Prose text={d.outlook} />
-        {escalationIndicators.length > 0 ? (
-          <div style={{ marginTop: 10 }}>
-            <StrandLabel>Escalation Indicators</StrandLabel>
-            <BulletList items={escalationIndicators} />
+      {/* 4. Actions & Outlook — the merged forward-looking block (owner ruling,
+          11 Aug 2026): Operational Impact bullets, Recommended Actions and the
+          Outlook prose render as strands under ONE section heading gated by the
+          single "actions-outlook" key. */}
+      {hiddenStub("actions-outlook")}
+      {show("actions-outlook") &&
+        (operationalImpact.length > 0 ||
+          (d.proseVariant === "operating-risk"
+            ? d.businessImpact.length > 0
+            : d.recommendedActions.length > 0) ||
+          d.outlook.trim() !== "" ||
+          editUi?.prose?.outlook != null) && (
+      <Section title="Actions & Outlook" extras={chrome("actions-outlook")}>
+        {operationalImpact.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <StrandLabel>Operational Impact</StrandLabel>
+            <BulletList items={operationalImpact} />
           </div>
-        ) : null}
-        {(d.upcomingSignals ?? []).length > 0 ? (
-          <div style={{ marginTop: 10 }}>
-            <StrandLabel>Reported Upcoming Activity</StrandLabel>
-            <BulletList items={(d.upcomingSignals ?? []).map(upcomingSignalLine)} />
-            <p
-              style={{
-                fontFamily: ROBOTO,
-                fontSize: 11,
-                lineHeight: 1.5,
-                color: DUSK,
-                margin: "4px 0 0 0",
-              }}
-            >
-              Forward-looking signals drawn from reporting that announces
-              scheduled or planned activity. Dates shown are announcement dates,
-              not confirmed event dates.
-            </p>
+        )}
+        {(d.proseVariant === "operating-risk"
+          ? d.businessImpact.length > 0
+          : d.recommendedActions.length > 0) && (
+          <div style={{ marginBottom: 12 }}>
+            <StrandLabel>Recommended Actions</StrandLabel>
+            {d.proseVariant === "operating-risk" ? (
+              <BulletList items={d.businessImpact} />
+            ) : (
+              d.recommendedActions.map((g) => (
+                <ActionGroup key={g.key} heading={g.heading} actions={g.actions} />
+              ))
+            )}
           </div>
-        ) : null}
+        )}
+        {(d.outlook.trim() !== "" || editUi?.prose?.outlook != null) && (
+          <>
+            <StrandLabel>Outlook: Next Seven Days</StrandLabel>
+            {prose("outlook", d.outlook.trim() !== "" ? <Prose text={d.outlook} /> : null)}
+            {escalationIndicators.length > 0 ? (
+              <div style={{ marginTop: 10 }}>
+                <StrandLabel>Escalation Indicators</StrandLabel>
+                <BulletList items={escalationIndicators} />
+              </div>
+            ) : null}
+            {(d.upcomingSignals ?? []).length > 0 ? (
+              <div style={{ marginTop: 10 }}>
+                <StrandLabel>Reported Upcoming Activity</StrandLabel>
+                <BulletList items={(d.upcomingSignals ?? []).map(upcomingSignalLine)} />
+                <p
+                  style={{
+                    fontFamily: ROBOTO,
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    color: DUSK,
+                    margin: "4px 0 0 0",
+                  }}
+                >
+                  Forward-looking signals drawn from reporting that announces
+                  scheduled or planned activity. Dates shown are announcement dates,
+                  not confirmed event dates.
+                </p>
+              </div>
+            ) : null}
+          </>
+        )}
       </Section>
       )}
       {mapAt("before-polestar")}
@@ -599,9 +657,14 @@ export default function PngCountryReportBody({
 
       {/* 8. Polestar View — closes the written brief. §27: omitted when the
           engine has no assessed judgement to add. */}
-      {show("polestar-view") && d.polestarView.trim() !== "" && (
-        <Section title="Polestar View">
-          <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />
+      {hiddenStub("polestar-view")}
+      {show("polestar-view") &&
+        (d.polestarView.trim() !== "" || editUi?.prose?.polestarView != null) && (
+        <Section title="Polestar View" extras={chrome("polestar-view")}>
+          {prose(
+            "polestarView",
+            <Prose text={d.polestarView} keepTogether={d.keepPolestarTogether} />,
+          )}
         </Section>
       )}
     </IncidentSummaryContext.Provider>

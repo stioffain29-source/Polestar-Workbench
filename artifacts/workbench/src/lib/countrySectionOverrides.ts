@@ -26,11 +26,8 @@
 export const COUNTRY_SECTION_KEYS = [
   "bottom-line",
   "top-3",
-  "incident-details",
   "current-situation",
-  "operational-impact",
-  "recommended-actions",
-  "outlook",
+  "actions-outlook",
   "polestar-view",
 ] as const;
 
@@ -39,15 +36,33 @@ export type CountrySectionKey = (typeof COUNTRY_SECTION_KEYS)[number];
 export const COUNTRY_SECTION_LABELS: Record<CountrySectionKey, string> = {
   "bottom-line": "Bottom Line Up Front",
   "top-3": "Top 3 Developments",
-  // Key kept stable (persisted in section_overrides jsonb); "Incident Details"
-  // was merged into Current Situation, so the label reflects what it now gates.
-  "incident-details": "Current Situation — incident themes",
-  "current-situation": "Current Situation — framing prose",
-  "operational-impact": "Operational Impact",
-  "recommended-actions": "Recommended Actions",
-  outlook: "Outlook: Next Seven Days",
+  "current-situation": "Current Situation",
+  "actions-outlook": "Actions & Outlook",
   "polestar-view": "Polestar View",
 };
+
+// Legacy → merged key map (owner ruling, 11 Aug 2026: five sections, Fast Facts
+// kept). Saved overrides may still carry the pre-merge 8-key vocabulary; they
+// are normalised on read so an old hidden key keeps hiding the section that now
+// CONTAINS its content, and unknown keys are dropped rather than silently kept.
+const LEGACY_SECTION_KEY_MAP: Record<string, CountrySectionKey> = {
+  "incident-details": "current-situation",
+  "operational-impact": "actions-outlook",
+  "recommended-actions": "actions-outlook",
+  outlook: "actions-outlook",
+};
+
+/** Normalise a persisted hiddenSections list to the current 5-key vocabulary. */
+export function normalizeHiddenSections(raw: string[] | null | undefined): CountrySectionKey[] {
+  const out = new Set<CountrySectionKey>();
+  for (const k of raw ?? []) {
+    const mapped = (COUNTRY_SECTION_KEYS as readonly string[]).includes(k)
+      ? (k as CountrySectionKey)
+      : LEGACY_SECTION_KEY_MAP[k];
+    if (mapped) out.add(mapped);
+  }
+  return [...out];
+}
 
 export interface CountrySectionOverrides {
   hiddenSections?: string[];
