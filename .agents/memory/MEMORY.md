@@ -152,3 +152,4 @@
 - [Country-engine §7 gate tuning](country-engine-gate-tuning.md) — tune via targeted soft exclusion rules + companion overrides, never band-wide; verify with dry-run replay and inspect includedLost.
 - [Ingest run watchdog](ingest-watchdog.md) — recurring prod staleness = one hung stage held the advisory lock forever (no run deadline); watchdog + stage markers fix it; replshield 307 blocks external admin curls on private deploys.
 - [Task-agent DB writes lost on merge](task-agent-db-writes.md) — only code merges; DB row content must come from main agent or marker-gated boot migrations; PROD_DATABASE_URL IS writable from workspace.
+- [No follow-up proposals](no-follow-up-proposals.md) — owner rule: proposals became never-ending without real improvement; report findings plainly, never queue tasks.
