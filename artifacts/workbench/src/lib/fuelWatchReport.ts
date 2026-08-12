@@ -49,6 +49,7 @@ export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 // this module.
 export type { FuelReportFacts } from "./fuelReportFacts";
 export { buildFuelReportFacts, serialiseFuelFactsForPrompt } from "./fuelReportFacts";
+import { buildFuelReportFacts as buildFuelReportFactsInternal, type FuelReportFacts } from "./fuelReportFacts";
 
 /** Kept local to make the canonical builder's validation call explicit in this
  * module; renderers call assertFuelReportConsistent before their first draw. */
@@ -189,6 +190,11 @@ export interface FuelWatchReportData {
   narrativeData: FuelNarrativeData;
   /** The only facts object Fuel Watch sections are allowed to consume. */
   canonicalFacts: FuelCanonicalFacts;
+  /** The prompt/gate facts object (same inputs as canonicalFacts) — feeds the
+   *  AI FIXED FACTS block and the prose-tolerant consistency gate that
+   *  validates the FINAL effective text (analyst edit -> AI -> canonical).
+   *  Computed here once so preview, PDF and editor share one instance. */
+  reportFacts: FuelReportFacts;
   validation: FuelValidation;
 }
 
@@ -330,6 +336,53 @@ export function buildFuelWatchReportData(
     watchIndicators: FUEL_DEFAULT_WATCH_NEXT,
   });
   const canonicalSections = buildFuelCanonicalSections(canonicalFacts);
+  // Prompt/gate facts — same issueDate/hardNumbers/incidents as canonicalFacts,
+  // shared by the AI FIXED FACTS block and the effective-text consistency gate.
+  // The pressure picture is RECONCILED to canonicalFacts' primaryPressurePoint:
+  // the two builders rank leaders differently (margin-based vs tie-based), and
+  // the canonical prose is generated from canonicalFacts — so the gate and the
+  // AI prompt must judge/describe leadership by the SAME authority or the gate
+  // false-blocks the canonical text itself.
+  const rawReportFacts = buildFuelReportFactsInternal({
+    issueDate: report.issueDate,
+    hardNumbers: report.hardNumbers,
+    incidents,
+  });
+  const canonPrimary = canonicalFacts.primaryPressurePoint;
+  // Severity is reconciled too: canonical prose asserts canonicalFacts'
+  // overall severity/distribution (uncapped), while buildFuelReportFacts caps
+  // market-commentary records — leaving both would false-block canonical text
+  // at the SEVERITY_TERMS / COUNT_TRACEABLE checks.
+  const canonSeverityLower = canonicalFacts.overallSeverity.toLowerCase() as FuelReportFacts["overallSeverity"] & string;
+  const canonDistribution = Object.fromEntries(
+    Object.entries(canonicalFacts.severityDistribution).map(([k, v]) => [k.toLowerCase(), v]),
+  ) as FuelReportFacts["severityDistribution"];
+  const severityReconciled: FuelReportFacts = {
+    ...rawReportFacts,
+    overallSeverity: canonSeverityLower,
+    severityDistribution: canonDistribution,
+  };
+  const reportFacts: FuelReportFacts =
+    canonPrimary.kind === "distributed"
+      ? { ...severityReconciled, pressure: { ...severityReconciled.pressure, distributed: true, primary: null } }
+      : {
+          ...severityReconciled,
+          pressure: {
+            ...severityReconciled.pressure,
+            distributed: false,
+            primary:
+              severityReconciled.pressure.primary &&
+              severityReconciled.pressure.primary.country.toLowerCase() ===
+                canonPrimary.label.toLowerCase()
+                ? severityReconciled.pressure.primary
+                : {
+                    country: canonPrimary.label,
+                    score: canonPrimary.score,
+                    recordCount: canonPrimary.incidentIds.length,
+                    highestSeverity: null,
+                  },
+          },
+        };
   const regionalHighlights = canonicalSections.regionalHighlights;
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
@@ -467,6 +520,7 @@ export function buildFuelWatchReportData(
       canonicalSections,
     },
     canonicalFacts,
+    reportFacts,
     validation: {
       hasPrices,
       hasBrent,

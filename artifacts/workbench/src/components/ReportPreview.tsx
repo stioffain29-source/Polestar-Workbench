@@ -24,6 +24,11 @@ import {
   toDraftableIncidents,
   type TopicAiProse,
 } from "@/lib/topicProseResolution";
+import {
+  resolveFuelEffectiveSections,
+  validateFuelReportConsistency as validateFuelEffectiveText,
+} from "@/lib/fuelReportConsistency";
+import { validateFuelReportConsistency as validateFuelCanonicalText } from "@/lib/fuelCanonicalFacts";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import {
@@ -808,22 +813,58 @@ export default function ReportPreview({
     // qualifying incident set.
     fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
-  // Fuel Watch has no analyst/AI precedence for its analytical sections.
-  // The canonical facts object remains the only source for every rendered claim.
-  const execText = fuelData
-    ? fuelData.narrativeData.canonicalSections.executiveSummary
+  // FINAL EFFECTIVE Fuel narrative (analyst edit -> AI -> canonical) from the
+  // ONE shared resolver the PDF exporter and editor prefill also call, so all
+  // three surfaces render byte-identical section text.
+  const fuelEffective = fuelData
+    ? resolveFuelEffectiveSections({
+        report: {
+          executiveSummary: report.executiveSummary,
+          situation: report.situation,
+          whatHappened: report.whatHappened,
+          whatMatters: report.whatMatters,
+          polestarView: report.polestarView,
+          fuelMarketRead: report.fuelMarketRead,
+          fuelOperationalRead: report.fuelOperationalRead,
+          fuelRegionalHighlights: report.fuelRegionalHighlights,
+        },
+        aiProse,
+        fuelData,
+      })
+    : null;
+  const execText = fuelEffective
+    ? (fuelEffective.executiveSummary ?? "")
     : resolveSimpleProse(
         report.executiveSummary,
         aiProse?.executiveSummary,
         proseDraft.executiveSummary,
       );
 
-  // Fuel Watch HARD consistency gate — the SAME reconciliation errors the PDF
-  // exporter throws on (assertFuelReportConsistent), surfaced here as a
-  // blocking panel so preview == PDF: a contradictory payload can neither be
-  // previewed as clean nor exported. A clean report passes by construction.
-  const fuelConsistencyErrors = fuelData?.validation.consistencyErrors ?? [];
-  if (fuelConsistencyErrors.length > 0) {
+  // Fuel Watch HARD consistency gate — the SAME reconciliation the PDF
+  // exporter throws on, surfaced here as a blocking panel so preview == PDF:
+  // a contradictory payload can neither be previewed as clean nor exported.
+  // Two layers, exactly as the exporter runs them: the strict canonical gate
+  // over the canonical payload PLUS the resolved Gulf read override (canonical
+  // text passes by construction), and the prose-tolerant gate over the FINAL
+  // effective text (whichever tier wins).
+  const resolvedFuelGulfRead = fuelData?.incidentData.gulfChokepointWatch
+    ? resolvePanelRead(
+        sectionOverrides,
+        PANEL_READ_GULF_HORMUZ,
+        fuelData.incidentData.gulfChokepointWatch.read,
+      ).text
+    : undefined;
+  const fuelConsistencyErrors = fuelData
+    ? validateFuelCanonicalText(fuelData.canonicalFacts, {
+        ...fuelData.narrativeData.canonicalSections,
+        gulfAndHormuzChokepointWatch: resolvedFuelGulfRead,
+      })
+    : [];
+  const fuelEffectiveIssues =
+    fuelData && fuelEffective
+      ? validateFuelEffectiveText(fuelData.reportFacts, fuelEffective)
+      : [];
+  if (fuelConsistencyErrors.length > 0 || fuelEffectiveIssues.length > 0) {
     return (
       <div
         className="print-report bg-white"
@@ -853,6 +894,12 @@ export default function ReportPreview({
                 <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
                 {issue.conflictingStatement} — canonical value{" "}
                 {issue.canonicalValue} ({issue.sourceField})
+              </li>
+            ))}
+            {fuelEffectiveIssues.map((issue, i) => (
+              <li key={`eff-${i}`}>
+                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
+                [{issue.code}] {issue.message}
               </li>
             ))}
           </ul>
@@ -1033,11 +1080,11 @@ export default function ReportPreview({
               )}
             </Section>
 
-            <NarrativeSection hidden={!show("market-read")} title="Market Read" text={fuelData.narrativeData.canonicalSections.marketRead} />
-            <NarrativeSection hidden={!show("situation")} title="Situation" text={fuelData.narrativeData.canonicalSections.situation} />
-            <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={fuelData.narrativeData.canonicalSections.whatHappened} />
-            <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={fuelData.narrativeData.canonicalSections.operationalRead} />
-            <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={fuelData.narrativeData.canonicalSections.regionalHighlights} />
+            <NarrativeSection hidden={!show("market-read")} title="Market Read" text={fuelEffective?.marketRead} />
+            <NarrativeSection hidden={!show("situation")} title="Situation" text={fuelEffective?.situation} />
+            <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={fuelEffective?.whatHappened} />
+            <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={fuelEffective?.operationalRead} />
+            <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={fuelEffective?.regionalHighlights} />
             {fuelData.incidentData.gulfChokepointWatch && (() => {
               // Owner per-bullet overrides (rewrite/suppress; blank = auto),
               // applied identically in the PDF exporter so preview == PDF.
@@ -1049,7 +1096,7 @@ export default function ReportPreview({
                 <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
                   {/* Staleness-guarded override — same resolvePanelRead the PDF
                       exporter uses, so preview == PDF. */}
-                  <Paragraphs text={resolvePanelRead(sectionOverrides, PANEL_READ_GULF_HORMUZ, gulf.read).text} />
+                  <Paragraphs text={resolvedFuelGulfRead ?? gulf.read} />
                   {currentLines.length > 0 && (
                     <ul
                       className="list-disc pl-5 space-y-1.5"
@@ -1098,10 +1145,10 @@ export default function ReportPreview({
                 </Section>
               ) : null;
             })()}
-            <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={fuelData.narrativeData.canonicalSections.whatMatters} />
+            <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={fuelEffective?.whatMatters} />
             <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelData.narrativeData.implications} />
             <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />
-            <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelData.narrativeData.canonicalSections.polestarView} />
+            <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelEffective?.polestarView} />
           </>
         ) : (
           <>

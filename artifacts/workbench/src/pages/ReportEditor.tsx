@@ -93,6 +93,7 @@ import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord, reportCadence } from "@/lib/reportWindow";
+import { resolveFuelEffectiveSections } from "@/lib/fuelReportConsistency";
 import { format, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
@@ -790,12 +791,15 @@ export default function ReportEditor() {
     if (form.topic !== "fuel" || !form.issueDate) return null;
     const hn = hardNumbersEdited ?? report?.hardNumbers;
     const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
+    // Use the shared payload's RECONCILED reportFacts (pressure leadership
+    // agrees with the canonical sections) so the AI FIXED FACTS block, the
+    // rendered canonical prose and the effective-text gate all describe the
+    // same pressure picture.
     return serialiseFuelFactsForPrompt(
-      buildFuelReportFacts({
-        issueDate: renderIssueDate,
-        hardNumbers: hn,
-        incidents: incidentsForExport,
-      }),
+      buildFuelWatchReportData(
+        { issueDate: renderIssueDate, hardNumbers: hn },
+        incidentsForExport,
+      ).reportFacts,
     );
   }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport]);
   const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
@@ -895,34 +899,40 @@ export default function ReportEditor() {
     // Mirror ReportPreview exactly: implications/watchNext flow through
     // buildFuelWatchReportData's narrativeData (AI text + default top-up), so
     // the prefill must come from the SAME payload, not aiOr() directly.
+    const hn = hardNumbersEdited ?? report.hardNumbers;
+    // Market-anchored render date — same derivation as ReportPreview and
+    // exportTopicReportPdf, so the payload the prefill reads is the payload
+    // the report renders.
+    const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
     const fuelData = buildFuelWatchReportData(
       {
-        issueDate: form.issueDate,
+        issueDate: renderIssueDate,
         implications: aiOr(aiProseSections?.implications, ""),
         watchNext: aiOr(aiProseSections?.watchNext, ""),
-        hardNumbers: hardNumbersEdited ?? report.hardNumbers,
+        hardNumbers: hn,
       },
       incidentsForExport,
     );
-    const proseDraft = stableDraftTopicReportProse({
-      topic: "fuel",
-      issueDate: form.issueDate,
-      incidents: toDraftableIncidents(
-        filterTopicReportIncidents(incidentsForExport, "fuel", form.issueDate),
-      ),
-      fuelGulf: fuelData.incidentData.gulfChokepointWatch ?? null,
+    // ONE shared resolver — the same call ReportPreview and the PDF exporter
+    // make, so the boxes hold byte-identical text to what renders. Report
+    // fields are passed blank: a saved analyst override already skips the
+    // prefill below, and the baseline must be the auto (AI/canonical) tier.
+    const effective = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: ai,
+      fuelData,
     });
     const resolved: Record<string, string> = {
-      executiveSummary: aiOr(ai?.executiveSummary, proseDraft.executiveSummary),
-      situation: aiOr(ai?.situation, proseDraft.situation),
-      whatHappened: aiOr(ai?.whatHappened, proseDraft.whatHappened),
-      whatMatters: aiOr(ai?.whatMatters, proseDraft.whatMatters),
+      executiveSummary: effective.executiveSummary ?? "",
+      situation: effective.situation ?? "",
+      whatHappened: effective.whatHappened ?? "",
+      whatMatters: effective.whatMatters ?? "",
       implications: fuelData.narrativeData.implications ?? "",
       watchNext: fuelData.narrativeData.watchNext ?? "",
-      polestarView: aiOr(ai?.polestarView, proseDraft.polestarView),
-      fuelMarketRead: fuelData.marketData.marketRead ?? "",
-      fuelOperationalRead: fuelData.incidentData.operationalRead ?? "",
-      fuelRegionalHighlights: fuelData.incidentData.regionalHighlights ?? "",
+      polestarView: effective.polestarView ?? "",
+      fuelMarketRead: effective.marketRead ?? "",
+      fuelOperationalRead: effective.operationalRead ?? "",
+      fuelRegionalHighlights: effective.regionalHighlights ?? "",
     };
     const fills: Partial<FormState> = {};
     const baselines: Record<string, string> = {};
