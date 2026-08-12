@@ -16,7 +16,9 @@ import {
   compareIncidentSignificance,
   incidentSeverityRank,
 } from "@workspace/country-engine";
-import { isReactionLed } from "@workspace/ingest";
+// Subpath import only — the @workspace/ingest ROOT barrel drags pg/rss-parser
+// into the browser bundle and crashes the app ("Buffer is not defined").
+import { isReactionLed } from "@workspace/ingest/severity";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any

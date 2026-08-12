@@ -14,7 +14,8 @@
     "./jakartaExtract": "./src/jakartaExtract.ts",
     "./kammiGeography": "./src/kammiGeography.ts",
     "./optionalIntegrations": "./src/optionalIntegrations.ts",
-    "./markers": "./src/markers.ts"
+    "./markers": "./src/markers.ts",
+    "./severity": "./src/severity.ts"
   },
   "dependencies": {
     "@workspace/db": "workspace:*",
