@@ -31,6 +31,22 @@ export function countBandColor(count: number): string | null {
 }
 
 /**
+ * Legend bands actually needed for a given intensity map. Always includes every
+ * band up through the maximum observed count, and never the unused upper bands
+ * above that maximum (e.g. omit 51–100 / 100+ when the max country count is 26).
+ */
+export function visibleCountBands(
+  maxCount: number,
+): Array<{ min: number; label: string; color: string }> {
+  if (maxCount <= 0) return COUNT_BANDS.slice(0, 1);
+  let last = 0;
+  for (let i = 0; i < COUNT_BANDS.length; i++) {
+    if (maxCount >= COUNT_BANDS[i].min) last = i;
+  }
+  return COUNT_BANDS.slice(0, last + 1);
+}
+
+/**
  * Canonical name a choropleth polygon feature carries (matches the app's
  * display-country names, e.g. "UAE", "South Korea").
  */

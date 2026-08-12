@@ -41,26 +41,32 @@ function richModel() {
     inc({ id: 2, title: "Armed men hijack a cargo truck near Johor Bahru, Malaysia", severity: "moderate", occurredAt: "2026-06-22" }),
     inc({ id: 3, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate", country: "Indonesia", occurredAt: "2026-06-23" }),
     inc({ id: 4, title: "Thieves loot a bonded warehouse in Surabaya, Indonesia", severity: "low", country: "Indonesia", occurredAt: "2026-06-21" }),
-    inc({ id: 5, title: "Robbers board a ship at Singapore anchorage", severity: "low", country: "Singapore", occurredAt: "2026-06-20" }),
+    inc({ id: 5, title: "Theft from container at Port Klang terminal yard, Malaysia", severity: "low", country: "Malaysia", occurredAt: "2026-06-20" }),
   ];
   return buildCargoPatternModel(rows, { issueDate: ISSUE });
 }
 
 describe("cargo report graphics — supply-chain exposure", () => {
-  it("renders the six physical stages and never the partitioned-out enforcement box", () => {
+  it("renders the physical stages in use and never the partitioned-out enforcement box", () => {
     const m = richModel();
     const html = renderToStaticMarkup(
       <CargoSupplyChainExposure stages={m.stages} total={m.totalUnique} />,
     );
     expect(html).toContain("Supply-Chain Exposure");
-    // The physical movement stages (everything except the unattributed catch-all)
-    // present in fixed order — including the inland waterway stage (spec pt2).
-    const physical = m.stages.filter((s) => s.key !== "unattributed");
-    expect(physical).toHaveLength(6);
-    // Enforcement is partitioned into its OWN panel upstream (spec pt1) and never
-    // reaches this graphic as a stage.
-    expect(physical.some((s) => s.key === "enforcement")).toBe(false);
-    for (const s of physical) expect(html).toContain(s.label);
+    // Empty maritime / inland-waterway stages are omitted from the graphic;
+    // other physical stages remain (muted when empty).
+    const rendered = m.stages.filter(
+      (s) =>
+        s.key !== "unattributed" &&
+        !(
+          (s.key === "maritime" || s.key === "inland_waterway") &&
+          s.count === 0
+        ),
+    );
+    expect(rendered.length).toBeGreaterThanOrEqual(4);
+    expect(rendered.some((s) => s.key === "enforcement")).toBe(false);
+    for (const s of rendered) expect(html).toContain(s.label);
+    expect(html).not.toContain(">Maritime<");
     // Electric-blue share-bar fill.
     expect(html).toContain("#465bff");
   });

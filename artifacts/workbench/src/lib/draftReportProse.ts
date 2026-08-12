@@ -514,7 +514,7 @@ const CARGO: ReportPack = {
     return `Loss in this category lands directly on supply chain continuity, insurance exposure and the cost of moving goods through repeat corridors.${where}`;
   },
   implications: () =>
-    "Review routing, escort use on high-value moves, depot access controls, seal and lock checks at handover, and insurance cover for repeat corridors. Cross-check supplier vetting on yard staff and contracted drivers.",
+    "Review routing on named repeat-loss corridors, escort use on high-value moves, depot access controls, seal and lock checks at handover, and insurance cover where losses already recur. Cross-check supplier vetting on yard staff and contracted drivers.",
   watchNext: () =>
     "Look for copycat losses on the same corridor inside two weeks of a reported event, fresh arrests or recoveries, and route shifts that quietly push volume through weaker depots.",
   polestarView: ({ lead, countries }) => {

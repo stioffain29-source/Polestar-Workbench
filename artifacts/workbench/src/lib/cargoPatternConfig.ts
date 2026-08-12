@@ -288,12 +288,27 @@ export const THEFT_CATEGORIES: ReadonlySet<string> = new Set([
   "Truck park / access-road crime",
 ]);
 
-// Per-incident enforcement-outcome decision (spec pt1). Category-first (the
-// classifier already isolates arrests + both seizures), then a title-frame
-// backstop for records the classifier left in an operational category but whose
-// HEADLINE leads with a completed enforcement action and carries no theft verb.
+// Completed enforcement verbs that must appear for a seizure CATEGORY to count
+// as an enforcement outcome. Without these, a looting / robbery headline that
+// merely names "weapons" or "contraband" near "port" must stay OPERATIONAL —
+// category labels alone are not evidence of an arrest, seizure or recovery.
+export const ENFORCEMENT_ACTION_RE =
+  /\b(arrest\w*|apprehend\w*|detain\w*|nabbed|busted|held over|remand\w*|charged|charge sheet|indict\w*|convict\w*|sentenc\w*|jailed|seiz\w*|confiscat\w*|impound\w*|recover\w*|dismantl\w*|intercept\w*|bust\b)\b/i;
+
+// Per-incident enforcement-outcome decision (spec pt1). Arrest category is
+// authoritative. Seizure categories require a completed enforcement verb in the
+// title (otherwise port looting / robbery is misfiled as "enforcement"). A
+// title-frame backstop catches operational categories whose HEADLINE leads with
+// a completed enforcement action and carries no theft verb.
 export function isEnforcementOutcome(category: string, title: string): boolean {
-  if (ENFORCEMENT_CATEGORIES.has(category)) return true;
+  if (category === "Arrest of cargo crime group") return true;
+  if (
+    (category === "Narcotics seizure (cargo / port)" ||
+      category === "Weapons / contraband seizure (cargo / port)") &&
+    ENFORCEMENT_ACTION_RE.test(title)
+  ) {
+    return true;
+  }
   if (ENFORCEMENT_TITLE_RE.test(title) && !THEFT_TITLE_RE.test(title)) {
     return true;
   }
@@ -405,5 +420,8 @@ export const MATRIX_MAX_POINTS = 8;
 // matters). At most MAX_PATTERN_CARDS cards are shown, ranked by total
 // consequence weight (frequency x mean consequence).
 export const MIN_PATTERN_INCIDENTS = 2;
+// Peak High/Extreme still qualifies a lone incident as a pattern card, but the
+// card's displayed severity is the MODAL tier among members (see pattern model)
+// so the dashboard cannot contradict an executive summary that is mostly Moderate.
 export const PATTERN_SEVERITY_FLOOR = 4; // High
 export const MAX_PATTERN_CARDS = 4;

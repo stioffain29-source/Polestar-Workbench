@@ -956,7 +956,7 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
     const title = reportTitleFrom(clone, filename);
 
     const canvas = await html2canvas(clone, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       backgroundColor: "#ffffff",
       logging: false,
@@ -1003,16 +1003,20 @@ export async function exportElementToPdf(element: HTMLElement, filename: string)
       ctx.fillRect(0, 0, sw, sh);
       ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
 
-      const imgData = pageCanvas.toDataURL("image/png");
-      const imgHeight = ((slice.end - slice.start) * pageWidth) / sourceWidth;
+      // JPEG @ 0.82 keeps typography readable while cutting multi-MB PNG pages.
+      const imgData = pageCanvas.toDataURL("image/jpeg", 0.82);
+      const rawImgHeight = ((slice.end - slice.start) * pageWidth) / sourceWidth;
       if (isCover) {
-        pdf.addImage(imgData, "PNG", 0, 0, pageWidth, imgHeight, undefined, "FAST");
+        pdf.addImage(imgData, "JPEG", 0, 0, pageWidth, rawImgHeight, undefined, "FAST");
       } else {
         const bodyPageNumber = index - coverSlices.length + 1;
         drawBodyHeader(pdf, title);
+        // Clamp body image into the band between header and footer so oversized
+        // slices cannot paint over the masthead or clip page numbers.
+        const imgHeight = Math.min(rawImgHeight, bodyAvailableHeight);
         pdf.addImage(
           imgData,
-          "PNG",
+          "JPEG",
           0,
           HEADER_BAND_H + BODY_TOP_PAD,
           pageWidth,

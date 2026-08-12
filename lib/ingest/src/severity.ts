@@ -760,6 +760,28 @@ export function classifySeverity(
   )
     return "high";
 
+  // Cargo Watch: a fatal cargo-crime event (theft / robbery / hijack / loot)
+  // is High even when the headline names no separate security keyword — a
+  // container theft that kills a driver is not a Moderate inventory loss.
+  if (
+    topic === "cargo_watch" &&
+    !reactionLed &&
+    !naturalCauseDeath &&
+    !judicialDeath &&
+    !biographicalDeath &&
+    !accidentalDeath &&
+    !burialOrFuneral &&
+    (FATAL_SIGNAL_RE.test(hay) ||
+      PRESENT_TENSE_FATAL_RE.test(hay) ||
+      PRESENT_TENSE_FATAL_COUNT_RE.test(hay) ||
+      PAST_TENSE_FATAL_RE.test(hay)) &&
+    /\b(theft|stolen|stole|robbery|robbed|hijack\w*|loot\w*|burglar\w*|heist|cargo crime|container)\b/i.test(
+      hay,
+    )
+  ) {
+    return "high";
+  }
+
   if (MODERATE.some((re) => re.test(hay))) return "moderate";
 
   // Cargo crime: an actual theft (stolen/robbery/burglary/heist) without

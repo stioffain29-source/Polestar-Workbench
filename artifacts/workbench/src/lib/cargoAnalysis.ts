@@ -319,6 +319,31 @@ export function hasPortCargoSecurity(text: string): boolean {
   return PORT_CARGO_SECURITY_RE.test(text);
 }
 
+// Pure ship / anchorage theft — boarding or theft from a vessel at sea or at
+// berth with no land logistics anchor. Cargo Watch is land- and warehouse-
+// focused; these events belong in Shipping Watch unless a warehouse, truck,
+// inland container, depot or similar land node is also named.
+const SHIP_OR_ANCHORAGE_THEFT_RE =
+  /\b(anchorage|vessels?|ships?|tankers?|bulk carriers?|cargo ships?|container ships?|on board|aboard)\b[^.]{0,40}\b(theft|stolen|stole|steal\w*|robber|robbed|robbery|pilfer\w*|loot\w*|boarded|boarding)\b|\b(theft|stolen|stole|steal\w*|robber|robbed|robbery|pilfer\w*|loot\w*|boarded|boarding)\b[^.]{0,40}\b(anchorage|vessels?|ships?|tankers?|bulk carriers?|cargo ships?|container ships?|on board|aboard)\b|\b(robbers?|pirates?|armed (?:men|gang|gunmen|robbers?|persons?))\b[^.]{0,25}\bboard(?:ed|ing)?\b/i;
+
+const LAND_LOGISTICS_ANCHOR_RE =
+  /\b(warehouse|godown|depot|distribution (?:centre|center)|inland container|icd|truck|lorry|highway|road corridor|container yard|bonded (?:warehouse|store)|cold[- ]?(?:store|storage|chain)|rail freight|fulfilment|trailer park|truck park)\b/i;
+
+/** True when the record is ship/anchorage theft without a land logistics node. */
+export function isShipOrAnchorageOnlyTheft(text: string): boolean {
+  if (!SHIP_OR_ANCHORAGE_THEFT_RE.test(text)) return false;
+  if (LAND_LOGISTICS_ANCHOR_RE.test(text)) return false;
+  // Container theft at a named land terminal / quay stays in (port-side land).
+  if (
+    /\b(container|containers)\b/i.test(text) &&
+    /\b(terminal|wharf|dock|quay|port gate|yard)\b/i.test(text) &&
+    !/\b(anchorage|on board|aboard|board(?:ed|ing)?)\b/i.test(text)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 // Personal, non-commercial robbery cues — a private traveller's phone, wallet or
 // cash; a passenger vehicle; household property. On their own these describe
 // street/highway crime, not a cargo movement.
@@ -621,6 +646,10 @@ export function classifyScope(i: CargoIncidentLike, region: Region): Scope {
   // cargo-vocab / genuineness / generic-noise gates below — but NOT the hard
   // non-cargo / fish rejects, nor the geography gates.
   const portSec = hasPortCargoSecurity(text);
+  // Land/warehouse focus: ship and anchorage theft without a land logistics
+  // anchor is Shipping Watch territory, not Cargo Watch (Chittagong-style
+  // theft-from-ships contamination).
+  if (isShipOrAnchorageOnlyTheft(text)) return "excluded_non_cargo";
   // Reject non-cargo / civic / film / etc. content first.
   if (NON_CARGO_RE.test(text)) return "excluded_non_cargo";
   // Seafood only counts as cargo when a genuine freight anchor is also present
@@ -907,8 +936,11 @@ export const CARGO_CATEGORIES: CargoCategoryDef[] = [
 const CARGO_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
   // ---- Port-related (checked first) ----
   { label: "Stowaway incident", pattern: /\bstowaways?\b/i },
-  { label: "Narcotics seizure (cargo / port)", pattern: /\b(cocaine|heroin|methamphetamine|meth\b|narcotics?|cannabis|marijuana|ketamine|opium|amphetamine|fentanyl)\b[^.]{0,50}\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b|\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b[^.]{0,50}\b(cocaine|heroin|methamphetamine|narcotics?|cannabis|ketamine|opium|amphetamine|fentanyl)\b/i },
-  { label: "Weapons / contraband seizure (cargo / port)", pattern: /\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b[^.]{0,50}\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock|vessel|ship)\b|\b(container|containers|cargo|consignment|shipment|freight|port|terminal|wharf|dock)\b[^.]{0,50}\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b/i },
+  // Seizure categories REQUIRE an enforcement verb (seiz*/confiscat*/…); a
+  // looting headline that merely names narcotics or weapons near a port must
+  // not be labelled a seizure.
+  { label: "Narcotics seizure (cargo / port)", pattern: /\b(seiz\w*|confiscat\w*|impound\w*|intercept\w*|recover\w*)\b[^.]{0,60}\b(cocaine|heroin|methamphetamine|meth\b|narcotics?|cannabis|marijuana|ketamine|opium|amphetamine|fentanyl)\b|\b(cocaine|heroin|methamphetamine|meth\b|narcotics?|cannabis|marijuana|ketamine|opium|amphetamine|fentanyl)\b[^.]{0,60}\b(seiz\w*|confiscat\w*|impound\w*|intercept\w*|recover\w*)\b/i },
+  { label: "Weapons / contraband seizure (cargo / port)", pattern: /\b(seiz\w*|confiscat\w*|impound\w*|intercept\w*|recover\w*)\b[^.]{0,60}\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b|\b(weapons?|firearms?|ammunition|explosives?|contraband|ivory|counterfeit\w*)\b[^.]{0,60}\b(seiz\w*|confiscat\w*|impound\w*|intercept\w*|recover\w*)\b/i },
   { label: "Port-linked cargo smuggling", pattern: /\bsmuggl\w*/i },
   { label: "Port sabotage / arson", pattern: /\b(port|terminal|wharf|dock|docks|quay|jetty|harbou?r)\b[^.]{0,40}\b(sabotage|sabotaged|arson|set (?:on )?fire|torched|explos\w*|bomb\w*)\b|\b(sabotage|sabotaged|arson|torched)\b[^.]{0,40}\b(port|terminal|wharf|dock|quay|jetty)\b/i },
   { label: "Port-access blockade (cargo disruption)", pattern: /\b(block(?:ad|ed|ing|ade)?|barricad\w*|blockad\w*)\b[^.]{0,30}\b(port (?:access|gate|gates|entrance|road|operations?)|access to (?:the )?port|terminal gate)\b/i },

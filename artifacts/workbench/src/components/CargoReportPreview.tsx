@@ -850,16 +850,33 @@ export default function CargoReportPreview({
 
         {/* Enforcement outcomes — arrests, seizures and recoveries shown in their
             OWN panel and EXCLUDED from every operational total above (spec pt1). */}
-        {model.enforcement.total > 0 && (
-          <Section hidden={!show("enforcement")} title="Enforcement Activity">
-            <p
-              className="text-[12px] leading-[1.6] mb-3"
-              style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-            >
-              {model.enforcement.statement}
-            </p>
+        {model.enforcement.total > 0 && show("enforcement") && (
+          <section className="mb-8" style={{ breakInside: "avoid" }}>
+            <div data-pdf-keep>
+              <h2
+                className="uppercase"
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  letterSpacing: "0.06em",
+                  color: NAVY,
+                  borderBottom: `2px solid ${NAVY}`,
+                  paddingBottom: 6,
+                  marginBottom: 12,
+                }}
+              >
+                Enforcement Activity
+              </h2>
+              <p
+                className="text-[12px] leading-[1.6] mb-3"
+                style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+              >
+                {model.enforcement.statement}
+              </p>
+            </div>
             <SelectedIncidents rows={model.enforcement.rows} subtitle={null} />
-          </Section>
+          </section>
         )}
 
         {/* Data-driven reads — editor override wins; auto-generated text fills

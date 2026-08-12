@@ -42,22 +42,23 @@ function freqCell(count: number, maxCell: number): { bg: string; fg: string } {
 
 const TH_BASE: React.CSSProperties = {
   fontFamily: "Roboto, sans-serif",
-  fontSize: 10,
+  fontSize: 9,
   fontWeight: 700,
   color: G.navy,
   background: HEADER_BG,
   border: `1px solid ${G.line}`,
-  lineHeight: 1,
-  padding: "6px 8px",
-  whiteSpace: "nowrap",
+  lineHeight: 1.15,
+  padding: "5px 4px",
+  whiteSpace: "normal",
+  wordBreak: "break-word",
 };
 
 const TD_BASE: React.CSSProperties = {
   fontFamily: "Roboto, sans-serif",
-  fontSize: 10.5,
+  fontSize: 10,
   border: `1px solid ${G.line}`,
   lineHeight: 1,
-  padding: "6px 8px",
+  padding: "5px 4px",
   textAlign: "center",
 };
 
@@ -146,7 +147,7 @@ export default function CargoActivityMatrix({
     textAlign: "left",
     color: G.navy,
     fontWeight: 600,
-    whiteSpace: "nowrap",
+    whiteSpace: "normal",
     background: G.panelAlt,
   };
   const neutralCell: React.CSSProperties = {
@@ -156,80 +157,108 @@ export default function CargoActivityMatrix({
     fontWeight: 700,
   };
 
+  // Drop empty maritime / inland-waterway rows so the matrix stays within the
+  // page width on land-dominated windows.
+  const visibleRows = rows.filter(
+    (r) =>
+      !(
+        (r.stageKey === "maritime" || r.stageKey === "inland_waterway") &&
+        r.total === 0
+      ),
+  );
+  const hasPartialWeek = weeks.some((w) => w.label.includes("*"));
+
   return (
-    <GraphicFrame title={TITLE} footnote={SHADE_FOOTNOTE}>
-      <table
-        style={{ borderCollapse: "collapse", width: "100%" }}
-        cellSpacing={0}
-      >
-        <thead>
-          <tr>
-            <th style={{ ...TH_BASE, textAlign: "left" }}>Pattern</th>
-            {weeks.map((w) => (
-              <th key={w.key} style={TH_BASE}>
-                {w.label}
+    <GraphicFrame
+      title={TITLE}
+      footnote={
+        hasPartialWeek
+          ? `${SHADE_FOOTNOTE} Weeks marked * are partial (clipped to the reporting period).`
+          : SHADE_FOOTNOTE
+      }
+    >
+      <div style={{ width: "100%", overflow: "hidden" }}>
+        <table
+          style={{
+            borderCollapse: "collapse",
+            width: "100%",
+            tableLayout: "fixed",
+          }}
+          cellSpacing={0}
+        >
+          <thead>
+            <tr>
+              <th style={{ ...TH_BASE, textAlign: "left", width: "18%" }}>
+                Pattern
               </th>
-            ))}
-            <th style={{ ...TH_BASE, background: NEUTRAL_BG }}>Total</th>
-            {hasUnconfirmed ? (
-              <th style={TH_BASE}>Date unconfirmed</th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.stageKey}>
-              <td style={rowLabelStyle}>{r.label}</td>
-              {r.weekCounts.map((c, i) => {
-                const { bg, fg } = freqCell(c, maxCell);
-                return (
-                  <td
-                    key={weeks[i].key}
-                    style={{
-                      ...TD_BASE,
-                      background: bg,
-                      color: fg,
-                      fontWeight: c > 0 ? 600 : 400,
-                    }}
-                  >
-                    {c}
-                  </td>
-                );
-              })}
-              <td style={neutralCell}>{r.total}</td>
+              {weeks.map((w) => (
+                <th key={w.key} style={TH_BASE}>
+                  {w.label}
+                </th>
+              ))}
+              <th style={{ ...TH_BASE, background: NEUTRAL_BG, width: "8%" }}>
+                Total
+              </th>
               {hasUnconfirmed ? (
-                (() => {
-                  const { bg, fg } = freqCell(r.unconfirmed, maxCell);
+                <th style={TH_BASE}>Date unconfirmed</th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {visibleRows.map((r) => (
+              <tr key={r.stageKey}>
+                <td style={rowLabelStyle}>{r.label}</td>
+                {r.weekCounts.map((c, i) => {
+                  const { bg, fg } = freqCell(c, maxCell);
                   return (
                     <td
+                      key={weeks[i].key}
                       style={{
                         ...TD_BASE,
                         background: bg,
                         color: fg,
-                        fontWeight: r.unconfirmed > 0 ? 600 : 400,
+                        fontWeight: c > 0 ? 600 : 400,
                       }}
                     >
-                      {r.unconfirmed}
+                      {c}
                     </td>
                   );
-                })()
+                })}
+                <td style={neutralCell}>{r.total}</td>
+                {hasUnconfirmed ? (
+                  (() => {
+                    const { bg, fg } = freqCell(r.unconfirmed, maxCell);
+                    return (
+                      <td
+                        style={{
+                          ...TD_BASE,
+                          background: bg,
+                          color: fg,
+                          fontWeight: r.unconfirmed > 0 ? 600 : 400,
+                        }}
+                      >
+                        {r.unconfirmed}
+                      </td>
+                    );
+                  })()
+                ) : null}
+              </tr>
+            ))}
+            <tr>
+              <td style={{ ...neutralCell, textAlign: "left" }}>Weekly total</td>
+              {weeklyTotals.map((t, i) => (
+                <td key={weeks[i].key} style={neutralCell}>
+                  {t}
+                </td>
+              ))}
+              <td style={neutralCell}>{total}</td>
+              {hasUnconfirmed ? (
+                <td style={neutralCell}>{unconfirmedTotal}</td>
               ) : null}
             </tr>
-          ))}
-          <tr>
-            <td style={{ ...neutralCell, textAlign: "left" }}>Weekly total</td>
-            {weeklyTotals.map((t, i) => (
-              <td key={weeks[i].key} style={neutralCell}>
-                {t}
-              </td>
-            ))}
-            <td style={neutralCell}>{total}</td>
-            {hasUnconfirmed ? (
-              <td style={neutralCell}>{unconfirmedTotal}</td>
-            ) : null}
-          </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
       {statement ? (
         <div style={{ fontSize: 10.5, color: G.dusk, marginTop: 10 }}>
           {statement}

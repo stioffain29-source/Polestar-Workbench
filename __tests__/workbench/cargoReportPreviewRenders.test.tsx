@@ -43,7 +43,7 @@ const RICH: TopicFastFactsIncident[] = [
   inc({ id: 2, title: "Armed men hijack a cargo truck near Johor Bahru, Malaysia", severity: "moderate", occurredAt: "2026-06-22" }),
   inc({ id: 3, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate", country: "Indonesia", occurredAt: "2026-06-23" }),
   inc({ id: 4, title: "Thieves loot a bonded warehouse in Surabaya, Indonesia", severity: "low", country: "Indonesia", occurredAt: "2026-06-21" }),
-  inc({ id: 5, title: "Robbers board a ship at Singapore anchorage", severity: "low", country: "Singapore", occurredAt: "2026-06-20" }),
+  inc({ id: 5, title: "Theft from container at Port Klang terminal yard, Malaysia", severity: "low", country: "Malaysia", occurredAt: "2026-06-20" }),
 ];
 
 describe("CargoReportPreview — pattern-report parity", () => {

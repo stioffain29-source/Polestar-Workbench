@@ -280,11 +280,20 @@ describe("recoverCargoPortName — strict, no-fabrication port extraction", () =
 // cargo-SECURITY events (stowaways, port/vessel robbery, container narcotics
 // seizures) while still dropping commercial-shipping / port-OPERATIONS noise
 // (congestion, throughput, freight rates). These tests lock that widening in.
-describe("classifyScope — widened to keep PORT cargo-security", () => {
-  it("keeps an armed vessel boarding at anchorage (names no land freight)", () => {
+describe("classifyScope — land/warehouse focus (ship theft out)", () => {
+  it("excludes armed vessel boarding at anchorage (Shipping Watch territory)", () => {
     expect(
       cargoScope({ title: "Armed robbers boarded a bulk carrier at Singapore anchorage", country: "Singapore" }),
-    ).toBe("in_scope");
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("excludes theft from ships at Chittagong without a land logistics node", () => {
+    expect(
+      cargoScope({
+        title: "Thieves steal cargo from ships at Chittagong port",
+        country: "Bangladesh",
+      }),
+    ).toBe("excluded_non_cargo");
   });
 
   it("keeps a stowaway-in-container report", () => {
@@ -296,6 +305,15 @@ describe("classifyScope — widened to keep PORT cargo-security", () => {
   it("keeps a container narcotics seizure at a port", () => {
     expect(
       cargoScope({ title: "Cocaine concealed in a cargo container seized at the port", country: "India" }),
+    ).toBe("in_scope");
+  });
+
+  it("keeps container theft at a land terminal", () => {
+    expect(
+      cargoScope({
+        title: "Containers stolen from the terminal yard at Port Klang",
+        country: "Malaysia",
+      }),
     ).toBe("in_scope");
   });
 

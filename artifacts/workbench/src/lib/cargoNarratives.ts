@@ -175,10 +175,21 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
     return `Little was reported this month on truck hijackings, container theft, in-transit loss, pilferage or convoy attacks. Cargo-security reporting tends to come in bursts, so a quiet month points to a gap in reporting rather than proof that risk on the road has eased.\n\nKeep an eye on insurance underwriter bulletins, transport-association advisories and any operator decisions on convoying or rerouting. Those signals usually move ahead of headline crime reporting on the routes that matter.`;
   }
   const lead = leadEntry(matches)!;
-  const countryLine = countryPicture(matches, 3, "among these route-side records").line;
   const intro = `Route-side and convoy cargo risk showed up this month, covering truck hijackings, container theft, in-transit loss and similar crime. One recent case involved ${describeCargoLead(lead)}.`;
-  const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories are the earliest signs that risk on the road is building.`;
-  return `${intro} ${countryLine}\n\n${watch}`;
+  const cp = countryPicture(matches, 3, "among these route-side records");
+  const overallTop = topCountries(windowIncidents, 1)[0]?.country ?? null;
+  const routeTop = cp.top[0]?.country ?? null;
+  let splitNote = "";
+  if (
+    overallTop &&
+    routeTop &&
+    overallTop !== routeTop &&
+    cp.strong
+  ) {
+    splitNote = ` That route-side lead differs from the overall-window lead (${overallTop}), because the Security Read counts only hijack, in-transit and related route-side records — not every cargo category.`;
+  }
+  const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories remain useful early indicators when they appear, but timing relative to hub losses is not established in this report.`;
+  return `${intro} ${cp.line}${splitNote}\n\n${watch}`;
 }
 
 // --- Cargo analyst auto-prose for the four standard sections ---------------
@@ -212,15 +223,15 @@ export function buildCargoWhatMatters(windowIncidents: CargoNarrativeIncident[])
     return `Little was reported this month on truck hijackings, container theft, in-transit loss or logistics-hub incidents. Cargo-crime reporting comes in bursts, so a quiet month points to a gap in reporting rather than proof that risk on the road or at the depot has eased. Treat the underlying inventory-loss, fulfilment and insurance-exposure picture as unchanged until at least two clean months in a row.`;
   }
   parts.push(
-    `What changed this month for cargo owners and operators sits in two places: route-side incidents that translate directly into inventory loss, fulfilment slippage and insurance-claim exposure; and logistics-hub losses that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
+    `What changed this month for cargo owners and operators sits in two places: route-side incidents that translate directly into inventory loss and fulfilment slippage; and logistics-hub losses that test warehouse and depot controls, driver and yard-staff vetting, and seal and handover integrity.`,
   );
   if (cp.top.length > 0) {
     parts.push(
-      `${cp.line} Repeat hits in the same country month after month are the clearest early sign that a specific corridor or operator is being worked by an organised crew — that is the point at which insurance bulletins and police alerts typically follow.`,
+      `${cp.line} Repeat hits in the same country month after month are the clearest early sign that a specific corridor or operator is being worked by an organised crew.`,
     );
   }
   parts.push(
-    `For high-value cargo moves the implication is to assume route-side risk has not eased even on a quiet month. Pre-route security reviews, seal and lock integrity checks at handover, and driver-vetting on contracted hauliers are the cheapest mitigation; they only get expensive after a loss.`,
+    `For high-value cargo moves the implication is to assume route-side risk has not eased even on a quiet month. Pre-route security reviews, seal and lock integrity checks at handover, and driver-vetting on contracted hauliers remain the lowest-cost mitigations.`,
   );
   return parts.join("\n\n");
 }
@@ -240,7 +251,7 @@ export function buildCargoImplications(_windowIncidents: CargoNarrativeIncident[
     `Tighten depot and warehouse access control — visitor logs, after-hours staffing, CCTV blind spots and perimeter integrity at named hubs.`,
     `Re-baseline driver and yard-staff vetting on contracted hauliers; insider involvement is the consistent thread behind larger losses.`,
     `Enforce seal and lock checks at every handover, with photographic evidence captured and matched at origin and destination.`,
-    `Review insurance cover and deductibles on repeat corridors; expect underwriter response within one to two weeks on lanes with recurring activity.`,
+    `Review insurance cover and deductibles on repeat corridors where losses recur; treat underwriter response timing as case-by-case, not fixed.`,
     `Confirm incident-reporting and recovery procedures end-to-end — police notification, insurer notification, internal escalation and stock-recovery actions — so the response is rehearsed, not improvised.`,
   ];
   return bullets.map((b) => `- ${b}`).join("\n");
@@ -351,7 +362,7 @@ export function buildLogisticsHubRead(windowIncidents: CargoNarrativeIncident[])
   const lead = leadEntry(matches)!;
   const countryLine = countryPicture(matches, 3, "among these hub-side records").line;
   const intro = `Logistics-hub risk across warehouses, depots, distribution centres, terminals and bonded storage showed up this month. One recent case involved ${describeCargoLead(lead)}.`;
-  const watch = `Watch for repeat incidents at the same facility or operator, escalation from pilferage to organised raids, and any insurance-premium movement on affected corridors. Hub-side losses typically precede a hardening of underwriting terms by one to two weeks.`;
+  const watch = `Watch for repeat incidents at the same facility or operator and escalation from pilferage to organised raids. Insurance-premium movement on affected corridors is worth tracking when reported, but this report does not establish a fixed lead time from hub loss to harder underwriting terms.`;
   return `${intro} ${countryLine}\n\n${watch}`;
 }
 

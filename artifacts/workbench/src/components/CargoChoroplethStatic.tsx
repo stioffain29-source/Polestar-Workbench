@@ -10,12 +10,12 @@
 import type { FeatureCollection, Geometry } from "geojson";
 import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
 import {
-  COUNT_BANDS,
   countBandColor,
   featureCountryName,
   buildChoroplethProjection,
   featurePath,
   featureCenter,
+  visibleCountBands,
   type CargoCountryIntensity,
 } from "@/lib/cargoChoropleth";
 
@@ -107,6 +107,11 @@ export default function CargoChoroplethStatic({
   title = "Cargo Theft Incidents by Country",
 }: CargoChoroplethStaticProps) {
   const { width: W, height: H, project } = projection;
+  let maxCount = 0;
+  for (const v of intensity.values()) {
+    if (v.count > maxCount) maxCount = v.count;
+  }
+  const legendBands = visibleCountBands(maxCount);
 
   return (
     // paddingBottom reserves whitespace UNDER the legend that is captured as
@@ -179,7 +184,7 @@ export default function CargoChoroplethStatic({
         <span style={{ fontWeight: 700, color: NAVY, textTransform: "uppercase", letterSpacing: "0.05em" }}>
           Cargo incidents
         </span>
-        {COUNT_BANDS.map((b) => (
+        {legendBands.map((b) => (
           <span key={b.label} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <span style={{ width: 12, height: 12, background: b.color, display: "inline-block", border: `1px solid ${BORDER}` }} />
             <span style={{ color: DUSK }}>{b.label}</span>

@@ -37,7 +37,7 @@ describe("cargo pattern model — single-source reconciliation", () => {
     const rows = [
       inc({ id: 1, title: "Armed robbers hijack container truck on the North-South highway in Malaysia", severity: "high", occurredAt: "2026-06-24" }),
       inc({ id: 2, title: "Thieves raid a bonded warehouse in Jakarta, Indonesia overnight", severity: "moderate", occurredAt: "2026-06-23" }),
-      inc({ id: 3, title: "Robbers board a bulk carrier at Singapore Strait anchorage", severity: "low", occurredAt: "2026-06-22" }),
+      inc({ id: 3, title: "Thieves break into a bonded warehouse depot in Singapore overnight", severity: "low", occurredAt: "2026-06-22" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
     // The reconciliation property: the Fast Facts "Total Records" card always
@@ -47,8 +47,8 @@ describe("cargo pattern model — single-source reconciliation", () => {
   });
 
   it("collapses syndicated duplicates so raw input exceeds the deduped set", () => {
-    const a = inc({ id: 1, title: "Robbers board vessel at Port Klang anchorage", source: "Reuters", sourceUrl: "https://r/1", occurredAt: "2026-06-20" });
-    const b = inc({ id: 2, title: "Robbers board ship at Port Klang anchorage overnight", source: "Local Daily", sourceUrl: "https://l/2", occurredAt: "2026-06-21" });
+    const a = inc({ id: 1, title: "Thieves raid bonded warehouse depot at Port Klang", source: "Reuters", sourceUrl: "https://r/1", occurredAt: "2026-06-20" });
+    const b = inc({ id: 2, title: "Thieves raid bonded warehouse depot at Port Klang overnight", source: "Local Daily", sourceUrl: "https://l/2", occurredAt: "2026-06-21" });
     const m = buildCargoPatternModel([a, b], { issueDate: "2026-06-24" });
     expect(m.totalUnique).toBe(1);
     expect(m.clusters[0].clusterSize).toBe(2);
@@ -179,7 +179,7 @@ describe("cargo pattern model — single-source reconciliation", () => {
     const rows = [
       inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high" }),
       inc({ id: 2, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate" }),
-      inc({ id: 3, title: "Robbers board ship at Singapore anchorage", severity: "low" }),
+      inc({ id: 3, title: "Thieves raid a warehouse depot in Singapore overnight", severity: "low" }),
       inc({ id: 4, title: "Police arrest a cargo theft syndicate in the Philippines", severity: "moderate" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
@@ -192,7 +192,7 @@ describe("cargo pattern model — single-source reconciliation", () => {
     const rows = [
       inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high", occurredAt: "2026-06-24" }),
       inc({ id: 2, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate", occurredAt: "2026-06-17" }),
-      inc({ id: 3, title: "Robbers board ship at Singapore anchorage", severity: "low", occurredAt: "2026-06-10" }),
+      inc({ id: 3, title: "Thieves raid a warehouse depot in Singapore overnight", severity: "low", occurredAt: "2026-06-10" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
     // Every unique incident lands in exactly one cell: weekly totals plus the
@@ -226,7 +226,7 @@ describe("cargo pattern model — single-source reconciliation", () => {
     const specs = [
       "Truck hijacking on the highway in Malaysia",
       "Warehouse theft in Jakarta, Indonesia",
-      "Robbers board ship at Singapore anchorage",
+      "Thieves raid a warehouse depot in Singapore overnight",
       "Theft from container at Port Klang terminal, Malaysia",
       "Pilferage and seal tampering at a yard in Thailand",
     ];
@@ -278,7 +278,7 @@ describe("cargo pattern model — single-source reconciliation", () => {
     const rows = [
       inc({ id: 1, title: "Truck hijacking on the highway in Malaysia", severity: "high" }),
       inc({ id: 2, title: "Warehouse theft in Jakarta, Indonesia", severity: "moderate" }),
-      inc({ id: 3, title: "Robbers board ship at Singapore anchorage", severity: "low" }),
+      inc({ id: 3, title: "Thieves raid a warehouse depot in Singapore overnight", severity: "low" }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
     const intensityTotal = [...m.intensity.values()].reduce(
