@@ -16,6 +16,7 @@ import {
   compareIncidentSignificance,
   incidentSeverityRank,
 } from "@workspace/country-engine";
+import { isReactionLed } from "@workspace/ingest";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -92,14 +93,32 @@ const FORECAST_DATE_RE = new RegExp(
     `|\\b(?:on|set for|until|through|by|from|starting)\\s+${FORECAST_MONTH}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`,
   "i",
 );
+const BARE_FORECAST_DATE_RE = new RegExp(
+  `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${FORECAST_MONTH}\\b`,
+  "i",
+);
 function explicitForecastDate(r: { title?: string | null; summary?: string | null }): string | null {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   const m = FORECAST_DATE_RE.exec(text);
-  if (!m) return null;
-  const day = m[1] ?? m[4];
-  const month = m[2] ?? m[3];
-  if (!day || !month) return null;
-  return `${parseInt(day, 10)} ${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()}`;
+  if (m) {
+    const day = m[1] ?? m[4];
+    const month = m[2] ?? m[3];
+    if (day && month) {
+      return `${parseInt(day, 10)} ${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()}`;
+    }
+  }
+  // Bare "10 August" in a strike/protest headline (no "on/set for" prefix).
+  if (/\b(protest|demonstration|rally|march|strike|walkout|shutdown|sit[- ]?in)\b/i.test(text)) {
+    const bare = BARE_FORECAST_DATE_RE.exec(text);
+    if (bare) {
+      const day = bare[1];
+      const month = bare[2];
+      if (day && month) {
+        return `${parseInt(day, 10)} ${month.charAt(0).toUpperCase()}${month.slice(1).toLowerCase()}`;
+      }
+    }
+  }
+  return null;
 }
 
 // A forecast entry whose explicitly-stated date is ON or BEFORE the report's
@@ -912,6 +931,18 @@ function clusterSameEvent<
     for (let j = i + 1; j < n; j++) {
       if (Math.abs(rows[i].date.getTime() - rows[j].date.getTime()) > SAME_EVENT_WINDOW_MS) continue;
       if (!sameCountryOrUnknown(rows[i].country ?? "", rows[j].country ?? "")) continue;
+      const na = (rows[i].country ?? "").trim().toLowerCase();
+      const nb = (rows[j].country ?? "").trim().toLowerCase();
+      const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
+      const facility = (s: Set<string>) =>
+        s.has("prison") || s.has("jail") || s.has("airport");
+      // Facility-class fold runs BEFORE the distinct-subject veto so
+      // "Incheon Airport labour protest" and "Incheon Airport pay protest"
+      // collapse even when the grievance wording differs.
+      if (explicitSameCountry && facility(anchors[i]) && facility(anchors[j])) {
+        parent[find(i)] = find(j);
+        continue;
+      }
       if (distinctSubjects(subjects[i], subjects[j])) continue;
       const [small, big] = anchors[i].size <= anchors[j].size
         ? [anchors[i], anchors[j]] : [anchors[j], anchors[i]];
@@ -922,19 +953,6 @@ function clusterSameEvent<
         shared++;
       }
       if (shared >= 2) { parent[find(i)] = find(j); continue; }
-      // Facility-class fold: two same-country rows inside the window that
-      // both centre on a PRISON/JAIL event are one story arc even when the
-      // headlines share only that single anchor (casualty angle vs response
-      // angle). Requires an EXPLICIT matching country (never Unknown) and no
-      // mutually-exclusive subjects, so different countries' prison riots
-      // and genuinely different subjects stay apart.
-      const na = (rows[i].country ?? "").trim().toLowerCase();
-      const nb = (rows[j].country ?? "").trim().toLowerCase();
-      const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
-      const facility = (s: Set<string>) => s.has("prison") || s.has("jail");
-      if (explicitSameCountry && facility(anchors[i]) && facility(anchors[j])) {
-        parent[find(i)] = find(j);
-      }
     }
   }
   const best = new Map<number, T>();
@@ -1037,6 +1055,18 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
 
 function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
+// Incident tables surface the most operationally significant rows first,
+// not merely the most recent — so a Philippines transport strike mentioned
+// in Watch Next cannot sit below the cap while weaker items fill the table.
+function sortRowsForTable(rows: EnrichedIncident[]): EnrichedIncident[] {
+  return [...rows].sort((a, b) =>
+    compareIncidentSignificance(
+      { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
+      { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
+    ) || b.date.getTime() - a.date.getTime(),
+  );
 }
 
 function countriesOf(rows: EnrichedIncident[]): Map<string, number> {
@@ -1189,13 +1219,13 @@ export function buildFlashpointReportDataset(
 ): FlashpointReportDataset {
   const win = resolveReportWindow(topic, issueDate);
 
-  const { enriched, kineticDropped, courtDropped, dedupedDropped, weakDropped } =
+  const { enriched, kineticDropped, courtDropped, dedupedDropped, weakDropped, rawWindowCount } =
     selectFlashpointUsable(incidents, topic, issueDate);
 
   // Bucketed views for the operational reads and tables. `enriched` is
-  // already clean, so these are simple bucket splits.
-  const activismRows = enriched.filter((r) => r.bucket === "activism");
-  const unrestRows = enriched.filter((r) => r.bucket === "unrest");
+  // already clean, so these are simple bucket splits ranked for table display.
+  const activismRows = sortRowsForTable(enriched.filter((r) => r.bucket === "activism"));
+  const unrestRows = sortRowsForTable(enriched.filter((r) => r.bucket === "unrest"));
 
   // Fast Facts. The single top-severity incident is computed ONCE over the
   // full usable set and shared with every prose builder (Exec Summary,
@@ -1236,14 +1266,21 @@ export function buildFlashpointReportDataset(
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
     {
-      label: "Incidents In Window",
+      label: "Distinct Incidents",
       value: String(enriched.length),
+      note: dedupedDropped > 0
+        ? `${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? "" : "s"} removed from ${rawWindowCount} records`
+        : rawWindowCount > enriched.length
+          ? `${rawWindowCount} records screened`
+          : "After deduplication",
     },
     {
       label: "Highest Severity",
       value: hs.label,
       severity: hs.key || undefined,
-      note: hs.key ? "Highest rating this week" : undefined,
+      note: hs.key
+        ? "Peak incident rating — not the overall week posture"
+        : undefined,
     },
     {
       label: "Top Issue Type",
@@ -1305,7 +1342,8 @@ export function buildFlashpointReportDataset(
   // South Korea records that both reduce to "Union injunction ruling
   // — sectoral strike risk" must render once).
   const seenForecast = new Set<string>();
-  const forecastFuture: ForecastFutureRow[] = [];
+  const forecastDated: ForecastFutureRow[] = [];
+  const forecastDateless: ForecastFutureRow[] = [];
   for (const r of dedupeByTitle(futureRaw)) {
     // An explicitly-dated event ON or BEFORE the issue date has already
     // happened — it is window material, not a forward-looking row.
@@ -1315,9 +1353,16 @@ export function buildFlashpointReportDataset(
     const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
     if (seenForecast.has(key)) continue;
     seenForecast.add(key);
-    forecastFuture.push({ country, signal, meaning: forecastMeaningFor(r), date: explicitForecastDate(r) });
-    if (forecastFuture.length >= 6) break;
+    const row: ForecastFutureRow = {
+      country,
+      signal,
+      meaning: forecastMeaningFor(r),
+      date: explicitForecastDate(r),
+    };
+    if (row.date) forecastDated.push(row);
+    else forecastDateless.push(row);
   }
+  const forecastFuture = [...forecastDated, ...forecastDateless].slice(0, 6);
   const forecastRead = buildForecastRead({
     activismRows,
     unrestRows,
@@ -1447,12 +1492,15 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
       ),
     );
   if (strong.length > 0) {
-    // Political-mobilisation records are preferred ONLY when they match the
-    // pool's top severity. A named-movement cue must never demote a genuinely
-    // more severe event (a Low Melbourne march led over Pakistan's High
-    // Kashmir protests — an owner-flagged defect).
-    const bestStrong = sortBySignificance(strong)[0];
-    const political = strong.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
+    // Reaction-led advocacy headlines ("demands justice for six slain") report
+    // a mobilisation ABOUT a prior death — they must not lead over a fresh
+    // protest/disruption record at the same severity (owner-flagged defect:
+    // High Malaysian memorial protest declared main event while barely
+    // explaining the protest itself).
+    const nonReaction = strong.filter((r) => !isReactionLed(r.title ?? ""));
+    const leadPool = nonReaction.length > 0 ? nonReaction : strong;
+    const bestStrong = sortBySignificance(leadPool)[0];
+    const political = leadPool.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
     if (political.length > 0) {
       const bestPol = sortBySignificance(political)[0];
       if (
@@ -1499,7 +1547,7 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   if (sectoral.length > 0) drivers.push("union and trade-group action");
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
-    ? `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}, rated ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate"} severity.`
+    ? `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}, rated ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate"} severity.${lead && isReactionLed(lead.title ?? "") ? " That rating reflects the underlying incident being protested rather than disruption from the protest itself." : ""}`
     : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
   const driverLine = drivers.length > 0
     ? `Most of the reported events came from ${joinList(drivers)}.`
@@ -1563,7 +1611,17 @@ function buildForecastRead(opts: {
   // by the exporter when at least one credible future-dated record is
   // present. Prose then carries trajectory commentary only.
   const futureBlock = hasFutureTable
-    ? `Confirmed upcoming events are listed in the table above and are the first dates to plan around. The outlook below builds on that schedule.`
+    ? (() => {
+        const rows = opts.forecastRows ?? [];
+        const datedN = rows.filter((r) => !!r.date).length;
+        if (datedN > 0 && datedN === rows.length) {
+          return `Confirmed upcoming events with stated dates are listed in the table above and are the first dates to plan around. The outlook below builds on that schedule.`;
+        }
+        if (datedN > 0) {
+          return `Upcoming signals are listed in the table above. Rows with a date are confirmed schedule items; rows marked "—" have no stated date yet. The outlook below builds on that mix.`;
+        }
+        return `Upcoming signals without confirmed dates are listed in the table above. Treat them as items to monitor rather than fixed calendar dates. The outlook below builds on those signals.`;
+      })()
     : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of likely direction from current activity, not a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
@@ -1603,7 +1661,6 @@ function buildForecastRead(opts: {
     const tableClause = sevLeadsTable
       ? `, which is why it leads the forward-looking table even though it is not the busiest country`
       : ``;
-    const contained = sevInc ? containedVenueNote(sevInc) : null;
     // Tie-aware: with several incidents at the top tier, no single event may
     // be called "the most serious" (owner-flagged defect).
     const tieN = opts.topSeverityTie ?? topSeverityTieCount(allRows, sevInc);
@@ -1614,7 +1671,7 @@ function buildForecastRead(opts: {
       ? `watch the ${sevHs.label}-rated incidents, starting with ${sevCountry}, for how they develop`
       : `watch ${sevCountry} for how that incident develops`;
     lines.push(
-      `${lead.label} had the most events this week, ${seriousClause}.${contained ? ` ${contained}` : ""} Expect frequent, mostly lower-level disruption in ${lead.label}, and ${watchClause}.`,
+      `${lead.label} had the most events this week, ${seriousClause}. Expect frequent, mostly lower-level disruption in ${lead.label}, and ${watchClause}.`,
     );
   } else if (lead && tableLeadDiffers) {
     // Volume leader and forecast-table leader differ, but on count not
@@ -1687,11 +1744,13 @@ function buildRegionalCountryRead(opts: {
   // Name each region once and each leading country once. The old form
   // repeated "(led by X)" after every region, which read as boilerplate
   // when three or four regions were active — an owner-flagged defect.
-  const otherLeaders = spread.regions
-    .map((r) => (spread.byRegion.get(r) ?? [])[0]?.label)
-    .filter((l): l is string => Boolean(l) && l !== lead.label);
+  // Name the next-busiest countries by VOLUME (same order as the chart),
+  // not one leader per sub-region — an owner-flagged defect had Nepal and
+  // South Korea ranked above the Philippines in the chart while the headline
+  // named Bangladesh, Japan and the Philippines as "busiest elsewhere".
+  const otherBusy = countryRows.slice(1, 4).map((r) => r.label);
   const headline = spread.regions.length >= 2
-    ? `Activity this week is spread across ${joinList(spread.regions)}. ${lead.label} recorded the most events${otherLeaders.length > 0 ? `, with ${joinList(otherLeaders)} the busiest countries elsewhere` : ""}. The incidents are separate and driven by different local issues rather than a shared regional campaign, so businesses with a presence in several APAC capitals should plan around each country's own protest calendar rather than a single regional trend.`
+    ? `Activity this week is spread across ${joinList(spread.regions)}. ${lead.label} recorded the most events${otherBusy.length > 0 ? `, followed by ${joinList(otherBusy)}` : ""}. The incidents are separate and driven by different local issues rather than a shared regional campaign, so businesses with a presence in several APAC capitals should plan around each country's own protest calendar rather than a single regional trend.`
     : `This week activity centres on ${lead.label}, with the wider APAC region quieter than usual. Treat that as a feature of a quiet week rather than a lasting shift.`;
   // Per-country operational breakdown using the dataset's own bucket
   // tags. This gives the reader a genuine country-level read on what
@@ -1937,7 +1996,12 @@ function cleanRelatedSummary(s: string | null | undefined): string | null {
   if (t.length > 320) {
     const cut = t.slice(0, 320);
     const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
-    t = end > 120 ? cut.slice(0, end + 1) : `${cut.replace(/\s+\S*$/, "")}…`;
+    if (end > 120) {
+      t = cut.slice(0, end + 1);
+    } else {
+      const lastSpace = cut.lastIndexOf(" ");
+      t = `${lastSpace > 120 ? cut.slice(0, lastSpace) : cut.slice(0, 317)}…`;
+    }
   }
   return t || null;
 }
@@ -1957,8 +2021,29 @@ interface AutoCtx {
   windowEnd: Date;
 }
 
+// Overall week posture (Moderate / Low / Elevated) — distinct from the peak
+// incident severity shown on the Fast Facts card.
+function overallPostureLabel(ctx: {
+  activismRows: EnrichedIncident[];
+  unrestRows: EnrichedIncident[];
+}): string {
+  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
+  const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r))).length;
+  const student = ctx.activismRows.filter((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r))).length;
+  const named = ctx.activismRows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement)\b/i.test(text(r))).length;
+  const hasEnforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
+  const mobVectors = [named > 0, sectoral > 0, student > 0].filter(Boolean).length;
+  if (mobVectors >= 2 && hasEnforcement) return "Elevated";
+  if (mobVectors >= 2 || hasEnforcement) return "Moderate";
+  if (mobVectors >= 1) return "Low";
+  return "Low";
+}
+
 function buildWhatMatters(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
+  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
+  const all = [...ctx.activismRows, ...ctx.unrestRows];
+  const hasSectoral = all.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|samsung|walkout|transport)\b/i.test(text(r)));
   if (ctx.activismRows.length + ctx.unrestRows.length === 0) {
     return `What stands out this week is the absence of fresh protest and civil-unrest activity rather than any single event. Treat that as a single quiet reporting period rather than a lasting easing.`;
   }
@@ -1992,6 +2077,15 @@ function buildWhatMatters(ctx: AutoCtx): string {
   } else {
     lines.push(
       `The window leans towards civil unrest and enforcement rather than fresh organising.`,
+    );
+  }
+  if (hasSectoral) {
+    const sectoralLead = all.find((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|transport)\b/i.test(text(r)));
+    const where = (sectoralLead?.country ?? "").trim();
+    lines.push(
+      where
+        ? `Sectoral strike or transport action in ${where} is among the operational items to track this week — confirm whether it affects staff routes or suppliers.`
+        : `Sectoral strike or transport action appears in this week's records and is worth confirming against staff routes and suppliers.`,
     );
   }
   return lines.join("\n\n");
@@ -2148,17 +2242,24 @@ function buildPolestarView(ctx: AutoCtx): string {
   // just repeat the incident summary.
   const lead = ctx.countryRows[0];
   const where = lead ? lead.label : "the busiest cities in the region";
+  const posture = overallPostureLabel(ctx);
+  const peak = ctx.topSeverity
+    ? (SEV_LABEL[sevKey(ctx.topSeverity.severity)] ?? ctx.topSeverity.severity)
+    : null;
+  const postureNote = peak && posture.toLowerCase() !== peak.toLowerCase()
+    ? ` Overall posture is ${posture} even though individual incidents reached ${peak}.`
+    : "";
   let verdict: string;
   if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: this was an active week and the risk level is elevated. Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
+    verdict = `Polestar's view: this was an active week and the risk level is elevated.${postureNote} Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
   } else if (mobVectors >= 2) {
-    verdict = `Polestar's view: the risk level is moderate. Several protest campaigns are active, but reports show no police crackdowns or curfews. Disruption is most likely in ${where}, around city-centre gatherings. Monitor local news and social media for fresh protest calls and review staff travel routes in the affected cities.`;
+    verdict = `Polestar's view: the risk level is moderate.${postureNote} Several protest campaigns are active, but reports show no police crackdowns or curfews. Disruption is most likely in ${where}, around city-centre gatherings. Monitor local news and social media for fresh protest calls and review staff travel routes in the affected cities.`;
   } else if (hasEnforcement) {
-    verdict = `Polestar's view: the risk level is moderate. The main feature this week is police enforcement — arrests, curfews or similar orders — rather than new protest campaigns. Enforcement is what disrupts staff movement and site access on the day. Check site access arrangements in ${where} and be ready to update staff quickly if fresh orders are issued.`;
+    verdict = `Polestar's view: the risk level is moderate.${postureNote} The main feature this week is police enforcement — arrests, curfews or similar orders — rather than new protest campaigns. Enforcement is what disrupts staff movement and site access on the day. Check site access arrangements in ${where} and be ready to update staff quickly if fresh orders are issued.`;
   } else if (mobVectors >= 1) {
-    verdict = `Polestar's view: the risk level is low. Protest activity is running at a low level and no police enforcement was reported. Monitor local news in ${where} for new protest announcements; no other action is needed now.`;
+    verdict = `Polestar's view: the risk level is low.${postureNote} Protest activity is running at a low level and no police enforcement was reported. Monitor local news in ${where} for new protest announcements; no other action is needed now.`;
   } else {
-    verdict = `Polestar's view: the risk level is low. This was a quiet week with minimal reported activity and no enforcement action. Routine monitoring is enough for now.`;
+    verdict = `Polestar's view: the risk level is low.${postureNote} This was a quiet week with minimal reported activity and no enforcement action. Routine monitoring is enough for now.`;
   }
 
   return verdict;
@@ -2238,12 +2339,19 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
         : `, with the most serious incident rated ${hs.label}`
       : ``;
   const opener = `This week ${volClause}${sevClause}. ${driverLine}`;
+  const posture = overallPostureLabel(ctx);
+  const peakHs = hs.label;
+  const postureLine = peakHs && peakHs !== "—" && posture.toLowerCase() !== peakHs.toLowerCase()
+    ? `Overall protest posture this week is ${posture}, even though individual incidents reached ${peakHs}.`
+    : peakHs && peakHs !== "—"
+      ? `Overall protest posture this week is ${posture}, in line with the peak incident rating of ${peakHs}.`
+      : `Overall protest posture this week is ${posture}.`;
 
   const closing = hasEnforcement
     ? `Bottom line: police are already making arrests or breaking up some of these protests, so plan for disruption in the coming week rather than assuming it stays quiet. Detailed activism, civil-unrest, forecast and country sections follow.`
     : `Bottom line: these are organised protests with no police crackdowns reported so far. Detailed activism, civil-unrest, forecast and country sections follow.`;
 
-  return `${opener}\n\n${geoLine} ${severityLine}\n\n${closing}`;
+  return `${opener}\n\n${postureLine} ${geoLine} ${severityLine}\n\n${closing}`;
 }
 
 export const FLASHPOINT_SEV_LABEL = SEV_LABEL;

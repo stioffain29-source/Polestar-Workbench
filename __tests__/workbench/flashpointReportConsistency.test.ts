@@ -9,12 +9,16 @@
 //    incident reported this week"; forecast bullets read "upcoming, unconfirmed".
 //  - Multiple confirmed civic protest marches are summarised as one
 //    cross-country forecast line.
+//  - Stale dated forecast rows (on/before issue date) are excluded.
+//  - Regional headline names the next-busiest countries by chart volume.
+//  - Run-on Watch Next text splits into separate bullets.
 import {
   buildFlashpointReportDataset,
   validateFlashpointReportDataset,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
 import { locationForeignToCountry } from "../../artifacts/workbench/src/lib/upcomingSignals";
+import { parseBullets } from "../../artifacts/workbench/src/lib/pdfChrome";
 
 const ISSUE = "2026-07-27";
 
@@ -117,6 +121,112 @@ describe("flashpoint report consistency", () => {
       expect(ds.forecastRead).toMatch(/confirm turnout and access impact in each host city/);
     } else {
       expect(ds.forecastRead).not.toMatch(/Civic protest marches with confirmed dates are set in/);
+    }
+  });
+
+  test("stale dated forecast rows on or before the issue date are excluded", () => {
+    const rows = [
+      inc({
+        title: "Pakistan nationwide strike 10 August",
+        summary: "Unions say the general strike will run nationwide on 10 August.",
+        severity: "moderate",
+        country: "Pakistan",
+        location: "Islamabad",
+        occurredAt: "2026-08-09T08:00:00Z",
+      }),
+      inc({ title: "Minor rally dispersed in Delhi", severity: "low", country: "India", location: "Delhi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-10");
+    expect(ds.forecastFuture.some((r) => r.country === "Pakistan")).toBe(false);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("regional headline names the next-busiest countries by chart volume", () => {
+    const ausTitles = [
+      "Sydney teachers march on state parliament",
+      "Melbourne tram workers walk out over pay",
+      "Brisbane nurses rally outside hospital",
+      "Perth miners stage protest at site gate",
+      "Adelaide students sit-in at campus hall",
+      "Canberra public servants rally at ministry",
+      "Hobart ferry workers strike over roster",
+      "Darwin community protest over housing",
+    ];
+    const nepalTitles = [
+      "Kathmandu students rally against fee hike",
+      "Pokhara traders shut shops over tax",
+      "Biratnagar union march through market district",
+      "Nepalgunj transport operators walk out",
+      "Butwal civic groups protest corruption",
+    ];
+    const skTitles = [
+      "Seoul Samsung union walkout at chip plant",
+      "Busan dock workers strike over safety",
+      "Daegu taxi drivers rally at city hall",
+      "Incheon airport staff protest overtime",
+    ];
+    const phTitles = [
+      "Manila jeepney operators strike over franchise rules",
+      "Cebu transport groups walk out over fares",
+    ];
+    const rows = [
+      ...ausTitles.map((title) => inc({ title, country: "Australia", severity: "low" })),
+      ...nepalTitles.map((title) => inc({ title, country: "Nepal", severity: "low" })),
+      ...skTitles.map((title) => inc({ title, country: "South Korea", severity: "low" })),
+      ...phTitles.map((title) => inc({ title, country: "Philippines", severity: "moderate" })),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.countryRows[0]?.label).toBe("Australia");
+    expect(ds.regionalCountryRead).toMatch(/followed by Nepal, South Korea and Philippines/);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("Incheon Airport protest syndication collapses to one distinct incident", () => {
+    const rows = [
+      inc({
+        title: "Protesters rally at Incheon Airport over labour dispute",
+        country: "South Korea",
+        location: "Incheon",
+        severity: "moderate",
+        occurredAt: "2026-07-25T08:00:00Z",
+      }),
+      inc({
+        title: "Incheon Airport workers stage protest over pay",
+        country: "South Korea",
+        location: "Incheon",
+        severity: "low",
+        occurredAt: "2026-07-25T12:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.enriched.length).toBe(1);
+  });
+
+  test("parseBullets splits run-on Watch Next lines into separate items", () => {
+    const runOn =
+      "Pakistan — nationwide strike: upcoming, unconfirmed — plan around Islamabad. Philippines — transport strike: upcoming, unconfirmed — check staff routes. Thailand — rally call: upcoming, unconfirmed — monitor local media.";
+    const bullets = parseBullets(runOn, 8);
+    expect(bullets.length).toBe(3);
+    expect(bullets[0]).toMatch(/Pakistan/);
+    expect(bullets[1]).toMatch(/Philippines/);
+    expect(bullets[2]).toMatch(/Thailand/);
+  });
+
+  test("dateless forecast rows do not claim every listed event is confirmed and dated", () => {
+    const rows = [
+      inc({
+        title: "Thailand unions announce planned strike",
+        summary: "Transport unions say a strike is coming but gave no date.",
+        severity: "moderate",
+        country: "Thailand",
+        location: "Bangkok",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    if (ds.forecastFuture.length > 0) {
+      expect(ds.forecastFuture[0]?.date).toBeNull();
+      expect(ds.forecastRead).toMatch(/without confirmed dates/);
+      expect(ds.forecastRead).not.toMatch(/with confirmed dates are listed in the table above and are the first dates/);
     }
   });
 });
