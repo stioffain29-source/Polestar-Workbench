@@ -1962,6 +1962,16 @@ const FLASHPOINT_INDUSTRIAL_ACTION_RE = new RegExp(
   "i",
 );
 
+// Fuel-network collective action (Aug 2026, owner: fuel-driven strikes belong
+// in BOTH Fuel Watch and Protests & Civil Unrest). Petroleum dealers, petrol
+// pump owners, oil/goods transporters and tanker drivers shutting down are a
+// public-order/industrial-action event even when the headline says "closure"
+// or "shutdown" rather than "strike" ("Petroleum dealers announce closure of
+// pumps nationwide"). Actor-bound so an ordinary retail closure or a traffic
+// story never qualifies.
+const FLASHPOINT_FUEL_NETWORK_ACTION_RE =
+  /\b(petroleum dealers?|petrol pump (?:owners?|dealers?)|petrol pumps?|fuel station (?:owners?|dealers?)|oil transporters?|goods transporters?|tanker (?:drivers?|owners?))\b[^.!?]{0,60}\b(strike|strikes|striking|struck|shutdown|shut down|closure|close[sd]?|closing|boycott|ultimatum|wheel[- ]?jam|protest)/i;
+
 // Political-rally cue. A "rally" is the most overloaded flashpoint token:
 // it is a market move, a sports comeback, and a motorsport event as often
 // as it is a political demonstration. The finance/sports/motorsport senses
@@ -2542,6 +2552,14 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     }
     if (bodyVerdict === true) {
       return { relevant: true, reason: "kept: civil-unrest 'protest'/'crackdown' phrase" };
+    }
+    // 3c. Fuel-network collective action: dealers/transporters/pump owners
+    //     striking or shutting down. Runs AFTER the homonym excludes (so the
+    //     weather/crime "strike" senses are already dead) and does not need
+    //     the bare-"strike" ambiguous tier, because this class often carries
+    //     no strike token at all ("announce closure of pumps nationwide").
+    if (FLASHPOINT_FUEL_NETWORK_ACTION_RE.test(text)) {
+      return { relevant: true, reason: "kept: fuel-network collective action (dealers/transporters strike or shutdown)" };
     }
     // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
     //    public-order companion; bare "student(s)" needs a student-

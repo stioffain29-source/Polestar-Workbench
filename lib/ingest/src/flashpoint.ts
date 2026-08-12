@@ -56,6 +56,10 @@ const FLASHPOINT_REQUIRED: RegExp[] = [
   /\b(curfew|state of emergency|martial law|lockdown imposed)/i,
   /\b(security forces?|police|military) .{0,30}(deployed|operation|clash|crackdown|tear[- ]?gas|baton|rubber bullet|water cannon|mass arrest)/i,
   /\b(students?|workers|farmers|union|opposition|civil society|teachers|chemists?|lawyers?) .{0,30}(protest|march|rally|strike|gather|walkout|boycott)/i,
+  // Fuel-network collective action (owner: fuel-driven strikes belong in both
+  // Fuel Watch and this monitor). The actor IS the fuel network, and the
+  // action word is often "closure"/"shutdown" rather than "strike".
+  /\b(petroleum dealers?|petrol pump (?:owners?|dealers?)|petrol pumps?|fuel station (?:owners?|dealers?)|oil transporters?|goods transporters?|tanker (?:drivers?|owners?)) .{0,60}(strike|shutdown|shut down|closure|clos(?:e|es|ed|ing)|boycott|ultimatum|wheel[- ]?jam|protest)/i,
 ];
 
 // Deny list. Excludes kinetic armed-conflict, cargo-theft noise,

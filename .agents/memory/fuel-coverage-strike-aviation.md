@@ -13,3 +13,5 @@ Two story classes belong in the fuel topic but were structurally invisible: regu
 - Cross-border items still mis-stamp via defaultCountry; regulator names in the gazetteer (berc/petrobangla→Bangladesh, ogra→Pakistan) let detectCountry win over the default.
 
 **Why:** owner instruction — the builder must scrape from source, never hand-paste missed items. `fuelExcludes.test.ts` pins both keep and drop directions.
+
+**Dual-topic ruling (owner):** fuel-driven strikes belong in BOTH Fuel Watch and flashpoint. Cross-topic dedupe is topic-scoped, so each topic captures its own copy. Flashpoint side = FLASHPOINT_FUEL_NETWORK_ACTION_RE (actor-bound: dealers/transporters/pump owners + strike/shutdown/closure — the class often has NO "strike" token) + matching ingest cue + catalogued per-country "Fuel-network strikes (…)" source rows (flashpoint feeds live in the sources TABLE, not code — new rows must go to dev AND prod DBs; prod rules only apply after a republish).
