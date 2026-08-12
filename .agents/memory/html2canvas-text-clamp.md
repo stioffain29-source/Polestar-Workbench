@@ -111,3 +111,5 @@ badges in `drawSelectedIncidents` (exportTopicReportPdf.ts) are drawn with jsPDF
 centre — visually correct. A stale PRODUCTION pdf can show ALL badges low while
 current code only has the html2canvas ones low; regenerate from current code via
 the harness before concluding which path is actually broken.
+
+**Chart-embed host clip (Aug 2026):** when the LAST element of an `embedChartMarkupInPdf` host is a bare text line (e.g. the jet fuel chart's "N observations…" caption), the low-drawn glyphs fall below the measured canvas height and the PDF shows the line sliced in half. Fix lives in the shared host: `padding-bottom` on the offscreen host in embedReportChartInPdf.ts (canvas height includes it, pagination unaffected). Verify via the real-DOM harness — `TOPIC=fuel npx tsx scripts/verifyEnergyMarketPricesPdf.ts` drives the fuel branch too (output filename says FertiliserWatch, cosmetic only).
