@@ -231,6 +231,13 @@ export async function embedChartMarkupInPdf(
     "top:0",
     "z-index:-1",
     "pointer-events:none",
+    // html2canvas draws CSS text baselines LOW (see html2canvas-text-clamp
+    // note): when the last element in the host is a text line (e.g. the jet
+    // fuel chart's "N observations from X to Y" caption), its glyphs render
+    // below the layout box and the canvas slices them mid-line. Bottom
+    // padding gives the low-drawn final line room inside the capture; the
+    // measured canvas height includes it, so pagination stays correct.
+    "padding-bottom:14px",
   ].join(";");
   host.innerHTML = html;
   document.body.appendChild(host);
