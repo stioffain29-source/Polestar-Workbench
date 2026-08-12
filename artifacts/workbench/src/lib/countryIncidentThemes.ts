@@ -349,6 +349,42 @@ export function buildCountryIncidentThemes(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Analyst prose overrides (country_reports.section_overrides.themeParagraphs /
+// .actionGroups). Blank/absent per key = auto text; both the on-screen body
+// (PngCountryReportBody) and the headless structured renderer apply these
+// through the SAME helpers so preview == PDF by construction.
+
+/** Replace theme paragraphs with the analyst's edited text where present. */
+export function overrideThemeParagraphs<T extends { key: string; paragraph: string }>(
+  groups: T[],
+  overrides: Record<string, string> | undefined | null,
+): T[] {
+  if (!overrides) return groups;
+  return groups.map((g) => {
+    const edited = overrides[g.key]?.trim();
+    return edited ? { ...g, paragraph: edited } : g;
+  });
+}
+
+/** Replace an action group's bullets with the analyst's edited lines (one
+ *  bullet per line) where present. A blank/absent entry keeps auto bullets. */
+export function overrideActionGroups<T extends { key: string; actions: string[] }>(
+  groups: T[],
+  overrides: Record<string, string> | undefined | null,
+): T[] {
+  if (!overrides) return groups;
+  return groups.map((g) => {
+    const edited = overrides[g.key];
+    if (edited == null || edited.trim() === "") return g;
+    const lines = edited
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l !== "");
+    return lines.length > 0 ? { ...g, actions: lines } : g;
+  });
+}
+
 // Build the Operational Impact bullets: one impact line per theme PRESENT in the
 // full window (in fixed theme order). Count-free. Empty window → [].
 export function buildOperationalImpactBullets(windowItems: PngReportItem[]): string[] {

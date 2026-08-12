@@ -894,6 +894,15 @@ export interface PngReportDataset {
   // Grouped recommended actions (Movement security, Site security, …), built
   // from this period's incident mix and the location watchlist.
   recommendedActions: RecommendedActionGroup[];
+  // Analyst prose overrides (country_reports.section_overrides): edited
+  // Current Situation theme paragraphs (by theme key) and Recommended Actions
+  // bullets (by group key, newline-separated). Carried on the dataset so BOTH
+  // renderers (PngCountryReportBody + the headless structured renderer) apply
+  // them through the shared override helpers — preview == PDF by construction.
+  briefProseOverrides?: {
+    themeParagraphs?: Record<string, string>;
+    actionGroups?: Record<string, string>;
+  } | null;
   // Jakarta-only overrides (set behind config.jakartaProse). When present the
   // renderer prefers these over the generic Incident-Details theme groups and
   // Operational-Impact bullets; unset for every other theatre, leaving their
@@ -963,6 +972,12 @@ export interface BuildArgs {
   // reads "Not Assessed" instead of implying a confirmed quiet week. Omitted →
   // false (render unchanged).
   coverageUnconfirmed?: boolean;
+  // Analyst-edited theme paragraphs / recommended-action bullets (see the
+  // dataset field of the same name). Copied through verbatim.
+  briefProseOverrides?: {
+    themeParagraphs?: Record<string, string>;
+    actionGroups?: Record<string, string>;
+  } | null;
   // Analyst Top 3 Developments curation (country_reports.section_overrides):
   // pinned incident ids lead the section (pin order); excluded ids drop an
   // automatic pick from the section only (the incident falls back to the
@@ -2512,6 +2527,7 @@ export function buildStructuredReportDataset(
     showPerIncidentCards: config.perIncidentDetailCards ?? false,
     recommendedActions,
     incidentThemesOverride,
+    briefProseOverrides: args.briefProseOverrides ?? null,
     operationalImpactOverride,
     keepPolestarTogether,
     engineResult,

@@ -5,11 +5,13 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { CountryReportSectionOverridesActionGroups } from './countryReportSectionOverridesActionGroups';
 import type { CountryReportSectionOverridesFastFactOverrides } from './countryReportSectionOverridesFastFactOverrides';
 import type { CountryReportSectionOverridesMarketPriceOverrides } from './countryReportSectionOverridesMarketPriceOverrides';
 import type { CountryReportSectionOverridesPanelReads } from './countryReportSectionOverridesPanelReads';
 import type { CountryReportSectionOverridesSeverityDemotions } from './countryReportSectionOverridesSeverityDemotions';
 import type { CountryReportSectionOverridesSeverityOverrides } from './countryReportSectionOverridesSeverityOverrides';
+import type { CountryReportSectionOverridesThemeParagraphs } from './countryReportSectionOverridesThemeParagraphs';
 import type { CountryReportSectionOverridesTop3CustomItemsItem } from './countryReportSectionOverridesTop3CustomItemsItem';
 
 export interface CountryReportSectionOverrides {
@@ -19,6 +21,8 @@ export interface CountryReportSectionOverrides {
   severityOverrides?: CountryReportSectionOverridesSeverityOverrides;
   top3PinnedIds?: string[];
   top3ExcludedIds?: string[];
+  themeParagraphs?: CountryReportSectionOverridesThemeParagraphs;
+  actionGroups?: CountryReportSectionOverridesActionGroups;
   top3CustomItems?: CountryReportSectionOverridesTop3CustomItemsItem[];
   fastFactOverrides?: CountryReportSectionOverridesFastFactOverrides;
   panelReads?: CountryReportSectionOverridesPanelReads;

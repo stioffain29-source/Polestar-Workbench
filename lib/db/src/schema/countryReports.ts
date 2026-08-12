@@ -45,6 +45,12 @@ export interface CountryReportSectionOverrides {
     severity?: string;
     date?: string;
   }>;
+  /** Analyst-edited Current Situation theme paragraphs, keyed by theme key.
+   *  Blank/absent = auto paragraph. */
+  themeParagraphs?: Record<string, string>;
+  /** Analyst-edited Recommended Actions bullets, keyed by action-group key;
+   *  value is newline-separated bullet lines. Blank/absent = auto bullets. */
+  actionGroups?: Record<string, string>;
 }
 
 export const countryReportsTable = pgTable("country_reports", {

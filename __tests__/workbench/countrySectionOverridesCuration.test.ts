@@ -78,3 +78,35 @@ describe("applyIncidentCurations severityOverrides", () => {
     expect(out[0].severity).toBe("low");
   });
 });
+
+// --- Analyst prose overrides (theme paragraphs / recommended actions) -------
+import {
+  overrideThemeParagraphs,
+  overrideActionGroups,
+} from "../../artifacts/workbench/src/lib/countryIncidentThemes";
+
+describe("overrideThemeParagraphs", () => {
+  const groups = [
+    { key: "crime", paragraph: "auto crime" },
+    { key: "governance", paragraph: "auto gov" },
+  ];
+  it("replaces only edited keys; blank/absent keep auto", () => {
+    const out = overrideThemeParagraphs(groups, { governance: "edited gov", crime: "  " });
+    expect(out[0].paragraph).toBe("auto crime");
+    expect(out[1].paragraph).toBe("edited gov");
+  });
+  it("no overrides -> unchanged reference", () => {
+    expect(overrideThemeParagraphs(groups, undefined)).toBe(groups);
+  });
+});
+
+describe("overrideActionGroups", () => {
+  const groups = [{ key: "movement", actions: ["a", "b"] }];
+  it("splits edited text into one bullet per non-empty line", () => {
+    const out = overrideActionGroups(groups, { movement: "x\n\n  y  \n" });
+    expect(out[0].actions).toEqual(["x", "y"]);
+  });
+  it("blank entry keeps auto bullets", () => {
+    expect(overrideActionGroups(groups, { movement: "   " })[0].actions).toEqual(["a", "b"]);
+  });
+});

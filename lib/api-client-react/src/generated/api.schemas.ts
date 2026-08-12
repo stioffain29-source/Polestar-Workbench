@@ -514,6 +514,10 @@ export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: str
 
 export type CountryReportSectionOverridesSeverityOverrides = {[key: string]: string};
 
+export type CountryReportSectionOverridesThemeParagraphs = {[key: string]: string};
+
+export type CountryReportSectionOverridesActionGroups = {[key: string]: string};
+
 export type CountryReportSectionOverridesTop3CustomItemsItem = {
   id: string;
   title: string;
@@ -543,6 +547,8 @@ export interface CountryReportSectionOverrides {
   severityOverrides?: CountryReportSectionOverridesSeverityOverrides;
   top3PinnedIds?: string[];
   top3ExcludedIds?: string[];
+  themeParagraphs?: CountryReportSectionOverridesThemeParagraphs;
+  actionGroups?: CountryReportSectionOverridesActionGroups;
   top3CustomItems?: CountryReportSectionOverridesTop3CustomItemsItem[];
   fastFactOverrides?: CountryReportSectionOverridesFastFactOverrides;
   panelReads?: CountryReportSectionOverridesPanelReads;

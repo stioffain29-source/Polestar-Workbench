@@ -673,6 +673,13 @@ export default function CountryReport() {
         excludedIds: sectionOverrides.top3ExcludedIds ?? [],
         customItems: sectionOverrides.top3CustomItems ?? [],
       },
+      // Analyst-edited Current Situation paragraphs / Recommended Actions
+      // bullets (blank = auto). Persisted in section_overrides; applied by
+      // BOTH renderers via the shared override helpers (preview == PDF).
+      briefProseOverrides: {
+        themeParagraphs: sectionOverrides.themeParagraphs ?? {},
+        actionGroups: sectionOverrides.actionGroups ?? {},
+      },
     };
     switch (structuredTheatre) {
       case "westPapua":
@@ -693,7 +700,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds, sectionOverrides.top3CustomItems]);
+  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds, sectionOverrides.top3CustomItems, sectionOverrides.themeParagraphs, sectionOverrides.actionGroups]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -2157,6 +2164,83 @@ export default function CountryReport() {
                           polestarView: inlineProseEditor("polestarView", pngDataset.polestarView),
                         }
                       : undefined,
+                  // Current Situation theme paragraphs — free-text edit,
+                  // blank / matching the engine text = auto (override
+                  // key removed so future engine updates flow through).
+                  themeParagraphEditor: (key, autoText) => {
+                          const saved = (sectionOverrides.themeParagraphs ?? {})[key]?.trim() ?? "";
+                          const value = saved !== "" ? saved : autoText;
+                          return (
+                            <textarea
+                              className="no-print"
+                              value={value}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setSectionOverrides((ov) => {
+                                  const next = { ...(ov.themeParagraphs ?? {}) };
+                                  if (v.trim() === "" || v.trim() === autoText.trim()) delete next[key];
+                                  else next[key] = v;
+                                  return { ...ov, themeParagraphs: next };
+                                });
+                              }}
+                              rows={Math.min(12, Math.max(3, Math.ceil(value.length / 90) + 1))}
+                              style={{
+                                fontFamily: ROBOTO,
+                                fontSize: 13,
+                                lineHeight: 1.5,
+                                color: DUSK,
+                                width: "100%",
+                                border: `1px solid ${POLAR}`,
+                                padding: 8,
+                                margin: "6px 0 4px 0",
+                                background: "#FBFCFE",
+                                resize: "vertical",
+                              }}
+                            />
+                          );
+                        },
+                        // Recommended Actions bullets — one bullet per line;
+                        // blank / matching the auto bullets = auto.
+                        actionGroupEditor: (key, autoActions) => {
+                          const autoText = autoActions.join("\n");
+                          const saved = (sectionOverrides.actionGroups ?? {})[key]?.trim() ?? "";
+                          const value = saved !== "" ? saved : autoText;
+                          return (
+                            <textarea
+                              className="no-print"
+                              value={value}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                setSectionOverrides((ov) => {
+                                  const next = { ...(ov.actionGroups ?? {}) };
+                                  const norm = (s: string) =>
+                                    s
+                                      .split("\n")
+                                      .map((l) => l.trim())
+                                      .filter((l) => l !== "")
+                                      .join("\n");
+                                  if (v.trim() === "" || norm(v) === norm(autoText)) delete next[key];
+                                  else next[key] = v;
+                                  return { ...ov, actionGroups: next };
+                                });
+                              }}
+                              rows={Math.min(10, Math.max(3, value.split(/\n/).length + 1))}
+                              placeholder="One action per line"
+                              style={{
+                                fontFamily: ROBOTO,
+                                fontSize: 13,
+                                lineHeight: 1.5,
+                                color: DUSK,
+                                width: "100%",
+                                border: `1px solid ${POLAR}`,
+                                padding: 8,
+                                margin: "4px 0 8px 0",
+                                background: "#FBFCFE",
+                                resize: "vertical",
+                              }}
+                            />
+                          );
+                        },
                   // Top 3 Developments curation — remove/pin per card, set an
                   // exact severity (analyst authority, either direction), and
                   // add any other window incident into the section.

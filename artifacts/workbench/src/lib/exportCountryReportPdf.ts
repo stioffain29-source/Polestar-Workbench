@@ -68,6 +68,8 @@ import {
 import {
   buildCountryIncidentThemes,
   buildOperationalImpactBullets,
+  overrideThemeParagraphs,
+  overrideActionGroups,
 } from "./countryIncidentThemes";
 import { acceptedCountryTokens } from "./countryMatch";
 import { runCountryReportQc } from "./countryReportQc";
@@ -944,9 +946,16 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
 
   // Current Situation — same inclusion gate as PngCountryReportBody: the
   // section renders only when it has framing prose, themes, or window items.
-  const incidentThemes =
-    d.incidentThemesOverride ??
-    buildCountryIncidentThemes(d.incidentDetailsItems);
+  // Analyst prose overrides applied through the SAME shared helpers as the
+  // on-screen body (preview == PDF by construction).
+  const incidentThemes = overrideThemeParagraphs(
+    d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems),
+    d.briefProseOverrides?.themeParagraphs,
+  );
+  const recommendedActions = overrideActionGroups(
+    d.recommendedActions,
+    d.briefProseOverrides?.actionGroups,
+  );
   if (
     d.executiveSummary.trim() !== "" ||
     incidentThemes.length > 0 ||
@@ -982,7 +991,7 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
   const hasActions =
     d.proseVariant === "operating-risk"
       ? d.businessImpact.length > 0
-      : d.recommendedActions.length > 0;
+      : recommendedActions.length > 0;
   if (operationalImpact.length > 0 || hasActions || d.outlook.trim() !== "") {
     drawSectionHeading(ctx, "Actions & Outlook");
     if (operationalImpact.length > 0) {
@@ -994,7 +1003,7 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
       if (d.proseVariant === "operating-risk") {
         drawJakartaBulletList(ctx, d.businessImpact);
       } else {
-        for (const group of d.recommendedActions) {
+        for (const group of recommendedActions) {
           drawJakartaStrandLabel(ctx, group.heading);
           drawJakartaBulletList(ctx, group.actions);
         }
@@ -1145,6 +1154,10 @@ export async function exportCountryReportPdf(
         pinnedIds: extras.sectionOverrides?.top3PinnedIds ?? [],
         excludedIds: extras.sectionOverrides?.top3ExcludedIds ?? [],
         customItems: extras.sectionOverrides?.top3CustomItems ?? [],
+      },
+      briefProseOverrides: {
+        themeParagraphs: extras.sectionOverrides?.themeParagraphs ?? {},
+        actionGroups: extras.sectionOverrides?.actionGroups ?? {},
       },
       // Mirror the on-screen CountryReport window start (issueDate-6, start of
       // day) so the headless PDF's out-of-window flagging matches the in-app

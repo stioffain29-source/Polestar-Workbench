@@ -10,6 +10,8 @@ import type { JakartaOperatingPictureRow } from "@/lib/jakartaBrief";
 import {
   buildCountryIncidentThemes,
   buildOperationalImpactBullets,
+  overrideThemeParagraphs,
+  overrideActionGroups,
 } from "@/lib/countryIncidentThemes";
 
 // Per-incident AI analyst summaries, keyed by incident id, provided by the
@@ -416,6 +418,12 @@ export default function PngCountryReportBody({
     // .no-print by the page like all other edit chrome.
     top3ItemControls?: (item: PngReportItem) => ReactNode;
     top3Extras?: ReactNode;
+    // Inline editors for the Current Situation theme paragraphs and the
+    // Recommended Actions bullet groups (rendered after the auto content;
+    // page-provided, .no-print). autoText/autoActions carry the engine text so
+    // the page can implement blank=auto.
+    themeParagraphEditor?: (key: string, autoText: string) => ReactNode;
+    actionGroupEditor?: (key: string, autoActions: string[]) => ReactNode;
   } | null;
 }) {
   const d = dataset;
@@ -442,7 +450,15 @@ export default function PngCountryReportBody({
   // exceeds three when the analyst explicitly pinned more, and every pinned
   // development must render (never silently dropped).
   const topThree = d.topThree;
-  const incidentThemes = d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems);
+  // Analyst prose overrides (section_overrides.themeParagraphs/.actionGroups)
+  // are applied through the SHARED helpers the headless renderer also uses,
+  // so preview == PDF. autoThemes keeps the pre-override text for blank=auto.
+  const autoThemes = d.incidentThemesOverride ?? buildCountryIncidentThemes(d.incidentDetailsItems);
+  const incidentThemes = overrideThemeParagraphs(autoThemes, d.briefProseOverrides?.themeParagraphs);
+  const recommendedActions = overrideActionGroups(
+    d.recommendedActions,
+    d.briefProseOverrides?.actionGroups,
+  );
   // Cap the generic Operational Impact list (≤5) and Outlook escalation
   // indicators (≤3). Jakarta returns below with its approved compact layout.
   const operationalImpact =
@@ -586,10 +602,11 @@ export default function PngCountryReportBody({
             </EmptyNote>
           ) : null
         ) : (
-          incidentThemes.map((g) => (
+          incidentThemes.map((g, idx) => (
             <div key={g.key} style={{ marginBottom: 12 }}>
               <StrandLabel>{g.heading}</StrandLabel>
               <Prose text={g.paragraph} />
+              {editUi?.themeParagraphEditor?.(g.key, autoThemes[idx]?.paragraph ?? "")}
             </div>
           ))
         )}
@@ -620,14 +637,17 @@ export default function PngCountryReportBody({
         )}
         {(d.proseVariant === "operating-risk"
           ? d.businessImpact.length > 0
-          : d.recommendedActions.length > 0) && (
+          : recommendedActions.length > 0) && (
           <div style={{ marginBottom: 12 }}>
             <StrandLabel>Recommended Actions</StrandLabel>
             {d.proseVariant === "operating-risk" ? (
               <BulletList items={d.businessImpact} />
             ) : (
-              d.recommendedActions.map((g) => (
-                <ActionGroup key={g.key} heading={g.heading} actions={g.actions} />
+              recommendedActions.map((g, idx) => (
+                <div key={g.key}>
+                  <ActionGroup heading={g.heading} actions={g.actions} />
+                  {editUi?.actionGroupEditor?.(g.key, d.recommendedActions[idx]?.actions ?? [])}
+                </div>
               ))
             )}
           </div>

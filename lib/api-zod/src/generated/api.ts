@@ -266,6 +266,8 @@ export const GetDashboardOverviewResponse = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -1596,6 +1598,8 @@ export const ListReportsResponseItem = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -1941,6 +1945,8 @@ export const GetReportResponse = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -2128,6 +2134,8 @@ export const UpdateReportBody = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -2310,6 +2318,8 @@ export const UpdateReportResponse = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -5084,6 +5094,8 @@ export const ListCountryReportsResponseItem = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -5225,6 +5237,8 @@ export const GetCountryReportResponse = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -5280,6 +5294,8 @@ export const UpdateCountryReportBody = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),
@@ -5331,6 +5347,8 @@ export const UpdateCountryReportResponse = zod.object({
   "severityOverrides": zod.record(zod.string(), zod.string()).optional(),
   "top3PinnedIds": zod.array(zod.string()).optional(),
   "top3ExcludedIds": zod.array(zod.string()).optional(),
+  "themeParagraphs": zod.record(zod.string(), zod.string()).optional(),
+  "actionGroups": zod.record(zod.string(), zod.string()).optional(),
   "top3CustomItems": zod.array(zod.object({
   "id": zod.string(),
   "title": zod.string(),

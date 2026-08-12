@@ -83,6 +83,12 @@ export interface CountrySectionOverrides {
    *  pinned/automatic picks. Clearly analyst-attributed (source "Analyst
    *  entry"), never mixed into any dataset aggregate, chart or watchlist. */
   top3CustomItems?: CustomTop3Development[];
+  /** Analyst-edited Current Situation theme paragraphs, keyed by theme key
+   *  (e.g. "governance", "crime"). Blank/absent = auto paragraph. */
+  themeParagraphs?: Record<string, string>;
+  /** Analyst-edited Recommended Actions bullets, keyed by action-group key;
+   *  value is newline-separated bullet lines. Blank/absent = auto bullets. */
+  actionGroups?: Record<string, string>;
 }
 
 /** One analyst-typed Top-3 development. `date` is ISO yyyy-mm-dd. */

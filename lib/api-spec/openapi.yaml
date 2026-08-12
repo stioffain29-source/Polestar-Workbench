@@ -3611,6 +3611,17 @@ components:
         top3ExcludedIds:
           type: array
           items: { type: string }
+        # Analyst-edited Current Situation theme paragraphs, keyed by theme key
+        # (e.g. "governance", "crime"). Blank/absent = auto paragraph.
+        themeParagraphs:
+          type: object
+          additionalProperties: { type: string }
+        # Analyst-edited Recommended Actions bullets, keyed by action-group key
+        # (e.g. "movement", "site-security"); value is newline-separated bullet
+        # lines. Blank/absent = auto bullets.
+        actionGroups:
+          type: object
+          additionalProperties: { type: string }
         # Analyst-authored free-text developments — items the data hasn't
         # picked up yet (missed or just come through). Rendered as Top-3 cards
         # ahead of pinned/auto picks. `date` is ISO yyyy-mm-dd.
