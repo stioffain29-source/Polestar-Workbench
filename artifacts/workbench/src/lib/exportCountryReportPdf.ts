@@ -956,6 +956,12 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     d.recommendedActions,
     d.briefProseOverrides?.actionGroups,
   );
+  // Operating-risk flat list — editable under the reserved "business-impact"
+  // key, mirroring PngCountryReportBody exactly.
+  const businessImpact = overrideActionGroups(
+    [{ key: "business-impact", actions: d.businessImpact }],
+    d.briefProseOverrides?.actionGroups,
+  )[0].actions;
   if (
     d.executiveSummary.trim() !== "" ||
     incidentThemes.length > 0 ||
@@ -1001,7 +1007,7 @@ function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
     if (hasActions) {
       drawJakartaStrandLabel(ctx, "Recommended Actions");
       if (d.proseVariant === "operating-risk") {
-        drawJakartaBulletList(ctx, d.businessImpact);
+        drawJakartaBulletList(ctx, businessImpact);
       } else {
         for (const group of recommendedActions) {
           drawJakartaStrandLabel(ctx, group.heading);

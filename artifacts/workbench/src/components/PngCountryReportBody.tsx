@@ -459,6 +459,13 @@ export default function PngCountryReportBody({
     d.recommendedActions,
     d.briefProseOverrides?.actionGroups,
   );
+  // Operating-risk briefs (Indonesia / Thailand / Philippines / generic) render
+  // a FLAT recommended-actions list (businessImpact). It is editable through
+  // the same actionGroups store under the reserved key "business-impact".
+  const businessImpact = overrideActionGroups(
+    [{ key: "business-impact", actions: d.businessImpact }],
+    d.briefProseOverrides?.actionGroups,
+  )[0].actions;
   // Cap the generic Operational Impact list (≤5) and Outlook escalation
   // indicators (≤3). Jakarta returns below with its approved compact layout.
   const operationalImpact =
@@ -641,7 +648,10 @@ export default function PngCountryReportBody({
           <div style={{ marginBottom: 12 }}>
             <StrandLabel>Recommended Actions</StrandLabel>
             {d.proseVariant === "operating-risk" ? (
-              <BulletList items={d.businessImpact} />
+              <>
+                <BulletList items={businessImpact} />
+                {editUi?.actionGroupEditor?.("business-impact", d.businessImpact)}
+              </>
             ) : (
               recommendedActions.map((g, idx) => (
                 <div key={g.key}>
