@@ -121,6 +121,31 @@ describe("resolveFuelEffectiveSections precedence", () => {
 describe("consistency gate over the FINAL effective text", () => {
   const fuelData = buildData();
 
+  it("builder honours caller-resolved implications/watchNext (analyst/AI) instead of discarding them", () => {
+    const edited = buildFuelWatchReportData(
+      {
+        issueDate: ISSUE,
+        hardNumbers: { prices: [] },
+        implications: "Analyst implication: reroute Karachi fuel convoys.",
+        watchNext: "Analyst watch: Jet A-1 price notification in Dhaka.",
+      },
+      [inc(), inc(), inc()],
+    );
+    expect(edited.narrativeData.implications).toBe(
+      "Analyst implication: reroute Karachi fuel convoys.",
+    );
+    expect(edited.narrativeData.watchNext).toBe(
+      "Analyst watch: Jet A-1 price notification in Dhaka.",
+    );
+    // Blank input = canonical auto text (blank=auto rule).
+    expect(fuelData.narrativeData.implications).toBe(
+      fuelData.narrativeData.canonicalSections.implications,
+    );
+    expect(fuelData.narrativeData.watchNext).toBe(
+      fuelData.narrativeData.canonicalSections.watchNext,
+    );
+  });
+
   it("builder exposes reportFacts for the effective-text gate", () => {
     expect(fuelData.reportFacts.incidentCount).toBeGreaterThan(0);
   });

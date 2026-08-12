@@ -31,6 +31,7 @@ import {
   type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
+import { pickRead } from "./pickRead";
 import {
   buildFuelCanonicalFacts,
   buildFuelCanonicalSections,
@@ -508,15 +509,19 @@ export function buildFuelWatchReportData(
       gulfChokepointWatch,
     },
     narrativeData: {
-      // These five analytical sections are never sourced from a report field or
-      // model response. They are deterministic projections of canonicalFacts.
+      // The analytical sections default to deterministic projections of
+      // canonicalFacts. Implications / Watch Next HONOUR the caller-resolved
+      // text (analyst edit -> AI, resolved by preview/exporter before calling
+      // the builder) — previously those inputs were silently discarded, so
+      // every surface rendered the generic canonical bullets no matter what
+      // the draft said. Blank input = canonical auto (blank=auto rule).
       executiveSummary: canonicalSections.executiveSummary,
       situation: canonicalSections.situation,
       whatHappened: canonicalSections.whatHappened,
       whatMatters: canonicalSections.whatMatters,
-      implications: canonicalSections.implications,
+      implications: pickRead(report.implications, canonicalSections.implications),
       polestarView: canonicalSections.polestarView,
-      watchNext: canonicalSections.watchNext,
+      watchNext: pickRead(report.watchNext, canonicalSections.watchNext),
       canonicalSections,
     },
     canonicalFacts,
