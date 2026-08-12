@@ -631,19 +631,41 @@ export function parseBullets(text: string, maxBullets = 7): string[] {
   if (marked.length > 0) {
     bullets = marked;
   } else {
-    // Fall back to paragraph splitting; keep paragraphs short by
-    // taking the first sentence only when they run long.
-    bullets = s
-      .split(/\n\s*\n/)
-      .map((p) => p.replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .map((p) => {
-        if (p.length <= 220) return p;
-        const m = p.match(/^(.+?[.!?])(\s|$)/);
-        return (m ? m[1] : p.slice(0, 217) + "...").trim();
-      });
+    // Fall back to implicit line splitting — handles run-on Watch Next text
+    // where multiple "Country — signal: ..." items were saved on one line
+    // without "- " prefixes (owner-flagged defect: three indicators merged
+    // into one truncated bullet).
+    bullets = splitImplicitBullets(s);
+    if (bullets.length <= 1) {
+      bullets = s
+        .split(/\n\s*\n/)
+        .map((p) => p.replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .map((p) => {
+          if (p.length <= 220) return p;
+          const m = p.match(/^(.+?[.!?])(\s|$)/);
+          return (m ? m[1] : p.slice(0, 217) + "...").trim();
+        });
+    }
   }
   return bullets.slice(0, maxBullets);
+}
+
+/** Split run-on bullet text into separate items when line markers are absent. */
+function splitImplicitBullets(s: string): string[] {
+  const lines = s.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const line of lines) {
+    const stripped = line.replace(/^([-*•])\s+/, "").trim();
+    const parts = stripped.split(
+      /(?<=\.)\s+(?=[A-Z][A-Za-z'().-]+(?:\s+[A-Z][A-Za-z'().-]+)*\s+[-—]\s+)/,
+    );
+    for (const part of parts) {
+      const t = part.trim();
+      if (t) out.push(t);
+    }
+  }
+  return out.length > 1 ? out : (out[0] ? [out[0]] : []);
 }
 
 export function drawBulletSection(

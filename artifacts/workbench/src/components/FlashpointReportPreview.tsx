@@ -18,7 +18,7 @@ import {
   type EnrichedIncident,
   FLASHPOINT_SEV_LABEL,
 } from "@/lib/flashpointReportDataset";
-import { SEV_COLOR } from "@/lib/pdfChrome";
+import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
 // order, from the same dataset (buildFlashpointReportDataset) as
@@ -117,17 +117,7 @@ function Paragraphs({ text }: { text?: string | null }) {
 }
 
 function toBullets(text?: string | null, max = 7): string[] {
-  const s = (text ?? "").trim();
-  if (!s) return [];
-  const marked = s.split(/\r?\n/).map((l) => l.trim())
-    .filter((l) => /^([-*•])\s+/.test(l))
-    .map((l) => l.replace(/^([-*•])\s+/, "").trim())
-    .filter(Boolean);
-  let out: string[];
-  if (marked.length > 0) out = marked;
-  else out = s.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean)
-    .map((p) => p.length <= 220 ? p : (p.match(/^(.+?[.!?])(\s|$)/)?.[1] ?? p.slice(0, 217) + "...").trim());
-  return out.slice(0, max);
+  return parseBullets(text ?? "", max);
 }
 
 function Bullets({ text, max = 7 }: { text?: string | null; max?: number }) {

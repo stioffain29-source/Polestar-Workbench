@@ -101,7 +101,7 @@ describe("FlashpointReportPreview Fast Facts tiles", () => {
   it("emits the flashpoint Fast Facts tile labels", () => {
     for (const label of [
       "Reporting Period",
-      "Incidents In Window",
+      "Distinct Incidents",
       "Highest Severity",
       "Top Issue Type",
       "Most Affected Country",
@@ -111,8 +111,8 @@ describe("FlashpointReportPreview Fast Facts tiles", () => {
     }
   });
 
-  it("fills Incidents In Window with the enriched count, not a placeholder", () => {
-    expect(tileValue(html, "Incidents In Window")).toBe("3");
+  it("fills Distinct Incidents with the enriched count, not a placeholder", () => {
+    expect(tileValue(html, "Distinct Incidents")).toBe("3");
   });
 
   it("derives Highest Severity from the incident set", () => {
