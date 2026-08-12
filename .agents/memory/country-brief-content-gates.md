@@ -23,3 +23,6 @@ A named event re-reported across outlets ("Twenty-seven locked-up from second 'S
 
 ## Verifying under owner-gating
 The briefs are owner-gated (no live screenshots) AND the workbench has no Jest/vitest runner. Verify a brief-content fix by running the UPDATED predicates against the REAL offending titles pulled from the prod-replica DB (query `incidents` by title ILIKE), plus negative controls that must be UNAFFECTED — via a throwaway `tsx --import ./scripts/registerLoader.mjs` script. Do NOT claim done on fixtures or typecheck alone; that was the prior credibility failure.
+
+## Shooting class for the Top-3 diversity guard (12 Aug 2026)
+Two outlets covering one shooting as act vs follow-up ("Shooting at X festival" / "Crime scene processing after shooting at X") fall below the 0.4 Jaccard and shared no event-nature class ("fatal" needs a stated death) → duplicate Top-3 slots. Fix: added a "shooting" CLASS_PATTERN (shooting|shooter|gunman|gunfire|shot|penembakan) as a CORROBORATOR only, and added shooting/shooter/penembakan to CLASH_GENERIC_TOKENS so kinetic vocab can never act as a distinctive place anchor.

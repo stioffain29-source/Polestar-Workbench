@@ -12,7 +12,7 @@
 //   tsx scripts/checkCountryNarrativeText.ts <text-file> <hasPriorData:true|false> <label>
 import { readFileSync } from "node:fs";
 import { findBannedPhrases } from "@workspace/country-engine/bannedPhrases";
-import { TREND_WORDS } from "@workspace/country-engine/narrative";
+import { TREND_WORDS, CATEGORY_IMPLICATIONS } from "@workspace/country-engine/narrative";
 
 const [, , textPath, hasPriorDataRaw, label] = process.argv;
 if (!textPath || !hasPriorDataRaw) {
@@ -114,6 +114,16 @@ for (const family of BOILERPLATE_FAMILIES) {
     const key = m.trim();
     sentenceCounts.set(key, (sentenceCounts.get(key) ?? 0) + 1);
   }
+}
+// Cross-framing repeat: the same category-implication CLAUSE can be wrapped in
+// two different sentence frames ("For operators, an event of this kind ..."
+// in Top 3 vs "For operations, the immediate significance is that the lead
+// event ..." in the BLUF), so exact-sentence counting above cannot see it.
+// Count each implication clause directly — one appearance is legal, two is
+// the same boilerplate a few lines apart (12 Aug 2026 defect).
+for (const clause of Object.values(CATEGORY_IMPLICATIONS)) {
+  const n = flatText.split(clause).length - 1;
+  if (n > 1) sentenceCounts.set(`…${clause}…`, n);
 }
 const repeated = [...sentenceCounts.entries()].filter(([, n]) => n > 1);
 if (repeated.length > 0) {

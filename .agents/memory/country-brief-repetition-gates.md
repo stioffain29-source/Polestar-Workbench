@@ -12,3 +12,6 @@ description: How repeated boilerplate sentences in country/city briefs are preve
 - Cross-section restatement uses an exported ALT wording constant (see `INDIRECT_ASSESSED_SENTENCE[_ALT]` in country-engine impact.ts) — same meaning, different words, no new claim.
 - Top-3 same-story fold (`isSameStory`): shared PLACE tokens (event city/district/province) are excluded from title anchors — a shared district name must never merge two distinct events.
 - Verify by sweeping `verifyCountryBriefs.sh` then a python Counter scan of ≥40-char sentences over the exported .txt files.
+
+## Cross-framing implication repeat (12 Aug 2026)
+The BLUF ("For operations, the immediate significance is that the lead event <clause>…") and the lead Top-3 slot ("For operators, an event of this kind <clause>.") can render the SAME CATEGORY_IMPLICATIONS clause a few lines apart — the exact-sentence family counter can't see it because the wrapping sentences differ. Fix: buildTopThree takes the built BLUF text and treats any implication already appearing in it as used (§14 omit-never-pad, cross-section). Gate: checkCountryNarrativeText.ts now also counts each exported CATEGORY_IMPLICATIONS clause across the flattened PDF text (>1 = fail).

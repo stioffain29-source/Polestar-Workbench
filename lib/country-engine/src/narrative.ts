@@ -462,7 +462,7 @@ function isSameStory(a: CanonicalEvent, b: CanonicalEvent): boolean {
 // to the category (never event-specific claims). Used where no confirmed or
 // assessed operational effect exists — the implication follows from the stored
 // category alone, so it is an evidence-linked Assessment, not fabrication.
-const CATEGORY_IMPLICATIONS: Partial<Record<IssueCategory, string>> = {
+export const CATEGORY_IMPLICATIONS: Partial<Record<IssueCategory, string>> = {
   "Violent crime":
     "bears directly on staff safety and journey planning around the affected area",
   "Theft and robbery":
@@ -648,6 +648,14 @@ export interface NarrativeResult<T> {
  */
 export function buildTopThree(
   events: CanonicalEvent[],
+  // The already-built BLUF text, when available. The BLUF's operational
+  // sentence can draw the SAME category-implication clause the lead Top-3
+  // slot would print ("For operations, the immediate significance is that the
+  // lead event bears directly on ..." vs "For operators, an event of this kind
+  // bears directly on ..."), so the reader sees the clause twice a few lines
+  // apart. Seeding the repeat-suppression with the BLUF text extends the §14
+  // omit-never-pad rule across sections, not just within the three slots.
+  blufText: string = "",
 ): NarrativeResult<TopDevelopment[]> {
   const claims: EvidenceRecord[] = [];
   // §14 excludes commentary/background/not-an-incident/cancelled from top slots.
@@ -720,7 +728,9 @@ export function buildTopThree(
       const implication = isMaterialEvent(e)
         ? CATEGORY_IMPLICATIONS[e.issueCategory]
         : undefined;
-      const isRepeat = implication != null && usedImplications.has(implication);
+      const isRepeat =
+        implication != null &&
+        (usedImplications.has(implication) || blufText.includes(implication));
       if (implication) {
         const harm = harmPhrase([e]);
         const parts: string[] = [];
@@ -1990,7 +2000,7 @@ export function buildCountryNarrative(
   claims.push(...bluf.claims);
   sectionWordCounts["Bottom Line Up Front"] = countWords(bluf.value);
 
-  const topThree = buildTopThree(events);
+  const topThree = buildTopThree(events, bluf.value);
   claims.push(...topThree.claims);
 
   const categoryIntros: { category: IssueCategory; text: string }[] = [];
