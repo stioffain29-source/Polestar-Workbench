@@ -10,6 +10,7 @@ import type { CountryReportSectionOverridesMarketPriceOverrides } from './countr
 import type { CountryReportSectionOverridesPanelReads } from './countryReportSectionOverridesPanelReads';
 import type { CountryReportSectionOverridesSeverityDemotions } from './countryReportSectionOverridesSeverityDemotions';
 import type { CountryReportSectionOverridesSeverityOverrides } from './countryReportSectionOverridesSeverityOverrides';
+import type { CountryReportSectionOverridesTop3CustomItemsItem } from './countryReportSectionOverridesTop3CustomItemsItem';
 
 export interface CountryReportSectionOverrides {
   hiddenSections?: string[];
@@ -18,6 +19,7 @@ export interface CountryReportSectionOverrides {
   severityOverrides?: CountryReportSectionOverridesSeverityOverrides;
   top3PinnedIds?: string[];
   top3ExcludedIds?: string[];
+  top3CustomItems?: CountryReportSectionOverridesTop3CustomItemsItem[];
   fastFactOverrides?: CountryReportSectionOverridesFastFactOverrides;
   panelReads?: CountryReportSectionOverridesPanelReads;
   marketPriceOverrides?: CountryReportSectionOverridesMarketPriceOverrides;

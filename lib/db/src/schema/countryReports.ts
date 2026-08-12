@@ -35,6 +35,16 @@ export interface CountryReportSectionOverrides {
    *  Incident Details buckets). Section-scoped, unlike excludedIncidentIds. */
   top3PinnedIds?: string[];
   top3ExcludedIds?: string[];
+  // Analyst-authored free-text Top-3 developments (missed / just-come-through
+  // items). Rendered ahead of pinned/auto picks; date is ISO yyyy-mm-dd.
+  top3CustomItems?: Array<{
+    id: string;
+    title: string;
+    detail?: string;
+    location?: string;
+    severity?: string;
+    date?: string;
+  }>;
 }
 
 export const countryReportsTable = pgTable("country_reports", {

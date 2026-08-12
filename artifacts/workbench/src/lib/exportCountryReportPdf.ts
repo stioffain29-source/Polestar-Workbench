@@ -1144,6 +1144,7 @@ export async function exportCountryReportPdf(
       top3Curation: {
         pinnedIds: extras.sectionOverrides?.top3PinnedIds ?? [],
         excludedIds: extras.sectionOverrides?.top3ExcludedIds ?? [],
+        customItems: extras.sectionOverrides?.top3CustomItems ?? [],
       },
       // Mirror the on-screen CountryReport window start (issueDate-6, start of
       // day) so the headless PDF's out-of-window flagging matches the in-app

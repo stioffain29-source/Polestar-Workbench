@@ -3611,6 +3611,21 @@ components:
         top3ExcludedIds:
           type: array
           items: { type: string }
+        # Analyst-authored free-text developments — items the data hasn't
+        # picked up yet (missed or just come through). Rendered as Top-3 cards
+        # ahead of pinned/auto picks. `date` is ISO yyyy-mm-dd.
+        top3CustomItems:
+          type: array
+          items:
+            type: object
+            required: [id, title]
+            properties:
+              id: { type: string }
+              title: { type: string }
+              detail: { type: string }
+              location: { type: string }
+              severity: { type: string }
+              date: { type: string }
         # Topic-report analyst overrides (unused by country briefs).
         # fastFactOverrides is keyed by the AUTO tile label; a non-blank
         # label/value/note replaces the computed one, blank/absent = auto.

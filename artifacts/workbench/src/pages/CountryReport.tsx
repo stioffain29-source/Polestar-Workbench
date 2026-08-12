@@ -429,6 +429,14 @@ export default function CountryReport() {
   // Durable analyst curation of the rendered brief — hidden canonical sections,
   // excluded relevance-passing window incidents, demote-only severity fixes.
   const [sectionOverrides, setSectionOverrides] = useState<CountrySectionOverrides>({});
+  // Draft fields for the free-text "add a development" form (Top 3 curation).
+  const [customTop3Draft, setCustomTop3Draft] = useState({
+    title: "",
+    detail: "",
+    location: "",
+    severity: "moderate",
+    date: "",
+  });
   const [baselineDraft, setBaselineDraft] = useState<CountryBaseline>(EMPTY_BASELINE);
   const [baselineDirty, setBaselineDirty] = useState(false);
   const seededForSlug = useRef<string | null>(null);
@@ -663,6 +671,7 @@ export default function CountryReport() {
       top3Curation: {
         pinnedIds: sectionOverrides.top3PinnedIds ?? [],
         excludedIds: sectionOverrides.top3ExcludedIds ?? [],
+        customItems: sectionOverrides.top3CustomItems ?? [],
       },
     };
     switch (structuredTheatre) {
@@ -684,7 +693,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds]);
+  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds, sectionOverrides.top3CustomItems]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -2153,6 +2162,56 @@ export default function CountryReport() {
                   // add any other window incident into the section.
                   top3ItemControls: (item) => {
                     const id = String(item.id);
+                    // Analyst-typed free-text development — its own controls:
+                    // rating edits the stored custom entry, Remove deletes it.
+                    const customEntry = (sectionOverrides.top3CustomItems ?? []).find(
+                      (c) => String(c.id) === id,
+                    );
+                    if (customEntry) {
+                      return (
+                        <div
+                          className="no-print"
+                          style={{ display: "flex", gap: 8, alignItems: "center", margin: "-4px 0 10px", justifyContent: "flex-end" }}
+                        >
+                          <span style={{ fontFamily: ROBOTO, fontSize: 10, color: DUSK, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                            Analyst entry
+                          </span>
+                          <select
+                            value={(customEntry.severity ?? "moderate").toLowerCase()}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setSectionOverrides((ov) => ({
+                                ...ov,
+                                top3CustomItems: (ov.top3CustomItems ?? []).map((c) =>
+                                  String(c.id) === id ? { ...c, severity: v } : c,
+                                ),
+                              }));
+                            }}
+                            style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 6px", color: DUSK }}
+                          >
+                            {Object.keys(SEVERITY_ORDER).map((o) => (
+                              <option key={o} value={o}>
+                                Rating: {o}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSectionOverrides((ov) => ({
+                                ...ov,
+                                top3CustomItems: (ov.top3CustomItems ?? []).filter(
+                                  (c) => String(c.id) !== id,
+                                ),
+                              }))
+                            }
+                            style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "2px 8px", color: NAVY, background: "white", cursor: "pointer" }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      );
+                    }
                     const pinned = (sectionOverrides.top3PinnedIds ?? []).includes(id);
                     const overrideTo = sectionOverrides.severityOverrides?.[id] ?? "";
                     return (
@@ -2217,9 +2276,88 @@ export default function CountryReport() {
                     const candidates = (pngEffectiveDataset?.windowItems ?? []).filter(
                       (it) => !shown.has(String(it.id)),
                     );
+    const fieldStyle = {
+                      fontFamily: ROBOTO,
+                      fontSize: 11,
+                      border: `1px solid ${POLAR}`,
+                      padding: "4px 6px",
+                      color: NAVY,
+                    } as const;
+                    const addCustom = () => {
+                      const title = customTop3Draft.title.trim();
+                      if (!title) return;
+                      const entry = {
+                        id: `custom:${Date.now()}`,
+                        title,
+                        detail: customTop3Draft.detail.trim() || undefined,
+                        location: customTop3Draft.location.trim() || undefined,
+                        severity: customTop3Draft.severity,
+                        date: customTop3Draft.date || undefined,
+                      };
+                      setSectionOverrides((ov) => ({
+                        ...ov,
+                        top3CustomItems: [...(ov.top3CustomItems ?? []), entry],
+                      }));
+                      setCustomTop3Draft({ title: "", detail: "", location: "", severity: "moderate", date: "" });
+                    };
                     return (
                       <div className="no-print" style={{ borderTop: `1px dashed ${POLAR}`, paddingTop: 8, marginTop: 4 }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {/* Free-text entry — for a development the data missed
+                            or that has only just come through. */}
+                        <div style={{ fontFamily: ROBOTO, fontSize: 10, color: DUSK, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                          Add a development (free text)
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, maxWidth: 640 }}>
+                          <input
+                            type="text"
+                            placeholder="Headline (required)"
+                            value={customTop3Draft.title}
+                            onChange={(e) => setCustomTop3Draft((d) => ({ ...d, title: e.target.value }))}
+                            style={fieldStyle}
+                          />
+                          <textarea
+                            placeholder="Brief detail / why it matters (optional)"
+                            value={customTop3Draft.detail}
+                            onChange={(e) => setCustomTop3Draft((d) => ({ ...d, detail: e.target.value }))}
+                            rows={2}
+                            style={{ ...fieldStyle, resize: "vertical" }}
+                          />
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                            <input
+                              type="text"
+                              placeholder="Location (optional)"
+                              value={customTop3Draft.location}
+                              onChange={(e) => setCustomTop3Draft((d) => ({ ...d, location: e.target.value }))}
+                              style={{ ...fieldStyle, width: 180 }}
+                            />
+                            <input
+                              type="date"
+                              value={customTop3Draft.date}
+                              onChange={(e) => setCustomTop3Draft((d) => ({ ...d, date: e.target.value }))}
+                              style={fieldStyle}
+                            />
+                            <select
+                              value={customTop3Draft.severity}
+                              onChange={(e) => setCustomTop3Draft((d) => ({ ...d, severity: e.target.value }))}
+                              style={fieldStyle}
+                            >
+                              {Object.keys(SEVERITY_ORDER).map((o) => (
+                                <option key={o} value={o}>
+                                  Rating: {o}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={addCustom}
+                              disabled={!customTop3Draft.title.trim()}
+                              style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "4px 12px", color: "white", background: customTop3Draft.title.trim() ? NAVY : POLAR, cursor: customTop3Draft.title.trim() ? "pointer" : "default" }}
+                            >
+                              Add to Top 3
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
                           <select
                             value=""
                             onChange={(e) => {
@@ -2239,7 +2377,7 @@ export default function CountryReport() {
                             }}
                             style={{ fontFamily: ROBOTO, fontSize: 11, border: `1px solid ${POLAR}`, padding: "4px 6px", color: DUSK, maxWidth: 480 }}
                           >
-                            <option value="">Add a development from this week…</option>
+                            <option value="">…or pick an existing item from this week</option>
                             {candidates.map((it) => (
                               <option key={it.id} value={String(it.id)}>
                                 {(it.developmentTitle ?? it.title).slice(0, 90)}

@@ -78,6 +78,21 @@ export interface CountrySectionOverrides {
    *  Incident Details buckets). Section-scoped, unlike excludedIncidentIds. */
   top3PinnedIds?: string[];
   top3ExcludedIds?: string[];
+  /** Analyst-authored free-text developments — something the data has missed
+   *  or that has only just come through. Rendered as Top-3 cards AHEAD of the
+   *  pinned/automatic picks. Clearly analyst-attributed (source "Analyst
+   *  entry"), never mixed into any dataset aggregate, chart or watchlist. */
+  top3CustomItems?: CustomTop3Development[];
+}
+
+/** One analyst-typed Top-3 development. `date` is ISO yyyy-mm-dd. */
+export interface CustomTop3Development {
+  id: string;
+  title: string;
+  detail?: string;
+  location?: string;
+  severity?: string;
+  date?: string;
 }
 
 // Severity ordering (least -> most severe) used for the demote-only guard. The

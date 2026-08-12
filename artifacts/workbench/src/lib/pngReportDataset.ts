@@ -967,7 +967,72 @@ export interface BuildArgs {
   // pinned incident ids lead the section (pin order); excluded ids drop an
   // automatic pick from the section only (the incident falls back to the
   // Incident Details buckets). Omitted → automatic selection unchanged.
-  top3Curation?: { pinnedIds?: string[]; excludedIds?: string[] };
+  top3Curation?: {
+    pinnedIds?: string[];
+    excludedIds?: string[];
+    // Analyst-authored free-text developments (missed / just-come-through).
+    // Rendered as Top-3 cards AHEAD of pinned/auto picks, clearly attributed
+    // ("Analyst entry"). NEVER folded into any aggregate, chart, watchlist or
+    // prose grounding — they exist only as Top-3 tiles.
+    customItems?: Array<{
+      id: string;
+      title: string;
+      detail?: string;
+      location?: string;
+      severity?: string;
+      date?: string;
+    }>;
+  };
+}
+
+// Build a PngReportItem card from an analyst-typed free-text development. The
+// card is display-only: it joins topThree AFTER every aggregate is computed,
+// so it can never inflate trends, severity mixes or the watchlist.
+function customTop3Card(
+  c: NonNullable<NonNullable<BuildArgs["top3Curation"]>["customItems"]>[number],
+): PngReportItem {
+  const sev = (c.severity ?? "moderate").trim().toLowerCase();
+  const severity = SEV_RANK[sev] != null ? sev : "moderate";
+  let reportedDate = new Date();
+  if (c.date) {
+    const parsed = new Date(`${c.date}T00:00:00Z`);
+    if (!isNaN(parsed.getTime())) reportedDate = parsed;
+  }
+  return {
+    id: c.id,
+    title: c.title,
+    summary: c.detail ?? "",
+    province: c.location?.trim() || null,
+    location: c.location?.trim() || null,
+    category: "Other security",
+    displayCategory: "Analyst entry",
+    businessImpact: c.detail?.trim() ?? "",
+    severity,
+    severityLabel: SEV_LABEL[severity] ?? severity,
+    severityRank: SEV_RANK[severity] ?? 0,
+    reportedDate,
+    incidentDate: null,
+    occurredEarlier: false,
+    occurredOutOfWindow: false,
+    source: "Analyst entry",
+    url: null,
+    confidence: "Analyst-reported",
+  };
+}
+
+// Prepend the analyst's free-text developments to a final Top-3 selection
+// (additive — never displaces pins or autos; id-deduped defensively).
+function withCustomTop3<T extends { id: string }>(
+  selection: T[],
+  curation: BuildArgs["top3Curation"],
+): T[] {
+  const customs = (curation?.customItems ?? []).filter((c) => c.title?.trim());
+  if (customs.length === 0) return selection;
+  const existing = new Set(selection.map((it) => String(it.id)));
+  const cards = customs
+    .filter((c) => !existing.has(String(c.id)))
+    .map((c) => customTop3Card(c) as unknown as T);
+  return [...cards, ...selection];
 }
 
 // Rulebook "Other security" default — used ONLY for a residual row that somehow
@@ -1761,6 +1826,8 @@ export function buildStructuredReportDataset(
   // buckets so the incident still appears lower down rather than vanishing.
   const top3Curation = args.top3Curation;
   if (top3Curation && ((top3Curation.pinnedIds?.length ?? 0) > 0 || (top3Curation.excludedIds?.length ?? 0) > 0)) {
+    // (Free-text customItems are prepended LAST, once the selection is final —
+    // see the withCustomTop3 calls below — so they never affect member ids.)
     const excludedTopIds = new Set((top3Curation.excludedIds ?? []).map(String));
     for (const cluster of topClusters) {
       if (excludedTopIds.has(String(cluster[0].id))) {
@@ -2400,6 +2467,10 @@ export function buildStructuredReportDataset(
       // render both as a Top-3 tile and as a location-bucket card. The bucket
       // arrays were built from the INITIAL selection's member ids, so prune
       // them against the final selection here (removal-only, never re-adds).
+      // Analyst free-text developments join HERE, once the selection is final
+      // for BOTH the deterministic and engine paths (and even a sparse week —
+      // an analyst-entered item still renders). Additive and display-only.
+      topThree = withCustomTop3(topThree, top3Curation);
       const finalTopIds = new Set(topThree.map((it) => it.id));
       const prune = (arr: PngReportItem[]) => {
         for (let i = arr.length - 1; i >= 0; i--) {

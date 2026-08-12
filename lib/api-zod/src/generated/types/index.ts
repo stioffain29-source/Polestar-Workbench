@@ -64,6 +64,7 @@ export * from './countryReportSectionOverridesMarketPriceOverrides';
 export * from './countryReportSectionOverridesPanelReads';
 export * from './countryReportSectionOverridesSeverityDemotions';
 export * from './countryReportSectionOverridesSeverityOverrides';
+export * from './countryReportSectionOverridesTop3CustomItemsItem';
 export * from './countryReportUpdate';
 export * from './dashboardOverview';
 export * from './dashboardTopicCard';
