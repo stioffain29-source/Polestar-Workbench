@@ -890,3 +890,20 @@ describe("category intro / outlook location priority (§15)", () => {
     }
   });
 });
+
+describe("BLUF/Top-3 cross-section implication repeat (12 Aug 2026 defect)", () => {
+  it("omits a Top-3 implication sentence already present verbatim in the BLUF", () => {
+    const e = makeEvent();
+    const withBluf = buildTopThree(
+      [e],
+      "For operations, the immediate significance is that the lead event bears directly on staff safety and journey planning around the affected area.",
+    );
+    expect(withBluf.value[0].businessSentence ?? "").not.toMatch(
+      /bears directly on staff safety and journey planning/,
+    );
+    const withoutBluf = buildTopThree([e]);
+    expect(withoutBluf.value[0].businessSentence ?? "").toMatch(
+      /bears directly on staff safety and journey planning/,
+    );
+  });
+});

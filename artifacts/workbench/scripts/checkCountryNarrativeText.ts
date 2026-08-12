@@ -43,19 +43,21 @@ if (banned.length > 0) {
 // governs the engine's own analytical sentences, which live in the sections
 // before the incident tables. We approximate that boundary by cutting the
 // text at the incident-detail / situational-context headings when present.
-if (!hasPriorData) {
-  const CUT_MARKERS = [
-    "INCIDENT DETAILS",
-    "SITUATIONAL CONTEXT",
-    "RELATED INCIDENTS",
-  ];
-  let proseText = text;
+const CUT_MARKERS = [
+  "INCIDENT DETAILS",
+  "SITUATIONAL CONTEXT",
+  "RELATED INCIDENTS",
+];
+let proseText = text;
+{
   let cutAt = -1;
   for (const m of CUT_MARKERS) {
     const idx = proseText.toUpperCase().indexOf(m);
     if (idx >= 0 && (cutAt < 0 || idx < cutAt)) cutAt = idx;
   }
   if (cutAt >= 0) proseText = proseText.slice(0, cutAt);
+}
+if (!hasPriorData) {
   const hits: string[] = [];
   for (const word of TREND_WORDS) {
     const re = new RegExp(
@@ -120,9 +122,12 @@ for (const family of BOILERPLATE_FAMILIES) {
 // in Top 3 vs "For operations, the immediate significance is that the lead
 // event ..." in the BLUF), so exact-sentence counting above cannot see it.
 // Count each implication clause directly — one appearance is legal, two is
-// the same boilerplate a few lines apart (12 Aug 2026 defect).
+// the same boilerplate a few lines apart (12 Aug 2026 defect). Scope: the
+// ASSESSED PROSE only (same pre-incident-details boundary as the §16 trend
+// check) — a source headline or table entry may legitimately echo the clause.
+const flatProse = proseText.replace(/\s+/g, " ");
 for (const clause of Object.values(CATEGORY_IMPLICATIONS)) {
-  const n = flatText.split(clause).length - 1;
+  const n = flatProse.split(clause).length - 1;
   if (n > 1) sentenceCounts.set(`…${clause}…`, n);
 }
 const repeated = [...sentenceCounts.entries()].filter(([, n]) => n > 1);
