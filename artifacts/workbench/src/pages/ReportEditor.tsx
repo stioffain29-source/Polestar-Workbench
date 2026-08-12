@@ -80,6 +80,7 @@ import {
   clearMarketOperatorOverride,
 } from "@/lib/topicSectionOverrides";
 import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
+import { MarketOperatorResponsesEditor } from "@/components/MarketOperatorResponsesEditor";
 import { OrphanSaveWarning } from "@/components/OrphanSaveWarning";
 import {
   OrphanedGulfBulletsPanel,
@@ -2231,95 +2232,26 @@ export default function ReportEditor() {
             />
           )}
 
-          {/* Fuel Watch: per-row overrides for the Market and Operator
-              Responses table. Keyed by the AUTO row's date|actor|action so a
-              saved override re-attaches to the same row. Uncheck to suppress;
-              non-blank fields replace the displayed cells; blank = auto.
-              Applied identically in the preview AND the PDF exporter. */}
+          {/* Fuel Watch: Market and Operator Responses. Compact collapsed rows
+              (include checkbox + effective summary + Edit); the edit panel
+              prepopulates with the values the report currently renders and
+              stores only fields that differ from the generated text. Same
+              persistence (marketOperatorOverrides), same preview/PDF apply. */}
           {form.topic === "fuel" &&
             (fuelOverridePanels?.producerRows.length ?? 0) > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
-              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
-                Market and Operator Responses overrides
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-2">
-                Uncheck to remove a row. Blank fields keep the auto text.
-              </p>
-              <div className="flex flex-col gap-2">
-                {fuelOverridePanels!.producerRows.map((row) => {
-                  const k = marketOperatorRowKey(row);
-                  const ov: MarketOperatorRowOverride =
-                    sectionOverrides.marketOperatorOverrides?.[k] ?? {};
-                  const setR = (patch: Partial<MarketOperatorRowOverride>) =>
-                    setSectionOverrides((prev) => ({
-                      ...prev,
-                      marketOperatorOverrides: {
-                        ...(prev.marketOperatorOverrides ?? {}),
-                        [k]: {
-                          ...(prev.marketOperatorOverrides?.[k] ?? {}),
-                          ...patch,
-                        },
-                      },
-                    }));
-                  return (
-                    <div
-                      key={k}
-                      className="border border-border rounded-sm p-2"
-                      style={{ opacity: ov.suppressed ? 0.5 : 1 }}
-                    >
-                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground mb-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!ov.suppressed}
-                          className="mt-0.5"
-                          onChange={(e) =>
-                            setR({ suppressed: !e.target.checked })
-                          }
-                        />
-                        <span>
-                          {row.actor} · {row.category} · {row.date} —{" "}
-                          {row.action}
-                        </span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5 mb-1.5">
-                        <Input
-                          placeholder="Actor"
-                          value={ov.actor ?? ""}
-                          onChange={(e) => setR({ actor: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Category"
-                          value={ov.category ?? ""}
-                          onChange={(e) => setR({ category: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Date"
-                          value={ov.date ?? ""}
-                          onChange={(e) => setR({ date: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <Input
-                          placeholder="Action"
-                          value={ov.action ?? ""}
-                          onChange={(e) => setR({ action: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Operational read"
-                          value={ov.read ?? ""}
-                          onChange={(e) => setR({ read: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <MarketOperatorResponsesEditor
+              rows={fuelOverridePanels!.producerRows}
+              overrides={sectionOverrides.marketOperatorOverrides}
+              onSetOverride={(key, value) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  marketOperatorOverrides: {
+                    ...(prev.marketOperatorOverrides ?? {}),
+                    [key]: value,
+                  },
+                }))
+              }
+            />
           )}
 
           {/* Orphaned Market and Operator Responses overrides: saved edits
