@@ -4,8 +4,6 @@ import {
   applyMarketPriceOverrides,
   applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
-  resolvePanelRead,
-  PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
 import { format, parseISO } from "date-fns";
@@ -847,17 +845,9 @@ export default function ReportPreview({
   // over the canonical payload PLUS the resolved Gulf read override (canonical
   // text passes by construction), and the prose-tolerant gate over the FINAL
   // effective text (whichever tier wins).
-  const resolvedFuelGulfRead = fuelData?.incidentData.gulfChokepointWatch
-    ? resolvePanelRead(
-        sectionOverrides,
-        PANEL_READ_GULF_HORMUZ,
-        fuelData.incidentData.gulfChokepointWatch.read,
-      ).text
-    : undefined;
   const fuelConsistencyErrors = fuelData
     ? validateFuelCanonicalText(fuelData.canonicalFacts, {
         ...fuelData.narrativeData.canonicalSections,
-        gulfAndHormuzChokepointWatch: resolvedFuelGulfRead,
       })
     : [];
   const fuelEffectiveIssues =
@@ -1094,9 +1084,9 @@ export default function ReportPreview({
               const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
               return (
                 <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
-                  {/* Staleness-guarded override — same resolvePanelRead the PDF
-                      exporter uses, so preview == PDF. */}
-                  <Paragraphs text={resolvedFuelGulfRead ?? gulf.read} />
+                  {/* The Gulf read paragraph folds into the Operational Read
+                      narrative (owner ruling) — this section keeps only the
+                      dated anchor bullets. */}
                   {currentLines.length > 0 && (
                     <ul
                       className="list-disc pl-5 space-y-1.5"

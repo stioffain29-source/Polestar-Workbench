@@ -64,8 +64,6 @@ import {
   applyMarketPriceOverrides,
   applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
-  resolvePanelRead,
-  PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
 import {
@@ -893,17 +891,6 @@ export async function exportTopicReportPdf(
         incidents,
       )
     : null;
-  // Resolve the only editable Fuel narrative before validation. The section's
-  // generated count still comes from the canonical qualifying set; if an
-  // otherwise-current override claims a larger count, the gate below blocks
-  // export rather than allowing a contradictory statement into the PDF.
-  const renderedFuelGulfRead = fuelData?.incidentData.gulfChokepointWatch
-    ? resolvePanelRead(
-        options.sectionOverrides,
-        PANEL_READ_GULF_HORMUZ,
-        fuelData.incidentData.gulfChokepointWatch.read,
-      ).text
-    : undefined;
   // FINAL EFFECTIVE Fuel narrative — analyst edit -> AI -> canonical
   // deterministic, resolved by the ONE shared resolver the preview and the
   // editor prefill also call, so all three surfaces render byte-identical
@@ -929,11 +916,11 @@ export async function exportTopicReportPdf(
   // EFFECTIVE text (whatever tier wins), so analyst/AI prose can never smuggle
   // a contradictory claim past it.
   if (fuelData && fuelEffective) {
-    // Strict canonical gate — validates the canonical payload plus the only
-    // per-panel override (Gulf read); canonical text passes by construction.
+    // Strict canonical gate — validates the canonical payload (the Gulf read
+    // now folds into the canonical Operational Read, so it is covered there);
+    // canonical text passes by construction.
     assertFuelReportConsistent(fuelData.canonicalFacts, {
       ...fuelData.narrativeData.canonicalSections,
-      gulfAndHormuzChokepointWatch: renderedFuelGulfRead,
     });
     // Prose-tolerant gate over the FINAL effective text — whichever tier wins
     // (analyst edit / AI / canonical), its claims must agree with the facts.
@@ -1162,18 +1149,20 @@ export async function exportTopicReportPdf(
       const gbOverrides = options.sectionOverrides?.gulfBulletOverrides;
       const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
       const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
-      // Staleness-guarded override: a saved panel read applies only while the
-      // generated read still equals the baseline it was written against, so a
-      // frozen week-old paragraph can never outrank this week's reporting.
-      drawSectionWithProse(
-        ctx,
-        "Gulf and Hormuz Chokepoint Watch",
-        renderedFuelGulfRead ?? gulf.read,
-      );
+      // The Gulf read paragraph folds into the Operational Read narrative
+      // (owner ruling) — this section keeps only the dated anchor bullets,
+      // with the first bullet block atomic under the heading.
       if (currentLines.length > 0) {
-        renderProse(ctx, currentLines.map((l) => `\u2022  ${l}`).join("\n"));
+        drawSectionWithProse(
+          ctx,
+          "Gulf and Hormuz Chokepoint Watch",
+          currentLines.map((l) => `\u2022  ${l}`).join("\n"),
+        );
+      } else if (gulf.standingNote && standingLines.length > 0) {
+        drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.standingNote);
+        renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
-      if (gulf.standingNote && standingLines.length > 0) {
+      if (currentLines.length > 0 && gulf.standingNote && standingLines.length > 0) {
         renderProse(ctx, gulf.standingNote);
         renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
       }

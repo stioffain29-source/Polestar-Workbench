@@ -64,8 +64,6 @@ import {
   makeSectionGate,
   topicSectionKeys,
   pruneTopicSectionOverrides,
-  PANEL_READ_GULF_HORMUZ,
-  resolvePanelRead,
   marketOperatorRowKey,
   type TopicSectionOverrides,
   type FastFactOverride,
@@ -2097,49 +2095,9 @@ export default function ReportEditor() {
             </div>
           )}
 
-          {/* Fuel Watch: the Gulf & Hormuz Chokepoint Watch "read" paragraph
-              is owner-editable (blank = live auto text). Preview and PDF apply
-              the override through the same resolvePanelRead call, which only
-              honours it while the auto text still equals the baseline captured
-              here at edit time — so a saved paragraph can never silently
-              outrank a later week's fresh reporting. */}
-          {form.topic === "fuel" && (
-            <Field label="Gulf & Hormuz Chokepoint Watch — Read (blank = auto)">
-              <Textarea
-                rows={3}
-                value={sectionOverrides.panelReads?.[PANEL_READ_GULF_HORMUZ] ?? ""}
-                onChange={(e) =>
-                  setSectionOverrides((prev) => ({
-                    ...prev,
-                    panelReads: {
-                      ...(prev.panelReads ?? {}),
-                      [PANEL_READ_GULF_HORMUZ]: e.target.value,
-                    },
-                    // Bind the override to the auto text it was written
-                    // against. resolvePanelRead stops applying it the moment
-                    // the generated read changes.
-                    panelReadBases: {
-                      ...(prev.panelReadBases ?? {}),
-                      [PANEL_READ_GULF_HORMUZ]: fuelOverridePanels?.gulfRead ?? "",
-                    },
-                  }))
-                }
-                className="rounded-sm"
-              />
-              {resolvePanelRead(
-                sectionOverrides,
-                PANEL_READ_GULF_HORMUZ,
-                fuelOverridePanels?.gulfRead ?? "",
-              ).overrideStale && (
-                <p className="mt-1 text-[12px] leading-snug text-amber-700">
-                  Out of date — this saved text was written against an earlier
-                  week's generated read, so the report is showing the live
-                  generated text instead. Edit the box to re-apply it this
-                  week, or clear it to keep following the live text.
-                </p>
-              )}
-            </Field>
-          )}
+          {/* The Gulf & Hormuz read paragraph is no longer separately editable —
+              it folds into the Operational Read narrative (owner ruling), which
+              already has its own edit box. */}
 
           {/* Fuel Watch: per-bullet overrides for the Gulf & Hormuz Chokepoint
               Watch lists. Keyed by the bullet's AUTO line so a saved override

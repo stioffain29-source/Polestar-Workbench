@@ -389,7 +389,6 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     incidents,
   });
-  const operationalRead = canonicalSections.operationalRead;
   // Gulf/Hormuz Chokepoint Watch is a filtered subset of the canonical
   // qualifying records. Do not pass the full raw incident feed here: doing so
   // previously let its independent count exceed the report-wide total.
@@ -399,6 +398,20 @@ export function buildFuelWatchReportData(
     incidents,
     qualifyingIncidents: canonicalFacts.qualifyingIncidents,
   });
+  // Owner ruling (Aug 2026): the Gulf read is no longer a standalone editable
+  // paragraph (its exact-match staleness binding made every save go stale
+  // within days). Its information folds into the Operational Read canonical
+  // narrative instead, so it flows with the report and stays gate-validated;
+  // the Gulf section itself keeps only the dated anchor bullets.
+  if (gulfChokepointWatch?.read) {
+    canonicalSections.operationalRead = [
+      canonicalSections.operationalRead,
+      gulfChokepointWatch.read,
+    ]
+      .filter((t) => (t ?? "").trim() !== "")
+      .join("\n\n");
+  }
+  const operationalRead = canonicalSections.operationalRead;
 
   // Validation. The fail-closed export gate is keyed on market data
   // only: Brent, WTI and jet fuel are the required indicators. Other
