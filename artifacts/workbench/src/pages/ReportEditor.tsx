@@ -291,6 +291,17 @@ export default function ReportEditor() {
       queryKey: getListIncidentsQueryKey(secondaryParams as never),
     },
   });
+  // Fuel also cross-reads energy: fuel-to-power continuity failures (gas
+  // shortage load shedding, rationing, power cuts) qualify into Fuel Watch
+  // via filterFuelContinuityCrossRead.
+  const tertiaryTopic = activeTopic === "fuel" ? "energy" : undefined;
+  const tertiaryParams = { topic: tertiaryTopic };
+  const { data: tertiaryIncidents } = useListIncidents(tertiaryParams as never, {
+    query: {
+      enabled: !!tertiaryTopic,
+      queryKey: getListIncidentsQueryKey(tertiaryParams as never),
+    },
+  });
   // Merge the scoped buckets (disjoint topics → plain concat). Return undefined
   // until every query the active topic needs has resolved so the one-shot seed
   // never fires against a partial window (e.g. fuel without its shipping
@@ -298,10 +309,14 @@ export default function ReportEditor() {
   const rawIncidents = useMemo(() => {
     if (!primaryTopic || !primaryIncidents) return undefined;
     if (secondaryTopic && !secondaryIncidents) return undefined;
-    return secondaryTopic
-      ? [...primaryIncidents, ...(secondaryIncidents ?? [])]
-      : primaryIncidents;
-  }, [primaryTopic, secondaryTopic, primaryIncidents, secondaryIncidents]);
+    if (tertiaryTopic && !tertiaryIncidents) return undefined;
+    if (!secondaryTopic && !tertiaryTopic) return primaryIncidents;
+    return [
+      ...primaryIncidents,
+      ...(secondaryTopic ? secondaryIncidents ?? [] : []),
+      ...(tertiaryTopic ? tertiaryIncidents ?? [] : []),
+    ];
+  }, [primaryTopic, secondaryTopic, tertiaryTopic, primaryIncidents, secondaryIncidents, tertiaryIncidents]);
 
   // Market Prices rows render on energy AND fertiliser reports; fetch the
   // matching commodity group so the override UI and preview/PDF share rows.

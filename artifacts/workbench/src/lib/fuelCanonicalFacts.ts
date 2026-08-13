@@ -136,10 +136,11 @@ function title(value: string): string {
 function stableSort<T extends { label: string; severityScore: number }>(rows: T[]): T[] {
   return rows.sort((a, b) => b.severityScore - a.severityScore || a.label.localeCompare(b.label));
 }
-function routeFor(i: TopicFastFactsIncident): string | null {
+export function routeFor(i: TopicFastFactsIncident): string | null {
   const value = `${i.title ?? ""} ${i.summary ?? ""} ${i.location ?? ""}`.toLowerCase();
   if (/strait of hormuz|\bhormuz\b/.test(value)) return "Strait of Hormuz";
-  if (/bab[- ]el[- ]mandeb/.test(value)) return "Bab-el-Mandeb";
+  if (/gulf of oman/.test(value)) return "Gulf of Oman";
+  if (/bab[- ]el[- ]mandeb|bab al[- ]mandab|bab el[- ]mandab/.test(value)) return "Bab-el-Mandeb";
   if (/\bred sea\b/.test(value)) return "Red Sea";
   if (/\bsuez\b/.test(value)) return "Suez Canal";
   if (/\bmalacca\b/.test(value)) return "Strait of Malacca";
@@ -295,13 +296,63 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const whatHappened = count === 0
     ? "No qualifying incidents were recorded in the reporting period."
     : `${count} qualifying incident${count === 1 ? " was" : "s were"} recorded ${period}, across ${list(facts.countries.slice(0, 3).map((c) => c.label))}${facts.countries.length > 3 ? " and elsewhere" : ""}. ${top ? `The lead event, dated ${top.date}, is “${top.title}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, rated ${severityWord(top.severity)}.` : "No lead event is identified."}`;
-  const regionalHighlights = facts.primaryPressurePoint.kind === "distributed"
+  // Per-theatre detail sentences shared by Regional Highlights and the
+  // Operational Read. Word choice matters for the consistency gate: subset
+  // figures are "record(s)" (never "qualifying incidents") and subset date
+  // spreads never use the phrase "distinct days", so the gate's report-wide
+  // count/day claims can never bind onto a per-theatre figure.
+  const theatreDetail = (label: string, ids: string[]): string | null => {
+    const rows = facts.qualifyingIncidents.filter((i) => ids.includes(i.id));
+    if (!rows.length) return null;
+    const lead = rows
+      .slice()
+      .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || (a.date < b.date ? 1 : -1))[0];
+    const countClause = rows.length === 1 ? "one record" : `${rows.length} records`;
+    return `${label} carries ${countClause} this period, led by “${lead.title}” (${lead.date}, ${severityWord(lead.severity)} severity).`;
+  };
+  const pressureGroups: Array<{ label: string; incidentIds: string[] }> =
+    facts.primaryPressurePoint.kind === "distributed"
+      ? [...facts.countries.slice(0, 3), ...facts.routes.slice(0, 2)]
+      : [
+          { label: facts.primaryPressurePoint.label, incidentIds: facts.primaryPressurePoint.incidentIds },
+          ...facts.secondaryPressurePoints.slice(0, 3),
+        ];
+  const theatreSentences = pressureGroups
+    .map((g) => theatreDetail(g.label, g.incidentIds))
+    .filter((s): s is string => s !== null);
+  const regionalLead = facts.primaryPressurePoint.kind === "distributed"
     ? `Regional Highlights: pressure is distributed across ${list([...facts.countries.slice(0, 3).map((c) => c.label), ...facts.routes.slice(0, 3).map((r) => r.label)])}. Overall severity: ${severity}.`
     : `Regional Highlights: ${facts.primaryPressurePoint.label} is the primary pressure point; secondary pressure points are ${list(secondary)}. Overall severity: ${severity}.`;
+  const regionalHighlights = [regionalLead, theatreSentences.join(" ")]
+    .filter((s) => s.trim())
+    .join("\n\n");
   const whatMatters = `What Matters: ${pressure} The report contains ${count} qualifying incident${count === 1 ? "" : "s"}; route and country totals are derived from the same record set. ${marketSentence(facts)} Overall severity: ${severity}.`;
   const polestarView = `Polestar View: ${pressure} Overall severity: ${severity}. Evidence confidence: ${facts.evidenceConfidence}. ${facts.analystReviewRequired ? "Analyst review is required before publication." : "The assessed position is based on the qualifying evidence in this reporting period."}`;
   const marketRead = marketSentence(facts);
-  const operationalRead = `Operational Read: ${count} qualifying incident${count === 1 ? "" : "s"} across ${days} distinct day${days === 1 ? "" : "s"}. ${pressure} Overall severity: ${severity}.`;
+  // Operational Read: the gate-parsable summary line leads, then an
+  // event-led paragraph grounds it in the actual reporting so the section
+  // never ships as a bare counter.
+  const opLead = `Operational Read: ${count} qualifying incident${count === 1 ? "" : "s"} across ${days} distinct day${days === 1 ? "" : "s"}. ${pressure} Overall severity: ${severity}.`;
+  const opDetailParts: string[] = [];
+  if (top) {
+    opDetailParts.push(
+      `The period's most serious event is “${top.title}”${top.physicalLocation ? ` at ${top.physicalLocation}` : ""} on ${top.date}, rated ${severityWord(top.severity)}.`,
+    );
+  }
+  if (theatreSentences.length) {
+    // The lead event's theatre sentence would restate the same headline —
+    // keep the remaining theatres so the paragraph adds breadth, not an echo.
+    const rest = theatreSentences.filter((s) => !top || !s.includes(top.title));
+    if (rest.length) opDetailParts.push(rest.join(" "));
+  }
+  if (count > 0) {
+    opDetailParts.push(
+      "Where refinery, export or chokepoint disruption persists in these theatres, expect continued cost pressure and a live risk of localised availability gaps rather than a system-wide failure.",
+    );
+  }
+  const operationalRead = [opLead, opDetailParts.join(" ")]
+    .filter((s) => s.trim())
+    .join("\n\n");
   const implications = [
     `- Observed: align fuel-continuity actions to ${facts.primaryPressurePoint.label}.`,
     `- Assessed: plan against overall severity ${severity}.`,

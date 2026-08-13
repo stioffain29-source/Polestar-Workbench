@@ -929,6 +929,142 @@ function nearDuplicate(a: Set<string>, b: Set<string>): boolean {
   return (overlap >= 4 && jaccard >= 0.4) || overlap >= Math.ceil(0.55 * smaller);
 }
 
+// ---------------------------------------------------------------------------
+// Qualifying-set cross-read: fuel-continuity events filed under other topics.
+//
+// The fuel relevance gate is deliberately scoped to fuel-OPERATIONAL stories,
+// so two classes of genuinely fuel-relevant events never reach the qualifying
+// set on their own topic alone:
+//   1. shipping-topic KINETIC events on a tracked fuel-route chokepoint
+//      (a missile strike on a vessel in the Gulf of Oman or Bab-el-Mandeb is
+//      chokepoint pressure whether or not the headline names a fuel cargo);
+//   2. energy-topic fuel-to-power continuity failures (gas-shortage-driven
+//      load shedding, fuel rationing, power cuts) — the downstream face of a
+//      fuel supply problem.
+// Both admits are precision-gated, bounded to the SAME report window, and
+// collapsed for syndication (the same strike arrives as many rewrites) so a
+// single event can never inflate the report-wide qualifying count.
+// ---------------------------------------------------------------------------
+
+// Tracked fuel-route chokepoint names. Mirrors fuelCanonicalFacts routeFor()
+// (a VALUE import from there would close the module cycle
+// fuelNarratives -> fuelCanonicalFacts -> fuelReportFacts -> fuelNarratives,
+// so the name list is kept in sync here instead).
+const CHOKEPOINT_NAME_RE =
+  /strait of hormuz|\bhormuz\b|gulf of oman|bab[- ]el[- ]mandeb|bab al[- ]mandab|bab el[- ]mandab|\bred sea\b|\bsuez\b|\bmalacca\b|\bpersian gulf\b|\barabian gulf\b/i;
+
+const CHOKEPOINT_KINETIC_RE =
+  /\b(missile|drone|attack(?:ed|s)?|struck|hit by|explosion|blast|hijack\w*|seiz\w*|mined|sabotage|blockad\w*|closure|closed|shut)\b/i;
+
+const EXPLAINER_NOISE_RE =
+  /\bguide\b|here'?s (?:your|what|how)|\bhow to\b|\bexplained\b|\bexplainer\b|\bwhat to know\b|\bfaq\b/i;
+
+const FUEL_POWER_CONTINUITY_RE =
+  // Load-shedding is inherently a supply-rationing signal; every other
+  // branch requires an explicit fuel/gas anchor so an ordinary grid fault or
+  // storm blackout (an energy story with no fuel dimension) can never enter
+  // Fuel Watch.
+  /\bload[\s-]?shedding\b|\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng)\b[^.]{0,60}\b(?:shortage|rationing|crisis|scarcity|cut-?offs?|cuts?)\b|\b(?:shortage|rationing)s?\b[^.]{0,40}\b(?:fuel|gas|diesel|petrol|gasoline)\b/i;
+
+/**
+ * Cross-read additions to the fuel QUALIFYING set. Returns in-window rows
+ * from the shipping topic (kinetic chokepoint events) and the energy topic
+ * (fuel-to-power continuity failures), syndication-collapsed to one
+ * representative per event and de-duplicated against the fuel window the
+ * caller already holds. Capped so a heavy syndication week cannot swamp the
+ * fuel-topic core of the report.
+ */
+export function filterFuelContinuityCrossRead(
+  incidents: TopicFastFactsIncident[],
+  issueDate: string,
+  fuelWindow: TopicFastFactsIncident[],
+  maxAdds = 8,
+): TopicFastFactsIncident[] {
+  const keyOf = (i: TopicFastFactsIncident): string =>
+    (i.sourceUrl && i.sourceUrl.trim().toLowerCase()) ||
+    (i.id != null ? `id:${i.id}` : `t:${i.title.trim().toLowerCase()}`);
+  const seen = new Set(fuelWindow.map(keyOf));
+  // A shipping/energy rewrite of a story the fuel window ALREADY carries has
+  // a different URL/id, so identity keys alone double-count it — seed the
+  // syndication collapse with the fuel window's title tokens too.
+  const fuelWindowTokens = fuelWindow.map((i) =>
+    sigTokens(stripWireCruft(i.title ?? "")),
+  );
+
+  const shippingCandidates: TopicFastFactsIncident[] = [];
+  for (const i of filterTopicReportIncidents(incidents, "shipping", issueDate)) {
+    const hay = `${haystack(i)} ${(i.location ?? "").toLowerCase()}`;
+    if (!CHOKEPOINT_NAME_RE.test(hay)) continue;
+    if (!CHOKEPOINT_KINETIC_RE.test(hay)) continue;
+    shippingCandidates.push(i);
+  }
+  const energyCandidates: TopicFastFactsIncident[] = [];
+  for (const i of filterTopicReportIncidents(incidents, "energy", issueDate)) {
+    const hay = haystack(i);
+    if (!FUEL_POWER_CONTINUITY_RE.test(hay)) continue;
+    // Service guides / explainers ("your complete guide to TNPDCL services",
+    // "here's what to know about power cuts") mention outage vocabulary
+    // without reporting an event — reject them so they can't consume a slot
+    // a real load-shedding report needs.
+    if (EXPLAINER_NOISE_RE.test(stripWireCruft(i.title ?? ""))) continue;
+    energyCandidates.push(i);
+  }
+
+  // Most significant first, then syndication-collapse. Chokepoint strikes
+  // arrive as MANY rewrites whose distinctive tokens diverge (casualty
+  // nationality vs vessel name vs strait name), so title-token nearDuplicate
+  // alone under-collapses them: kinetic events at the SAME chokepoint on the
+  // SAME day additionally fold to one representative — a chokepoint watch
+  // needs the event once, not each outlet's angle on it. The two source
+  // pools are capped separately so a heavy strike week cannot starve the
+  // fuel-to-power admits out of the report (or vice versa).
+  const collapse = (
+    pool: TopicFastFactsIncident[],
+    cap: number,
+    coarseKey?: (i: TopicFastFactsIncident) => string | null,
+  ): TopicFastFactsIncident[] => {
+    const ranked = pool.slice().sort((a, b) => compareIncidentSignificance(a, b));
+    const kept: TopicFastFactsIncident[] = [];
+    const keptTokens: Set<string>[] = [];
+    const keptCoarse = new Set<string>();
+    for (const i of ranked) {
+      const k = keyOf(i);
+      if (seen.has(k)) continue;
+      const tok = sigTokens(stripWireCruft(i.title ?? ""));
+      if (fuelWindowTokens.some((t) => nearDuplicate(tok, t))) continue;
+      if (keptTokens.some((t) => nearDuplicate(tok, t))) continue;
+      const coarse = coarseKey ? coarseKey(i) : null;
+      if (coarse !== null) {
+        if (keptCoarse.has(coarse)) continue;
+        keptCoarse.add(coarse);
+      }
+      seen.add(k);
+      keptTokens.push(tok);
+      kept.push(i);
+      if (kept.length >= cap) break;
+    }
+    return kept;
+  };
+  const dayOf = (i: TopicFastFactsIncident): string =>
+    (i.occurredAt ?? "").slice(0, 10);
+  const chokepointDayKey = (i: TopicFastFactsIncident): string | null => {
+    const hay = `${haystack(i)} ${(i.location ?? "").toLowerCase()}`;
+    let name = CHOKEPOINT_NAME_RE.exec(hay)?.[0] ?? "chokepoint";
+    // Canonicalise spelling variants so "Bab el-Mandeb" and "Bab al-Mandab"
+    // rewrites of the same strike share one key.
+    if (name.startsWith("bab")) name = "bab-el-mandeb";
+    if (name.includes("hormuz")) name = "hormuz";
+    if (name.includes("gulf") && !name.includes("oman")) name = "persian gulf";
+    return `${name}:${dayOf(i)}`;
+  };
+  const shippingCap = Math.min(4, maxAdds);
+  const kept = [
+    ...collapse(shippingCandidates, shippingCap, chokepointDayKey),
+    ...collapse(energyCandidates, Math.max(0, maxAdds - shippingCap)),
+  ];
+  return kept;
+}
+
 // Fuel-market topical guard for cross-topic action rows. A shipping-topic
 // incident is admitted to the Producer/Buyer Actions table ONLY when it
 // carries an unambiguous fuel / crude / refined-product / national-oil-

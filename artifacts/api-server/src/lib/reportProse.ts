@@ -185,6 +185,7 @@ WRITING RULES:
 - Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the situation — not about the process.
 - British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
+- PARAGRAPHING: any prose section longer than about 70 words MUST be split into 2-3 short paragraphs separated by a blank line (a literal "\n\n" inside the JSON string). Never return a single unbroken wall of text.
 
 PLAIN-ENGLISH RULES — mandatory:
 - Use plain, easy-to-read English. Short, direct sentences with a clear subject. Every sentence must be understandable on first reading by a non-specialist.

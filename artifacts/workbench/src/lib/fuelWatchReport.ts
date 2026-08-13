@@ -26,6 +26,7 @@ import {
 import {
   buildFuelProducerBuyerActions,
   buildFuelGulfChokepointWatch,
+  filterFuelContinuityCrossRead,
   FUEL_DEFAULT_WATCH_NEXT,
   type ProducerBuyerActionRow,
   type FuelGulfChokepointWatch,
@@ -326,7 +327,16 @@ export function buildFuelWatchReportData(
 
   // Related-incident filtering uses the topic window + topic-relevance
   // filter so a hiking story that happens to say "fuel" is dropped.
-  const fuelIncidents = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
+  // The qualifying set then admits a bounded, syndication-collapsed
+  // cross-read: kinetic chokepoint events filed under `shipping` (a missile
+  // strike on a vessel in the Gulf of Oman is fuel-route pressure whether or
+  // not the headline names a fuel cargo) and fuel-to-power continuity
+  // failures filed under `energy` (gas-shortage load shedding, rationing).
+  const fuelTopicWindow = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
+  const fuelIncidents = [
+    ...fuelTopicWindow,
+    ...filterFuelContinuityCrossRead(incidents, report.issueDate, fuelTopicWindow),
+  ];
   // Canonical facts are built exactly once from the same filtered incident array
   // that all report counts and analytical sections consume.
   const canonicalFacts = buildFuelCanonicalFacts({
@@ -348,6 +358,11 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     hardNumbers: report.hardNumbers,
     incidents,
+    // Same universe as canonicalFacts (fuel window + continuity cross-read):
+    // counts, dates, countries and condition signals must describe the same
+    // incident set the canonical prose was generated from, or the gate
+    // false-blocks every cross-read-admitted event.
+    qualifyingIncidents: fuelIncidents,
   });
   const canonPrimary = canonicalFacts.primaryPressurePoint;
   // Severity is reconciled too: canonical prose asserts canonicalFacts'
@@ -412,6 +427,21 @@ export function buildFuelWatchReportData(
       .join("\n\n");
   }
   const operationalRead = canonicalSections.operationalRead;
+
+  // Market Read: the canonical one-line direction sentence stays (the
+  // consistency gate reads it), but the section renders it with the fuller
+  // two-paragraph market prose so it never ships as a bare one-liner.
+  const marketReadProse = buildFuelMarketRead({
+    brent,
+    wti,
+    jetFuel,
+    trajectory: trajectoryPoints,
+  });
+  if (marketReadProse) {
+    canonicalSections.marketRead = [canonicalSections.marketRead, marketReadProse]
+      .filter((t) => (t ?? "").trim() !== "")
+      .join("\n\n");
+  }
 
   // Validation. The fail-closed export gate is keyed on market data
   // only: Brent, WTI and jet fuel are the required indicators. Other

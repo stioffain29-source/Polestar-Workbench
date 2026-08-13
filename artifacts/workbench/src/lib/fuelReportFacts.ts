@@ -252,12 +252,19 @@ export function buildFuelReportFacts(opts: {
   issueDate: string;
   hardNumbers: unknown;
   incidents: TopicFastFactsIncident[];
+  /**
+   * The exact qualifying incident universe, when the caller has already
+   * assembled it (fuel window + continuity cross-read). MUST be the same
+   * array buildFuelCanonicalFacts receives — the AI FIXED FACTS block and
+   * the effective-text consistency gate judge canonical prose against these
+   * facts, so counting a different universe here (e.g. fuel-topic-only)
+   * makes the gate false-block cross-read-admitted events.
+   */
+  qualifyingIncidents?: TopicFastFactsIncident[];
 }): FuelReportFacts {
-  const windowIncidents = filterTopicReportIncidents(
-    opts.incidents,
-    "fuel",
-    opts.issueDate,
-  );
+  const windowIncidents =
+    opts.qualifyingIncidents ??
+    filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
 
   const records: FuelReportFactsIncident[] = windowIncidents.map((i) => ({
     id: i.id ?? null,
