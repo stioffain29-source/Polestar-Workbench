@@ -438,6 +438,13 @@ export function selectIncidents(
   });
   pushUnique(bestOf(diverse));
 
+  // (d) most recent sourced incident — ensures the Fast Facts "Latest Incident"
+  // date always appears somewhere in the report body (Key Incidents).
+  const latest = candidates
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date) || bySelectionRank(a, b))[0];
+  pushUnique(latest ?? null);
+
   // Top up so a data-rich period always fills the section, but prefer an event
   // that adds a fresh country+category combination before allowing a second
   // card from an already-represented combination (a genuine cluster).
@@ -494,6 +501,9 @@ export interface CargoPatternModel {
   mapTitle: string; // theft-only predicate drives the wording (spec pt3)
   mapCaption: string;
   trendCaption: string;
+  stageCategoryNote: string;
+  highSeverityNote: string;
+  namedPlaces: string[];
   stages: CargoStageSummary[];
   patterns: CargoPatternCard[]; // <= MAX_PATTERN_CARDS dashboard cards
   activity: CargoActivityMatrix;
@@ -841,6 +851,148 @@ function topCountry(primaries: CargoClusterInput[]): string | null {
   return best;
 }
 
+/** Keep only control labels supported by the incident corpus. */
+function evidenceGatedControls(corpus: string, controls: string[]): string[] {
+  const t = corpus.toLowerCase();
+  const gated = controls.filter((c) => {
+    const lc = c.toLowerCase();
+    if (/driver/.test(lc) && !/\bdriver/.test(t)) return false;
+    if (/escort|convoy/.test(lc) && !/\b(escort|convoy)/.test(t)) return false;
+    if (/insider|collusion/.test(lc) && !/\b(insider|employee|staff|collusion)/.test(t))
+      return false;
+    if (/seal/.test(lc) && !/\bseal/.test(t)) return false;
+    if (/route planning|corridor/.test(lc) && !/\b(route|corridor|highway|nh[- ]?\d)/.test(t))
+      return false;
+    if (/tracking|telematics|gps/.test(lc) && !/\b(track\w*|gps|telematics)/.test(t))
+      return false;
+    return true;
+  });
+  return gated.length > 0 ? gated : ["In-transit custody"];
+}
+
+interface CountryExposure {
+  country: string;
+  total: number;
+  hub: number;
+  route: number;
+}
+
+const HUB_STAGE: ReadonlySet<CargoStageKey> = new Set([
+  "warehouse_depot",
+  "staging_yard",
+  "port_terminal",
+]);
+
+function countryExposures(primaries: CargoClusterInput[]): CountryExposure[] {
+  const map = new Map<string, CountryExposure>();
+  for (const p of primaries) {
+    for (const c of cargoCountriesFor(toIncidentLike(p))) {
+      const cat = classifyCargoCategory(toIncidentLike(p));
+      const stage = stageForIncident(cat, primaryText(p));
+      const cur = map.get(c) ?? { country: c, total: 0, hub: 0, route: 0 };
+      cur.total += 1;
+      if (HUB_STAGE.has(stage)) cur.hub += 1;
+      else if (stage === "inland_transport" || stage === "inland_waterway")
+        cur.route += 1;
+      map.set(c, cur);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+function extractNamedPlaces(primaries: CargoClusterInput[]): string[] {
+  const counts = new Map<string, number>();
+  for (const p of primaries) {
+    const loc = shortLocation(p);
+    if (loc && loc.length >= 3) counts.set(loc, (counts.get(loc) ?? 0) + 1);
+    const text = primaryText(p);
+    for (const m of text.match(/\bNH[- ]?\d+[A-Z]?\b/gi) ?? []) {
+      const nh = m.toUpperCase().replace(/\s+/, "-");
+      counts.set(nh, (counts.get(nh) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 4)
+    .map(([place]) => place);
+}
+
+function buildStageCategoryNote(
+  stages: CargoStageSummary[],
+  derived: Array<{ category: string; stage: CargoStageKey }>,
+): string {
+  const inland = stages.find((s) => s.key === "inland_transport");
+  if (!inland || inland.count === 0) {
+    return "Supply-chain stages count where in the movement chain each incident occurred. Incident-type categories (below) classify the method; stage and category totals measure different things.";
+  }
+  const transitCat = "Cargo theft in transit";
+  const transitN = derived.filter(
+    (d) => d.category === transitCat && d.stage === "inland_transport",
+  ).length;
+  if (inland.count === transitN) {
+    return "Inland transport is a movement-stage total. Cargo theft in transit is the matching incident-type category within it. Stage totals and pattern categories measure different things and need not match when other road-side categories also occur.";
+  }
+  const other = new Map<string, number>();
+  for (const d of derived) {
+    if (d.stage !== "inland_transport" || d.category === transitCat) continue;
+    other.set(d.category, (other.get(d.category) ?? 0) + 1);
+  }
+  const parts = [...other.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, n]) => `${cat} (${n})`);
+  const otherTotal = inland.count - transitN;
+  return `Inland transport (${inland.count}) is a movement-stage total. Cargo theft in transit (${transitN}) is one incident-type category within it; the other ${otherTotal} inland-transport incident${otherTotal === 1 ? "" : "s"} are ${parts.join(", ")}. Stages and categories measure different things and need not match.`;
+}
+
+function buildHighSeverityNote(appendix: CargoAppendixRow[]): string {
+  const highs = appendix.filter((r) => r.severityKey === "high");
+  if (highs.length !== 1) return "";
+  const r = highs[0];
+  const why =
+    VIOLENCE_RE.test(r.summary) || /\b(killed|fatal|dead|murder|hostage|shoot)\b/i.test(r.summary)
+      ? "violence or fatalities in the reporting"
+      : parseUsdLoss({
+            title: r.summary,
+            summary: null,
+            source: null,
+          }) != null
+        ? "a source-stated loss figure"
+        : "operational consequence beyond a routine inventory loss";
+  const where = r.location || r.country || "the affected area";
+  return `The single High rating reflects ${why} (${r.category}${where ? `, ${where}` : ""}). Arrest or recovery reports elsewhere in the period are rated separately and do not inherit this tier.`;
+}
+
+function enforcementDisplaySeverity(text: string): { key: string; label: string } {
+  if (
+    VIOLENCE_RE.test(text) &&
+    /\b(killed|fatal|dead|murder\w*|hostage|shoot\w*|gunman|gunmen|injured|wounded)\b/i.test(
+      text,
+    )
+  ) {
+    return { key: "high", label: "High" };
+  }
+  const usd = parseUsdLoss({ title: text, summary: null, source: null });
+  if (usd != null && usd >= USD_MID_MIN) {
+    return { key: "moderate", label: "Moderate" };
+  }
+  return { key: "low", label: "Low" };
+}
+
+function weekEffectiveDays(
+  point: { date: string; partial?: boolean },
+  issueDate: string,
+): number {
+  if (!point.partial) return 7;
+  const win = resolveReportWindow("cargo_watch", issueDate);
+  const weekStart = parseISO(point.date);
+  const weekEnd = addDays(weekStart, 6);
+  const start = weekStart.getTime() < win.start.getTime() ? win.start : weekStart;
+  const end = weekEnd.getTime() > win.end.getTime() ? win.end : weekEnd;
+  const days =
+    Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, Math.min(7, days));
+}
+
 /** Modal severity among members; unknown/blank tiers are ignored. */
 function modalSeverity(primaries: CargoClusterInput[]): {
   key: string | null;
@@ -1081,12 +1233,15 @@ export function buildCargoPatternModel(
       const consequenceMean =
         members.reduce((s, m) => s + m.consequence, 0) / members.length;
       const geo = topCountry(members.map((m) => m.primary));
-      const controls = meta.controlAffected;
-      // Specific watch line: corridor/country + cargo category, not a bare
-      // stage template.
+      const memberText = members.map((m) => primaryText(m.primary)).join(" ");
+      const controls = evidenceGatedControls(memberText, meta.controlAffected);
+      // Specific watch line: named place or country when available — never a
+      // bare "same corridor" without naming it.
       const watchBase = meta.watchNext;
-      const watchNext = geo
-        ? `${watchBase.replace(/\.$/, "")} on ${category.toLowerCase()} corridors in ${geo}.`
+      const place = extractNamedPlaces(members.map((m) => m.primary))[0];
+      const watchGeo = place ?? geo;
+      const watchNext = watchGeo
+        ? `${watchBase.replace(/\.$/, "")} involving ${category.toLowerCase()} around ${watchGeo}.`
         : `${watchBase.replace(/\.$/, "")} for ${category.toLowerCase()}.`;
       return {
         id: `pattern-${stage}-${category}`.replace(/\s+/g, "-").toLowerCase(),
@@ -1371,14 +1526,16 @@ export function buildCargoPatternModel(
     .map((ec) => {
       const e = ec.cluster.enrichment;
       const p = ec.primary;
+      const text = primaryText(p);
+      const sev = enforcementDisplaySeverity(text);
       return {
         id: String(p.id ?? ec.cluster.id),
         date: p.occurredAt,
         location: shortLocation(p),
         category: ec.category,
         summary: cleanSummary(p.title),
-        severityLabel: SEV_LABEL[severityKeyOf(p)] ?? severityKeyOf(p),
-        severityKey: severityKeyOf(p),
+        severityLabel: sev.label,
+        severityKey: sev.key,
         confidence: e.confidence === "Low" ? "Unconfirmed" : "",
         country: cargoCountry(toIncidentLike(p)) ?? "",
         confidenceLabel: e.confidence ?? "",
@@ -1398,8 +1555,12 @@ export function buildCargoPatternModel(
         ? "No enforcement outcomes reported this period."
         : `${enforcementRows.length} enforcement ${
             enforcementRows.length === 1 ? "outcome" : "outcomes"
-          } reported this period (arrests, seizures or recoveries), shown separately and excluded from the incident totals above.`,
+          } reported this period (arrests, seizures or recoveries). Dates reflect when the enforcement action was reported, not necessarily when the underlying theft occurred. These are shown separately and excluded from the incident totals above.`,
   };
+
+  const namedPlaces = extractNamedPlaces(primaries);
+  const stageCategoryNote = buildStageCategoryNote(stages, derived);
+  const highSeverityNote = buildHighSeverityNote(appendix);
 
   // 9b. Map title — a theft-only predicate (spec pt3). When every operational
   //     category present is a theft/loss category the map plots theft; otherwise
@@ -1411,7 +1572,7 @@ export function buildCargoPatternModel(
 
   // 10. Data-derived captions (spec PAGE 2). No hardcoded names/dates.
   const mapCaption = buildMapCaption(intensity, totalUnique);
-  const trendCaption = buildTrendCaption(extras, stages);
+  const trendCaption = buildTrendCaption(extras, stages, issueDate);
 
   // 11. Operational assessment defaults (editor overrides applied at render).
   const assessment = buildAssessment(
@@ -1422,6 +1583,8 @@ export function buildCargoPatternModel(
     totalUnique,
     selected,
     appendix,
+    namedPlaces,
+    countryExposures(primaries),
   );
 
   const model: CargoPatternModel = {
@@ -1435,6 +1598,9 @@ export function buildCargoPatternModel(
     mapTitle,
     mapCaption,
     trendCaption,
+    stageCategoryNote,
+    highSeverityNote,
+    namedPlaces,
     stages,
     patterns,
     activity,
@@ -1473,23 +1639,32 @@ function buildMapCaption(
 function buildTrendCaption(
   extras: CargoReportExtras,
   stages: CargoStageSummary[],
+  issueDate: string,
 ): string {
   const trend = extras.trend;
   if (trend.length < 2) return "";
-  const last = trend[trend.length - 1].count;
-  const prev = trend[trend.length - 2].count;
+  const lastPt = trend[trend.length - 1];
+  const prevPt = trend[trend.length - 2];
+  const lastDays = weekEffectiveDays(lastPt, issueDate);
+  const prevDays = weekEffectiveDays(prevPt, issueDate);
+  const lastRate = lastPt.count / lastDays;
+  const prevRate = prevPt.count / prevDays;
   const leadStage = stages
     .slice()
     .sort((a, b) => b.count - a.count)
     .filter((s) => s.count > 0)[0];
   const driver = leadStage ? ` driven mainly by ${leadStage.label.toLowerCase()} incidents` : "";
-  if (last > prev) {
-    return `Activity increased during the final reporting week${driver}.`;
+  const partialNote =
+    lastPt.partial || prevPt.partial
+      ? ", comparing incidents per day because one or both weeks are partial"
+      : "";
+  if (lastRate > prevRate * 1.08) {
+    return `Activity increased during the final reporting week${driver}${partialNote}.`;
   }
-  if (last < prev) {
-    return `Activity eased during the final reporting week relative to the preceding week.`;
+  if (lastRate < prevRate * 0.92) {
+    return `Activity was lower during the final reporting week than the preceding week${driver}${partialNote}.`;
   }
-  return `Activity held broadly steady across the closing weeks of the period.`;
+  return `Activity held broadly steady across the closing weeks of the period${partialNote}.`;
 }
 
 // One data-derived sentence beneath the Weekly Activity by Pattern matrix. It
@@ -1609,22 +1784,20 @@ export function buildCargoExecutiveSummary(model: CargoPatternModel): string {
     if ((SEV_RANK[k] ?? 0) > (SEV_RANK[highestKey] ?? 0)) highestKey = k;
   }
   const modalLabel = (SEV_LABEL[modalKey] ?? modalKey).toLowerCase();
+  const highCount = [...sevCount.entries()]
+    .filter(([k]) => (SEV_RANK[k] ?? 0) >= 4)
+    .reduce((s, [, n]) => s + n, 0);
   const s3 =
-    (SEV_RANK[highestKey] ?? 0) > (SEV_RANK[modalKey] ?? 0)
-      ? `Overall severity was predominantly ${modalLabel}, with a minority of events reaching ${(SEV_LABEL[highestKey] ?? highestKey).toLowerCase()} severity.`
-      : `Overall severity was predominantly ${modalLabel}, with no higher-tier events recorded.`;
+    highCount === 1
+      ? `Overall severity was predominantly ${modalLabel}, with one High-rated operational incident reflecting violence, loss or disruption rather than a law-enforcement outcome.`
+      : (SEV_RANK[highestKey] ?? 0) > (SEV_RANK[modalKey] ?? 0)
+        ? `Overall severity was predominantly ${modalLabel}, with a minority of events reaching ${(SEV_LABEL[highestKey] ?? highestKey).toLowerCase()} severity.`
+        : `Overall severity was predominantly ${modalLabel}, with no higher-tier events recorded.`;
 
   const concern = leadStage
     ? leadStage.primaryConcern.toLowerCase()
     : "cargo-in-transit protection";
-  const controls = model.patterns[0]?.controlAffected.slice(0, 2) ?? [];
-  const controlClause =
-    controls.length >= 2
-      ? `, with ${controls[0].toLowerCase()} and ${controls[1].toLowerCase()} the controls most in need of reinforcement across the region`
-      : controls.length === 1
-        ? `, with ${controls[0].toLowerCase()} the control most in need of reinforcement across the region`
-        : " across the region";
-  const s4 = `This keeps ${concern} the main operational priority${controlClause}.`;
+  const s4 = `This keeps ${concern} the main operational priority for the period.`;
 
   const thinNote =
     model.totalUnique < 5 ? " Reporting remains indicative rather than comprehensive." : "";
@@ -1642,6 +1815,8 @@ function buildAssessment(
   totalUnique: number,
   selected: CargoAppendixRow[],
   appendix: CargoAppendixRow[],
+  namedPlaces: string[],
+  exposures: CountryExposure[],
 ): CargoAssessment {
   if (totalUnique === 0) {
     return {
@@ -1661,7 +1836,18 @@ function buildAssessment(
     .sort((a, b) => b.count - a.count)
     .filter((s) => s.count > 0)[0];
   const geo = topCountry(primaries);
-  const geoPhrase = geo ? ` and concentrated in ${geo}` : "";
+  const india = exposures.find((e) => e.country === "India");
+  const bangladesh = exposures.find((e) => e.country === "Bangladesh");
+  let geoPhrase = geo ? `, with reporting concentrated in ${geo}` : "";
+  if (india && bangladesh) {
+    geoPhrase = `, with India carrying most warehouse and depot-linked exposure (${india.hub} hub-side of ${india.total} records) and Bangladesh most inland-transit exposure (${bangladesh.route} route-side of ${bangladesh.total} records)`;
+  } else if (india && india.hub >= india.route) {
+    geoPhrase = `, with India the main pressure point on warehouse and depot-linked incidents`;
+  } else if (bangladesh && bangladesh.route >= bangladesh.hub) {
+    geoPhrase = `, with Bangladesh the main pressure point on inland-transit incidents`;
+  } else if (geo) {
+    geoPhrase = `, with reporting concentrated in ${geo}`;
+  }
   const limited = totalUnique < 5;
   const limitNote = limited
     ? " Reporting remains limited and should be treated as indicative rather than comprehensive."
@@ -1679,14 +1865,17 @@ function buildAssessment(
     ? `Reported events this period fell mainly in ${leadStage.label.toLowerCase()}${geoPhrase}${patternClause}.${limitNote}`
     : `Reported events this period were spread across the supply chain${geoPhrase}${patternClause}.${limitNote}`;
 
-  // WHAT MATTERS — three evidence-based findings focused on AUDIENCE impact,
-  // not a re-statement of the Situation's stage/country lead.
   const audiences = ["cargo owners", "logistics operators", "security teams"];
   const whatMatters: string[] = patterns.slice(0, 3).map((p, i) => {
     const where = p.primaryGeography ? ` in ${p.primaryGeography}` : "";
     const who = audiences[i % audiences.length];
-    const control = p.controlAffected[0]?.toLowerCase() ?? "custody controls";
-    return `${p.name}${where} is stressing ${control}, which raises near-term loss and delay exposure for ${who}.`;
+    if (p.primaryGeography === "India" || (india && p.primaryGeography === "India")) {
+      return `${p.name}${where} is adding to warehouse and depot-side inventory risk for ${who} this period.`;
+    }
+    if (p.primaryGeography === "Bangladesh" || (bangladesh && p.primaryGeography === "Bangladesh")) {
+      return `${p.name}${where} is adding to inland-transit loss and delay exposure for ${who} this period.`;
+    }
+    return `${p.name}${where} accounts for a material share of reported losses, raising near-term fulfilment and insurance exposure for ${who}.`;
   });
 
   // IMPLICATIONS — up to three practical implications, each tied to a SPECIFIC
@@ -1704,47 +1893,41 @@ function buildAssessment(
   for (const row of implicationRows.slice(0, 3)) {
     const st = stageForIncident(row.category, `${row.category} ${row.summary}`);
     const stageLabel = (STAGE_META[st]?.label ?? "supply-chain").toLowerCase();
-    const controls = (STAGE_META[st]?.controlAffected ?? []).slice(0, 2);
     const cat = row.category.toLowerCase();
     const where = row.country
       ? ` in ${row.country}`
       : row.location
         ? ` at ${row.location}`
         : "";
-    const controlClause =
-      controls.length >= 2
-        ? `Prioritise ${controls[0].toLowerCase()} and ${controls[1].toLowerCase()}`
-        : controls.length === 1
-          ? `Prioritise ${controls[0].toLowerCase()}`
-          : `Tighten controls`;
-    const windowHint =
-      st === "inland_transport"
-        ? " on night and early-morning runs"
-        : st === "warehouse_depot"
-          ? " on after-hours shifts"
-          : "";
+    const detail = row.summary.split(/[.!?]/)[0]?.trim() ?? row.summary;
     implications.push(
-      `${controlClause} for ${cat}${where}${windowHint}; the case confirms ${stageLabel} as a live exposure point for affected consignments.`,
+      `The ${cat}${where} case confirms ${stageLabel} as a live exposure point: ${detail}.`,
     );
     implicationIncidentIds.push(row.id);
   }
 
-  // WATCH NEXT — three or four observable indicators (spec pt4). Pattern-derived
-  // first, then topped up with data-anchored observables (recurrence, method
-  // repetition, insider signals, targeted cargo types) so the section always
-  // holds at least three where data exists.
   const watchNext: string[] = [];
   for (const p of patterns) {
     if (watchNext.length >= 4) break;
     if (p.watchNext && !watchNext.includes(p.watchNext)) watchNext.push(p.watchNext);
   }
   if (watchNext.length < 3) {
+    const corpus = appendix.map((r) => r.summary).join(" ").toLowerCase();
     const topUps = [
-      geo ? `Recurrence of incidents at the same locations or routes in ${geo}.` : "",
+      namedPlaces.length >= 2
+        ? `Repeat incidents around ${namedPlaces.slice(0, 2).join(" and ")}.`
+        : namedPlaces.length === 1
+          ? `Repeat incidents around ${namedPlaces[0]}.`
+          : "",
+      india && bangladesh
+        ? `Whether India warehouse losses and Bangladesh transit losses continue on separate tracks rather than converging.`
+        : "",
       leadStage
         ? `Repeat use of the methods characterising ${leadStage.label.toLowerCase()} incidents.`
         : "",
-      "Any confirmed indication of insider involvement in subsequent incidents.",
+      /\binsider|employee|staff|collusion\b/i.test(corpus)
+        ? "Any further reporting naming insider or staff involvement."
+        : "",
       "Reports naming the same targeted cargo types more than once.",
     ].filter(Boolean);
     for (const t of topUps) {
@@ -1761,6 +1944,8 @@ function buildAssessment(
     stages,
     totalUnique,
     appendix,
+    india,
+    bangladesh,
   });
 
   return {
@@ -1787,8 +1972,11 @@ function buildPolestarView(args: {
   stages: CargoStageSummary[];
   totalUnique: number;
   appendix: CargoAppendixRow[];
+  india?: CountryExposure;
+  bangladesh?: CountryExposure;
 }): string {
-  const { leadStage, geo, leadPatternNames, totalUnique, appendix } = args;
+  const { leadStage, geo, leadPatternNames, totalUnique, appendix, india, bangladesh } =
+    args;
   const stagePhrase = leadStage
     ? `${leadStage.label.toLowerCase()} exposure`
     : "exposure spread across the supply chain";
@@ -1822,11 +2010,17 @@ function buildPolestarView(args: {
       ? "reflecting thin open-source coverage and limited enrichment"
       : "reflecting open-source volume that is often single-source rather than independently corroborated, plus enrichment gaps";
 
-  const judgement = `The standing judgement is that reported cargo crime this period remains opportunistic and financially motivated${geo ? `, with the clearest pressure around ${geo}` : ""}, not a coordinated or politically driven campaign.`;
-  const supports = `What the records support is ${patternsPhrase} affecting ${stagePhrase}, with ${modalLabel} severity the most common outcome for cargo owners and logistics providers.`;
-  const notSupport = `They do not establish an organised cross-border network, a confirmed insider or seal-compromise campaign, or a statistically meaningful surge.`;
+  const judgement =
+    india && bangladesh
+      ? `The standing judgement is that reported cargo crime this period remains opportunistic and financially motivated: India is the main warehouse and depot concern, Bangladesh the main inland-transit concern, not a coordinated cross-border campaign.`
+      : `The standing judgement is that reported cargo crime this period remains opportunistic and financially motivated${geo ? `, with the clearest pressure around ${geo}` : ""}, not a coordinated or politically driven campaign.`;
+  const supports = `What the records support is ${patternsPhrase} affecting ${stagePhrase}, with ${modalLabel} severity the most common outcome for fresh operational incidents.`;
+  const notSupport = `They do not establish an organised cross-border network, driver-vetting or escort gaps as default explanations, or a statistically meaningful surge. Arrest and recovery reports are dated to enforcement actions and are not treated as fresh thefts in this period.`;
   const limits = `Open-source reporting and enrichment remain partial: loss values, cargo types and movement stage are frequently unstated, so totals and shares are indicative, not exhaustive.`;
-  const outlook = `Near-term outlook: further ${leadStage ? leadStage.label.toLowerCase() : "cargo-security"} incidents of a similar character are likely${geo ? ` in and around ${geo}` : ""}, absent a change in local enforcement or operators' own measures.`;
+  const outlook =
+    india && bangladesh
+      ? `Near-term outlook: further warehouse-side incidents are most likely in India and further transit-side incidents in Bangladesh unless local enforcement or operator measures change.`
+      : `Near-term outlook: further ${leadStage ? leadStage.label.toLowerCase() : "cargo-security"} incidents of a similar character are likely${geo ? ` in and around ${geo}` : ""}, absent a change in local enforcement or operators' own measures.`;
   const confidence = `Overall analytical confidence is ${confidenceWord}, ${confidenceBasis}.`;
 
   return `${judgement} ${supports} ${notSupport} ${limits} ${outlook} ${confidence}`;

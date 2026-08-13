@@ -172,4 +172,139 @@ describe("cargo watch report fixes", () => {
     expect(bands.map((b) => b.label)).toEqual(["1–5", "6–20", "21–50"]);
     expect(bands.some((b) => b.min >= 51)).toBe(false);
   });
+
+  it("does not compare partial final week raw counts as activity eased", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Warehouse theft at depot in India",
+        occurredAt: "2026-07-28",
+      }),
+      inc({
+        id: 2,
+        title: "Truck hijacking on highway in India",
+        occurredAt: "2026-08-09",
+      }),
+      inc({
+        id: 3,
+        title: "Cargo theft in transit on NH-48 in India",
+        occurredAt: "2026-08-10",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.trendCaption).not.toMatch(/activity eased/i);
+    if (m.extras.trend.some((t) => t.partial)) {
+      expect(m.trendCaption).toMatch(/per day|partial/i);
+    }
+  });
+
+  it("explains inland transport stage total vs cargo theft in transit category", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Cargo theft in transit on NH-48 near Delhi, India",
+        occurredAt: "2026-07-12",
+      }),
+      inc({
+        id: 2,
+        title: "Second cargo theft in transit on NH-19 near Jaipur, India",
+        occurredAt: "2026-07-20",
+      }),
+      inc({
+        id: 3,
+        title: "Truck hijacking of electronics cargo on highway in India",
+        severity: "high",
+        occurredAt: "2026-07-28",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.stageCategoryNote).toMatch(/movement-stage total/i);
+    expect(m.stageCategoryNote).toMatch(/Truck hijacking/i);
+  });
+
+  it("excludes Munshiganj contracting-firm robbery from scope", () => {
+    expect(
+      cargoScope({
+        title: "Armed robbers loot contracting firm office in Munshiganj",
+        country: "Bangladesh",
+      }),
+    ).toBe("excluded_non_cargo");
+  });
+
+  it("classifies Mojokerto facility burglary as warehouse theft not in-transit", () => {
+    const title = "Burglars break into logistics facility in Mojokerto, Indonesia";
+    expect(classifyCargoCategory({ title })).toBe("Warehouse theft");
+    expect(classifyCargoCategory({ title: "Facility burglary in Mojokerto" })).not.toBe(
+      "Cargo theft in transit",
+    );
+  });
+
+  it("includes the latest operational incident in Key Incidents", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Warehouse theft at depot in India",
+        occurredAt: "2026-07-12",
+        source: "Reuters",
+        sourceUrl: "https://example.com/1",
+      }),
+      inc({
+        id: 2,
+        title: "Cargo theft in transit on NH-44 in India",
+        occurredAt: "2026-08-11",
+        source: "Local",
+        sourceUrl: "https://example.com/2",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-12" });
+    expect(m.selected.some((r) => r.date.startsWith("2026-08-11"))).toBe(true);
+  });
+
+  it("rates arrest-only enforcement headlines as Low severity in the panel", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Police arrest cargo theft syndicate members in India",
+        occurredAt: "2026-08-05",
+        severity: "moderate",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.enforcement.total).toBe(1);
+    expect(m.enforcement.rows[0].severityKey).toBe("low");
+  });
+
+  it("separates India warehouse concern from Bangladesh transit concern in assessment", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Warehouse theft at depot in India",
+        occurredAt: "2026-07-20",
+        country: "India",
+      }),
+      inc({
+        id: 2,
+        title: "Warehouse theft at second depot in India",
+        occurredAt: "2026-07-21",
+        country: "India",
+      }),
+      inc({
+        id: 3,
+        title: "Truck hijacking and cargo theft in transit near Dhaka, Bangladesh",
+        occurredAt: "2026-07-22",
+        country: "Bangladesh",
+      }),
+      inc({
+        id: 4,
+        title: "Container theft in transit on Bangladesh highway",
+        occurredAt: "2026-07-23",
+        country: "Bangladesh",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.assessment.situation).toMatch(/India.*warehouse/i);
+    expect(m.assessment.situation).toMatch(/Bangladesh.*transit/i);
+    expect(m.assessment.polestarView).toMatch(/India.*warehouse/i);
+    expect(m.assessment.polestarView).toMatch(/Bangladesh.*transit/i);
+  });
 });

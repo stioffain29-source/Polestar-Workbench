@@ -188,7 +188,7 @@ export function buildCargoSecurityRead(windowIncidents: CargoNarrativeIncident[]
   ) {
     splitNote = ` That route-side lead differs from the overall-window lead (${overallTop}), because the Security Read counts only hijack, in-transit and related route-side records — not every cargo category.`;
   }
-  const watch = `Watch for clustering on specific corridors, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories remain useful early indicators when they appear, but timing relative to hub losses is not established in this report.`;
+  const watch = `Watch for clustering at named locations, repeat operator names in the same week and any escalation from pilferage to coordinated hijack. Insurance loss bulletins and transport-association advisories remain useful early indicators when they appear, but timing relative to hub losses is not established in this report.`;
   return `${intro} ${cp.line}${splitNote}\n\n${watch}`;
 }
 
@@ -581,7 +581,7 @@ function operationalReadFor(
   if (lead === "route") {
     if (/hijack/.test(primary)) {
       core =
-        "Truck and convoy hijacking is the recurring method; corridor selection, escort cover on high-value loads and driver vetting are the first controls.";
+        "Truck and convoy hijacking is the recurring method; in-transit custody and load verification are the first controls to test.";
     } else if (/container/.test(primary)) {
       core =
         "Container theft in transit leads the route-side picture; seal integrity and matched origin-to-destination handover checks are the priority.";
@@ -590,7 +590,7 @@ function operationalReadFor(
         "Route-side pilferage is the dominant loss; tighten in-transit seals, stop-point discipline and load-count reconciliation.";
     } else {
       core =
-        "Road-movement losses dominate; harden corridor selection and driver vetting on contracted hauliers before the next high-value move.";
+        "Road-movement losses dominate; review route selection and handover custody on contracted hauliers before the next high-value move.";
     }
   } else if (lead === "hub") {
     if (/warehouse/.test(primary)) {
@@ -652,15 +652,15 @@ function buildRegionalRead(rows: CargoCountryRow[]): string {
   }
   if (hubNames.length > 0 && routeNames.length > 0) {
     parts.push(
-      `For clients the practical split is simple: ${joinCountryNames(hubNames)} need hub-control scrutiny on access, seals and vendor vetting, while ${joinCountryNames(routeNames)} need route security and driver and vendor control.`,
+      `For clients the practical split is simple: ${joinCountryNames(hubNames)} need hub-control scrutiny on access, seals and handover integrity, while ${joinCountryNames(routeNames)} need in-transit custody and route-side monitoring.`,
     );
   } else if (hubNames.length > 0) {
     parts.push(
-      `For clients the focus is hub control across ${joinCountryNames(hubNames)} — depot access, seal integrity and vendor vetting.`,
+      `For clients the focus is hub control across ${joinCountryNames(hubNames)} — depot access, seal integrity and after-hours staffing.`,
     );
   } else if (routeNames.length > 0) {
     parts.push(
-      `For clients the focus is route security across ${joinCountryNames(routeNames)} — corridor selection, escorts on high-value loads and driver vetting.`,
+      `For clients the focus is in-transit custody across ${joinCountryNames(routeNames)} — load verification, handover checks and repeat-route monitoring.`,
     );
   }
   return parts.join(" ");

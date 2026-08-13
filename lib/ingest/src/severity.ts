@@ -789,6 +789,20 @@ export function classifySeverity(
   // attempted / recovered stays low.
   if (topic === "cargo_watch") {
     if (/\b(pilferage|petty|attempted|foiled|recovered|minor)\b/i.test(hay)) return "low";
+    // Arrest / seizure / recovery headlines report a law-enforcement RESPONSE to
+    // a prior crime, not a fresh operational loss. Rate Low unless violence,
+    // fatalities or a stated loss figure appears in the same record.
+    if (
+      /\b(arrest\w*|apprehend\w*|detain\w*|seiz\w*|confiscat\w*|recover\w*|busted|dismantl\w*)\b/i.test(
+        hay,
+      ) &&
+      !/\b(killed|fatal|dead|murder\w*|hostage|shoot\w*|gunman|gunmen|injured|wounded)\b/i.test(
+        hay,
+      ) &&
+      !/\b(US\$|USD\s*\$?|\$)\s?[\d]/.test(hay)
+    ) {
+      return "low";
+    }
     if (/\b(theft|stolen|stole|robbery|robbed|burglary|burgl|heist|loot|cargo crime)\b/i.test(hay)) {
       return "moderate";
     }

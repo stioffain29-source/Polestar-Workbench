@@ -799,6 +799,9 @@ export default function CargoReportPreview({
         {execText.trim() && (
           <Section hidden={!show("executive-summary")} title="Executive Summary">
             <Paragraphs text={execText} />
+            {model.highSeverityNote.trim() ? (
+              <p className="mt-3 text-sm text-muted-foreground">{model.highSeverityNote}</p>
+            ) : null}
           </Section>
         )}
 
@@ -838,7 +841,11 @@ export default function CargoReportPreview({
             answers a different analytical question (spec pt6). */}
         {model.totalUnique > 0 && (
           <div className="mb-8" style={{ breakInside: "avoid" }}>
-            <CargoSupplyChainExposure stages={model.stages} total={model.totalUnique} />
+            <CargoSupplyChainExposure
+              stages={model.stages}
+              total={model.totalUnique}
+              stageCategoryNote={model.stageCategoryNote}
+            />
           </div>
         )}
 

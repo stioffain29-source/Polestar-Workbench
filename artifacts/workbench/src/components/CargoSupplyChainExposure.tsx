@@ -18,6 +18,8 @@ import { GraphicFrame, ShareBar, SevChip } from "./CargoGraphicPrimitives";
 export interface CargoSupplyChainExposureProps {
   stages: CargoStageSummary[];
   total: number;
+  /** Explains why stage totals differ from pattern-category totals. */
+  stageCategoryNote?: string;
 }
 
 const UNATTRIBUTED_TITLE = "Stage Not Determined";
@@ -26,6 +28,7 @@ const NO_INCIDENTS = "No incidents identified this period.";
 export default function CargoSupplyChainExposure({
   stages,
   total,
+  stageCategoryNote,
 }: CargoSupplyChainExposureProps) {
   // The "unattributed" bucket is not a physical movement position, so it is
   // lifted out of the numbered flow into its own box below.
@@ -46,7 +49,11 @@ export default function CargoSupplyChainExposure({
     <GraphicFrame
       title="Supply-Chain Exposure"
       subtitle="Where this period's cargo incidents fall across the movement chain."
-      footnote="Share is each stage's percentage of the period's unique incidents."
+      footnote={
+        stageCategoryNote?.trim()
+          ? `${stageCategoryNote.trim()} Share is each stage's percentage of the period's unique incidents.`
+          : "Share is each stage's percentage of the period's unique incidents."
+      }
     >
       <div>
         {physical.map((s, i) => {

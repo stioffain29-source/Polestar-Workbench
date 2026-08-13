@@ -70,14 +70,14 @@ export const STAGE_META: Record<CargoStageKey, CargoStageMeta> = {
   },
   inland_transport: {
     label: "Inland transport",
-    primaryConcern: "Route security and driver integrity",
+    primaryConcern: "Route security and in-transit cargo custody",
     controlAffected: [
       "Route planning",
-      "Driver vetting",
       "In-transit tracking",
-      "Escort protocols",
+      "Load custody",
+      "Handover checks",
     ],
-    watchNext: "Repeat hits on the same corridor, operator or load type.",
+    watchNext: "Repeat hits on the same route, operator or load type.",
   },
   inland_waterway: {
     label: "Inland waterway",
@@ -146,7 +146,7 @@ export const OPERATIONAL_RELEVANCE_BY_STAGE: Record<CargoStageKey, string> = {
   warehouse_depot:
     "Highlights static-site exposure at storage and distribution facilities, where access control and after-hours security carry the load.",
   inland_transport:
-    "Points to exposure during road movement on predictable corridors, where route planning and in-transit tracking are the main defences.",
+    "Points to exposure during road movement, where route planning and in-transit custody are the main defences.",
   inland_waterway:
     "Points to exposure during river and barge movement, where on-water escort and jetty access control are the main defences.",
   staging_yard:

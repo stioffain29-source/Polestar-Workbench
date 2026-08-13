@@ -1008,6 +1008,9 @@ export async function exportTopicReportPdf(
   if (show("executive-summary") && execText.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, execText);
+    if (isCargo && cargoModel?.highSeverityNote.trim()) {
+      renderProse(ctx, cargoModel.highSeverityNote);
+    }
   }
 
   const rawWindow = filterIncidentsToWindow(
@@ -1305,6 +1308,7 @@ export async function exportTopicReportPdf(
           createElement(CargoSupplyChainExposure, {
             stages: cargoModel.stages,
             total: cargoModel.totalUnique,
+            stageCategoryNote: cargoModel.stageCategoryNote,
           }),
         );
 

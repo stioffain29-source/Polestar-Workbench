@@ -95,7 +95,8 @@ export default function CargoPatternDashboard({
               {p.operationalConcern}
             </div>
 
-            {p.controlAffected.length > 0 ? (
+            {p.controlAffected.length > 0 &&
+            p.controlAffected.some((c) => c !== "In-transit custody") ? (
               <div style={{ marginTop: 8 }}>
                 {p.controlAffected.map((c) => (
                   <TagChip key={c}>{c}</TagChip>

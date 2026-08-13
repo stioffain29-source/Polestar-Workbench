@@ -259,6 +259,22 @@ const NOISE_VEHICLE_TARGET_RE =
   /\b(steals?|stole|stolen|theft of|made off with|drives? off (?:with|in)|speeds? away (?:in|with))\b[^.]{0,25}\b(six[- ]wheel|ten[- ]wheel|truck|lorry|pickup|pick[- ]up|van|car|vehicle|motorcycle|motorbike|scooter|tuk[- ]tuk)\b/i;
 const NOISE_RESIDENTIAL_PARCEL_RE =
   /\b(dormitory|dorm|boarding house|residential|apartment|housing (?:complex|estate)|condo)\b[^.]{0,40}\b(parcel|parcels|package|packages)\b|\bposes? as (?:a )?resident\b/i;
+// Contracting / construction-firm robberies with no freight or shipment named
+// (e.g. Munshiganj contracting-firm hold-up) are ordinary property crime, not
+// cargo-security events.
+const NOISE_CONTRACTING_FIRM_RE =
+  /\b(contracting firm|construction firm|construction company|civil works (?:firm|company)|contractor(?:s)?(?:'s)? (?:office|premises|site))\b/i;
+// Retail grocery / provision stores and non-logistics grocery warehouses
+// (e.g. Ranchi grocery warehouse) are not freight logistics nodes.
+const NOISE_RETAIL_GROCERY_RE =
+  /\b(grocery (?:store|shop|outlet|warehouse)|supermarket|kirana|provision store|retail grocery|mom[- ]and[- ]pop store)\b/i;
+// Generic facility / plant burglary without a logistics or freight anchor is
+// property crime, not a warehouse-theft event (e.g. Mojokerto facility
+// burglary misread as in-transit cargo loss).
+const NOISE_GENERIC_FACILITY_RE =
+  /\b(facility|factory|plant|premises|office)\b/i;
+const LOGISTICS_FACILITY_ANCHOR_RE =
+  /\b(logistics|freight|distribution|bonded|container|cold[- ]chain|fulfilment|fulfillment|warehouse|godown|depot|consignment|shipment|cargo)\b/i;
 
 // True when a record is generic crime mislabelled cargo. Each class stands down
 // when explicit cargo / load context is present (the goods, not the conveyance
@@ -274,6 +290,18 @@ function isCargoNoise(text: string): boolean {
   if (NOISE_ARMS_DEALER_RE.test(text) && !hasLoad) return true;
   if (NOISE_VEHICLE_TARGET_RE.test(text) && !hasLoad && !hasTransitHijack(text)) return true;
   if (NOISE_RESIDENTIAL_PARCEL_RE.test(text) && !hasLoad) return true;
+  if (NOISE_CONTRACTING_FIRM_RE.test(text) && !hasLoad && !hasPortCargoSecurity(text))
+    return true;
+  if (NOISE_RETAIL_GROCERY_RE.test(text) && !LOGISTICS_FACILITY_ANCHOR_RE.test(text))
+    return true;
+  if (
+    NOISE_GENERIC_FACILITY_RE.test(text) &&
+    /\b(burglar\w*|broke into|broken into|break[- ]?in|raid\w*)\b/i.test(text) &&
+    !LOGISTICS_FACILITY_ANCHOR_RE.test(text) &&
+    !STRONG_CARGO_NOUN_RE.test(text)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -957,7 +985,7 @@ const CARGO_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
   // ---- Land-side ----
   { label: "Truck hijacking", pattern: /\bhijack\w*/i },
   { label: "Attack on cargo vehicle / convoy", pattern: /\b(convoy|cargo (?:truck|vehicle|lorry)|goods (?:truck|vehicle)|freight (?:truck|vehicle)|haulage)\b[^.]{0,30}\b(attack\w*|ambush\w*|fired on|shot at|torched|set (?:on )?fire)\b|\b(attack\w*|ambush\w*)\b[^.]{0,30}\b(convoy|cargo truck|goods truck|freight truck)\b/i },
-  { label: "Warehouse theft", pattern: /\b(warehouse|godown|storage facility)\b[^.]{0,40}\b(theft|burglar\w*|robber|robbed|robbery|raid\w*|stolen|stole|loot\w*|broke into|broken into)\b|\b(theft|stolen|stole|raid\w*|burglar\w*|loot\w*)\b[^.]{0,40}\b(warehouse|godown)\b/i },
+  { label: "Warehouse theft", pattern: /\b(warehouse|godown|storage facility|logistics facility|freight facility|distribution facility|bonded warehouse|cold storage facility)\b[^.]{0,40}\b(theft|burglar\w*|robber|robbed|robbery|raid\w*|stolen|stole|loot\w*|broke into|broken into)\b|\b(theft|stolen|stole|raid\w*|burglar\w*|loot\w*)\b[^.]{0,40}\b(warehouse|godown|logistics facility|freight facility|distribution facility)\b|\b(burglar\w*|broke into|broken into|break[- ]?in)\b[^.]{0,30}\b(warehouse|godown|logistics facility|freight facility|distribution facility|bonded warehouse)\b/i },
   { label: "Depot / yard theft", pattern: /\b(depot|distribution cent(?:re|er)|inland container depot|icd|container yard|freight yard|goods yard)\b[^.]{0,40}\b(theft|stolen|stole|robber|robbed|robbery|raid\w*|loot\w*|broke into|broken into|pilfer\w*)\b/i },
   { label: "Container theft (inland)", pattern: /\bcontainer\b[^.]{0,30}\b(theft|stolen|stole|loot\w*|broke into|broken into)\b|\b(theft|stolen|stole)\b[^.]{0,30}\bcontainer\b/i },
   { label: "Pilferage / seal tampering", pattern: /\bpilfer\w*|\bseal[- ]?tamper\w*|\btamper\w*[^.]{0,20}\bseal\b/i },
@@ -965,6 +993,7 @@ const CARGO_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
   { label: "Cargo diversion / misrouting", pattern: /\b(diverted|diversion|misrout\w*|rerout\w*|redirect\w*)\b[^.]{0,30}\b(cargo|consignment|shipment|container|load|goods|freight)\b|\b(cargo|consignment|shipment|load)\b[^.]{0,20}\b(diverted|misrout\w*)\b/i },
   { label: "Insider / driver collusion theft", pattern: /\b(insider|inside job|driver|employee|staff|warehouse worker)\b[^.]{0,30}\b(collusion|colluded|complicit|aided|involved|stole|theft|connivance|conspir\w*)\b/i },
   { label: "Cargo documentation fraud", pattern: /\b(documentation fraud|forged (?:documents?|bill of lading|waybill|invoice)|fake (?:documents?|bill of lading|waybill|invoice)|false (?:declaration|manifest)|bill of lading fraud)\b/i },
+  { label: "Highway / road cargo robbery", pattern: /\b(highway|motorway|expressway|NH[- ]?\d+|SH[- ]?\d+|arterial|truck route|road corridor)\b[^.]{0,40}\b(robber|robbed|robbery|theft|stolen|stole|hijack\w*|ambush\w*)\b/i },
   { label: "Cargo theft in transit", pattern: /\b(robbery|robbed|loot\w*|burglar\w*|raid\w*|stolen|stole|theft|hijack\w*)\b/i },
 ];
 
@@ -975,6 +1004,13 @@ const CARGO_CATEGORY_RULES: Array<{ label: string; pattern: RegExp }> = [
 // and to the "Not relevant" sentinel only when there is no cargo signal at all.
 export function classifyCargoCategory(i: CargoIncidentLike): string {
   const text = `${i.title} ${i.summary ?? ""}`;
+  if (
+    NOISE_GENERIC_FACILITY_RE.test(text) &&
+    !LOGISTICS_FACILITY_ANCHOR_RE.test(text) &&
+    /\b(burglar\w*|broke into|broken into|break[- ]?in)\b/i.test(text)
+  ) {
+    return CARGO_NOT_RELEVANT;
+  }
   for (const r of CARGO_CATEGORY_RULES) {
     if (r.pattern.test(text)) return r.label;
   }

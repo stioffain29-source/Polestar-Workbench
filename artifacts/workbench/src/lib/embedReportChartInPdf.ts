@@ -244,7 +244,7 @@ export async function embedChartMarkupInPdf(
     // centred. Sized to each element's measured box, so preview==PDF holds.
     rasteriseChipsToCanvas(host);
     const canvas = await html2canvas(host, {
-      scale: 2,
+      scale: 1.5,
       backgroundColor: "#ffffff",
       logging: false,
       width: widthPt,
@@ -297,8 +297,8 @@ export async function embedChartMarkupInPdf(
     // Centre horizontally when the image was scaled narrower than the column.
     const drawX = ctx.MX + (widthPt - imgW) / 2;
     ctx.pdf.addImage(
-      canvas.toDataURL("image/png"),
-      "PNG",
+      canvas.toDataURL("image/jpeg", 0.82),
+      "JPEG",
       drawX,
       ctx.y,
       imgW,
