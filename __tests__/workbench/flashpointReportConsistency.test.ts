@@ -321,6 +321,20 @@ describe("flashpoint report consistency", () => {
     expect(ds.unrestRows.some((r) => /166kg of meth/i.test(r.title))).toBe(false);
   });
 
+  test("auto What Matters names operational incidents not regional spread boilerplate", () => {
+    const rows = [
+      inc({ title: "Goods transporters' strike disrupts supply across Pakistan", country: "Pakistan", severity: "low" }),
+      inc({ title: "Indian police fire tear gas, use batons to disperse youth protesters in Jharkhand", country: "India", severity: "high", location: "Jharkhand" }),
+      inc({ title: "Hyundai Motor Union Launches Four-Day Partial Strike Over Wage Deadlock in South Korea", country: "South Korea", severity: "low" }),
+      inc({ title: "Three dead, 23 injured, in Sri Lanka prison riots as overcrowding strains jails", country: "Sri Lanka", severity: "high" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.autoWhatMatters).toMatch(/Pakistan/);
+    expect(ds.autoWhatMatters).not.toMatch(/spread across South Asia, East Asia/);
+    expect(ds.autoPolestarView).toMatch(/Risk level: Moderate\./);
+    expect(ds.autoPolestarView).not.toMatch(/Polestar's view: this was an active week and the risk level is High/i);
+  });
+
   test("cleanDisplayTitle strips chained outlet mastheads", () => {
     expect(
       cleanDisplayTitle(

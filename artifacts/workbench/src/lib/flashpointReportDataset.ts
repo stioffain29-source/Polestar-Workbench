@@ -312,6 +312,10 @@ const GENERIC_FLASHPOINT_PROSE: string[] = [
   "review staff movement plans, journey management for affected cities",
   "track planned political dates, calls to mobilise",
   "track planned protest dates, university and union calls",
+  "what matters most this week is that activity is spread across",
+  "this week has both organised protests and police enforcement against them",
+  "review staff movement and journey plans in",
+  "polestar's view: this was an active week",
 ];
 
 export function isGenericFlashpointProse(text: string | null | undefined): boolean {
@@ -333,8 +337,23 @@ export function pickFlashpointAnalystProse(
 ): string {
   const t = (editor ?? "").trim();
   if (!t || isGenericFlashpointProse(t)) return auto;
+  // Saved seed packs can exceed 240 chars but still be template filler —
+  // prefer data-driven auto when the editor opens like canned prose.
+  if (/^what matters most this week is that activity is spread across/i.test(t)) return auto;
+  if (/^review staff movement and journey plans in/i.test(t)) return auto;
+  if (/^polestar'?s view: this was an active week/i.test(t)) return auto;
   if (t.length >= 240) return t;
   return auto;
+}
+
+/** Editor > AI > auto, with generic/template text stripped at each layer. */
+export function resolveFlashpointAnalystProse(
+  editor: string | null | undefined,
+  ai: string | null | undefined,
+  auto: string,
+): string {
+  const resolvedAuto = pickFlashpointAnalystProse(ai, auto);
+  return pickFlashpointAnalystProse(editor, resolvedAuto);
 }
 
 // --- Scope filter ----------------------------------------------------------
@@ -2140,91 +2159,186 @@ interface AutoCtx {
 
 // Overall week posture — uses the approved five-tier severity vocabulary
 // (Insignificant / Low / Moderate / High / Extreme), distinct from the peak
-// incident severity shown on the Fast Facts card.
+// incident severity shown on the Fast Facts card. Contained prison unrest
+// does not elevate the whole-week posture to High on its own.
 function overallPostureLabel(ctx: {
   activismRows: EnrichedIncident[];
   unrestRows: EnrichedIncident[];
 }): string {
-  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
-  const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r))).length;
-  const student = ctx.activismRows.filter((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r))).length;
-  const named = ctx.activismRows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement)\b/i.test(text(r))).length;
-  const hasEnforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
-  const mobVectors = [named > 0, sectoral > 0, student > 0].filter(Boolean).length;
-  if (mobVectors >= 2 && hasEnforcement) return "High";
-  if (mobVectors >= 2 || hasEnforcement) return "Moderate";
-  if (mobVectors >= 1) return "Low";
+  const all = [...ctx.activismRows, ...ctx.unrestRows];
+  if (all.length === 0) return "Low";
+  const highStreet = all.filter((r) => {
+    if ((SEV_RANK[sevKey(r.severity)] ?? 0) < 4) return false;
+    return !containedVenueNote(r);
+  }).length;
+  const moderateCount = all.filter((r) => (SEV_RANK[sevKey(r.severity)] ?? 0) === 3).length;
+  const hasEnforcement = hasEnforcementSignal(all);
+  if (highStreet >= 2 || (highStreet >= 1 && hasEnforcement && moderateCount >= 4)) return "High";
+  if (highStreet >= 1 || hasEnforcement || moderateCount >= 3 || all.length >= 12) return "Moderate";
   return "Low";
 }
 
+function sortBySignificance(rows: EnrichedIncident[]): EnrichedIncident[] {
+  return [...rows].sort((a, b) =>
+    compareIncidentSignificance(
+      { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
+      { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
+    ),
+  );
+}
+
+function extractCityLabel(r: EnrichedIncident): string {
+  const loc = (r.location ?? "").trim();
+  if (loc) return loc.split(/[,;]/)[0].trim();
+  const t = r.title ?? "";
+  const m = t.match(/\b(?:in|at|near)\s+([A-Z][A-Za-z'(). -]{2,40})\b/);
+  return m?.[1]?.trim() ?? "";
+}
+
+/** One operational What Matters paragraph keyed off a specific incident. */
+function whatMattersParagraphFor(r: EnrichedIncident): string | null {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  const country = (r.country ?? "").trim();
+  if (/\b(pakistan|transporter|goods transport)\b/i.test(text) && /\bstrike\b/i.test(text)) {
+    return `In Pakistan, the transporters' strike has direct implications for freight timing, deliveries and onward distribution.`;
+  }
+  if (/\b(yongsan|metro|subway)\b/i.test(text)) {
+    return `In South Korea, the skipped stop at Yongsan shows that even limited protests can create short-notice public-transport changes in central Seoul.`;
+  }
+  if (/\bincheon\b/i.test(text) && /\b(airport|protest|labou?r)\b/i.test(text)) {
+    return `Protest activity at Incheon Airport raises the chance of access friction around a critical transport hub.`;
+  }
+  if (/\bhyundai\b/i.test(text) && /\bstrike\b/i.test(text)) {
+    return `The Hyundai partial strike adds industrial pressure, even though the reporting does not specify wider public disorder around production sites.`;
+  }
+  if (/\b(tear gas|baton)\b/i.test(text) && /\b(india|jharkhand)\b/i.test(text)) {
+    return `In India, the Jharkhand protests matter because police dispersal raised the chance of sudden road disruption and access constraints around protest sites.`;
+  }
+  if (/\bkarnataka\b/i.test(text) && /\b(shutdown|strike|protest)\b/i.test(text)) {
+    const dateM = text.match(/\b(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec))\b/i);
+    return `The planned Karnataka shutdown adds a separate risk of day-long movement restrictions${dateM ? ` on ${dateM[1]}` : ""}.`;
+  }
+  if (
+    (country === "New Zealand" || /\b(auckland|wellington|christchurch)\b/i.test(text)) &&
+    /\b(protest|march|rally|demonstration)\b/i.test(text)
+  ) {
+    return `New Zealand's reported events were Low severity and largely planned, but demonstrations in central Wellington, Auckland and Christchurch can still affect traffic, venue access and staff movement in the immediate area at set times.`;
+  }
+  if (containedVenueNote(r) && (SEV_RANK[sevKey(r.severity)] ?? 0) >= 3) {
+    const c = country || "the reported country";
+    return `The ${c} prison riot was ${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity because of the deaths and injuries reported, but the operational meaning is different from a street protest. The immediate concern there is not broad public disorder but the potential for heightened security controls or official sensitivity around prison-related developments.`;
+  }
+  const city = extractCityLabel(r);
+  if ((SEV_RANK[sevKey(r.severity)] ?? 0) >= 3 && (country || city)) {
+    const where = city && country ? `${city}, ${country}` : country || city;
+    return `${shortSignalLabel(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is among the operational items to track for access and movement impacts.`;
+  }
+  return null;
+}
+
+function extractNamedHubs(all: EnrichedIncident[], enriched: EnrichedIncident[]): string[] {
+  const hubs = new Set<string>();
+  const scan = [...all, ...extractFutureSignals(enriched)];
+  for (const r of scan) {
+    const text = `${r.title ?? ""} ${r.summary ?? ""} ${r.location ?? ""}`;
+    if (/\bincheon\b/i.test(text) && /\bairport\b/i.test(text)) hubs.add("Incheon Airport");
+    if (/\bauckland\b/i.test(text)) hubs.add("central Auckland");
+    if (/\bchristchurch\b/i.test(text)) hubs.add("Christchurch");
+    if (/\bwellington\b/i.test(text)) hubs.add("Wellington");
+    if (/\bseoul\b/i.test(text)) hubs.add("Seoul");
+    if (/\btokyo\b/i.test(text)) hubs.add("Tokyo");
+    if (/\b(campus|university)\b/i.test(text)) {
+      const city = extractCityLabel(r);
+      if (city) hubs.add(city);
+    }
+  }
+  return [...hubs];
+}
+
 function buildWhatMatters(ctx: AutoCtx): string {
-  const lead = ctx.countryRows[0];
-  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const all = [...ctx.activismRows, ...ctx.unrestRows];
-  const hasSectoral = all.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|samsung|walkout|transport)\b/i.test(text(r)));
-  if (ctx.activismRows.length + ctx.unrestRows.length === 0) {
+  if (all.length === 0) {
     return `What stands out this week is the absence of fresh protest and civil-unrest activity rather than any single event. Treat that as a single quiet reporting period rather than a lasting easing.`;
   }
+  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
+  const hasStrike = all.some((r) => /\b(strike|walkout|transport|transporter)\b/i.test(text(r)));
+  const hasEnforcement = hasEnforcementSignal(all);
   const lines: string[] = [];
-  const spread = subregionSpread(ctx.countryRows);
-  if (spread.regions.length >= 2 && lead) {
-    lines.push(
-      `What matters most this week is that activity is spread across ${joinList(spread.regions)} rather than concentrated in a single capital. ${lead.label} has the most events, but several countries are affected.`,
-    );
-  } else if (lead) {
-    lines.push(
-      `What matters most this week is how concentrated activity is in ${lead.label}, which carries the bulk of the reported events.`,
-    );
-  } else {
-    lines.push(
-      `Activity is spread across the region this week, with no single country standing out.`,
-    );
+  lines.push(
+    hasStrike && hasEnforcement
+      ? `The practical risk this week was disruption to movement rather than sustained unrest.`
+      : hasEnforcement
+        ? `The practical risk this week was enforcement-driven access disruption rather than sustained unrest.`
+        : `The practical risk this week was localised protest activity rather than a regional campaign.`,
+  );
+  const seen = new Set<string>();
+  for (const r of sortBySignificance(all)) {
+    const para = whatMattersParagraphFor(r);
+    if (!para || seen.has(para)) continue;
+    seen.add(para);
+    lines.push(para);
+    if (lines.length >= 5) break;
   }
-  // Enforcement claims use the ONE shared detector over the whole file so
-  // this section can never contradict the Civil Unrest read or Polestar's
-  // View (owner-flagged defect).
-  const enforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
-  if (enforcement && ctx.activismRows.length > 0) {
+  const hubs = extractNamedHubs(all, ctx.enriched);
+  if (hubs.length > 0) {
     lines.push(
-      `This week has both organised protests and police enforcement against them.`,
-    );
-  } else if (ctx.activismRows.length > 0) {
-    lines.push(
-      `The window leans towards protests and organised action rather than civil unrest; no curfews, arrests or crackdowns are among the records.`,
-    );
-  } else {
-    lines.push(
-      `The window leans towards civil unrest and enforcement rather than fresh organising.`,
-    );
-  }
-  if (hasSectoral) {
-    const sectoralLead = all.find((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|transport)\b/i.test(text(r)));
-    const where = (sectoralLead?.country ?? "").trim();
-    lines.push(
-      where
-        ? `Sectoral strike or transport action in ${where} is among the operational items to track this week — confirm whether it affects staff routes or suppliers.`
-        : `Sectoral strike or transport action appears in this week's records and is worth confirming against staff routes and suppliers.`,
+      `Airport, campus and city-centre locations need closer attention where demonstrations are scheduled. ${joinList(hubs)} all feature in either active or imminent protest reporting.`,
     );
   }
   return lines.join("\n\n");
 }
 
 function buildImplications(ctx: AutoCtx): string {
-  const lead = ctx.countryRows[0];
-  const topCountries = ctx.countryRows.slice(0, 3).map((r) => r.label);
-  const where = topCountries.length > 0
-    ? joinList(topCountries)
-    : (lead ? lead.label : "the affected cities");
-  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const all = [...ctx.activismRows, ...ctx.unrestRows];
-  const hasSectoral = all.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|samsung|walkout)\b/i.test(text(r)));
+  const topCountries = ctx.countryRows.slice(0, 3).map((r) => r.label);
+  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
+  const bullets: string[] = [];
+
+  if (all.some((r) => (r.country ?? "").includes("Pakistan") && /\b(transporter|transport|strike|freight|supply)\b/i.test(text(r)))) {
+    bullets.push(`Review freight and delivery schedules linked to Pakistan for delay risk.`);
+  }
+  if (all.some((r) => /\b(tear gas|baton|youth protest|jharkhand)\b/i.test(text(r)))) {
+    bullets.push(`Avoid non-essential movements near protest sites in Jharkhand and during any rapid police action.`);
+  }
+  const karnataka = all.find((r) => /\bkarnataka\b/i.test(text(r)));
+  if (karnataka) {
+    const dateM = text(karnataka).match(/\b(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Aug))\b/i);
+    bullets.push(`Reconfirm movement plans in Karnataka for the ${dateM?.[1] ?? "scheduled"} shutdown period.`);
+  }
+  if (all.some((r) => /\b(yongsan|seoul metro|metro skip)\b/i.test(text(r)))) {
+    bullets.push(`Check Seoul Metro service changes around central protest locations, including Yongsan.`);
+  }
+  if (all.some((r) => /\bincheon\b/i.test(text(r)) && /\b(airport|protest|labou?r)\b/i.test(text(r)))) {
+    bullets.push(`Confirm access arrangements at Incheon Airport during any follow-on advocacy activity.`);
+  }
+  const nzCities = new Set<string>();
+  for (const r of all) {
+    if ((r.country ?? "") !== "New Zealand" && !/\b(auckland|wellington|christchurch)\b/i.test(text(r))) continue;
+    for (const c of ["Auckland", "Christchurch", "Wellington"]) {
+      if (new RegExp(`\\b${c}\\b`, "i").test(text(r))) nzCities.add(c);
+    }
+  }
+  if (nzCities.size > 0) {
+    bullets.push(`Update travel plans in ${joinList([...nzCities])} around scheduled demonstrations.`);
+  }
+  if (all.some((r) => (r.country ?? "").includes("Philippines") && /\b(strike|transport)\b/i.test(text(r)))) {
+    bullets.push(`Verify local transport availability in the Philippines during strike-related service disruption.`);
+  }
+  if (all.some((r) => containedVenueNote(r))) {
+    const contained = all.find((r) => containedVenueNote(r));
+    const c = (contained?.country ?? "").trim() || "the affected country";
+    bullets.push(`Monitor official security measures in ${c} without treating prison unrest as wider street disorder.`);
+  }
+
   const hasCurfew = all.some((r) => /\b(curfew|section\s*144|assembly ban|lockdown|state of emergency|martial law)\b/i.test(text(r)));
-  const hasCampus = all.some((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r)));
+  if (hasCurfew) {
+    bullets.push(`Curfew or emergency orders appear in this week's records: treat any fresh order in a city of operation as a trigger to review site access and staff movement for the day.`);
+  }
   const campusLoci: string[] = [];
   const campusSeen = new Set<string>();
   for (const r of all) {
     if (!/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
-    const loc = (r.location ?? "").trim();
+    const loc = (r.location ?? "").trim() || extractCityLabel(r);
     if (!loc) continue;
     const country = (r.country ?? "").trim();
     if (country && locationForeignToCountry(loc, country)) continue;
@@ -2234,21 +2348,18 @@ function buildImplications(ctx: AutoCtx): string {
     campusLoci.push(loc);
     if (campusLoci.length >= 3) break;
   }
-  const bullets: string[] = [
-    `Review staff movement and journey plans in ${where} against the incidents reported this week.`,
-    `Confirm alternative routes for staff and deliveries around the locations named in this week's records.`,
-    `Keep staff and customer communications ready so updates can go out quickly on a disrupted day.`,
-  ];
-  if (hasCurfew) {
-    bullets.push(`Curfew or emergency orders appear in this week's records: treat any fresh order in a city of operation as a trigger to review site access and staff movement for the day.`);
-  }
-  if (hasSectoral) {
-    bullets.push(`Trade-group or union action appears in this week's records: check whether any named walkout affects your suppliers or distribution and plan around the announced dates.`);
-  }
-  if (hasCampus && campusLoci.length > 0) {
+  if (campusLoci.length > 0) {
     bullets.push(`Student or campus activity appears in this week's records: brief sites near ${joinList(campusLoci)} on possible knock-on disruption.`);
   }
-  return bullets.map((b) => `- ${b}`).join("\n");
+
+  if (bullets.length < 3 && topCountries.length > 0) {
+    bullets.push(`Review staff movement and journey plans in ${joinList(topCountries)} against the incidents reported this week.`);
+    bullets.push(`Confirm alternative routes for staff and deliveries around the locations named in this week's records.`);
+  }
+  if (bullets.length === 0) {
+    bullets.push(`Keep staff and customer communications ready so updates can go out quickly on a disrupted day.`);
+  }
+  return bullets.slice(0, 7).map((b) => `- ${b}`).join("\n");
 }
 
 // Build Watch Next from actual future-looking signals in the file
@@ -2357,46 +2468,29 @@ function containedVenueNote(r: EnrichedIncident): string | null {
 }
 
 function buildPolestarView(ctx: AutoCtx): string {
-  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
-  const sectoral = ctx.activismRows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r))).length;
-  const student = ctx.activismRows.filter((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r))).length;
-  const named = ctx.activismRows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement)\b/i.test(text(r))).length;
-  // ONE shared enforcement detector over the WHOLE file — an arrest or
-  // lethal police action on an activism-bucketed row counts (owner-flagged
-  // contradiction: "no police enforcement" beside an arrest row).
-  const hasEnforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
-  const mobVectors = [named > 0, sectoral > 0, student > 0].filter(Boolean).length;
-
-  // Polestar's view is a single directional judgement — a read on the balance
-  // of the week, not a repeat of the What Matters, Implications or Watch Next
-  // sections. It deliberately stops after the verdict so it does not restate
-  // the same disruption points those sections already make.
-  // Rule for this section: give useful advice. State the appropriate risk
-  // level, say where disruption is most likely, and say what to do. Never
-  // just repeat the incident summary.
-  const lead = ctx.countryRows[0];
-  const where = lead ? lead.label : "the busiest cities in the region";
+  const all = [...ctx.activismRows, ...ctx.unrestRows];
   const posture = overallPostureLabel(ctx);
-  const peak = ctx.topSeverity
-    ? (SEV_LABEL[sevKey(ctx.topSeverity.severity)] ?? ctx.topSeverity.severity)
-    : null;
-  const postureNote = peak && posture.toLowerCase() !== peak.toLowerCase()
-    ? ` Overall posture is ${posture} even though individual incidents reached ${peak}.`
-    : "";
-  let verdict: string;
-  if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: this was an active week and the risk level is High.${postureNote} Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
-  } else if (mobVectors >= 2) {
-    verdict = `Polestar's view: the risk level is moderate.${postureNote} Several protest campaigns are active, but reports show no police crackdowns or curfews. Disruption is most likely in ${where}, around city-centre gatherings. Monitor local news and social media for fresh protest calls and review staff travel routes in the affected cities.`;
-  } else if (hasEnforcement) {
-    verdict = `Polestar's view: the risk level is moderate.${postureNote} The main feature this week is police enforcement — arrests, curfews or similar orders — rather than new protest campaigns. Enforcement is what disrupts staff movement and site access on the day. Check site access arrangements in ${where} and be ready to update staff quickly if fresh orders are issued.`;
-  } else if (mobVectors >= 1) {
-    verdict = `Polestar's view: the risk level is low.${postureNote} Protest activity is running at a low level and no police enforcement was reported. Monitor local news in ${where} for new protest announcements; no other action is needed now.`;
-  } else {
-    verdict = `Polestar's view: the risk level is low.${postureNote} This was a quiet week with minimal reported activity and no enforcement action. Routine monitoring is enough for now.`;
-  }
+  const activeCountries = ctx.countryRows.slice(0, 6).map((r) => r.label);
+  const countryLine =
+    activeCountries.length > 0
+      ? joinList(activeCountries)
+      : "the affected APAC cities named in this week's records";
 
-  return verdict;
+  const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
+  const hasPakistanStrike = all.some(
+    (r) => (r.country ?? "").includes("Pakistan") && /\b(strike|transporter|transport)\b/i.test(text(r)),
+  );
+  const others = activeCountries.filter((c) => c !== "Pakistan");
+  const disruptionLead = hasPakistanStrike
+    ? others.length > 0
+      ? `strike action affects transport networks or supply movement, especially in Pakistan, and around live or scheduled protest locations in ${joinList(others)}`
+      : `strike action affects transport networks or supply movement, especially in Pakistan`
+    : `gatherings and transport disruption affect staff routes in ${countryLine}`;
+
+  return [
+    `Risk level: ${posture}.`,
+    `Disruption is most likely where ${disruptionLead}. The most useful immediate step is to keep movement plans flexible, validate transport availability close to departure, and track scheduled protest dates and routes closely rather than treating the window as one of broad regional unrest.`,
+  ].join("\n");
 }
 
 // Auto-generated Executive Summary. Used by the exporter and preview

@@ -11,7 +11,7 @@ import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
-  pickFlashpointAnalystProse,
+  resolveFlashpointAnalystProse,
   type FlashpointReportIncident,
   type KpiCard,
   type BarRow,
@@ -61,8 +61,12 @@ function sevKey(s: string | null | undefined): string {
 // Match exportFlashpointReportPdf: editor text replaces auto ONLY when it is
 // a substantive custom write (>= 240 chars). Thin stubs use auto alone so
 // What Matters never stacks two near-duplicate blocks.
-function pickProse(editor: string | null | undefined, auto: string): string {
-  return pickFlashpointAnalystProse(editor, auto);
+function pickProse(
+  editor: string | null | undefined,
+  ai: string | null | undefined,
+  auto: string,
+): string {
+  return resolveFlashpointAnalystProse(editor, ai, auto);
 }
 
 // Data-driven "reads" (Activism, Civil Unrest, Forecast, Regional) are full
@@ -521,16 +525,16 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">
-          <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
+          <Paragraphs text={pickProse(report.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters)} />
         </Section>
         <Section hidden={!show("implications")} title="Implications for Business">
-          <Bullets text={pickProse(report.implications, aiOr(aiProse?.implications, ds.autoImplications))} />
+          <Bullets text={pickProse(report.implications, aiProse?.implications, ds.autoImplications)} />
         </Section>
         <Section hidden={!show("watch-next")} title="Watch Next">
-          <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
+          <Bullets text={pickProse(report.watchNext, aiProse?.watchNext, ds.autoWatchNext)} max={8} />
         </Section>
         <Section hidden={!show("polestar-view")} title="Polestar View">
-          <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
+          <Paragraphs text={pickProse(report.polestarView, aiProse?.polestarView, ds.autoPolestarView)} />
         </Section>
 
         <Section hidden={!show("related-incidents")} title="Related Incidents">

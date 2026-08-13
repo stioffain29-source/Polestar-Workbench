@@ -43,7 +43,7 @@ import {
 import { aiOr, type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
-  pickFlashpointAnalystProse,
+  resolveFlashpointAnalystProse,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
@@ -700,26 +700,26 @@ export async function exportFlashpointReportPdf(
   // Mirror FlashpointReportPreview.pickProse exactly: recognised generic
   // seed text is always replaced by the data-driven auto-prose so the PDF
   // can never show boilerplate the preview suppresses.
-  const pickProse = pickFlashpointAnalystProse;
+  const pickProse = resolveFlashpointAnalystProse;
   if (show("what-matters")) {
     drawSectionWithProse(
       ctx,
       "What Matters",
-      pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
+      pickProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
     );
   }
   if (show("implications")) {
     drawBulletSection(
       ctx,
       "Implications for Business",
-      pickProse(data.implications, aiOr(aiProse?.implications, ds.autoImplications)),
+      pickProse(data.implications, aiProse?.implications, ds.autoImplications),
     );
   }
   if (show("watch-next")) {
     drawBulletSection(
       ctx,
       "Watch Next",
-      pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
+      pickProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
       8,
     );
   }
@@ -727,7 +727,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Polestar View",
-      pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
+      pickProse(data.polestarView, aiProse?.polestarView, ds.autoPolestarView),
     );
   }
 
