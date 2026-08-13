@@ -61,8 +61,8 @@ import {
   foreignSyndicationDropIds,
   isPreparednessDrill,
 } from "@/lib/countryMatch";
-import CountryReportMap from "@/components/CountryReportMap";
-import JakartaCorridorMap from "@/components/JakartaCorridorMap";
+import IncidentMap from "@/components/IncidentMap";
+import { buildCountryIncidentMapPoints } from "@/lib/countryIncidentMapPoints";
 import CountryReportVisuals from "@/components/CountryReportVisuals";
 import type {
   CountryMapPlacement,
@@ -1430,37 +1430,18 @@ export default function CountryReport() {
     : [];
 
   // Analyst-placed incident map node, rendered at the chosen placement slot.
-  // Jakarta uses a corridor & access schematic (operating-exposure graphic)
-  // instead of the numbered incident-dot map; all other theatres are unchanged.
-  // City reports (Jakarta today; Manila/Bangkok planned) are framed as CITY, not
-  // COUNTRY, reports — driven by the shared reportKind registry.
+  // ALL theatres (Jakarta included) now use the spot-report incident map:
+  // the §23-gated window incidents plotted as severity-coloured dots on the
+  // spot-report basemap/theme (owner ruling: country maps just show the
+  // incidents — no zone/impact aggregation, no corridor schematic).
   const isCity = isCityReport(effective.name);
-  const jakartaMapCaption = pngEffectiveDataset?.jakartaTacticalBrief?.mapCaption ?? "";
-  const mapNode = isJakarta ? (
-    // Jakarta's corridor schematic and its one-line exposure caption stay as a
-    // keep-together block. The caption replaces the former seven-zone table.
+  const countryMapPoints = buildCountryIncidentMapPoints(
+    mapGatedIncidents as CountryFastFactsIncident[],
+  );
+  const mapNode = (
     <div data-pdf-keep="true">
-      <JakartaCorridorMap
-        incidents={windowIncidents as CountryFastFactsIncident[]}
-        issueDate={issueDate}
-        coverageUnconfirmed={coverage.state === "coverage-problem"}
-      />
-      {jakartaMapCaption
-        ? jakartaMapCaption.split(/\n+/).map((p, i) => (
-            <p
-              key={i}
-              style={{ fontFamily: ROBOTO, fontSize: 11, lineHeight: 1.45, color: DUSK, margin: "8px 0 0 0", fontStyle: "italic" }}
-            >
-              {p}
-            </p>
-          ))
-        : null}
+      <IncidentMap points={countryMapPoints} domId="country-report-map" height={360} />
     </div>
-  ) : (
-    <CountryReportMap
-      incidents={mapGatedIncidents as CountryFastFactsIncident[]}
-      countryName={effective.name}
-    />
   );
   // Analyst-attached photo block, rendered at the chosen placement slot.
   const photoBlock = reportPhotos.length > 0 ? <CountryReportPhotoBlock photos={reportPhotos} /> : null;
