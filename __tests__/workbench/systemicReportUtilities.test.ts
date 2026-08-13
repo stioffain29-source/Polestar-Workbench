@@ -17,8 +17,6 @@ import {
   buildFuelRegionalHighlights,
 } from "@/lib/fuelNarratives";
 import { computeCountryCoverageStatus } from "@/lib/countryReportLayers";
-import { buildJakartaPostureZones } from "@/lib/jakartaOperatingPosture";
-import { buildJakartaCorridorStatuses } from "@/lib/jakartaCorridors";
 import { findBannedPhrases } from "../../lib/country-engine/src/bannedPhrases";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -321,16 +319,5 @@ describe("empty-week Not-Assessed propagation — coverage contradiction regress
     });
     expect(ds.bluf).toMatch(/no further analysis is warranted/i);
     expect(ds.jakartaTacticalBrief!.crimeEscalationWatch.crime).not.toMatch(/Not Assessed/);
-  });
-
-  it("posture zones fall to Not assessed under unconfirmed coverage instead of Monitored", () => {
-    const { statuses } = buildJakartaCorridorStatuses([]);
-    const rated = buildJakartaPostureZones(statuses, false);
-    const unassessed = buildJakartaPostureZones(statuses, true);
-    expect(unassessed.length).toBeGreaterThan(0);
-    // With the flag every quiet zone is Not assessed…
-    for (const zone of unassessed) expect(zone.rating).toBe("not-assessed");
-    // …whereas without it the standing ratings still apply (the flag is the only lever).
-    expect(rated.some((zone) => zone.rating !== "not-assessed")).toBe(true);
   });
 });

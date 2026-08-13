@@ -89,6 +89,44 @@ export interface CountrySectionOverrides {
   /** Analyst-edited Recommended Actions bullets, keyed by action-group key;
    *  value is newline-separated bullet lines. Blank/absent = auto bullets. */
   actionGroups?: Record<string, string>;
+  /** Analyst-placed extra map markers (facility, route point, area of concern
+   *  …), rendered ALONGSIDE the §23-gated incident dots on the spot-style
+   *  report map. Same shape as the spot-report mapPoints: hand-typed
+   *  coordinates + label + optional severity tint. Display-only — never joins
+   *  any aggregate, watchlist or prose grounding. */
+  mapMarkers?: CountryMapMarker[];
+}
+
+/** One analyst-placed report-map marker. */
+export interface CountryMapMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  label?: string;
+  severity?: string;
+}
+
+/** Persisted mapMarkers can be malformed (hand-edited jsonb, older shapes) —
+ *  keep only rows with real finite coordinates. */
+export function sanitizeMapMarkers(raw: unknown): CountryMapMarker[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CountryMapMarker[] = [];
+  for (const m of raw) {
+    if (!m || typeof m !== "object") continue;
+    const r = m as Record<string, unknown>;
+    const lat = typeof r.lat === "number" ? r.lat : Number(r.lat);
+    const lng = typeof r.lng === "number" ? r.lng : Number(r.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+    out.push({
+      id: typeof r.id === "string" && r.id ? r.id : `${lat},${lng}`,
+      lat,
+      lng,
+      label: typeof r.label === "string" ? r.label : undefined,
+      severity: typeof r.severity === "string" ? r.severity : undefined,
+    });
+  }
+  return out;
 }
 
 /** One analyst-typed Top-3 development. `date` is ISO yyyy-mm-dd. */

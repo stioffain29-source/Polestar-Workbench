@@ -73,6 +73,8 @@ import {
   COUNTRY_SECTION_LABELS,
   applyIncidentCurations,
   normalizeHiddenSections,
+  sanitizeMapMarkers,
+  type CountryMapMarker,
   type CountrySectionKey,
   type CountrySectionOverrides,
 } from "../lib/countrySectionOverrides";
@@ -938,6 +940,18 @@ export default function CountryReport() {
     if (!editing && proseDraft) setProseDraft(null);
   }, [editing, proseResult, proseDraft]);
 
+  // Session-local VERBATIM text for every inline editor box, keyed by
+  // "<kind>:<field>". The persisted layers use "" / deleted-key as the
+  // "auto flows" sentinel, so a box driven only by them snaps back to the
+  // engine text the instant the analyst deletes everything — the reported
+  // "text I delete will not delete" glitch. While editing, the box always
+  // shows exactly what was last typed (including empty); the sentinel logic
+  // still decides what is SAVED (blank = auto). Cleared on exiting edit mode.
+  const [liveEditTexts, setLiveEditTexts] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!editing) setLiveEditTexts({});
+  }, [editing]);
+
   // PNG: overlay the AI narrative sections (Bottom Line Up Front, Executive
   // Summary, What Changed, Outlook, Polestar View) onto the deterministic dataset,
   // which still supplies every structured section (breakdown, watchlist, incident
@@ -955,7 +969,25 @@ export default function CountryReport() {
     // PNG / West Papua keep the overlay below, byte-identical to before. The
     // per-incident AI summaries are unaffected — they are derived separately and
     // still populate each card.
-    if (pngDataset.proseVariant === "operating-risk") return pngDataset;
+    // Explicit ANALYST edits (never AI text) DO overlay operating-risk briefs
+    // too — the owner asked for every narrative block to be editable. The AI
+    // overlay ban stands: proseResult.sections is never consulted here.
+    if (pngDataset.proseVariant === "operating-risk") {
+      const src = editing && proseDraft ? proseDraft : (proseResult?.edited ?? null);
+      if (!src) return pngDataset;
+      const prefer = (edit: string | undefined, engineDefault: string) => {
+        const t = (edit ?? "").trim();
+        return t ? t : engineDefault;
+      };
+      return {
+        ...pngDataset,
+        bluf: prefer(src.bluf, pngDataset.bluf),
+        executiveSummary: prefer(src.executiveSummary, pngDataset.executiveSummary),
+        whatChanged: prefer(src.whatChanged, pngDataset.whatChanged),
+        outlook: prefer(src.outlook, pngDataset.outlook),
+        polestarView: prefer(src.polestarView, pngDataset.polestarView),
+      };
+    }
     // Owner brief §36: the DEFAULT source of the analytical sections is now the
     // shared country-engine narrative built into pngDataset — the old free-form
     // AI generator is NO LONGER a silent fallback OR an automatic overlay. Only
@@ -1012,14 +1044,17 @@ export default function CountryReport() {
   // otherwise the engine default). Editing writes the draft; restoring the text
   // to the engine default stores "" so the auto narrative keeps flowing.
   const inlineProseEditor = (field: "bluf" | "executiveSummary" | "outlook" | "polestarView", engineDefault: string) => {
+    const liveKey = `prose:${field}`;
     const draftVal = ((proseDraft?.[field] as string | undefined) ?? "").trim();
-    const value = draftVal !== "" ? (proseDraft?.[field] as string) : engineDefault;
+    const value =
+      liveEditTexts[liveKey] ?? (draftVal !== "" ? (proseDraft?.[field] as string) : engineDefault);
     return (
       <textarea
         className="no-print"
         value={value}
         onChange={(e) => {
           const v = e.target.value;
+          setLiveEditTexts((t) => ({ ...t, [liveKey]: v }));
           setProseField(field, v.trim() === engineDefault.trim() ? "" : v);
         }}
         rows={Math.min(14, Math.max(3, value.split(/\n/).reduce((n, l) => n + Math.ceil(l.length / 90) || 1, 0) + 1))}
@@ -1435,12 +1470,134 @@ export default function CountryReport() {
   // spot-report basemap/theme (owner ruling: country maps just show the
   // incidents — no zone/impact aggregation, no corridor schematic).
   const isCity = isCityReport(effective.name);
-  const countryMapPoints = buildCountryIncidentMapPoints(
-    mapGatedIncidents as CountryFastFactsIncident[],
-  );
+  // Analyst-placed extra markers (facility / route point / area of concern)
+  // merged ALONGSIDE the incident dots. Display-only: they never join any
+  // aggregate, watchlist or prose grounding. Persisted in section_overrides.
+  const analystMarkers = sanitizeMapMarkers(sectionOverrides.mapMarkers);
+  // Incident dots stay unlabelled (dozens of location captions would clutter
+  // the map); ONLY the analyst-placed markers carry an on-map label, so
+  // showLabels is on and incident labels are stripped here.
+  const countryMapPoints = [
+    ...buildCountryIncidentMapPoints(mapGatedIncidents as CountryFastFactsIncident[]).map(
+      (p) => ({ ...p, label: null }),
+    ),
+    ...analystMarkers.map((m) => ({
+      lat: m.lat,
+      lng: m.lng,
+      severity: m.severity || null,
+      title: m.label ? `${m.label} (analyst-placed)` : "Analyst-placed marker",
+      label: m.label ?? null,
+    })),
+  ];
+  const setMapMarkers = (next: CountryMapMarker[]) =>
+    setSectionOverrides((ov) => ({ ...ov, mapMarkers: next }));
   const mapNode = (
     <div data-pdf-keep="true">
-      <IncidentMap points={countryMapPoints} domId="country-report-map" height={360} />
+      <IncidentMap points={countryMapPoints} domId="country-report-map" height={360} showLabels />
+      {editing && (
+        <div
+          className="no-print"
+          style={{
+            fontFamily: ROBOTO,
+            fontSize: 12,
+            color: DUSK,
+            border: `1px dashed ${POLAR}`,
+            padding: "8px 10px",
+            margin: "6px 0 0 0",
+          }}
+        >
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: 6 }}>
+            Analyst map markers
+          </div>
+          {analystMarkers.length === 0 && (
+            <div style={{ marginBottom: 6 }}>
+              No analyst markers. Markers plot alongside the incident dots (label shown on the
+              map); they never change any count or narrative.
+            </div>
+          )}
+          {analystMarkers.map((m) => (
+            <div key={m.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4, flexWrap: "wrap" }}>
+              <input
+                type="number"
+                step="any"
+                value={m.lat}
+                onChange={(e) =>
+                  setMapMarkers(
+                    analystMarkers.map((x) =>
+                      x.id === m.id ? { ...x, lat: Number(e.target.value) } : x,
+                    ),
+                  )
+                }
+                placeholder="Latitude"
+                style={{ width: 110, border: `1px solid ${POLAR}`, padding: "2px 6px", fontFamily: ROBOTO, fontSize: 12 }}
+              />
+              <input
+                type="number"
+                step="any"
+                value={m.lng}
+                onChange={(e) =>
+                  setMapMarkers(
+                    analystMarkers.map((x) =>
+                      x.id === m.id ? { ...x, lng: Number(e.target.value) } : x,
+                    ),
+                  )
+                }
+                placeholder="Longitude"
+                style={{ width: 110, border: `1px solid ${POLAR}`, padding: "2px 6px", fontFamily: ROBOTO, fontSize: 12 }}
+              />
+              <input
+                type="text"
+                value={m.label ?? ""}
+                onChange={(e) =>
+                  setMapMarkers(
+                    analystMarkers.map((x) =>
+                      x.id === m.id ? { ...x, label: e.target.value } : x,
+                    ),
+                  )
+                }
+                placeholder="Label (e.g. Client site)"
+                style={{ flex: 1, minWidth: 160, border: `1px solid ${POLAR}`, padding: "2px 6px", fontFamily: ROBOTO, fontSize: 12 }}
+              />
+              <select
+                value={m.severity ?? ""}
+                onChange={(e) =>
+                  setMapMarkers(
+                    analystMarkers.map((x) =>
+                      x.id === m.id ? { ...x, severity: e.target.value || undefined } : x,
+                    ),
+                  )
+                }
+                style={{ border: `1px solid ${POLAR}`, padding: "2px 6px", fontFamily: ROBOTO, fontSize: 12 }}
+              >
+                <option value="">Neutral</option>
+                <option value="low">Low</option>
+                <option value="moderate">Moderate</option>
+                <option value="high">High</option>
+                <option value="extreme">Extreme</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setMapMarkers(analystMarkers.filter((x) => x.id !== m.id))}
+                style={{ border: `1px solid ${POLAR}`, padding: "2px 8px", color: NAVY, cursor: "pointer", fontFamily: ROBOTO, fontSize: 11 }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setMapMarkers([
+                ...analystMarkers,
+                { id: `marker-${Date.now()}`, lat: 0, lng: 0, label: "" },
+              ])
+            }
+            style={{ border: `1px solid ${POLAR}`, padding: "2px 8px", color: NAVY, cursor: "pointer", fontFamily: ROBOTO, fontSize: 11, marginTop: 2 }}
+          >
+            Add marker
+          </button>
+        </div>
+      )}
     </div>
   );
   // Analyst-attached photo block, rendered at the chosen placement slot.
@@ -2024,17 +2181,7 @@ export default function CountryReport() {
 
         {proseDraft && (
         <Section title="Narrative (advanced)">
-          {pngDataset && pngDataset.proseVariant === "operating-risk" ? (
-            // Operating-risk briefs (Indonesia / Jakarta / every generic country)
-            // render a deterministic, business-language narrative from the live
-            // window — the section prose is intentionally NOT editable so it can
-            // never drift from the data or persist as stale hidden prose. Only the
-            // per-incident analyst summary on each card is editable.
-            <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
-              The written brief is generated deterministically from this window's incidents and is not
-              directly editable. Refine the one-line analyst summary shown on each incident card below.
-            </div>
-          ) : (
+          {(
             <>
               <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginBottom: 10, fontStyle: "italic" }}>
                 Edit the main narrative directly in the preview below — each prose block is an
@@ -2137,7 +2284,7 @@ export default function CountryReport() {
                       </button>
                     ),
                   prose:
-                    pngDataset && pngDataset.proseVariant !== "operating-risk" && proseDraft
+                    pngDataset && proseDraft
                       ? {
                           bluf: inlineProseEditor("bluf", pngDataset.bluf),
                           executiveSummary: inlineProseEditor("executiveSummary", pngDataset.executiveSummary),
@@ -2149,14 +2296,16 @@ export default function CountryReport() {
                   // blank / matching the engine text = auto (override
                   // key removed so future engine updates flow through).
                   themeParagraphEditor: (key, autoText) => {
+                          const liveKey = `theme:${key}`;
                           const saved = (sectionOverrides.themeParagraphs ?? {})[key]?.trim() ?? "";
-                          const value = saved !== "" ? saved : autoText;
+                          const value = liveEditTexts[liveKey] ?? (saved !== "" ? saved : autoText);
                           return (
                             <textarea
                               className="no-print"
                               value={value}
                               onChange={(e) => {
                                 const v = e.target.value;
+                                setLiveEditTexts((t) => ({ ...t, [liveKey]: v }));
                                 setSectionOverrides((ov) => {
                                   const next = { ...(ov.themeParagraphs ?? {}) };
                                   if (v.trim() === "" || v.trim() === autoText.trim()) delete next[key];
@@ -2183,15 +2332,17 @@ export default function CountryReport() {
                         // Recommended Actions bullets — one bullet per line;
                         // blank / matching the auto bullets = auto.
                         actionGroupEditor: (key, autoActions) => {
+                          const liveKey = `actions:${key}`;
                           const autoText = autoActions.join("\n");
                           const saved = (sectionOverrides.actionGroups ?? {})[key]?.trim() ?? "";
-                          const value = saved !== "" ? saved : autoText;
+                          const value = liveEditTexts[liveKey] ?? (saved !== "" ? saved : autoText);
                           return (
                             <textarea
                               className="no-print"
                               value={value}
                               onChange={(e) => {
                                 const v = e.target.value;
+                                setLiveEditTexts((t) => ({ ...t, [liveKey]: v }));
                                 setSectionOverrides((ov) => {
                                   const next = { ...(ov.actionGroups ?? {}) };
                                   const norm = (s: string) =>
