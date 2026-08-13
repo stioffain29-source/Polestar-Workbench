@@ -644,7 +644,10 @@ export function parseBullets(text: string, maxBullets = 7): string[] {
         .map((p) => {
           if (p.length <= 220) return p;
           const m = p.match(/^(.+?[.!?])(\s|$)/);
-          return (m ? m[1] : p.slice(0, 217) + "...").trim();
+          if (m) return m[1].trim();
+          const cut = p.slice(0, 217);
+          const lastSpace = cut.lastIndexOf(" ");
+          return `${lastSpace > 80 ? cut.slice(0, lastSpace) : cut}…`;
         });
     }
   }

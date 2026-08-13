@@ -79,6 +79,9 @@ const DROP_FIXTURES: Array<[string, string]> = [
   ["why-essay comparative", "Why India's Gen Z protest movement differs from Nepal, Bangladesh and Sri Lanka"],
   ["why-essay question", "Why Pakistan hasn't seen a major youth protest? US analyst reveals reason: 'Its social cleavages ...'"],
   ["why-essay global trend", "Why Gen Z protests are reshaping politics worldwide: From Bangladesh and Nepal to India"],
+  ["from protest to power essay", "From Protest to Power: BNP, Student Politics and Campus Violence"],
+  ["movement keeps heat trend", "India's protest movement keeps heat on Modi"],
+  ["presidential vote calendar", "Bangladesh presidential vote set for August as parties prepare"],
 ];
 
 // [class label, headline] — every row must KEEP. Each shares vocabulary with a

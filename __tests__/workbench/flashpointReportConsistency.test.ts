@@ -97,7 +97,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     const lines = ds.autoWatchNext.split("\n");
-    const forecastLines = lines.filter((l) => /upcoming, unconfirmed/.test(l));
+    const forecastLines = lines.filter((l) => /upcoming, (?:unconfirmed|date confirmed)/.test(l));
     // The announcement renders as a forecast bullet…
     expect(forecastLines.length).toBeGreaterThan(0);
     // …and the follow-through "most serious incident reported this week" line
@@ -212,7 +212,7 @@ describe("flashpoint report consistency", () => {
     expect(bullets[2]).toMatch(/Thailand/);
   });
 
-  test("dateless forecast rows do not claim every listed event is confirmed and dated", () => {
+  test("dateless forecast rows stay out of the confirmed table and appear only in Watch Next", () => {
     const rows = [
       inc({
         title: "Thailand unions announce planned strike",
@@ -223,10 +223,62 @@ describe("flashpoint report consistency", () => {
       }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
-    if (ds.forecastFuture.length > 0) {
-      expect(ds.forecastFuture[0]?.date).toBeNull();
-      expect(ds.forecastRead).toMatch(/without confirmed dates/);
-      expect(ds.forecastRead).not.toMatch(/with confirmed dates are listed in the table above and are the first dates/);
-    }
+    expect(ds.forecastFuture).toHaveLength(0);
+    expect(ds.forecastRead).toMatch(/No confirmed upcoming protest calls/i);
+    expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
+  });
+
+  test("analysis essays and elections are excluded from the incident count", () => {
+    const rows = [
+      inc({ title: "From Protest to Power: BNP, Student Politics and Campus Violence", country: "Bangladesh", severity: "moderate" }),
+      inc({ title: "India's protest movement keeps heat on Modi", country: "India", severity: "low" }),
+      inc({ title: "Bangladesh presidential vote set for August as parties prepare", country: "Bangladesh", severity: "moderate" }),
+      inc({ title: "Garment workers block road in Dhaka over wage arrears", country: "Bangladesh", severity: "moderate", location: "Dhaka" }),
+      inc({ title: "Traders march on parliament in Delhi over tax rules", country: "India", severity: "low", location: "Delhi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.enriched.length).toBe(2);
+    expect(ds.fastFacts.find((k) => k.label === "Most Affected Country")?.value).toBe("Bangladesh");
+    expect(ds.countryRows[0]?.label).toBe("Bangladesh");
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("Fast Facts most affected country matches the chart volume leader", () => {
+    const rows = [
+      ...Array.from({ length: 8 }, (_, i) =>
+        inc({ title: `Union walkout over pay dispute round ${i} in Dhaka`, country: "Bangladesh", severity: "low", location: "Dhaka" }),
+      ),
+      ...Array.from({ length: 4 }, (_, i) =>
+        inc({ title: `Teachers rally outside ministry over arrears case ${i}`, country: "Sri Lanka", severity: "high", location: "Colombo" }),
+      ),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.countryRows[0]?.label).toBe("Bangladesh");
+    expect(ds.fastFacts.find((k) => k.label === "Most Affected Country")?.value).toBe("Bangladesh");
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("Polestar View uses five-tier severity vocabulary not elevated", () => {
+    const rows = [
+      inc({ title: "PTI supporters clash with police outside Adiala jail", severity: "high", country: "Pakistan", location: "Rawalpindi" }),
+      inc({ title: "Chemists walk out over e-pharmacy rules in Lahore", severity: "moderate", country: "Pakistan", location: "Lahore" }),
+      inc({ title: "Students sit-in at campus hall in Dhaka", severity: "moderate", country: "Bangladesh", location: "Dhaka" }),
+      inc({ title: "Police detain protesters after curfew order in Karachi", severity: "high", country: "Pakistan", location: "Karachi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.autoPolestarView).not.toMatch(/\belevated\b/i);
+    expect(ds.autoPolestarView).toMatch(/risk level is (High|Moderate|Low)/i);
+  });
+
+  test("implications name specific countries and campus sites when available", () => {
+    const rows = [
+      inc({ title: "Students sit-in at University of Dhaka campus", country: "Bangladesh", location: "Dhaka", severity: "moderate" }),
+      inc({ title: "Traders march in Delhi over tax rules", country: "India", location: "Delhi", severity: "low" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.autoImplications).toMatch(/Bangladesh and India/);
+    expect(ds.autoImplications).not.toMatch(/South Asia, East Asia/);
+    expect(ds.autoImplications).toMatch(/near Dhaka/);
+    expect(ds.autoImplications).not.toMatch(/named campuses/);
   });
 });

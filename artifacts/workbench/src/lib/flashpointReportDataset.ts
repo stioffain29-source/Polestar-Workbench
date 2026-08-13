@@ -464,6 +464,22 @@ const ANTICIPATORY_NEGATED_RE =
 // after an unrest cycle is the absence of a live incident, not an incident.
 const AFTERMATH_NORMALISATION_RE =
   /\b(peaceful\s+(?:polling|poll|election|elections|vote|voting)|polling\s+(?:underway|begins|began|concludes|concluded|peacefully)|returns?\s+to\s+(?:normal|normalcy|calm)|calm\s+(?:returns?|restored|prevails))\b/i;
+// Scheduled elections / votes are political calendar events, not unrest
+// incidents. Drop unless the same record describes live disorder at the
+// polls (clashes, curfews, roadblocks) — not mere electoral commentary.
+const SCHEDULED_ELECTION_RE =
+  /\b(presidential (?:vote|election)|general election|parliamentary election|by-?election|snap election|goes? to (?:the )?polls|heading to polls|voters? (?:head|go|cast) to (?:the )?polls|polls? (?:open|close|scheduled)|election day|ballot(?:ing)?)\b/i;
+const ELECTION_UNREST_RE =
+  /\b(election (?:violence|clash|riot|unrest)|violence (?:at|during|mar) polls|clash(?:es)? (?:at|near) polling|polling station (?:attack|clash|riot))\b/i;
+// Analysis / trend essays that carry protest vocabulary but report no
+// discrete street event ("From Protest to Power: …", "movement keeps heat
+// on Modi"). Belt-and-suspenders with the relevance gate.
+const ANALYSIS_COMMENTARY_RE =
+  /\b(from protest to power|keeps (?:the )?heat on|keeps pressure on|student politics and campus violence)\b/i;
+const MOVEMENT_TREND_RE =
+  /\b(?:(?:protest|youth|gen z|opposition)\s+movement|protest movement)\b[^.!?]{0,50}\b(keeps|continues to|maintains|builds|turns up|turns the|still has|still puts)\b/i;
+const COLON_FEATURE_RE =
+  /^[^:]{10,100}:\s+[A-Z][^,]{2,},\s+[A-Z]/;
 // Foreign labour action carrying a stray APAC country tag because an APAC
 // outlet syndicated it. The Icelandic "Eimskip" seafarers' dispute is the
 // recurring case — it is mislabelled Philippines and pollutes that country
@@ -610,6 +626,12 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // Post-event normalisation (peaceful polling / calm restored) — the
   // absence of an incident, not an incident.
   if (AFTERMATH_NORMALISATION_RE.test(text)) return true;
+  // Scheduled elections / votes without live public-order signal.
+  if (SCHEDULED_ELECTION_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text) && !ELECTION_UNREST_RE.test(text)) return true;
+  // Think-piece / trend analysis using protest vocabulary.
+  if (ANALYSIS_COMMENTARY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (MOVEMENT_TREND_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (COLON_FEATURE_RE.test(r.title ?? "") && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Foreign labour action mislabelled into an APAC country (Eimskip).
   if (FOREIGN_ENTITY_MISLABEL_RE.test(text)) return true;
   // SEO comma-spam / multi-script keyword-stuffed captions.
@@ -945,6 +967,17 @@ function clusterSameEvent<
         parent[find(i)] = find(j);
         continue;
       }
+      // Same named facility city when one headline says "Incheon" and the
+      // other "Incheon Airport" — syndicated rewrites often drop "airport".
+      if (
+        explicitSameCountry &&
+        anchors[i].has("incheon") &&
+        anchors[j].has("incheon") &&
+        (facility(anchors[i]) || facility(anchors[j]) || /\bincheon\b/i.test(`${rows[i].title} ${rows[j].title}`))
+      ) {
+        parent[find(i)] = find(j);
+        continue;
+      }
       if (distinctSubjects(subjects[i], subjects[j])) continue;
       const [small, big] = anchors[i].size <= anchors[j].size
         ? [anchors[i], anchors[j]] : [anchors[j], anchors[i]];
@@ -1250,9 +1283,12 @@ export function buildFlashpointReportDataset(
     countrySignificance.set(country, aggregateIncidentSignificance(rows));
   }
   const rankedCountries = [...countryCount.keys()].sort(
+    // COUNT first — must match countryRows / Regional View so Fast Facts
+    // "Most Affected Country" never contradicts the chart (owner-flagged:
+    // Sri Lanka named while Bangladesh had twice the incidents).
     (a, b) =>
-      (countrySignificance.get(b) ?? 0) - (countrySignificance.get(a) ?? 0) ||
       (countryCount.get(b) ?? 0) - (countryCount.get(a) ?? 0) ||
+      (countrySignificance.get(b) ?? 0) - (countrySignificance.get(a) ?? 0) ||
       a.localeCompare(b),
   );
   const topCountry = rankedCountries[0] ?? "—";
@@ -1271,9 +1307,9 @@ export function buildFlashpointReportDataset(
       label: "Distinct Incidents",
       value: String(enriched.length),
       note: dedupedDropped > 0
-        ? `${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? "" : "s"} removed from ${rawWindowCount} records`
+        ? `${rawWindowCount} records screened; ${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? "" : "s"} removed — ${enriched.length} distinct incident${enriched.length === 1 ? "" : "s"}`
         : rawWindowCount > enriched.length
-          ? `${rawWindowCount} records screened`
+          ? `${rawWindowCount} records screened — ${enriched.length} distinct incident${enriched.length === 1 ? "" : "s"}`
           : "After deduplication",
     },
     {
@@ -1345,7 +1381,6 @@ export function buildFlashpointReportDataset(
   // — sectoral strike risk" must render once).
   const seenForecast = new Set<string>();
   const forecastDated: ForecastFutureRow[] = [];
-  const forecastDateless: ForecastFutureRow[] = [];
   for (const r of dedupeByTitle(futureRaw)) {
     // An explicitly-dated event ON or BEFORE the issue date has already
     // happened — it is window material, not a forward-looking row.
@@ -1355,16 +1390,19 @@ export function buildFlashpointReportDataset(
     const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
     if (seenForecast.has(key)) continue;
     seenForecast.add(key);
-    const row: ForecastFutureRow = {
+    const statedDate = explicitForecastDate(r);
+    // Dateless announcements belong in Watch Next only — not in the
+    // confirmed-upcoming table (owner-flagged: Thailand with no date in
+    // a table labelled as confirmed schedule items).
+    if (!statedDate) continue;
+    forecastDated.push({
       country,
       signal,
       meaning: forecastMeaningFor(r),
-      date: explicitForecastDate(r),
-    };
-    if (row.date) forecastDated.push(row);
-    else forecastDateless.push(row);
+      date: statedDate,
+    });
   }
-  const forecastFuture = [...forecastDated, ...forecastDateless].slice(0, 6);
+  const forecastFuture = forecastDated.slice(0, 6);
   const forecastRead = buildForecastRead({
     activismRows,
     unrestRows,
@@ -1493,14 +1531,25 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
         { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
       ),
     );
-  if (strong.length > 0) {
+  // High-severity leads must describe live street activity or enforcement,
+  // not a bare call / analysis piece (owner-flagged: Klang protest rated
+  // High with no account of what happened on the ground).
+  const operationalStrong = strong.filter((r) => {
+    if (isWeakOperational(r)) return false;
+    const txt = `${r.title ?? ""} ${r.summary ?? ""}`;
+    const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
+    if (sev >= 3 && !LIVE_PUBLIC_ORDER_RE.test(txt) && !ENFORCEMENT_RE.test(txt)) return false;
+    return true;
+  });
+  const leadStrong = operationalStrong.length > 0 ? operationalStrong : strong;
+  if (leadStrong.length > 0) {
     // Reaction-led advocacy headlines ("demands justice for six slain") report
     // a mobilisation ABOUT a prior death — they must not lead over a fresh
     // protest/disruption record at the same severity (owner-flagged defect:
     // High Malaysian memorial protest declared main event while barely
     // explaining the protest itself).
-    const nonReaction = strong.filter((r) => !isReactionLed(r.title ?? ""));
-    const leadPool = nonReaction.length > 0 ? nonReaction : strong;
+    const nonReaction = leadStrong.filter((r) => !isReactionLed(r.title ?? ""));
+    const leadPool = nonReaction.length > 0 ? nonReaction : leadStrong;
     const bestStrong = sortBySignificance(leadPool)[0];
     const political = leadPool.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
     if (political.length > 0) {
@@ -1513,6 +1562,9 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
       }
     }
     return bestStrong;
+  }
+  if (strong.length > 0) {
+    return sortBySignificance(strong)[0];
   }
   if (credible.length > 0) return sortBySignificance(credible)[0];
   const safe = rows.filter((r) => !isWeakNovelty(r));
@@ -1549,7 +1601,19 @@ function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, window
   if (sectoral.length > 0) drivers.push("union and trade-group action");
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
-    ? `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}, rated ${SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate"} severity.${lead && isReactionLed(lead.title ?? "") ? " That rating reflects the underlying incident being protested rather than disruption from the protest itself." : ""}`
+    ? (() => {
+        const where = (lead.country ?? "").trim();
+        const label = SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate";
+        const txt = `${lead.title ?? ""} ${lead.summary ?? ""}`;
+        const live = LIVE_PUBLIC_ORDER_RE.test(txt) || ENFORCEMENT_RE.test(txt);
+        const detail = live
+          ? ""
+          : " Reports describe the grievance or call rather than turnout, routes or police action on the day — treat the severity as provisional.";
+        const reaction = lead && isReactionLed(lead.title ?? "")
+          ? " That rating reflects the underlying incident being protested rather than disruption from the protest itself."
+          : "";
+        return `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${where ? ` in ${where}` : ""}, rated ${label} severity.${reaction}${detail}`;
+      })()
     : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
   const driverLine = drivers.length > 0
     ? `Most of the reported events came from ${joinList(drivers)}.`
@@ -2002,7 +2066,7 @@ function cleanRelatedSummary(s: string | null | undefined): string | null {
       t = cut.slice(0, end + 1);
     } else {
       const lastSpace = cut.lastIndexOf(" ");
-      t = `${lastSpace > 120 ? cut.slice(0, lastSpace) : cut.slice(0, 317)}…`;
+      t = lastSpace > 80 ? `${cut.slice(0, lastSpace)}…` : `${cut.trim()}…`;
     }
   }
   return t || null;
@@ -2023,7 +2087,8 @@ interface AutoCtx {
   windowEnd: Date;
 }
 
-// Overall week posture (Moderate / Low / Elevated) — distinct from the peak
+// Overall week posture — uses the approved five-tier severity vocabulary
+// (Insignificant / Low / Moderate / High / Extreme), distinct from the peak
 // incident severity shown on the Fast Facts card.
 function overallPostureLabel(ctx: {
   activismRows: EnrichedIncident[];
@@ -2035,7 +2100,7 @@ function overallPostureLabel(ctx: {
   const named = ctx.activismRows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement)\b/i.test(text(r))).length;
   const hasEnforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
   const mobVectors = [named > 0, sectoral > 0, student > 0].filter(Boolean).length;
-  if (mobVectors >= 2 && hasEnforcement) return "Elevated";
+  if (mobVectors >= 2 && hasEnforcement) return "High";
   if (mobVectors >= 2 || hasEnforcement) return "Moderate";
   if (mobVectors >= 1) return "Low";
   return "Low";
@@ -2095,17 +2160,31 @@ function buildWhatMatters(ctx: AutoCtx): string {
 
 function buildImplications(ctx: AutoCtx): string {
   const lead = ctx.countryRows[0];
-  const spread = subregionSpread(ctx.countryRows);
-  const where = spread.regions.length >= 2
-    ? `${lead ? lead.label : "the busiest area"} and the wider ${joinList(spread.regions)} region`
-    : (lead ? lead.label : "the affected areas");
+  const topCountries = ctx.countryRows.slice(0, 3).map((r) => r.label);
+  const where = topCountries.length > 0
+    ? joinList(topCountries)
+    : (lead ? lead.label : "the affected cities");
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const all = [...ctx.activismRows, ...ctx.unrestRows];
   const hasSectoral = all.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|federation|sectoral|samsung|walkout)\b/i.test(text(r)));
   const hasCurfew = all.some((r) => /\b(curfew|section\s*144|assembly ban|lockdown|state of emergency|martial law)\b/i.test(text(r)));
   const hasCampus = all.some((r) => /\b(student|university|campus|college|faculty)\b/i.test(text(r)));
+  const campusLoci: string[] = [];
+  const campusSeen = new Set<string>();
+  for (const r of all) {
+    if (!/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
+    const loc = (r.location ?? "").trim();
+    if (!loc) continue;
+    const country = (r.country ?? "").trim();
+    if (country && locationForeignToCountry(loc, country)) continue;
+    const key = loc.toLowerCase();
+    if (campusSeen.has(key)) continue;
+    campusSeen.add(key);
+    campusLoci.push(loc);
+    if (campusLoci.length >= 3) break;
+  }
   const bullets: string[] = [
-    `Review staff movement and journey plans across ${where} against the incidents reported this week.`,
+    `Review staff movement and journey plans in ${where} against the incidents reported this week.`,
     `Confirm alternative routes for staff and deliveries around the locations named in this week's records.`,
     `Keep staff and customer communications ready so updates can go out quickly on a disrupted day.`,
   ];
@@ -2115,8 +2194,8 @@ function buildImplications(ctx: AutoCtx): string {
   if (hasSectoral) {
     bullets.push(`Trade-group or union action appears in this week's records: check whether any named walkout affects your suppliers or distribution and plan around the announced dates.`);
   }
-  if (hasCampus) {
-    bullets.push(`Student or campus activity appears in this week's records: brief sites near the named campuses on possible knock-on disruption.`);
+  if (hasCampus && campusLoci.length > 0) {
+    bullets.push(`Student or campus activity appears in this week's records: brief sites near ${joinList(campusLoci)} on possible knock-on disruption.`);
   }
   return bullets.map((b) => `- ${b}`).join("\n");
 }
@@ -2167,9 +2246,11 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const bullets: string[] = [];
   for (const r of future) {
     const where = r.country ? `${r.country} — ` : "";
-    // Forward-looking items are announcements, not events that have
-    // happened: label them plainly as upcoming and unconfirmed.
-    bullets.push(`${where}${shortSignalLabel(r)}: upcoming, unconfirmed — ${operationalMeaningFor(r)}`);
+    const stated = explicitForecastDate(r);
+    // Align with the forecast table: dated announcements are schedule items;
+    // dateless ones stay monitor-only.
+    const status = stated ? "upcoming, date confirmed" : "upcoming, unconfirmed";
+    bullets.push(`${where}${shortSignalLabel(r)}: ${status} — ${operationalMeaningFor(r)}`);
   }
   // Never describe a forecast/announcement item as "the most serious
   // incident reported this week" — the follow-through line only fires when
@@ -2253,7 +2334,7 @@ function buildPolestarView(ctx: AutoCtx): string {
     : "";
   let verdict: string;
   if (mobVectors >= 2 && hasEnforcement) {
-    verdict = `Polestar's view: this was an active week and the risk level is elevated.${postureNote} Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
+    verdict = `Polestar's view: this was an active week and the risk level is High.${postureNote} Several separate protest campaigns were running and police took enforcement action. Disruption is most likely in ${where}, around city-centre protest sites. Review staff travel routes in the affected cities, avoid confirmed protest locations, and confirm who will contact staff if conditions change.`;
   } else if (mobVectors >= 2) {
     verdict = `Polestar's view: the risk level is moderate.${postureNote} Several protest campaigns are active, but reports show no police crackdowns or curfews. Disruption is most likely in ${where}, around city-centre gatherings. Monitor local news and social media for fresh protest calls and review staff travel routes in the affected cities.`;
   } else if (hasEnforcement) {
@@ -2396,6 +2477,8 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
   /\bis being shaped by\b/i,
   /\btopic-signature dedupe\b/i,
   /\bbackground organising\b/i,
+  /\brisk level is elevated\b/i,
+  /\bthe risk level is elevated\b/i,
 ];
 
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
@@ -2408,6 +2491,15 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
   if (card && card.value !== expected) {
     errors.push(
       `Fast Facts severity "${card.value}" != actual highest "${expected}"`,
+    );
+  }
+
+  // 1b. Most Affected Country must match the volume leader on the chart.
+  const countryCard = ds.fastFacts.find((k) => k.label === "Most Affected Country");
+  const chartLead = ds.countryRows[0]?.label;
+  if (countryCard && chartLead && countryCard.value !== chartLead) {
+    errors.push(
+      `Fast Facts country "${countryCard.value}" != chart leader "${chartLead}"`,
     );
   }
 

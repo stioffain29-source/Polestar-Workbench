@@ -654,13 +654,10 @@ export async function exportFlashpointReportPdf(
     renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
   }
 
-  // Regional and Country View — prose leads the country bar chart.
+  // Regional and Country View — chart first so page balance is tighter
+  // when prose is short (owner-flagged: page 4 excessive whitespace).
   if (show("regional")) {
-    drawSectionWithProse(
-      ctx,
-      "Regional and Country View",
-      pickRead(data.regionalCountryRead, ds.regionalCountryRead),
-    );
+    drawSectionHeading(ctx, "Regional and Country View");
     drawHorizontalBarChart(
       ctx,
       ds.countryRows.length >= 12
@@ -674,6 +671,7 @@ export async function exportFlashpointReportPdf(
           "Bar length shows incident count; colour shows the highest severity reported in each country.",
       },
     );
+    renderProse(ctx, pickRead(data.regionalCountryRead, ds.regionalCountryRead));
   }
 
   // Editor-authored analyst sections. Editor text wins only when it

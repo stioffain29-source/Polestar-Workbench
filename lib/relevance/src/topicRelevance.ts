@@ -725,6 +725,12 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // Trend-analysis framing — "Balen Shah's political rise … reflects a
   // broader shift after youth-led protests".
   /\breflects?\s+a\s+(broader|wider|deeper|larger)\s+(shift|trend|change|realignment)\b/i,
+  // Trend / heat-on essays — "India's protest movement keeps heat on Modi".
+  /\b(?:protest|youth|gen z|opposition)\s+movement\b[^.!?]{0,50}\bkeeps (?:the )?(?:heat|pressure) on\b/i,
+  // Colon-subtitle feature essays — "From Protest to Power: BNP, …".
+  /^[^:]{10,100}:\s+[A-Z][^,]{2,},\s+[A-Z]/,
+  // Scheduled elections / votes as calendar events, not unrest incidents.
+  /\b(presidential vote|presidential election|general election|parliamentary election|by-?election|snap election)\b[^.!?]{0,50}\b(set for|scheduled|prepare|preparing|calm|peaceful|underway peacefully)\b/i,
   // Question-framed capability/forecast analysis — "Can Nepal actually
   // enforce its Human Rights Commission's findings?". A leading
   // can/could/should/will interrogative marks a debate piece, not an event

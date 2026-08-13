@@ -508,8 +508,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("regional")} title="Regional and Country View">
-          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
-          <div className="mt-4">
+          <div className="mb-4">
             <div
               className="uppercase mb-2"
               style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
@@ -526,6 +525,7 @@ export default function FlashpointReportPreview({
             )}
             <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No countries with reported activity this week." />
           </div>
+          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">
