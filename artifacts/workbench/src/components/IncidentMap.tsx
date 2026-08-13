@@ -282,10 +282,11 @@ export default function IncidentMap({
         id={domId}
         ref={containerRef}
         style={{
-          // A square aspect ratio (country report maps) derives height from the
-          // rendered width, so the map stays square at any page width and in the
-          // DOM-rasterised PDF; otherwise the fixed pixel height applies.
-          ...(square ? { aspectRatio: "1 / 1" } : { height }),
+          // Country report maps derive height from the rendered width so the
+          // shape holds at any page width and in the DOM-rasterised PDF. Owner
+          // tuned the full square down 25% → 4:3 (height = 75% of width);
+          // otherwise the fixed pixel height applies.
+          ...(square ? { aspectRatio: "4 / 3" } : { height }),
           width: "100%",
           position: "relative",
           border: `1px solid ${POLAR}`,
