@@ -100,6 +100,11 @@ export interface PngSourceIncident {
   sourceUrl?: string | null;
   resolvedUrl?: string | null;
   confidence?: string | null;
+  // Geocoded coordinates (curated lookup, set at ingest). Carried through the
+  // engine so §23 map points exist for credible-precision rows; without these
+  // toMapPoints() rejects every event and the report map renders empty.
+  latitude?: number | null;
+  longitude?: number | null;
   // Server-extracted enrichment (see lib/ingest/src/structuredExtract.ts),
   // surfaced through the incidents API. When present these are authoritative and
   // the client derivation below is skipped; when null (non-structured-theatre /
@@ -762,6 +767,10 @@ export interface PngReportItem {
   // it equals `category` (so PNG / West Papua rendering is unchanged).
   displayCategory: string;
   businessImpact: string;
+  // Geocoded coordinates carried from the source incident so the canonical
+  // engine can emit §23 map points (credible precision + real coordinates).
+  latitude?: number | null;
+  longitude?: number | null;
   severity: string;
   severityLabel: string;
   severityRank: number;
@@ -1148,6 +1157,8 @@ function toItem(
     source: (i.source ?? "").trim(),
     url: (i.resolvedUrl ?? i.sourceUrl ?? null) || null,
     confidence: (i.confidence ?? "").trim().toLowerCase() || "unrated",
+    latitude: i.latitude ?? null,
+    longitude: i.longitude ?? null,
   };
 }
 

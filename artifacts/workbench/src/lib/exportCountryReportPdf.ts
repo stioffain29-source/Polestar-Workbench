@@ -764,19 +764,6 @@ function drawJakartaWatchLine(ctx: Ctx, label: string, text: string) {
   ctx.y += lines.length * lineH + 5;
 }
 
-function drawJakartaMapCaption(ctx: Ctx, caption: string) {
-  if (!caption.trim()) return;
-  const { pdf, MX, CW } = ctx;
-  setRoboto(pdf, "italic");
-  pdf.setFontSize(8);
-  const lines = pdf.splitTextToSize(sanitize(caption), CW) as string[];
-  ensureSpace(ctx, lines.length * 11 + 8);
-  setText(pdf, DUSK);
-  pdf.text(lines, MX, ctx.y + 9, { lineHeightFactor: 1.3 });
-  setRoboto(pdf, "regular");
-  ctx.y += lines.length * 11 + 8;
-}
-
 // One structured-brief incident card — the headless counterpart to the
 // on-screen ItemCard (PngCountryReportBody). Title, severity chip, a meta line
 // (display category · province · date · source) and the deterministic
@@ -921,7 +908,10 @@ function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
     renderProse(ctx, d.businessImpactEmptyNote);
   }
 
-  drawJakartaMapCaption(ctx, tactical.mapCaption);
+  // NOTE: the Jakarta corridor-map caption is no longer drawn — the on-screen
+  // report now plots gated window incidents on the shared spot-report map for
+  // every theatre (owner ruling), so the corridor caption would describe a
+  // graphic that no longer exists. Parity with the preview requires omitting it.
 }
 
 // The shared structured country brief remains unchanged for the other

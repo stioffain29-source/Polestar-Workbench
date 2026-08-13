@@ -1,0 +1,235 @@
+Implement a root cause fix for the Fuel Watch generator. Do not patch the current PDF, hard code current headlines or manually replace the present wording. Fix the underlying record selection, classification, analysis and report generation.
+
+OBJECTIVE
+
+Fuel Watch must be generated from one canonical, deduplicated set of qualifying fuel events. Every total, country ranking, severity judgement and narrative section must use that same dataset. Market prices remain a separate dataset and must never count as incidents.
+
+1. CANONICAL EVENT MODEL
+
+Each event must contain:
+
+• event_id
+• event_date
+• publication_date
+• country
+• region
+• city or specific location
+• actor
+• event_type
+• confirmation_status
+• severity
+• confidence
+• affected fuel or product
+• operational consequence
+• business relevance
+• source records
+• duplicate_group_id
+
+Use event_date for reporting-window inclusion. Publication_date must never substitute for an unknown event date.
+
+Reject an event from the published report if its location or event date cannot be established. Do not output “not identified,” “elsewhere” or similar placeholder language.
+
+2. QUALIFYING EVENT RULES
+
+Include only events that materially concern:
+
+• Fuel production, refining, storage or distribution
+• Confirmed refinery or terminal outages
+• Fuel rationing, shortages or station closures
+• Government price, subsidy, levy or allocation changes
+• Material transport disruption affecting fuel availability
+• Attacks that damage or interrupt fuel infrastructure
+• Confirmed operator action affecting output, routing or supply
+
+Exclude:
+
+• Commentary and market opinion
+• Repeated reporting of the same event
+• Political condemnation without an operational action
+• OPEC or IEA forecast disagreements
+• General conflict reporting without a demonstrated fuel consequence
+• Threats or claims presented as confirmed operational disruption
+• Historical events republished during the reporting window
+
+Claimed attacks may be retained only when clearly labelled “Claimed” and kept separate from confirmed operational effects.
+
+3. EVENT DEDUPLICATION
+
+Cluster reports describing the same event using date, location, facility, actor and event type.
+
+Multiple articles must become supporting sources beneath one event, not additional incidents.
+
+Do not merge separate events because they involve the same country or operator. In particular, the Jazan refinery attack and reports of an explosion at Jubail must remain separate unless evidence confirms they were the same event.
+
+4. INCIDENT TOTALS
+
+“Seven qualifying incidents” must mean seven unique event records.
+
+If the report states seven incidents, all seven must be available in the report’s incident section or an attached incident table.
+
+The following must reconcile exactly:
+
+• Total qualifying incidents
+• Country totals
+• Event-type totals
+• Reporting-day totals
+• Regional rankings
+• Number of displayed incident records
+
+Fail report generation if these values do not reconcile.
+
+5. PRESSURE-POINT LOGIC
+
+Determine the primary pressure point from material, deduplicated events, not article volume or country mentions.
+
+The ranking must consider:
+
+• Event severity
+• Confirmed supply impact
+• Geographic reach
+• Duration
+• Fuel-market consequence
+• Business disruption
+• Evidence confidence
+
+Do not label Iran the primary pressure point unless the current-period evidence demonstrates why. The report must state the events and operational consequences supporting the ranking.
+
+6. SEVERITY AND CONFIDENCE
+
+Overall severity must not simply inherit the highest individual event rating.
+
+Generate overall severity from the combined operational effect and explain the basis in plain language.
+
+Evidence confidence must reflect:
+
+• Source reliability
+• Independent corroboration
+• Confirmation status
+• Location confidence
+• Event-date confidence
+• Whether operational impact is confirmed
+
+Confidence cannot be High when key records are claimed, single-source, unlocated or operationally unconfirmed.
+
+7. MARKET AND OPERATOR RESPONSES
+
+This table must contain only concrete actions by a named operator or government, including:
+
+• Production shutdown or restart
+• Rationing
+• Stock release
+• Export restriction
+• Price adjustment
+• Route change
+• Force majeure
+• Confirmed supply allocation
+• Refinery or terminal operating change
+
+Do not classify the following as operator responses:
+
+• A condemnation by ADNOC or a government
+• An IEA and OPEC forecast disagreement
+• A media report about an alleged attack without confirmed operational change
+
+Each row must state the actual action and its demonstrated or assessed supply consequence.
+
+8. CURRENT REGIONAL HIGHLIGHTS
+
+Regional Highlights must identify materially relevant developments across the covered region, not merely repeat the country ranking.
+
+For the current dataset, verify that the generator captures and assesses:
+
+• Pakistan fuel shortages and their interaction with transport-sector strikes
+• The effect on freight, including perishable, pharmaceutical, FMCG and chemical cargo
+• Bangladesh’s reported increase of more than 21 percent in Jet A 1 prices and its effect on airline operating costs
+• Russia’s Orenburg or Orsk refinery disruption and any confirmed rationing
+• Saudi refinery or gas-facility incidents without conflating Jazan and Jubail
+• Gulf tanker or route disruption only where there is a demonstrated fuel-market consequence
+
+These are acceptance tests for the current dataset, not values to hard code into the template.
+
+9. REPORT SECTION PURPOSES
+
+Each section must perform a different function.
+
+Executive Summary
+Summarise the main fuel pressure, price direction, most consequential events and immediate business exposure.
+
+Situation
+Describe the current fuel-supply and pricing position.
+
+What Happened
+Explain the principal qualifying events with date, location and consequence.
+
+Operational Read
+Assess how those events affect availability, distribution, freight, aviation, production or continuity.
+
+Regional Highlights
+Provide concise country-level developments and explain their regional significance.
+
+What Matters
+State the decision businesses face now. Do not mention internal record handling or dataset reconciliation.
+
+Implications for Business
+Give specific actions tied to named countries, products and exposures.
+
+Watch Next
+Use named, observable triggers tied to current events. Do not produce a generic list prefixed repeatedly with “Potential.”
+
+Polestar View
+Provide an actual analytical judgement, near-term outlook and practical guidance. Do not repeat the incident count, country ranking and severity label.
+
+Remove repeated labels inside body text such as “What Matters:” and “Polestar View:”.
+
+10. MARKET DATA
+
+Keep market-price data separate from incident data.
+
+For Brent, WTI and jet fuel:
+
+• Display the instrument or series name
+• Display the source
+• Display the exact as-of date
+• Distinguish market close from published data
+• Calculate seven-day change against the correct previous observation
+• Validate the displayed price, percentage and chart endpoint against the same source value
+
+The jet-fuel chart must continue to state that the EIA series trails the crude-market close.
+
+11. BUSINESS LANGUAGE
+
+Remove internal system phrases such as:
+
+• “Current, non-potential evidence covers 7 of 7”
+• “Route and country totals are derived from the same record set”
+• “Plan against overall severity High”
+• “Verify exposure against the 7 qualifying incidents”
+
+Replace these with specific, operationally useful analysis.
+
+Do not generate vague instructions such as “align fuel-continuity actions to Iran.” State the exposure, affected product, location, operational trigger and required action.
+
+12. PDF OUTPUT
+
+Keep the disclaimer.
+
+Preserve the existing branding and Roboto typography.
+
+Prevent unnecessary repetition and excessive unused space. If the disclaimer fits cleanly after the Polestar View without violating margins or heading rules, keep it on the same page.
+
+13. AUTOMATED ACCEPTANCE TESTS
+
+Report generation must fail if:
+
+• Totals do not reconcile
+• A displayed location is missing
+• Publication date has been substituted for event date
+• Duplicate events remain
+• A commentary article is counted as an incident
+• A political statement is classified as an operator action
+• Confidence is High while unresolved claims remain
+• The primary pressure point is not supported by displayed events
+• Any report section merely repeats metadata without adding analysis
+• Any incident is silently omitted from the visible event list
+
+Regenerate Fuel Watch only after these validations pass.

@@ -31,6 +31,7 @@ import {
   type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
+import { pickRead } from "./pickRead";
 import {
   buildFuelCanonicalFacts,
   buildFuelCanonicalSections,
@@ -49,6 +50,7 @@ export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 // this module.
 export type { FuelReportFacts } from "./fuelReportFacts";
 export { buildFuelReportFacts, serialiseFuelFactsForPrompt } from "./fuelReportFacts";
+import { buildFuelReportFacts as buildFuelReportFactsInternal, type FuelReportFacts } from "./fuelReportFacts";
 
 /** Kept local to make the canonical builder's validation call explicit in this
  * module; renderers call assertFuelReportConsistent before their first draw. */
@@ -189,6 +191,11 @@ export interface FuelWatchReportData {
   narrativeData: FuelNarrativeData;
   /** The only facts object Fuel Watch sections are allowed to consume. */
   canonicalFacts: FuelCanonicalFacts;
+  /** The prompt/gate facts object (same inputs as canonicalFacts) — feeds the
+   *  AI FIXED FACTS block and the prose-tolerant consistency gate that
+   *  validates the FINAL effective text (analyst edit -> AI -> canonical).
+   *  Computed here once so preview, PDF and editor share one instance. */
+  reportFacts: FuelReportFacts;
   validation: FuelValidation;
 }
 
@@ -330,12 +337,58 @@ export function buildFuelWatchReportData(
     watchIndicators: FUEL_DEFAULT_WATCH_NEXT,
   });
   const canonicalSections = buildFuelCanonicalSections(canonicalFacts);
+  // Prompt/gate facts — same issueDate/hardNumbers/incidents as canonicalFacts,
+  // shared by the AI FIXED FACTS block and the effective-text consistency gate.
+  // The pressure picture is RECONCILED to canonicalFacts' primaryPressurePoint:
+  // the two builders rank leaders differently (margin-based vs tie-based), and
+  // the canonical prose is generated from canonicalFacts — so the gate and the
+  // AI prompt must judge/describe leadership by the SAME authority or the gate
+  // false-blocks the canonical text itself.
+  const rawReportFacts = buildFuelReportFactsInternal({
+    issueDate: report.issueDate,
+    hardNumbers: report.hardNumbers,
+    incidents,
+  });
+  const canonPrimary = canonicalFacts.primaryPressurePoint;
+  // Severity is reconciled too: canonical prose asserts canonicalFacts'
+  // overall severity/distribution (uncapped), while buildFuelReportFacts caps
+  // market-commentary records — leaving both would false-block canonical text
+  // at the SEVERITY_TERMS / COUNT_TRACEABLE checks.
+  const canonSeverityLower = canonicalFacts.overallSeverity.toLowerCase() as FuelReportFacts["overallSeverity"] & string;
+  const canonDistribution = Object.fromEntries(
+    Object.entries(canonicalFacts.severityDistribution).map(([k, v]) => [k.toLowerCase(), v]),
+  ) as FuelReportFacts["severityDistribution"];
+  const severityReconciled: FuelReportFacts = {
+    ...rawReportFacts,
+    overallSeverity: canonSeverityLower,
+    severityDistribution: canonDistribution,
+  };
+  const reportFacts: FuelReportFacts =
+    canonPrimary.kind === "distributed"
+      ? { ...severityReconciled, pressure: { ...severityReconciled.pressure, distributed: true, primary: null } }
+      : {
+          ...severityReconciled,
+          pressure: {
+            ...severityReconciled.pressure,
+            distributed: false,
+            primary:
+              severityReconciled.pressure.primary &&
+              severityReconciled.pressure.primary.country.toLowerCase() ===
+                canonPrimary.label.toLowerCase()
+                ? severityReconciled.pressure.primary
+                : {
+                    country: canonPrimary.label,
+                    score: canonPrimary.score,
+                    recordCount: canonPrimary.incidentIds.length,
+                    highestSeverity: null,
+                  },
+          },
+        };
   const regionalHighlights = canonicalSections.regionalHighlights;
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
     incidents,
   });
-  const operationalRead = canonicalSections.operationalRead;
   // Gulf/Hormuz Chokepoint Watch is a filtered subset of the canonical
   // qualifying records. Do not pass the full raw incident feed here: doing so
   // previously let its independent count exceed the report-wide total.
@@ -345,6 +398,20 @@ export function buildFuelWatchReportData(
     incidents,
     qualifyingIncidents: canonicalFacts.qualifyingIncidents,
   });
+  // Owner ruling (Aug 2026): the Gulf read is no longer a standalone editable
+  // paragraph (its exact-match staleness binding made every save go stale
+  // within days). Its information folds into the Operational Read canonical
+  // narrative instead, so it flows with the report and stays gate-validated;
+  // the Gulf section itself keeps only the dated anchor bullets.
+  if (gulfChokepointWatch?.read) {
+    canonicalSections.operationalRead = [
+      canonicalSections.operationalRead,
+      gulfChokepointWatch.read,
+    ]
+      .filter((t) => (t ?? "").trim() !== "")
+      .join("\n\n");
+  }
+  const operationalRead = canonicalSections.operationalRead;
 
   // Validation. The fail-closed export gate is keyed on market data
   // only: Brent, WTI and jet fuel are the required indicators. Other
@@ -455,18 +522,23 @@ export function buildFuelWatchReportData(
       gulfChokepointWatch,
     },
     narrativeData: {
-      // These five analytical sections are never sourced from a report field or
-      // model response. They are deterministic projections of canonicalFacts.
+      // The analytical sections default to deterministic projections of
+      // canonicalFacts. Implications / Watch Next HONOUR the caller-resolved
+      // text (analyst edit -> AI, resolved by preview/exporter before calling
+      // the builder) — previously those inputs were silently discarded, so
+      // every surface rendered the generic canonical bullets no matter what
+      // the draft said. Blank input = canonical auto (blank=auto rule).
       executiveSummary: canonicalSections.executiveSummary,
       situation: canonicalSections.situation,
       whatHappened: canonicalSections.whatHappened,
       whatMatters: canonicalSections.whatMatters,
-      implications: canonicalSections.implications,
+      implications: pickRead(report.implications, canonicalSections.implications),
       polestarView: canonicalSections.polestarView,
-      watchNext: canonicalSections.watchNext,
+      watchNext: pickRead(report.watchNext, canonicalSections.watchNext),
       canonicalSections,
     },
     canonicalFacts,
+    reportFacts,
     validation: {
       hasPrices,
       hasBrent,

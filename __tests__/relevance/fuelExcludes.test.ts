@@ -105,3 +105,35 @@ describe("fuel exclude stack (market-commentary regression pins)", () => {
     expect(v.relevant).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fuel coverage classes added Aug 2026 (Bangladesh Jet A-1 hike + Pakistan
+// fuel-pricing transport/pump strikes). Pins the new REQUIRED.fuel patterns
+// both ways: the missed-story classes must KEEP, and neighbouring market
+// chatter / generic commuter strikes must still DROP.
+describe("fuel coverage: aviation price action + fuel-linked transport strikes (Aug 2026)", () => {
+  const KEEP: Array<[string, string, string?]> = [
+    ["Jet A-1 regulator hike", "Energy regulator hikes the price of Jet A-1 fuel by over 21%"],
+    ["jet fuel price hiked", "Jet fuel price hiked by over 21%"],
+    ["goods-transport strike over fuel pricing", "Nationwide goods-transport strike halts freight services", "Transporters press unresolved demands over daily fuel pricing and diesel and cargo-transport taxes."],
+    ["oil transporters strike (actor is fuel-haulage)", "Goods, oil transporters strike continues"],
+    ["petroleum dealers pump closure", "Petroleum dealers announce closure of pumps nationwide from Aug 15"],
+    ["petrol pumps nationwide close", "Petrol pumps nationwide to close from August 15"],
+  ];
+  KEEP.forEach(([label, title, summary]) => {
+    it(`KEEP: ${label}`, () => {
+      expect(verdict(title, summary ?? "").relevant).toBe(true);
+    });
+  });
+
+  const DROP: Array<[string, string, string?]> = [
+    ["jet fuel market chatter", "Jet fuel prices tick higher on global markets", "Analysts see jet fuel price forecast rising with crude futures."],
+    ["generic commuter transport strike", "Jeepney drivers stage transport strike in Iligan City"],
+    ["pay strike with no fuel link", "Teachers strike nationwide over pay", "Teachers demand salary increase."],
+  ];
+  DROP.forEach(([label, title, summary]) => {
+    it(`DROP: ${label}`, () => {
+      expect(verdict(title, summary ?? "").relevant).toBe(false);
+    });
+  });
+});

@@ -1,0 +1,66 @@
+Simplify the “Market and Operator Responses Overrides” editor. The current interface is too complex because every row permanently displays five empty override fields and requires the user to understand that blank means “keep the generated value.”
+
+Do not change the underlying report generation, persistence or PDF export logic. This is a user interface simplification.
+
+DEFAULT ROW VIEW
+
+Display each response as one compact collapsed row containing:
+
+• Include checkbox
+• Actor
+• Category
+• Date
+• Short action summary
+• Edit button
+
+Unchecking the row removes it from the report.
+
+Do not display override input fields until the user selects Edit.
+
+EDIT VIEW
+
+Selecting Edit should open a compact modal, drawer or expandable panel containing:
+
+• Actor: text field
+• Category: dropdown using the permitted response categories
+• Date: date picker
+• Action: multiline text field
+• Operational Read: multiline text field
+
+All fields must be prepopulated with the values currently shown in the generated report. Never present empty fields when generated values already exist.
+
+Provide three controls:
+
+• Save Changes
+• Cancel
+• Restore Generated Version
+
+Save Changes updates the draft and exported report.
+
+Cancel closes the editor without making changes.
+
+Restore Generated Version removes the overrides for that row and reloads the generated values.
+
+BEHAVIOUR
+
+• Preserve the existing include or exclude checkbox behaviour.
+• Preserve all existing generated content.
+• Preserve saved overrides across refresh.
+• Do not regenerate the complete report when one response row is edited.
+• Do not require the user to understand override mechanics.
+• Remove the instruction “Blank fields keep the auto text.”
+• Do not display blank override fields beneath every row.
+• Keep the list compact and easy to scan.
+
+ACCEPTANCE TESTS
+
+1. Every response initially appears as one compact row.
+2. No empty editing fields are visible by default.
+3. Selecting Edit shows the current values already populated.
+4. Saving one changed field preserves all unchanged fields.
+5. Cancelling makes no changes.
+6. Restoring the generated version removes only that row’s overrides.
+7. Unchecking a row excludes it from the PDF.
+8. Rechecking the row restores it with its current saved content.
+9. Saved changes appear in the draft, preview and PDF.
+10. Existing report-generation and export behaviour remains unchanged.

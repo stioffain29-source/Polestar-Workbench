@@ -37,7 +37,6 @@ import PublicationCalendar from "./pages/PublicationCalendar";
 import Cards from "./pages/Cards";
 import CardBuilder from "./pages/CardBuilder";
 import BrandSettings from "./pages/BrandSettings";
-import JakartaCorridorMap from "@/components/JakartaCorridorMap";
 
 const queryClient = new QueryClient();
 
@@ -237,70 +236,7 @@ function Router() {
   );
 }
 
-// Dev-only static sample of the redesigned Jakarta exposure map, viewable at
-// `…/__jakarta-sample` outside the AuthGate. Representative hardcoded incidents
-// drive a varied exposure picture for design review before live data is wired.
-function JakartaMapSample() {
-  const incidents = [
-    {
-      topic: "flashpoint",
-      title: "Protesters rally near Monas in Central Jakarta government district",
-      severity: "high",
-      occurredAt: "2026-06-28T03:00:00Z",
-      country: "Indonesia",
-      location: "Central Jakarta",
-    },
-    {
-      topic: "flashpoint",
-      title: "Flooding disrupts access roads around Tanjung Priok port",
-      severity: "moderate",
-      occurredAt: "2026-06-27T03:00:00Z",
-      country: "Indonesia",
-      location: "North Jakarta",
-    },
-    {
-      topic: "flashpoint",
-      title: "Robbery reported near offices in SCBD business district",
-      severity: "moderate",
-      occurredAt: "2026-06-26T03:00:00Z",
-      country: "Indonesia",
-      location: "South Jakarta",
-    },
-  ];
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#f4f4f6",
-        padding: "32px 24px",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start",
-      }}
-    >
-      <div
-        style={{
-          width: 900,
-          maxWidth: "100%",
-          background: "#ffffff",
-          border: `1px solid ${BRAND.polar}`,
-          padding: "28px 30px",
-          boxSizing: "border-box",
-        }}
-      >
-        <JakartaCorridorMap incidents={incidents} issueDate="2026-06-30" />
-      </div>
-    </div>
-  );
-}
-
 function App() {
-  if (typeof window !== "undefined") {
-    const p = window.location.pathname.replace(/\/$/, "");
-    if (p.endsWith("__jakarta-sample")) {
-      return <JakartaMapSample />;
-    }
-  }
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

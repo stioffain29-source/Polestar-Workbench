@@ -64,8 +64,6 @@ import {
   applyMarketPriceOverrides,
   applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
-  resolvePanelRead,
-  PANEL_READ_GULF_HORMUZ,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
 import {
@@ -87,6 +85,10 @@ import {
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
 import { assertFuelReportConsistent } from "./fuelCanonicalFacts";
+import {
+  resolveFuelEffectiveSections,
+  assertFuelReportConsistent as assertFuelEffectiveTextConsistent,
+} from "./fuelReportConsistency";
 import {
   capFuelMarketSeverity,
   type ProducerBuyerActionRow,
@@ -889,25 +891,40 @@ export async function exportTopicReportPdf(
         incidents,
       )
     : null;
-  // Resolve the only editable Fuel narrative before validation. The section's
-  // generated count still comes from the canonical qualifying set; if an
-  // otherwise-current override claims a larger count, the gate below blocks
-  // export rather than allowing a contradictory statement into the PDF.
-  const renderedFuelGulfRead = fuelData?.incidentData.gulfChokepointWatch
-    ? resolvePanelRead(
-        options.sectionOverrides,
-        PANEL_READ_GULF_HORMUZ,
-        fuelData.incidentData.gulfChokepointWatch.read,
-      ).text
-    : undefined;
+  // FINAL EFFECTIVE Fuel narrative — analyst edit -> AI -> canonical
+  // deterministic, resolved by the ONE shared resolver the preview and the
+  // editor prefill also call, so all three surfaces render byte-identical
+  // section text.
+  const fuelEffective = fuelData
+    ? resolveFuelEffectiveSections({
+        report: {
+          executiveSummary: data.executiveSummary,
+          situation: data.situation,
+          whatHappened: data.whatHappened,
+          whatMatters: data.whatMatters,
+          polestarView: data.polestarView,
+          fuelMarketRead: data.fuelMarketRead,
+          fuelOperationalRead: data.fuelOperationalRead,
+          fuelRegionalHighlights: data.fuelRegionalHighlights,
+        },
+        aiProse,
+        fuelData,
+      })
+    : null;
   // Pre-render Fuel Watch consistency gate. This runs after all canonical facts
-  // exist and before the first report section is drawn; it is never bypassed by
-  // analyst/AI prose or export override flags.
-  if (fuelData) {
+  // exist and before the first report section is drawn; it validates the FINAL
+  // EFFECTIVE text (whatever tier wins), so analyst/AI prose can never smuggle
+  // a contradictory claim past it.
+  if (fuelData && fuelEffective) {
+    // Strict canonical gate — validates the canonical payload (the Gulf read
+    // now folds into the canonical Operational Read, so it is covered there);
+    // canonical text passes by construction.
     assertFuelReportConsistent(fuelData.canonicalFacts, {
       ...fuelData.narrativeData.canonicalSections,
-      gulfAndHormuzChokepointWatch: renderedFuelGulfRead,
     });
+    // Prose-tolerant gate over the FINAL effective text — whichever tier wins
+    // (analyst edit / AI / canonical), its claims must agree with the facts.
+    assertFuelEffectiveTextConsistent(fuelData.reportFacts, fuelEffective);
   }
   // Deterministic per-topic draft — the labelled fallback beneath the AI
   // narrative and any analyst edit. Built from the SAME windowed incident
@@ -996,8 +1013,8 @@ export async function exportTopicReportPdf(
   // layer is deliberately NOT consulted so the strict format rules always hold.
   // Every other topic keeps the AI narrative + template fallback stack.
   const execText =
-    fuelData
-      ? fuelData.narrativeData.canonicalSections.executiveSummary
+    fuelEffective
+      ? (fuelEffective.executiveSummary ?? "")
       : isCargo && cargoModel
         ? resolveSimpleProse(data.executiveSummary, null, cargoModel.executiveSummary)
         : resolveSimpleProse(
@@ -1105,34 +1122,24 @@ export async function exportTopicReportPdf(
       if (body && body.trim()) drawSectionWithProse(ctx, label, body);
     };
 
+    // FINAL EFFECTIVE narrative (analyst edit -> AI -> canonical) from the ONE
+    // shared resolver — identical to the on-screen preview and editor prefill.
     if (show("market-read")) {
-      renderProseSection(
-        "Market Read",
-        fuelData.narrativeData.canonicalSections.marketRead,
-      );
+      renderProseSection("Market Read", fuelEffective?.marketRead);
     }
     if (show("situation")) {
-      renderProseSection(
-        "Situation",
-        fuelData.narrativeData.canonicalSections.situation,
-      );
+      renderProseSection("Situation", fuelEffective?.situation);
     }
     if (show("what-happened")) {
-      renderProseSection(
-        "What Happened",
-        fuelData.narrativeData.canonicalSections.whatHappened,
-      );
+      renderProseSection("What Happened", fuelEffective?.whatHappened);
     }
     if (show("operational-read")) {
-      renderProseSection(
-        "Operational Read",
-        fuelData.narrativeData.canonicalSections.operationalRead,
-      );
+      renderProseSection("Operational Read", fuelEffective?.operationalRead);
     }
     if (show("regional-highlights")) {
       renderProseSection(
         "Regional Highlights",
-        fuelData.narrativeData.canonicalSections.regionalHighlights,
+        fuelEffective?.regionalHighlights,
       );
     }
     // Gulf and Hormuz Chokepoint Watch — heading + prose (atomic) then the
@@ -1145,18 +1152,20 @@ export async function exportTopicReportPdf(
       const gbOverrides = options.sectionOverrides?.gulfBulletOverrides;
       const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
       const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
-      // Staleness-guarded override: a saved panel read applies only while the
-      // generated read still equals the baseline it was written against, so a
-      // frozen week-old paragraph can never outrank this week's reporting.
-      drawSectionWithProse(
-        ctx,
-        "Gulf and Hormuz Chokepoint Watch",
-        renderedFuelGulfRead ?? gulf.read,
-      );
+      // The Gulf read paragraph folds into the Operational Read narrative
+      // (owner ruling) — this section keeps only the dated anchor bullets,
+      // with the first bullet block atomic under the heading.
       if (currentLines.length > 0) {
-        renderProse(ctx, currentLines.map((l) => `\u2022  ${l}`).join("\n"));
+        drawSectionWithProse(
+          ctx,
+          "Gulf and Hormuz Chokepoint Watch",
+          currentLines.map((l) => `\u2022  ${l}`).join("\n"),
+        );
+      } else if (gulf.standingNote && standingLines.length > 0) {
+        drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.standingNote);
+        renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
-      if (gulf.standingNote && standingLines.length > 0) {
+      if (currentLines.length > 0 && gulf.standingNote && standingLines.length > 0) {
         renderProse(ctx, gulf.standingNote);
         renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
       }
@@ -1177,10 +1186,7 @@ export async function exportTopicReportPdf(
       drawProducerBuyerActionsTable(ctx, producerRows);
     }
     if (show("what-matters")) {
-      renderProseSection(
-        "What Matters",
-        fuelData.narrativeData.canonicalSections.whatMatters,
-      );
+      renderProseSection("What Matters", fuelEffective?.whatMatters);
     }
     // Render from the canonical fuel narrative payload (analyst edit -> AI ->
     // deterministic top-up), identical to the on-screen preview, so screen ==
@@ -1201,10 +1207,7 @@ export async function exportTopicReportPdf(
       );
     }
     if (show("polestar-view")) {
-      renderProseSection(
-        "Polestar View",
-        fuelData.narrativeData.canonicalSections.polestarView,
-      );
+      renderProseSection("Polestar View", fuelEffective?.polestarView);
     }
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can

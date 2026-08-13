@@ -1547,7 +1547,7 @@ const CONFLICT_HARD_EXCLUDE: RegExp[] = [
 
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
-    /\bfuel (shortage|crisis|emergency|price|prices|protest|protests|supply|stockout|rationing|tanker|truck)/,
+    /\bfuel (shortage|crisis|emergency|price|prices|pricing|protest|protests|supply|stockout|rationing|tanker|truck)/,
     /\bpetrol (shortage|price|prices|station)/,
     /\bdiesel (shortage|price|prices|supply)/,
     /\b(refinery|refineries) (disruption|outage|shutdown|fire|attack|maintenance|closure|halt)/,
@@ -1580,8 +1580,29 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(diesel|petrol|fuel) (restriction|restrictions|curb|curbs|quota|quotas|cap|capped|limit|limits)\b/,
     // Aviation fuel only when it carries a disruption/market-control signal —
     // bare "jet fuel" technical/market chatter stays out.
-    /\b(aviation turbine fuel|jet fuel|aviation fuel) .{0,30}(shortage|crisis|disrupt|ban|levy|levies|duty|duties|export|ration|supply|cut|cuts|halt|restrict|price hike|surge|schedule)/,
-    /\b(shortage|crisis|disrupt|ban|levy|levies|export|ration|supply (cut|halt|disruption|squeeze)|restrict|price hike|surge) .{0,30}(aviation turbine fuel|jet fuel|aviation fuel)\b/,
+    /\b(aviation turbine fuel|jet fuel|jet a-?1|aviation fuel) .{0,30}(shortage|crisis|disrupt|ban|levy|levies|duty|duties|export|ration|supply|cut|cuts|halt|restrict|price hike|surge|schedule)/,
+    /\b(shortage|crisis|disrupt|ban|levy|levies|export|ration|supply (cut|halt|disruption|squeeze)|restrict|price hike|surge) .{0,30}(aviation turbine fuel|jet fuel|jet a-?1|aviation fuel)\b/,
+    // Regulator/operator PRICE ACTION on a named aviation-fuel product
+    // ("hiked the price of Jet A-1 fuel by over 21%", Bangladesh Aug 2026).
+    // The verb is required so bare "jet fuel price" market chatter stays out.
+    /\b(hike[ds]?|hiking|rais(?:e[ds]?|ing)|increas(?:e[ds]?|ing)|slash(?:e[ds]?|ing)|cut[s]?) .{0,40}price[s]? .{0,20}(jet a-?1|jet fuel|aviation fuel|aviation turbine fuel)/,
+    /\b(jet a-?1|jet fuel|aviation fuel|aviation turbine fuel) .{0,20}price[s]? .{0,40}(hike[ds]?|hiked|rais\w+|increas\w+|slash\w+|cut[s]?)\b/,
+    // Freight/transport strike whose stated CAUSE is fuel pricing/taxes
+    // (Pakistan nationwide goods-transport strike, Aug 2026). The fuel word
+    // must appear near the strike or this stays a flashpoint story.
+    /\b(goods[- ]?transport|transporters?|truckers?|freight|tanker) .{0,20}(strike|shutdown|blockade|boycott).{0,120}(fuel|diesel|petrol)/,
+    // Petrol-pump / petroleum-dealer strikes and closures (Pakistan 15 Aug
+    // 2026 nationwide pump shutdown) — the actor IS the fuel retail network,
+    // so no separate fuel word is needed.
+    /\bpetroleum dealers? .{0,60}(strike|shutdown|closure|close|closing|shut)/,
+    // "Goods, oil transporters strike" (Dawn, Pakistan Aug 2026): the actor
+    // itself is the fuel-haulage network, so no separate fuel word appears in
+    // the headline. "oil" must sit right next to "transporters" — a generic
+    // commuter transport strike still needs the fuel-cause link above.
+    /\b(goods,? )?oil transporters?['’]? .{0,20}(strike|shutdown|blockade|boycott)/,
+    /\b(closure|shutdown|shut|strike)\w* .{0,40}(petrol|fuel) (pump|pumps|station|stations)\b/,
+    /\b(petrol|fuel) (pump|pumps|station|stations) .{0,40}(close|closes|closed|closing|closure|shut|shutdown|strike)/,
+    /\b(fuel|diesel|petrol) .{0,40}(pricing|price|prices|tax|taxes|levy|levies).{0,120}(goods[- ]?transport|transporters?|truckers?|freight) .{0,20}(strike|shutdown|blockade|boycott)/,
     /\b(national fuel pass|fuel pass)\b/,
     /\bfuel queue/,
     /\bfuel[- ]?related protest/,
@@ -1940,6 +1961,16 @@ const FLASHPOINT_INDUSTRIAL_ACTION_RE = new RegExp(
   `\\b${FP_INDUSTRIAL_STOPPAGE}\\b[^.!?]{0,70}\\b${FP_INDUSTRIAL_ANCHOR}\\b|\\b${FP_INDUSTRIAL_ANCHOR}\\b[^.!?]{0,70}\\b${FP_INDUSTRIAL_STOPPAGE}\\b`,
   "i",
 );
+
+// Fuel-network collective action (Aug 2026, owner: fuel-driven strikes belong
+// in BOTH Fuel Watch and Protests & Civil Unrest). Petroleum dealers, petrol
+// pump owners, oil/goods transporters and tanker drivers shutting down are a
+// public-order/industrial-action event even when the headline says "closure"
+// or "shutdown" rather than "strike" ("Petroleum dealers announce closure of
+// pumps nationwide"). Actor-bound so an ordinary retail closure or a traffic
+// story never qualifies.
+const FLASHPOINT_FUEL_NETWORK_ACTION_RE =
+  /\b(petroleum dealers?|petrol pump (?:owners?|dealers?)|petrol pumps?|fuel station (?:owners?|dealers?)|oil transporters?|goods transporters?|tanker (?:drivers?|owners?))\b[^.!?]{0,60}\b(strike|strikes|striking|struck|shutdown|shut down|closure|close[sd]?|closing|boycott|ultimatum|wheel[- ]?jam|protest)/i;
 
 // Political-rally cue. A "rally" is the most overloaded flashpoint token:
 // it is a market move, a sports comeback, and a motorsport event as often
@@ -2521,6 +2552,14 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     }
     if (bodyVerdict === true) {
       return { relevant: true, reason: "kept: civil-unrest 'protest'/'crackdown' phrase" };
+    }
+    // 3c. Fuel-network collective action: dealers/transporters/pump owners
+    //     striking or shutting down. Runs AFTER the homonym excludes (so the
+    //     weather/crime "strike" senses are already dead) and does not need
+    //     the bare-"strike" ambiguous tier, because this class often carries
+    //     no strike token at all ("announce closure of pumps nationwide").
+    if (FLASHPOINT_FUEL_NETWORK_ACTION_RE.test(text)) {
+      return { relevant: true, reason: "kept: fuel-network collective action (dealers/transporters strike or shutdown)" };
     }
     // 4. Ambiguous-tier match: bare "rally" / "strike" needs a
     //    public-order companion; bare "student(s)" needs a student-

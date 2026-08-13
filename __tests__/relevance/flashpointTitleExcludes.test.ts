@@ -130,3 +130,33 @@ describe("flashpoint title hard-excludes (protest-noise regression pins)", () =>
     expect(v.relevant).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fuel-network collective action (Aug 2026, owner: fuel-driven strikes belong
+// in BOTH Fuel Watch and this monitor). Pins FLASHPOINT_FUEL_NETWORK_ACTION_RE
+// both ways: dealer/transporter strikes and pump shutdowns KEEP even without a
+// "strike" token; ordinary retail/crime/price stories still DROP.
+describe("flashpoint: fuel-network collective action (Aug 2026)", () => {
+  const KEEP: Array<[string, string]> = [
+    ["petroleum dealers pump closure", "Petroleum dealers announce closure of pumps nationwide from Aug 15"],
+    ["petrol pumps nationwide close", "Petrol pumps nationwide to close from August 15"],
+    ["oil transporters strike", "Goods, oil transporters strike continues"],
+    ["goods transporters strike", "Goods transporters begin indefinite strike over fuel prices, daily rate revisions"],
+  ];
+  KEEP.forEach(([label, title]) => {
+    it(`KEEP: ${label}`, () => {
+      expect(verdict(title).relevant).toBe(true);
+    });
+  });
+
+  const DROP: Array<[string, string]> = [
+    ["pump opening (retail news)", "New petrol station opens in Lahore suburb"],
+    ["pump robbery (crime-verb strike homonym)", "Robbers strike petrol pump in Multan, flee with cash"],
+    ["pump price display (admin notice)", "Petrol pumps to display new prices after government cut"],
+  ];
+  DROP.forEach(([label, title]) => {
+    it(`DROP: ${label}`, () => {
+      expect(verdict(title).relevant).toBe(false);
+    });
+  });
+});

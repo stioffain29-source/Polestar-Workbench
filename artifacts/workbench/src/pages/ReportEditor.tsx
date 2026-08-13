@@ -64,8 +64,6 @@ import {
   makeSectionGate,
   topicSectionKeys,
   pruneTopicSectionOverrides,
-  PANEL_READ_GULF_HORMUZ,
-  resolvePanelRead,
   marketOperatorRowKey,
   type TopicSectionOverrides,
   type FastFactOverride,
@@ -80,6 +78,7 @@ import {
   clearMarketOperatorOverride,
 } from "@/lib/topicSectionOverrides";
 import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
+import { MarketOperatorResponsesEditor } from "@/components/MarketOperatorResponsesEditor";
 import { OrphanSaveWarning } from "@/components/OrphanSaveWarning";
 import {
   OrphanedGulfBulletsPanel,
@@ -93,6 +92,7 @@ import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord, reportCadence } from "@/lib/reportWindow";
+import { resolveFuelEffectiveSections } from "@/lib/fuelReportConsistency";
 import { format, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
@@ -790,12 +790,15 @@ export default function ReportEditor() {
     if (form.topic !== "fuel" || !form.issueDate) return null;
     const hn = hardNumbersEdited ?? report?.hardNumbers;
     const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
+    // Use the shared payload's RECONCILED reportFacts (pressure leadership
+    // agrees with the canonical sections) so the AI FIXED FACTS block, the
+    // rendered canonical prose and the effective-text gate all describe the
+    // same pressure picture.
     return serialiseFuelFactsForPrompt(
-      buildFuelReportFacts({
-        issueDate: renderIssueDate,
-        hardNumbers: hn,
-        incidents: incidentsForExport,
-      }),
+      buildFuelWatchReportData(
+        { issueDate: renderIssueDate, hardNumbers: hn },
+        incidentsForExport,
+      ).reportFacts,
     );
   }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport]);
   const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
@@ -895,34 +898,40 @@ export default function ReportEditor() {
     // Mirror ReportPreview exactly: implications/watchNext flow through
     // buildFuelWatchReportData's narrativeData (AI text + default top-up), so
     // the prefill must come from the SAME payload, not aiOr() directly.
+    const hn = hardNumbersEdited ?? report.hardNumbers;
+    // Market-anchored render date — same derivation as ReportPreview and
+    // exportTopicReportPdf, so the payload the prefill reads is the payload
+    // the report renders.
+    const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
     const fuelData = buildFuelWatchReportData(
       {
-        issueDate: form.issueDate,
+        issueDate: renderIssueDate,
         implications: aiOr(aiProseSections?.implications, ""),
         watchNext: aiOr(aiProseSections?.watchNext, ""),
-        hardNumbers: hardNumbersEdited ?? report.hardNumbers,
+        hardNumbers: hn,
       },
       incidentsForExport,
     );
-    const proseDraft = stableDraftTopicReportProse({
-      topic: "fuel",
-      issueDate: form.issueDate,
-      incidents: toDraftableIncidents(
-        filterTopicReportIncidents(incidentsForExport, "fuel", form.issueDate),
-      ),
-      fuelGulf: fuelData.incidentData.gulfChokepointWatch ?? null,
+    // ONE shared resolver — the same call ReportPreview and the PDF exporter
+    // make, so the boxes hold byte-identical text to what renders. Report
+    // fields are passed blank: a saved analyst override already skips the
+    // prefill below, and the baseline must be the auto (AI/canonical) tier.
+    const effective = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: ai,
+      fuelData,
     });
     const resolved: Record<string, string> = {
-      executiveSummary: aiOr(ai?.executiveSummary, proseDraft.executiveSummary),
-      situation: aiOr(ai?.situation, proseDraft.situation),
-      whatHappened: aiOr(ai?.whatHappened, proseDraft.whatHappened),
-      whatMatters: aiOr(ai?.whatMatters, proseDraft.whatMatters),
+      executiveSummary: effective.executiveSummary ?? "",
+      situation: effective.situation ?? "",
+      whatHappened: effective.whatHappened ?? "",
+      whatMatters: effective.whatMatters ?? "",
       implications: fuelData.narrativeData.implications ?? "",
       watchNext: fuelData.narrativeData.watchNext ?? "",
-      polestarView: aiOr(ai?.polestarView, proseDraft.polestarView),
-      fuelMarketRead: fuelData.marketData.marketRead ?? "",
-      fuelOperationalRead: fuelData.incidentData.operationalRead ?? "",
-      fuelRegionalHighlights: fuelData.incidentData.regionalHighlights ?? "",
+      polestarView: effective.polestarView ?? "",
+      fuelMarketRead: effective.marketRead ?? "",
+      fuelOperationalRead: effective.operationalRead ?? "",
+      fuelRegionalHighlights: effective.regionalHighlights ?? "",
     };
     const fills: Partial<FormState> = {};
     const baselines: Record<string, string> = {};
@@ -2086,49 +2095,9 @@ export default function ReportEditor() {
             </div>
           )}
 
-          {/* Fuel Watch: the Gulf & Hormuz Chokepoint Watch "read" paragraph
-              is owner-editable (blank = live auto text). Preview and PDF apply
-              the override through the same resolvePanelRead call, which only
-              honours it while the auto text still equals the baseline captured
-              here at edit time — so a saved paragraph can never silently
-              outrank a later week's fresh reporting. */}
-          {form.topic === "fuel" && (
-            <Field label="Gulf & Hormuz Chokepoint Watch — Read (blank = auto)">
-              <Textarea
-                rows={3}
-                value={sectionOverrides.panelReads?.[PANEL_READ_GULF_HORMUZ] ?? ""}
-                onChange={(e) =>
-                  setSectionOverrides((prev) => ({
-                    ...prev,
-                    panelReads: {
-                      ...(prev.panelReads ?? {}),
-                      [PANEL_READ_GULF_HORMUZ]: e.target.value,
-                    },
-                    // Bind the override to the auto text it was written
-                    // against. resolvePanelRead stops applying it the moment
-                    // the generated read changes.
-                    panelReadBases: {
-                      ...(prev.panelReadBases ?? {}),
-                      [PANEL_READ_GULF_HORMUZ]: fuelOverridePanels?.gulfRead ?? "",
-                    },
-                  }))
-                }
-                className="rounded-sm"
-              />
-              {resolvePanelRead(
-                sectionOverrides,
-                PANEL_READ_GULF_HORMUZ,
-                fuelOverridePanels?.gulfRead ?? "",
-              ).overrideStale && (
-                <p className="mt-1 text-[12px] leading-snug text-amber-700">
-                  Out of date — this saved text was written against an earlier
-                  week's generated read, so the report is showing the live
-                  generated text instead. Edit the box to re-apply it this
-                  week, or clear it to keep following the live text.
-                </p>
-              )}
-            </Field>
-          )}
+          {/* The Gulf & Hormuz read paragraph is no longer separately editable —
+              it folds into the Operational Read narrative (owner ruling), which
+              already has its own edit box. */}
 
           {/* Fuel Watch: per-bullet overrides for the Gulf & Hormuz Chokepoint
               Watch lists. Keyed by the bullet's AUTO line so a saved override
@@ -2221,95 +2190,26 @@ export default function ReportEditor() {
             />
           )}
 
-          {/* Fuel Watch: per-row overrides for the Market and Operator
-              Responses table. Keyed by the AUTO row's date|actor|action so a
-              saved override re-attaches to the same row. Uncheck to suppress;
-              non-blank fields replace the displayed cells; blank = auto.
-              Applied identically in the preview AND the PDF exporter. */}
+          {/* Fuel Watch: Market and Operator Responses. Compact collapsed rows
+              (include checkbox + effective summary + Edit); the edit panel
+              prepopulates with the values the report currently renders and
+              stores only fields that differ from the generated text. Same
+              persistence (marketOperatorOverrides), same preview/PDF apply. */}
           {form.topic === "fuel" &&
             (fuelOverridePanels?.producerRows.length ?? 0) > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
-              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
-                Market and Operator Responses overrides
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-2">
-                Uncheck to remove a row. Blank fields keep the auto text.
-              </p>
-              <div className="flex flex-col gap-2">
-                {fuelOverridePanels!.producerRows.map((row) => {
-                  const k = marketOperatorRowKey(row);
-                  const ov: MarketOperatorRowOverride =
-                    sectionOverrides.marketOperatorOverrides?.[k] ?? {};
-                  const setR = (patch: Partial<MarketOperatorRowOverride>) =>
-                    setSectionOverrides((prev) => ({
-                      ...prev,
-                      marketOperatorOverrides: {
-                        ...(prev.marketOperatorOverrides ?? {}),
-                        [k]: {
-                          ...(prev.marketOperatorOverrides?.[k] ?? {}),
-                          ...patch,
-                        },
-                      },
-                    }));
-                  return (
-                    <div
-                      key={k}
-                      className="border border-border rounded-sm p-2"
-                      style={{ opacity: ov.suppressed ? 0.5 : 1 }}
-                    >
-                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground mb-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!ov.suppressed}
-                          className="mt-0.5"
-                          onChange={(e) =>
-                            setR({ suppressed: !e.target.checked })
-                          }
-                        />
-                        <span>
-                          {row.actor} · {row.category} · {row.date} —{" "}
-                          {row.action}
-                        </span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-1.5 mb-1.5">
-                        <Input
-                          placeholder="Actor"
-                          value={ov.actor ?? ""}
-                          onChange={(e) => setR({ actor: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Category"
-                          value={ov.category ?? ""}
-                          onChange={(e) => setR({ category: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Date"
-                          value={ov.date ?? ""}
-                          onChange={(e) => setR({ date: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <Input
-                          placeholder="Action"
-                          value={ov.action ?? ""}
-                          onChange={(e) => setR({ action: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Operational read"
-                          value={ov.read ?? ""}
-                          onChange={(e) => setR({ read: e.target.value })}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <MarketOperatorResponsesEditor
+              rows={fuelOverridePanels!.producerRows}
+              overrides={sectionOverrides.marketOperatorOverrides}
+              onSetOverride={(key, value) =>
+                setSectionOverrides((prev) => ({
+                  ...prev,
+                  marketOperatorOverrides: {
+                    ...(prev.marketOperatorOverrides ?? {}),
+                    [key]: value,
+                  },
+                }))
+              }
+            />
           )}
 
           {/* Orphaned Market and Operator Responses overrides: saved edits

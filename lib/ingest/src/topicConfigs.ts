@@ -22,8 +22,8 @@ import type { IngestOptions, IngestSummary } from "./types";
 // (e.g. "brownout") are intentionally excluded to stay precision-first.
 export const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kolkata", "chennai", "bengaluru", "uttar pradesh", "maharashtra", "punjab", "bihar", "tamil nadu", "kerala", "gurugram", "gurgaon", "karnataka", "telangana", "gujarat", "rajasthan", "odisha", "kochi", "krishnankutty"] },
-  { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "karachi", "lahore", "islamabad", "punjab province", "sindh", "balochistan", "khyber", "k-electric", "k electric", "kelectric", "lesco", "hesco", "nepra", "peshawar", "quetta", "multan", "faisalabad", "rawalpindi", "gujranwala", "leghari", "shehbaz", "ufone"] },
-  { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram", "bkmea", "bpdb", "desco", "gazipur", "brahmanbaria", "sylhet", "khulna", "jessore", "narayanganj", "rajshahi", "barisal", "mymensingh", "ctg", "comilla", "cumilla", "bogura", "rmg", "nasrul"] },
+  { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "karachi", "lahore", "islamabad", "punjab province", "sindh", "balochistan", "khyber", "k-electric", "k electric", "kelectric", "lesco", "hesco", "nepra", "peshawar", "quetta", "multan", "faisalabad", "rawalpindi", "gujranwala", "leghari", "shehbaz", "ufone", "ogra"] },
+  { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram", "bkmea", "bpdb", "desco", "gazipur", "brahmanbaria", "sylhet", "khulna", "jessore", "narayanganj", "rajshahi", "barisal", "mymensingh", "ctg", "comilla", "cumilla", "bogura", "rmg", "nasrul", "berc", "petrobangla"] },
   { canonical: "Sri Lanka", aliases: ["sri lanka", "sri lankan", "colombo", "ceylon", "ceb", "sajith", "kandy", "jaffna"] },
   { canonical: "Nepal", aliases: ["nepal", "nepali", "kathmandu", "nea", "ghising", "chitwan", "pokhara", "biratnagar"] },
   { canonical: "Myanmar", aliases: ["myanmar", "burma", "burmese", "yangon", "naypyidaw", "mandalay"] },
@@ -356,7 +356,13 @@ export const FERTILISER_CONFIG: NewsTopicConfig = {
 };
 
 // ------------------------------------------------------------------ fuel ----
-const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "fuel conservation" OR "diesel rationing" OR "diesel restriction" OR "petrol shortage" OR "diesel shortage" OR "fuel price hike" OR "refinery fire" OR "refinery outage" OR "fuel subsidy" OR "LPG shortage" OR "pump price" OR "aviation turbine fuel" OR "jet fuel shortage" OR "fuel pass" OR "fuel queue" OR "fuel protest" OR "aviation fuel" OR "fuel export")`;
+// "Jet A-1" / "jet fuel price" (Bangladesh 21% Jet A-1 hike, Aug 2026) and the
+// transport-strike terms (Pakistan nationwide goods-transport strike over fuel
+// pricing/diesel taxes, Aug 2026) close two missed-story classes: a fuel-price
+// regulatory hike framed by product name, and a freight strike whose CAUSE is
+// fuel pricing. The strike terms fetch coarse; the central fuel relevance gate
+// keeps only fuel-linked strikes.
+const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "fuel conservation" OR "diesel rationing" OR "diesel restriction" OR "petrol shortage" OR "diesel shortage" OR "fuel price hike" OR "refinery fire" OR "refinery outage" OR "fuel subsidy" OR "LPG shortage" OR "pump price" OR "aviation turbine fuel" OR "jet fuel shortage" OR "jet fuel price" OR "Jet A-1" OR "fuel pass" OR "fuel queue" OR "fuel protest" OR "aviation fuel" OR "fuel export" OR "transport strike" OR "transporters strike" OR "truckers strike" OR "fuel pricing")`;
 
 export const FUEL_CONFIG: NewsTopicConfig = {
   topic: "fuel",
@@ -368,6 +374,35 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     // Island export halt (Aug 2026): a terminal going idle is neither a
     // refinery nor a depot event, so the whole class was invisible.
     { label: "Crude export disruption (Gulf)", q: `("crude exports" OR "oil exports" OR "export terminal" OR "oil terminal" OR Kharg) (halt OR halted OR stall OR stalled OR suspended OR idle OR blockade OR disrupted OR resume) (Iran OR Iraq OR "Saudi Arabia" OR UAE OR Kuwait OR Qatar OR Oman)`, defaultCountry: "Unknown" },
+    // Targeted feeds (Aug 2026): the broad per-country OR-query is rank-capped,
+    // so two whole story classes never surfaced — freight/pump strikes over
+    // fuel pricing (Pakistan goods-transport strike + 15 Aug nationwide pump
+    // closure) and regulator price action on aviation fuel (Bangladesh Jet A-1
+    // +21%). Place-anchored, class-specific queries dodge the rank cap.
+    // PER-COUNTRY (not one multi-country OR-query): these headlines usually
+    // don't name the country ("Petroleum dealers announce closure of pumps
+    // nationwide", "Jet fuel price hiked by over 21%"), so detectCountry
+    // yields Unknown — anchoring each query on one country lets
+    // defaultCountry stamp it correctly. when:14d keeps the class current
+    // instead of dredging months-old archive items.
+    // Actor-only terms ("petroleum dealers", "oil transporters", "petrol
+    // pumps") are self-evidently fuel-network actors, so they must NOT be
+    // conjoined with a fuel word — the pinned headlines ("Goods, oil
+    // transporters strike continues", "Petroleum dealers announce closure of
+    // pumps nationwide") carry no separate fuel/diesel/petrol token. Only the
+    // generic transport terms keep the fuel-cause conjunct.
+    ...["Pakistan", "India", "Bangladesh", "Sri Lanka", "Nepal"].map((c) => ({
+      label: `Fuel-linked transport/pump strikes (${c})`,
+      q: `("petroleum dealers" OR "oil transporters" OR "petrol pumps" OR (("transport strike" OR "transporters strike" OR "goods transport") (fuel OR diesel OR petrol))) (strike OR shutdown OR closure OR "wheel-jam" OR protest) ${c.includes(" ") ? `"${c}"` : c} when:14d`,
+      defaultCountry: c,
+      ...(EDITIONS[c] ?? {}),
+    })),
+    ...["Pakistan", "India", "Bangladesh", "Sri Lanka", "Nepal"].map((c) => ({
+      label: `Aviation fuel price action (${c})`,
+      q: `("jet fuel" OR "Jet A-1" OR "aviation turbine fuel") (price OR hike OR hiked OR raised OR adjusted OR cut) ${c.includes(" ") ? `"${c}"` : c} when:14d`,
+      defaultCountry: c,
+      ...(EDITIONS[c] ?? {}),
+    })),
   ],
   allow: [
     "fuel shortage",
@@ -383,7 +418,16 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     "national fuel pass",
     "aviation turbine fuel",
     "jet fuel",
+    "jet a-1",
+    "jet a1",
     "aviation fuel",
+    "fuel pricing",
+    // Freight strikes over fuel pricing/taxes (coarse — the central fuel
+    // relevance gate requires the fuel link before anything renders)
+    "transport strike",
+    "transporters strike",
+    "truckers strike",
+    "goods transport",
     "fuel export",
     "fuel stockout",
     "fuel supply",
@@ -406,6 +450,9 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     "lpg shortage",
     "cng shortage",
     "tanker driver",
+    "petroleum dealers",
+    "oil transporters",
+    "wheel-jam",
     "oil supply cut",
     "crude supply",
     // Crude EXPORT disruption class (Kharg gap, Aug 2026)

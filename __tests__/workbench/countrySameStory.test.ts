@@ -714,3 +714,30 @@ describe("buildWestPapuaReportDataset — Top 3 never leads with untranslated Ba
     expect(isLikelyNonEnglish(yahu!.title)).toBe(false);
   });
 });
+
+describe("storySimilarity — shooting act-vs-follow-up framing (12 Aug 2026 defect)", () => {
+  // One shooting, two framings: the act itself vs the crime-scene follow-up.
+  // Jaccard falls below the 0.4 selector floor and "fatal" never fires (no
+  // stated death), so before the "shooting" class these occupied two Top-3
+  // slots. The class is a corroborator only — a shared distinctive place is
+  // still required.
+  const act =
+    "Shooting at Jayawijaya cultural festival, police investigate evidence and witness statements";
+  const followUp =
+    "Crime scene processing after shooting at Jayawijaya cultural festival, police probe KKB involvement";
+  it("folds the pair via sharedPlaceClass on the same day", () => {
+    const s = storySimilarity(
+      { title: act, dateMs: base },
+      { title: followUp, dateMs: base },
+    );
+    expect(s.jaccard).toBeLessThan(0.4);
+    expect(s.sharedPlaceClass).toBe(true);
+  });
+  it("does not fold two shootings in different towns", () => {
+    const s = storySimilarity(
+      { title: "Shooting at Wamena market wounds trader", dateMs: base },
+      { title: "Shooting at Timika mining checkpoint", dateMs: base },
+    );
+    expect(s.sharedPlaceClass).toBe(false);
+  });
+});

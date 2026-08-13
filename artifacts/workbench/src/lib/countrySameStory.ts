@@ -185,6 +185,14 @@ const CLASS_PATTERNS: Array<[string, RegExp]> = [
   // CORROBORATOR only (Top-3 diversity + strong-entity PATH 3); it never folds
   // buckets on its own, so distinct same-city fires are still shown separately.
   ["fire", /\b(fire|blaze|inferno|conflagration|kebakaran|razed|gutted|burn\w*|explos\w*|ledakan)\b/i],
+  // Event-nature: a shooting. Two outlets covering the same shooting can frame
+  // it as the act ("Shooting at X festival") vs the follow-up ("Crime scene
+  // processing after shooting at X"), sharing too few tokens for the Jaccard
+  // floor and no other class ("fatal" needs a stated death). CORROBORATOR only
+  // (never folds on its own) — a shared distinctive place is still required, so
+  // two different shootings in different towns stay separate. Bahasa
+  // "penembakan" (shooting) included for Indonesian-language feeds.
+  ["shooting", /\b(shooting|shootings|shooter|gunman|gunmen|gunfire|shot|penembakan)\b/i],
   ["evacuation", /\b(evacuat\w*|repatriat\w*|airlift\w*|flown\s+out)\b/i],
   ["abduction", /\b(abduct\w*|kidnap\w*|hostage\w*|held\s+captive|taken\s+captive)\b/i],
   ["injury", /\b(injured|wounded|hurt)\b/i],
@@ -336,6 +344,7 @@ const CLASH_GENERIC_TOKENS = new Set([
   "encounter", "encounters", "cordon", "siege", "besieged", "surround",
   "surrounded", "surrounds", "surrounding", "trapped", "holed", "gunfire",
   "gun", "guns", "firing", "fire", "exchange", "clash", "clashes", "ambush",
+  "shooting", "shootings", "shooter", "penembakan",
   "ambushed", "raid", "raids", "crackdown", "operation", "operations", "search",
   "blast", "attack", "attacks",
   // forces / actors

@@ -332,7 +332,6 @@ function escapeRe(s: string): string {
 
 import { pickRead } from "./pickRead";
 import { resolveSimpleProse, type TopicAiProse } from "./topicProseResolution";
-import type { TopicReportProse } from "./draftReportProse";
 import type { FuelWatchReportData } from "./fuelWatchReport";
 
 export interface FuelGateReportFields {
@@ -349,44 +348,49 @@ export interface FuelGateReportFields {
 export function resolveFuelEffectiveSections(opts: {
   report: FuelGateReportFields;
   aiProse: TopicAiProse | null | undefined;
-  proseDraft: TopicReportProse;
   fuelData: FuelWatchReportData;
 }): FuelEffectiveSections {
-  const { report, aiProse, proseDraft, fuelData } = opts;
+  const { report, aiProse, fuelData } = opts;
+  // The deterministic tier is the canonical-facts prose — the exact text the
+  // report renders when no analyst edit and no AI narrative exist. This keeps
+  // the fail-closed gate's guarantee: every tier below an analyst edit is
+  // either model prose grounded on the canonical FIXED FACTS or the canonical
+  // projection itself, and the gate validates whichever tier wins.
+  const canonical = fuelData.narrativeData.canonicalSections;
   return {
     executiveSummary: resolveSimpleProse(
       report.executiveSummary,
       aiProse?.executiveSummary,
-      proseDraft.executiveSummary,
+      canonical.executiveSummary,
     ),
     situation: resolveSimpleProse(
       report.situation,
       aiProse?.situation,
-      proseDraft.situation,
+      canonical.situation,
     ),
     whatHappened: resolveSimpleProse(
       report.whatHappened,
       aiProse?.whatHappened,
-      proseDraft.whatHappened,
+      canonical.whatHappened,
     ),
     whatMatters: resolveSimpleProse(
       report.whatMatters,
       aiProse?.whatMatters,
-      proseDraft.whatMatters,
+      canonical.whatMatters,
     ),
     polestarView: resolveSimpleProse(
       report.polestarView,
       aiProse?.polestarView,
-      proseDraft.polestarView,
+      canonical.polestarView,
     ),
-    marketRead: pickRead(report.fuelMarketRead, fuelData.marketData.marketRead),
+    marketRead: pickRead(report.fuelMarketRead, canonical.marketRead),
     operationalRead: pickRead(
       report.fuelOperationalRead,
-      fuelData.incidentData.operationalRead,
+      canonical.operationalRead,
     ),
     regionalHighlights: pickRead(
       report.fuelRegionalHighlights,
-      fuelData.incidentData.regionalHighlights,
+      canonical.regionalHighlights,
     ),
     // Implications / Watch Next are deliberately NOT gated: they are generic
     // topped-up bullet lists (forward-looking by design) whose stock phrasing
