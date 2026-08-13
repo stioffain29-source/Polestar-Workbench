@@ -305,6 +305,22 @@ describe("flashpoint report consistency", () => {
     expect(pickFlashpointAnalystProse("", auto)).toBe(auto);
   });
 
+  test("drug crime is excluded even when summary mentions roadblock", () => {
+    const rows = [
+      inc({
+        title: "Malaysian driver held in Thailand with 166kg of meth",
+        summary: "Police seized drugs at a checkpoint roadblock near the border.",
+        country: "Thailand",
+        location: "Bangkok",
+        severity: "moderate",
+      }),
+      inc({ title: "Indian police fire tear gas to disperse youth protesters", country: "India", severity: "high", location: "Delhi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.enriched.length).toBe(1);
+    expect(ds.unrestRows.some((r) => /166kg of meth/i.test(r.title))).toBe(false);
+  });
+
   test("cleanDisplayTitle strips chained outlet mastheads", () => {
     expect(
       cleanDisplayTitle(

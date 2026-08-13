@@ -663,7 +663,10 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (COLON_FEATURE_RE.test(r.title ?? "") && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (STOCK_MARKET_RALLY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (CEREMONIAL_EVENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (DRUG_CRIME_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  // Drug / smuggling arrests are never public-order events — drop even when
+  // the classifier or summary mis-tags "roadblock" (owner-flagged: meth seizure
+  // in Thailand listed as Roadblock / access disruption).
+  if (DRUG_CRIME_RE.test(text)) return true;
   if (ROCKET_SPACE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Foreign labour action mislabelled into an APAC country (Eimskip).
   if (FOREIGN_ENTITY_MISLABEL_RE.test(text)) return true;
@@ -1952,8 +1955,8 @@ function buildRegionalCountryRead(opts: {
     );
   });
   const reach = countryRows.length > 3
-    ? `Other APAC countries saw less activity this week and appear in the country chart below.`
-    : `Full breakdown in the chart below.`;
+    ? `Other APAC countries saw less activity this week and appear in the country chart above.`
+    : `Full breakdown in the chart above.`;
   // Coverage callouts. The product needs to be visibly checking the
   // recurring Asia-Pacific protest environments — Australia, Papua /
   // PNG / Indonesian Papua, Philippines / Manila, Japan / Tokyo,

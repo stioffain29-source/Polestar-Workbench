@@ -1,11 +1,8 @@
-import { createElement, type ReactElement } from "react";
+import { createElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
-import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
-import CargoPatternDashboard from "@/components/CargoPatternDashboard";
-import CargoActivityMatrix from "@/components/CargoActivityMatrix";
 import {
   buildCargoPatternModel,
   type CargoAppendixRow,
@@ -228,11 +225,30 @@ function drawCargoPatternFallback(ctx: Ctx, patterns: CargoPatternCard[]): void 
   );
 }
 
-/** Native PDF fallback when the activity matrix fails to rasterise. */
+/** Native PDF summary for the weekly activity matrix (preview still uses React). */
 function drawCargoActivityFallback(ctx: Ctx, activity: CargoActivityMatrix): void {
   drawSectionHeading(ctx, "Weekly Activity by Pattern");
   if (activity.statement.trim()) {
     renderProse(ctx, activity.statement);
+  }
+  const activeRows = activity.rows.filter((r) => r.total > 0);
+  if (activeRows.length > 0) {
+    const weekHeader =
+      activity.weeks.length > 0
+        ? ` Weekly columns: ${activity.weeks.map((w) => w.label).join(", ")}.`
+        : "";
+    renderProse(
+      ctx,
+      activeRows
+        .map((r) => {
+          const weekPart =
+            activity.weeks.length > 0
+              ? ` (${activity.weeks.map((w, i) => `${w.label}: ${r.weekCounts[i] ?? 0}`).join("; ")})`
+              : "";
+          return `${r.label}: ${r.total} incident${r.total === 1 ? "" : "s"}${weekPart}.`;
+        })
+        .join("\n\n") + weekHeader,
+    );
     return;
   }
   if (activity.sparseItems.length > 0) {
@@ -255,17 +271,6 @@ function drawCargoActivityFallback(ctx: Ctx, activity: CargoActivityMatrix): voi
       ? `Activity across ${activity.total} incidents distributed over ${weekLabels}.`
       : "Insufficient dated activity to render the weekly matrix this period.",
   );
-}
-
-/** Try React chart embed; draw native fallback when rasterisation fails. */
-async function embedReactChartOrFallback(
-  ctx: Ctx,
-  element: ReactElement,
-  fallback: () => void,
-  options: { heading?: string } = {},
-): Promise<void> {
-  const ok = await embedReactChartInPdf(ctx, element, options);
-  if (!ok) fallback();
 }
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -1450,55 +1455,22 @@ export async function exportTopicReportPdf(
             caption: cargoModel.trendCaption.trim() || undefined,
           });
           if (cargoModel.activity.total > 0) {
-            await embedReactChartOrFallback(
-              ctx,
-              createElement(CargoActivityMatrix, {
-                activity: cargoModel.activity,
-              }),
-              () => drawCargoActivityFallback(ctx, cargoModel.activity),
-            );
+            drawCargoActivityFallback(ctx, cargoModel.activity);
           }
         } else if (cargoModel.activity.total > 0) {
-          await embedReactChartOrFallback(
-            ctx,
-            createElement(CargoActivityMatrix, {
-              activity: cargoModel.activity,
-            }),
-            () => drawCargoActivityFallback(ctx, cargoModel.activity),
-            { heading: "Weekly Trend and Activity" },
-          );
+          drawCargoActivityFallback(ctx, cargoModel.activity);
         }
       }
 
-      // Operational pattern graphics — supply-chain exposure and the pattern
-      // dashboard. Each is the SAME React component the preview renders,
-      // rasterised here, and each answers a DIFFERENT analytical question
-      // (spec pt6). They carry their OWN internal GraphicFrame titles, and the
-      // preview renders them WITHOUT an external section heading — so no external
-      // drawSectionHeading here either (avoids double-titling, keeps preview==PDF).
+      // Supply-chain exposure and pattern dashboard — native PDF prose/bullets.
+      // html2canvas often rasterises these React graphics as blank off-screen pages.
       if (cargoModel.totalUnique > 0) {
-        await embedReactChartOrFallback(
+        drawCargoSupplyChainFallback(
           ctx,
-          createElement(CargoSupplyChainExposure, {
-            stages: cargoModel.stages,
-            total: cargoModel.totalUnique,
-            stageCategoryNote: cargoModel.stageCategoryNote,
-          }),
-          () =>
-            drawCargoSupplyChainFallback(
-              ctx,
-              cargoModel.stages,
-              cargoModel.stageCategoryNote,
-            ),
+          cargoModel.stages,
+          cargoModel.stageCategoryNote,
         );
-
-        await embedReactChartOrFallback(
-          ctx,
-          createElement(CargoPatternDashboard, {
-            patterns: cargoModel.patterns,
-          }),
-          () => drawCargoPatternFallback(ctx, cargoModel.patterns),
-        );
+        drawCargoPatternFallback(ctx, cargoModel.patterns);
       }
 
       // Enforcement outcomes — arrests, seizures and recoveries in their OWN
