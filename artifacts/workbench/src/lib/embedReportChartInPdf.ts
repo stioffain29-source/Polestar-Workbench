@@ -246,12 +246,25 @@ async function rasterizeSvgsToCanvas(host: HTMLElement): Promise<void> {
 function canvasIsMostlyBlank(canvas: HTMLCanvasElement): boolean {
   const ctx = canvas.getContext("2d");
   if (!ctx || canvas.width < 2 || canvas.height < 2) return true;
-  const sample = ctx.getImageData(0, 0, Math.min(canvas.width, 48), Math.min(canvas.height, 48)).data;
+  const probes = [
+    [0, 0],
+    [Math.floor(canvas.width * 0.35), Math.floor(canvas.height * 0.35)],
+    [Math.floor(canvas.width * 0.65), Math.floor(canvas.height * 0.65)],
+    [Math.max(0, canvas.width - 64), Math.max(0, canvas.height - 64)],
+  ];
   let nonWhite = 0;
-  for (let i = 0; i < sample.length; i += 4) {
-    if (sample[i] < 250 || sample[i + 1] < 250 || sample[i + 2] < 250) nonWhite++;
+  let total = 0;
+  for (const [sx, sy] of probes) {
+    const w = Math.min(64, canvas.width - sx);
+    const h = Math.min(64, canvas.height - sy);
+    if (w < 1 || h < 1) continue;
+    const sample = ctx.getImageData(sx, sy, w, h).data;
+    for (let i = 0; i < sample.length; i += 4) {
+      total++;
+      if (sample[i] < 248 || sample[i + 1] < 248 || sample[i + 2] < 248) nonWhite++;
+    }
   }
-  return nonWhite < 4;
+  return total === 0 || nonWhite / total < 0.008;
 }
 
 /**

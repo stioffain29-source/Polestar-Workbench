@@ -282,10 +282,14 @@ export function ensureSpace(ctx: Ctx, h: number) {
   if (ctx.y + h > ctx.H - ctx.BOTTOM) newPage(ctx);
 }
 
-export function drawSectionHeading(ctx: Ctx, title: string) {
+export function drawSectionHeading(
+  ctx: Ctx,
+  title: string,
+  opts?: { skipEnsureSpace?: boolean },
+) {
   // Reserve enough vertical room for the heading itself plus a couple of
   // lines of body so we never leave an orphan heading at the page foot.
-  ensureSpace(ctx, 70);
+  if (!opts?.skipEnsureSpace) ensureSpace(ctx, 70);
   // Breathing room above the heading when it follows other content on the
   // same page — reduced to decrease excessive gaps between sections.
   if (ctx.y > ctx.TOP + 4) ctx.y += 20;

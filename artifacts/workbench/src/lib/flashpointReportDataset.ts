@@ -505,7 +505,7 @@ const CEREMONIAL_EVENT_RE =
   /\b(air demonstration|flypast|fly[- ]?past|flyover|fly[- ]?over|military parade|ceremonial (?:flight|display)|anniversary of (?:the )?independence|independence (?:day|anniversary)|\d+\s+(?:tni\s+)?aircraft|aircraft and helicopters for an)\b/i;
 // Drug / smuggling arrests mis-tagged as roadblock or protest.
 const DRUG_CRIME_RE =
-  /\b(meth(?:amphetamine)?|narcotics?|cocaine|heroin|fentanyl|drugs?\s+(?:seized|found|recovered)|(?:held| caught| arrested) with \d+\s*(?:kg|kilos?|lb|pounds?) of|kg of meth|\d+kg of|drug (?:bust|seizure|smuggl)|smuggl\w*\s+(?:meth|drugs|narcotics))\b/i;
+  /\b(meth(?:amphetamine)?|narcotics?|cocaine|heroin|fentanyl|drugs?\s+(?:seized|found|recovered)|(?:held|caught|arrested)(?:\s+\w+){0,6}\s+with\s+\d+\s*(?:kg|kilos?|lb|pounds?) of|kg of meth|\d+\s*kg of|\d+kg of|drug (?:bust|seizure|smuggl)|smuggl\w*\s+(?:meth|drugs|narcotics))\b/i;
 // Rocket / space launch failures — not civil unrest.
 const ROCKET_SPACE_RE =
   /\b(rocket launch (?:failed|failure|anomaly)|long march\s*\d|space launch|satellite launch|flight anomaly|launch vehicle|missile test (?:failed|failure))\b/i;

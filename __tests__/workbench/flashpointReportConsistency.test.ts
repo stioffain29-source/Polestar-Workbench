@@ -295,6 +295,7 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.enriched.length).toBe(1);
     expect(ds.enriched[0]?.country).toBe("India");
+    expect(ds.unrestRows.some((r) => /166kg of meth/i.test(r.title))).toBe(false);
   });
 
   test("pickFlashpointAnalystProse uses auto when editor stub is thin", () => {

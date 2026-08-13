@@ -1,16 +1,17 @@
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
-import CargoTrendChart from "@/components/CargoTrendChart";
-import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import CargoSupplyChainExposure from "@/components/CargoSupplyChainExposure";
 import CargoPatternDashboard from "@/components/CargoPatternDashboard";
 import CargoActivityMatrix from "@/components/CargoActivityMatrix";
 import {
   buildCargoPatternModel,
   type CargoAppendixRow,
+  type CargoActivityMatrix,
+  type CargoPatternCard,
+  type CargoStageSummary,
 } from "./cargoPatternModel";
 import {
   createCtx,
@@ -172,6 +173,99 @@ function drawSimpleBarChart(
   pdf.setLineWidth(0.6);
   pdf.line(trackX, ctx.y + 2, trackX + trackW, ctx.y + 2);
   ctx.y += axisH + 6;
+}
+
+/** Native PDF fallback when React supply-chain graphic fails to rasterise. */
+function drawCargoSupplyChainFallback(
+  ctx: Ctx,
+  stages: CargoStageSummary[],
+  stageCategoryNote?: string,
+): void {
+  drawSectionHeading(ctx, "Supply-Chain Exposure");
+  renderProse(
+    ctx,
+    "Where this period's cargo incidents fall across the movement chain.",
+  );
+  const active = stages.filter((s) => s.key !== "unattributed" && s.count > 0);
+  if (active.length === 0) {
+    renderProse(ctx, "No incidents identified this period.");
+  } else {
+    renderProse(
+      ctx,
+      active
+        .map(
+          (s) =>
+            `${s.label}: ${s.count} incident${s.count === 1 ? "" : "s"} (${s.sharePct}% share)${s.mainCountry ? ` — mainly ${s.mainCountry}` : ""}.`,
+        )
+        .join("\n\n"),
+    );
+  }
+  if (stageCategoryNote?.trim()) renderProse(ctx, stageCategoryNote.trim());
+}
+
+/** Native PDF fallback when React pattern dashboard fails to rasterise. */
+function drawCargoPatternFallback(ctx: Ctx, patterns: CargoPatternCard[]): void {
+  drawSectionHeading(ctx, "Operational Patterns");
+  renderProse(
+    ctx,
+    "Leading incident types within the broader supply chain exposure.",
+  );
+  if (patterns.length === 0) {
+    renderProse(
+      ctx,
+      "No single category rose to a distinct operational pattern this period.",
+    );
+    return;
+  }
+  renderProse(
+    ctx,
+    patterns
+      .map(
+        (p) =>
+          `${p.name}: ${p.count} incident${p.count === 1 ? "" : "s"} (${p.sharePct}% share)${p.primaryGeography ? ` — ${p.primaryGeography}` : ""}. ${p.operationalConcern}`,
+      )
+      .join("\n\n"),
+  );
+}
+
+/** Native PDF fallback when the activity matrix fails to rasterise. */
+function drawCargoActivityFallback(ctx: Ctx, activity: CargoActivityMatrix): void {
+  drawSectionHeading(ctx, "Weekly Activity by Pattern");
+  if (activity.statement.trim()) {
+    renderProse(ctx, activity.statement);
+    return;
+  }
+  if (activity.sparseItems.length > 0) {
+    renderProse(
+      ctx,
+      activity.sparseItems
+        .slice(0, 8)
+        .map(
+          (i) =>
+            `${i.dateLabel}: ${i.pattern}${i.location ? ` (${i.location})` : ""} — ${i.severityLabel}.`,
+        )
+        .join("\n\n"),
+    );
+    return;
+  }
+  const weekLabels = activity.weeks.map((w) => w.label).join(", ");
+  renderProse(
+    ctx,
+    weekLabels
+      ? `Activity across ${activity.total} incidents distributed over ${weekLabels}.`
+      : "Insufficient dated activity to render the weekly matrix this period.",
+  );
+}
+
+/** Try React chart embed; draw native fallback when rasterisation fails. */
+async function embedReactChartOrFallback(
+  ctx: Ctx,
+  element: ReactElement,
+  fallback: () => void,
+  options: { heading?: string } = {},
+): Promise<void> {
+  const ok = await embedReactChartInPdf(ctx, element, options);
+  if (!ok) fallback();
 }
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
@@ -1329,66 +1423,48 @@ export async function exportTopicReportPdf(
       // external heading and the internal chart title agree. Caption strings are
       // data-derived in the model, so they render identically on screen and PDF.
       if (show("map") && cargoModel.intensity.size > 0) {
-        const mapOk = await embedReactChartInPdf(
-          ctx,
-          createElement(CargoChoroplethStatic, {
-            intensity: cargoModel.intensity,
-            title: cargoModel.mapTitle,
-          }),
-          { heading: cargoModel.mapTitle },
-        );
-        if (!mapOk) {
-          const rows = [...cargoModel.intensity.entries()]
-            .map(([label, v]) => ({
-              label,
-              value: v.count,
-              color: countBandColor(v.count) ?? ELECTRIC,
-            }))
-            .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-            .slice(0, 12);
-          drawSimpleBarChart(ctx, cargoModel.mapTitle, rows, {
-            caption: cargoModel.mapCaption.trim() || undefined,
-            emptyMessage: "No identified incident countries reported this week.",
-          });
-        } else if (cargoModel.mapCaption.trim()) {
-          renderProse(ctx, cargoModel.mapCaption);
-        }
+        const mapRows = [...cargoModel.intensity.entries()]
+          .map(([label, v]) => ({
+            label,
+            value: v.count,
+            color: countBandColor(v.count) ?? ELECTRIC,
+          }))
+          .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+          .slice(0, 12);
+        // Native PDF bars — html2canvas often rasterises choropleth SVGs blank off-screen.
+        drawSimpleBarChart(ctx, cargoModel.mapTitle, mapRows, {
+          caption: cargoModel.mapCaption.trim() || undefined,
+          emptyMessage: "No identified incident countries reported this period.",
+        });
       }
 
       // Weekly trend AND activity table combined under ONE heading (spec pt6) so
       // the PDF does not spend two near-duplicate pages on the same dataset.
       if (show("weekly-trend") && (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0)) {
         if (cargoModel.extras.trend.length >= 2) {
-          const trendOk = await embedReactChartInPdf(
-            ctx,
-            createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
-            { heading: "Weekly Trend and Activity" },
-          );
-          if (!trendOk) {
-            const rows = cargoModel.extras.trend.map((t) => ({
-              label: t.label ?? t.date,
-              value: t.count,
-            }));
-            drawSimpleBarChart(ctx, "Weekly Trend and Activity", rows);
-          }
-          if (cargoModel.trendCaption.trim())
-            renderProse(ctx, cargoModel.trendCaption);
+          const trendRows = cargoModel.extras.trend.map((t) => ({
+            label: t.label ?? t.date,
+            value: t.count,
+          }));
+          drawSimpleBarChart(ctx, "Weekly Trend and Activity", trendRows, {
+            caption: cargoModel.trendCaption.trim() || undefined,
+          });
           if (cargoModel.activity.total > 0) {
-            await embedReactChartInPdf(
+            await embedReactChartOrFallback(
               ctx,
               createElement(CargoActivityMatrix, {
                 activity: cargoModel.activity,
               }),
+              () => drawCargoActivityFallback(ctx, cargoModel.activity),
             );
           }
         } else if (cargoModel.activity.total > 0) {
-          // No trend line (too few periods) — the activity matrix carries its own
-          // internal title, so give it the combined section heading.
-          await embedReactChartInPdf(
+          await embedReactChartOrFallback(
             ctx,
             createElement(CargoActivityMatrix, {
               activity: cargoModel.activity,
             }),
+            () => drawCargoActivityFallback(ctx, cargoModel.activity),
             { heading: "Weekly Trend and Activity" },
           );
         }
@@ -1401,20 +1477,27 @@ export async function exportTopicReportPdf(
       // preview renders them WITHOUT an external section heading — so no external
       // drawSectionHeading here either (avoids double-titling, keeps preview==PDF).
       if (cargoModel.totalUnique > 0) {
-        await embedReactChartInPdf(
+        await embedReactChartOrFallback(
           ctx,
           createElement(CargoSupplyChainExposure, {
             stages: cargoModel.stages,
             total: cargoModel.totalUnique,
             stageCategoryNote: cargoModel.stageCategoryNote,
           }),
+          () =>
+            drawCargoSupplyChainFallback(
+              ctx,
+              cargoModel.stages,
+              cargoModel.stageCategoryNote,
+            ),
         );
 
-        await embedReactChartInPdf(
+        await embedReactChartOrFallback(
           ctx,
           createElement(CargoPatternDashboard, {
             patterns: cargoModel.patterns,
           }),
+          () => drawCargoPatternFallback(ctx, cargoModel.patterns),
         );
       }
 

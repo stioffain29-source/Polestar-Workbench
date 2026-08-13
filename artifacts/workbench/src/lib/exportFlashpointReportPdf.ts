@@ -242,14 +242,10 @@ function niceScale(rawMax: number): { max: number; step: number } {
   return { max, step: Math.max(step, 1) };
 }
 
-function drawHorizontalBarChart(
-  ctx: Ctx,
-  heading: string,
+function horizontalBarChartBodyHeight(
   rows: BarRow[],
-  opts: { labelW?: number; barColor?: string; emptyMessage?: string; caption?: string } = {},
-) {
-  const labelW = opts.labelW ?? 160;
-  const valueW = 34;
+  opts: { caption?: string } = {},
+): number {
   const rowH = 20;
   const gap = 5;
   const axisH = 14;
@@ -257,9 +253,34 @@ function drawHorizontalBarChart(
   const captionH = opts.caption && rows.length > 0 ? 14 : 0;
   const projectedH =
     rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
+  return headingH + captionH + projectedH;
+}
+
+function drawHorizontalBarChart(
+  ctx: Ctx,
+  heading: string,
+  rows: BarRow[],
+  opts: {
+    labelW?: number;
+    barColor?: string;
+    emptyMessage?: string;
+    caption?: string;
+    skipEnsureSpace?: boolean;
+  } = {},
+) {
+  const labelW = opts.labelW ?? 160;
+  const valueW = 34;
+  const rowH = 20;
+  const gap = 5;
+  const axisH = 14;
+  const captionH = opts.caption && rows.length > 0 ? 14 : 0;
+  const projectedH =
+    rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
   // Reserve room for heading + caption + chart body together so the
   // heading cannot strand at the bottom of a page above an orphaned chart.
-  ensureSpace(ctx, headingH + captionH + projectedH);
+  if (!opts.skipEnsureSpace) {
+    ensureSpace(ctx, 22 + captionH + projectedH);
+  }
   drawSubtitle(ctx, heading);
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
@@ -654,23 +675,23 @@ export async function exportFlashpointReportPdf(
     renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
   }
 
-  // Regional and Country View — chart first so page balance is tighter
-  // when prose is short (owner-flagged: page 4 excessive whitespace).
+  // Regional and Country View — keep section heading + chart on one page
+  // (owner-flagged: orphaned heading stranded above the country chart).
   if (show("regional")) {
-    drawSectionHeading(ctx, "Regional and Country View");
-    drawHorizontalBarChart(
-      ctx,
+    const chartCaption =
+      "Bar length shows incident count; colour shows the highest severity reported in each country.";
+    const chartTitle =
       ds.countryRows.length >= 12
         ? "Incidents by Country (Top 12)"
-        : "Incidents by Country",
-      ds.countryRows,
-      {
-        labelW: 160,
-        emptyMessage: "No identified incident countries reported this week.",
-        caption:
-          "Bar length shows incident count; colour shows the highest severity reported in each country.",
-      },
-    );
+        : "Incidents by Country";
+    ensureSpace(ctx, 70 + horizontalBarChartBodyHeight(ds.countryRows, { caption: chartCaption }));
+    drawSectionHeading(ctx, "Regional and Country View", { skipEnsureSpace: true });
+    drawHorizontalBarChart(ctx, chartTitle, ds.countryRows, {
+      labelW: 160,
+      emptyMessage: "No identified incident countries reported this week.",
+      caption: chartCaption,
+      skipEnsureSpace: true,
+    });
     renderProse(ctx, pickRead(data.regionalCountryRead, ds.regionalCountryRead));
   }
 
