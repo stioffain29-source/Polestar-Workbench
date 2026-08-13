@@ -315,9 +315,26 @@ const GENERIC_FLASHPOINT_PROSE: string[] = [
 ];
 
 export function isGenericFlashpointProse(text: string | null | undefined): boolean {
-  const t = (text ?? "").toLowerCase();
+  const t = (text ?? "").trim().toLowerCase();
   if (!t) return false;
   return GENERIC_FLASHPOINT_PROSE.some((sig) => t.includes(sig));
+}
+
+/**
+ * Pick analyst-section prose (What Matters, Implications, Watch Next,
+ * Polestar View). Editor text replaces auto ONLY when it is a substantive
+ * custom write (>= 240 chars). Thin editor stubs and generic seed packs are
+ * discarded in favour of the data-driven auto-prose so the section never
+ * stacks two near-duplicate blocks (owner-flagged What Matters defect).
+ */
+export function pickFlashpointAnalystProse(
+  editor: string | null | undefined,
+  auto: string,
+): string {
+  const t = (editor ?? "").trim();
+  if (!t || isGenericFlashpointProse(t)) return auto;
+  if (t.length >= 240) return t;
+  return auto;
 }
 
 // --- Scope filter ----------------------------------------------------------
@@ -480,6 +497,18 @@ const MOVEMENT_TREND_RE =
   /\b(?:(?:protest|youth|gen z|opposition)\s+movement|protest movement)\b[^.!?]{0,50}\b(keeps|continues to|maintains|builds|turns up|turns the|still has|still puts)\b/i;
 const COLON_FEATURE_RE =
   /^[^:]{10,100}:\s+[A-Z][^,]{2,},\s+[A-Z]/;
+// Stock-market / equity "rally" homonyms — NOT a street protest.
+const STOCK_MARKET_RALLY_RE =
+  /\b(?:(?:stock|share|equity|chip(?:maker)?|semiconductor)s?\s+(?:rally|rallies|surge|rise|gain|jump|rebound)|(?:rally|rallies|surge|rise|gain|jump|rebound)s?\s+(?:as|on|after)\s+(?:foreign\s+)?(?:interest|inflow|buying|returns)|foreign interest returns|(?:kospi|kosdaq|nikkei|sensex|nifty|hang seng)\b|(?:samsung|sk hynix|hynix)\b[^.]{0,40}\b(?:rally|rallies|surge|rise|gain|jump|rebound|stock))\b/i;
+// Ceremonial military / independence displays — not public-order incidents.
+const CEREMONIAL_EVENT_RE =
+  /\b(air demonstration|flypast|fly[- ]?past|flyover|fly[- ]?over|military parade|ceremonial (?:flight|display)|anniversary of (?:the )?independence|independence (?:day|anniversary)|\d+\s+(?:tni\s+)?aircraft|aircraft and helicopters for an)\b/i;
+// Drug / smuggling arrests mis-tagged as roadblock or protest.
+const DRUG_CRIME_RE =
+  /\b(meth(?:amphetamine)?|narcotics?|cocaine|heroin|fentanyl|drugs?\s+(?:seized|found|recovered)|(?:held| caught| arrested) with \d+\s*(?:kg|kilos?|lb|pounds?) of|kg of meth|\d+kg of|drug (?:bust|seizure|smuggl)|smuggl\w*\s+(?:meth|drugs|narcotics))\b/i;
+// Rocket / space launch failures — not civil unrest.
+const ROCKET_SPACE_RE =
+  /\b(rocket launch (?:failed|failure|anomaly)|long march\s*\d|space launch|satellite launch|flight anomaly|launch vehicle|missile test (?:failed|failure))\b/i;
 // Foreign labour action carrying a stray APAC country tag because an APAC
 // outlet syndicated it. The Icelandic "Eimskip" seafarers' dispute is the
 // recurring case — it is mislabelled Philippines and pollutes that country
@@ -632,6 +661,10 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (ANALYSIS_COMMENTARY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (MOVEMENT_TREND_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (COLON_FEATURE_RE.test(r.title ?? "") && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (STOCK_MARKET_RALLY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (CEREMONIAL_EVENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (DRUG_CRIME_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (ROCKET_SPACE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Foreign labour action mislabelled into an APAC country (Eimskip).
   if (FOREIGN_ENTITY_MISLABEL_RE.test(text)) return true;
   // SEO comma-spam / multi-script keyword-stuffed captions.
@@ -662,13 +695,23 @@ const COVERAGE_CITY_RE = /\b(sydney|melbourne|canberra|brisbane|port moresby|jay
 // only; em-dashes (—) are left intact (they separate real clauses).
 function stripMasthead(title: string): string {
   let t = (title ?? "").trim();
+  // Blog-aggregator prefixes ("Business.Scoop » …").
+  t = t.replace(/^[\w.]+\s*scoops?\s*[\u00bb\u203a>]\s*/i, "").trim();
+  // Peel trailing outlet chains: "… - ABC News & Headlines - Australian Broadcasting Corporation".
+  const OUTLET_TAIL_RE =
+    /\s+[-\u2013|»\u203a]\s+(?:the\s+)?(?:[A-Z0-9][\w.'&-]*\s+){0,8}(?:news|times|post|herald|gazette|telegraph|tribune|journal|standard|observer|guardian|broadcast(?:ing)?|corporation|corp|scoops?|\.com|\.net|\.org|abc|bbc|reuters|afp)\b[^-]*$/i;
+  for (let i = 0; i < 8; i++) {
+    const next = t.replace(OUTLET_TAIL_RE, "").trim();
+    if (next === t) break;
+    t = next;
+  }
   // Peel trailing " - <publisher>" / " | <publisher>" segments. Split on the
   // LAST space-padded ASCII " - " / " | " and treat the tail as a masthead when
   // it is short (<= 6 words); the tail may itself contain hyphens/dots
   // ("Journal-News.com", "bdtonline.com"). Keep a >= 2-word head so a real
   // clause is never consumed. em-dashes (—) are not delimiters here.
   for (let i = 0; i < 5; i++) {
-    const m = t.match(/^(.*\S)\s+[-|]\s+(.+)$/);
+    const m = t.match(/^(.*\S)\s+[-|»\u203a]\s+(.+)$/);
     if (!m) break;
     const head = m[1].trim();
     if (m[2].trim().split(/\s+/).length > 6) break;
@@ -680,6 +723,11 @@ function stripMasthead(title: string): string {
   const pipe = t.indexOf(" | ");
   if (pipe > 0) {
     const lead = t.slice(0, pipe).trim();
+    if (lead.split(/\s+/).length >= 2) t = lead;
+  }
+  const guillemet = t.indexOf(" » ");
+  if (guillemet > 0) {
+    const lead = t.slice(0, guillemet).trim();
     if (lead.split(/\s+/).length >= 2) t = lead;
   }
   return t;

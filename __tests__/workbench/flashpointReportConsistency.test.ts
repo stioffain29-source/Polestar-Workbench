@@ -15,6 +15,8 @@
 import {
   buildFlashpointReportDataset,
   validateFlashpointReportDataset,
+  pickFlashpointAnalystProse,
+  cleanDisplayTitle,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
 import { locationForeignToCountry } from "../../artifacts/workbench/src/lib/upcomingSignals";
@@ -280,5 +282,38 @@ describe("flashpoint report consistency", () => {
     expect(ds.autoImplications).not.toMatch(/South Asia, East Asia/);
     expect(ds.autoImplications).toMatch(/near Dhaka/);
     expect(ds.autoImplications).not.toMatch(/named campuses/);
+  });
+
+  test("stock rally, ceremonial demo, drug crime and rocket launch are excluded", () => {
+    const rows = [
+      inc({ title: "Samsung and SK Hynix rally as foreign interest returns to South Korea", country: "South Korea" }),
+      inc({ title: "The moment of the 81st Anniversary of the Independence of the Republic of Indonesia, involving 81 TNI aircraft", country: "Indonesia" }),
+      inc({ title: "Malaysian driver held in Thailand with 166kg of meth", country: "Thailand", location: "Bangkok" }),
+      inc({ title: "China says Long March 7A rocket launch failed after flight anomaly", country: "China" }),
+      inc({ title: "Indian police fire tear gas to disperse youth protesters", country: "India", severity: "high", location: "Delhi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.enriched.length).toBe(1);
+    expect(ds.enriched[0]?.country).toBe("India");
+  });
+
+  test("pickFlashpointAnalystProse uses auto when editor stub is thin", () => {
+    const auto = "What matters most this week is that activity is spread across South Asia.";
+    const thin = "The practical concerns are staff movement, site access and keeping staff informed.";
+    expect(pickFlashpointAnalystProse(thin, auto)).toBe(auto);
+    expect(pickFlashpointAnalystProse("", auto)).toBe(auto);
+  });
+
+  test("cleanDisplayTitle strips chained outlet mastheads", () => {
+    expect(
+      cleanDisplayTitle(
+        "Sunshine rally demands more police - ABC News & Headlines - Australian Broadcasting Corporation",
+      ),
+    ).toBe("Sunshine rally demands more police");
+    expect(
+      cleanDisplayTitle(
+        "Business.Scoop » Wellington Households To March Against Tiaki Wai",
+      ),
+    ).toBe("Wellington Households To March Against Tiaki Wai");
   });
 });

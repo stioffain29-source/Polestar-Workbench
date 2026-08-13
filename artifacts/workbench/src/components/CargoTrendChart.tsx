@@ -65,7 +65,7 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           {total} record{total === 1 ? "" : "s"} across {data.length} weeks
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} style={{ display: "block" }}>
         {/* Axes */}
         <line x1={padL} y1={padT} x2={padL} y2={H - padB} stroke={POLAR} strokeWidth={1} />
         <line x1={padL} y1={H - padB} x2={W - padR} y2={H - padB} stroke={POLAR} strokeWidth={1} />

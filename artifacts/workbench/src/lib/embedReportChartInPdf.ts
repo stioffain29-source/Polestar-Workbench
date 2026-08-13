@@ -2,7 +2,7 @@ import html2canvas from "html2canvas";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { ReactElement } from "react";
-import { ensureSpace, drawSectionHeading, type Ctx } from "./pdfChrome";
+import { ensureSpace, drawSectionHeading, setRoboto, setText, type Ctx } from "./pdfChrome";
 
 /** Optional section heading kept together with the chart image (see below). */
 export interface EmbedChartOptions {
@@ -183,7 +183,7 @@ export async function embedReactChartInPdf(
   ctx: Ctx,
   element: ReactElement,
   options: EmbedChartOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   // Charts rasterise to a PNG image (no embedded text), so a headless run —
   // e.g. the font-audit exporter, which has no DOM — can safely skip them. Guard
   // here before renderElementToHtml touches `document`; embedChartMarkupInPdf
@@ -195,27 +195,81 @@ export async function embedReactChartInPdf(
       "[embedReportChartInPdf] Chart embedding requires a browser DOM. " +
         "Use the in-app Download PDF button or exportReportPdfBrowser.mjs.",
     );
-    return;
+    return false;
   }
   const html = renderElementToHtml(element);
-  await embedChartMarkupInPdf(ctx, html, options);
+  return embedChartMarkupInPdf(ctx, html, options);
+}
+
+/**
+ * html2canvas often rasterises inline <svg> as blank/white when the host is
+ * off-screen. Swap each SVG for a browser-drawn <canvas> (bitmap) before
+ * capture so Cargo Watch choropleth / trend charts survive into the PDF.
+ */
+async function rasterizeSvgsToCanvas(host: HTMLElement): Promise<void> {
+  const svgs = Array.from(host.querySelectorAll("svg"));
+  for (const svg of svgs) {
+    const vb = svg.viewBox.baseVal;
+    const attrW = parseFloat(svg.getAttribute("width") ?? "");
+    const attrH = parseFloat(svg.getAttribute("height") ?? "");
+    const rect = svg.getBoundingClientRect();
+    const w = vb.width > 0 ? vb.width : (Number.isFinite(attrW) && attrW > 0 ? attrW : rect.width) || 640;
+    const h = vb.height > 0 ? vb.height : (Number.isFinite(attrH) && attrH > 0 ? attrH : rect.height) || 240;
+    if (w < 1 || h < 1) continue;
+
+    const xml = new XMLSerializer().serializeToString(svg);
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("SVG rasterize failed"));
+      img.src = url;
+    });
+
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(w * scale));
+    canvas.height = Math.max(1, Math.round(h * scale));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    canvas.style.display = "block";
+    canvas.style.margin = svg.style.margin || "0 auto";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) continue;
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0, w, h);
+    svg.replaceWith(canvas);
+  }
+}
+
+/** True when a rasterised capture is effectively blank (failed SVG/layout). */
+function canvasIsMostlyBlank(canvas: HTMLCanvasElement): boolean {
+  const ctx = canvas.getContext("2d");
+  if (!ctx || canvas.width < 2 || canvas.height < 2) return true;
+  const sample = ctx.getImageData(0, 0, Math.min(canvas.width, 48), Math.min(canvas.height, 48)).data;
+  let nonWhite = 0;
+  for (let i = 0; i < sample.length; i += 4) {
+    if (sample[i] < 250 || sample[i + 1] < 250 || sample[i + 2] < 250) nonWhite++;
+  }
+  return nonWhite < 4;
 }
 
 /**
  * Rasterise pre-rendered chart markup into the PDF body at the current cursor.
+ * Returns false when capture failed (blank raster) so callers can draw a fallback.
  */
 export async function embedChartMarkupInPdf(
   ctx: Ctx,
   html: string,
   options: EmbedChartOptions = {},
-): Promise<void> {
+): Promise<boolean> {
   if (typeof document === "undefined") {
     if (options.heading) drawSectionHeading(ctx, options.heading);
     console.warn(
       "[embedReportChartInPdf] Chart embedding requires a browser DOM. " +
         "Use the in-app Download PDF button or exportReportPdfBrowser.mjs.",
     );
-    return;
+    return false;
   }
 
   const widthPt = ctx.CW;
@@ -244,12 +298,22 @@ export async function embedChartMarkupInPdf(
 
   try {
     await waitForFonts();
+    // Force layout so percentage-width SVGs resolve before capture.
+    void host.offsetHeight;
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
     // html2canvas draws CSS text baselines low, so the cargo pattern graphics'
     // severity/tag pills and numbered stage markers would sit low in the exported
     // PDF. Swap each tagged chip/numeral for a browser-drawn <canvas>
     // (textBaseline:"middle") BEFORE rasterising so the labels are genuinely
     // centred. Sized to each element's measured box, so preview==PDF holds.
     rasteriseChipsToCanvas(host);
+    // SVG paths/colours often capture as blank white when the host is off-screen;
+    // pre-rasterise to bitmap so Cargo Watch map/trend charts render in PDF.
+    try {
+      await rasterizeSvgsToCanvas(host);
+    } catch (err) {
+      console.warn("[embedReportChartInPdf] SVG pre-rasterize failed", err);
+    }
     const canvas = await html2canvas(host, {
       scale: 1.5,
       backgroundColor: "#ffffff",
@@ -257,6 +321,27 @@ export async function embedChartMarkupInPdf(
       width: widthPt,
       windowWidth: widthPt,
     });
+
+    if (canvasIsMostlyBlank(canvas)) {
+      console.warn(
+        "[embedReportChartInPdf] Chart rasterised blank — check SVG/layout in the export host.",
+      );
+      if (options.heading) {
+        ensureSpace(ctx, HEADING_RESERVE + 30);
+        drawSectionHeading(ctx, options.heading);
+      }
+      setText(ctx.pdf, "#363636");
+      setRoboto(ctx.pdf, "italic");
+      ctx.pdf.setFontSize(9);
+      ctx.pdf.text(
+        "Chart could not be rendered in this export. Re-download from the in-app preview.",
+        ctx.MX,
+        ctx.y + 10,
+      );
+      setRoboto(ctx.pdf, "regular");
+      ctx.y += 22;
+      return false;
+    }
 
     let imgW = widthPt;
     let imgH = (canvas.height / canvas.width) * widthPt;
@@ -312,6 +397,7 @@ export async function embedChartMarkupInPdf(
       imgH,
     );
     ctx.y += imgH + 8;
+    return true;
   } finally {
     document.body.removeChild(host);
   }

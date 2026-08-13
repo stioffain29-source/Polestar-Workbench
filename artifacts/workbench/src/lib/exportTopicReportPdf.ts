@@ -100,6 +100,79 @@ import {
   buildLogisticsHubRead,
   buildCargoCountryBreakdown,
 } from "./cargoNarratives";
+import { countBandColor } from "./cargoChoropleth";
+
+const ELECTRIC = "#465bff";
+
+/** jsPDF-native horizontal bar chart — fallback when html2canvas embed fails. */
+function drawSimpleBarChart(
+  ctx: Ctx,
+  heading: string,
+  rows: Array<{ label: string; value: number; color?: string }>,
+  opts: { caption?: string; emptyMessage?: string } = {},
+): void {
+  const labelW = 160;
+  const valueW = 34;
+  const rowH = 20;
+  const gap = 5;
+  const axisH = 14;
+  const headingH = 22;
+  const captionH = opts.caption ? 14 : 0;
+  const projectedH = rows.length === 0 ? 30 : rows.length * (rowH + gap) + axisH + 6;
+  ensureSpace(ctx, headingH + captionH + projectedH);
+  drawSectionHeading(ctx, heading);
+  const { pdf, MX, CW } = ctx;
+  if (rows.length === 0) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(9);
+    pdf.text(sanitize(opts.emptyMessage ?? "No data reported this week."), MX, ctx.y + 10);
+    setRoboto(pdf, "regular");
+    ctx.y += 22;
+    return;
+  }
+  if (opts.caption) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "italic");
+    pdf.setFontSize(8);
+    pdf.text(sanitize(opts.caption), MX, ctx.y + 6);
+    setRoboto(pdf, "regular");
+    ctx.y += captionH;
+  }
+  const trackX = MX + labelW + 6;
+  const trackW = CW - labelW - 6 - valueW - 6;
+  const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rawMax)));
+  const norm = rawMax / pow10;
+  const niceNorm = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10;
+  const max = niceNorm * pow10;
+  const step = (niceNorm <= 2 ? niceNorm / 2 : niceNorm / 5) * pow10 || 1;
+
+  for (const r of rows) {
+    const y = ctx.y;
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(9.5);
+    pdf.text(sanitize(r.label).slice(0, 28), MX, y + rowH - 7);
+    setFill(pdf, "#F3F4F8");
+    pdf.rect(trackX, y + 4, trackW, rowH - 8, "F");
+    const w = (r.value / max) * trackW;
+    if (w > 0) {
+      setFill(pdf, r.color ?? ELECTRIC);
+      pdf.rect(trackX, y + 4, w, rowH - 8, "F");
+    }
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(9.5);
+    pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 7);
+    setRoboto(pdf, "regular");
+    ctx.y += rowH + gap;
+  }
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.6);
+  pdf.line(trackX, ctx.y + 2, trackX + trackW, ctx.y + 2);
+  ctx.y += axisH + 6;
+}
 
 /** Thrown by exportTopicReportPdf when Fuel Watch is missing required
  *  market data and the caller did not pass allowMissingMarketData. The
@@ -1256,7 +1329,7 @@ export async function exportTopicReportPdf(
       // external heading and the internal chart title agree. Caption strings are
       // data-derived in the model, so they render identically on screen and PDF.
       if (show("map") && cargoModel.intensity.size > 0) {
-        await embedReactChartInPdf(
+        const mapOk = await embedReactChartInPdf(
           ctx,
           createElement(CargoChoroplethStatic, {
             intensity: cargoModel.intensity,
@@ -1264,18 +1337,40 @@ export async function exportTopicReportPdf(
           }),
           { heading: cargoModel.mapTitle },
         );
-        if (cargoModel.mapCaption.trim()) renderProse(ctx, cargoModel.mapCaption);
+        if (!mapOk) {
+          const rows = [...cargoModel.intensity.entries()]
+            .map(([label, v]) => ({
+              label,
+              value: v.count,
+              color: countBandColor(v.count) ?? ELECTRIC,
+            }))
+            .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+            .slice(0, 12);
+          drawSimpleBarChart(ctx, cargoModel.mapTitle, rows, {
+            caption: cargoModel.mapCaption.trim() || undefined,
+            emptyMessage: "No identified incident countries reported this week.",
+          });
+        } else if (cargoModel.mapCaption.trim()) {
+          renderProse(ctx, cargoModel.mapCaption);
+        }
       }
 
       // Weekly trend AND activity table combined under ONE heading (spec pt6) so
       // the PDF does not spend two near-duplicate pages on the same dataset.
       if (show("weekly-trend") && (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0)) {
         if (cargoModel.extras.trend.length >= 2) {
-          await embedReactChartInPdf(
+          const trendOk = await embedReactChartInPdf(
             ctx,
             createElement(CargoTrendChart, { data: cargoModel.extras.trend }),
             { heading: "Weekly Trend and Activity" },
           );
+          if (!trendOk) {
+            const rows = cargoModel.extras.trend.map((t) => ({
+              label: t.label ?? t.date,
+              value: t.count,
+            }));
+            drawSimpleBarChart(ctx, "Weekly Trend and Activity", rows);
+          }
           if (cargoModel.trendCaption.trim())
             renderProse(ctx, cargoModel.trendCaption);
           if (cargoModel.activity.total > 0) {

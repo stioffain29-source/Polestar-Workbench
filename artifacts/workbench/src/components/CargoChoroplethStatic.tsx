@@ -107,6 +107,8 @@ export default function CargoChoroplethStatic({
   title = "Cargo Theft Incidents by Country",
 }: CargoChoroplethStaticProps) {
   const { width: W, height: H, project } = projection;
+  const svgW = Math.round(W * 0.88);
+  const svgH = Math.round(H * 0.88);
   let maxCount = 0;
   for (const v of intensity.values()) {
     if (v.count > maxCount) maxCount = v.count;
@@ -142,7 +144,8 @@ export default function CargoChoroplethStatic({
           component, so preview==PDF. */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        width="88%"
+        width={svgW}
+        height={svgH}
         style={{ display: "block", margin: "0 auto" }}
       >
         {geo.features.map((f, idx) => {

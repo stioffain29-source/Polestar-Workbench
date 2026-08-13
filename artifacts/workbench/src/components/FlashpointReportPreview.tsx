@@ -11,7 +11,7 @@ import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
-  isGenericFlashpointProse,
+  pickFlashpointAnalystProse,
   type FlashpointReportIncident,
   type KpiCard,
   type BarRow,
@@ -58,19 +58,11 @@ function sevKey(s: string | null | undefined): string {
   return (s ?? "").toLowerCase();
 }
 
-// Match exportFlashpointReportPdf.pickProse: editor text wins only when
-// it carries substance (>= 240 chars) AND is not a recognised generic
-// seed. Canned template prose (from the legacy draftReportProse packs,
-// e.g. "Operational tempo, not headline severity") is always replaced
-// by the dataset's data-driven auto-prose — even when it is long enough
-// to clear the substance bar — so already-saved reports stop showing
-// the boilerplate without a reseed. Genuine short analyst notes are
-// preserved (appended ahead of the auto-prose).
+// Match exportFlashpointReportPdf: editor text replaces auto ONLY when it is
+// a substantive custom write (>= 240 chars). Thin stubs use auto alone so
+// What Matters never stacks two near-duplicate blocks.
 function pickProse(editor: string | null | undefined, auto: string): string {
-  const t = (editor ?? "").trim();
-  if (!t || isGenericFlashpointProse(t)) return auto;
-  if (t.length >= 240) return t;
-  return `${t}\n\n${auto}`;
+  return pickFlashpointAnalystProse(editor, auto);
 }
 
 // Data-driven "reads" (Activism, Civil Unrest, Forecast, Regional) are full
