@@ -26,6 +26,8 @@ export interface IncidentMapProps {
   /** Text shown as the primary point's label when showLabels is on. */
   locationLabel?: string;
   height?: number;
+  /** Render as a square (height = width) instead of the fixed pixel height. */
+  square?: boolean;
 }
 
 /**
@@ -43,6 +45,7 @@ export default function IncidentMap({
   showLabels,
   locationLabel,
   height = 360,
+  square = false,
 }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -279,7 +282,10 @@ export default function IncidentMap({
         id={domId}
         ref={containerRef}
         style={{
-          height,
+          // A square aspect ratio (country report maps) derives height from the
+          // rendered width, so the map stays square at any page width and in the
+          // DOM-rasterised PDF; otherwise the fixed pixel height applies.
+          ...(square ? { aspectRatio: "1 / 1" } : { height }),
           width: "100%",
           position: "relative",
           border: `1px solid ${POLAR}`,

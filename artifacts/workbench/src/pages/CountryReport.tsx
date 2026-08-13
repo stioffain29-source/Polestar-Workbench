@@ -1493,7 +1493,7 @@ export default function CountryReport() {
     setSectionOverrides((ov) => ({ ...ov, mapMarkers: next }));
   const mapNode = (
     <div data-pdf-keep="true">
-      <IncidentMap points={countryMapPoints} domId="country-report-map" height={360} showLabels />
+      <IncidentMap points={countryMapPoints} domId="country-report-map" square showLabels />
       {editing && (
         <div
           className="no-print"
