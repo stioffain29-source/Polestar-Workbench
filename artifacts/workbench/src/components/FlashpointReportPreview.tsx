@@ -18,6 +18,7 @@ import {
   type EnrichedIncident,
   FLASHPOINT_SEV_LABEL,
 } from "@/lib/flashpointReportDataset";
+import { pickFlashpointRead } from "@/lib/pickRead";
 import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
@@ -69,7 +70,7 @@ function pickProse(
   return resolveFlashpointAnalystProse(editor, ai, auto);
 }
 
-import { pickFlashpointRead } from "@/lib/pickRead";
+export interface FlashpointPreviewReport {
   title?: string;
   topic?: string;
   issueDate?: string;
