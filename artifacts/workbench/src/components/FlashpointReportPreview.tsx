@@ -69,16 +69,7 @@ function pickProse(
   return resolveFlashpointAnalystProse(editor, ai, auto);
 }
 
-// Data-driven "reads" (Activism, Civil Unrest, Forecast, Regional) are full
-// section bodies, not short analyst notes: a saved override REPLACES the
-// generated read outright; a blank value falls back to the dataset read so
-// nothing is fabricated and the editor preview == the PDF.
-function pickRead(editor: string | null | undefined, auto: string): string {
-  const t = (editor ?? "").trim();
-  return t ? t : auto;
-}
-
-export interface FlashpointPreviewReport {
+import { pickFlashpointRead } from "@/lib/pickRead";
   title?: string;
   topic?: string;
   issueDate?: string;
@@ -456,7 +447,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("activism")} title="Activism and Protest Read">
-          <Paragraphs text={pickRead(report.activismRead, ds.activismRead)} />
+          <Paragraphs text={pickFlashpointRead(report.activismRead, ds.activismRead)} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.activismRows}
@@ -466,7 +457,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("civil-unrest")} title="Civil Unrest and Public Order Read">
-          <Paragraphs text={pickRead(report.civilUnrestRead, ds.civilUnrestRead)} />
+          <Paragraphs text={pickFlashpointRead(report.civilUnrestRead, ds.civilUnrestRead)} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.unrestRows}
@@ -500,7 +491,7 @@ export default function FlashpointReportPreview({
               </table>
             </div>
           )}
-          <Paragraphs text={pickRead(report.forecastRead, ds.forecastRead)} />
+          <Paragraphs text={pickFlashpointRead(report.forecastRead, ds.forecastRead)} />
         </Section>
 
         <Section hidden={!show("regional")} title="Regional and Country View">
@@ -521,7 +512,7 @@ export default function FlashpointReportPreview({
             )}
             <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No countries with reported activity this week." />
           </div>
-          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
+          <Paragraphs text={pickFlashpointRead(report.regionalCountryRead, ds.regionalCountryRead)} />
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">

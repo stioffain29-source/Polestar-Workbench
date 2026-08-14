@@ -87,6 +87,7 @@ import {
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
+import { resolveFlashpointReadOverride } from "@/lib/pickRead";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
@@ -1269,16 +1270,27 @@ export default function ReportEditor() {
       polestarView: pick(report.polestarView, draft.polestarView),
       watchNext: pick(report.watchNext, draft.watchNext),
       activismRead: fpReads
-        ? pick(report.activismRead, fpReads.activismRead)
+        ? proseIsStale
+          ? fpReads.activismRead
+          : resolveFlashpointReadOverride(report.activismRead, fpReads.activismRead)
         : "",
       civilUnrestRead: fpReads
-        ? pick(report.civilUnrestRead, fpReads.civilUnrestRead)
+        ? proseIsStale
+          ? fpReads.civilUnrestRead
+          : resolveFlashpointReadOverride(report.civilUnrestRead, fpReads.civilUnrestRead)
         : "",
       forecastRead: fpReads
-        ? pick(report.forecastRead, fpReads.forecastRead)
+        ? proseIsStale
+          ? fpReads.forecastRead
+          : resolveFlashpointReadOverride(report.forecastRead, fpReads.forecastRead)
         : "",
       regionalCountryRead: fpReads
-        ? pick(report.regionalCountryRead, fpReads.regionalCountryRead)
+        ? proseIsStale
+          ? fpReads.regionalCountryRead
+          : resolveFlashpointReadOverride(
+              report.regionalCountryRead,
+              fpReads.regionalCountryRead,
+            )
         : "",
       // Topic-specific reads (shipping/cargo/fuel/conflict) seed SAVED-ONLY:
       // pick(saved, "") drops stale saved prose and otherwise returns the saved
@@ -1464,28 +1476,30 @@ export default function ReportEditor() {
       if (!keepReads.has(key)) delete payload[key];
     }
 
-    // Flashpoint/protests seed PRE-FILLED with the generated read, so persist a
-    // read only when it differs from a freshly-generated dataset read; an
-    // untouched field stores "" (renders the live auto read). Shipping, cargo
-    // and fuel seed SAVED-ONLY (blank box), so their form value already IS the
-    // override and flows through {...payload} unchanged.
+    // Flashpoint/protests section reads seed SAVED-ONLY unless the issue
+    // window is stale: a blank field renders the live generated read at preview
+    // and export time. Previously saved auto-prose that no longer matches the
+    // current dataset output is discarded so code fixes cannot be blocked by
+    // an old machine-generated paragraph left in the DB.
     if (form.topic === "flashpoint" || form.topic === "protests") {
       const gen = buildFlashpointReportDataset(
         incidentsForExport,
         form.topic,
         form.issueDate,
       );
-      const overrideRead = (val: string, generated: string) => {
-        const t = (val ?? "").trim();
-        return t && t !== (generated ?? "").trim() ? t : "";
-      };
-      payload.activismRead = overrideRead(form.activismRead, gen.activismRead);
-      payload.civilUnrestRead = overrideRead(
+      payload.activismRead = resolveFlashpointReadOverride(
+        form.activismRead,
+        gen.activismRead,
+      );
+      payload.civilUnrestRead = resolveFlashpointReadOverride(
         form.civilUnrestRead,
         gen.civilUnrestRead,
       );
-      payload.forecastRead = overrideRead(form.forecastRead, gen.forecastRead);
-      payload.regionalCountryRead = overrideRead(
+      payload.forecastRead = resolveFlashpointReadOverride(
+        form.forecastRead,
+        gen.forecastRead,
+      );
+      payload.regionalCountryRead = resolveFlashpointReadOverride(
         form.regionalCountryRead,
         gen.regionalCountryRead,
       );

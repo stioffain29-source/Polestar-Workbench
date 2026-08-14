@@ -49,6 +49,7 @@ import {
   type BarRow,
   type ForecastFutureRow,
 } from "./flashpointReportDataset";
+import { pickFlashpointRead } from "./pickRead";
 
 // Flashpoint PDF. Section order (per final spec):
 //   Cover -> Executive Summary -> Fast Facts ->
@@ -78,16 +79,6 @@ export interface FlashpointReportData {
   forecastRead?: string | null;
   regionalCountryRead?: string | null;
 }
-
-// Data-driven reads are full sections, not analyst notes: a saved override
-// REPLACES the generated read; a blank value falls back to the dataset read so
-// nothing is fabricated and the in-app PDF == the on-screen preview.
-function pickRead(editor: string | null | undefined, auto: string): string {
-  const t = (editor ?? "").trim();
-  return t ? t : auto;
-}
-
-export type { FlashpointReportIncident };
 
 // --- Subtle bar styling helpers (kept local; identical math to shipping) ----
 function parseHex(hex: string): [number, number, number] {
@@ -639,7 +630,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Activism and Protest Read",
-      pickRead(data.activismRead, ds.activismRead),
+      pickFlashpointRead(data.activismRead, ds.activismRead),
     );
     drawIncidentTable(
       ctx,
@@ -654,7 +645,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Civil Unrest and Public Order Read",
-      pickRead(data.civilUnrestRead, ds.civilUnrestRead),
+      pickFlashpointRead(data.civilUnrestRead, ds.civilUnrestRead),
     );
     drawIncidentTable(
       ctx,
@@ -672,7 +663,7 @@ export async function exportFlashpointReportPdf(
     if (ds.forecastFuture.length > 0) {
       drawForecastFutureTable(ctx, ds.forecastFuture);
     }
-    renderProse(ctx, pickRead(data.forecastRead, ds.forecastRead));
+    renderProse(ctx, pickFlashpointRead(data.forecastRead, ds.forecastRead));
   }
 
   // Regional and Country View — keep section heading + chart on one page
@@ -692,7 +683,7 @@ export async function exportFlashpointReportPdf(
       caption: chartCaption,
       skipEnsureSpace: true,
     });
-    renderProse(ctx, pickRead(data.regionalCountryRead, ds.regionalCountryRead));
+    renderProse(ctx, pickFlashpointRead(data.regionalCountryRead, ds.regionalCountryRead));
   }
 
   // Editor-authored analyst sections. Editor text wins only when it
