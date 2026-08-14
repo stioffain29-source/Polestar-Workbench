@@ -275,6 +275,32 @@ describe("cargo watch report fixes", () => {
     expect(totalCard?.value).toBe(String(m.totalUnique));
   });
 
+  it("uses URL hostname as source fallback for Key Incidents validation", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Driver killed as armed gang steals container from truck park in India",
+        severity: "high",
+        occurredAt: "2026-07-20",
+        source: null,
+        sourceUrl: "https://www.thehindu.com/news/cargo-theft-example",
+        country: "India",
+      }),
+      inc({
+        id: 2,
+        title: "Warehouse theft at bonded depot in India",
+        severity: "moderate",
+        occurredAt: "2026-07-21",
+        source: "Reuters",
+        sourceUrl: "https://example.com/2",
+        country: "India",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.selected.every((r) => (r.source ?? "").trim() !== "")).toBe(true);
+    expect(m.selected.some((r) => r.severityKey === "high")).toBe(true);
+  });
+
   it("includes a High-rated incident in Key Incidents when one exists", () => {
     const rows = [
       inc({

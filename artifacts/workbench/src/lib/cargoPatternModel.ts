@@ -487,7 +487,7 @@ function finalizeSelectedIncidents(
   const hasId = (id: string) => out.some((r) => r.id === id);
 
   const requireRow = (row: CargoAppendixRow | undefined) => {
-    if (!row || hasId(row.id)) return;
+    if (!row || hasId(row.id) || !hasKeyIncidentSource(row)) return;
     if (out.length < max) {
       out.push(row);
       return;
@@ -504,16 +504,18 @@ function finalizeSelectedIncidents(
   };
 
   const highRow = appendix
-    .filter((r) => (SEV_RANK[r.severityKey] ?? 0) >= 4)
+    .filter((r) => (SEV_RANK[r.severityKey] ?? 0) >= 4 && hasKeyIncidentSource(r))
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))[0];
   requireRow(highRow);
 
   const latestRow = appendix
-    .filter((r) => (r.date ?? "").trim() !== "" && (r.source ?? "").trim() !== "")
+    .filter((r) => (r.date ?? "").trim() !== "" && hasKeyIncidentSource(r))
     .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))[0];
   requireRow(latestRow);
 
-  return out.sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
+  return out
+    .filter(hasKeyIncidentSource)
+    .sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id));
 }
 
 function dedupeEnforcementRows(rows: CargoAppendixRow[]): CargoAppendixRow[] {
@@ -734,12 +736,23 @@ function highestSeverity(primaries: CargoClusterInput[]): {
   return { key, label: key ? (SEV_LABEL[key] ?? key) : "—" };
 }
 
+function sourceLabelFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./i, "");
+    return /[A-Za-z]/.test(host) ? host : "";
+  } catch {
+    return "";
+  }
+}
+
 // The first source name that will actually RENDER (contains a Latin letter),
 // paired with its URL, drawn from a cluster's deduped source links. A wholly
 // non-Latin outlet name ("দৈনিক ইনকিলাব") shows on screen but blanks in the
 // Roboto PDF, so preferring a renderable name keeps preview == PDF and never
-// prints an empty "Source:" line. Returns blanks when nothing is renderable —
-// both renderers already skip a falsy source.
+// prints an empty "Source:" line. When only a URL is available, the hostname
+// is used as a Latin fallback so Key Incidents still pass the source gate.
+// Returns blanks when nothing is renderable — both renderers already skip a
+// falsy source.
 function renderableSourceLink(
   links: CargoSourceLink[],
 ): { source: string; sourceUrl: string } {
@@ -747,7 +760,21 @@ function renderableSourceLink(
     const s = (l.source ?? "").trim();
     if (/[A-Za-z]/.test(s)) return { source: s, sourceUrl: (l.url ?? "").trim() };
   }
+  for (const l of links) {
+    const url = (l.url ?? "").trim();
+    if (!url) continue;
+    const host = sourceLabelFromUrl(url);
+    if (host) return { source: host, sourceUrl: url };
+  }
+  for (const l of links) {
+    const s = (l.source ?? "").trim();
+    if (s) return { source: s, sourceUrl: (l.url ?? "").trim() };
+  }
   return { source: "", sourceUrl: "" };
+}
+
+function hasKeyIncidentSource(row: CargoAppendixRow): boolean {
+  return (row.source ?? "").trim() !== "";
 }
 
 // --- Second-pass syndication collapse -------------------------------------
@@ -1623,13 +1650,13 @@ export function buildCargoPatternModel(
   // sourced candidates. Fall back to the unfiltered set only when nothing has a
   // source, so a source-poor period still fills the section rather than blocking
   // on the validation gate.
-  const sourcedCandidates = candidates.filter((c) => (c.row.source ?? "").trim() !== "");
+  const sourcedCandidates = candidates.filter((c) => hasKeyIncidentSource(c.row));
   const selected = finalizeSelectedIncidents(
     selectIncidents(
       dedupeCandidateEvents(sourcedCandidates.length > 0 ? sourcedCandidates : candidates),
     ),
     appendix,
-  );
+  ).filter(hasKeyIncidentSource);
 
   // 9a. Enforcement panel — the deduped enforcement outcomes, as their own set
   //     of register rows, EXCLUDED from every operational total above. Rows are
