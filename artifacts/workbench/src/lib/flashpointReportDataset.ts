@@ -5,6 +5,7 @@ import { classifyIncidentType } from "./incidentClassifier";
 import { stripWireCruft } from "./incidentTitle";
 import {
   extractFutureSignals,
+  hasUpcomingSignal,
   shortSignalLabel,
   forecastMeaningFor,
   operationalMeaningFor,
@@ -192,6 +193,24 @@ function isInReportingPeriod(r: EnrichedIncident, win: { start: Date; end: Date 
   return eventMs >= startMs && eventMs <= refEnd.getTime();
 }
 
+/** True when source text names an event date outside the reporting window. */
+function isScheduledOutsideReportingPeriod(
+  r: { title?: string | null; summary?: string | null },
+  topic: string,
+  issueDate: string,
+): boolean {
+  const win = resolveReportWindow(topic, issueDate);
+  const refEnd = endOfReportDay(win.end);
+  const stated = normalizeStatedEventDate(r, refEnd);
+  if (!stated) return false;
+  const startMs = Date.UTC(
+    win.start.getUTCFullYear(),
+    win.start.getUTCMonth(),
+    win.start.getUTCDate(),
+  );
+  return stated.getTime() > refEnd.getTime() || stated.getTime() < startMs;
+}
+
 function forecastDateHasPassed(
   r: { title?: string | null; summary?: string | null },
   issueDate: Date,
@@ -212,6 +231,8 @@ function buildScreeningNote(args: {
   outOfScopeCrimeDropped: number;
   weakNoveltyDropped: number;
   weakOperationalDropped: number;
+  /** Usable rows whose stated event date falls outside the reporting window. */
+  forecastHeld: number;
 }): string {
   const excluded =
     args.offTopicDropped +
@@ -228,6 +249,11 @@ function buildScreeningNote(args: {
   }
   if (excluded > 0) {
     parts.push(`${excluded} excluded as off-topic or low-signal`);
+  }
+  if (args.forecastHeld > 0) {
+    parts.push(
+      `${args.forecastHeld} held for forecast (event date outside reporting period)`,
+    );
   }
   parts.push(`${args.distinct} distinct incident${args.distinct === 1 ? "" : "s"}`);
   return `${parts.join("; ")}.`;
@@ -1402,7 +1428,10 @@ export function selectFlashpointUsable(
       reject("weak-novelty", r);
       continue;
     }
-    if (isWeakOperational(r)) {
+    if (
+      isWeakOperational(r) &&
+      !(hasUpcomingSignal(r) && isScheduledOutsideReportingPeriod(r, topic, issueDate))
+    ) {
       weakOperationalDropped++;
       reject("weak-operational", r);
       continue;
@@ -1453,9 +1482,13 @@ export function buildFlashpointReportDataset(
   // already clean, so these are simple bucket splits ranked for table display.
   const activismRows = sortRowsForTable(enriched.filter((r) => r.bucket === "activism"));
   const unrestRows = sortRowsForTable(enriched.filter((r) => r.bucket === "unrest"));
-  const periodLeadPool = sortRowsForTable(
-    enriched.filter((r) => r.bucket === "activism" || r.bucket === "unrest"),
-  );
+  const forecastHeld = usableEnriched.length - enriched.length;
+  const activismLeadPool = sortRowsForTable([
+    ...activismRows,
+    ...unrestRows.filter(
+      (r) => hasConfirmedOperationalImpact(r) && !containedVenueNote(r),
+    ),
+  ]);
 
   // Fast Facts. The single top-severity incident is computed ONCE over the
   // full usable set and shared with every prose builder (Exec Summary,
@@ -1509,6 +1542,7 @@ export function buildFlashpointReportDataset(
     outOfScopeCrimeDropped,
     weakNoveltyDropped,
     weakOperationalDropped,
+    forecastHeld,
   });
 
   const fastFacts: KpiCard[] = [
@@ -1575,7 +1609,9 @@ export function buildFlashpointReportDataset(
     .slice(0, 12);
 
   // --- Reads ---------------------------------------------------------------
-  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end, periodLeadPool);
+  // Activism lead draws from activism rows plus confirmed street-level unrest,
+  // but never prison / contained-facility events (those stay in civil-unrest read).
+  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end, activismLeadPool);
   const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel, win.end, [...activismRows, ...unrestRows]);
   // Forward-looking items rendered as a structured Country / Signal /
   // Operational meaning table rather than a quoted paragraph dump.
@@ -1770,6 +1806,7 @@ function pickLead(rows: EnrichedIncident[], windowEnd: Date): EnrichedIncident |
     if (ANNOUNCEMENT_RE.test(r.title ?? "")) return false;
     const stated = normalizeStatedEventDate(r, refEnd);
     if (stated && stated.getTime() > refEnd.getTime()) return false;
+    if (stated && stated.getTime() <= refEnd.getTime() && hasUpcomingSignal(r)) return false;
     return true;
   });
   const credible = occurred.length > 0 ? occurred : credibleAll;
@@ -1947,8 +1984,19 @@ function buildForecastRead(opts: {
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
   const lines: string[] = [futureBlock];
+  const datedMarches = (opts.forecastRows ?? []).filter(
+    (r) => /civic protest march/i.test(r.signal) && !!r.date,
+  );
   if (total === 0) {
+    if (datedMarches.length > 1) {
+      lines.push(
+        `Civic protest marches with confirmed dates are set in ${joinList(datedMarches.map((m) => m.country))} — confirm turnout and access impact in each host city before the date.`,
+      );
+    }
     lines.push(`The near-term outlook is for continued quiet, with little fresh protest or civil-unrest activity on the current record. That could change if a named movement announces a fresh protest schedule.`);
+    lines.push(
+      `This outlook is based on one reporting period and on confirmed announcements only, so treat it as a starting point rather than a firm prediction.`,
+    );
     return lines.join("\n\n");
   }
   const allRows = [...activismRows, ...unrestRows];
@@ -2030,9 +2078,7 @@ function buildForecastRead(opts: {
   // A dateless announcement is unconfirmed and must not be called confirmed
   // here while Watch Next calls the same item unconfirmed (owner-flagged
   // contradiction).
-  const marches = (opts.forecastRows ?? []).filter(
-    (r) => /civic protest march/i.test(r.signal) && !!r.date,
-  );
+  const marches = datedMarches;
   if (marches.length > 1) {
     lines.push(
       `Civic protest marches with confirmed dates are set in ${joinList(marches.map((m) => m.country))} — confirm turnout and access impact in each host city before the date.`,

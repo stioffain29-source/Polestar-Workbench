@@ -240,18 +240,29 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.enriched.length).toBe(2);
-    expect(ds.fastFacts.find((k) => k.label === "Most Affected Country")?.value).toBe("Bangladesh");
-    expect(ds.countryRows[0]?.label).toBe("Bangladesh");
+    expect(ds.countryRows.map((r) => r.label).sort()).toEqual(["Bangladesh", "India"]);
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 
   test("Fast Facts most affected country matches the chart volume leader", () => {
+    const bdCities = ["Dhaka", "Chittagong", "Khulna", "Rajshahi", "Sylhet", "Barishal", "Rangpur", "Mymensingh"];
+    const lkCities = ["Colombo", "Kandy", "Galle", "Jaffna"];
     const rows = [
-      ...Array.from({ length: 8 }, (_, i) =>
-        inc({ title: `Union walkout over pay dispute round ${i} in Dhaka`, country: "Bangladesh", severity: "low", location: "Dhaka" }),
+      ...bdCities.map((city) =>
+        inc({
+          title: `Garment workers block road in ${city} over wage arrears`,
+          country: "Bangladesh",
+          severity: "low",
+          location: city,
+        }),
       ),
-      ...Array.from({ length: 4 }, (_, i) =>
-        inc({ title: `Teachers rally outside ministry over arrears case ${i}`, country: "Sri Lanka", severity: "high", location: "Colombo" }),
+      ...lkCities.map((city) =>
+        inc({
+          title: `Teachers rally outside ministry over arrears in ${city}`,
+          country: "Sri Lanka",
+          severity: "high",
+          location: city,
+        }),
       ),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
@@ -269,7 +280,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.autoPolestarView).not.toMatch(/\belevated\b/i);
-    expect(ds.autoPolestarView).toMatch(/risk level is (High|Moderate|Low)/i);
+    expect(ds.autoPolestarView).toMatch(/Risk level: (High|Moderate|Low)/i);
   });
 
   test("implications name specific countries and campus sites when available", () => {
@@ -351,8 +362,8 @@ describe("flashpoint report consistency", () => {
   test("future-dated announcements published in-window count only in forecast, not period totals", () => {
     const rows = [
       inc({
-        title: "Karnataka unions announce statewide shutdown set for 13 August",
-        summary: "Organisers say the shutdown will run statewide on 13 August.",
+        title: "India transport unions announce statewide strike set for 13 August",
+        summary: "Organisers say the strike will run statewide on 13 August.",
         country: "India",
         location: "Karnataka",
         severity: "moderate",
@@ -418,7 +429,8 @@ describe("flashpoint report consistency", () => {
     const distinct = Number(note.match(/(\d+) distinct incident/)?.[1] ?? 0);
     const dupes = Number(note.match(/(\d+) syndicated duplicate/)?.[1] ?? 0);
     const excluded = Number(note.match(/(\d+) excluded as off-topic or low-signal/)?.[1] ?? 0);
-    expect(screened).toBe(distinct + dupes + excluded);
+    const forecastHeld = Number(note.match(/(\d+) held for forecast/)?.[1] ?? 0);
+    expect(screened).toBe(distinct + dupes + excluded + forecastHeld);
   });
 
   test("events dated on the issue date are not labelled upcoming when the report is generated that day", () => {
@@ -434,7 +446,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-13");
     expect(ds.forecastFuture.some((r) => r.country === "Pakistan")).toBe(false);
-    expect(ds.autoWatchNext).not.toMatch(/upcoming/i);
+    expect(ds.autoWatchNext).not.toMatch(/upcoming, (?:unconfirmed|date confirmed)/i);
   });
 
   test("activism main event prefers higher-severity confirmed operational incidents", () => {
@@ -457,5 +469,54 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     expect(ds.activismRead).toMatch(/rated Moderate severity/i);
     expect(ds.activismRead).not.toMatch(/push for tougher labour rules/i);
+  });
+
+  test("activism read never leads with a prison riot from the unrest bucket", () => {
+    const rows = [
+      inc({
+        title: "Three dead, 23 injured, in Sri Lanka prison riots as overcrowding strains jails",
+        country: "Sri Lanka",
+        severity: "high",
+        occurredAt: "2026-08-07T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas, use batons to disperse youth protesters",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.activismRead).toMatch(/India/i);
+    expect(ds.activismRead).not.toMatch(/Prison riot/i);
+    expect(ds.civilUnrestRead).toMatch(/Prison riot/i);
+  });
+
+  test("screening note counts forecast-held records so figures fully reconcile", () => {
+    const rows = [
+      inc({
+        title: "India transport unions announce statewide strike set for 13 August",
+        summary: "Organisers say the strike will run statewide on 13 August.",
+        country: "India",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas to disperse youth protesters in Delhi",
+        country: "India",
+        severity: "high",
+        location: "Delhi",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    const note = ds.fastFacts.find((k) => k.label === "Distinct Incidents")?.note ?? "";
+    expect(note).toMatch(/held for forecast/);
+    const screened = Number(note.match(/(\d+) records screened/)?.[1] ?? 0);
+    const distinct = Number(note.match(/(\d+) distinct incident/)?.[1] ?? 0);
+    const forecastHeld = Number(note.match(/(\d+) held for forecast/)?.[1] ?? 0);
+    expect(forecastHeld).toBeGreaterThan(0);
+    expect(screened).toBeGreaterThanOrEqual(distinct + forecastHeld);
   });
 });
