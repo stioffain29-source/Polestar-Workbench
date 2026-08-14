@@ -514,6 +514,7 @@ export default function ReportEditor() {
           incidentsForExport,
           form.topic,
           form.issueDate,
+          { generatedAt: new Date() },
         ).fastFacts;
       }
       if (form.topic === "conflict") {
@@ -1250,7 +1251,9 @@ export default function ReportEditor() {
     // never render these reads, so leave them blank.
     const fpReads =
       topic === "flashpoint" || topic === "protests"
-        ? buildFlashpointReportDataset(incidents ?? [], topic, issueDate)
+        ? buildFlashpointReportDataset(incidents ?? [], topic, issueDate, {
+            generatedAt: new Date(),
+          })
         : null;
 
     // Replace empty titles and the well-known old regional defaults (e.g.
@@ -1486,6 +1489,7 @@ export default function ReportEditor() {
         incidentsForExport,
         form.topic,
         form.issueDate,
+        { generatedAt: new Date() },
       );
       payload.activismRead = resolveFlashpointReadOverride(
         form.activismRead,

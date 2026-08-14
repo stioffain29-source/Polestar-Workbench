@@ -36,8 +36,9 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
+  const chartValue = (d: CargoTrendPoint) => d.displayCount ?? d.count;
   const total = data.reduce((s, d) => s + d.count, 0);
-  const yMax = niceCargoCountMax(Math.max(...data.map((d) => d.count)));
+  const yMax = niceCargoCountMax(Math.max(...data.map(chartValue)));
   const ticks = yMax <= 4
     ? Array.from({ length: yMax + 1 }, (_, k) => k)
     : [0, 1, 2, 3, 4].map((k) => (k / 4) * yMax);
@@ -62,7 +63,7 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           Weekly Cargo Theft Trend
         </div>
         <div style={{ fontSize: 11 }}>
-          {total} record{total === 1 ? "" : "s"} across {data.length} weeks
+          {total} incident{total === 1 ? "" : "s"} across {data.length} weeks
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} style={{ display: "block" }}>
@@ -74,18 +75,19 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           <g key={k}>
             <line x1={padL} y1={yAt(v)} x2={W - padR} y2={yAt(v)} stroke={POLAR} strokeWidth={0.5} />
             <text x={padL - 6} y={yAt(v) + 3} fontSize={10} fill={DUSK} textAnchor="end">
-              {Math.round(v)}
+              {hasPartial && v % 1 !== 0 ? v.toFixed(1) : Math.round(v)}
             </text>
           </g>
         ))}
         {/* Bars */}
         {data.map((d, i) => {
-          const h = innerH - (yAt(d.count) - padT);
+          const value = chartValue(d);
+          const h = innerH - (yAt(value) - padT);
           return (
             <rect
               key={i}
               x={xAt(i) - barW / 2}
-              y={yAt(d.count)}
+              y={yAt(value)}
               width={barW}
               height={Math.max(0, h)}
               fill={ELECTRIC}
@@ -103,10 +105,9 @@ export default function CargoTrendChart({ data }: CargoTrendChartProps) {
           room this last caption line has its descenders sheared in the PDF
           rasterisation. Component-level so preview==PDF. */}
       <div style={{ fontSize: 11, marginTop: 6, paddingBottom: 6, lineHeight: 1.35 }}>
-        In-scope cargo incidents per week, {firstLabel} to {lastLabel}.
         {hasPartial
-          ? " Weeks marked * are partial (clipped to the reporting period)."
-          : ""}
+          ? `In-scope cargo incidents per day, ${firstLabel} to ${lastLabel}. All weeks plot daily averages when any week is partial (*), so the closing period is comparable with full seven-day weeks.`
+          : `In-scope cargo incidents per week, ${firstLabel} to ${lastLabel}.`}
       </div>
     </div>
   );

@@ -262,8 +262,18 @@ describe("cargo pattern model — single-source reconciliation", () => {
 
   it("handles an enforcement-only period without inflating operational totals", () => {
     const rows = [
-      inc({ id: 1, title: "Police arrest a cargo theft syndicate in the Philippines", severity: "moderate" }),
-      inc({ id: 2, title: "Authorities dismantle a truck-hijacking gang in Malaysia", severity: "moderate" }),
+      inc({
+        id: 1,
+        title: "Police arrest a cargo theft syndicate in the Philippines",
+        severity: "moderate",
+        country: "Philippines",
+      }),
+      inc({
+        id: 2,
+        title: "Authorities dismantle a truck-hijacking gang in Malaysia",
+        severity: "moderate",
+        country: "Malaysia",
+      }),
     ];
     const m = buildCargoPatternModel(rows, { issueDate: ISSUE });
     // Enforcement outcomes are partitioned into their OWN panel and EXCLUDED from

@@ -21,7 +21,9 @@ async function main() {
     today,
     rows.map((r) => ({ occurredAt: r.occurredAt, topic: r.topic })),
   );
-  const ds = buildFlashpointReportDataset(inp, "flashpoint", issue);
+  const ds = buildFlashpointReportDataset(inp, "flashpoint", issue, {
+    generatedAt: new Date(),
+  });
   console.log("EFFECTIVE ISSUE DATE:", issue);
   console.log("WINDOW:", ds.windowLabel ?? JSON.stringify((ds as any).window ?? ""));
   console.log("\nFAST FACTS:", JSON.stringify((ds as any).fastFacts, null, 1));

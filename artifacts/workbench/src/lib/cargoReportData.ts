@@ -16,7 +16,7 @@ import {
   totalUsdLoss,
   type CargoIncidentLike,
 } from "./cargoAnalysis";
-import { resolveReportWindow } from "./reportWindow";
+import { resolveReportWindow, type ReportWindow } from "./reportWindow";
 
 export interface CargoReportIncident extends CargoIncidentLike {
   occurredAt: string;
@@ -30,6 +30,8 @@ export interface CargoTrendPoint {
   partial?: boolean;
   /** Display range clipped to the report window, e.g. "12 Jul–13 Jul*". */
   label?: string;
+  /** Chart value — raw count for full weeks, incidents-per-day for partial weeks. */
+  displayCount?: number;
 }
 
 export interface CargoReportExtras {
@@ -38,6 +40,35 @@ export interface CargoReportExtras {
   commodity: string | null;
   commodityCount: number;
   trend: CargoTrendPoint[];
+}
+
+function weekEffectiveDays(
+  point: Pick<CargoTrendPoint, "date" | "partial">,
+  win: ReportWindow,
+): number {
+  if (!point.partial) return 7;
+  const weekStart = parseISO(point.date);
+  const weekEnd = addDays(weekStart, 6);
+  const start = weekStart.getTime() < win.start.getTime() ? win.start : weekStart;
+  const end = weekEnd.getTime() > win.end.getTime() ? win.end : weekEnd;
+  const days =
+    Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  return Math.max(1, Math.min(7, days));
+}
+
+/** Attach chart display values so partial weeks plot incidents-per-day, not raw totals. */
+export function attachTrendDisplayCounts(
+  trend: CargoTrendPoint[],
+  issueDate?: string,
+): CargoTrendPoint[] {
+  if (!issueDate) return trend.map((p) => ({ ...p, displayCount: p.count }));
+  const win = resolveReportWindow("cargo_watch", issueDate);
+  const hasPartial = trend.some((p) => p.partial);
+  return trend.map((p) => {
+    const days = weekEffectiveDays(p, win);
+    if (hasPartial) return { ...p, displayCount: p.count / days };
+    return { ...p, displayCount: p.count };
+  });
 }
 
 // Bucket in-window cargo incidents into contiguous weekly bins (Monday-start)
@@ -122,7 +153,7 @@ export function buildCargoReportExtras(
       if (classifyCategory(i) === commodity) commodityCount += 1;
     }
   }
-  const trend = buildWeeklyTrend(incidents, issueDate);
+  const trend = attachTrendDisplayCounts(buildWeeklyTrend(incidents, issueDate), issueDate);
   return { usd, commodity, commodityCount, trend };
 }
 

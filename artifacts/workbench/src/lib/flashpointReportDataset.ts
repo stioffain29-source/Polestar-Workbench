@@ -134,7 +134,7 @@ const MONTH_INDEX: Record<string, number> = {
   july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
 };
 
-/** End of the report issue date in UTC — forecast status compares against this. */
+/** End of a calendar day in UTC — forecast status compares against this. */
 function endOfReportDay(issueDate: Date): Date {
   return new Date(
     Date.UTC(
@@ -147,6 +147,23 @@ function endOfReportDay(issueDate: Date): Date {
       999,
     ),
   );
+}
+
+/**
+ * Instant used to decide whether a dated forecast row is still upcoming.
+ * Defaults to the reporting-window end (issue date) so unit tests stay
+ * deterministic; preview/PDF pass `generatedAt` so a file exported after
+ * the window cannot still call yesterday's events "upcoming".
+ */
+function resolveForecastAsOf(
+  windowEnd: Date,
+  generatedAt?: Date | string,
+): Date {
+  if (generatedAt == null || generatedAt === "") return windowEnd;
+  const dt =
+    typeof generatedAt === "string" ? parseISO(generatedAt) : generatedAt;
+  if (!(dt instanceof Date) || isNaN(dt.getTime())) return windowEnd;
+  return dt.getTime() > windowEnd.getTime() ? dt : windowEnd;
 }
 
 function parseStatedEventDate(
@@ -179,7 +196,19 @@ function effectiveEventDate(
   r: EnrichedIncident,
   referenceEnd: Date,
 ): Date {
-  return normalizeStatedEventDate(r, referenceEnd) ?? r.date;
+  const stated = normalizeStatedEventDate(r, referenceEnd);
+  if (!stated) return r.date;
+  // A live street/enforcement account published in-window stays on its
+  // occurred/publication date even if the same copy also names a later
+  // event. Pure future announcements (no live ops) still use the stated date.
+  if (
+    hasConfirmedOperationalImpact(r) &&
+    !Number.isNaN(r.date.getTime()) &&
+    stated.getTime() > r.date.getTime()
+  ) {
+    return r.date;
+  }
+  return stated;
 }
 
 function isInReportingPeriod(r: EnrichedIncident, win: { start: Date; end: Date }): boolean {
@@ -213,9 +242,9 @@ function isScheduledOutsideReportingPeriod(
 
 function forecastDateHasPassed(
   r: { title?: string | null; summary?: string | null },
-  issueDate: Date,
+  asOf: Date,
 ): boolean {
-  const refEnd = endOfReportDay(issueDate);
+  const refEnd = endOfReportDay(asOf);
   const stated = normalizeStatedEventDate(r, refEnd);
   if (!stated) return false;
   return stated.getTime() <= refEnd.getTime();
@@ -304,6 +333,11 @@ export interface FlashpointReportDataset {
   autoWatchNext: string;
   autoPolestarView: string;
   dataNote: string;
+}
+
+export interface FlashpointReportOptions {
+  /** Report-generation instant. Forecast "upcoming" is computed against this. */
+  generatedAt?: Date | string;
 }
 
 // APAC sub-region map. Used by the Regional and Country View and the
@@ -1458,8 +1492,10 @@ export function buildFlashpointReportDataset(
   incidents: FlashpointReportIncident[],
   topic: string,
   issueDate: string,
+  opts?: FlashpointReportOptions,
 ): FlashpointReportDataset {
   const win = resolveReportWindow(topic, issueDate);
+  const forecastAsOf = resolveForecastAsOf(win.end, opts?.generatedAt);
 
   const {
     enriched: usableEnriched,
@@ -1634,7 +1670,7 @@ export function buildFlashpointReportDataset(
   for (const r of dedupeByTitle(futureRaw)) {
     // An explicitly-dated event ON or BEFORE the issue date has already
     // happened — it is window material, not a forward-looking row.
-    if (forecastDateHasPassed(r, win.end)) continue;
+    if (forecastDateHasPassed(r, forecastAsOf)) continue;
     const country = r.country?.trim() || "—";
     const signal = shortSignalLabel(r);
     const key = `${country.toLowerCase()}|${signal.toLowerCase()}`;
@@ -1695,6 +1731,7 @@ export function buildFlashpointReportDataset(
     usableEnriched,
     topSeverity,
     windowEnd: win.end,
+    forecastAsOf,
   };
   const autoExecutiveSummary = buildAutoExecutiveSummary({
     ...autoCtx,
@@ -1826,16 +1863,29 @@ function pickLead(
   // A future ANNOUNCEMENT ("students to protest nationwide on 13 August")
   // is a forecast-table item, never the "main event" of the week that
   // already happened — an owner-flagged defect. Excluded from the lead pool
-  // unless nothing else qualifies.
+  // unless nothing else qualifies. In-window strikes ("will strike on
+  // 10 August") and live enforcement accounts stay eligible even when the
+  // same article also names a later date or uses hedging ("allegedly").
   const ANNOUNCEMENT_RE =
     /\b(?:to\s+(?:protest|strike|rally|march|walk\s?out)|will\s+(?:protest|strike|rally|march)|set\s+for|scheduled\s+(?:for|on)|plans?\s+(?:to\s+)?(?:protest|strike|rally|march)|announces?\s+(?:protest|strike|rally|march))\b/i;
-  const credibleAll = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
+  const eligibleRow = (r: EnrichedIncident): boolean => {
+    if (isWeakNovelty(r)) return false;
+    if (opts?.activism && containedVenueNote(r)) return false;
+    if (!isLowCredibility(r)) return true;
+    // Hedged wording ("allegedly", "reportedly") must not drop a
+    // Moderate+/enforcement event from the main-event pool.
+    return hasConfirmedOperationalImpact(r);
+  };
+  const credibleAll = rows.filter(eligibleRow);
   const refEnd = endOfReportDay(windowEnd);
   const occurred = credibleAll.filter((r) => {
-    if (ANNOUNCEMENT_RE.test(r.title ?? "")) return false;
+    const liveOps = hasConfirmedOperationalImpact(r);
     const stated = normalizeStatedEventDate(r, refEnd);
-    if (stated && stated.getTime() > refEnd.getTime()) return false;
-    if (stated && stated.getTime() <= refEnd.getTime() && hasUpcomingSignal(r)) return false;
+    const futureStated = !!(stated && stated.getTime() > refEnd.getTime());
+    const titleIsAnnouncement = ANNOUNCEMENT_RE.test(r.title ?? "");
+    if (liveOps) return true;
+    if (futureStated) return false;
+    if (titleIsAnnouncement && (!stated || futureStated)) return false;
     return true;
   });
   const credible = occurred.length > 0 ? occurred : credibleAll;
@@ -1847,16 +1897,22 @@ function pickLead(
     return compareIncidentSignificance(significanceInput(a, refEnd), significanceInput(b, refEnd));
   };
   const sortBySignificance = (arr: EnrichedIncident[]) => [...arr].sort(compareLead);
+  const pickFrom = (pool: EnrichedIncident[]): EnrichedIncident => {
+    const nonReaction = pool.filter((r) => !isReactionLed(r.title ?? ""));
+    return sortBySignificance(nonReaction.length > 0 ? nonReaction : pool)[0];
+  };
   // Activism read: confirmed Moderate+ street/enforcement events must lead
   // over Low grievance-only marches even when the latter match title cues
   // more cleanly (owner-flagged PDF-2 defect: Sri Lanka civic march over
-  // Jharkhand tear-gas dispersal).
+  // Jharkhand tear-gas dispersal). Severity then ranks remaining candidates
+  // so a Moderate strike outranks a Low civic march.
   if (opts?.activism) {
     const elevatedOperational = credible.filter((r) => isElevatedOperationalLead(r));
-    if (elevatedOperational.length > 0) {
-      const nonReaction = elevatedOperational.filter((r) => !isReactionLed(r.title ?? ""));
-      return sortBySignificance(nonReaction.length > 0 ? nonReaction : elevatedOperational)[0];
-    }
+    if (elevatedOperational.length > 0) return pickFrom(elevatedOperational);
+    const elevatedSev = credible.filter(
+      (r) => (SEV_RANK[sevKey(r.severity)] ?? 0) >= 3,
+    );
+    if (elevatedSev.length > 0) return pickFrom(elevatedSev);
   }
   // High-severity leads must describe live street activity or enforcement,
   // not a bare call / analysis piece (owner-flagged: Klang protest rated
@@ -2436,9 +2492,10 @@ interface AutoCtx {
   // prose MUST use this — never recompute over a subset — so the narrative
   // always matches the Fast Facts Highest Severity card.
   topSeverity: EnrichedIncident | null;
-  // Report window end (issue date). Forward-looking sections use it to drop
-  // explicitly-dated announcements that have already passed.
+  // Report window end (issue date).
   windowEnd: Date;
+  /** Generation instant when later than windowEnd; otherwise windowEnd. */
+  forecastAsOf: Date;
 }
 
 // Overall week posture — uses the approved five-tier severity vocabulary
@@ -2653,11 +2710,11 @@ function buildImplications(ctx: AutoCtx): string {
 function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const all = [...ctx.activismRows, ...ctx.unrestRows];
   // Same passed-date gate as the forecast table: an announcement explicitly
-  // dated on/before the issue date has already happened and must not be
+  // dated on/before the generation instant has already happened and must not be
   // listed as "upcoming" here while the forecast table (correctly) drops it.
   const futureRaw = extractFutureSignals(ctx.usableEnriched)
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
-    .filter((r) => !forecastDateHasPassed(r, ctx.windowEnd));
+    .filter((r) => !forecastDateHasPassed(r, ctx.forecastAsOf));
   // Collapse (country, signal) duplicates so the same operational
   // signal cannot appear twice (e.g. two South Korea records both
   // reducing to "Union injunction ruling — sectoral strike risk").

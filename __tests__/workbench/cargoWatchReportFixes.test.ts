@@ -260,6 +260,115 @@ describe("cargo watch report fixes", () => {
     expect(m.selected.some((r) => r.date.startsWith("2026-08-11"))).toBe(true);
   });
 
+  it("labels Fast Facts with incidents not records for deduplicated cargo totals", () => {
+    const m = buildCargoPatternModel(
+      [
+        inc({
+          id: 1,
+          title: "Cargo theft in transit on NH-48 near Delhi, India",
+          occurredAt: "2026-07-12",
+        }),
+      ],
+      { issueDate: "2026-08-10" },
+    );
+    const totalCard = m.fastFacts.find((c) => c.label === "Total Incidents");
+    expect(totalCard?.value).toBe(String(m.totalUnique));
+  });
+
+  it("includes a High-rated incident in Key Incidents when one exists", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Electronics cargo theft in transit on NH-48 near Delhi, India",
+        severity: "moderate",
+        occurredAt: "2026-07-12",
+        source: "Reuters",
+        sourceUrl: "https://example.com/1",
+      }),
+      inc({
+        id: 2,
+        title: "Driver killed as armed gang steals container from truck park in India",
+        severity: "high",
+        occurredAt: "2026-07-20",
+        source: "Reuters",
+        sourceUrl: "https://example.com/2",
+      }),
+      inc({
+        id: 3,
+        title: "Warehouse theft at bonded depot in India",
+        severity: "moderate",
+        occurredAt: "2026-07-21",
+        source: "Reuters",
+        sourceUrl: "https://example.com/3",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.selected.some((r) => r.severityKey === "high")).toBe(true);
+  });
+
+  it("follows inland-transit evidence in Situation when it dominates stages", () => {
+    const rows = Array.from({ length: 7 }, (_, i) =>
+      inc({
+        id: i + 1,
+        title: `Cargo theft in transit on NH-${48 + i} in India`,
+        occurredAt: `2026-07-${String(12 + i).padStart(2, "0")}`,
+      }),
+    ).concat([
+      inc({
+        id: 8,
+        title: "Warehouse theft at depot in India",
+        occurredAt: "2026-07-28",
+      }),
+      inc({
+        id: 9,
+        title: "Warehouse theft at second depot in India",
+        occurredAt: "2026-07-29",
+      }),
+      inc({
+        id: 10,
+        title: "Warehouse theft at third depot in India",
+        occurredAt: "2026-07-30",
+      }),
+    ]);
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.stages.find((s) => s.key === "inland_transport")?.sharePct).toBeGreaterThanOrEqual(50);
+    expect(m.assessment.situation).toMatch(/inland transport as the principal exposure/i);
+    expect(m.assessment.polestarView).toMatch(/inland-transit exposure the principal concern/i);
+  });
+
+  it("rewrites enforcement headlines into underlying-event language", () => {
+    const rows = [
+      inc({
+        id: 1,
+        title: "Batu police dismantle warehouse cargo theft syndicate; four arrested",
+        summary: "Police dismantled a syndicate linked to warehouse cargo theft in Batu.",
+        occurredAt: "2026-07-18",
+        country: "Indonesia",
+        source: "Local",
+        sourceUrl: "https://example.com/1",
+      }),
+      inc({
+        id: 2,
+        title: "Warehouse cargo theft syndicate in Batu busted, four detained",
+        summary: "Police detained four people over a warehouse cargo theft syndicate in Batu.",
+        occurredAt: "2026-07-18",
+        country: "Indonesia",
+        source: "Local Daily",
+        sourceUrl: "https://example.com/2",
+      }),
+    ];
+    const m = buildCargoPatternModel(rows, { issueDate: "2026-08-10" });
+    expect(m.enforcement.total).toBe(1);
+    expect(m.enforcement.rows[0].summary).toMatch(/warehouse theft in Indonesia resulted in/i);
+    expect(m.enforcement.rows[0].summary).not.toMatch(/Arrest of cargo crime group/i);
+  });
+
+  it("classifies Mojokerto facility break-in as depot or warehouse theft", () => {
+    expect(classifyCargoCategory({ title: "Facility burglary in Mojokerto" })).toBe(
+      "Depot / yard theft",
+    );
+  });
+
   it("rates arrest-only enforcement headlines as Low severity in the panel", () => {
     const rows = [
       inc({

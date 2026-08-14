@@ -449,6 +449,62 @@ describe("flashpoint report consistency", () => {
     expect(ds.autoWatchNext).not.toMatch(/upcoming, (?:unconfirmed|date confirmed)/i);
   });
 
+  test("events dated 13 August are not upcoming when generated on 13 August even if the window ended 12 August", () => {
+    const rows = [
+      inc({
+        title: "Pakistan nationwide strike 13 August",
+        summary: "Unions say the general strike will run nationwide on 13 August.",
+        severity: "moderate",
+        country: "Pakistan",
+        location: "Islamabad",
+        occurredAt: "2026-08-12T08:00:00Z",
+      }),
+      inc({
+        title: "Seoul civic groups announce protest march for 16 August",
+        summary: "Residents will march through central Seoul on 16 August.",
+        country: "South Korea",
+        location: "Seoul",
+        severity: "moderate",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12", {
+      generatedAt: "2026-08-13T11:31:00+08:00",
+    });
+    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(false);
+    expect(ds.forecastFuture.some((r) => r.country === "South Korea")).toBe(true);
+    expect(ds.forecastRead).not.toMatch(/Pakistan/);
+    expect(ds.autoWatchNext).not.toMatch(/Pakistan — .{0,80}upcoming/i);
+  });
+
+  test("events dated 13 August are not upcoming when the PDF is generated on 14 August", () => {
+    const rows = [
+      inc({
+        title: "India transport unions announce statewide strike set for 13 August",
+        summary: "Organisers say the strike will run statewide on 13 August.",
+        country: "India",
+        location: "Karnataka",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Seoul civic groups announce protest march for 16 August",
+        summary: "Residents will march through central Seoul on 16 August.",
+        country: "South Korea",
+        location: "Seoul",
+        severity: "moderate",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12", {
+      generatedAt: "2026-08-14T11:31:00+08:00",
+    });
+    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(false);
+    expect(ds.forecastFuture.some((r) => r.country === "South Korea" && /16 August/.test(r.date ?? ""))).toBe(true);
+    expect(ds.forecastRead).toMatch(/Confirmed upcoming events/i);
+    expect(ds.autoWatchNext).not.toMatch(/13 August/);
+  });
+
   test("activism main event prefers higher-severity confirmed operational incidents", () => {
     const rows = [
       inc({
@@ -537,6 +593,44 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     expect(ds.activismRead).toMatch(/India/i);
     expect(ds.activismRead).not.toMatch(/Civic protest march in Sri Lanka/i);
+  });
+
+  test("activism main event still prefers India High when the copy is hedged and names a later date", () => {
+    const rows = [
+      inc({
+        title: "Jaffna MC members protest against commissioner interference",
+        country: "Sri Lanka",
+        location: "Jaffna",
+        severity: "low",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas, use batons to disperse youth protesters",
+        summary:
+          "Police allegedly fired tear gas and used batons to disperse youth protesters in Ranchi. Organisers also flagged a statewide shutdown on 13 August.",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "All Pakistan Goods Transport Ittehad will strike nationwide on 10 August in protest over government policy",
+        country: "Pakistan",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Three dead, 23 injured, in Sri Lanka prison riots as overcrowding strains jails",
+        country: "Sri Lanka",
+        severity: "high",
+        occurredAt: "2026-08-07T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.activismRead).toMatch(/India/i);
+    expect(ds.activismRead).toMatch(/High severity/i);
+    expect(ds.activismRead).not.toMatch(/Civic protest march in Sri Lanka/i);
+    expect(ds.activismRead).not.toMatch(/Prison riot/i);
   });
 
   test("screening note counts forecast-held records so figures fully reconcile", () => {

@@ -155,9 +155,19 @@ export function computeTopicFastFacts(opts: {
     ? "Country not identified"
     : sanitizeFactValue(topic, topCountry);
 
+  const countNoun =
+    topic === "cargo_watch"
+      ? { one: "incident", many: "incidents" }
+      : { one: "record", many: "records" };
+  const totalLabel = topic === "cargo_watch" ? "Total Incidents" : "Total Records";
+
   return [
     { label: "Reporting Period", value: reportingPeriod },
-    { label: "Total Records", value: String(windowIncidents.length), note: `${topicLabel} this period` },
+    {
+      label: totalLabel,
+      value: String(windowIncidents.length),
+      note: `${topicLabel} this period`,
+    },
     {
       label: "Highest Severity",
       value: highestLabel,
@@ -168,14 +178,14 @@ export function computeTopicFastFacts(opts: {
       label: "Top Issue Type",
       value: safeType,
       note: topTypeN > 0 && safeType === topTypeLabel
-        ? `${topTypeN} record${topTypeN === 1 ? "" : "s"}`
+        ? `${topTypeN} ${topTypeN === 1 ? countNoun.one : countNoun.many}`
         : "Data quality issue",
     },
     {
       label: "Most Affected Country",
       value: safeCountry,
       note: topCountryN > 0 && safeCountry === topCountry
-        ? `${topCountryN} record${topCountryN === 1 ? "" : "s"}`
+        ? `${topCountryN} ${topCountryN === 1 ? countNoun.one : countNoun.many}`
         : "Limited reporting",
     },
     { label: "Latest Incident", value: latest },

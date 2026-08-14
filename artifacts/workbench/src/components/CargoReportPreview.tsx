@@ -215,6 +215,10 @@ function GraphicCaption({ text }: { text: string }) {
         color: DUSK,
         fontStyle: "italic",
         margin: "8px 0 0",
+        maxWidth: "100%",
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        whiteSpace: "normal",
       }}
     >
       {text}

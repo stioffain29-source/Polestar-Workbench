@@ -606,6 +606,7 @@ export async function exportFlashpointReportPdf(
     incidents,
     data.topic,
     data.issueDate,
+    { generatedAt: new Date() },
   );
 
   if (show("executive-summary")) {

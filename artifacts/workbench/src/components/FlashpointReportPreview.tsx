@@ -383,7 +383,10 @@ export default function FlashpointReportPreview({
   const coverUrl = TOPIC_COVER_URLS[topic];
 
   const ds = useMemo(
-    () => buildFlashpointReportDataset(incidents, topic, issueDate),
+    () =>
+      buildFlashpointReportDataset(incidents, topic, issueDate, {
+        generatedAt: new Date(),
+      }),
     [incidents, topic, issueDate],
   );
 
