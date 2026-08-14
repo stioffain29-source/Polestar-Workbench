@@ -347,4 +347,115 @@ describe("flashpoint report consistency", () => {
       ),
     ).toBe("Wellington Households To March Against Tiaki Wai");
   });
+
+  test("future-dated announcements published in-window count only in forecast, not period totals", () => {
+    const rows = [
+      inc({
+        title: "Karnataka unions announce statewide shutdown set for 13 August",
+        summary: "Organisers say the shutdown will run statewide on 13 August.",
+        country: "India",
+        location: "Karnataka",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Seoul civic groups announce protest march for 16 August",
+        summary: "Residents will march through central Seoul on 16 August.",
+        country: "South Korea",
+        location: "Seoul",
+        severity: "moderate",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+      inc({
+        title: "Wellington households to march against Tiaki Wai on 20 August",
+        summary: "Organisers confirmed the march for 20 August.",
+        country: "New Zealand",
+        location: "Wellington",
+        severity: "low",
+        occurredAt: "2026-08-09T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas to disperse youth protesters in Delhi",
+        country: "India",
+        severity: "high",
+        location: "Delhi",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.enriched).toHaveLength(1);
+    expect(ds.enriched[0]?.country).toBe("India");
+    expect(ds.forecastFuture.some((r) => r.country === "India" && /13 August/.test(r.date ?? ""))).toBe(true);
+    expect(ds.forecastFuture.some((r) => r.country === "South Korea")).toBe(true);
+    expect(ds.forecastFuture.some((r) => r.country === "New Zealand")).toBe(true);
+  });
+
+  test("screening note accounts for every exclusion between screened and distinct counts", () => {
+    const rows = [
+      inc({ title: "Samsung shares rally as foreign interest returns", country: "South Korea" }),
+      inc({ title: "From Protest to Power: campus politics essay", country: "Bangladesh", severity: "moderate" }),
+      inc({
+        title: "Protesters rally at Incheon Airport over labour dispute",
+        country: "South Korea",
+        location: "Incheon",
+        severity: "moderate",
+        occurredAt: "2026-07-25T08:00:00Z",
+      }),
+      inc({
+        title: "Incheon Airport workers stage protest over pay",
+        country: "South Korea",
+        location: "Incheon",
+        severity: "low",
+        occurredAt: "2026-07-25T12:00:00Z",
+      }),
+      inc({ title: "Traders march on parliament in Delhi over tax rules", country: "India", severity: "low", location: "Delhi" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    const note = ds.fastFacts.find((k) => k.label === "Distinct Incidents")?.note ?? "";
+    expect(note).toMatch(/records screened/);
+    expect(note).toMatch(/distinct incident/);
+    const screened = Number(note.match(/(\d+) records screened/)?.[1] ?? 0);
+    const distinct = Number(note.match(/(\d+) distinct incident/)?.[1] ?? 0);
+    const dupes = Number(note.match(/(\d+) syndicated duplicate/)?.[1] ?? 0);
+    const excluded = Number(note.match(/(\d+) excluded as off-topic or low-signal/)?.[1] ?? 0);
+    expect(screened).toBe(distinct + dupes + excluded);
+  });
+
+  test("events dated on the issue date are not labelled upcoming when the report is generated that day", () => {
+    const rows = [
+      inc({
+        title: "Pakistan nationwide strike 13 August",
+        summary: "Unions say the general strike will run nationwide on 13 August.",
+        severity: "moderate",
+        country: "Pakistan",
+        location: "Islamabad",
+        occurredAt: "2026-08-12T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-13");
+    expect(ds.forecastFuture.some((r) => r.country === "Pakistan")).toBe(false);
+    expect(ds.autoWatchNext).not.toMatch(/upcoming/i);
+  });
+
+  test("activism main event prefers higher-severity confirmed operational incidents", () => {
+    const rows = [
+      inc({
+        title: "Manila community groups push for tougher labour rules at city hall rally",
+        country: "Philippines",
+        location: "Manila",
+        severity: "low",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+      inc({
+        title: "Manila transport operators block EDSA after franchise dispute, police deploy tear gas",
+        country: "Philippines",
+        location: "Manila",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.activismRead).toMatch(/rated Moderate severity/i);
+    expect(ds.activismRead).not.toMatch(/push for tougher labour rules/i);
+  });
 });

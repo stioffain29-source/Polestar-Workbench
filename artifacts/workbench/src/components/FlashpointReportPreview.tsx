@@ -214,7 +214,7 @@ function IncidentTable({ rows, emptyMessage, rowLimit = 12 }: { rows: EnrichedIn
   const limited = rows.slice(0, rowLimit);
   const cols = "0.7fr 1.0fr 2.2fr 0.7fr";
   return (
-    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+    <div className="w-full border" style={{ borderColor: POLAR }}>
       <div
         className="grid uppercase tracking-widest"
         style={{
@@ -235,12 +235,12 @@ function IncidentTable({ rows, emptyMessage, rowLimit = 12 }: { rows: EnrichedIn
           style={{
             gridTemplateColumns: cols, padding: "8px 10px", gap: 10,
             borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
-            fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, alignItems: "center",
+            fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, alignItems: "start",
           }}
         >
-          <div>{format(r.date, "dd MMM yyyy")}</div>
-          <div>{r.issue}</div>
-          <div style={{ color: NAVY }}>{r.title}</div>
+          <div style={{ minWidth: 0 }}>{format(r.date, "dd MMM yyyy")}</div>
+          <div style={{ minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.issue}</div>
+          <div style={{ color: NAVY, minWidth: 0, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.title}</div>
           <div>
             <SeverityChip
               sevKey={sevKey(r.severity)}
@@ -477,7 +477,7 @@ export default function FlashpointReportPreview({
 
         <Section hidden={!show("forecast")} title={"Forecast: Next 7\u201314 Days"}>
           {ds.forecastFuture.length > 0 && (
-            <div className="mb-4 overflow-hidden" style={{ border: `1px solid ${POLAR}` }}>
+            <div className="mb-4 border" style={{ border: `1px solid ${POLAR}` }}>
               <table className="w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: NAVY, color: "#FFFFFF" }}>
@@ -491,9 +491,9 @@ export default function FlashpointReportPreview({
                   {ds.forecastFuture.map((r, idx) => (
                     <tr key={idx} style={{ borderTop: `1px solid ${POLAR}` }}>
                       <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.date ?? "\u2014"}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: NAVY, fontWeight: 700 }}>{r.country}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.signal}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: DUSK }}>{r.meaning}</td>
+                      <td className="px-2 py-2 align-top" style={{ color: NAVY, fontWeight: 700, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.country}</td>
+                      <td className="px-2 py-2 align-top" style={{ color: NAVY, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.signal}</td>
+                      <td className="px-2 py-2 align-top" style={{ color: DUSK, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.meaning}</td>
                     </tr>
                   ))}
                 </tbody>

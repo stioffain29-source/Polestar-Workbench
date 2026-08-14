@@ -132,18 +132,105 @@ const MONTH_INDEX: Record<string, number> = {
   january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
   july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
 };
-function forecastDateHasPassed(
+
+/** End of the report issue date in UTC — forecast status compares against this. */
+function endOfReportDay(issueDate: Date): Date {
+  return new Date(
+    Date.UTC(
+      issueDate.getUTCFullYear(),
+      issueDate.getUTCMonth(),
+      issueDate.getUTCDate(),
+      23,
+      59,
+      59,
+      999,
+    ),
+  );
+}
+
+function parseStatedEventDate(
   r: { title?: string | null; summary?: string | null },
-  windowEnd: Date,
-): boolean {
+  refYear: number,
+): Date | null {
   const s = explicitForecastDate(r);
-  if (!s) return false;
+  if (!s) return null;
   const [d, mName] = s.split(" ");
   const m = MONTH_INDEX[(mName ?? "").toLowerCase()];
-  if (m === undefined) return false;
-  const dt = new Date(Date.UTC(windowEnd.getUTCFullYear(), m, parseInt(d ?? "0", 10)));
-  if (windowEnd.getTime() - dt.getTime() > 180 * 86400000) return false;
-  return dt.getTime() <= windowEnd.getTime();
+  if (m === undefined) return null;
+  return new Date(Date.UTC(refYear, m, parseInt(d ?? "0", 10)));
+}
+
+/** Lift a verbatim stated event date and resolve year rollover near window end. */
+function normalizeStatedEventDate(
+  r: { title?: string | null; summary?: string | null },
+  referenceEnd: Date,
+): Date | null {
+  let dt = parseStatedEventDate(r, referenceEnd.getUTCFullYear());
+  if (!dt) return null;
+  if (referenceEnd.getTime() - dt.getTime() > 180 * 86400000) {
+    dt = parseStatedEventDate(r, referenceEnd.getUTCFullYear() + 1);
+  }
+  return dt;
+}
+
+/** Effective event date for period totals: stated date in source text, else publication date. */
+function effectiveEventDate(
+  r: EnrichedIncident,
+  referenceEnd: Date,
+): Date {
+  return normalizeStatedEventDate(r, referenceEnd) ?? r.date;
+}
+
+function isInReportingPeriod(r: EnrichedIncident, win: { start: Date; end: Date }): boolean {
+  const refEnd = endOfReportDay(win.end);
+  const eventMs = effectiveEventDate(r, refEnd).getTime();
+  const startMs = Date.UTC(
+    win.start.getUTCFullYear(),
+    win.start.getUTCMonth(),
+    win.start.getUTCDate(),
+  );
+  return eventMs >= startMs && eventMs <= refEnd.getTime();
+}
+
+function forecastDateHasPassed(
+  r: { title?: string | null; summary?: string | null },
+  issueDate: Date,
+): boolean {
+  const refEnd = endOfReportDay(issueDate);
+  const stated = normalizeStatedEventDate(r, refEnd);
+  if (!stated) return false;
+  return stated.getTime() <= refEnd.getTime();
+}
+
+function buildScreeningNote(args: {
+  rawWindowCount: number;
+  distinct: number;
+  dedupedDropped: number;
+  offTopicDropped: number;
+  kineticDropped: number;
+  courtDropped: number;
+  outOfScopeCrimeDropped: number;
+  weakNoveltyDropped: number;
+  weakOperationalDropped: number;
+}): string {
+  const excluded =
+    args.offTopicDropped +
+    args.kineticDropped +
+    args.courtDropped +
+    args.outOfScopeCrimeDropped +
+    args.weakNoveltyDropped +
+    args.weakOperationalDropped;
+  const parts: string[] = [`${args.rawWindowCount} records screened`];
+  if (args.dedupedDropped > 0) {
+    parts.push(
+      `${args.dedupedDropped} syndicated duplicate${args.dedupedDropped === 1 ? "" : "s"} removed`,
+    );
+  }
+  if (excluded > 0) {
+    parts.push(`${excluded} excluded as off-topic or low-signal`);
+  }
+  parts.push(`${args.distinct} distinct incident${args.distinct === 1 ? "" : "s"}`);
+  return `${parts.join("; ")}.`;
 }
 
 // ONE shared enforcement detector. Every "police response" claim in the
@@ -1217,9 +1304,13 @@ export interface FlashpointSelection {
    *  kinetic-only, court-only, out-of-scope (crime), novelty and
    *  weak-operational noise removed, and syndicated duplicates collapsed. */
   enriched: EnrichedIncident[];
+  offTopicDropped: number;
   kineticDropped: number;
   courtDropped: number;
+  outOfScopeCrimeDropped: number;
   dedupedDropped: number;
+  weakNoveltyDropped: number;
+  weakOperationalDropped: number;
   weakDropped: number;
   /** How many records were in the window+bucket before any filtering. */
   rawWindowCount: number;
@@ -1285,9 +1376,12 @@ export function selectFlashpointUsable(
   // Drop armed-robbery / armed-group / generic-crime classifications.
   const enrichedAll = sortByDateDesc(enrich(scoped));
   const enrichedInScope: EnrichedIncident[] = [];
+  let outOfScopeCrimeDropped = 0;
   for (const r of enrichedAll) {
-    if (isOutOfScopeIssue(r)) reject("out-of-scope-crime", r);
-    else enrichedInScope.push(r);
+    if (isOutOfScopeIssue(r)) {
+      outOfScopeCrimeDropped++;
+      reject("out-of-scope-crime", r);
+    } else enrichedInScope.push(r);
   }
   // Two-pass dedupe so syndicated rewrites of the same protest don't
   // dominate the operational read.
@@ -1300,18 +1394,32 @@ export function selectFlashpointUsable(
   // surface counts and renders, so Fast Facts, prose and the Related
   // Incidents table all agree.
   const enriched: EnrichedIncident[] = [];
+  let weakNoveltyDropped = 0;
+  let weakOperationalDropped = 0;
   for (const r of enrichedDeduped) {
-    if (isWeakNovelty(r)) { reject("weak-novelty", r); continue; }
-    if (isWeakOperational(r)) { reject("weak-operational", r); continue; }
+    if (isWeakNovelty(r)) {
+      weakNoveltyDropped++;
+      reject("weak-novelty", r);
+      continue;
+    }
+    if (isWeakOperational(r)) {
+      weakOperationalDropped++;
+      reject("weak-operational", r);
+      continue;
+    }
     enriched.push(r);
   }
 
   return {
     enriched,
+    offTopicDropped: rawWindow.length - onTopic.length,
     kineticDropped,
     courtDropped,
+    outOfScopeCrimeDropped,
     dedupedDropped: enrichedInScope.length - enrichedDeduped.length,
-    weakDropped: enrichedDeduped.length - enriched.length,
+    weakNoveltyDropped,
+    weakOperationalDropped,
+    weakDropped: weakNoveltyDropped + weakOperationalDropped,
     rawWindowCount: rawWindow.length,
     rejected,
   };
@@ -1324,13 +1432,30 @@ export function buildFlashpointReportDataset(
 ): FlashpointReportDataset {
   const win = resolveReportWindow(topic, issueDate);
 
-  const { enriched, kineticDropped, courtDropped, dedupedDropped, weakDropped, rawWindowCount } =
-    selectFlashpointUsable(incidents, topic, issueDate);
+  const {
+    enriched: usableEnriched,
+    offTopicDropped,
+    kineticDropped,
+    courtDropped,
+    outOfScopeCrimeDropped,
+    dedupedDropped,
+    weakNoveltyDropped,
+    weakOperationalDropped,
+    rawWindowCount,
+  } = selectFlashpointUsable(incidents, topic, issueDate);
+
+  // Period totals use the stated EVENT date when the source text names one,
+  // not the article publication date — future-dated announcements published
+  // inside the window belong in the forecast only.
+  const enriched = usableEnriched.filter((r) => isInReportingPeriod(r, win));
 
   // Bucketed views for the operational reads and tables. `enriched` is
   // already clean, so these are simple bucket splits ranked for table display.
   const activismRows = sortRowsForTable(enriched.filter((r) => r.bucket === "activism"));
   const unrestRows = sortRowsForTable(enriched.filter((r) => r.bucket === "unrest"));
+  const periodLeadPool = sortRowsForTable(
+    enriched.filter((r) => r.bucket === "activism" || r.bucket === "unrest"),
+  );
 
   // Fast Facts. The single top-severity incident is computed ONCE over the
   // full usable set and shared with every prose builder (Exec Summary,
@@ -1368,19 +1493,30 @@ export function buildFlashpointReportDataset(
   let topIssue = "—", topIssueN = 0;
   for (const [k, v] of issueCount) if (v > topIssueN) { topIssueN = v; topIssue = k; }
   const latest = enriched.length > 0
-    ? format(dateMax(enriched.map((r) => r.date)), "dd MMM yyyy")
+    ? format(
+        dateMax(enriched.map((r) => effectiveEventDate(r, endOfReportDay(win.end)))),
+        "dd MMM yyyy",
+      )
     : "—";
+
+  const screeningNote = buildScreeningNote({
+    rawWindowCount,
+    distinct: enriched.length,
+    dedupedDropped,
+    offTopicDropped,
+    kineticDropped,
+    courtDropped,
+    outOfScopeCrimeDropped,
+    weakNoveltyDropped,
+    weakOperationalDropped,
+  });
 
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
     {
       label: "Distinct Incidents",
       value: String(enriched.length),
-      note: dedupedDropped > 0
-        ? `${rawWindowCount} records screened; ${dedupedDropped} syndicated duplicate${dedupedDropped === 1 ? "" : "s"} removed — ${enriched.length} distinct incident${enriched.length === 1 ? "" : "s"}`
-        : rawWindowCount > enriched.length
-          ? `${rawWindowCount} records screened — ${enriched.length} distinct incident${enriched.length === 1 ? "" : "s"}`
-          : "After deduplication",
+      note: screeningNote,
     },
     {
       label: "Highest Severity",
@@ -1439,11 +1575,13 @@ export function buildFlashpointReportDataset(
     .slice(0, 12);
 
   // --- Reads ---------------------------------------------------------------
-  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end);
+  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end, periodLeadPool);
   const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel, win.end, [...activismRows, ...unrestRows]);
   // Forward-looking items rendered as a structured Country / Signal /
   // Operational meaning table rather than a quoted paragraph dump.
-  const futureRaw = extractFutureSignals([...activismRows, ...unrestRows])
+  // Forecast draws from the full usable set (including future-dated rows
+  // excluded from period totals) so announcements stay in the outlook.
+  const futureRaw = extractFutureSignals(usableEnriched)
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r) && !isWeakOperational(r));
   // Build forecast rows, then collapse any (country, signal) duplicate
   // so the same operational signal cannot appear twice (e.g. two
@@ -1507,7 +1645,15 @@ export function buildFlashpointReportDataset(
   const relatedIncidents = prioritiseRelated(enriched, shownInTables);
 
   // Auto-prose for the closing analyst sections.
-  const autoCtx = { activismRows, unrestRows, countryRows, enriched, topSeverity, windowEnd: win.end };
+  const autoCtx = {
+    activismRows,
+    unrestRows,
+    countryRows,
+    enriched,
+    usableEnriched,
+    topSeverity,
+    windowEnd: win.end,
+  };
   const autoExecutiveSummary = buildAutoExecutiveSummary({
     ...autoCtx,
     windowLabel: win.shortLabel,
@@ -1533,8 +1679,8 @@ export function buildFlashpointReportDataset(
   if (dedupedDropped > 0) {
     noteParts.push(`${dedupedDropped} duplicate report${dedupedDropped === 1 ? "" : "s"} of the same stories ${dedupedDropped === 1 ? "was" : "were"} removed.`);
   }
-  if (weakDropped > 0) {
-    noteParts.push(`${weakDropped} low-signal record${weakDropped === 1 ? " was" : "s were"} excluded — stories about past events (court cases, probes, arrests over earlier incidents), sports, procurement, legislative-process and stock-photo items that use protest or strike wording without any live event.`);
+  if (weakNoveltyDropped + weakOperationalDropped > 0) {
+    noteParts.push(`${weakNoveltyDropped + weakOperationalDropped} low-signal record${weakNoveltyDropped + weakOperationalDropped === 1 ? " was" : "s were"} excluded — stories about past events (court cases, probes, arrests over earlier incidents), sports, procurement, legislative-process and stock-photo items that use protest or strike wording without any live event.`);
   }
   const dataNote = noteParts.length > 0
     ? noteParts.join(" ")
@@ -1577,7 +1723,35 @@ export function buildFlashpointReportDataset(
 // strike commentary even when severities tie.
 const POLITICAL_MOBILISATION_RE = /\b(pti|imran|adiala|tehreek|ttap|section\s*144|opposition|movement|countrywide protest)\b/i;
 
-function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
+function hasConfirmedOperationalImpact(r: {
+  title?: string | null;
+  summary?: string | null;
+}): boolean {
+  const txt = `${r.title ?? ""} ${r.summary ?? ""}`;
+  return LIVE_PUBLIC_ORDER_RE.test(txt) || ENFORCEMENT_RE.test(txt);
+}
+
+function significanceInput(
+  r: EnrichedIncident,
+  referenceEnd: Date,
+): {
+  severity: string;
+  title: string;
+  summary?: string | null;
+  occurredAt: string;
+  eventDate?: string;
+} {
+  const stated = normalizeStatedEventDate(r, referenceEnd);
+  return {
+    severity: r.severity,
+    title: r.title,
+    summary: r.summary,
+    occurredAt: r.occurredAt,
+    eventDate: stated ? stated.toISOString() : undefined,
+  };
+}
+
+function pickLead(rows: EnrichedIncident[], windowEnd: Date): EnrichedIncident | null {
   // Strict lead: credible AND not novelty/parody AND has an actual
   // mobilisation signal in the TITLE (not just summary), then pick
   // the highest severity among those — not the first by date. This
@@ -1591,16 +1765,22 @@ function pickLead(rows: EnrichedIncident[]): EnrichedIncident | null {
   const ANNOUNCEMENT_RE =
     /\b(?:to\s+(?:protest|strike|rally|march|walk\s?out)|will\s+(?:protest|strike|rally|march)|set\s+for|scheduled\s+(?:for|on)|plans?\s+(?:to\s+)?(?:protest|strike|rally|march)|announces?\s+(?:protest|strike|rally|march))\b/i;
   const credibleAll = rows.filter((r) => !isLowCredibility(r) && !isWeakNovelty(r));
-  const occurred = credibleAll.filter((r) => !ANNOUNCEMENT_RE.test(r.title ?? ""));
+  const refEnd = endOfReportDay(windowEnd);
+  const occurred = credibleAll.filter((r) => {
+    if (ANNOUNCEMENT_RE.test(r.title ?? "")) return false;
+    const stated = normalizeStatedEventDate(r, refEnd);
+    if (stated && stated.getTime() > refEnd.getTime()) return false;
+    return true;
+  });
   const credible = occurred.length > 0 ? occurred : credibleAll;
   const strong = credible.filter((r) => STRONG_LEAD_RE.test(r.title ?? ""));
-  const sortBySignificance = (arr: EnrichedIncident[]) =>
-    [...arr].sort((a, b) =>
-      compareIncidentSignificance(
-        { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
-        { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
-      ),
-    );
+  const compareLead = (a: EnrichedIncident, b: EnrichedIncident) => {
+    const opA = hasConfirmedOperationalImpact(a) ? 1 : 0;
+    const opB = hasConfirmedOperationalImpact(b) ? 1 : 0;
+    if (opB !== opA) return opB - opA;
+    return compareIncidentSignificance(significanceInput(a, refEnd), significanceInput(b, refEnd));
+  };
+  const sortBySignificance = (arr: EnrichedIncident[]) => [...arr].sort(compareLead);
   // High-severity leads must describe live street activity or enforcement,
   // not a bare call / analysis piece (owner-flagged: Klang protest rated
   // High with no account of what happened on the ground).
@@ -1654,11 +1834,16 @@ function stalenessPrefix(rows: EnrichedIncident[], windowEnd: Date): string {
   return `The last reported incident was ${daysOld} days ago. No fresh activity is recorded since then. Treat this as residual concern unless new mobilisation, planned action, or unresolved disruption is confirmed.`;
 }
 
-function buildActivismRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date): string {
+function buildActivismRead(
+  rows: EnrichedIncident[],
+  windowLabel: string,
+  windowEnd: Date,
+  leadPool?: EnrichedIncident[],
+): string {
   if (rows.length === 0) {
     return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
   }
-  const lead = pickLead(rows);
+  const lead = pickLead(leadPool ?? rows, windowEnd);
   // Driver fingerprinting drives prose shape rather than a generic
   // "mix breaks down as protest (N)" line. Reads as judgement, not
   // counting.
@@ -1698,7 +1883,7 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (rows.length === 0) {
     return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. A quiet stretch for civil unrest alongside continuing protest activity usually means the authorities have held back from mass arrests or curfew orders — useful, but it can reverse within days if a protest crosses a policy line.\n\nKeep tracking police statements, local government orders, internet-shutdown notices and any move to call in the military. These tend to come ahead of curfews and visible street-level enforcement.`;
   }
-  const lead = pickLead(rows);
+  const lead = pickLead(rows, windowEnd);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   // Posture claims scan the WHOLE usable file, not just the unrest bucket —
   // an arrest reported on an activism-bucketed row still falsifies "no
@@ -2147,6 +2332,8 @@ interface AutoCtx {
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
   enriched: EnrichedIncident[];
+  /** Full usable set before period-date filtering — feeds forecast / Watch Next. */
+  usableEnriched: EnrichedIncident[];
   // The one shared top-severity incident (computed over the full usable set
   // in buildFlashpointReportDataset). Every "most serious" reference in the
   // prose MUST use this — never recompute over a subset — so the narrative
@@ -2371,7 +2558,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   // Same passed-date gate as the forecast table: an announcement explicitly
   // dated on/before the issue date has already happened and must not be
   // listed as "upcoming" here while the forecast table (correctly) drops it.
-  const futureRaw = extractFutureSignals(all)
+  const futureRaw = extractFutureSignals(ctx.usableEnriched)
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
     .filter((r) => !forecastDateHasPassed(r, ctx.windowEnd));
   // Collapse (country, signal) duplicates so the same operational
