@@ -627,7 +627,26 @@ function joinCountryNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-function buildRegionalRead(rows: CargoCountryRow[]): string {
+function overallExposureLead(
+  windowIncidents: CargoNarrativeIncident[],
+): "route" | "hub" | "mixed" {
+  if (windowIncidents.length === 0) return "mixed";
+  const route = windowIncidents.filter((r) =>
+    CARGO_SECURITY_RE.test(incidentText(r)),
+  ).length;
+  const hub = windowIncidents.filter((r) =>
+    LOGISTICS_HUB_RE.test(incidentText(r)),
+  ).length;
+  const total = windowIncidents.length;
+  if (route >= total * 0.5 && route > hub) return "route";
+  if (hub >= total * 0.5 && hub > route) return "hub";
+  return "mixed";
+}
+
+function buildRegionalRead(
+  rows: CargoCountryRow[],
+  overallLead: "route" | "hub" | "mixed" = "mixed",
+): string {
   if (rows.length === 0) return "";
   const lead = rows[0];
   const hubNames = rows.filter((r) => r.lead === "hub").map((r) => r.country);
@@ -636,15 +655,21 @@ function buildRegionalRead(rows: CargoCountryRow[]): string {
     .slice()
     .sort((a, b) => SEV_RANK_C[b.severityKey] - SEV_RANK_C[a.severityKey])[0];
   const parts: string[] = [];
-  const leadFocus =
-    lead.lead === "hub"
-      ? "warehouse and depot-linked incidents clustering around logistics hubs"
-      : lead.lead === "route"
-        ? "road-movement incidents clustering on the route side"
-        : "a mix of road-movement and storage incidents";
-  parts.push(
-    `${lead.country} is the main pressure point this month, with ${leadFocus}.`,
-  );
+  if (overallLead === "route") {
+    parts.push(
+      `Inland-transit exposure dominates this period${routeNames.length ? `, with ${joinCountryNames(routeNames.slice(0, 3))} the most active route-side theatres` : ""}. ${lead.country} still accounts for the largest overall share of reported incidents${lead.lead === "hub" ? ", including a concentration of warehouse-side reporting there" : ""}.`,
+    );
+  } else {
+    const leadFocus =
+      lead.lead === "hub"
+        ? "warehouse and depot-linked incidents clustering around logistics hubs"
+        : lead.lead === "route"
+          ? "road-movement incidents clustering on the route side"
+          : "a mix of road-movement and storage incidents";
+    parts.push(
+      `${lead.country} is the main pressure point this month, with ${leadFocus}.`,
+    );
+  }
   if (highest && highest.country !== lead.country && SEV_RANK_C[highest.severityKey] >= 4) {
     parts.push(
       `${highest.country} carries the highest severity (${highest.severityLabel.toLowerCase()}), consistent with organised, higher-value targeting rather than opportunistic theft.`,
@@ -653,6 +678,10 @@ function buildRegionalRead(rows: CargoCountryRow[]): string {
   if (hubNames.length > 0 && routeNames.length > 0) {
     parts.push(
       `For clients the practical split is simple: ${joinCountryNames(hubNames)} need hub-control scrutiny on access, seals and handover integrity, while ${joinCountryNames(routeNames)} need in-transit custody and route-side monitoring.`,
+    );
+  } else if (overallLead === "route" && routeNames.length > 0) {
+    parts.push(
+      `For clients the focus is in-transit custody across ${joinCountryNames(routeNames)} — load verification, handover checks and repeat-route monitoring — with warehouse-side controls secondary.`,
     );
   } else if (hubNames.length > 0) {
     parts.push(
@@ -698,7 +727,7 @@ export function buildCargoCountryBreakdown(
       operationalRead: operationalReadFor(rows, lead, sev.key, rows.length),
     };
   });
-  return { rows, regionalRead: buildRegionalRead(rows) };
+  return { rows, regionalRead: buildRegionalRead(rows, overallExposureLead(windowIncidents)) };
 }
 
 export interface CargoPortRow {

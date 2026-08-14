@@ -157,6 +157,21 @@ export function buildCargoReportExtras(
   return { usd, commodity, commodityCount, trend };
 }
 
+/** Value plotted on the trend chart — daily average when any week is partial. */
+export function trendChartValue(point: CargoTrendPoint): number {
+  return point.displayCount ?? point.count;
+}
+
+export function trendUsesDailyAverage(points: CargoTrendPoint[]): boolean {
+  return points.some((p) => p.partial);
+}
+
+/** Bar label for preview/PDF trend charts. */
+export function formatTrendBarValue(value: number, perDay: boolean): string {
+  if (perDay) return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return String(Math.round(value));
+}
+
 // Shared formatting so the preview and PDF print identical card values.
 export function formatCargoUsd(usd: { total: number; count: number }): string {
   if (usd.count === 0) return "Not disclosed";

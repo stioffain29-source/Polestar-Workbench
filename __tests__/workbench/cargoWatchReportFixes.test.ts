@@ -10,8 +10,8 @@ import {
   buildCargoExecutiveSummary,
   type CargoPatternModelInput,
 } from "../../artifacts/workbench/src/lib/cargoPatternModel";
-import { buildCargoReportExtras } from "../../artifacts/workbench/src/lib/cargoReportData";
-import { buildLogisticsHubRead, buildCargoSecurityRead } from "../../artifacts/workbench/src/lib/cargoNarratives";
+import { buildCargoReportExtras, trendChartValue, formatTrendBarValue } from "../../artifacts/workbench/src/lib/cargoReportData";
+import { buildLogisticsHubRead, buildCargoSecurityRead, buildCargoCountryBreakdown } from "../../artifacts/workbench/src/lib/cargoNarratives";
 import { visibleCountBands } from "../../artifacts/workbench/src/lib/cargoChoropleth";
 
 function inc(p: Partial<CargoPatternModelInput>): CargoPatternModelInput {
@@ -54,6 +54,58 @@ describe("cargo watch report fixes", () => {
         "cargo_watch",
       ),
     ).toBe("high");
+  });
+
+  it("plots daily averages for every week when any week is partial", () => {
+    const extras = buildCargoReportExtras(
+      Array.from({ length: 8 }, (_, i) => ({
+        title: "Cargo theft in transit on NH-48 in India",
+        occurredAt: `2026-07-${String(13 + i).padStart(2, "0")}`,
+        country: "India",
+      })).concat([
+        {
+          title: "Cargo theft in transit on NH-48 in India",
+          occurredAt: "2026-08-10",
+          country: "India",
+        },
+      ]),
+      "2026-08-10",
+    );
+    expect(extras.trend.some((t) => t.partial)).toBe(true);
+    const fullWeek = extras.trend.find((t) => t.label?.includes("13 Jul"));
+    expect(fullWeek).toBeTruthy();
+    expect(fullWeek!.count).toBeGreaterThan(0);
+    expect(trendChartValue(fullWeek!)).toBeCloseTo(fullWeek!.count / 7, 5);
+  });
+
+  it("Regional Read follows inland-transit dominance instead of defaulting to hub-first", () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      topic: "cargo_watch",
+      title: `Cargo theft in transit on NH-${48 + i} in Bangladesh`,
+      severity: "moderate",
+      occurredAt: `2026-07-${String(12 + i).padStart(2, "0")}`,
+      country: "Bangladesh",
+    })).concat([
+      {
+        topic: "cargo_watch",
+        title: "Warehouse theft at depot in India",
+        severity: "moderate",
+        occurredAt: "2026-07-28",
+        country: "India",
+      },
+      {
+        topic: "cargo_watch",
+        title: "Warehouse theft at second depot in India",
+        severity: "moderate",
+        occurredAt: "2026-07-29",
+        country: "India",
+      },
+    ]);
+    const breakdown = buildCargoCountryBreakdown(rows);
+    expect(breakdown.regionalRead).toMatch(/Inland-transit exposure dominates/i);
+    expect(breakdown.regionalRead).not.toMatch(
+      /India is the main pressure point this month, with warehouse and depot-linked/i,
+    );
   });
 
   it("clips weekly trend to the report window and marks partial weeks", () => {

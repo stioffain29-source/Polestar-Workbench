@@ -11,6 +11,11 @@ import {
   type CargoStageSummary,
 } from "./cargoPatternModel";
 import {
+  formatTrendBarValue,
+  trendChartValue,
+  trendUsesDailyAverage,
+} from "./cargoReportData";
+import {
   createCtx,
   newPage,
   ensureSpace,
@@ -106,7 +111,7 @@ const ELECTRIC = "#465bff";
 function drawSimpleBarChart(
   ctx: Ctx,
   heading: string,
-  rows: Array<{ label: string; value: number; color?: string }>,
+  rows: Array<{ label: string; value: number; color?: string; displayValue?: string }>,
   opts: { caption?: string; emptyMessage?: string } = {},
 ): void {
   const labelW = 160;
@@ -162,7 +167,7 @@ function drawSimpleBarChart(
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
     pdf.setFontSize(9.5);
-    pdf.text(String(r.value), trackX + trackW + 6, y + rowH - 7);
+    pdf.text(r.displayValue ?? String(r.value), trackX + trackW + 6, y + rowH - 7);
     setRoboto(pdf, "regular");
     ctx.y += rowH + gap;
   }
@@ -1447,10 +1452,15 @@ export async function exportTopicReportPdf(
       // the PDF does not spend two near-duplicate pages on the same dataset.
       if (show("weekly-trend") && (cargoModel.extras.trend.length >= 2 || cargoModel.activity.total > 0)) {
         if (cargoModel.extras.trend.length >= 2) {
-          const trendRows = cargoModel.extras.trend.map((t) => ({
-            label: t.label ?? t.date,
-            value: t.count,
-          }));
+          const perDay = trendUsesDailyAverage(cargoModel.extras.trend);
+          const trendRows = cargoModel.extras.trend.map((t) => {
+            const value = trendChartValue(t);
+            return {
+              label: t.label ?? t.date,
+              value,
+              displayValue: formatTrendBarValue(value, perDay),
+            };
+          });
           drawSimpleBarChart(ctx, "Weekly Trend and Activity", trendRows, {
             caption: cargoModel.trendCaption.trim() || undefined,
           });
