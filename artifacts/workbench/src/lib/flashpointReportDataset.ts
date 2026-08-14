@@ -1488,6 +1488,12 @@ export function buildFlashpointReportDataset(
     ...unrestRows.filter(
       (r) => hasConfirmedOperationalImpact(r) && !containedVenueNote(r),
     ),
+    ...enriched.filter(
+      (r) =>
+        r.bucket === "other" &&
+        hasConfirmedOperationalImpact(r) &&
+        !containedVenueNote(r),
+    ),
   ]);
 
   // Fast Facts. The single top-severity incident is computed ONCE over the
@@ -1787,13 +1793,36 @@ function significanceInput(
   };
 }
 
-function pickLead(rows: EnrichedIncident[], windowEnd: Date): EnrichedIncident | null {
+function isOperationalStreetLead(r: EnrichedIncident): boolean {
+  if (isWeakOperational(r)) return false;
+  return hasConfirmedOperationalImpact(r);
+}
+
+/** Moderate-or-higher with confirmed on-the-ground street/enforcement impact. */
+function isElevatedOperationalLead(r: EnrichedIncident): boolean {
+  return (SEV_RANK[sevKey(r.severity)] ?? 0) >= 3 && isOperationalStreetLead(r);
+}
+
+function leadCandidateTier(r: EnrichedIncident): number {
+  const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
+  if (sev >= 3 && isOperationalStreetLead(r)) return 4;
+  if (isOperationalStreetLead(r)) return 3;
+  if (sev >= 3) return 2;
+  return 1;
+}
+
+function pickLead(
+  rows: EnrichedIncident[],
+  windowEnd: Date,
+  opts?: { activism?: boolean },
+): EnrichedIncident | null {
   // Strict lead: credible AND not novelty/parody AND has an actual
-  // mobilisation signal in the TITLE (not just summary), then pick
-  // the highest severity among those — not the first by date. This
-  // keeps weak commentary / court-process items off the lead line
-  // when a stronger HIGH/EXTREME protest record sits in the file.
+  // mobilisation signal in the TITLE or summary, then pick the highest
+  // severity among those — not the first by date. This keeps weak
+  // commentary / court-process items off the lead line when a stronger
+  // HIGH/EXTREME protest record sits in the file.
   const STRONG_LEAD_RE = /\b(protest(?:s|ers?|ing)?|demonstrat(?:ion|ions|ors?)|rall(?:y|ies)|march(?:es)?|sit[- ]?ins?|strikes?|walkouts?|stoppages?|shutdowns?|riots?|crackdowns?|curfews?|tear[- ]?gas|water cannon|baton|arrest(?:s|ed)?|detentions?|roadblocks?|blockades?|section\s*144|assembly ban|mobilisation|mobilization)\b/i;
+  const leadText = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   // A future ANNOUNCEMENT ("students to protest nationwide on 13 August")
   // is a forecast-table item, never the "main event" of the week that
   // already happened — an owner-flagged defect. Excluded from the lead pool
@@ -1810,20 +1839,31 @@ function pickLead(rows: EnrichedIncident[], windowEnd: Date): EnrichedIncident |
     return true;
   });
   const credible = occurred.length > 0 ? occurred : credibleAll;
-  const strong = credible.filter((r) => STRONG_LEAD_RE.test(r.title ?? ""));
+  const strong = credible.filter((r) => STRONG_LEAD_RE.test(leadText(r)));
   const compareLead = (a: EnrichedIncident, b: EnrichedIncident) => {
-    const opA = hasConfirmedOperationalImpact(a) ? 1 : 0;
-    const opB = hasConfirmedOperationalImpact(b) ? 1 : 0;
-    if (opB !== opA) return opB - opA;
+    const tierA = leadCandidateTier(a);
+    const tierB = leadCandidateTier(b);
+    if (tierB !== tierA) return tierB - tierA;
     return compareIncidentSignificance(significanceInput(a, refEnd), significanceInput(b, refEnd));
   };
   const sortBySignificance = (arr: EnrichedIncident[]) => [...arr].sort(compareLead);
+  // Activism read: confirmed Moderate+ street/enforcement events must lead
+  // over Low grievance-only marches even when the latter match title cues
+  // more cleanly (owner-flagged PDF-2 defect: Sri Lanka civic march over
+  // Jharkhand tear-gas dispersal).
+  if (opts?.activism) {
+    const elevatedOperational = credible.filter((r) => isElevatedOperationalLead(r));
+    if (elevatedOperational.length > 0) {
+      const nonReaction = elevatedOperational.filter((r) => !isReactionLed(r.title ?? ""));
+      return sortBySignificance(nonReaction.length > 0 ? nonReaction : elevatedOperational)[0];
+    }
+  }
   // High-severity leads must describe live street activity or enforcement,
   // not a bare call / analysis piece (owner-flagged: Klang protest rated
   // High with no account of what happened on the ground).
   const operationalStrong = strong.filter((r) => {
     if (isWeakOperational(r)) return false;
-    const txt = `${r.title ?? ""} ${r.summary ?? ""}`;
+    const txt = leadText(r);
     const sev = SEV_RANK[sevKey(r.severity)] ?? 0;
     if (sev >= 3 && !LIVE_PUBLIC_ORDER_RE.test(txt) && !ENFORCEMENT_RE.test(txt)) return false;
     return true;
@@ -1838,12 +1878,23 @@ function pickLead(rows: EnrichedIncident[], windowEnd: Date): EnrichedIncident |
     const nonReaction = leadStrong.filter((r) => !isReactionLed(r.title ?? ""));
     const leadPool = nonReaction.length > 0 ? nonReaction : leadStrong;
     const bestStrong = sortBySignificance(leadPool)[0];
-    const political = leadPool.filter((r) => POLITICAL_MOBILISATION_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`));
+    const elevatedOutsideStrong = credible.filter(
+      (r) => isElevatedOperationalLead(r) && !leadPool.includes(r),
+    );
+    if (elevatedOutsideStrong.length > 0) {
+      const bestElevated = sortBySignificance(elevatedOutsideStrong)[0];
+      if (compareLead(bestStrong, bestElevated) > 0) return bestElevated;
+    }
+    const political = leadPool.filter((r) => POLITICAL_MOBILISATION_RE.test(leadText(r)));
     if (political.length > 0) {
       const bestPol = sortBySignificance(political)[0];
+      const polSev = SEV_RANK[sevKey(bestPol.severity)] ?? 0;
+      const strongSev = SEV_RANK[sevKey(bestStrong.severity)] ?? 0;
       if (
-        (SEV_RANK[sevKey(bestPol.severity)] ?? 0) >=
-        (SEV_RANK[sevKey(bestStrong.severity)] ?? 0)
+        polSev > strongSev ||
+        (polSev === strongSev &&
+          hasConfirmedOperationalImpact(bestPol) &&
+          !hasConfirmedOperationalImpact(bestStrong))
       ) {
         return bestPol;
       }
@@ -1880,7 +1931,7 @@ function buildActivismRead(
   if (rows.length === 0) {
     return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
   }
-  const lead = pickLead(leadPool ?? rows, windowEnd);
+  const lead = pickLead(leadPool ?? rows, windowEnd, { activism: true });
   // Driver fingerprinting drives prose shape rather than a generic
   // "mix breaks down as protest (N)" line. Reads as judgement, not
   // counting.

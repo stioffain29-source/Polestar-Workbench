@@ -493,6 +493,52 @@ describe("flashpoint report consistency", () => {
     expect(ds.civilUnrestRead).toMatch(/Prison riot/i);
   });
 
+  test("activism main event prefers Jharkhand tear-gas dispersal over Sri Lanka low civic march", () => {
+    const rows = [
+      inc({
+        title: "Jaffna MC members protest against commissioner interference",
+        country: "Sri Lanka",
+        location: "Jaffna",
+        severity: "low",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas, use batons to disperse youth protesters",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.activismRead).toMatch(/India/i);
+    expect(ds.activismRead).toMatch(/High severity/i);
+    expect(ds.activismRead).not.toMatch(/Civic protest march in Sri Lanka/i);
+  });
+
+  test("activism main event uses summary-only enforcement cues when title is thin", () => {
+    const rows = [
+      inc({
+        title: "Jharkhand police move against youth rally",
+        summary: "Officers fired tear gas and used batons to disperse protesters in Ranchi.",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Jaffna civic groups march against local administration interference",
+        country: "Sri Lanka",
+        location: "Jaffna",
+        severity: "low",
+        occurredAt: "2026-08-11T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.activismRead).toMatch(/India/i);
+    expect(ds.activismRead).not.toMatch(/Civic protest march in Sri Lanka/i);
+  });
+
   test("screening note counts forecast-held records so figures fully reconcile", () => {
     const rows = [
       inc({
