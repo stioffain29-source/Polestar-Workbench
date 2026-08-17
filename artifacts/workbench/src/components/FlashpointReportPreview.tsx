@@ -394,10 +394,12 @@ export default function FlashpointReportPreview({
   // ds.autoExecutiveSummary unless the analyst has written a genuine
   // (non-generic) override. Previously the preview used a thin one-liner
   // fallback that never matched the PDF — a preview==PDF violation.
-  const execText = pickProse(
-    report.executiveSummary,
-    aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
-  );
+  // Mirror exportFlashpointReportPdf exactly: any non-empty analyst edit wins,
+  // otherwise AI-or-deterministic (no 240-char substantive threshold here —
+  // the PDF applies none for the Executive Summary).
+  const execEdit = (report.executiveSummary ?? "").trim();
+  const execText =
+    execEdit || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary);
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>

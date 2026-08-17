@@ -64,6 +64,45 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\bviewport-wrapper\b/,
 ];
 
+// ---------------------------------------------------------------------------
+// GLOBAL sports-fixture gate (owner ruling: NO sport in ANY report).
+//
+// A match report ("Harimau Malaya fall to Vietnam in Asean Cup semis") is
+// never an incident, whatever topic bucket it lands in — and its BODY is a
+// minefield of public-order homonyms ("stoppage time", "shootout", "clash",
+// "march into the semis") that keep tiers can incidentally match. So sports
+// coverage is dropped ONCE, globally, before every topic gate.
+//
+// Precision rules:
+//   * Only unmistakable fixture context fires: scoreline/match-report idioms
+//     ("own goal", "stoppage time", "hat-trick", "return leg"), or a result
+//     verb bound within one clause to a competition word (cup/championship/
+//     league/tournament/semis...). A bare competition mention ("ahead of the
+//     ASEAN Cup clash") deliberately does NOT fire — pre-match security
+//     stories (fireworks at the team hotel) are genuine records.
+//   * Real unrest AT a fixture always survives via the override: riots,
+//     stampedes, casualties, police action, pitch invasions, protests.
+const SPORTS_FIXTURE_RE = new RegExp(
+  [
+    // Scoreline / match-report idioms that only occur in sports coverage.
+    String.raw`\b(own goal|stoppage[ -]time|extra[ -]time|injury[ -]time|half[- ]time|full[- ]time|hat[ -]?trick|goalless|goal-?scorer|scoreline|matchday|man of the match|player of the match|clean sheet|first leg|second leg|return leg|group stage|knockout stage|round of (16|32)|aggregate (win|lead|score))\b`,
+    // Result verb bound to a competition word in the same clause.
+    String.raw`\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|super league|premier league|la liga|serie a|bundesliga|sea games|olympics?|friendly)\b[^.!?]{0,80}\b(semis?|semi[- ]?finals?|quarter[- ]?finals?|beat|beats|defeat(?:s|ed)?|falls? to|fell to|loses? to|lost to|edges? (?:out|past)|thrash(?:es|ed)?|held to a (?:goalless )?draw|draws? (?:with|against)|drew (?:with|against)|wins? (?:over|against)|won (?:over|against)|victory (?:over|against)|kick[- ]?off|top scorer)\b`,
+    String.raw`\b(semis?|semi[- ]?finals?|quarter[- ]?finals?|beat|defeat(?:s|ed)?|falls? to|fell to|lost to|held to a (?:goalless )?draw|drew (?:with|against)|victory (?:over|against))\b[^.!?]{0,80}\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|sea games|olympics?)\b`,
+  ].join("|"),
+  "i",
+);
+// Genuine security events at/around a fixture must NEVER be dropped by the
+// sports gate — casualty, police-action and mobilisation cues override it.
+const SPORTS_UNREST_OVERRIDE_RE =
+  /\b(riot\w*|stamped\w*|crush(?:ed)?|killed|dead|deaths?|fatal\w*|injur\w*|wound\w*|tear ?gas|water cannon|police fired|opened fire|gunfire|shooting|shot|stabb\w*|arrest\w*|detain\w*|protest\w*|demonstrat\w*|unrest|violen\w*|hooligan\w*|pitch invasion|brawl\w*|explos\w*|bomb\w*|evacuat\w*|curfew|emergency)\b/i;
+
+/** True when the record is unmistakable sports-fixture coverage with no real
+ *  security signal. Global: applied before every topic and country gate. */
+export function isSportsFixtureNoise(text: string): boolean {
+  return SPORTS_FIXTURE_RE.test(text) && !SPORTS_UNREST_OVERRIDE_RE.test(text);
+}
+
 // A scraped Google-News SECTION / topic-page heading that leaked in as though
 // it were an article: "Papua New Guinea Massacre News", "<Place> Crime News",
 // "Breaking News", etc. The WHOLE (raw) title is "<optional place words>
@@ -1783,7 +1822,7 @@ const REQUIRED: Record<string, RegExp[]> = {
     // (flashpointProtestCrackdownVerdict) so a record is no longer kept merely
     // because its text contains "protest"/"crackdown" in a diplomatic, gesture,
     // interstate or law-enforcement sense. The unambiguous tokens stay.
-    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage(?!s?[ -]time)|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
     // inflected protest forms (marches/marchers/marching/marched) or an
     // explicit protest-march phrase count; bare "march" needs a companion
@@ -1803,7 +1842,7 @@ const REQUIRED: Record<string, RegExp[]> = {
     // (flashpointProtestCrackdownVerdict) so a record is no longer kept merely
     // because its text contains "protest"/"crackdown" in a diplomatic, gesture,
     // interstate or law-enforcement sense. The unambiguous tokens stay.
-    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
+    /\b(demonstration|sit[- ]?in|picket|walkout|stoppage(?!s?[ -]time)|riot|public disorder|looting|roadblock|road block|unrest|civil unrest|industrial action|strike notice|hartal|bandh|gherao)(e?s|ers?|ing|ed)?\b/,
     // "march" alone is a calendar month ("flat from 50.4 in March"). Only the
     // inflected protest forms (marches/marchers/marching/marched) or an
     // explicit protest-march phrase count; bare "march" needs a companion
@@ -1835,7 +1874,7 @@ const FLASHPOINT_AMBIGUOUS_RE =
 // protest", interstate "Bangladesh protests India") or "crackdown" ("drug
 // crackdown").
 const FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE =
-  /\b(demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|gen[- ]?z protest)\b/i;
+  /\b(demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage(?!s?[ -]time)|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|gen[- ]?z protest)\b/i;
 
 // ---- Negative-sense gate for the polysemous words "protest" / "crackdown" ----
 // "protest" is kept by default (high recall) UNLESS it is used in a non-civil-
@@ -1942,7 +1981,7 @@ function flashpointProtestCrackdownVerdict(text: string, negText: string): boole
 // strike kills three" — both have an ambiguous trigger but no
 // public-order companion, so they are not flashpoint material.
 const FLASHPOINT_PUBLIC_ORDER_CUE_RE =
-  /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
+  /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage(?!s?[ -]time)|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
 
 // Industrial-action recogniser. This monitor's scope explicitly includes
 // industrial action, but real labour-strike headlines often omit the
@@ -2084,6 +2123,11 @@ function firstMatch(text: string, patterns: RegExp[]): RegExp | null {
  */
 export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResult {
   const text = haystack(i);
+  // GLOBAL sports gate — mirrors explainRelevance; must run before any
+  // topic-specific title-rescue so a fixture headline is never lane-vouched.
+  if (isSportsFixtureNoise(text)) {
+    return { relevant: false, reason: "slop: sports-fixture coverage (match report, no security signal)" };
+  }
   if (topic === "flashpoint") {
     const t = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
     if (t) return { relevant: false, reason: `slop: flashpoint title noise (/${t.source}/)` };
@@ -2151,6 +2195,12 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
 
   const general = firstMatch(text, EXCLUDE_PHRASES);
   if (general) return { relevant: false, reason: `excluded: general-news noise (/${general.source}/)` };
+
+  // GLOBAL sports gate — a match report is never an incident for ANY topic,
+  // and its body text ("stoppage time", "shootout") trips keep tiers.
+  if (isSportsFixtureNoise(text)) {
+    return { relevant: false, reason: "excluded: sports-fixture coverage (match report, no security signal)" };
+  }
 
   // Scraped Google-News SECTION / topic-page heading ("Papua New Guinea
   // Massacre News", "<Place> Crime News") that leaked in as though it were an
@@ -2478,7 +2528,7 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // is kept by the active-strike override.
     if (
       FP_LABOUR_TRIBUNAL_RE.test(text) &&
-      /\b(strike|strikes|industrial action|walkout|stoppage|lockout)\b/i.test(text) &&
+      /\b(strike|strikes|industrial action|walkout|stoppage(?!s?[ -]time)|lockout)\b/i.test(text) &&
       FP_TRIBUNAL_PROCESS_RE.test(text) &&
       !FP_TRIBUNAL_ACTIVE_STRIKE_RE.test(text)
     ) {
@@ -2954,6 +3004,9 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
   }
+  // GLOBAL sports gate — country briefs treat isCountryRelevant as the sole
+  // authority, so the no-sport ruling must be enforced here too.
+  if (isSportsFixtureNoise(text)) return false;
   // Scraped-aggregator junk: a leftover YouTube video-id in the headline
   // ("...Papua New Guinea (vFetqxZnwf) - Mshale") is never a real incident.
   // Test the RAW title — the lower→UPPER case transition is the signature

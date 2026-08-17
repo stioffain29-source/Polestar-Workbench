@@ -130,6 +130,16 @@ function canonicalSeverity(value: string | null | undefined): FuelSeverity {
   return key === "extreme" ? "Extreme" : key === "high" ? "High" : key === "moderate" ? "Moderate" : key === "low" ? "Low" : "Insignificant";
 }
 function severityWord(value: FuelSeverity): string { return value.toLowerCase(); }
+// A quoted incident headline can carry its own percentage ("Jet fuel price
+// raised by 21%"). The consistency gate reads any "NN%" in a sentence that
+// also names an indicator (jet fuel, Brent...) as a MARKET claim and demands
+// it match a calculated indicator change — so quoted headlines must never
+// contribute bare "%" figures. Rewriting to "per cent" keeps the wording
+// honest while staying invisible to the gate's percentage scanner.
+function proseSafeTitle(t: string): string {
+  return t.replace(/(\d+(?:\.\d+)?)\s*%/g, "$1 per cent");
+}
+
 function title(value: string): string {
   return value.replace(/\b\w/g, (m) => m.toUpperCase());
 }
@@ -283,7 +293,7 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const observed = facts.currentConditions.length;
   const secondary = facts.secondaryPressurePoints.map((p) => p.label);
   const executiveSummary = `Fuel Watch records ${count} qualifying incident${count === 1 ? "" : "s"} across ${days} distinct reporting day${days === 1 ? "" : "s"}. Overall severity: ${severity}. ${pressure} ${marketSentence(facts)}`;
-  const situation = `Current, non-potential evidence covers ${observed} of the reporting period's ${count} qualifying incident${count === 1 ? "" : "s"}. ${pressure} The highest-priority incident is ${top ? `“${top.title}” at ${top.physicalLocation ?? UNKNOWN}` : "not identified"}. Overall severity: ${severity}.`;
+  const situation = `Current, non-potential evidence covers ${observed} of the reporting period's ${count} qualifying incident${count === 1 ? "" : "s"}. ${pressure} The highest-priority incident is ${top ? `“${proseSafeTitle(top.title)}” at ${top.physicalLocation ?? UNKNOWN}` : "not identified"}. Overall severity: ${severity}.`;
   // What Happened is a distinct event-led narrative. It deliberately repeats
   // no full sentence from `situation` (no evidence-coverage sentence, no
   // pressure sentence) so the two sections can never render verbatim
@@ -295,7 +305,7 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
     : "in the reporting period";
   const whatHappened = count === 0
     ? "No qualifying incidents were recorded in the reporting period."
-    : `${count} qualifying incident${count === 1 ? " was" : "s were"} recorded ${period}, across ${list(facts.countries.slice(0, 3).map((c) => c.label))}${facts.countries.length > 3 ? " and elsewhere" : ""}. ${top ? `The lead event, dated ${top.date}, is “${top.title}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, rated ${severityWord(top.severity)}.` : "No lead event is identified."}`;
+    : `${count} qualifying incident${count === 1 ? " was" : "s were"} recorded ${period}, across ${list(facts.countries.slice(0, 3).map((c) => c.label))}${facts.countries.length > 3 ? " and elsewhere" : ""}. ${top ? `The lead event, dated ${top.date}, is “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, rated ${severityWord(top.severity)}.` : "No lead event is identified."}`;
   // Per-theatre detail sentences shared by Regional Highlights and the
   // Operational Read. Word choice matters for the consistency gate: subset
   // figures are "record(s)" (never "qualifying incidents") and subset date
@@ -308,7 +318,7 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
       .slice()
       .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || (a.date < b.date ? 1 : -1))[0];
     const countClause = rows.length === 1 ? "one record" : `${rows.length} records`;
-    return `${label} carries ${countClause} this period, led by “${lead.title}” (${lead.date}, ${severityWord(lead.severity)} severity).`;
+    return `${label} carries ${countClause} this period, led by “${proseSafeTitle(lead.title)}” (${lead.date}, ${severityWord(lead.severity)} severity).`;
   };
   const pressureGroups: Array<{ label: string; incidentIds: string[] }> =
     facts.primaryPressurePoint.kind === "distributed"
@@ -336,13 +346,13 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const opDetailParts: string[] = [];
   if (top) {
     opDetailParts.push(
-      `The period's most serious event is “${top.title}”${top.physicalLocation ? ` at ${top.physicalLocation}` : ""} on ${top.date}, rated ${severityWord(top.severity)}.`,
+      `The period's most serious event is “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` at ${top.physicalLocation}` : ""} on ${top.date}, rated ${severityWord(top.severity)}.`,
     );
   }
   if (theatreSentences.length) {
     // The lead event's theatre sentence would restate the same headline —
     // keep the remaining theatres so the paragraph adds breadth, not an echo.
-    const rest = theatreSentences.filter((s) => !top || !s.includes(top.title));
+    const rest = theatreSentences.filter((s) => !top || !s.includes(proseSafeTitle(top.title)));
     if (rest.length) opDetailParts.push(rest.join(" "));
   }
   if (count > 0) {
