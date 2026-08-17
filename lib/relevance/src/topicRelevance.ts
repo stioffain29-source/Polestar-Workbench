@@ -89,13 +89,41 @@ const SPORTS_FIXTURE_RE = new RegExp(
     // Result verb bound to a competition word in the same clause.
     String.raw`\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|super league|premier league|la liga|serie a|bundesliga|sea games|olympics?|friendly)\b[^.!?]{0,80}\b(semis?|semi[- ]?finals?|quarter[- ]?finals?|beat|beats|defeat(?:s|ed)?|falls? to|fell to|loses? to|lost to|edges? (?:out|past)|thrash(?:es|ed)?|held to a (?:goalless )?draw|draws? (?:with|against)|drew (?:with|against)|wins? (?:over|against)|won (?:over|against)|victory (?:over|against)|kick[- ]?off|top scorer)\b`,
     String.raw`\b(semis?|semi[- ]?finals?|quarter[- ]?finals?|beat|defeat(?:s|ed)?|falls? to|fell to|lost to|held to a (?:goalless )?draw|drew (?:with|against)|victory (?:over|against))\b[^.!?]{0,80}\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|sea games|olympics?)\b`,
+    // A numeric scoreline ("crushed rivals 5-0", "won 2-1") bound in the same
+    // clause to a competition word — only sports coverage carries both.
+    String.raw`\b\d{1,2}[-–]\d{1,2}\b[^.!?]{0,80}\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|super league|premier league|sea games|friendly)\b`,
+    String.raw`\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|super league|premier league|sea games|friendly)\b[^.!?]{0,80}\b\d{1,2}[-–]\d{1,2}\b`,
+    // Rout verbs used with scorelines ("crushed rivals 5-0", "thrashed 4-0").
+    String.raw`\b(crush(?:es|ed)?|thrash(?:es|ed)?|rout(?:s|ed)?|hammer(?:s|ed)?|demolish(?:es|ed)?|outclass(?:es|ed)?)\b[^.!?]{0,40}\b\d{1,2}[-–]\d{1,2}\b`,
   ].join("|"),
   "i",
 );
 // Genuine security events at/around a fixture must NEVER be dropped by the
-// sports gate — casualty, police-action and mobilisation cues override it.
-const SPORTS_UNREST_OVERRIDE_RE =
-  /\b(riot\w*|stamped\w*|crush(?:ed)?|killed|dead|deaths?|fatal\w*|injur\w*|wound\w*|tear ?gas|water cannon|police fired|opened fire|gunfire|shooting|shot|stabb\w*|arrest\w*|detain\w*|protest\w*|demonstrat\w*|unrest|violen\w*|hooligan\w*|pitch invasion|brawl\w*|explos\w*|bomb\w*|evacuat\w*|curfew|emergency)\b/i;
+// sports gate — casualty, police-action and crowd-disorder cues override it.
+// Each cue must be immune to ORDINARY sports vocabulary, or the gate is
+// defeated by its own override: "injury time" / a player injury is not a
+// casualty ("injur\w*" is deliberately NOT a cue — only casualty-framed
+// injury phrasing counts), "shot on target" is not gunfire, "crushed their
+// rivals" is not a crowd crush, and a cricket "dead rubber" is not a death.
+const SPORTS_UNREST_OVERRIDE_RE = new RegExp(
+  [
+    // Unambiguous violence / disorder nouns.
+    String.raw`\b(riot\w*|stamped\w*|unrest|violen\w*|hooligan\w*|pitch invasion|brawl\w*|explos\w*|bomb\w*|grenade|stabb\w*|lynch\w*|loot\w*)\b`,
+    // Casualties — framed as people harmed, never player-fitness/idiom usage.
+    String.raw`\bcrushed to death\b|\bcrush (?:at|outside|near|in)\b|\bcrowd (?:crush|trouble|disorder|surge|control)\b`,
+    String.raw`\b(?:killed|dead(?! rubber| ball| heat)|deaths?|death toll|fatal\w*|casualt\w*)\b`,
+    String.raw`\b(?:\d+|several|dozens?|scores|many|fans?|spectators?|people|civilians?|officers?)\b[^.!?]{0,20}\b(?:were |was )?(?:injured|hurt|wounded|trampled|hospitalised|hospitalized)\b`,
+    String.raw`\binjur(?:ies|ed)\b[^.!?]{0,30}\b(?:reported|among|fans?|spectators?|crowd)\b`,
+    // Gunfire / weapons — never the sports "shot/shooting" senses.
+    String.raw`\b(?:gunfire|gunshot\w*|opened fire|shot (?:dead|at|and (?:killed|wounded|injured))|shooting (?:at|outside|near|leaves?|kills?))\b`,
+    // Police / security-force response at the venue.
+    String.raw`\bpolice\b[^.!?]{0,40}\b(?:fired|charg\w*|deploy\w*|dispers\w*|baton\w*|clash\w*|respond\w*|arrest\w*|detain\w*|escort\w*|riot gear)\b`,
+    String.raw`\b(?:tear ?gas|water cannon|rubber bullet\w*|riot police|security forces)\b`,
+    // Mobilisation / official-response cues.
+    String.raw`\b(?:arrest\w*|detain\w*|protest\w*|demonstrat\w*|evacuat\w*|curfew|state of emergency|emergency (?:services|declared|response))\b`,
+  ].join("|"),
+  "i",
+);
 
 /** True when the record is unmistakable sports-fixture coverage with no real
  *  security signal. Global: applied before every topic and country gate. */
@@ -3050,7 +3078,15 @@ export function isCountryRelevant(i: RelevanceInput): boolean {
   // report routinely calls itself a "Round 1 clash"; "clash" (and "raid",
   // "fighting", "victory") must NOT rescue a football story — only an
   // unambiguous violence/crime word does.
-  if (COUNTRY_SPORTS_NOISE_RE.test(text) && !COUNTRY_HARD_SECURITY_RE.test(text)) {
+  // The global sports-gate unrest override is a second rescue lane: a stadium
+  // crush / police deployment / crowd-disorder venue incident phrases its
+  // casualties in ways the HARD lexicon misses ("dozens injured", "police
+  // deploy reinforcements") and must never be dropped as fixture noise.
+  if (
+    COUNTRY_SPORTS_NOISE_RE.test(text) &&
+    !COUNTRY_HARD_SECURITY_RE.test(text) &&
+    !SPORTS_UNREST_OVERRIDE_RE.test(text)
+  ) {
     return false;
   }
   // Drop ceremonial / PR diary EVENTS (a breakfast, summit, signing ceremony)
