@@ -155,3 +155,4 @@
 - [Ingest run watchdog](ingest-watchdog.md) — recurring prod staleness = one hung stage held the advisory lock forever (no run deadline); watchdog + stage markers fix it; replshield 307 blocks external admin curls on private deploys.
 - [Task-agent DB writes lost on merge](task-agent-db-writes.md) — only code merges; DB row content must come from main agent or marker-gated boot migrations; PROD_DATABASE_URL IS writable from workspace.
 - [No follow-up proposals](no-follow-up-proposals.md) — owner rule: proposals became never-ending without real improvement; report findings plainly, never queue tasks.
+- [Global sports-fixture gate](sports-fixture-global-gate.md) — owner: NO sport in any report; one gate + unrest override immune to sports idioms (injury time/shot/crush/dead rubber); keep cues must be SUMMARY-safe ("stoppage time" trap).
