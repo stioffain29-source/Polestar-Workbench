@@ -125,13 +125,21 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
     const potential = incident(1, "Iran", "2031-03-30", "moderate", {
       title: "Fuel allocation cuts may be introduced", summary: "Potential allocation cuts if disruption worsens.",
     });
-    const model = facts([potential]);
+    const model = buildFuelCanonicalFacts({
+      issueDate: ISSUE_DATE,
+      incidents: [potential],
+      qualifyingIncidents: [potential],
+      marketCards: [
+        { label: "Brent", value: 80, unit: "USD/bbl", change: "+2.0% 7d" },
+        { label: "WTI", value: 75, unit: "USD/bbl", change: "+2.0% 7d" },
+      ],
+      watchIndicators: ["allocation cuts"],
+    });
     const sections = buildFuelCanonicalSections(model);
     expect(model.currentConditions).toHaveLength(0);
-    expect(sections.watchNext).toContain("Potential: allocation cuts");
-    expect(sections.situation).toContain(
-      `Current, non-potential evidence covers 0 of the reporting period's ${model.incidentCount} qualifying incidents`,
-    );
+    expect(sections.watchNext).toContain("allocation cuts");
+    expect(sections.watchNext).not.toMatch(/^- Potential:/);
+    expect(sections.situation).toContain("Nothing in the window is confirmed yet");
   });
 
   it("the validation gate rejects generated-section attempts to override canonical facts", () => {
@@ -174,6 +182,23 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
       if (statedCount !== undefined) expect(Number(statedCount)).toBeLessThanOrEqual(model.incidentCount);
       expect(watch?.currentItems.length ?? 0).toBeLessThanOrEqual(model.incidentCount);
     }
+  });
+
+  it("chokepoint route with extreme severity outranks high-volume country pressure", () => {
+    const model = facts([
+      incident(1, "Yemen", "2031-03-29", "extreme", {
+        title: "Houthi strike hits tanker in Bab el-Mandeb",
+        summary: "Extreme severity strike in Bab el-Mandeb corridor.",
+      }),
+      incident(2, "Yemen", "2031-03-30", "extreme", {
+        title: "Second Bab el-Mandeb attack disrupts fuel tanker transit",
+        summary: "Another Bab el-Mandeb disruption.",
+      }),
+      ...Array.from({ length: 8 }, (_, n) =>
+        incident(n + 3, "India", `2031-03-${String(28 + (n % 3)).padStart(2, "0")}`, "moderate"),
+      ),
+    ]);
+    expect(model.primaryPressurePoint.label).toMatch(/Bab-el-Mandeb|Yemen/);
   });
 
   it("reports and throws a specific error when Chokepoint Watch exceeds the canonical total", () => {

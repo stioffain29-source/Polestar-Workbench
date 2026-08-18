@@ -278,4 +278,39 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     });
     expect(rows).toHaveLength(0);
   });
+
+  it("excludes condemnation-only producer headlines", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(45, "fuel", "UAE strongly condemns targeting of two ADNOC vessels"),
+      ],
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("gives windfall tax cuts a policy read, not an aviation trim read", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(46, "fuel", "India cuts windfall tax on petrol, diesel, aviation-fuel exports"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Government / policy action");
+    expect(rows[0].operationalRead).toMatch(/policy reset/i);
+    expect(rows[0].operationalRead).not.toMatch(/aviation demand response/i);
+  });
+
+  it("reads a failed shortage-ease headline as persistent tightness", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(47, "fuel", "Indian gasoline fails to ease Russia's fuel shortage"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].operationalRead).toMatch(/did not materialise|persists/i);
+    expect(rows[0].operationalRead).not.toMatch(/supply resuming eases/i);
+  });
 });

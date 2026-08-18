@@ -665,6 +665,7 @@ const CATEGORY_RULES: CategoryRule[] = [
       // signal (bearish for local pump prices), not a policy action.
       /\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/,
       /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/,
+      /\bfails?\s+to\s+ease\b.{0,50}\b(shortage|crisis|fuel shortage|fuel crisis)\b/,
     ],
   },
 ];
@@ -674,6 +675,15 @@ function classifyCategory(t: string): FuelActionCategory | null {
     if (rule.test.some((re) => re.test(t))) return rule.category;
   }
   return null;
+}
+
+function isStatementOnlyHeadline(t: string): boolean {
+  const hasOperationalAction = /\b(production|output|export|pipeline|bypass|cut|hike|restart|shut|contract|tender|supply deal|long[- ]term|maintenance|outage|expand|increase|reduce|announce\w* output)\b/.test(t);
+  if (hasOperationalAction) return false;
+  if (/\b(condemn|condemns|condemned|denounc|deplor|strongly condemns)\b/.test(t)) return true;
+  if (/\b(issues statement|statement clarifying)\b/.test(t)
+      && !/\b(attack|attacks|pipeline|output|production|export|restart|shut|maintenance|outage)\b/.test(t)) return true;
+  return false;
 }
 
 // Per-row operational-read derivation. Each row gets a sentence shaped
@@ -686,10 +696,15 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   // (owner ruling), so this branch precedes the generic refinery branch.
   if (/\b(refin(?:ery|er|ing) margins?|crack spreads?)\b/.test(t))
     return "Supporting market indicator: margin strength corroborates tight refined-product supply. Not an operational driver on its own.";
+  if (/\b(condemn|condemns|condemned|denounc|deplor)\b/.test(t))
+    return "Statement only — no confirmed operational supply change unless reporting evidences output, routing or allocation impact.";
+  if (/\bfails?\s+to\s+ease\b/.test(t))
+    return "The expected relief did not materialise; the shortage or tightness persists and keeps local pricing under pressure.";
   if (/\b(refinery|refining)\b/.test(t))
     return "Refinery-side change to regional product supply; watch crack spreads and downstream product availability.";
-  if ((/\b(flight|flights|route|routes|capacity|aviation|airline|carrier|airways)\b/.test(t))
-      && /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim|drop)\w*/.test(t))
+  if ((/\b(flight|flights|route|routes|capacity|airline|carrier|airways)\b/.test(t))
+      && /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim|drop)\w*/.test(t)
+      && !/\b(tax|taxes|windfall|levy|levies|duty|export ban|import ban|subsidy|subsidies)\b/.test(t))
     return "Aviation demand response: carriers trimming capacity signal jet-fuel cost or availability stress feeding straight into route economics.";
   if (/\b(fuel (cost|costs|price|prices)|jet fuel|aviation fuel)\b/.test(t)
       && /\b(airline|airways|flight|flights|aviation|air india)\b/.test(t))
@@ -719,7 +734,7 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   if (/\b(supply (tighten|tightens|squeeze)|inventory draw)/.test(t))
     return "Tightening balances put a floor under prices and reduce buyer flexibility in the weeks ahead.";
   if (/\b(supply|supplies|fuel|petrol|diesel|cargo|shipment|tanker|stock|stocks) .{0,30}(arriv\w+|resum\w+|restor\w+|replenish\w+|normalis\w+)/.test(t)
-      || /\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/.test(t))
+      || (/\b(shortage|crisis|outage|disruption) .{0,30}(ease|eases|easing|end|ends|over|resolv\w+)/.test(t) && !/\bfails?\s+to\s+ease\b/.test(t)))
     return "Supply resuming eases the local shortage; pump-price and surcharge pressure should soften as availability normalises.";
   if (/\b(price|prices) (rise|climb|surge|jump|hit|reach|break)/.test(t))
     return "Reinforces the cost-pressure picture on freight surcharges and bunker invoices.";
@@ -1179,6 +1194,7 @@ export function buildFuelProducerBuyerActions(opts: {
   const seen = new Set<string>();
   for (const i of window) {
     const t = haystack(i);
+    if (isStatementOnlyHeadline(t)) continue;
     const category = classifyCategory(t);
     if (!category) continue;
     // Action cell: WHO/WHAT from the headline (conservatively sentence-

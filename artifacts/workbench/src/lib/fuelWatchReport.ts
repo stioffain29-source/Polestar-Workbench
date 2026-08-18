@@ -656,19 +656,36 @@ export function buildFuelMarketRead(opts: {
     const m = change.match(/(-?\d+(?:\.\d+)?)\s*%/);
     return m ? parseFloat(m[1]) : null;
   };
+  const directionFromPct = (pct: number | null): "rising" | "falling" | "flat" => {
+    if (pct === null) return "flat";
+    if (Math.abs(pct) <= 0.5) return "flat";
+    return pct > 0 ? "rising" : "falling";
+  };
   const changePcts = [parseChangePct(brent?.change), parseChangePct(wti?.change)].filter(
     (v): v is number => v !== null,
   );
+  let jetPct: number | null = null;
+  if (jetFuel && trajectory.length >= 2) {
+    const first = trajectory[0].value;
+    const last = trajectory[trajectory.length - 1].value;
+    jetPct = first !== 0 ? ((last - first) / first) * 100 : 0;
+  }
+  const moveDirections = [
+    ...changePcts.map(directionFromPct),
+    directionFromPct(jetPct),
+  ].filter((d) => d !== "flat");
+  const risingMoves = moveDirections.filter((d) => d === "rising").length;
+  const fallingMoves = moveDirections.filter((d) => d === "falling").length;
   const avgChangePct = changePcts.length
     ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
-    : null;
+    : jetPct;
   let para2: string;
-  if (avgChangePct !== null && avgChangePct <= -3) {
-    para2 =
-      "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
-  } else if (avgChangePct !== null && avgChangePct >= 3) {
+  if (risingMoves > fallingMoves || (avgChangePct !== null && avgChangePct >= 2)) {
     para2 =
       "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
+  } else if (fallingMoves > risingMoves || (avgChangePct !== null && avgChangePct <= -2)) {
+    para2 =
+      "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
   } else {
     para2 =
       "Taken together, the market picture is broadly flat rather than trending sharply in either direction. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing, so treat these market indicators as the cost floor for the decisions that follow.";

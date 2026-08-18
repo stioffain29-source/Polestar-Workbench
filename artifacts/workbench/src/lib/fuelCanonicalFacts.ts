@@ -143,8 +143,47 @@ function proseSafeTitle(t: string): string {
 function title(value: string): string {
   return value.replace(/\b\w/g, (m) => m.toUpperCase());
 }
-function stableSort<T extends { label: string; severityScore: number }>(rows: T[]): T[] {
-  return rows.sort((a, b) => b.severityScore - a.severityScore || a.label.localeCompare(b.label));
+function stableSort<T extends { label: string; severityScore: number; maxSeverity: number }>(rows: T[]): T[] {
+  return rows.sort(
+    (a, b) =>
+      b.maxSeverity - a.maxSeverity
+      || b.severityScore - a.severityScore
+      || a.label.localeCompare(b.label),
+  );
+}
+function maxSeverityRank(rows: CanonicalFuelIncident[]): number {
+  return rows.reduce((peak, i) => Math.max(peak, SEVERITY_RANK[i.severity]), 0);
+}
+function incidentSetKey(ids: string[]): string {
+  return [...ids].sort().join(",");
+}
+function dedupeSharedIncidentGroups<T extends { kind: "country" | "route"; label: string; incidentIds: string[] }>(rows: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    const key = incidentSetKey(row.incidentIds);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, row);
+      continue;
+    }
+    // Same underlying records: keep the route label when it names the chokepoint.
+    if (row.kind === "route" && prev.kind === "country") map.set(key, row);
+  }
+  return [...map.values()];
+}
+function pickPrimaryPool(
+  countryCandidates: Array<{ kind: "country"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }>,
+  routeCandidates: Array<{ kind: "route"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }>,
+): Array<{ kind: "country" | "route"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }> {
+  const sortedCountries = stableSort(countryCandidates);
+  const sortedRoutes = stableSort(routeCandidates);
+  const bestCountry = sortedCountries[0];
+  const bestRoute = sortedRoutes[0];
+  if (bestRoute && bestCountry && bestRoute.maxSeverity > bestCountry.maxSeverity) {
+    return dedupeSharedIncidentGroups(sortedRoutes);
+  }
+  if (sortedCountries.length) return dedupeSharedIncidentGroups(sortedCountries);
+  return dedupeSharedIncidentGroups(sortedRoutes);
 }
 export function routeFor(i: TopicFastFactsIncident): string | null {
   const value = `${i.title ?? ""} ${i.summary ?? ""} ${i.location ?? ""}`.toLowerCase();
@@ -224,22 +263,31 @@ export function buildFuelCanonicalFacts(opts: {
       const key = pick(i); if (!key) continue;
       map.set(key, [...(map.get(key) ?? []), i]);
     }
-    return stableSort([...map.entries()].map(([label, rows]) => ({ label, count: rows.length, severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0), incidentIds: rows.map((i) => i.id) })));
+    return stableSort([...map.entries()].map(([label, rows]) => ({
+      label,
+      count: rows.length,
+      severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0),
+      maxSeverity: maxSeverityRank(rows),
+      incidentIds: rows.map((i) => i.id),
+    })));
   };
   const countries = groups((i) => i.country);
   const routes = groups((i) => i.routeOrChokepoint);
   // Geography and route are two valid but non-additive lenses over the same
-  // incident. Rank countries first when country attribution exists; only use
-  // route ranking when no country is evidenced. This avoids falsely calling a
-  // single event "distributed" merely because it has both a country and route.
+  // incident set. Rank both together by peak severity first so a single
+  // extreme chokepoint event is not drowned out by higher article volume
+  // elsewhere.
   const countryCandidates = countries.map((r) => ({ kind: "country" as const, ...r }));
   const routeCandidates = routes.map((r) => ({ kind: "route" as const, ...r }));
-  const primaryCandidates = (countryCandidates.length ? countryCandidates : routeCandidates)
-    .slice().sort((a, b) => b.severityScore - a.severityScore || b.count - a.count || a.label.localeCompare(b.label));
+  const primaryCandidates = stableSort(pickPrimaryPool(countryCandidates, routeCandidates));
   const candidate = [...countryCandidates, ...routeCandidates]
-    .sort((a, b) => b.severityScore - a.severityScore || b.count - a.count || a.label.localeCompare(b.label));
+    .slice()
+    .sort((a, b) => b.maxSeverity - a.maxSeverity || b.severityScore - a.severityScore || b.count - a.count || a.label.localeCompare(b.label));
   const topScore = primaryCandidates[0]?.severityScore ?? 0;
-  const leaders = primaryCandidates.filter((point) => point.severityScore === topScore && point.count === (primaryCandidates[0]?.count ?? 0));
+  const topMax = primaryCandidates[0]?.maxSeverity ?? 0;
+  const leaders = primaryCandidates.filter(
+    (point) => point.severityScore === topScore && point.maxSeverity === topMax && point.count === (primaryCandidates[0]?.count ?? 0),
+  );
   const primaryPressurePoint: FuelRankedPressurePoint = leaders.length === 1
     ? { kind: leaders[0].kind, label: leaders[0].label, score: leaders[0].severityScore, incidentIds: leaders[0].incidentIds }
     : { kind: "distributed", label: "Distributed pressure", score: topScore, incidentIds: leaders.flatMap((p) => p.incidentIds).sort() };
@@ -284,6 +332,13 @@ function list(values: string[]): string {
   return `${values.slice(0, -1).join(", ")} and ${values.at(-1)}`;
 }
 
+function evidenceCoverageSentence(observed: number, count: number): string {
+  if (count === 0) return "No incidents were logged in the reporting window.";
+  if (observed === count) return "All logged incidents carry confirmed reporting rather than speculative framing.";
+  if (observed === 0) return "Nothing in the window is confirmed yet — treat operational claims as watch items until sourcing firms up.";
+  return `${observed} of ${count} incidents are confirmed; the remainder remain potential-only and belong in Watch Next rather than the live picture.`;
+}
+
 export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanonicalSections {
   const count = facts.incidentCount;
   const days = facts.distinctIncidentDates.length;
@@ -292,12 +347,23 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const pressure = pressureSentence(facts);
   const observed = facts.currentConditions.length;
   const secondary = facts.secondaryPressurePoints.map((p) => p.label);
-  const executiveSummary = `Fuel Watch records ${count} qualifying incident${count === 1 ? "" : "s"} across ${days} distinct reporting day${days === 1 ? "" : "s"}. Overall severity: ${severity}. ${pressure} ${marketSentence(facts)}`;
-  const situation = `Current, non-potential evidence covers ${observed} of the reporting period's ${count} qualifying incident${count === 1 ? "" : "s"}. ${pressure} The highest-priority incident is ${top ? `“${proseSafeTitle(top.title)}” at ${top.physicalLocation ?? UNKNOWN}` : "not identified"}. Overall severity: ${severity}.`;
-  // What Happened is a distinct event-led narrative. It deliberately repeats
-  // no full sentence from `situation` (no evidence-coverage sentence, no
-  // pressure sentence) so the two sections can never render verbatim
-  // duplicates.
+  const market = marketSentence(facts);
+  const primaryLabel = facts.primaryPressurePoint.label;
+
+  const executiveSummary = count === 0
+    ? `No fuel-market incidents were logged this period. Overall severity: ${severity}. ${market}`
+    : top
+      ? `The week is led by “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, dated ${top.date}. ${pressure} ${count} incidents were logged across ${days} reporting day${days === 1 ? "" : "s"}. Overall severity: ${severity}. ${market}`
+      : `${count} fuel-market incidents were logged across ${days} reporting day${days === 1 ? "" : "s"}. ${pressure} Overall severity: ${severity}. ${market}`;
+
+  const situation = [
+    evidenceCoverageSentence(observed, count),
+    top
+      ? `The highest-priority incident is “${proseSafeTitle(top.title)}” at ${top.physicalLocation ?? UNKNOWN}. Overall severity: ${severity}.`
+      : `Overall severity: ${severity}.`,
+    pressure,
+  ].filter(Boolean).join(" ");
+
   const period = facts.reportingPeriod.incidentStart && facts.reportingPeriod.incidentEnd
     ? (facts.reportingPeriod.incidentStart === facts.reportingPeriod.incidentEnd
         ? `on ${facts.reportingPeriod.incidentStart}`
@@ -306,19 +372,18 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const whatHappened = count === 0
     ? "No qualifying incidents were recorded in the reporting period."
     : `${count} qualifying incident${count === 1 ? " was" : "s were"} recorded ${period}, across ${list(facts.countries.slice(0, 3).map((c) => c.label))}${facts.countries.length > 3 ? " and elsewhere" : ""}. ${top ? `The lead event, dated ${top.date}, is “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, rated ${severityWord(top.severity)}.` : "No lead event is identified."}`;
-  // Per-theatre detail sentences shared by Regional Highlights and the
-  // Operational Read. Word choice matters for the consistency gate: subset
-  // figures are "record(s)" (never "qualifying incidents") and subset date
-  // spreads never use the phrase "distinct days", so the gate's report-wide
-  // count/day claims can never bind onto a per-theatre figure.
-  const theatreDetail = (label: string, ids: string[]): string | null => {
+
+  const theatreDetail = (label: string, ids: string[]): { sentence: string; leadId: string } | null => {
     const rows = facts.qualifyingIncidents.filter((i) => ids.includes(i.id));
     if (!rows.length) return null;
     const lead = rows
       .slice()
       .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || (a.date < b.date ? 1 : -1))[0];
     const countClause = rows.length === 1 ? "one record" : `${rows.length} records`;
-    return `${label} carries ${countClause} this period, led by “${proseSafeTitle(lead.title)}” (${lead.date}, ${severityWord(lead.severity)} severity).`;
+    return {
+      leadId: lead.id,
+      sentence: `${label} carries ${countClause} this period, led by “${proseSafeTitle(lead.title)}” (${lead.date}, ${severityWord(lead.severity)} severity).`,
+    };
   };
   const pressureGroups: Array<{ label: string; incidentIds: string[] }> =
     facts.primaryPressurePoint.kind === "distributed"
@@ -327,22 +392,33 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
           { label: facts.primaryPressurePoint.label, incidentIds: facts.primaryPressurePoint.incidentIds },
           ...facts.secondaryPressurePoints.slice(0, 3),
         ];
-  const theatreSentences = pressureGroups
-    .map((g) => theatreDetail(g.label, g.incidentIds))
-    .filter((s): s is string => s !== null);
+  const seenLeadIds = new Set<string>();
+  const theatreSentences: string[] = [];
+  for (const g of pressureGroups) {
+    const detail = theatreDetail(g.label, g.incidentIds);
+    if (!detail || seenLeadIds.has(detail.leadId)) continue;
+    seenLeadIds.add(detail.leadId);
+    theatreSentences.push(detail.sentence);
+  }
+
   const regionalLead = facts.primaryPressurePoint.kind === "distributed"
-    ? `Regional Highlights: pressure is distributed across ${list([...facts.countries.slice(0, 3).map((c) => c.label), ...facts.routes.slice(0, 3).map((r) => r.label)])}. Overall severity: ${severity}.`
-    : `Regional Highlights: ${facts.primaryPressurePoint.label} is the primary pressure point; secondary pressure points are ${list(secondary)}. Overall severity: ${severity}.`;
+    ? `Pressure is distributed across ${list([...facts.countries.slice(0, 3).map((c) => c.label), ...facts.routes.slice(0, 3).map((r) => r.label)])} rather than concentrating in one theatre. Overall severity: ${severity}.`
+    : `${primaryLabel} anchors the regional picture${secondary.length ? `, with secondary pressure in ${list(secondary)}` : ""}. Overall severity: ${severity}.`;
   const regionalHighlights = [regionalLead, theatreSentences.join(" ")]
     .filter((s) => s.trim())
     .join("\n\n");
-  const whatMatters = `What Matters: ${pressure} The report contains ${count} qualifying incident${count === 1 ? "" : "s"}; route and country totals are derived from the same record set. ${marketSentence(facts)} Overall severity: ${severity}.`;
-  const polestarView = `Polestar View: ${pressure} Overall severity: ${severity}. Evidence confidence: ${facts.evidenceConfidence}. ${facts.analystReviewRequired ? "Analyst review is required before publication." : "The assessed position is based on the qualifying evidence in this reporting period."}`;
-  const marketRead = marketSentence(facts);
-  // Operational Read: the gate-parsable summary line leads, then an
-  // event-led paragraph grounds it in the actual reporting so the section
-  // never ships as a bare counter.
-  const opLead = `Operational Read: ${count} qualifying incident${count === 1 ? "" : "s"} across ${days} distinct day${days === 1 ? "" : "s"}. ${pressure} Overall severity: ${severity}.`;
+
+  const whatMatters = count === 0
+    ? `${pressure} Overall severity: ${severity}. ${market}`
+    : `${pressure} With ${count} incidents this period, the supply and cost picture turns on ${primaryLabel} and adjacent routing exposure. ${market} Overall severity: ${severity}.`;
+
+  const polestarView = facts.analystReviewRequired
+    ? `Hold wider circulation until analyst review completes. ${pressure} Overall severity: ${severity}. Evidence confidence is ${facts.evidenceConfidence.toLowerCase()} on the current sourcing base.`
+    : `Polestar treats ${primaryLabel} as the anchor for continuity planning this week. Overall severity: ${severity}. Evidence confidence is ${facts.evidenceConfidence.toLowerCase()} on the qualifying record set.`;
+
+  const marketRead = market;
+
+  const opLead = `${count} incident${count === 1 ? "" : "s"} across ${days} day${days === 1 ? "" : "s"} frame the operational picture. ${pressure} Overall severity: ${severity}.`;
   const opDetailParts: string[] = [];
   if (top) {
     opDetailParts.push(
@@ -350,8 +426,6 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
     );
   }
   if (theatreSentences.length) {
-    // The lead event's theatre sentence would restate the same headline —
-    // keep the remaining theatres so the paragraph adds breadth, not an echo.
     const rest = theatreSentences.filter((s) => !top || !s.includes(proseSafeTitle(top.title)));
     if (rest.length) opDetailParts.push(rest.join(" "));
   }
@@ -363,14 +437,17 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   const operationalRead = [opLead, opDetailParts.join(" ")]
     .filter((s) => s.trim())
     .join("\n\n");
+
   const implications = [
-    `- Observed: align fuel-continuity actions to ${facts.primaryPressurePoint.label}.`,
-    `- Assessed: plan against overall severity ${severity}.`,
-    `- Reported: verify supplier, route and stock exposure against the ${count} qualifying incident${count === 1 ? "" : "s"}.`,
+    `- Align fuel continuity and generator cover to ${primaryLabel}.`,
+    `- Contract and surcharge clauses should assume ${severity} severity exposure through the next billing cycle.`,
+    `- Reconcile supplier, route and on-site stock assumptions against this week's incident set (${count} record${count === 1 ? "" : "s"}).`,
   ].join("\n");
+
   const watchNext = facts.watchIndicators.length
-    ? facts.watchIndicators.map((x) => `- Potential: ${x}`).join("\n")
-    : "- Potential: monitor for new evidence before classifying a condition as current.";
+    ? facts.watchIndicators.map((x) => `- ${x}`).join("\n")
+    : "- Monitor for new evidence before classifying a condition as current.";
+
   return { executiveSummary, situation, whatHappened, regionalHighlights, whatMatters, polestarView, marketRead, operationalRead, implications, watchNext };
 }
 
