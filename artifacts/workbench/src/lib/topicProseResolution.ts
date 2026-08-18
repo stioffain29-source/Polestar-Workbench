@@ -95,10 +95,10 @@ export function stableDraftTopicReportProse(opts: {
   topic: string;
   issueDate: string;
   incidents: DraftableIncident[];
-  // Fuel only: the Gulf & Hormuz Chokepoint Watch the report renders, so the
-  // lead narrative can name a live Gulf story (Hormuz rows are topic=shipping
-  // and never survive the fuel topic filter). Both the preview and the PDF
-  // pass the watch from the SAME buildFuelWatchReportData payload → parity.
+  // Fuel only: Gulf/Hormuz chokepoint activity used to name a live Gulf
+  // story in the lead narrative. Hormuz rows are often topic=shipping and
+  // never survive the fuel topic filter on their own. Both the preview and
+  // the PDF pass the watch from the SAME buildFuelWatchReportData payload.
   fuelGulf?: FuelGulfChokepointWatch | null;
 }): TopicReportProse {
   const incidents = [...opts.incidents].sort((a, b) => {

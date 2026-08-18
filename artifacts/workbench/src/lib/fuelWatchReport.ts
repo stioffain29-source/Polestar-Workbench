@@ -150,8 +150,8 @@ export interface FuelIncidentData {
    *  Never repeats the Related Incidents table. Null when the window
    *  carries no usable fuel-relevant records. */
   operationalRead: string | null;
-  /** Canonical-subset Gulf/Hormuz chokepoint view. Null when no qualifying
-   *  canonical record is chokepoint-relevant, so the section is omitted. */
+  /** Gulf/Hormuz chokepoint view used to name a live Hormuz story in the
+   *  lead narrative. Not rendered as a standalone report section. */
   gulfChokepointWatch: FuelGulfChokepointWatch | null;
 }
 
@@ -404,28 +404,17 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     incidents,
   });
-  // Gulf/Hormuz Chokepoint Watch is a filtered subset of the canonical
-  // qualifying records. Do not pass the full raw incident feed here: doing so
-  // previously let its independent count exceed the report-wide total.
+  // Gulf/Hormuz developments stay in the canonical qualifying set and flow
+  // through the normal sections (Operational Read, Regional Highlights,
+  // Market and Operator Responses, and the lead draft prose). The watch
+  // object is still built so Executive Summary / Situation can name a live
+  // Hormuz story; it is NOT rendered as a separate repetitive section.
   const gulfChokepointWatch = buildFuelGulfChokepointWatch({
     issueDate: report.issueDate,
     periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? undefined,
     incidents,
     qualifyingIncidents: canonicalFacts.qualifyingIncidents,
   });
-  // Owner ruling (Aug 2026): the Gulf read is no longer a standalone editable
-  // paragraph (its exact-match staleness binding made every save go stale
-  // within days). Its information folds into the Operational Read canonical
-  // narrative instead, so it flows with the report and stays gate-validated;
-  // the Gulf section itself keeps only the dated anchor bullets.
-  if (gulfChokepointWatch?.read) {
-    canonicalSections.operationalRead = [
-      canonicalSections.operationalRead,
-      gulfChokepointWatch.read,
-    ]
-      .filter((t) => (t ?? "").trim() !== "")
-      .join("\n\n");
-  }
   const operationalRead = canonicalSections.operationalRead;
 
   // Market Read: the canonical one-line direction sentence stays (the
@@ -519,7 +508,6 @@ export function buildFuelWatchReportData(
   // substitute contradictory prose.
   const consistencyErrors = validateFuelCanonicalSections(canonicalFacts, {
     ...canonicalSections,
-    gulfAndHormuzChokepointWatch: gulfChokepointWatch?.read,
   });
 
   return {

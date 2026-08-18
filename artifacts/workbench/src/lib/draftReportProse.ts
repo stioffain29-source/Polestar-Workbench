@@ -233,14 +233,13 @@ interface BuildCtx {
   // a Strait-of-Hormuz reopening). When supplied, the Executive Summary leads
   // with it by name so the report can never omit the story driving the window.
   leadDevelopment?: string;
-  // Fuel only: current-period Gulf/Hormuz chokepoint activity, derived from the
-  // SAME Gulf & Hormuz Chokepoint Watch object the report renders further down.
-  // When present, the lead narrative (Executive Summary, Situation, What
-  // Happened, What Matters, Polestar View) names the Gulf story instead of
-  // describing the week as routine cost-and-continuity pressure — a live
-  // chokepoint escalation must never be invisible at the top of the report.
-  // `severe` is true only when a current-period item reached High or Extreme,
-  // gating the word "escalation" so a Moderate-only week never overstates.
+  // Fuel only: current-period Gulf/Hormuz chokepoint activity, derived from
+  // the Gulf watch object. When present, the lead narrative (Executive
+  // Summary, Situation, What Happened, What Matters, Polestar View) names
+  // the Gulf story in the normal report flow rather than as a separate
+  // chokepoint heading. `severe` is true only when a current-period item
+  // reached High or Extreme, gating the word "escalation" so a Moderate-only
+  // week never overstates.
   gulf?: { headline: string; severe: boolean };
 }
 
@@ -857,12 +856,11 @@ export function draftTopicReportProse(opts: {
   topic: string;
   issueDate: string;
   incidents: DraftableIncident[];
-  // Fuel only: the Gulf & Hormuz Chokepoint Watch the report renders. The fuel
-  // incident window is topic-filtered (Hormuz rows live under `shipping`), so
-  // without this the lead narrative cannot see a live Gulf escalation. Passed
-  // from the SAME buildFuelWatchReportData payload the preview/PDF draw the
-  // chokepoint section from, so the headline named in the prose is always a
-  // row the report itself lists.
+  // Fuel only: Gulf/Hormuz activity used to name a live Gulf story in the
+  // lead narrative. The fuel incident window is topic-filtered (Hormuz rows
+  // live under `shipping`), so without this the top of the report cannot see
+  // a live Gulf escalation. Passed from the SAME buildFuelWatchReportData
+  // payload the preview/PDF use — not rendered as a separate section.
   fuelGulf?: FuelGulfChokepointWatch | null;
 }): TopicReportProse {
   const { topic, issueDate, incidents } = opts;

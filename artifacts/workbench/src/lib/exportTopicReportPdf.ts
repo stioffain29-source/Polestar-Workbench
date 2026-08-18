@@ -65,7 +65,6 @@ import {
   makeSectionGate,
   applyFastFactOverrides,
   applyMarketPriceOverrides,
-  applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
@@ -321,8 +320,8 @@ export interface ExportTopicReportPdfOptions {
    *  hideable. */
   hiddenSections?: string[];
   /** Analyst overrides persisted in reports.section_overrides — Fast Facts
-   *  tiles, panel reads (gulf-hormuz) and Market Prices rows. Applied here in
-   *  lockstep with the on-screen preview so preview == PDF. */
+   *  tiles and Market Prices rows. Applied here in lockstep with the
+   *  on-screen preview so preview == PDF. */
   sectionOverrides?: TopicSectionOverrides | null;
 }
 
@@ -1093,9 +1092,9 @@ export async function exportTopicReportPdf(
   // EFFECTIVE text (whatever tier wins), so analyst/AI prose can never smuggle
   // a contradictory claim past it.
   if (fuelData && fuelEffective) {
-    // Strict canonical gate — validates the canonical payload (the Gulf read
-    // now folds into the canonical Operational Read, so it is covered there);
-    // canonical text passes by construction.
+    // Strict canonical gate — validates the canonical payload (Gulf/Hormuz
+    // developments flow through the normal analytical sections, not a
+    // separate chokepoint heading); canonical text passes by construction.
     assertFuelReportConsistent(fuelData.canonicalFacts, {
       ...fuelData.narrativeData.canonicalSections,
     });
@@ -1318,34 +1317,6 @@ export async function exportTopicReportPdf(
         "Regional Highlights",
         fuelEffective?.regionalHighlights,
       );
-    }
-    // Gulf and Hormuz Chokepoint Watch — heading + prose (atomic) then the
-    // dated anchor lines as bullets. Mirrors the on-screen preview exactly, so
-    // screen == in-app PDF.
-    if (show("gulf-hormuz") && fuelData.incidentData.gulfChokepointWatch) {
-      const gulf = fuelData.incidentData.gulfChokepointWatch;
-      // Owner per-bullet overrides (rewrite/suppress; blank = auto) — the
-      // SAME applyGulfBulletOverrides call the preview uses, so screen == PDF.
-      const gbOverrides = options.sectionOverrides?.gulfBulletOverrides;
-      const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
-      const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
-      // The Gulf read paragraph folds into the Operational Read narrative
-      // (owner ruling) — this section keeps only the dated anchor bullets,
-      // with the first bullet block atomic under the heading.
-      if (currentLines.length > 0) {
-        drawSectionWithProse(
-          ctx,
-          "Gulf and Hormuz Chokepoint Watch",
-          currentLines.map((l) => `\u2022  ${l}`).join("\n"),
-        );
-      } else if (gulf.standingNote && standingLines.length > 0) {
-        drawSectionWithProse(ctx, "Gulf and Hormuz Chokepoint Watch", gulf.standingNote);
-        renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
-      }
-      if (currentLines.length > 0 && gulf.standingNote && standingLines.length > 0) {
-        renderProse(ctx, gulf.standingNote);
-        renderProse(ctx, standingLines.map((l) => `\u2022  ${l}`).join("\n"));
-      }
     }
     // Owner per-row overrides (rewrite cells / suppress rows) — same
     // applyMarketOperatorOverrides call as the preview, so screen == PDF.

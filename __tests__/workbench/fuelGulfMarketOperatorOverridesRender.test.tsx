@@ -1,10 +1,7 @@
 /**
- * Rendered-markup proof for Task: owner-editable fuel Gulf/Hormuz bullets and
- * "Market and Operator Responses" table rows. Owner-gated `/api` means no live
- * screenshots, so per `.agents/memory/owner-gated-ui-verification.md` we
- * verify with `renderToStaticMarkup`:
- *   1. A Gulf bullet override (keyed by the AUTO line) replaces the rendered
- *      bullet; suppressed drops it; blank text reverts byte-identically.
+ * Rendered-markup proof for Fuel Watch report structure:
+ *   1. Gulf/Hormuz developments flow through the normal sections — there is
+ *      no standalone "Gulf and Hormuz Chokepoint Watch" heading.
  *   2. A Market and Operator Responses row override (keyed by
  *      date|actor|action) replaces the rendered cells; suppressing every row
  *      removes the section entirely; blank fields revert byte-identically.
@@ -93,33 +90,29 @@ const el = (ov?: TopicSectionOverrides) =>
     sectionOverrides: ov,
   } as never);
 
-describe("fuel Gulf & Hormuz bullet overrides", () => {
-  it("dataset produces at least one Gulf bullet to override", () => {
+describe("fuel Gulf & Hormuz is not a separate report section", () => {
+  it("dataset still derives Gulf/Hormuz items for the lead narrative", () => {
     expect(gulfLines.length).toBeGreaterThan(0);
   });
 
-  it("override replaces the bullet; suppress drops it; blank reverts", () => {
+  it("does not render a standalone Gulf and Hormuz Chokepoint Watch heading", () => {
+    const html = renderToStaticMarkup(el());
+    expect(html).not.toContain("Gulf and Hormuz Chokepoint Watch");
+  });
+
+  it("still carries the Hormuz development in the normal report flow", () => {
+    const html = renderToStaticMarkup(el());
+    expect(html).toMatch(/Tanker transit disrupted near the Strait of Hormuz/i);
+  });
+
+  it("Gulf bullet overrides no longer change the rendered report", () => {
     const target = gulfLines[0];
     const base = renderToStaticMarkup(el());
-    expect(base).toContain(target.slice(0, 30));
-    expect(base).not.toContain(OV_TEXT);
-
     const withOv = renderToStaticMarkup(
       el({ gulfBulletOverrides: { [target]: { text: OV_TEXT } } }),
     );
-    expect(withOv).toContain(OV_TEXT);
-    expect(withOv).not.toContain(target);
-
-    const suppressed = renderToStaticMarkup(
-      el({ gulfBulletOverrides: { [target]: { suppressed: true } } }),
-    );
-    expect(suppressed).not.toContain(target);
-    expect(suppressed).not.toContain(OV_TEXT);
-
-    const cleared = renderToStaticMarkup(
-      el({ gulfBulletOverrides: { [target]: { text: "   " } } }),
-    );
-    expect(cleared).toBe(base);
+    expect(withOv).not.toContain(OV_TEXT);
+    expect(withOv).toBe(base);
   });
 
   it("apply helper is pure and order-preserving", () => {

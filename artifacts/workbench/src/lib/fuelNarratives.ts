@@ -618,6 +618,22 @@ const CATEGORY_RULES: CategoryRule[] = [
       // seeking extra gasoline from one of its top oil buyers") is a core
       // buyer-side procurement action during a supply crisis.
       ...SUPPLIER_PIVOT_RES,
+      // Aviation operating-cost impact: Fuel Watch is not limited to
+      // schedule cuts. A carrier facing fuel-cost pressure belongs here
+      // even when the headline does not use suspend/cancel/cut.
+      /\b(airline|carrier|airways|indigo|emirates|easyjet|jet2|lufthansa|qantas|ryanair|wizz air|air india|spicejet|vistara|cathay|singapore airlines|ana|jal|yemenia|akasa|airasia|air asia|garuda|lion air|thai airways|vietnam airlines|philippine airlines|cebu pacific)\b.{0,80}\b(fuel (cost|costs|price|prices)|jet fuel|aviation fuel)\b/,
+      /\b(fuel (cost|costs)|jet fuel|aviation fuel)\b.{0,80}\b(airline|airways|flight|flights|aviation|air india)\b/,
+    ],
+  },
+  {
+    // OPEC/IEA supply-demand forecast disagreement is relevant because it
+    // moves the pricing picture, not because OPEC executed a production
+    // action. Must sit BEFORE the Producer name-match so a forecast split
+    // is not forced into "Producer action".
+    category: "Market / supply signal",
+    test: [
+      /\b(opec\+?|iea)\b.{0,100}\b(forecast|outlook|disagre\w*|demand outlook|demand forecast|demand estimate|supply outlook)\b/,
+      /\b(forecast|outlook|demand (forecast|outlook|estimate)|disagre\w*)\b.{0,80}\b(opec\+?|iea)\b/,
     ],
   },
   {
@@ -675,6 +691,11 @@ function deriveOperationalRead(t: string, category: FuelActionCategory): string 
   if ((/\b(flight|flights|route|routes|capacity|aviation|airline|carrier|airways)\b/.test(t))
       && /\b(suspend|cancel|cut|cuts|ground|grounded|reduc|axe|halt|slash|defer|trim|drop)\w*/.test(t))
     return "Aviation demand response: carriers trimming capacity signal jet-fuel cost or availability stress feeding straight into route economics.";
+  if (/\b(fuel (cost|costs|price|prices)|jet fuel|aviation fuel)\b/.test(t)
+      && /\b(airline|airways|flight|flights|aviation|air india)\b/.test(t))
+    return "Aviation cost pressure: fuel expense is feeding into airline operating economics; watch schedule, surcharge and capacity responses.";
+  if (/\b(opec\+?|iea)\b/.test(t) && /\b(forecast|outlook|disagre\w*|demand outlook|demand forecast)\b/.test(t))
+    return "Market-outlook signal: a supply-demand forecast split feeds crude and product pricing expectations. Treat as a pricing and planning input, not a physical supply change on its own.";
   if (/\b(ration|rationing|allocation|curfew)\b/.test(t))
     return "Rationing or allocation controls confirm a physical shortage; commercial offtake is restricted before pump prices fully adjust.";
   if (/\b(export ban|import ban|export quota|import quota|embargo)\b/.test(t))
@@ -828,7 +849,7 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
   if (/\b(reliance industries|reliance jamnagar|jamnagar)\b/.test(t))
     return "Reliance";
   const ACTORS = [
-    "OPEC+", "OPEC", "Saudi Aramco", "ADNOC", "QatarEnergy", "Petrobras",
+    "OPEC+", "OPEC", "IEA", "Saudi Aramco", "ADNOC", "QatarEnergy", "Petrobras",
     "Rosneft", "Gazprom", "Sinopec", "CNPC", "CNOOC",
     "Indian Oil", "Bharat Petroleum", "Hindustan Petroleum", "ONGC",
     "Pertamina", "Petronas",
@@ -1071,13 +1092,18 @@ export function filterFuelContinuityCrossRead(
 // company signal, so a container-ship, grain or piracy story that happens
 // to match a generic action pattern (e.g. a bare "export ban") never leaks.
 const FUEL_ACTION_TOPICAL_RE =
-  /(?<!\b(?:palm|cooking|vegetable|veg|olive|sunflower|soybean|soy|coconut|mustard|castor|sesame|groundnut|peanut|edible)\s)\b(oil|crude|petroleum|refiner\w*|refined|gasoline|petrol|diesel|jet fuel|kerosene|lpg|naphtha|fuel oil|bunker|barrel|barrels|bpd|opec\+?|aramco|adnoc|petrobras|rosneft|gazprom|qatarenergy|pertamina|petronas|cnpc|sinopec|cnooc|ongc|reliance industries|jamnagar)\b/;
+  /(?<!\b(?:palm|cooking|vegetable|veg|olive|sunflower|soybean|soy|coconut|mustard|castor|sesame|groundnut|peanut|edible)\s)\b(oil|crude|petroleum|refiner\w*|refined|gasoline|petrol|diesel|jet fuel|kerosene|lpg|naphtha|fuel oil|fuel costs?|fuel prices?|bunker|barrel|barrels|bpd|opec\+?|iea|aramco|adnoc|petrobras|rosneft|gazprom|qatarenergy|pertamina|petronas|cnpc|sinopec|cnooc|ongc|reliance industries|jamnagar)\b/;
 
-// The cross-read from the shipping topic admits ONLY genuine actions — a
-// bare oil-price-movement / market signal is not a producer or buyer ACTION
-// and reintroduces exactly the crude-market noise the fuel topic is
-// deliberately scoped to exclude, so it never enters via cross-read. (Fuel-
-// topic rows keep their full category range, market signals included.)
+// OPEC/IEA supply-demand outlook splits are fuel-market relevant even when
+// they are not a producer output action. Used to admit them via the shipping
+// cross-read without reopening the door to bare "oil prices jump" wires.
+const OPEC_IEA_FORECAST_RE =
+  /\b(opec\+?|iea)\b.{0,100}\b(forecast|outlook|disagre\w*|demand outlook|demand forecast|demand estimate|supply outlook)\b|\b(forecast|outlook|demand (forecast|outlook|estimate)|disagre\w*)\b.{0,80}\b(opec\+?|iea)\b/;
+
+// The cross-read from the shipping topic admits genuine actions plus
+// OPEC/IEA supply-demand outlook splits. A bare oil-price-movement wire
+// ("oil prices jump") is still not a fuel-market development of that kind
+// and stays out. Fuel-topic rows keep their full category range.
 const CROSS_READ_ACTION_CATEGORIES = new Set<FuelActionCategory>([
   "Producer action",
   "Buyer action",
@@ -1086,18 +1112,19 @@ const CROSS_READ_ACTION_CATEGORIES = new Set<FuelActionCategory>([
 ]);
 
 /**
- * Incident set for the Producer/Buyer Actions table ONLY. It merges the
- * canonical in-window fuel incidents with genuine fuel-market ACTIONS that
+ * Incident set for the Market and Operator Responses table. It merges the
+ * canonical in-window fuel incidents with fuel-market-relevant rows that
  * the ingestion pipeline files under the `shipping` topic (OPEC+ output
- * moves, ADNOC / Aramco / Pertamina tenders, crude-route producer actions).
- * These are real producer/buyer actions that never reach the fuel topic
- * because the fuel relevance gate is deliberately scoped to fuel-OPERATIONAL
- * incidents and excludes OPEC / crude-market framing.
+ * moves, ADNOC / Aramco / Pertamina tenders, crude-route producer actions,
+ * OPEC/IEA outlook splits). Inclusion is material relevance to fuel
+ * markets — supply, production, pricing, transport, aviation fuel,
+ * distribution, sanctions, disruption or wider market impact — not a
+ * requirement that the row be a direct producer action.
  *
  * The cross-read is strictly bounded to the SAME reporting window (both fuel
  * and shipping are weekly, so the window bounds are identical) and requires
- * BOTH a discrete action category AND a fuel-market topical signal — so no
- * out-of-window row and no non-fuel shipping story can enter. Every OTHER
+ * a fuel-market topical signal plus either a discrete action category or an
+ * OPEC/IEA outlook split. Bare "oil prices jump" wires stay out. Every OTHER
  * Fuel Watch section stays on the canonical fuel window, untouched.
  */
 export function filterFuelActionIncidents(
@@ -1124,7 +1151,10 @@ export function filterFuelActionIncidents(
     const t = haystack(i);
     if (!FUEL_ACTION_TOPICAL_RE.test(t)) continue;
     const cat = classifyCategory(t);
-    if (cat === null || !CROSS_READ_ACTION_CATEGORIES.has(cat)) continue;
+    if (cat === null) continue;
+    const admitMarketOutlook =
+      cat === "Market / supply signal" && OPEC_IEA_FORECAST_RE.test(t);
+    if (!CROSS_READ_ACTION_CATEGORIES.has(cat) && !admitMarketOutlook) continue;
     const k = keyOf(i);
     if (seen.has(k)) continue;
     seen.add(k);

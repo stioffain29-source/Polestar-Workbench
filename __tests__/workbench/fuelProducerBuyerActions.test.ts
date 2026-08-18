@@ -225,3 +225,57 @@ describe("Market and Operator Responses rework", () => {
     }
   });
 });
+
+describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost items", () => {
+  // Inclusion is material fuel-market relevance, not a narrow "direct
+  // producer action" test. Classification follows why the story matters.
+  it("keeps Aramco and ADNOC as Producer action when the producer is central", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(40, "fuel", "Saudi Aramco announces output increase to stabilise supply"),
+        mk(41, "fuel", "ADNOC issues statement clarifying attacks on facilities"),
+      ],
+    });
+    const aramco = rows.find((r) => r.actor === "Saudi Aramco");
+    const adnoc = rows.find((r) => r.actor === "ADNOC");
+    expect(aramco).toBeDefined();
+    expect(aramco?.category).toBe("Producer action");
+    expect(adnoc).toBeDefined();
+    expect(adnoc?.category).toBe("Producer action");
+  });
+
+  it("keeps an OPEC/IEA demand-outlook disagreement as a market signal", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(42, "fuel", "OPEC and IEA disagree over 2026 oil demand outlook"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].category).toBe("Market / supply signal");
+    expect(rows[0].action).toMatch(/OPEC and IEA disagree/i);
+  });
+
+  it("keeps Air India fuel-cost operational impact as a Buyer action", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(43, "fuel", "Air India warns of operational impact as fuel costs rise"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actor).toBe("Air India");
+    expect(rows[0].category).toBe("Buyer action");
+  });
+
+  it("still excludes a bare oil-price jump that is not an OPEC/IEA outlook", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(44, "shipping", "Oil Prices Jump After Attack Halts Shipping in Strait of Hormuz"),
+      ],
+    });
+    expect(rows).toHaveLength(0);
+  });
+});

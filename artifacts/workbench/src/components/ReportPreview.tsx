@@ -2,7 +2,6 @@ import {
   makeSectionGate,
   applyFastFactOverrides,
   applyMarketPriceOverrides,
-  applyGulfBulletOverrides,
   applyMarketOperatorOverrides,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
@@ -842,9 +841,8 @@ export default function ReportPreview({
   // exporter throws on, surfaced here as a blocking panel so preview == PDF:
   // a contradictory payload can neither be previewed as clean nor exported.
   // Two layers, exactly as the exporter runs them: the strict canonical gate
-  // over the canonical payload PLUS the resolved Gulf read override (canonical
-  // text passes by construction), and the prose-tolerant gate over the FINAL
-  // effective text (whichever tier wins).
+  // over the canonical payload (canonical text passes by construction), and
+  // the prose-tolerant gate over the FINAL effective text (whichever tier wins).
   const fuelConsistencyErrors = fuelData
     ? validateFuelCanonicalText(fuelData.canonicalFacts, {
         ...fuelData.narrativeData.canonicalSections,
@@ -1075,53 +1073,6 @@ export default function ReportPreview({
             <NarrativeSection hidden={!show("what-happened")} title="What Happened" text={fuelEffective?.whatHappened} />
             <NarrativeSection hidden={!show("operational-read")} title="Operational Read" text={fuelEffective?.operationalRead} />
             <NarrativeSection hidden={!show("regional-highlights")} title="Regional Highlights" text={fuelEffective?.regionalHighlights} />
-            {fuelData.incidentData.gulfChokepointWatch && (() => {
-              // Owner per-bullet overrides (rewrite/suppress; blank = auto),
-              // applied identically in the PDF exporter so preview == PDF.
-              const gulf = fuelData.incidentData.gulfChokepointWatch;
-              const gbOverrides = sectionOverrides?.gulfBulletOverrides;
-              const currentLines = applyGulfBulletOverrides(gulf.currentItemLines, gbOverrides);
-              const standingLines = applyGulfBulletOverrides(gulf.standingItemLines, gbOverrides);
-              return (
-                <Section hidden={!show("gulf-hormuz")} title="Gulf and Hormuz Chokepoint Watch">
-                  {/* The Gulf read paragraph folds into the Operational Read
-                      narrative (owner ruling) — this section keeps only the
-                      dated anchor bullets. */}
-                  {currentLines.length > 0 && (
-                    <ul
-                      className="list-disc pl-5 space-y-1.5"
-                      style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-                    >
-                      {currentLines.map((line, i) => (
-                        <li key={i} className="text-[14px] leading-[1.6] font-light">
-                          {line}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {gulf.standingNote && standingLines.length > 0 && (
-                    <>
-                      <div
-                        className="text-[13px] leading-[1.5] font-medium mt-3 mb-1"
-                        style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-                      >
-                        {gulf.standingNote}
-                      </div>
-                      <ul
-                        className="list-disc pl-5 space-y-1.5"
-                        style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-                      >
-                        {standingLines.map((line, i) => (
-                          <li key={i} className="text-[14px] leading-[1.6] font-light">
-                            {line}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </Section>
-              );
-            })()}
             {(() => {
               // Owner per-row overrides (rewrite cells / suppress rows). The
               // section is omitted entirely when every row is suppressed.

@@ -522,7 +522,6 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "what-happened", label: "What Happened" },
     { key: "operational-read", label: "Operational Read" },
     { key: "regional-highlights", label: "Regional Highlights" },
-    { key: "gulf-hormuz", label: "Gulf and Hormuz Chokepoint Watch" },
     // Key stays "producer-buyer" — section-override keys are stable
     // identifiers persisted in saved reports; only the label renames.
     { key: "producer-buyer", label: "Market and Operator Responses" },

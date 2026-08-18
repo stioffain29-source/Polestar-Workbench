@@ -72,6 +72,10 @@ const KEEP_FIXTURES: Array<[string, string]> = [
   // must not swallow the operational shortage story.
   ["refiner margins on shortage", "US refiner margins hit new records as fuel shortage concerns grow"],
   ["jet-fuel route cuts", "Thai AirAsia cuts more summer routes as jet fuel prices surge"],
+  ["OPEC/IEA demand-outlook split", "OPEC and IEA disagree over 2026 oil demand outlook"],
+  ["Aramco producer-central output", "Saudi Aramco announces output increase to stabilise supply"],
+  ["ADNOC producer-central facilities", "ADNOC issues statement clarifying attacks on facilities"],
+  ["Air India fuel-cost operations", "Air India warns of operational impact as fuel costs rise"],
 ];
 
 describe("fuel exclude stack (market-commentary regression pins)", () => {

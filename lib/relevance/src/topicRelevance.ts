@@ -1620,7 +1620,7 @@ const CONFLICT_HARD_EXCLUDE: RegExp[] = [
 
 const REQUIRED: Record<string, RegExp[]> = {
   fuel: [
-    /\bfuel (shortage|crisis|emergency|price|prices|pricing|protest|protests|supply|stockout|rationing|tanker|truck)/,
+    /\bfuel (shortage|crisis|emergency|price|prices|pricing|cost|costs|protest|protests|supply|stockout|rationing|tanker|truck)/,
     /\bpetrol (shortage|price|prices|station)/,
     /\bdiesel (shortage|price|prices|supply)/,
     /\b(refinery|refineries) (disruption|outage|shutdown|fire|attack|maintenance|closure|halt)/,
@@ -1690,6 +1690,15 @@ const REQUIRED: Record<string, RegExp[]> = {
     // conservation — a bare retail-hours story stays out.
     /\b(fuel|energy|power|electricity)[- ]?(saving|conservation|crisis|shortage) .{0,50}(opening hour|business hour|operating hour|commercial hour|shop|store|market|mall)/,
     /\b(opening hour|business hour|operating hour|commercial hour) .{0,50}(fuel|energy|power|electricity)[- ]?(saving|conservation|crisis|shortage)/,
+    // Material fuel-MARKET relevance — Fuel Watch is not limited to Gulf
+    // producers or direct supply events. Producer-central developments,
+    // OPEC/IEA supply-demand outlook splits, and aviation operating-cost
+    // impact all belong; bank price-calls stay out via FUEL_EXCLUDE.
+    /\b(saudi aramco|aramco|adnoc|qatarenergy)\b.{0,100}\b(output|production|supply|refiner|export|attack|facilit|tanker|pipeline|bypass|crude|oil|fuel|statement|capacity|quota)\b/,
+    /\b(opec\+?|iea)\b.{0,100}\b(forecast|outlook|disagre\w*|demand outlook|demand forecast|demand estimate|supply outlook)\b/,
+    /\b(forecast|outlook|demand (forecast|outlook|estimate)|disagre\w*)\b.{0,80}\b(opec\+?|iea)\b/,
+    /\b(air india|indigo|emirates|airline|airways|carrier)\b.{0,80}\b(fuel (cost|costs|price|prices)|jet fuel)\b/,
+    /\b(fuel (cost|costs)|jet fuel)\b.{0,80}\b(air india|airline|airways|flight|flights|aviation)\b/,
   ],
   fertiliser: [
     /\bfertili[sz]er (shortage|price|prices|supply|export|import|stockout|subsidy)/,

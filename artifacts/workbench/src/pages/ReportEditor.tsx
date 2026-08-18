@@ -64,16 +64,12 @@ import {
   makeSectionGate,
   topicSectionKeys,
   pruneTopicSectionOverrides,
-  marketOperatorRowKey,
   type TopicSectionOverrides,
   type FastFactOverride,
   reattachFastFactOverride,
   clearFastFactOverride,
-  type GulfBulletOverride,
   type MarketOperatorRowOverride,
   orphanedFastFactOverrideKeys,
-  reattachGulfBulletOverride,
-  clearGulfBulletOverride,
   reattachMarketOperatorOverride,
   clearMarketOperatorOverride,
 } from "@/lib/topicSectionOverrides";
@@ -81,7 +77,6 @@ import { OrphanedFastFactsPanel } from "@/components/OrphanedFastFactsPanel";
 import { MarketOperatorResponsesEditor } from "@/components/MarketOperatorResponsesEditor";
 import { OrphanSaveWarning } from "@/components/OrphanSaveWarning";
 import {
-  OrphanedGulfBulletsPanel,
   OrphanedMarketOperatorPanel,
 } from "@/components/OrphanedFuelOverridesPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
@@ -542,12 +537,10 @@ export default function ReportEditor() {
     report,
   ]);
 
-  // The AUTO Gulf/Hormuz bullets and Market & Operator Responses rows for a
-  // fuel report, computed from the SAME canonical builder the preview/PDF
-  // use, so the override editor lists exactly the bullets/rows that render.
+  // The AUTO Market & Operator Responses rows for a fuel report, computed
+  // from the SAME canonical builder the preview/PDF use, so the override
+  // editor lists exactly the rows that render.
   const fuelOverridePanels = useMemo<{
-    gulfLines: string[];
-    gulfRead: string;
     producerRows: ProducerBuyerActionRow[];
   } | null>(() => {
     if (form.topic !== "fuel" || !form.issueDate) return null;
@@ -559,15 +552,7 @@ export default function ReportEditor() {
         },
         incidentsForExport,
       );
-      const gulf = d.incidentData.gulfChokepointWatch;
       return {
-        gulfLines: gulf
-          ? [...gulf.currentItemLines, ...gulf.standingItemLines]
-          : [],
-        // The live AUTO read — recorded as the staleness baseline whenever the
-        // owner edits the panel-read override, and compared against any saved
-        // baseline to flag an override the report no longer applies.
-        gulfRead: gulf?.read ?? "",
         producerRows: d.incidentData.producerBuyerActions,
       };
     } catch {
@@ -2128,106 +2113,13 @@ export default function ReportEditor() {
             </div>
           )}
 
-          {/* The Gulf & Hormuz read paragraph is no longer separately editable —
-              it folds into the Operational Read narrative (owner ruling), which
-              already has its own edit box. */}
+          {/* The Gulf & Hormuz read and bullet list are no longer separately
+              editable — those developments flow through the normal narrative
+              sections (Operational Read, Regional Highlights, What Happened)
+              rather than a duplicate chokepoint heading. */}
 
-          {/* Fuel Watch: per-bullet overrides for the Gulf & Hormuz Chokepoint
-              Watch lists. Keyed by the bullet's AUTO line so a saved override
-              re-attaches to the same bullet. Uncheck to suppress; non-blank
-              text replaces the line; blank = auto. Applied identically in the
-              preview AND the PDF exporter. */}
-          {form.topic === "fuel" &&
-            (fuelOverridePanels?.gulfLines.length ?? 0) > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
-              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
-                Gulf &amp; Hormuz bullet overrides
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-2">
-                Uncheck to remove a bullet. Blank text keeps the auto line.
-              </p>
-              <div className="flex flex-col gap-2">
-                {fuelOverridePanels!.gulfLines.map((line) => {
-                  const ov: GulfBulletOverride =
-                    sectionOverrides.gulfBulletOverrides?.[line] ?? {};
-                  const setG = (patch: Partial<GulfBulletOverride>) =>
-                    setSectionOverrides((prev) => ({
-                      ...prev,
-                      gulfBulletOverrides: {
-                        ...(prev.gulfBulletOverrides ?? {}),
-                        [line]: {
-                          ...(prev.gulfBulletOverrides?.[line] ?? {}),
-                          ...patch,
-                        },
-                      },
-                    }));
-                  return (
-                    <div
-                      key={line}
-                      className="border border-border rounded-sm p-2"
-                      style={{ opacity: ov.suppressed ? 0.5 : 1 }}
-                    >
-                      <label className="flex items-start gap-2 text-[11px] text-muted-foreground mb-1.5 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={!ov.suppressed}
-                          className="mt-0.5"
-                          onChange={(e) =>
-                            setG({ suppressed: !e.target.checked })
-                          }
-                        />
-                        <span>{line}</span>
-                      </label>
-                      <Input
-                        placeholder="Replacement text (blank = auto)"
-                        value={ov.text ?? ""}
-                        onChange={(e) => setG({ text: e.target.value })}
-                        className="rounded-sm text-[12px] h-8"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Orphaned Gulf/Hormuz bullet overrides: saved edits keyed to an
-              auto line that no longer renders (the underlying incident title,
-              date wording or classification changed on a refresh). They no
-              longer apply anywhere; surface them so the owner can re-attach
-              the edit to a current bullet or clear it. Nothing is migrated
-              silently. */}
-          {form.topic === "fuel" && (
-            <OrphanedGulfBulletsPanel
-              autoLines={fuelOverridePanels?.gulfLines ?? []}
-              overrides={sectionOverrides.gulfBulletOverrides}
-              onReattach={(from, to) =>
-                setSectionOverrides((prev) => ({
-                  ...prev,
-                  gulfBulletOverrides: reattachGulfBulletOverride(
-                    prev.gulfBulletOverrides,
-                    from,
-                    to,
-                  ),
-                }))
-              }
-              onClear={(key) =>
-                setSectionOverrides((prev) => ({
-                  ...prev,
-                  gulfBulletOverrides: clearGulfBulletOverride(
-                    prev.gulfBulletOverrides,
-                    key,
-                  ),
-                }))
-              }
-            />
-          )}
-
-          {/* Fuel Watch: Market and Operator Responses. Compact collapsed rows
-              (include checkbox + effective summary + Edit); the edit panel
-              prepopulates with the values the report currently renders and
-              stores only fields that differ from the generated text. Same
-              persistence (marketOperatorOverrides), same preview/PDF apply. */}
+          {/* Fuel Watch: Market and Operator Responses. Each row is the
+              generated text, ready to edit in place. Uncheck to omit. */}
           {form.topic === "fuel" &&
             (fuelOverridePanels?.producerRows.length ?? 0) > 0 && (
             <MarketOperatorResponsesEditor
