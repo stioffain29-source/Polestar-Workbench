@@ -43,7 +43,11 @@ import {
 } from "@/lib/cargoPatternModel";
 import { downloadCargoRegisterCsv } from "@/lib/cargoRegisterExport";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, Save } from "lucide-react";
-import { exportElementToPdf, slugifyForFilename } from "@/lib/exportPdf";
+import {
+  exportElementToPdf,
+  formatDateForFilename,
+  slugifyForFilename,
+} from "@/lib/exportPdf";
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { exportConflictReportPdf } from "@/lib/exportConflictReportPdf";
@@ -1031,7 +1035,7 @@ export default function ReportEditor() {
         return;
       }
 
-      const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}.pdf`;
+      const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}-${formatDateForFilename(form.issueDate)}.pdf`;
 
       // Common payload shared by all PDF exporters.
       const pdfPayload = {

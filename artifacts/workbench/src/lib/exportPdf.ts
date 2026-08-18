@@ -1040,3 +1040,9 @@ export function slugifyForFilename(input: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "report";
 }
+
+/** Compact YYYYMMDD suffix for downloaded report filenames. */
+export function formatDateForFilename(isoDate?: string): string {
+  const ymd = (isoDate ?? new Date().toISOString()).slice(0, 10);
+  return ymd.replace(/-/g, "");
+}
