@@ -289,6 +289,28 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     expect(rows).toHaveLength(0);
   });
 
+  it("excludes producer-named vessel attack headlines", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(48, "fuel", "ADNOC vessel attacked again in Strait of Hormuz, no injuries"),
+        mk(49, "fuel", "ADNOC vessel Attacked Again in Strait of Hormuz"),
+      ],
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("still keeps Pertamina operational tanker moves", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(2, "shipping", "Pertamina tanker clears Strait of Hormuz after months-long delay amid Iran-US tensions"),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].actor).toBe("Pertamina");
+  });
+
   it("gives windfall tax cuts a policy read, not an aviation trim read", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,

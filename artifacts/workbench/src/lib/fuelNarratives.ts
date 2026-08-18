@@ -686,6 +686,16 @@ function isStatementOnlyHeadline(t: string): boolean {
   return false;
 }
 
+/** Producer-named incident reporting (attack on a vessel/facility) — not a supply-side action. */
+function isVictimProducerIncidentHeadline(t: string): boolean {
+  if (/\b(issues statement|statement clarifying|announc\w+|said it will|plans to|complet\w+|expand\w+|restart\w+|resume\w+|restore\w+|shut\w+|cut\w+|hike\w+|raise\w+|reduce\w+|export\w+|import\w+|sign\w+|award\w+|launch\w+|open\w+|close\w+|bypass\w+|pipeline|contract|tender|supply deal|long[- ]term|output increase|production (cut|hike|increase|reduce))\b/.test(t)) {
+    return false;
+  }
+  const producerNamed = /\b(adnoc|saudi aramco|aramco|qatarenergy|petrobras|rosneft|gazprom|cnooc|pertamina|petronas|reliance industries|reliance jamnagar|jamnagar|ongc)\b/.test(t);
+  if (!producerNamed) return false;
+  return /\b(vessel|tanker|ship|facilit(?:y|ies)|terminal|platform|refiner(?:y|ies))\b.{0,80}\b(attack|attacked|attacking|struck|hit|targeted|targeting|fired on|damaged)\b|\b(attack|attacked|attacking|struck|hit|targeted|targeting|fired on|damaged)\b.{0,80}\b(vessel|tanker|ship|facilit(?:y|ies)|terminal|platform|refiner(?:y|ies))\b/.test(t);
+}
+
 // Per-row operational-read derivation. Each row gets a sentence shaped
 // by keywords in the actual action text, so rows in the same category
 // don't all carry an identical generic line. Falls back to a per-
@@ -878,7 +888,17 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
   for (const a of ACTORS) {
     if (t.includes(a.toLowerCase())) return a;
   }
-  if (category === "Government / policy action") return "Government / policy";
+  if (category === "Government / policy action") {
+    const c = incidentCountry(i);
+    if (c) return c;
+    return "Government";
+  }
+  if (category === "Buyer action") {
+    if (/\b(airline|aviation|jet fuel|carrier|flight|airways|airlines)\b/.test(t)) return "Aviation sector";
+    const c = incidentCountry(i);
+    if (c) return c;
+    return "Buyer";
+  }
   if (category === "Infrastructure / routing action") {
     // No named corporate actor matched above. Falling back to the bare
     // generic label "Infrastructure operator" made two unrelated events
@@ -1195,6 +1215,7 @@ export function buildFuelProducerBuyerActions(opts: {
   for (const i of window) {
     const t = haystack(i);
     if (isStatementOnlyHeadline(t)) continue;
+    if (isVictimProducerIncidentHeadline(t)) continue;
     const category = classifyCategory(t);
     if (!category) continue;
     // Action cell: WHO/WHAT from the headline (conservatively sentence-
