@@ -12,7 +12,7 @@ import {
   selectFlashpointUsable,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
-import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
+import { draftTopicReportProse } from "../../artifacts/workbench/src/lib/draftReportProse";
 
 const FUEL_ISSUE = "2026-08-17";
 const FP_ISSUE = "2026-08-17";
@@ -66,6 +66,16 @@ describe("Fuel Watch — client feedback Aug 2026", () => {
         "extreme",
         "Three sailors killed in Red Sea tanker attack",
         "Crew fatalities reported after missile strike on vessel",
+      ),
+    ).toBe("moderate");
+  });
+
+  it("downgrades maritime missile attack without fuel continuity signal", () => {
+    expect(
+      capFuelMarketSeverity(
+        "high",
+        "Houthis Claim Ballistic Missile Attack On Saudi Military Landing Ship Off Red Seaport Of Mocha",
+        "Missile strike on naval vessel in Red Sea",
       ),
     ).toBe("moderate");
   });
@@ -135,6 +145,50 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     expect(sel.enriched).toHaveLength(0);
   });
 
+  it("drops World in Brief Ceuta multi-story syndicated onto Indonesia", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "World in Brief: Indonesia hit by earthquake; migrants stage protest in Ceuta",
+          country: "Indonesia",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(0);
+  });
+
+  it("drops diplomatic Japan-Russia Kuril protest commentary", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Japan 'crossed line of decency' with protest over Putin's Kuril Islands visit: Russia",
+          summary: "Moscow said Tokyo crossed a diplomatic line over the Kuril visit.",
+          country: "Japan",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(0);
+  });
+
+  it("drops non-APAC country stamps without live public-order signal", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Israeli cabinet debate over Gaza policy draws regional attention",
+          summary: "Analysts reviewed the diplomatic fallout from the cabinet session.",
+          country: "Israel",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(0);
+  });
+
   it("folds West Papua into Indonesia country roll-ups", () => {
     const ds = buildFlashpointReportDataset(
       [
@@ -174,5 +228,30 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     expect(ds.countryRows[0]?.label).toBe("Japan");
     expect(ds.autoWhatMatters).toMatch(/Japan accounts for/i);
     expect(ds.autoPolestarView).toMatch(/Japan carries the highest incident volume/i);
+  });
+
+  it("draft exec summary names the same volume lead as the country chart", () => {
+    const tokyoTitles = [
+      "Dockworkers walk out at Yokohama port",
+      "Nurses rally outside Osaka university hospital",
+      "Teachers march on Nagoya city hall",
+      "Students sit-in at Kyoto campus over fees",
+      "Farm cooperatives protest in Sapporo",
+      "Bus drivers strike in Fukuoka",
+      "Community rally in Hiroshima over base plans",
+      "Retail workers picket in Sendai",
+    ];
+    const rows = tokyoTitles.map((title, i) =>
+      fp({
+        id: i + 1,
+        title,
+        summary: "Protesters marched through the city centre today.",
+        country: "Japan",
+        severity: "low",
+      }),
+    );
+    rows.push(fp({ id: 99, title: "Farmers protest in Dhaka over crop prices", country: "Bangladesh", severity: "moderate" }));
+    const draft = draftTopicReportProse({ topic: "flashpoint", issueDate: FP_ISSUE, incidents: rows });
+    expect(draft.executiveSummary).toMatch(/Japan sees the most activity/i);
   });
 });

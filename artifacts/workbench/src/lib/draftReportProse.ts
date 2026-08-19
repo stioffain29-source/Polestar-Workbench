@@ -24,7 +24,7 @@ import { resolveReportWindow, filterIncidentsToWindow, reportCadence } from "./r
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { classifyConflictCategory, CATEGORY_CARD_LABEL } from "./conflictAnalysis";
 import { isTopicRelevant, isCountryRelevant } from "./topicRelevance";
-import { selectFlashpointUsable } from "./flashpointReportDataset";
+import { selectFlashpointUsable, buildFlashpointReportDataset, type FlashpointReportIncident } from "./flashpointReportDataset";
 import { buildShippingReportDataset, type ShippingReportIncident } from "./shippingReportDataset";
 import { buildConflictReportDataset, type ConflictReportIncident } from "./conflictReportDataset";
 import type { FuelGulfChokepointWatch } from "./fuelNarratives";
@@ -968,14 +968,57 @@ export function draftTopicReportProse(opts: {
   // decision — and the lead country it names — can never contradict the
   // Fast Facts count or the Related Incidents table the report renders.
   const isFlashpoint = topic === "flashpoint" || topic === "protests";
-  let inWindow: DraftableIncident[];
   if (isFlashpoint) {
-    inWindow = selectFlashpointUsable(
-      incidents as unknown as Parameters<typeof selectFlashpointUsable>[0],
-      topic,
-      issueDate,
-    ).enriched as unknown as DraftableIncident[];
-  } else {
+    const fpIncidents: FlashpointReportIncident[] = incidents.map((r, i) => ({
+      id: r.id ?? i,
+      title: r.title,
+      topic: r.topic,
+      severity: r.severity,
+      occurredAt: r.occurredAt,
+      country: r.country ?? null,
+      summary: r.summary ?? null,
+      source: r.source ?? null,
+      sourceUrl: r.sourceUrl ?? null,
+      location: r.location ?? null,
+    }));
+    const ds = buildFlashpointReportDataset(fpIncidents, topic, issueDate);
+    const fpEnriched: DraftableIncident[] = ds.enriched.map((e) => ({
+      id: e.id,
+      topic: e.topic,
+      title: e.title,
+      summary: e.summary ?? null,
+      source: e.source ?? null,
+      sourceUrl: e.sourceUrl ?? null,
+      location: e.location ?? null,
+      severity: e.severity,
+      occurredAt: e.occurredAt,
+      country: e.country ?? null,
+    }));
+    const total = ds.enriched.length;
+    const ctx: BuildCtx = {
+      total,
+      countries: joinList(ds.countryRows.filter((r) => r.value > 0).slice(0, 3).map((r) => r.label)),
+      lead: ds.countryRows[0]?.label ?? "",
+      types: topTypesText(fpEnriched),
+      sev: ds.fastFacts.find((k) => k.label === "Highest Severity")?.value?.toLowerCase() ?? highestSeverity(fpEnriched),
+      period: periodPhrase(topic, issueDate),
+      cadence: cadenceWord(topic),
+      thin: total > 0 && total < 3,
+    };
+    const pack = packFor(topic);
+    const hasContent = total > 0;
+    return {
+      executiveSummary: hasContent ? ds.autoExecutiveSummary : pack.zeroExec,
+      situation: hasContent ? pack.situation(ctx) : pack.zeroSituation,
+      whatHappened: hasContent ? pack.whatHappened(ctx) : pack.zeroWhatHappened,
+      whatMatters: hasContent ? ds.autoWhatMatters : pack.zeroWhatMatters,
+      implications: hasContent ? ds.autoImplications : pack.implications(ctx),
+      watchNext: hasContent ? ds.autoWatchNext : pack.watchNext(ctx),
+      polestarView: hasContent ? ds.autoPolestarView : pack.zeroPolestar,
+    };
+  }
+  let inWindow: DraftableIncident[];
+  {
     const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
     inWindow = rawWindow.filter((i) =>
       isTopicRelevant(topic, {

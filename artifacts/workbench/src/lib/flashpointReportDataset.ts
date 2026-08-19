@@ -763,6 +763,22 @@ function normalizeFlashpointCountry(country: string): string {
   return c;
 }
 const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|ceuta|melilla|argentina|brazil|chile|peru|colombia|mexico|venezuela|bolivia|bolivian|ecuador|paraguay|uruguay|guatemala|honduras|nicaragua|panama|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
+// Multi-headline briefs syndicated onto APAC feeds — the protest event may sit
+// in a non-APAC dateline (Ceuta, Melilla) while the masthead country is APAC.
+const MULTI_STORY_BRIEF_RE = /\b(world in brief|news in brief|in brief|world briefing|world roundup)\b/i;
+const FOREIGN_PROTEST_VENUE_RE = /\b(ceuta|melilla|gibraltar|canary islands)\b/i;
+// Inter-state diplomatic reaction — not a street protest in the reporting window.
+const INTER_STATE_DIPLOMATIC_RE =
+  /\b(crossed (?:the )?line of decency|lavrov says|foreign ministry (?:said|says|deplores)|mfa says|ministry (?:of foreign affairs )?(?:said|says)|diplomatic row|summons the ambassador)\b/i;
+const PROTEST_OVER_STATE_VISIT_RE =
+  /\bprotest over (?:putin|president'?s? visit|kuril|territorial|state visit|diplomatic)\b/i;
+const FLASHPOINT_APAC_COUNTRIES = new Set([
+  "Australia", "Papua New Guinea", "Indonesia", "Philippines", "Japan", "Nepal",
+  "South Korea", "North Korea", "Thailand", "India", "Bangladesh", "Sri Lanka",
+  "Pakistan", "Malaysia", "China", "New Zealand", "Vietnam", "Myanmar", "Singapore",
+  "Cambodia", "Laos", "Brunei", "Timor-Leste", "Fiji", "Taiwan", "Hong Kong",
+  "Bhutan", "Maldives", "Mongolia", "Solomon Islands", "Vanuatu",
+]);
 const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu|tokyo|seoul|manila|jakarta|bangkok|new delhi|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|dhaka|kathmandu|colombo|karachi|lahore|islamabad|kuala lumpur|hanoi|ho chi minh|taipei|beijing|shanghai|yangon|phnom penh|kabul|sydney|melbourne|wellington|auckland)\b/i;
 // Defence procurement / weapons-system news (missile offers, arms deals,
 // fighter-jet / submarine acquisitions). The classifier keeps these on the
@@ -817,6 +833,26 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (TOURISM_DEMO_RE.test(text)) return true;
   if (RETROSPECTIVE_UNREST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  const editorialTitle = titleWithoutSource(r.title ?? "");
+  if (
+    (MULTI_STORY_BRIEF_RE.test(editorialTitle) || /\bprotest in ceuta\b/i.test(editorialTitle)) &&
+    FOREIGN_PROTEST_VENUE_RE.test(`${editorialTitle} ${text}`)
+  ) {
+    return true;
+  }
+  if (INTER_STATE_DIPLOMATIC_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (PROTEST_OVER_STATE_VISIT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  {
+    const country = normalizeFlashpointCountry((r.country ?? "").trim());
+    if (
+      country &&
+      country !== LOCATION_NOT_IDENTIFIED &&
+      !FLASHPOINT_APAC_COUNTRIES.has(country) &&
+      !LIVE_PUBLIC_ORDER_RE.test(text)
+    ) {
+      return true;
+    }
+  }
   if (LICENSABLE_PHOTO_RE.test(text)) return true;
   // Diplomatic protest (démarche / note verbale / lodge a protest with an
   // embassy) and head-of-state visit framing — homonyms, not street events.
@@ -876,7 +912,6 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // editorial title only — summaries often repeat the source name
   // verbatim ("...Bangladesh Sangbad Sangstha (BSS)") and would
   // falsely satisfy the APAC hook.
-  const editorialTitle = titleWithoutSource(r.title ?? "");
   if (NON_APAC_FOCUS_RE.test(editorialTitle) && !APAC_HOOK_RE.test(editorialTitle)) return true;
   return false;
 }
@@ -2033,9 +2068,15 @@ function buildActivismRead(
   const political = rows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
   const sectoral = rows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|wage|salary|pay|metro bus|pension)\b/i.test(text(r)));
   const student = rows.filter((r) => /\b(student|university|campus|college|faculty|vc|exam[- ]board)\b/i.test(text(r)));
+  const protestN = rows.filter((r) => /\bprotest/i.test(r.issue)).length;
   const drivers: string[] = [];
+  if (protestN >= Math.max(3, Math.ceil(rows.length * 0.35))) {
+    drivers.push("street protests and demonstrations");
+  }
   if (political.length > 0) drivers.push("opposition party protests");
-  if (sectoral.length > 0) drivers.push("union and trade-group action");
+  if (sectoral.length > 0 && protestN < Math.ceil(rows.length * 0.5)) {
+    drivers.push("union and trade-group action");
+  }
   if (student.length > 0) drivers.push("student and campus activism");
   const headline = lead
     ? (() => {

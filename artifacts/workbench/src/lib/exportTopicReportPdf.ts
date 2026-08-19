@@ -25,6 +25,7 @@ import {
   drawFastFactsKpiCards,
   drawBulletSection,
   drawDisclaimer,
+  drawSectionWithProseAndDisclaimer,
   ensureRoomForDisclaimer,
   drawFooters,
   drawPolestarCover,
@@ -1356,8 +1357,9 @@ export async function exportTopicReportPdf(
       );
     }
     if (show("polestar-view")) {
-      ensureRoomForDisclaimer(ctx);
-      renderProseSection("Polestar View", fuelEffective?.polestarView);
+      drawSectionWithProseAndDisclaimer(ctx, "Polestar View", fuelEffective?.polestarView ?? "");
+    } else {
+      drawDisclaimer(ctx);
     }
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
@@ -1627,9 +1629,10 @@ export async function exportTopicReportPdf(
     );
   }
 
-  ensureRoomForDisclaimer(ctx);
-  drawDisclaimer(ctx);
-
+  if (data.topic !== "fuel") {
+    ensureRoomForDisclaimer(ctx);
+    drawDisclaimer(ctx);
+  }
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }

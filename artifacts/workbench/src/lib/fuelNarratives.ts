@@ -1571,6 +1571,18 @@ export function capFuelMarketSeverity(
   }
   // Warning / forecast / policy-proposal framing is commentary → downgrade.
   if (FUEL_SPECULATIVE_RE.test(hay)) return "moderate";
+  // Bare maritime kinetic reporting (missile on a vessel, naval landing ship)
+  // without fuel infrastructure, cargo or continuity language is NOT a fuel-
+  // market severity driver — cap at moderate.
+  const FUEL_FUEL_INFRA_RE =
+    /\b(refinery|pipeline|terminal|depot|bunker|fuel cargo|oil export|crude export|gasoline|diesel|jet fuel|fuel shortage|fuel ration|forecourt|pump|load[- ]shedding|oil tanker|fuel tanker|lpg tanker|tanker transit|\btanker\b)\b/i;
+  if (
+    FUEL_MARITIME_ONLY_RE.test(hay) &&
+    !FUEL_CONTINUITY_RE.test(hay) &&
+    !FUEL_FUEL_INFRA_RE.test(hay)
+  ) {
+    return "moderate";
+  }
   // A concrete physical disruption keeps the elevated rating.
   if (FUEL_OPERATIONAL_RE.test(hay)) return severity ?? "";
   // Shortage, rationing and availability signals keep elevated severity.

@@ -594,12 +594,61 @@ export function measureDisclaimerHeight(ctx: Ctx): number {
   return 8 + headingBlockH + bodyH + 4;
 }
 
+/** Estimate rendered prose height for keep-together pagination. */
+export function measureProseHeight(ctx: Ctx, body: string): number {
+  const { pdf, CW } = ctx;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(11);
+  const lineH = 14;
+  const paragraphs = sanitize(body ?? "")
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (!paragraphs.length) return 0;
+  let h = 0;
+  for (const p of paragraphs) {
+    const lines: string[] = pdf.splitTextToSize(p, CW);
+    h += lines.length * lineH + 14;
+  }
+  return h + 4;
+}
+
 /** Start a fresh page when the disclaimer would otherwise orphan alone. */
 export function ensureRoomForDisclaimer(ctx: Ctx) {
   const need = measureDisclaimerHeight(ctx);
   if (ctx.y + need > ctx.H - ctx.BOTTOM) {
     newPage(ctx);
   }
+}
+
+/**
+ * Render a final prose section immediately followed by the disclaimer on the
+ * same page when both fit together — prevents a disclaimer-only orphan page.
+ */
+export function drawSectionWithProseAndDisclaimer(
+  ctx: Ctx,
+  title: string,
+  body: string,
+) {
+  const prose = (body ?? "").trim();
+  if (!prose) {
+    drawDisclaimer(ctx);
+    return;
+  }
+  const headingBlockH = 14 + 14 + 8 + 16;
+  const totalProseH = headingBlockH + measureProseHeight(ctx, prose);
+  const disclaimerH = measureDisclaimerHeight(ctx);
+  const pageBody = ctx.H - ctx.TOP - ctx.BOTTOM;
+  const available = ctx.H - ctx.BOTTOM - ctx.y;
+  if (totalProseH + disclaimerH > available) {
+    if (totalProseH + disclaimerH <= pageBody) {
+      newPage(ctx);
+    } else {
+      ensureRoomForDisclaimer(ctx);
+    }
+  }
+  drawSectionWithProse(ctx, title, prose);
+  drawDisclaimer(ctx);
 }
 
 export function drawDisclaimer(ctx: Ctx) {

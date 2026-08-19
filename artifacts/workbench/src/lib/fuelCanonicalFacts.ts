@@ -209,18 +209,19 @@ function dedupeSharedIncidentGroups<T extends { kind: "country" | "route"; label
   return [...map.values()];
 }
 function pickPrimaryPool(
-  countryCandidates: Array<{ kind: "country"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }>,
-  routeCandidates: Array<{ kind: "route"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }>,
-): Array<{ kind: "country" | "route"; maxSeverity: number; severityScore: number; count: number; label: string; incidentIds: string[] }> {
+  countryCandidates: Array<{ kind: "country"; maxSeverity: number; severityScore: number; continuityBoost: number; count: number; label: string; incidentIds: string[] }>,
+  routeCandidates: Array<{ kind: "route"; maxSeverity: number; severityScore: number; continuityBoost: number; count: number; label: string; incidentIds: string[] }>,
+): Array<{ kind: "country" | "route"; maxSeverity: number; severityScore: number; continuityBoost: number; count: number; label: string; incidentIds: string[] }> {
   const sortedCountries = stableSort(countryCandidates);
   const sortedRoutes = stableSort(routeCandidates);
   const bestCountry = sortedCountries[0];
   const bestRoute = sortedRoutes[0];
   if (bestRoute && bestCountry && bestRoute.maxSeverity > bestCountry.maxSeverity) {
     // Acute fuel continuity (rationing, shortage) outranks corridor maritime
-    // volume when the combined score is competitive — Orenburg rationing must
-    // not lose to a fatal Red Sea strike on peak severity alone.
-    if (bestCountry.severityScore >= bestRoute.severityScore) {
+    // strikes when the combined score is competitive — Orenburg rationing must
+    // not lose to a fatal Red Sea strike on peak severity alone. High-volume
+    // moderate country noise must not drown out an extreme chokepoint event.
+    if (bestCountry.continuityBoost > 0 && bestCountry.severityScore >= bestRoute.severityScore) {
       return dedupeSharedIncidentGroups(sortedCountries);
     }
     return dedupeSharedIncidentGroups(sortedRoutes);
@@ -308,14 +309,17 @@ export function buildFuelCanonicalFacts(opts: {
       const key = pick(i); if (!key) continue;
       map.set(key, [...(map.get(key) ?? []), i]);
     }
-    return stableSort([...map.entries()].map(([label, rows]) => ({
-      label,
-      count: rows.length,
-      severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0)
-        + rows.reduce((n, i) => n + fuelContinuityBoost(i.raw), 0),
-      maxSeverity: maxSeverityRank(rows),
-      incidentIds: rows.map((i) => i.id),
-    })));
+    return stableSort([...map.entries()].map(([label, rows]) => {
+      const continuityBoost = rows.reduce((n, i) => n + fuelContinuityBoost(i.raw), 0);
+      return {
+        label,
+        count: rows.length,
+        continuityBoost,
+        severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0) + continuityBoost,
+        maxSeverity: maxSeverityRank(rows),
+        incidentIds: rows.map((i) => i.id),
+      };
+    }));
   };
   const countries = groups((i) => i.country);
   const routes = groups((i) => i.routeOrChokepoint);
@@ -347,8 +351,20 @@ export function buildFuelCanonicalFacts(opts: {
   // a raw post must never headline as the highest-priority incident. The
   // social-only fallback keeps the field populated when the window carries
   // nothing else.
-  const byPriority = (a: CanonicalFuelIncident, b: CanonicalFuelIncident) =>
-    SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
+  const byPriority = (a: CanonicalFuelIncident, b: CanonicalFuelIncident) => {
+    const score = (i: CanonicalFuelIncident) => {
+      const hay = `${i.title} ${i.raw.summary ?? ""}`.toLowerCase();
+      let s = SEVERITY_RANK[i.severity] * 1000 + fuelContinuityBoost(i.raw) * 10;
+      if (
+        /\b(vessel|tanker|ship|landing ship|warship|naval|military ship|ballistic missile)\b/.test(hay) &&
+        !/\b(refinery|pipeline|terminal|depot|ration|shortage|fuel|forecourt|pump)\b/.test(hay)
+      ) {
+        s -= 500;
+      }
+      return s;
+    };
+    return score(b) - score(a) || b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
+  };
   const newsTitled = qualifyingIncidents.filter((i) => !isSocialPostTitle(i.title));
   const highestPriorityIncident = (newsTitled.length ? newsTitled : qualifyingIncidents).slice().sort(byPriority)[0] ?? null;
   const overallSeverity = highestPriorityIncident?.severity ?? "Insignificant";
