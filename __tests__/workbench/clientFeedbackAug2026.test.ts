@@ -174,6 +174,46 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     expect(sel.enriched).toHaveLength(0);
   });
 
+  it("drops Japan-Russia Northern Territories diplomatic protest commentary", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Russia protests after Japan protested over Northern Territories",
+          summary: "Moscow and Tokyo traded diplomatic statements over the disputed islands.",
+          country: "Japan",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(0);
+  });
+
+  it("drops APTOPIX and bare wire photo-desk protest captions", () => {
+    for (const title of ["APTOPIX Indonesia Protest", "Indonesia Protest"]) {
+      const sel = selectFlashpointUsable(
+        [fp({ title, summary: "Photo desk caption with no operational detail.", country: "Indonesia" })],
+        "flashpoint",
+        FP_ISSUE,
+      );
+      expect(sel.enriched).toHaveLength(0);
+    }
+  });
+
+  it("keeps substantive protest headlines that mention a city or issue", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Seoul Residents Protest Housing Plans and Tax Increases Amid Growing Tensions",
+          country: "South Korea",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(1);
+  });
+
   it("drops non-APAC country stamps without live public-order signal", () => {
     const sel = selectFlashpointUsable(
       [

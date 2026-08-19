@@ -607,7 +607,7 @@ function isWeakNovelty(r: FlashpointReportIncident): boolean {
 // and from Related Incidents. User-driven: see "Final tightening"
 // brief — these are the recurring noise classes that survived the
 // classifier pass.
-const LICENSABLE_PHOTO_RE = /\b(licensable picture|reuters connect|getty images|epa[- ]efe|alamy|stock photo|file photo|photo caption|photo: ap|photo by)\b/i;
+const LICENSABLE_PHOTO_RE = /\b(licensable picture|reuters connect|getty images|epa[- ]efe|alamy|stock photo|file photo|photo caption|photo: ap|photo by|aptopix|pixstory|slideshow caption)\b/i;
 const SPORTS_LEAGUE_RE = /\b(french open|us open|wimbledon|australian open|grand slam|atp|wta|nba|nfl|mlb|ipl|epl|premier league|champions league|olympics?|fifa world cup|formula one|formula 1|f1|grand prix|moto[- ]?gp|tour de france|esports?|cricket world cup|rugby world cup)\b/i;
 const SPORTS_PROTEST_VERB_RE = /\b(protest|boycott|walkout|media protest|prize money|players plan)\b/i;
 const SUSPENDED_STRIKE_RE = /\b(strike|walkout|stoppage|shutdown|protest|march|rally)\b.{0,40}\b(suspend(ed|s)|call(ed)? off|cancell?ed|withdraws?|stood down|postpon(ed|es))\b/i;
@@ -695,8 +695,18 @@ const NON_LATIN_SCRIPT_RE = /[\u0900-\u097F\u3040-\u30FF\u4E00-\u9FFF\u3400-\u4D
 // homonyms are already stripped earlier in isWeakOperational, so "strike"
 // is trustworthy here.
 const PUBLIC_ORDER_TITLE_RE = /\b(chakka jam|wheel[- ]?jam|bandh|hartal|gherao|strike|protest(s|ers?)?|walkout|stoppage|sit[- ]?in|picket|blockade|roadblock|shutter[- ]?down)\b/i;
+function isBareWireCaptionTitle(title: string): boolean {
+  const t = cleanDisplayTitle(title).trim();
+  if (!t) return false;
+  if (/^(?:APTOPIX|PICTURE|PHOTOS?|IMAGES?|SLIDESHOW|PIXSTORY)\b/i.test(t)) return true;
+  const words = t.split(/\s+/);
+  if (words.length > 3) return false;
+  if (!/^(?:protest|strike|rally|demonstration)$/i.test(words[words.length - 1] ?? "")) return false;
+  return words.slice(0, -1).every((w) => /^[A-Z]/.test(w));
+}
 function isSpamCaption(title: string): boolean {
   if (!title) return false;
+  if (isBareWireCaptionTitle(title)) return true;
   // Non-Latin script mixed with ASCII letters in the same title is a hard
   // spam signal (Devanagari/CJK keyword-stuffed video captions) and fires
   // regardless of public-order vocabulary.
@@ -783,7 +793,7 @@ const FOREIGN_PROTEST_VENUE_RE = /\b(ceuta|melilla|gibraltar|canary islands)\b/i
 const INTER_STATE_DIPLOMATIC_RE =
   /\b(crossed (?:the )?line of decency|lavrov says|foreign ministry (?:said|says|deplores)|mfa says|ministry (?:of foreign affairs )?(?:said|says)|diplomatic row|summons the ambassador)\b/i;
 const PROTEST_OVER_STATE_VISIT_RE =
-  /\bprotest over (?:putin|president'?s? visit|kuril|territorial|state visit|diplomatic)\b/i;
+  /\bprotest(?:ed|s)?\s+(?:after|over)\b.{0,50}\b(?:putin|president'?s? visit|kuril|northern territories|territorial dispute|disputed islands?|state visit|diplomatic)\b|\b(?:russia|japan|moscow|tokyo)\b.{0,30}\bprotests?\b.{0,30}\b(?:after|over)\b.{0,30}\b(?:japan|russia|northern territories|kuril)\b/i;
 const FLASHPOINT_APAC_COUNTRIES = new Set([
   "Australia", "Papua New Guinea", "Indonesia", "Philippines", "Japan", "Nepal",
   "South Korea", "North Korea", "Thailand", "India", "Bangladesh", "Sri Lanka",
@@ -866,6 +876,7 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
     }
   }
   if (LICENSABLE_PHOTO_RE.test(text)) return true;
+  if (isBareWireCaptionTitle(r.title ?? "")) return true;
   // Diplomatic protest (démarche / note verbale / lodge a protest with an
   // embassy) and head-of-state visit framing — homonyms, not street events.
   if (DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
