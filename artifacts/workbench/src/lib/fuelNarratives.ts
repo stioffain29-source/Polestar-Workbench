@@ -686,6 +686,26 @@ function isStatementOnlyHeadline(t: string): boolean {
   return false;
 }
 
+/** Commentary / outlook pieces — not an operator response action. */
+function isCommentaryOnlyHeadline(t: string): boolean {
+  if (/\b(electric aviation|e[- ]?vtol|hybrid[- ]electric aircraft|battery[- ]electric aircraft)\b/.test(t)) {
+    return true;
+  }
+  if (
+    /\b(commentary|analyst view|perspective|long[- ]term trend|industry trend)\b/.test(t)
+    && !/\b(suspend|cancel|cut|ground|ration|rationing|export ban|production cut|restart|shut|pipeline|contract|tender|opec|iea)\b/.test(t)
+  ) {
+    return true;
+  }
+  if (
+    /\b(analysts? say)\b/.test(t)
+    && !/\b(opec|iea|airline|carrier|suspend|cancel|cut|ground|ration|rationing|export ban|production cut|restart|shut|pipeline|contract|tender)\b/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Producer-named incident reporting (attack on a vessel/facility) — not a supply-side action. */
 function isVictimProducerIncidentHeadline(t: string): boolean {
   if (/\b(issues statement|statement clarifying|announc\w+|said it will|plans to|complet\w+|expand\w+|restart\w+|resume\w+|restore\w+|shut\w+|cut\w+|hike\w+|raise\w+|reduce\w+|export\w+|import\w+|sign\w+|award\w+|launch\w+|open\w+|close\w+|bypass\w+|pipeline|contract|tender|supply deal|long[- ]term|output increase|production (cut|hike|increase|reduce))\b/.test(t)) {
@@ -1215,6 +1235,7 @@ export function buildFuelProducerBuyerActions(opts: {
   for (const i of window) {
     const t = haystack(i);
     if (isStatementOnlyHeadline(t)) continue;
+    if (isCommentaryOnlyHeadline(t)) continue;
     if (isVictimProducerIncidentHeadline(t)) continue;
     const category = classifyCategory(t);
     if (!category) continue;
@@ -1501,6 +1522,11 @@ const SEV_RANK: Record<string, number> = {
 };
 const FUEL_CASUALTY_RE =
   /\b(killed|dead|deaths?|died|fatal(it(y|ies))?|casualt(y|ies)|injur(y|ies|ed)|wounded|massacre|martial law|state of emergency|hostage|kidnap(ped|ping)?)\b/i;
+/** Fuel availability, pricing or continuity signals — severity must track these. */
+export const FUEL_CONTINUITY_RE =
+  /\b(ration|rationing|shortage|queues?|forecourt|pump price|availability|supply cut|load[- ]shedding|export ban|import ban|allocation|curfew|diesel|petrol|gasoline|gasoil|kerosene|lpg|jet fuel|refinery|pipeline|depot|terminal|bunker|fuel crisis|fuel shortage)\b/i;
+const FUEL_MARITIME_ONLY_RE =
+  /\b(vessel|tanker|ship|maritime|crew|sailor|seafarer|seafaring|red sea|bab[- ]el[- ]mandeb|bab al[- ]mandab|strait of hormuz|\bhormuz\b)\b/i;
 // DIRECT operational disruption only — physical events that have actually
 // occurred and impede fuel production, movement or supply. A market/price/
 // policy headline that merely "warns" of or comments on these has no such
@@ -1534,12 +1560,21 @@ export function capFuelMarketSeverity(
   const sev = (severity ?? "").toLowerCase();
   if ((SEV_RANK[sev] ?? 0) <= SEV_RANK.moderate) return severity ?? "";
   const hay = `${title}\n${summary}`;
-  // Casualties always keep the elevated rating.
-  if (FUEL_CASUALTY_RE.test(hay)) return severity ?? "";
+  // Casualties keep the elevated rating only when they bear on fuel
+  // availability, pricing or continuity — bare maritime crew fatalities
+  // must not drive an Extreme market-watch call on their own.
+  if (FUEL_CASUALTY_RE.test(hay)) {
+    if (FUEL_MARITIME_ONLY_RE.test(hay) && !FUEL_CONTINUITY_RE.test(hay)) {
+      return "moderate";
+    }
+    return severity ?? "";
+  }
   // Warning / forecast / policy-proposal framing is commentary → downgrade.
   if (FUEL_SPECULATIVE_RE.test(hay)) return "moderate";
   // A concrete physical disruption keeps the elevated rating.
   if (FUEL_OPERATIONAL_RE.test(hay)) return severity ?? "";
+  // Shortage, rationing and availability signals keep elevated severity.
+  if (FUEL_CONTINUITY_RE.test(hay)) return severity ?? "";
   // Everything else (pure market/price/policy signal) → downgrade.
   return "moderate";
 }

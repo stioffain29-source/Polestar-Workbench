@@ -25,6 +25,7 @@ import {
   drawFastFactsKpiCards,
   drawBulletSection,
   drawDisclaimer,
+  ensureRoomForDisclaimer,
   drawFooters,
   drawPolestarCover,
   beginBodyPages,
@@ -1355,6 +1356,7 @@ export async function exportTopicReportPdf(
       );
     }
     if (show("polestar-view")) {
+      ensureRoomForDisclaimer(ctx);
       renderProseSection("Polestar View", fuelEffective?.polestarView);
     }
   } else {
@@ -1625,6 +1627,7 @@ export async function exportTopicReportPdf(
     );
   }
 
+  ensureRoomForDisclaimer(ctx);
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);

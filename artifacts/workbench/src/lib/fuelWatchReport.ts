@@ -365,32 +365,28 @@ export function buildFuelWatchReportData(
     qualifyingIncidents: fuelIncidents,
   });
   const canonPrimary = canonicalFacts.primaryPressurePoint;
-  // Severity is reconciled too: canonical prose asserts canonicalFacts'
-  // overall severity/distribution (uncapped), while buildFuelReportFacts caps
-  // market-commentary records — leaving both would false-block canonical text
-  // at the SEVERITY_TERMS / COUNT_TRACEABLE checks.
   const canonSeverityLower = canonicalFacts.overallSeverity.toLowerCase() as FuelReportFacts["overallSeverity"] & string;
   const canonDistribution = Object.fromEntries(
     Object.entries(canonicalFacts.severityDistribution).map(([k, v]) => [k.toLowerCase(), v]),
   ) as FuelReportFacts["severityDistribution"];
-  const severityReconciled: FuelReportFacts = {
-    ...rawReportFacts,
-    overallSeverity: canonSeverityLower,
-    severityDistribution: canonDistribution,
-  };
+  // Severity and pressure both reconcile to the canonical facts object so
+  // prose, the consistency gate and the AI FIXED FACTS block share one
+  // capped-severity, continuity-weighted assessment.
   const reportFacts: FuelReportFacts =
     canonPrimary.kind === "distributed"
-      ? { ...severityReconciled, pressure: { ...severityReconciled.pressure, distributed: true, primary: null } }
+      ? { ...rawReportFacts, overallSeverity: canonSeverityLower, severityDistribution: canonDistribution, pressure: { ...rawReportFacts.pressure, distributed: true, primary: null } }
       : {
-          ...severityReconciled,
+          ...rawReportFacts,
+          overallSeverity: canonSeverityLower,
+          severityDistribution: canonDistribution,
           pressure: {
-            ...severityReconciled.pressure,
+            ...rawReportFacts.pressure,
             distributed: false,
             primary:
-              severityReconciled.pressure.primary &&
-              severityReconciled.pressure.primary.country.toLowerCase() ===
+              rawReportFacts.pressure.primary &&
+              rawReportFacts.pressure.primary.country.toLowerCase() ===
                 canonPrimary.label.toLowerCase()
-                ? severityReconciled.pressure.primary
+                ? rawReportFacts.pressure.primary
                 : {
                     country: canonPrimary.label,
                     score: canonPrimary.score,

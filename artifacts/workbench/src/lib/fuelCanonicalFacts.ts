@@ -9,6 +9,7 @@
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 import { deriveIncidentCountry } from "./shippingCountry";
 import { isSocialPostTitle } from "./fuelReportFacts";
+import { capFuelMarketSeverity } from "./fuelNarratives";
 
 export const FUEL_SEVERITIES = ["Insignificant", "Low", "Moderate", "High", "Extreme"] as const;
 export type FuelSeverity = (typeof FUEL_SEVERITIES)[number];
@@ -129,6 +130,42 @@ function canonicalSeverity(value: string | null | undefined): FuelSeverity {
   const key = (value ?? "").trim().toLowerCase();
   return key === "extreme" ? "Extreme" : key === "high" ? "High" : key === "moderate" ? "Moderate" : key === "low" ? "Low" : "Insignificant";
 }
+function effectiveSeverityFor(i: TopicFastFactsIncident): FuelSeverity {
+  return canonicalSeverity(
+    capFuelMarketSeverity(i.severity, i.title, i.summary ?? "") || i.severity,
+  );
+}
+function fuelContinuityBoost(i: TopicFastFactsIncident): number {
+  const hay = `${i.title ?? ""} ${i.summary ?? ""}`.toLowerCase();
+  if (/\b(ration|rationing|shortage|allocation|curfew|queues?|forecourt|pump price|fuel crisis)\b/.test(hay)) return 20;
+  if (/\b(diesel|petrol|gasoline|gasoil|kerosene|lpg|jet fuel)\b/.test(hay)
+      && /\b(shortage|ration|cut|disrupt|crisis|offline)\b/.test(hay)) return 12;
+  return 0;
+}
+/** Collapse syndicated Red Sea / Yemen / Bab-el-Mandeb corridor copies to one record. */
+function fuelStoryFamilyKey(i: TopicFastFactsIncident): string | null {
+  const hay = `${i.title ?? ""} ${i.summary ?? ""}`.toLowerCase();
+  if (!/\b(red sea|bab[- ]el[- ]mandeb|bab al[- ]mandab|houthi|yemen)\b/.test(hay)) return null;
+  if (!/\b(vessel|tanker|ship|attack|strike|missile|shipping|maritime|crew)\b/.test(hay)) return null;
+  if (/\bbab[- ]el|bab al[- ]mandab/.test(hay)) return "corridor:bab-el-mandeb";
+  return "corridor:red-sea-yemen";
+}
+function dedupeFuelSyndication(incidents: TopicFastFactsIncident[]): TopicFastFactsIncident[] {
+  const unkeyed: TopicFastFactsIncident[] = [];
+  const families = new Map<string, TopicFastFactsIncident>();
+  for (const raw of incidents) {
+    const key = fuelStoryFamilyKey(raw);
+    if (!key) {
+      unkeyed.push(raw);
+      continue;
+    }
+    const prev = families.get(key);
+    if (!prev || SEVERITY_RANK[effectiveSeverityFor(raw)] > SEVERITY_RANK[effectiveSeverityFor(prev)]) {
+      families.set(key, raw);
+    }
+  }
+  return [...unkeyed, ...families.values()];
+}
 function severityWord(value: FuelSeverity): string { return value.toLowerCase(); }
 // A quoted incident headline can carry its own percentage ("Jet fuel price
 // raised by 21%"). The consistency gate reads any "NN%" in a sentence that
@@ -180,6 +217,12 @@ function pickPrimaryPool(
   const bestCountry = sortedCountries[0];
   const bestRoute = sortedRoutes[0];
   if (bestRoute && bestCountry && bestRoute.maxSeverity > bestCountry.maxSeverity) {
+    // Acute fuel continuity (rationing, shortage) outranks corridor maritime
+    // volume when the combined score is competitive — Orenburg rationing must
+    // not lose to a fatal Red Sea strike on peak severity alone.
+    if (bestCountry.severityScore >= bestRoute.severityScore) {
+      return dedupeSharedIncidentGroups(sortedCountries);
+    }
     return dedupeSharedIncidentGroups(sortedRoutes);
   }
   if (sortedCountries.length) return dedupeSharedIncidentGroups(sortedCountries);
@@ -247,12 +290,14 @@ export function buildFuelCanonicalFacts(opts: {
   watchIndicators?: string[];
 }): FuelCanonicalFacts {
   const filtered = opts.qualifyingIncidents ?? filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
-  const qualifyingIncidents = filtered.map((raw, index): CanonicalFuelIncident => {
+  const deduped = dedupeFuelSyndication(filtered);
+  const qualifyingIncidents = deduped.map((raw, index): CanonicalFuelIncident => {
     const country = deriveIncidentCountry(raw);
     const physicalLocation = text(raw.location) ?? null;
+    const severity = effectiveSeverityFor(raw);
     return {
       id: String(raw.id ?? `${day(raw.occurredAt)}:${index}:${raw.title}`), title: raw.title, occurredAt: raw.occurredAt,
-      date: day(raw.occurredAt), topic: raw.topic, severity: canonicalSeverity(raw.severity), physicalLocation,
+      date: day(raw.occurredAt), topic: raw.topic, severity, physicalLocation,
       country, routeOrChokepoint: routeFor(raw), widerRegionalRelevance: relevanceFor(routeFor(raw)), entities: entitiesFor(raw),
       evidenceStatus: evidenceStatusFor(raw), sourceUrl: raw.sourceUrl ?? null, source: raw.source ?? null, raw,
     };
@@ -266,7 +311,8 @@ export function buildFuelCanonicalFacts(opts: {
     return stableSort([...map.entries()].map(([label, rows]) => ({
       label,
       count: rows.length,
-      severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0),
+      severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0)
+        + rows.reduce((n, i) => n + fuelContinuityBoost(i.raw), 0),
       maxSeverity: maxSeverityRank(rows),
       incidentIds: rows.map((i) => i.id),
     })));
@@ -385,12 +431,15 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
       sentence: `${label} carries ${countClause} this period, led by “${proseSafeTitle(lead.title)}” (${lead.date}, ${severityWord(lead.severity)} severity).`,
     };
   };
-  const pressureGroups: Array<{ label: string; incidentIds: string[] }> =
+  const pressureGroups: Array<{ label: string; incidentIds: string[]; kind: "country" | "route" }> =
     facts.primaryPressurePoint.kind === "distributed"
-      ? [...facts.countries.slice(0, 3), ...facts.routes.slice(0, 2)]
+      ? [
+          ...facts.countries.slice(0, 3).map((c) => ({ kind: "country" as const, label: c.label, incidentIds: c.incidentIds })),
+          ...facts.routes.slice(0, 2).map((r) => ({ kind: "route" as const, label: r.label, incidentIds: r.incidentIds })),
+        ]
       : [
-          { label: facts.primaryPressurePoint.label, incidentIds: facts.primaryPressurePoint.incidentIds },
-          ...facts.secondaryPressurePoints.slice(0, 3),
+          { kind: facts.primaryPressurePoint.kind, label: facts.primaryPressurePoint.label, incidentIds: facts.primaryPressurePoint.incidentIds },
+          ...facts.secondaryPressurePoints.slice(0, 3).map((p) => ({ kind: p.kind, label: p.label, incidentIds: p.incidentIds })),
         ];
   const seenLeadIds = new Set<string>();
   const theatreSentences: string[] = [];
@@ -402,8 +451,17 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
   }
 
   const regionalLead = facts.primaryPressurePoint.kind === "distributed"
-    ? `Pressure is distributed across ${list([...facts.countries.slice(0, 3).map((c) => c.label), ...facts.routes.slice(0, 3).map((r) => r.label)])} rather than concentrating in one theatre. Overall severity: ${severity}.`
-    : `${primaryLabel} anchors the regional picture${secondary.length ? `, with secondary pressure in ${list(secondary)}` : ""}. Overall severity: ${severity}.`;
+    ? (() => {
+        const countryLabels = facts.countries.slice(0, 3).map((c) => c.label);
+        const routeLabels = facts.routes.slice(0, 3).map((r) => r.label);
+        const parts: string[] = [];
+        if (countryLabels.length) parts.push(`country pressure is spread across ${list(countryLabels)}`);
+        if (routeLabels.length) parts.push(`routing exposure sits on ${list(routeLabels)}`);
+        return `${parts.join("; ")} rather than concentrating in one theatre. Overall severity: ${severity}.`;
+      })()
+    : facts.primaryPressurePoint.kind === "route"
+      ? `${primaryLabel} anchors routing exposure${secondary.length ? `, with secondary country pressure in ${list(secondary.filter((l) => !facts.routes.some((r) => r.label === l)))}` : ""}. Overall severity: ${severity}.`
+      : `${primaryLabel} anchors the regional picture${secondary.length ? `, with secondary routing exposure in ${list(secondary.filter((l) => !facts.countries.some((c) => c.label === l)))}` : ""}. Overall severity: ${severity}.`;
   const regionalHighlights = [regionalLead, theatreSentences.join(" ")]
     .filter((s) => s.trim())
     .join("\n\n");

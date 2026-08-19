@@ -732,7 +732,37 @@ function titleWithoutSource(title: string): string {
 // is retained for the EU-accession/independence-day homonym; the APAC hook
 // below now includes major cities so an APAC-city solidarity headline still
 // survives even when it names a non-APAC country as the cause.
-const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|argentina|brazil|chile|peru|colombia|mexico|venezuela|bolivia|bolivian|ecuador|paraguay|uruguay|guatemala|honduras|nicaragua|panama|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
+// Tourism / travel-industry "demonstration" homonyms — not public-order events.
+const TOURISM_DEMO_RE = /\b(sleep tourism|tourism demonstration|travel tourism|hotel tourism)\b/i;
+// Retrospective reporting about earlier unrest (funeral coverage, anniversary).
+const RETROSPECTIVE_UNREST_RE =
+  /\b(earlier riots?|previous riots?|last year'?s? (?:riot|protest|unrest)|(?:funeral|memorial|burial).{0,100}(?:riot|unrest|protest|clash)|(?:riot|unrest|protest|clash).{0,100}(?:funeral|memorial|burial))\b/i;
+// Court developments arising from an earlier protest cycle — not a live event.
+const PROTEST_FOLLOWUP_COURT_RE =
+  /\b(labor day|labour day|may day|international workers'? day).{0,120}(court|verdict|ruling|hearing|appeal|sentenc|indict)|(?:court|verdict|ruling|hearing|appeal|sentenc|indict).{0,120}(labor day|labour day|may day)\b/i;
+// Archival years in the headline — e.g. a 2008 USS George Washington protest
+// syndicated into a 2026 reporting window.
+function isArchivalOutsideWindow(
+  r: FlashpointReportIncident,
+  issueDate: string,
+): boolean {
+  const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  const win = resolveReportWindow("flashpoint", issueDate);
+  const windowStartYear = win.start.getUTCFullYear();
+  for (const m of text.matchAll(/\b(19\d{2}|20\d{2})\b/g)) {
+    const y = Number(m[1]);
+    if (y < windowStartYear - 1) return true;
+  }
+  return false;
+}
+
+/** West Papua is a region within Indonesia for Flashpoint country roll-ups. */
+function normalizeFlashpointCountry(country: string): string {
+  const c = country.trim();
+  if (/^west papua$/i.test(c)) return "Indonesia";
+  return c;
+}
+const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|ceuta|melilla|argentina|brazil|chile|peru|colombia|mexico|venezuela|bolivia|bolivian|ecuador|paraguay|uruguay|guatemala|honduras|nicaragua|panama|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
 const APAC_HOOK_RE = /\b(pakistan|india|bangladesh|sri lanka|nepal|bhutan|maldives|afghanistan|china|hong kong|taiwan|south korea|north korea|japan|mongolia|philippines|indonesia|malaysia|thailand|vietnam|myanmar|singapore|cambodia|laos|brunei|timor[- ]leste|australia|new zealand|papua new guinea|fiji|solomon|vanuatu|tokyo|seoul|manila|jakarta|bangkok|new delhi|delhi|mumbai|kolkata|chennai|bengaluru|hyderabad|dhaka|kathmandu|colombo|karachi|lahore|islamabad|kuala lumpur|hanoi|ho chi minh|taipei|beijing|shanghai|yangon|phnom penh|kabul|sydney|melbourne|wellington|auckland)\b/i;
 // Defence procurement / weapons-system news (missile offers, arms deals,
 // fighter-jet / submarine acquisitions). The classifier keeps these on the
@@ -784,6 +814,9 @@ const LODGE_DIPLOMATIC_PROTEST_RE = /\b(?:lodg|convey)\w*\s+(?:a\s+|an\s+|its\s+
 const DIPLOMATIC_VISIT_RE = /\b(president|prime minister|\bpm\b|premier|foreign minister|\bfm\b|junta chief|chancellor|monarch|crown prince|defen[cs]e minister|delegation|envoy)\b.{0,60}\b(heads? to|head to|visits?|arrives? in|to visit|pays? a\b.{0,20}\bvisit|state visit|official visit|bilateral (talks|meeting|summit))\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+  if (TOURISM_DEMO_RE.test(text)) return true;
+  if (RETROSPECTIVE_UNREST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (LICENSABLE_PHOTO_RE.test(text)) return true;
   // Diplomatic protest (démarche / note verbale / lodge a protest with an
   // embassy) and head-of-state visit framing — homonyms, not street events.
@@ -1297,7 +1330,7 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
       // Resolve physical incident location from title, summary and location
       // text. The raw country tag can be source attribution and is not trusted
       // without corroboration.
-      const country = deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED;
+      const country = normalizeFlashpointCountry(deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED);
       // Clean the rendered title (drop publisher masthead + "Watch:" / "VIDEO
       // BY" video cruft). Classification above runs on the ORIGINAL title.
       return { ...r, title: cleanDisplayTitle(r.title), country, date, issue, bucket: bucketFor(issue) };
@@ -1324,7 +1357,7 @@ function sortRowsForTable(rows: EnrichedIncident[]): EnrichedIncident[] {
 function countriesOf(rows: EnrichedIncident[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const r of rows) {
-    const c = (r.country ?? "").trim();
+    const c = normalizeFlashpointCountry((r.country ?? "").trim());
     // An unresolved location is a data-quality state, not a country. Keep it
     // out of geographic rankings and prose rather than letting it appear as a
     // false regional leader.
@@ -1457,6 +1490,11 @@ export function selectFlashpointUsable(
   let weakNoveltyDropped = 0;
   let weakOperationalDropped = 0;
   for (const r of enrichedDeduped) {
+    if (isArchivalOutsideWindow(r, issueDate)) {
+      weakOperationalDropped++;
+      reject("weak-operational", r);
+      continue;
+    }
     if (isWeakNovelty(r)) {
       weakNoveltyDropped++;
       reject("weak-novelty", r);
@@ -1544,7 +1582,7 @@ export function buildFlashpointReportDataset(
   const countrySignificance = new Map<string, number>();
   for (const [country, rows] of Object.entries(
     enriched.reduce<Record<string, EnrichedIncident[]>>((groups, row) => {
-      const country = (row.country ?? "").trim();
+      const country = normalizeFlashpointCountry((row.country ?? "").trim());
       if (!country || country === LOCATION_NOT_IDENTIFIED) return groups;
       (groups[country] ??= []).push(row);
       return groups;
@@ -1621,8 +1659,8 @@ export function buildFlashpointReportDataset(
   // rather than being buried beneath high-volume, low-severity activity.
   const countryTopSev = new Map<string, string>();
   for (const r of enriched) {
-    const c = (r.country ?? "").trim();
-    if (!c) continue;
+    const c = normalizeFlashpointCountry((r.country ?? "").trim());
+    if (!c || c === LOCATION_NOT_IDENTIFIED) continue;
     const k = sevKey(r.severity);
     if (
       incidentSeverityRank(r.severity) >
@@ -2620,6 +2658,17 @@ function buildWhatMatters(ctx: AutoCtx): string {
     lines.push(para);
     if (lines.length >= 5) break;
   }
+  const volumeLead = ctx.countryRows[0];
+  if (
+    volumeLead?.label === "Japan" &&
+    !lines.some((l) => /\bJapan\b/i.test(l))
+  ) {
+    lines.splice(
+      1,
+      0,
+      `Japan accounts for ${volumeLead.value} of the week's screened incidents. Most are low-severity administrative or symbolic gatherings rather than sustained unrest, but the volume still warrants monitoring in Tokyo and other hub cities.`,
+    );
+  }
   const hubs = extractNamedHubs(all, ctx.enriched);
   if (hubs.length > 0) {
     lines.push(
@@ -2812,6 +2861,7 @@ function buildPolestarView(ctx: AutoCtx): string {
   const all = [...ctx.activismRows, ...ctx.unrestRows];
   const posture = overallPostureLabel(ctx);
   const activeCountries = ctx.countryRows.slice(0, 6).map((r) => r.label);
+  const volumeLead = ctx.countryRows[0];
   const countryLine =
     activeCountries.length > 0
       ? joinList(activeCountries)
@@ -2822,11 +2872,14 @@ function buildPolestarView(ctx: AutoCtx): string {
     (r) => (r.country ?? "").includes("Pakistan") && /\b(strike|transporter|transport)\b/i.test(text(r)),
   );
   const others = activeCountries.filter((c) => c !== "Pakistan");
-  const disruptionLead = hasPakistanStrike
+  let disruptionLead = hasPakistanStrike
     ? others.length > 0
       ? `strike action affects transport networks or supply movement, especially in Pakistan, and around live or scheduled protest locations in ${joinList(others)}`
       : `strike action affects transport networks or supply movement, especially in Pakistan`
     : `gatherings and transport disruption affect staff routes in ${countryLine}`;
+  if (volumeLead?.label === "Japan" && volumeLead.value >= 5) {
+    disruptionLead = `Japan carries the highest incident volume this week (${volumeLead.value} records), mostly low-severity gatherings; ${disruptionLead.charAt(0).toLowerCase()}${disruptionLead.slice(1)}`;
+  }
 
   return [
     `Risk level: ${posture}.`,
@@ -2855,13 +2908,20 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const spread = subregionSpread(ctx.countryRows);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const hs = highestSeverity(ctx.enriched);
-  const political = [...ctx.activismRows, ...ctx.unrestRows].some((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
-  const sectoral = [...ctx.activismRows, ...ctx.unrestRows].some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r)));
-  const hasEnforcement = hasEnforcementSignal([...ctx.activismRows, ...ctx.unrestRows]);
+  const allRows = [...ctx.activismRows, ...ctx.unrestRows];
+  const protestCount = allRows.filter((r) => /\bprotest/i.test(r.issue)).length;
+  const political = allRows.some((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
+  const sectoral = allRows.some((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|samsung)\b/i.test(text(r)));
+  const hasEnforcement = hasEnforcementSignal(allRows);
 
   const driverBits: string[] = [];
+  if (protestCount >= Math.max(3, Math.ceil(allRows.length * 0.35))) {
+    driverBits.push("street protests and demonstrations");
+  }
   if (political) driverBits.push("opposition party protests");
-  if (sectoral) driverBits.push("union and trade-group action");
+  if (sectoral && protestCount < Math.ceil(allRows.length * 0.5)) {
+    driverBits.push("union and trade-group action");
+  }
   if (hasEnforcement) driverBits.push("police enforcement");
   const driverLine = driverBits.length > 1
     ? `The main drivers are ${joinList(driverBits)}.`
@@ -2885,8 +2945,6 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   // Sharp operational opener: lead with the judgement, then name the
   // volume lead and the severity lead explicitly (and reconcile them
   // when they diverge) so the summary reads as a decision, not a recap.
-  const allRows = [...ctx.activismRows, ...ctx.unrestRows];
-  void allRows;
   // The ONE shared top-severity incident — identical to the Fast Facts card.
   const sevInc = ctx.topSeverity;
   const sevCountry = (sevInc?.country ?? "").trim();

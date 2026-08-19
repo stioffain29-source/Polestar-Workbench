@@ -82,7 +82,14 @@ const CITY_COUNTRY_CUES: Array<[RegExp, string]> = [
   [/\bport moresby\b/i, "Papua New Guinea"],
   [/\bkyiv\b|\bkiev\b/i, "Ukraine"],
   [/\blagos\b|\babuja\b/i, "Nigeria"],
+  [/\borenburg\b|\bbelgorod\b|\bnovorossiysk\b|\btuapse\b/i, "Russia"],
 ];
+
+// Russian infrastructure / city cues used when Ukraine (or another actor) is
+// named as the attacker — the incident LOCATION is where the strike landed,
+// not the attacker's home country ("Ukraine drone strike on Orenburg depot").
+const RUSSIA_ATTACK_TARGET_RE =
+  /\b(orenburg|belgorod|kursk|rostov(?:-on-don)?|novorossiysk|tuapse|volgograd|samara|kazan|moscow|saint petersburg|st\.?\s*petersburg|Russian (?:refinery|depot|terminal|pipeline|oil|fuel)|Russia'?s? (?:refinery|depot|terminal|pipeline))\b/i;
 
 // Geographic context that is sufficiently specific to corroborate a matching
 // raw country, but not sufficiently exclusive to derive the country by itself.
@@ -223,6 +230,14 @@ export function deriveIncidentCountry(i: CountrySource): string | null {
   if (fromLocation) return fromLocation;
 
   const eventBlob = `${i.title ?? ""} ${i.summary ?? ""} ${i.location ?? ""}`;
+  // Attack-on-target: when prose names an actor (e.g. Ukraine) striking
+  // infrastructure in Russia, the event location is Russia — not the actor.
+  if (
+    RUSSIA_ATTACK_TARGET_RE.test(eventBlob) &&
+    /\b(ukrain(?:e|ian)|drone strike|missile strike|attack(?:ed|s|ing)? on|strike on|launched (?:a )?(?:drone|missile))\b/i.test(eventBlob)
+  ) {
+    return "Russia";
+  }
   // 2. A country named directly in title/summary is an event-location signal
   // even when the source row leaves `country` blank.
   const fromProse = findCountryCue(eventBlob);
