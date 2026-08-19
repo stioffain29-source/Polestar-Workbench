@@ -1,6 +1,7 @@
 import {
   cleanDisplayTitle,
   dedupeByTitle,
+  normalizeWestPapuaRegionInTitle,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
 
 describe("cleanDisplayTitle", () => {
@@ -54,6 +55,35 @@ describe("cleanDisplayTitle", () => {
     expect(cleanDisplayTitle("Pride rally floods Manila streets Video by Allen Limos")).toBe(
       "Pride rally floods Manila streets",
     );
+  });
+});
+
+describe("normalizeWestPapuaRegionInTitle", () => {
+  it("appends Indonesia to standalone West Papua place references", () => {
+    expect(
+      normalizeWestPapuaRegionInTitle(
+        "Large demos across West Papua meet with mixed responses by police",
+        "Indonesia",
+      ),
+    ).toBe("Large demos across West Papua, Indonesia meet with mixed responses by police");
+  });
+
+  it("prefixes West Papuan with Indonesian when Indonesia is not already in the title", () => {
+    expect(
+      normalizeWestPapuaRegionInTitle(
+        "West Papuan protesters face police crackdown over independence calls",
+        "Indonesia",
+      ),
+    ).toBe("Indonesian West Papuan protesters face police crackdown over independence calls");
+  });
+
+  it("leaves Indonesia-framed headlines unchanged", () => {
+    expect(
+      normalizeWestPapuaRegionInTitle(
+        "Indonesia's West Papuan protesters face police crackdown over independence calls",
+        "Indonesia",
+      ),
+    ).toBe("Indonesia's West Papuan protesters face police crackdown over independence calls");
   });
 });
 

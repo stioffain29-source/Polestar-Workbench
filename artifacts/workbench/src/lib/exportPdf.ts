@@ -1046,3 +1046,15 @@ export function formatDateForFilename(isoDate?: string): string {
   const ymd = (isoDate ?? new Date().toISOString()).slice(0, 10);
   return ymd.replace(/-/g, "");
 }
+
+/** Local export timestamp suffix: YYYYMMDDhhmm. */
+export function formatExportTimestampForFilename(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    String(date.getFullYear())
+    + pad(date.getMonth() + 1)
+    + pad(date.getDate())
+    + pad(date.getHours())
+    + pad(date.getMinutes())
+  );
+}

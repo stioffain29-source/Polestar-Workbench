@@ -762,6 +762,18 @@ function normalizeFlashpointCountry(country: string): string {
   if (/^west papua$/i.test(c)) return "Indonesia";
   return c;
 }
+
+/** Clarify West Papua as Indonesian territory in reader-facing incident titles. */
+export function normalizeWestPapuaRegionInTitle(title: string, country: string): string {
+  const t = (title ?? "").trim();
+  if (!/\bwest papua(n|nese|ns)?\b/i.test(t)) return t;
+  if (/\bindonesia\b/i.test(t)) return t;
+  if (normalizeFlashpointCountry(country) !== "Indonesia") return t;
+  return t
+    .replace(/\bWest Papuans\b/g, "Indonesian West Papuans")
+    .replace(/\bWest Papuan\b/g, "Indonesian West Papuan")
+    .replace(/\bWest Papua\b/g, "West Papua, Indonesia");
+}
 const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|sweden|finland|france|germany|spain|italy|portugal|switzerland|austria|belgium|netherlands|ireland|scotland|wales|england(?! batting)|georgia|georgian|tbilisi|ceuta|melilla|argentina|brazil|chile|peru|colombia|mexico|venezuela|bolivia|bolivian|ecuador|paraguay|uruguay|guatemala|honduras|nicaragua|panama|canada|haiti|cuba|jamaica|nigeria|kenya|south africa|egypt|libya|sudan|ethiopia|morocco|tunisia)\b/i;
 // Multi-headline briefs syndicated onto APAC feeds — the protest event may sit
 // in a non-APAC dateline (Ceuta, Melilla) while the masthead country is APAC.
@@ -1366,9 +1378,15 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
       // text. The raw country tag can be source attribution and is not trusted
       // without corroboration.
       const country = normalizeFlashpointCountry(deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED);
+      const cleanedTitle = cleanDisplayTitle(r.title);
+      const displayTitle = normalizeWestPapuaRegionInTitle(cleanedTitle, country);
+      const location = (() => {
+        const loc = (r.location ?? "").trim();
+        return /^west papua$/i.test(loc) ? "West Papua, Indonesia" : r.location;
+      })();
       // Clean the rendered title (drop publisher masthead + "Watch:" / "VIDEO
       // BY" video cruft). Classification above runs on the ORIGINAL title.
-      return { ...r, title: cleanDisplayTitle(r.title), country, date, issue, bucket: bucketFor(issue) };
+      return { ...r, title: displayTitle, location, country, date, issue, bucket: bucketFor(issue) };
     })
     .filter((r) => !isNaN(r.date.getTime()));
 }

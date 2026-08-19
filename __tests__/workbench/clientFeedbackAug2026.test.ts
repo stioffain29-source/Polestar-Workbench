@@ -192,7 +192,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
   it("folds West Papua into Indonesia country roll-ups", () => {
     const ds = buildFlashpointReportDataset(
       [
-        fp({ title: "Land-rights rally in Jayapura", country: "West Papua", location: "Jayapura" }),
+        fp({ title: "Large demos across West Papua meet with mixed responses by police", country: "West Papua", location: "West Papua" }),
         fp({ title: "Student protest in Jakarta", country: "Indonesia", location: "Jakarta" }),
       ],
       "flashpoint",
@@ -201,6 +201,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     const indonesia = ds.countryRows.find((r) => r.label === "Indonesia");
     expect(indonesia?.value).toBe(2);
     expect(ds.countryRows.some((r) => r.label === "West Papua")).toBe(false);
+    expect(ds.activismRows.some((r) => /West Papua, Indonesia/.test(r.title))).toBe(true);
   });
 
   it("names Japan in What Matters when Japan leads incident volume", () => {
