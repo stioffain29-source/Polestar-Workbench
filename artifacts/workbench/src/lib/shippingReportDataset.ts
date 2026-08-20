@@ -14,7 +14,7 @@ import {
   FREIGHT_MARKET_INDEX_RE,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
-import { stripWireCruft } from "./incidentTitle";
+import { displayIncidentTitle, stripWireCruft } from "./incidentTitle";
 import {
   buildMaritimeSecuritySummary,
   type MaritimeSecuritySummary,
@@ -35,6 +35,7 @@ export const SHIPPING_RELATED_ROW_CAP = 6;
 export interface ShippingReportIncident {
   id: number | string;
   title: string;
+  displayTitle?: string | null;
   topic: string;
   severity: string;
   occurredAt: string;
@@ -58,6 +59,7 @@ export interface PiracyRow extends CanonicalIncident { act: NonNullable<ReturnTy
 /** One reference to a syndicated article folded beneath a canonical incident. */
 export interface SupportingArticle {
   title: string;
+  displayTitle?: string | null;
   source: string | null;
   sourceUrl: string | null;
 }
@@ -456,7 +458,12 @@ function foldCanonical(rows: EnrichedIncident[]): CanonicalIncident[] {
     ...g.rep,
     supportingArticles: g.members
       .filter((m) => m.id !== g.rep.id)
-      .map((m) => ({ title: m.title, source: m.source ?? null, sourceUrl: m.sourceUrl ?? null })),
+      .map((m) => ({
+        title: m.title,
+        displayTitle: m.displayTitle ?? null,
+        source: m.source ?? null,
+        sourceUrl: m.sourceUrl ?? null,
+      })),
   }));
 }
 
@@ -500,6 +507,7 @@ function dedupeByTitle<T extends { title: string; date: Date; severity: string }
 export function dedupeShippingMonitorRows<
   T extends {
     title: string;
+    displayTitle?: string | null;
     severity: string;
     occurredDate: Date;
     summary?: string | null;
@@ -529,7 +537,12 @@ export function dedupeShippingMonitorRows<
     ...dedupeByTitle(nonVessel),
     ...undatable,
   ];
-  return deduped as unknown as T[];
+  // Deduplication/classification above intentionally use raw source headlines.
+  // Keep the cleaned RAW headline after those analytical decisions. Callers
+  // still perform additional issue/chokepoint/category analysis, so translated
+  // wording must not replace the analytical title here. Presentation surfaces
+  // resolve displayTitle only after their remaining analysis is complete.
+  return deduped.map(stripIncidentWireCruft) as unknown as T[];
 }
 
 // Pure shipping-market / corporate-finance items with no operational hook
@@ -556,12 +569,39 @@ function isShippingMarketOnly(r: ShippingReportIncident): boolean {
 const COMMERCIAL_OPERATIONAL_RE = /\b(port (clos|closes|closed|closure|shut|halt|disrupt|congest|congestion|strike|stoppage|stopped|fire|blast|outage)|berth (clos|closes|closed|closure|congest|congestion|delay|delays|delayed)|terminal (clos|closes|closed|closure|fire|congest|disrupt|outage)|dock(workers?| strike|workers strike|workers walk)|stevedore strike|wharf (strike|stoppage)|canal (clos|closes|closed|closure|congest|congestion|disrupt|halt)|(vessel|ship|tanker|carrier|fleet) (divert|diverted|reroute|rerouted|re-?routed|delay|delayed|stranded|adrift|grounded|stopped|halt|halted|skipped)|skip(ping)? (port|call|calls)|port skipping|schedule (slip|slippage|disruption|reliability|miss|missed)|sailing cancel|blank sailing|service (suspension|suspended|cancel|cancelled|withdrawn)|liner service (suspension|cancel|cancelled)|war[\s-]?risk (premium|surcharge|adjust|adjustment|widened|extended|raised|raise|hike|hiked|review|reviewed)|insurance (premium|surcharge) (rise|rises|risen|jump|jumped|hike|hiked|adjust|adjustment|widen|widened|extended|raised|raise)|p&i (premium|surcharge|warning|advisory)|protection and indemnity (premium|warning|advisory)|surcharge (introduce|introduced|impose|imposed|raise|raised|hike|hiked|extend|extended)|advisory (issued|expanded|extended|widened|tightened)|naval (escort|patrol|protection)|convoy (operation|escort|protection)|crew (change|repatriation) (disrupt|delay|delayed|suspended|halted)|cargo (flow|movement|disruption|halt|backlog|backlogged)|export (halt|suspension|suspended|ban|banned)|import (halt|disruption|backlog)|attack(ed)? .{0,30}(vessel|tanker|ship|carrier|port|terminal)|seiz(ed|ure)? .{0,30}(vessel|tanker|ship|carrier|cargo)|hijack(ed)? .{0,30}(vessel|tanker|ship|carrier|cargo)|drone .{0,30}(vessel|tanker|ship|carrier|port|terminal)|missile .{0,30}(vessel|tanker|ship|carrier|port|terminal))\b/i;
 
 // Strip social/video wire cruft ("Watch:", trailing "VIDEO BY <credit>",
-// "(VIDEO)") from a record's title before enrichment, dedupe and rendering, so
-// the Shipping report's tables and cards never show it and cruft-only duplicates
-// collapse. Shared with the other report topics via lib/incidentTitle.
-function stripIncidentWireCruft<T extends { title: string }>(i: T): T {
+// "(VIDEO)") from the RAW title before enrichment and dedupe so cruft-only
+// duplicates collapse without allowing translated wording to alter analysis.
+function stripIncidentWireCruft<
+  T extends { title: string; displayTitle?: string | null },
+>(i: T): T {
   const cleaned = stripWireCruft(i.title);
   return cleaned === i.title ? i : { ...i, title: cleaned };
+}
+
+/** Resolve a Shipping headline only at a presentation boundary. */
+function shippingPresentationTitle(
+  i: Pick<ShippingReportIncident, "title" | "displayTitle">,
+): string {
+  return stripWireCruft(displayIncidentTitle(i.title, i.displayTitle));
+}
+
+function toShippingPresentationIncident<T extends ShippingReportIncident>(i: T): T {
+  const title = shippingPresentationTitle(i);
+  return title === i.title ? i : { ...i, title };
+}
+
+function toShippingPresentationCanonical<T extends CanonicalIncident>(i: T): T {
+  const presented = toShippingPresentationIncident(i);
+  const supportingArticles = i.supportingArticles.map((article) => ({
+    ...article,
+    title: stripWireCruft(
+      displayIncidentTitle(article.title, article.displayTitle),
+    ),
+  }));
+  return {
+    ...presented,
+    supportingArticles,
+  };
 }
 
 export function buildShippingReportDataset(
@@ -794,7 +834,7 @@ export function buildShippingReportDataset(
       label: "Latest Significant Incident",
       value: latestSig ? format(latestSig.date, "dd MMM yyyy") : "—",
       severity: latestSig ? sevKey(latestSig.severity) : undefined,
-      note: latestSig ? latestSig.title : undefined,
+      note: latestSig ? shippingPresentationTitle(latestSig) : undefined,
     },
   ];
 
@@ -820,9 +860,9 @@ export function buildShippingReportDataset(
     if (credible.length === 0) {
       readText = "Quiet this week, with little reported here.";
     } else if (credible.length === 1) {
-      readText = `Activity here came down to a single event this week, "${credibleLatest!.title}".`;
+      readText = `Activity here came down to a single event this week, "${shippingPresentationTitle(credibleLatest!)}".`;
     } else {
-      readText = `The standout here this week was "${credibleLatest!.title}", with further events reported alongside it.`;
+      readText = `The standout here this week was "${shippingPresentationTitle(credibleLatest!)}", with further events reported alongside it.`;
     }
     return {
       name: cp,
@@ -830,7 +870,7 @@ export function buildShippingReportDataset(
       highestSeverityKey: hs.key,
       highestSeverityLabel: hs.label,
       latestDate: credibleLatest ? credibleLatest.date : null,
-      latestTitle: credibleLatest ? credibleLatest.title : null,
+      latestTitle: credibleLatest ? shippingPresentationTitle(credibleLatest) : null,
       readText,
     };
   });
@@ -881,8 +921,8 @@ export function buildShippingReportDataset(
   const vesselPiracyRead = buildVesselPiracyRead({
     vesselThreat30Total: vesselDeduped.length,
     vesselTableShown: vesselRows.length,
-    vesselRows30: vesselRows,
-    piracyRows30: piracyRows,
+    vesselRows30: vesselRows.map(toShippingPresentationCanonical),
+    piracyRows30: piracyRows.map(toShippingPresentationCanonical),
     vAttackSeize30: vAttackSeize,
     thirtyDayLabel: thirtyDayShortLabel,
   });
@@ -890,7 +930,7 @@ export function buildShippingReportDataset(
   // Commercial Impact Read — leads with the operational reason the
   // commercial pressure shows up, before the table of records.
   const commercialImpactRead = buildCommercialImpactRead(
-    commercialRecords,
+    commercialRecords.map(toShippingPresentationIncident),
     // Cross-signal so an empty commercial table can never claim "no
     // disruption" while the vessel/chokepoint sections above report attacks
     // and rerouting pressure in the same window.
@@ -987,18 +1027,18 @@ export function buildShippingReportDataset(
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: `Reporting period: ${win.label}`,
     thirtyDayShortLabel,
-    enriched,
-    canonicalIncidents,
+    enriched: enriched.map(toShippingPresentationIncident),
+    canonicalIncidents: canonicalIncidents.map(toShippingPresentationCanonical),
     articleCount,
     outOfScopeCount,
     fastFacts,
     locationNotIdentifiedCount,
     chokepointRows,
-    vesselRows,
-    piracyRows,
+    vesselRows: vesselRows.map(toShippingPresentationCanonical),
+    piracyRows: piracyRows.map(toShippingPresentationCanonical),
     regionRows,
     countryRows,
-    commercialRows: commercialRecords,
+    commercialRows: commercialRecords.map(toShippingPresentationIncident),
     leadDevelopment: leadDevelopmentIncident
       ? describeShippingLead(leadDevelopmentIncident)
       : null,
@@ -1006,7 +1046,7 @@ export function buildShippingReportDataset(
     vesselPiracyRead,
     commercialImpactRead,
     regionalCountryRead,
-    relatedIncidents,
+    relatedIncidents: relatedIncidents.map(toShippingPresentationCanonical),
     autoWhatMatters,
     autoImplications,
     autoWatchNext,

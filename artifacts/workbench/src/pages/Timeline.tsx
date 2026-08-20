@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 
 // The /incidents API caps its `days` window at 365, so the timeline omits the
 // 2y range (730d) the topic monitors offer — requesting it would be rejected.
@@ -54,7 +55,9 @@ export default function Timeline() {
                 <div key={i.id} className="grid grid-cols-[80px_120px_1fr_140px_100px] items-center text-sm hover:bg-muted/30">
                   <div className="p-3 font-mono text-xs text-muted-foreground">{format(new Date(i.occurredAt), "HH:mm")}</div>
                   <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm bg-secondary text-secondary-foreground">{TOPIC_LABELS[i.topic]}</span></div>
-                  <div className="p-3 font-medium">{i.title}</div>
+                  <div className="p-3 font-medium">
+                    {displayIncidentTitle(i.title, i.displayTitle)}
+                  </div>
                   <div className="p-3 text-xs">{i.country}</div>
                   <div className="p-3"><span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>{i.severity}</span></div>
                 </div>

@@ -84,6 +84,7 @@ import { buildCountryLayers, filterCountryRelevant, dropSyndicatedRehashes, reso
 import { clampIssueDateToLatestRecord } from "@/lib/reportWindow";
 import { runCountryReportQc, type CountryReportQcMapIncident } from "@/lib/countryReportQc";
 import { parseISO, subDays, startOfDay } from "date-fns";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 
 // Brand palette (lowercase per brand spec).
 const NAVY = "#0b0a3d";
@@ -624,7 +625,9 @@ export default function CountryReport() {
   const draftedProse = useMemo(() => {
     if (!country) return null;
     const inputs: DraftableIncident[] = dedupedWindowIncidents.map((i) => ({
-      topic: i.topic, title: i.title, summary: i.summary,
+      topic: i.topic,
+      title: displayIncidentTitle(i.title, i.displayTitle),
+      summary: i.summary,
       source: i.source, sourceUrl: i.sourceUrl, location: i.location,
       severity: i.severity, occurredAt: i.occurredAt, country: i.country,
     }));
@@ -780,7 +783,9 @@ export default function CountryReport() {
     // a subset of this set, so each shown row still resolves a summary.
     return curatedWindowIncidents.map((i) => ({
       id: i.id != null ? String(i.id) : undefined,
-      topic: i.topic, title: i.title, summary: i.summary,
+      topic: i.topic,
+      title: displayIncidentTitle(i.title, i.displayTitle),
+      summary: i.summary,
       location: i.location, country: i.country,
       severity: i.severity, occurredAt: i.occurredAt, source: i.source,
     }));
@@ -2143,7 +2148,7 @@ export default function CountryReport() {
                       />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontFamily: ROBOTO, fontSize: 12, color: MIDNIGHT }}>
-                          {inc.displayTitle ?? inc.title}
+                          {displayIncidentTitle(inc.title, inc.displayTitle)}
                         </div>
                         <div style={{ fontFamily: ROBOTO, fontSize: 11, color: DUSK, marginTop: 2 }}>
                           Stored severity: {stored || "—"}

@@ -281,7 +281,11 @@ export function incidentBlock(incidents: ProseIncidentInput[]): string {
     .map((i, idx) => {
       const sev = (i.severity ?? "").trim() || "unrated";
       const date = (i.occurredAt ?? "").slice(0, 10) || "undated";
-      const title = (i.title ?? "").trim() || "(untitled)";
+      const title =
+        (
+          (i as ProseIncidentInput & { displayTitle?: string | null })
+            .displayTitle?.trim() || i.title?.trim()
+        ) || "(untitled)";
       const place = [i.location, i.country].map((s) => (s ?? "").trim()).filter(Boolean).join(", ") || "location unclear";
       const src = (i.source ?? "").trim();
       const summary = (i.summary ?? "").trim().replace(/\s+/g, " ").slice(0, 300);

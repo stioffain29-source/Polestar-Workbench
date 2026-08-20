@@ -33,9 +33,11 @@ import {
   type CargoEnrichment,
   type CargoEnrichmentInput,
 } from "./cargoEnrichment";
+import { displayIncidentTitle } from "./incidentTitle";
 
 export interface CargoClusterInput extends CargoEnrichmentInput {
   id?: string | number;
+  displayTitle?: string | null;
   topic?: string;
   occurredAt: string;
 }
@@ -255,7 +257,10 @@ export function buildCargoGroupedDataset(
     });
     return {
       id: String(primary.id ?? cargoClusterKey(primary)),
-      title: primary.title,
+      // Category, grouping, same-event matching and enrichment above all read
+      // the raw source title. Resolve only the cluster headline that presentation
+      // surfaces render; keep primary/supporting raw for downstream analysis.
+      title: displayIncidentTitle(primary.title, primary.displayTitle),
       primary,
       supporting,
       sourceLinks: dedupeSourceLinks([primary, ...supporting]),

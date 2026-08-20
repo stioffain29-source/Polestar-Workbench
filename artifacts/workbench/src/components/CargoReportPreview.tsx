@@ -23,6 +23,7 @@ import {
   type TopicAiProse,
 } from "@/lib/topicProseResolution";
 import type { TopicFastFactsIncident, TopicFastFactCard } from "@/lib/topicFastFacts";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import {
   buildCargoPatternModel,
   type CargoPatternModelInput,
@@ -525,7 +526,7 @@ export default function CargoReportPreview({
       incidents.map((i) => ({
         id: i.id,
         topic: i.topic,
-        title: i.title,
+        title: displayIncidentTitle(i.title, i.displayTitle),
         summary: i.summary ?? null,
         source: i.source ?? null,
         sourceUrl: i.sourceUrl ?? null,

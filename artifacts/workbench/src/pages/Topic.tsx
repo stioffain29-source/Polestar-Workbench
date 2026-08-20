@@ -302,7 +302,7 @@ export default function Topic() {
       id: i.id,
       dateLabel: isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy"),
       country: i.country,
-      title: i.title,
+      title: displayIncidentTitle(i.title, i.displayTitle),
       severity: i.severity,
       sourceUrl: (i as { sourceUrl?: string | null }).sourceUrl,
       resolvedUrl: (i as { resolvedUrl?: string | null }).resolvedUrl,

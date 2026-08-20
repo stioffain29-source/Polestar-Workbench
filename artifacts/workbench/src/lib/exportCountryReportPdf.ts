@@ -38,6 +38,7 @@ import { upcomingSignalLine } from "./upcomingSignals";
 import { relatedIncidentsLimit } from "./reportWindow";
 import { reportKindLabel } from "./reportKind";
 import { classifyIncidentType } from "./incidentClassifier";
+import { displayIncidentTitle } from "./incidentTitle";
 import {
   computeCountryFastFacts,
   COUNTRY_WINDOW_TOPIC,
@@ -79,6 +80,7 @@ import type { ReliefWebReport } from "@workspace/api-client-react";
 export interface PdfIncident {
   id: number | string;
   title: string;
+  displayTitle?: string | null;
   topic: string;
   severity: string;
   occurredAt: string;
@@ -312,7 +314,7 @@ function drawIncidentTable(ctx: Ctx, incidents: PdfIncident[]) {
     pdf.setFontSize(8.5);
 
     const titleLines: string[] = pdf.splitTextToSize(
-      sanitize(i.title),
+      sanitize(displayIncidentTitle(i.title, i.displayTitle)),
       colTitleW - 8,
     );
     const rh = Math.max(rowH, titleLines.length * 12 + 10);

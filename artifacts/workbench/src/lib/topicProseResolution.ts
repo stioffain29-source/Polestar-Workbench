@@ -22,6 +22,7 @@ import {
   type TopicReportProse,
 } from "./draftReportProse";
 import type { FuelGulfChokepointWatch } from "./fuelNarratives";
+import { displayIncidentTitle } from "./incidentTitle";
 
 // Cached AI narrative sections. Mirrors the server TopicProseSections shape;
 // every field optional/nullable so a partial or absent payload degrades safely.
@@ -62,6 +63,7 @@ export interface DraftIncidentInput {
   id?: number | string | null;
   topic?: string | null;
   title?: string | null;
+  displayTitle?: string | null;
   summary?: string | null;
   source?: string | null;
   sourceUrl?: string | null;
@@ -77,7 +79,7 @@ export function toDraftableIncidents(
   return incidents.map((i) => ({
     id: i.id ?? undefined,
     topic: i.topic ?? "",
-    title: i.title ?? "",
+    title: displayIncidentTitle(i.title ?? "", i.displayTitle),
     summary: i.summary ?? null,
     source: i.source ?? null,
     sourceUrl: i.sourceUrl ?? null,

@@ -187,7 +187,9 @@ function IncidentDetail({ incident, onSaved }: { incident: Incident; onSaved: ()
   return (
     <div className="space-y-4">
       <SheetHeader>
-        <SheetTitle className="font-serif uppercase tracking-wide">{incident.title}</SheetTitle>
+        <SheetTitle className="font-serif uppercase tracking-wide">
+          {displayIncidentTitle(incident.title, incident.displayTitle)}
+        </SheetTitle>
       </SheetHeader>
       <Button
         variant="outline"

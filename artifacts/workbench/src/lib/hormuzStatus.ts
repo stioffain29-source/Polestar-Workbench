@@ -116,6 +116,7 @@ export const HORMUZ_CATEGORIES: HormuzCategoryDef[] = [
 
 type HormuzRecord = MaritimeRecordLike & {
   id?: string | number;
+  displayTitle?: string | null;
   occurredAt?: string | null;
   severity?: string | null;
   source?: string | null;

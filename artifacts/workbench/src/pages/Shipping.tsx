@@ -35,6 +35,7 @@ import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
 import VesselMap from "@/components/VesselMap";
 import FleetIntelligence from "@/components/FleetIntelligence";
@@ -654,7 +655,7 @@ export default function Shipping() {
             value={latestSignificant ? format(latestSignificant.occurredDate, "dd MMM yyyy") : "—"}
             note={
               latestSignificant
-                ? `${latestSignificant.title} (${latestSignificant.incidentCountry ?? NOT_IDENTIFIED}).`
+                ? `${displayIncidentTitle(latestSignificant.title, latestSignificant.displayTitle)} (${latestSignificant.incidentCountry ?? NOT_IDENTIFIED}).`
                 : "No significant shipping incident on record."
             }
             accent={latestSignificant ? ratingColor(latestSignificant.severity) : "#B8C2CC"}
@@ -790,7 +791,7 @@ export default function Shipping() {
                   <td className="p-2 text-xs text-foreground/80">
                     {row.count === 0
                       ? <span className="italic text-muted-foreground">No current records in selected window.</span>
-                      : `Latest item: ${row.latest!.title}. (${row.count} record${row.count === 1 ? "" : "s"} in window.)`}
+                      : `Latest item: ${displayIncidentTitle(row.latest!.title, row.latest!.displayTitle)}. (${row.count} record${row.count === 1 ? "" : "s"} in window.)`}
                   </td>
                 </tr>
               ))}
@@ -828,7 +829,7 @@ export default function Shipping() {
                   className="snap-start shrink-0 w-[280px] md:w-[300px] xl:w-[320px]"
                 >
                   <VesselCard
-                    title={v.title}
+                    title={displayIncidentTitle(v.title, v.displayTitle)}
                     date={isNaN(v.occurredDate.getTime()) ? null : format(v.occurredDate, "dd MMM yyyy")}
                     country={v.incidentCountry}
                     flagState={v.flagState}
@@ -877,7 +878,9 @@ export default function Shipping() {
                       {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
                     </td>
                     <td className="p-2 text-xs uppercase tracking-wider font-sans text-primary">{i.piracyAct}</td>
-                    <td className="p-2 font-medium">{i.title}</td>
+                    <td className="p-2 font-medium">
+                      {displayIncidentTitle(i.title, i.displayTitle)}
+                    </td>
                     <td className="p-2 text-xs">{i.incidentCountry ?? NOT_IDENTIFIED}</td>
                     <td className="p-2">
                       <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm" style={severityBadgeStyle(i.severity)}>
@@ -1013,7 +1016,7 @@ export default function Shipping() {
             label="Chokepoint / Route Activity"
             body={
               transitRecords.length > 0
-                ? `Chokepoint reporting was led by ${transitRecords[0].title}, with the wider set covering chokepoint risk, route diversion and maritime advisories (${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} in window).`
+                ? `Chokepoint reporting was led by ${displayIncidentTitle(transitRecords[0].title, transitRecords[0].displayTitle)}, with the wider set covering chokepoint risk, route diversion and maritime advisories (${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} in window).`
                 : null
             }
           />
@@ -1021,7 +1024,19 @@ export default function Shipping() {
             label="Vessel Threat / Piracy"
             body={
               vesselIncidents.length + piracyIncidents.length > 0
-                ? `Hostile maritime activity was led by ${vesselIncidents[0]?.title ?? piracyIncidents[0]?.title ?? "—"}, split across ${vesselAttackOrSeizureCount} vessel attack or seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy or armed-robbery record${piracyIncidents.length === 1 ? "" : "s"}.`
+                ? `Hostile maritime activity was led by ${
+                    vesselIncidents[0]
+                      ? displayIncidentTitle(
+                          vesselIncidents[0].title,
+                          vesselIncidents[0].displayTitle,
+                        )
+                      : piracyIncidents[0]
+                        ? displayIncidentTitle(
+                            piracyIncidents[0].title,
+                            piracyIncidents[0].displayTitle,
+                          )
+                        : "—"
+                  }, split across ${vesselAttackOrSeizureCount} vessel attack or seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy or armed-robbery record${piracyIncidents.length === 1 ? "" : "s"}.`
                 : null
             }
           />
@@ -1029,7 +1044,7 @@ export default function Shipping() {
             label="Commercial Impact"
             body={
               commercialRecords.length > 0
-                ? `Commercial pressure was led by ${commercialRecords[0].title}, covering port disruption, freight and insurance pressure and wider commercial shipping disruption (${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} in window).`
+                ? `Commercial pressure was led by ${displayIncidentTitle(commercialRecords[0].title, commercialRecords[0].displayTitle)}, covering port disruption, freight and insurance pressure and wider commercial shipping disruption (${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} in window).`
                 : null
             }
           />
@@ -1063,7 +1078,9 @@ export default function Shipping() {
                     >
                       <LeafletTooltip>
                         <div className="text-xs">
-                          <div className="font-bold">{i.title}</div>
+                          <div className="font-bold">
+                            {displayIncidentTitle(i.title, i.displayTitle)}
+                          </div>
                           <div>{i.incidentCountry ?? NOT_IDENTIFIED} · {i.region} · {i.issue}</div>
                         </div>
                       </LeafletTooltip>
@@ -1219,7 +1236,9 @@ export default function Shipping() {
                           <td className="p-2 font-mono text-xs whitespace-nowrap">
                             {isNaN(i.occurredDate.getTime()) ? "—" : format(i.occurredDate, "dd MMM yyyy")}
                           </td>
-                          <td className="p-2 font-medium">{i.title}</td>
+                          <td className="p-2 font-medium">
+                            {displayIncidentTitle(i.title, i.displayTitle)}
+                          </td>
                           <td className="p-2 text-xs">{countryDisplay}</td>
                           <td className="p-2 text-xs">{i.region}</td>
                           <td className="p-2 text-xs">{i.issue}</td>
@@ -1304,7 +1323,7 @@ function HormuzCategoryCard({ cat }: { cat: HormuzCategoryResult }) {
                     })()
                   : "—"}
               </span>
-              {r.title}
+              {displayIncidentTitle(r.title, r.displayTitle)}
             </li>
           ))}
           {cat.count > 3 && (

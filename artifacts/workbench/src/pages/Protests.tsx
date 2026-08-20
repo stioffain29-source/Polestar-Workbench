@@ -27,6 +27,7 @@ import {
 } from "@/lib/protestsAnalysis";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { buildUpcomingSignalRows, formatAnnouncedDate } from "@/lib/upcomingSignals";
 
 const FILL_OPACITY = 0.78;
@@ -293,7 +294,7 @@ export default function Protests() {
         enriched.map((i) => ({
           // Translated title first so English cues fire on Bahasa headlines —
           // parity with the Indonesia brief, which also feeds displayTitle.
-          title: i.displayTitle ?? i.title,
+          title: displayIncidentTitle(i.title, i.displayTitle),
           summary: i.summary ?? null,
           country: i.country ?? null,
           occurredAt: i.occurredAt,
@@ -344,7 +345,9 @@ export default function Protests() {
                 </span>
               </td>
               <td className="p-2 text-xs">{i.country ?? "—"}</td>
-              <td className="p-2 font-medium">{i.title}</td>
+              <td className="p-2 font-medium">
+                {displayIncidentTitle(i.title, i.displayTitle)}
+              </td>
               <td className="p-2 text-xs text-foreground/80">
                 {i.impacts.length > 0 ? i.impacts[0] : <span className="text-muted-foreground">—</span>}
               </td>

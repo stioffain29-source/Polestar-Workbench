@@ -88,6 +88,7 @@ import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
 import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
 import { resolveFlashpointReadOverride } from "@/lib/pickRead";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { autoReportRating } from "@/lib/cardAutofill";
 import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
@@ -487,7 +488,7 @@ export default function ReportEditor() {
             (i): CargoPatternModelInput => ({
               id: i.id,
               topic: i.topic,
-              title: i.title,
+              title: displayIncidentTitle(i.title, i.displayTitle),
               summary: i.summary ?? null,
               source: i.source ?? null,
               sourceUrl: i.sourceUrl ?? null,
@@ -595,7 +596,7 @@ export default function ReportEditor() {
         (i): CargoPatternModelInput => ({
           id: i.id,
           topic: i.topic,
-          title: i.title,
+          title: displayIncidentTitle(i.title, i.displayTitle),
           summary: i.summary ?? null,
           source: i.source ?? null,
           sourceUrl: i.sourceUrl ?? null,
@@ -663,17 +664,24 @@ export default function ReportEditor() {
         form.topic,
       ) as unknown as Array<Record<string, unknown>>;
     }
-    return rows.map((i) => ({
-      id: i.id != null ? String(i.id) : undefined,
-      topic: typeof i.topic === "string" ? i.topic : form.topic,
-      title: typeof i.title === "string" ? i.title : "",
-      summary: typeof i.summary === "string" ? i.summary : "",
-      location: typeof i.location === "string" ? i.location : "",
-      country: typeof i.country === "string" ? i.country : "",
-      severity: typeof i.severity === "string" ? i.severity : "",
-      occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
-      source: typeof i.source === "string" ? i.source : "",
-    }));
+    return rows.map((i) => {
+      const rawTitle = typeof i.title === "string" ? i.title : "";
+      const translatedTitle =
+        typeof i.displayTitle === "string" ? i.displayTitle : null;
+      return {
+        id: i.id != null ? String(i.id) : undefined,
+        topic: typeof i.topic === "string" ? i.topic : form.topic,
+        // Resolve at the summary/prose payload boundary. Selection, relevance,
+        // clustering and dedupe above continue to use the raw source headline.
+        title: displayIncidentTitle(rawTitle, translatedTitle),
+        summary: typeof i.summary === "string" ? i.summary : "",
+        location: typeof i.location === "string" ? i.location : "",
+        country: typeof i.country === "string" ? i.country : "",
+        severity: typeof i.severity === "string" ? i.severity : "",
+        occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
+        source: typeof i.source === "string" ? i.source : "",
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     summariesEnabled,
@@ -763,22 +771,33 @@ export default function ReportEditor() {
   // windowed incident set the report actually renders.
   const proseGrounding = useMemo(() => {
     if (!proseEnabled) return [];
-    if (summariesEnabled) return relatedForSummaries;
-    return filterTopicReportIncidents(
-      incidentsForExport,
-      form.topic,
-      form.issueDate,
-    ).map((i) => ({
-      id: i.id != null ? String(i.id) : undefined,
-      topic: typeof i.topic === "string" ? i.topic : form.topic,
-      title: typeof i.title === "string" ? i.title : "",
-      summary: typeof i.summary === "string" ? i.summary : "",
-      location: typeof i.location === "string" ? i.location : "",
-      country: typeof i.country === "string" ? i.country : "",
-      severity: typeof i.severity === "string" ? i.severity : "",
-      occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
-      source: typeof i.source === "string" ? i.source : "",
-    }));
+    const groundingRows = summariesEnabled
+      ? relatedForSummaries
+      : filterTopicReportIncidents(
+          incidentsForExport,
+          form.topic,
+          form.issueDate,
+        );
+    return groundingRows.map((i) => {
+      const translatedTitle =
+        "displayTitle" in i && typeof i.displayTitle === "string"
+          ? i.displayTitle
+          : null;
+      return {
+        id: i.id != null ? String(i.id) : undefined,
+        topic: typeof i.topic === "string" ? i.topic : form.topic,
+        title:
+          typeof i.title === "string"
+            ? displayIncidentTitle(i.title, translatedTitle)
+            : "",
+        summary: typeof i.summary === "string" ? i.summary : "",
+        location: typeof i.location === "string" ? i.location : "",
+        country: typeof i.country === "string" ? i.country : "",
+        severity: typeof i.severity === "string" ? i.severity : "",
+        occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
+        source: typeof i.source === "string" ? i.source : "",
+      };
+    });
   }, [
     proseEnabled,
     summariesEnabled,
@@ -1181,7 +1200,7 @@ export default function ReportEditor() {
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       id: i.id,
       topic: i.topic,
-      title: i.title,
+      title: displayIncidentTitle(i.title, i.displayTitle),
       summary: i.summary,
       source: i.source,
       sourceUrl: i.sourceUrl,
@@ -2268,7 +2287,7 @@ export default function ReportEditor() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="text-[12px] text-foreground">
-                          {inc.displayTitle ?? inc.title}
+                          {displayIncidentTitle(inc.title, inc.displayTitle)}
                         </div>
                         <div className="text-[11px] text-muted-foreground mt-0.5">
                           Stored severity: {stored || "—"}

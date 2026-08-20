@@ -15,6 +15,7 @@ export interface TopicFastFactsIncident {
   id?: number | string;
   topic: string;
   title: string;
+  displayTitle?: string | null;
   severity: string;
   occurredAt: string;
   country?: string | null;

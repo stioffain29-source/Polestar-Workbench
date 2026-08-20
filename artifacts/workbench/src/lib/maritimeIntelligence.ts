@@ -26,6 +26,7 @@ import {
 } from "./shippingAnalysis";
 import { dedupeShippingMonitorRows } from "./shippingReportDataset";
 import { deriveIncidentCountry } from "./shippingCountry";
+import { displayIncidentTitle } from "./incidentTitle";
 
 // ---------------------------------------------------------------------------
 // Incident input + the 11-category maritime taxonomy
@@ -34,6 +35,7 @@ import { deriveIncidentCountry } from "./shippingCountry";
 export interface MaritimeIncidentInput {
   id: number | string;
   title: string;
+  displayTitle?: string | null;
   severity: string;
   occurredAt: string;
   summary?: string | null;
@@ -633,7 +635,11 @@ function stripTrailingPublisher(title: string): string {
 function toLatestIncident(r: ClassifiedIncident): LatestIncident {
   return {
     id: r.id,
-    title: stripTrailingPublisher(r.title),
+    // All maritime classification/dedupe above uses r.title. Resolve the
+    // translated headline only when producing the presentation row.
+    title: stripTrailingPublisher(
+      displayIncidentTitle(r.title, r.displayTitle),
+    ),
     category: r.category,
     severity: r.severity,
     occurredAt: r.occurredAt,

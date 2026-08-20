@@ -57,6 +57,7 @@ import {
 } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { resolveIncidentSummary } from "./incidentSummary";
+import { displayIncidentTitle } from "./incidentTitle";
 import { selectRelatedIncidents } from "./relatedIncidents";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
@@ -356,6 +357,7 @@ export interface TopicReportData {
 export interface TopicReportIncident {
   id: number | string;
   title: string;
+  displayTitle?: string | null;
   topic: string;
   severity: string;
   occurredAt: string;
@@ -573,7 +575,7 @@ function drawRelatedIncidents(
 
   for (const i of rows) {
     const titleLines: string[] = pdf.splitTextToSize(
-      sanitize(i.title),
+      sanitize(displayIncidentTitle(i.title, i.displayTitle)),
       colTitleW - 8,
     );
     pdf.setFontSize(6.5);
@@ -1124,7 +1126,7 @@ export async function exportTopicReportPdf(
         (i) => ({
           id: i.id,
           topic: i.topic,
-          title: i.title,
+          title: displayIncidentTitle(i.title, i.displayTitle),
           summary: i.summary ?? null,
           source: i.source ?? null,
           sourceUrl: i.sourceUrl ?? null,

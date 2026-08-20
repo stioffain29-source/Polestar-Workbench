@@ -71,7 +71,8 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
         incidentCount: total?.count ?? 0,
         incidentCount7d: agg7d?.count ?? 0,
         criticalCount: agg7d?.critical ?? 0,
-        latestHeadline: latest?.title ?? null,
+        latestHeadline:
+          latest?.displayTitle?.trim() || latest?.title?.trim() || null,
         latestAt: latest?.occurredAt ?? null,
       };
     }),

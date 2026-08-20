@@ -13,6 +13,7 @@ import { pickRead } from "@/lib/pickRead";
 import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import {
   aiOr,
@@ -601,7 +602,7 @@ function RelatedIncidentsTable({ rows, summaries }: { rows: TopicFastFactsIncide
               <td style={{ ...td, color: DUSK }}>{fmtDate(r.occurredAt)}</td>
               <td style={td}>{classifyIncidentType(r)}</td>
               <td style={{ ...td, color: NAVY }}>
-                {r.title}
+                {displayIncidentTitle(r.title, r.displayTitle)}
                 <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
                   {resolveIncidentSummary(r, summaries)}
                 </div>
@@ -699,7 +700,7 @@ export default function ReportPreview({
   const cargoExtras = isCargo
     ? buildCargoReportExtras(
         cargoWindow.map((i) => ({
-          title: i.title,
+          title: displayIncidentTitle(i.title, i.displayTitle),
           summary: i.summary ?? null,
           source: i.source ?? null,
           location: i.location ?? null,
@@ -714,7 +715,7 @@ export default function ReportPreview({
   const cargoIntensity = isCargo
     ? buildCargoCountryIntensity(
         cargoWindow.map((i) => ({
-          title: i.title,
+          title: displayIncidentTitle(i.title, i.displayTitle),
           summary: i.summary ?? null,
           source: i.source ?? null,
           location: i.location ?? null,
@@ -733,6 +734,7 @@ export default function ReportPreview({
             id: i.id,
             topic: i.topic,
             title: i.title,
+            displayTitle: i.displayTitle,
             summary: i.summary ?? null,
             source: i.source ?? null,
             sourceUrl: i.sourceUrl ?? null,

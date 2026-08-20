@@ -18,6 +18,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGri
 import { severityBadgeStyle } from "@/lib/topics";
 import { ExternalLink } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { TopicReportPanel } from "@/components/TopicReportPanel";
 import {
   classifyRegion,
@@ -354,6 +355,7 @@ export default function CargoWatch() {
           id: i.id,
           topic: i.topic,
           title: i.title,
+          displayTitle: i.displayTitle,
           summary: i.summary ?? null,
           source: i.source ?? null,
           sourceUrl: i.sourceUrl ?? null,
@@ -634,8 +636,10 @@ export default function CargoWatch() {
                   </div>
                   <div className="text-sm font-medium leading-snug">
                     {incidentSourceUrl(i) ? (
-                      <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="hover:text-accent hover:underline">{i.title}</a>
-                    ) : i.title}
+                      <a href={incidentSourceUrl(i)!} target="_blank" rel="noopener noreferrer" className="hover:text-accent hover:underline">
+                        {displayIncidentTitle(i.title, i.displayTitle)}
+                      </a>
+                    ) : displayIncidentTitle(i.title, i.displayTitle)}
                   </div>
                   <div className="text-[11px] text-muted-foreground font-sans mt-1 flex items-center justify-between gap-2">
                     <span className="truncate">{i.source ?? "—"}</span>

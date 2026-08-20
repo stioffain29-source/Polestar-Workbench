@@ -2,7 +2,7 @@ import { format, parseISO, max as dateMax, differenceInCalendarDays } from "date
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import { classifyIncidentType } from "./incidentClassifier";
-import { stripWireCruft } from "./incidentTitle";
+import { displayIncidentTitle, stripWireCruft } from "./incidentTitle";
 import {
   extractFutureSignals,
   hasUpcomingSignal,
@@ -47,6 +47,7 @@ export const FLASHPOINT_TABLE_ROW_CAP = 12;
 export interface FlashpointReportIncident {
   id: number | string;
   title: string;
+  displayTitle?: string | null;
   topic: string;
   severity: string;
   occurredAt: string;
@@ -1389,7 +1390,13 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
       // text. The raw country tag can be source attribution and is not trusted
       // without corroboration.
       const country = normalizeFlashpointCountry(deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED);
-      const cleanedTitle = cleanDisplayTitle(r.title);
+      // Keep classification above on the raw source title, then cross the
+      // presentation boundary once: previews, tables and PDF exporters all
+      // receive the English advisory title where the ingest translator supplied
+      // one. This prevents title-only report row types from discarding it.
+      const cleanedTitle = cleanDisplayTitle(
+        displayIncidentTitle(r.title, r.displayTitle),
+      );
       const displayTitle = normalizeWestPapuaRegionInTitle(cleanedTitle, country);
       const location = (() => {
         const loc = (r.location ?? "").trim();
