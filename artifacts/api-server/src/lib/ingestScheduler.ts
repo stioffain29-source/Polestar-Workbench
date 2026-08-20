@@ -507,15 +507,13 @@ async function tick(reason: string): Promise<boolean> {
 /**
  * Run ONE dedicated title-translation pass and log the outcome. Foreign
  * (Bahasa / non-Latin) headlines get an English `display_title` here. The full
- * incident chain's OWN translation step sits at the very end (after the strikes
- * and ICC-piracy passes) and is routinely skipped when an autoscale instance is
- * torn down mid-chain, so without a dedicated pass freshly-ingested foreign
- * headlines ship untranslated and the 7-day country briefs render the raw
- * original title. Runs on the SAME cadence as ingest (boot catch-up + recurring
- * interval) so newly-inserted rows are translated promptly, not only at the next
- * cold-start boot. Idempotent, commits per row, converges (each committed row
- * leaves the candidate set), self-skips when no OpenAI key is configured, and
- * shares the advisory lock so it never collides with a full run.
+ * incident chain has an early backlog pass and a post-ingest fresh-row pass,
+ * but an autoscale instance can still be torn down before the long chain
+ * completes. This dedicated pass therefore remains the recovery path for
+ * interrupted runs and runs on the SAME cadence as ingest (boot catch-up +
+ * recurring interval). Idempotent, commits per row, converges (each committed
+ * row leaves the candidate set), self-skips when no OpenAI key is configured,
+ * and shares the advisory lock so it never collides with a full run.
  */
 async function translationTick(reason: string): Promise<void> {
   try {

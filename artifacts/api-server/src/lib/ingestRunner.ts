@@ -1215,6 +1215,31 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "GDELT promote pass failed");
       gdeltPromote = emptyGdeltPromote(err);
     }
+    // Translate again AFTER every incident-producing stage. The early pass
+    // above is still required to drain an existing backlog before a long run,
+    // but it cannot see rows inserted later in this same run. Without this
+    // post-ingest pass, a completed admin/manual ingest can publish fresh
+    // Bahasa headlines with display_title=NULL and leave them visible until
+    // the next scheduled translation cycle (up to 12 hours). Keep this pass
+    // inside the same advisory lock so a successful full ingest does not
+    // return until its newest translatable incident titles have been handled.
+    // Translation failure remains non-fatal and leaves the original title for
+    // a later convergent retry.
+    try {
+      markIngestStage("runPostIngestTitleTranslation");
+      const titles = await runTitleTranslation({ commit: true });
+      logger.info(
+        {
+          translated: titles.translated,
+          candidates: titles.candidates,
+          failed: titles.failed,
+          skipped: titles.skipped,
+        },
+        "post-ingest title translation pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "post-ingest title translation pass failed");
+    }
     const finishedAt = new Date();
     return {
       startedAt,
