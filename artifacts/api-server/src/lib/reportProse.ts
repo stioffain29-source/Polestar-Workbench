@@ -34,7 +34,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
-export const REPORT_PROSE_PROMPT_VERSION = "v2";
+export const REPORT_PROSE_PROMPT_VERSION = "v3";
 
 export { isLlmAvailable, MAX_PROSE_INCIDENTS_ACCEPTED };
 export type { ProseIncidentInput };
@@ -228,6 +228,7 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
           "You may explain these values and their operational meaning, but you must NEVER recalculate, round differently, contradict or replace them. Trend/direction wording must match the stated direction exactly. Never state numeric incident counts in prose regardless of these values.",
           "STYLE RULES for these facts:",
           '- Express direction with natural verbs — "fell", "eased", "rose", "climbed", "was flat". Never interpolate the raw direction word into a sentence (e.g. never write "moved falling" or "all moved falling"; write "all fell").',
+          "- Never copy an incident headline's price-move clause when it contradicts FIXED FACTS. If jet fuel direction is rising, do not write that jet fuel costs eased, fell, declined or dropped — describe the operational event (airline pricing dispute, surcharge talks) without asserting the contrary move. The same rule applies to Brent, WTI and crude.",
           "- Never reproduce the country list as a bare enumeration with a shared verb (e.g. \"Iraq, Saudi Arabia carry...\"). If a country matters, give it its own clause grounded in what actually happened there.",
           "- Downstream impacts (aviation fuel supply, airport resupply, road distribution) may be stated as CURRENT effects only when a listed observed condition directly supports them; otherwise frame them conditionally or as watch items (\"if the outage extends...\", \"would come under pressure\").",
           "- Operational consequences that follow from an event type but were not reported (allocation, rationing, pass-through) must be framed as typical/conditional, never asserted as fact for this window.",

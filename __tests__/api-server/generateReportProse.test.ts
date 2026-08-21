@@ -177,6 +177,24 @@ describe("generateReportProse — request assembly", () => {
     const [system] = calls[0].body.messages;
     expect(system.content).toMatch(/Security report/);
   });
+
+  it("threads FIXED FACTS and forbids copying a contrary jet-fuel headline move", async () => {
+    mockModelReply(topicReply());
+
+    await generateReportProse(
+      input({
+        topic: "fuel",
+        title: "Fuel Watch",
+        facts: "Jet fuel: 2.2 USD/gal, +10.0% vs previous, direction: rising",
+      }),
+      0,
+    );
+
+    const user = calls[0].body.messages[1];
+    expect(user.content).toMatch(/FIXED FACTS/);
+    expect(user.content).toMatch(/direction: rising/);
+    expect(user.content).toMatch(/do not write that jet fuel costs eased/i);
+  });
 });
 
 describe("generateReportProse — result mapping", () => {

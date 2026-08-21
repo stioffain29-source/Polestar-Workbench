@@ -18,6 +18,7 @@ import {
   resolveFuelEffectiveSections,
   validateFuelReportConsistency,
   assertFuelReportConsistent,
+  alignFuelProseToMarketFacts,
 } from "../fuelReportConsistency";
 import type { TopicFastFactsIncident } from "../topicFastFacts";
 
@@ -222,5 +223,92 @@ describe("consistency gate over the FINAL effective text", () => {
     });
     expect(eff.executiveSummary).toBe("Analyst exec with no numeric claims.");
     expect(validateFuelReportConsistency(fuelData.reportFacts, eff)).toEqual([]);
+  });
+});
+
+const JET_EASING_HEADLINE =
+  "The same window also carried repeated reporting on a stand-off over airline pricing as jet fuel costs eased, while Pakistan saw diesel price rises.";
+
+function risingJetData() {
+  return buildFuelWatchReportData(
+    {
+      issueDate: ISSUE,
+      hardNumbers: {
+        prices: [
+          { label: "Brent crude", value: 80, unit: "USD/bbl", change: "+1.2%", asOf: ISSUE },
+          { label: "WTI crude", value: 76, unit: "USD/bbl", change: "+0.9%", asOf: ISSUE },
+          { label: "Jet fuel", value: 2.2, unit: "USD/gal", change: "+10.0%", asOf: ISSUE },
+        ],
+        jetFuelTrajectory: {
+          benchmark: "US Gulf Coast kerosene-type",
+          unit: "USD/gal",
+          points: [
+            { date: "2026-07-01", value: 2.0 },
+            { date: "2026-08-01", value: 2.2 },
+          ],
+        },
+      },
+    },
+    [inc(), inc(), inc()],
+  );
+}
+
+describe("AI jet-direction headlines are aligned to the calculated series", () => {
+  it("rewrites 'jet fuel costs eased' when the jet series is rising", () => {
+    const data = risingJetData();
+    const jet = data.reportFacts.market.indicators.find((m) => m.key === "jet");
+    expect(jet?.direction).toBe("rising");
+    expect(
+      validateFuelReportConsistency(data.reportFacts, { whatHappened: JET_EASING_HEADLINE }).some(
+        (i) => i.code === "MARKET_DIRECTION",
+      ),
+    ).toBe(true);
+
+    const aligned = alignFuelProseToMarketFacts(JET_EASING_HEADLINE, data.reportFacts);
+    expect(aligned).toMatch(/jet fuel costs climbed/i);
+    expect(aligned).not.toMatch(/\beased\b/i);
+    expect(
+      validateFuelReportConsistency(data.reportFacts, { whatHappened: aligned }).filter(
+        (i) => i.code === "MARKET_DIRECTION",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("aligns AI whatHappened (and the editor prefill copy of it) so the gate stays green", () => {
+    const data = risingJetData();
+    const fromAi = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: { whatHappened: JET_EASING_HEADLINE },
+      fuelData: data,
+    });
+    expect(fromAi.whatHappened).toMatch(/jet fuel costs climbed/i);
+    expect(validateFuelReportConsistency(data.reportFacts, fromAi).filter((i) => i.code === "MARKET_DIRECTION")).toHaveLength(0);
+
+    // Fuel Watch prefill copies the AI text into the editor box; that must
+    // still be treated as AI, not as a genuine analyst override.
+    const fromPrefill = resolveFuelEffectiveSections({
+      report: { whatHappened: JET_EASING_HEADLINE },
+      aiProse: { whatHappened: JET_EASING_HEADLINE },
+      fuelData: data,
+    });
+    expect(fromPrefill.whatHappened).toBe(fromAi.whatHappened);
+    expect(
+      validateFuelReportConsistency(data.reportFacts, fromPrefill).filter(
+        (i) => i.code === "MARKET_DIRECTION",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("a genuine analyst override that contradicts jet direction still fail-closes", () => {
+    const data = risingJetData();
+    const eff = resolveFuelEffectiveSections({
+      report: { whatHappened: JET_EASING_HEADLINE },
+      aiProse: { whatHappened: "Airline pricing talks continued without a market-direction claim." },
+      fuelData: data,
+    });
+    expect(eff.whatHappened).toBe(JET_EASING_HEADLINE);
+    expect(
+      validateFuelReportConsistency(data.reportFacts, eff).some((i) => i.code === "MARKET_DIRECTION"),
+    ).toBe(true);
   });
 });

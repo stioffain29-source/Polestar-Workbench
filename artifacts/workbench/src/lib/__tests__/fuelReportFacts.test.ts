@@ -317,6 +317,23 @@ describe("validateFuelReportConsistency — the gate catches seeded contradictio
     expect(issues.some((i) => i.code === "MARKET_DIRECTION")).toBe(true);
   });
 
+  it("flags 'rose' as a rising claim (the prompt's natural verb)", () => {
+    const f = facts(
+      [inc()],
+      hardNumbers({
+        jetTrajectory: [
+          { date: "2026-07-01", value: 2.2 },
+          { date: "2026-08-01", value: 2.0 },
+        ],
+      }),
+    );
+    expect(f.market.indicators.find((m) => m.key === "jet")?.direction).toBe("falling");
+    const issues = validateFuelReportConsistency(f, {
+      whatHappened: "Jet fuel costs rose over the window as airlines locked in surcharges.",
+    });
+    expect(issues.some((i) => i.code === "MARKET_DIRECTION")).toBe(true);
+  });
+
   it("passes wording that agrees with the calculated direction", () => {
     const f = facts([inc()], risingCrude);
     const issues = validateFuelReportConsistency(f, {

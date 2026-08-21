@@ -83,14 +83,16 @@ const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 // Direction wording sets. Kept tight: only words that unambiguously assert a
 // direction for a price/market series.
 const RISING_RE =
-  /\b(rising|climbing|climbed|surging|surged|rallying|rallied|jumped|spiking|spiked|firming|gained|advancing|up sharply|moved higher|pushed higher|higher on the week)\b/i;
+  /\b(rising|rose|risen|climbing|climbed|surging|surged|rallying|rallied|jumped|spiking|spiked|firming|firmed|gained|advancing|advanced|up sharply|moved higher|pushed higher|higher on the week)\b/i;
 const FALLING_RE =
   /\b(falling|fell|declining|declined|easing|eased|retreating|retreated|slumped|sliding|slid|dropped|dropping|pulled back|pullback|moved lower|pushed lower|lower on the week|softened|softening)\b/i;
 
 // A sentence must carry price/market-movement context before its direction
-// wording is validated against the calculated series direction.
+// wording is validated against the calculated series direction. "costs"
+// counts: "jet fuel costs eased" is a series claim even without the word
+// "price".
 const PRICE_CONTEXT_RE =
-  /\b(price|prices|pricing|\$|usd|bbl|barrel|gallon|per[- ]litre|market|trading|traded|close|closed|benchmark|on the week|this week|over th(?:e|is) (?:week|window|period))\b/i;
+  /\b(price|prices|pricing|costs?|\$|usd|bbl|barrel|gallon|per[- ]litre|market|trading|traded|close|closed|benchmark|on the week|this week|over th(?:e|is) (?:week|window|period))\b/i;
 
 const INDICATOR_TOKENS: { key: "brent" | "wti" | "jet" | "crude"; re: RegExp }[] = [
   { key: "brent", re: /\bbrent\b/i },
@@ -115,6 +117,144 @@ function directionConflict(
   )
     return `describes a clear ${saysRising ? "rise" : "fall"} but the calculated move is within the neutral band (${calculated})`;
   return null;
+}
+
+// Longer phrases first so "moved lower" is not partially rewritten by "lower".
+const FALLING_TO_RISING: Array<[RegExp, string]> = [
+  [/\blower on the week\b/gi, "higher on the week"],
+  [/\bmoved lower\b/gi, "moved higher"],
+  [/\bpushed lower\b/gi, "pushed higher"],
+  [/\bpulled back\b/gi, "moved higher"],
+  [/\bpullback\b/gi, "move higher"],
+  [/\bfalling\b/gi, "rising"],
+  [/\bdeclining\b/gi, "climbing"],
+  [/\bdeclined\b/gi, "climbed"],
+  [/\beasing\b/gi, "climbing"],
+  [/\beased\b/gi, "climbed"],
+  [/\bretreating\b/gi, "advancing"],
+  [/\bretreated\b/gi, "advanced"],
+  [/\bslumped\b/gi, "jumped"],
+  [/\bsliding\b/gi, "climbing"],
+  [/\bslid\b/gi, "climbed"],
+  [/\bdropped\b/gi, "climbed"],
+  [/\bdropping\b/gi, "climbing"],
+  [/\bsoftened\b/gi, "firmed"],
+  [/\bsoftening\b/gi, "firming"],
+  [/\bfell\b/gi, "climbed"],
+];
+
+const RISING_TO_FALLING: Array<[RegExp, string]> = [
+  [/\bhigher on the week\b/gi, "lower on the week"],
+  [/\bmoved higher\b/gi, "moved lower"],
+  [/\bpushed higher\b/gi, "pushed lower"],
+  [/\bup sharply\b/gi, "lower on the week"],
+  [/\brising\b/gi, "falling"],
+  [/\bclimbing\b/gi, "falling"],
+  [/\bclimbed\b/gi, "fell"],
+  [/\bsurging\b/gi, "falling"],
+  [/\bsurged\b/gi, "fell"],
+  [/\brallying\b/gi, "retreating"],
+  [/\brallied\b/gi, "retreated"],
+  [/\bjumped\b/gi, "dropped"],
+  [/\bspiking\b/gi, "sliding"],
+  [/\bspiked\b/gi, "slid"],
+  [/\bfirming\b/gi, "softening"],
+  [/\bfirmed\b/gi, "softened"],
+  [/\bgained\b/gi, "fell"],
+  [/\badvancing\b/gi, "retreating"],
+  [/\badvanced\b/gi, "retreated"],
+  [/\brisen\b/gi, "fallen"],
+  [/\brose\b/gi, "fell"],
+];
+
+const DIRECTION_TO_STABLE: Array<[RegExp, string]> = [
+  ...FALLING_TO_RISING.map(([re]) => [re, "held steady"] as [RegExp, string]),
+  ...RISING_TO_FALLING.map(([re]) => [re, "held steady"] as [RegExp, string]),
+];
+
+function pairsForDirection(calculated: MarketDirection): Array<[RegExp, string]> {
+  if (calculated === "rising") return FALLING_TO_RISING;
+  if (calculated === "falling") return RISING_TO_FALLING;
+  return DIRECTION_TO_STABLE;
+}
+
+function applyDirectionPairs(text: string, pairs: Array<[RegExp, string]>): string {
+  let out = text;
+  for (const [re, to] of pairs) {
+    out = out.replace(new RegExp(re.source, re.flags), to);
+  }
+  return out;
+}
+
+function rewriteDirectionNearIndicator(
+  sentence: string,
+  indicatorRe: RegExp,
+  calculated: MarketDirection,
+): string {
+  const re = new RegExp(indicatorRe.source, "gi");
+  const matches = [...sentence.matchAll(re)];
+  if (!matches.length) return sentence;
+  const pairs = pairsForDirection(calculated);
+  let out = sentence;
+  // Right-to-left so earlier indices stay valid after a replacement.
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const m = matches[i];
+    const at = m.index ?? 0;
+    const start = Math.max(0, at - 24);
+    const end = Math.min(out.length, at + m[0].length + 80);
+    out =
+      out.slice(0, start) +
+      applyDirectionPairs(out.slice(start, end), pairs) +
+      out.slice(end);
+  }
+  return out;
+}
+
+function alignSentence(
+  sentence: string,
+  dirByKey: Record<string, MarketDirection | null>,
+): string {
+  if (!PRICE_CONTEXT_RE.test(sentence)) return sentence;
+  let out = sentence;
+  for (const tok of INDICATOR_TOKENS) {
+    if (!tok.re.test(out)) continue;
+    const calc = dirByKey[tok.key];
+    if (!calc) continue;
+    if (!directionConflict(out, calc)) continue;
+    out = rewriteDirectionNearIndicator(out, tok.re, calc);
+  }
+  return out;
+}
+
+function dirByKeyFromFacts(
+  facts: FuelReportFacts,
+): Record<string, MarketDirection | null> {
+  return {
+    brent: facts.market.indicators.find((m) => m.key === "brent")?.direction ?? null,
+    wti: facts.market.indicators.find((m) => m.key === "wti")?.direction ?? null,
+    jet: facts.market.indicators.find((m) => m.key === "jet")?.direction ?? null,
+    crude: facts.market.crudeDirection,
+  };
+}
+
+/**
+ * Rewrite Brent/WTI/jet/crude direction wording so it agrees with the
+ * calculated facts. Used on AI (and AI-prefilled) Fuel Watch prose: the model
+ * copies incident headlines ("as jet fuel costs eased") that contradict the
+ * EIA series, and the fail-closed gate then blocks preview and PDF export.
+ * Genuine analyst overrides are NOT rewritten — those still fail closed.
+ */
+export function alignFuelProseToMarketFacts(
+  text: string,
+  facts: FuelReportFacts,
+): string {
+  if (!text.trim()) return text;
+  const dirByKey = dirByKeyFromFacts(facts);
+  const parts = text.split(/((?<=[.!?])\s+)/);
+  for (let i = 0; i < parts.length; i += 2) {
+    parts[i] = alignSentence(parts[i], dirByKey);
+  }
+  return parts.join("");
 }
 
 // Leader-claim phrasing: "X is the clearest/primary/main/leading pressure
@@ -174,12 +314,7 @@ export function validateFuelReportConsistency(
   if (facts.market.avgCrudePctChange !== null)
     knownPcts.push(facts.market.avgCrudePctChange);
 
-  const dirByKey: Record<string, MarketDirection | null> = {
-    brent: facts.market.indicators.find((m) => m.key === "brent")?.direction ?? null,
-    wti: facts.market.indicators.find((m) => m.key === "wti")?.direction ?? null,
-    jet: facts.market.indicators.find((m) => m.key === "jet")?.direction ?? null,
-    crude: facts.market.crudeDirection,
-  };
+  const dirByKey = dirByKeyFromFacts(facts);
 
   for (const [section, raw] of Object.entries(sections)) {
     const text = (raw ?? "").trim();
@@ -321,13 +456,13 @@ function escapeRe(s: string): string {
 
 // ---------------------------------------------------------------------------
 // Effective-section resolution for the gate. Uses the SAME resolvers the
-// preview JSX and PDF builder use (pickRead / resolveSimpleProse) on the SAME
+// preview JSX and PDF builder use (pickRead / AI-aligned resolve) on the SAME
 // inputs, so the text the gate validates is byte-identical to the text that
 // renders — including analyst overrides (spec: validate the FINAL text).
 // ---------------------------------------------------------------------------
 
 import { pickRead } from "./pickRead";
-import { resolveSimpleProse, type TopicAiProse } from "./topicProseResolution";
+import type { TopicAiProse } from "./topicProseResolution";
 import type { FuelWatchReportData } from "./fuelWatchReport";
 
 export interface FuelGateReportFields {
@@ -353,28 +488,43 @@ export function resolveFuelEffectiveSections(opts: {
   // either model prose grounded on the canonical FIXED FACTS or the canonical
   // projection itself, and the gate validates whichever tier wins.
   const canonical = fuelData.narrativeData.canonicalSections;
+  const facts = fuelData.reportFacts;
+  // AI (and Fuel Watch's editor prefill, which copies the AI byte-for-byte)
+  // must not ship headline direction wording that contradicts the series.
+  // Genuine analyst overrides — text that is present AND different from the
+  // AI — stay fail-closed so a deliberate edit is not silently rewritten.
+  const resolveAligned = (
+    editor: string | null | undefined,
+    ai: string | null | undefined,
+    det: string,
+  ): string => {
+    const e = (editor ?? "").trim();
+    const a = (ai ?? "").trim();
+    if (e && (!a || e !== a)) return e;
+    return alignFuelProseToMarketFacts(a || det, facts);
+  };
   return {
-    executiveSummary: resolveSimpleProse(
+    executiveSummary: resolveAligned(
       report.executiveSummary,
       aiProse?.executiveSummary,
       canonical.executiveSummary,
     ),
-    situation: resolveSimpleProse(
+    situation: resolveAligned(
       report.situation,
       aiProse?.situation,
       canonical.situation,
     ),
-    whatHappened: resolveSimpleProse(
+    whatHappened: resolveAligned(
       report.whatHappened,
       aiProse?.whatHappened,
       canonical.whatHappened,
     ),
-    whatMatters: resolveSimpleProse(
+    whatMatters: resolveAligned(
       report.whatMatters,
       aiProse?.whatMatters,
       canonical.whatMatters,
     ),
-    polestarView: resolveSimpleProse(
+    polestarView: resolveAligned(
       report.polestarView,
       aiProse?.polestarView,
       canonical.polestarView,
