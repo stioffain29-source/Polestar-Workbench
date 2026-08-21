@@ -2917,39 +2917,39 @@ function buildImplications(ctx: AutoCtx): string {
   if (hasCurfew) {
     bullets.push(`Curfew or emergency orders appear in this week's records: treat any fresh order in a city of operation as a trigger to review site access and staff movement for the day.`);
   }
-  const campusLoci: string[] = [];
-  const campusSeen = new Set<string>();
-  for (const r of all) {
-    if (!/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
-    const loc = (r.location ?? "").trim() || extractCityLabel(r);
-    if (!loc) continue;
-    const country = (r.country ?? "").trim();
-    if (country && locationForeignToCountry(loc, country)) continue;
-    const key = loc.toLowerCase();
-    if (campusSeen.has(key)) continue;
-    campusSeen.add(key);
-    campusLoci.push(loc);
-    if (campusLoci.length >= 3) break;
-  }
-  if (campusLoci.length > 0) {
-    bullets.push(`Student or campus activity appears in this week's records: brief sites near ${joinList(campusLoci)} on possible knock-on disruption.`);
-  }
   const futureCampus: string[] = [];
   const futureCampusSeen = new Set<string>();
   for (const r of extractFutureSignals(ctx.usableEnriched)) {
-    if (pastIds.has(r.id)) continue;
     if (isWeakOperational(r) || isWeakNovelty(r) || forecastDateHasPassed(r, ctx.forecastAsOf)) continue;
     if (!hasUpcomingSignal(r) || !/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
     const loc = (r.location ?? "").trim() || extractCityLabel(r);
     if (!loc) continue;
     const key = loc.toLowerCase();
-    if (futureCampusSeen.has(key) || campusSeen.has(key)) continue;
+    if (futureCampusSeen.has(key)) continue;
     futureCampusSeen.add(key);
     futureCampus.push(loc);
     if (futureCampus.length >= 3) break;
   }
   if (futureCampus.length > 0) {
     bullets.push(`Upcoming student or campus mobilisation signals name ${joinList(futureCampus)} — confirm dates before adjusting site access.`);
+  }
+  const campusLoci: string[] = [];
+  const campusSeen = new Set<string>();
+  for (const r of all) {
+    if (hasUpcomingSignal(r)) continue;
+    if (!/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
+    const loc = (r.location ?? "").trim() || extractCityLabel(r);
+    if (!loc) continue;
+    const country = (r.country ?? "").trim();
+    if (country && locationForeignToCountry(loc, country)) continue;
+    const key = loc.toLowerCase();
+    if (campusSeen.has(key) || futureCampusSeen.has(key)) continue;
+    campusSeen.add(key);
+    campusLoci.push(loc);
+    if (campusLoci.length >= 3) break;
+  }
+  if (campusLoci.length > 0) {
+    bullets.push(`Student or campus activity appears in this week's records: brief sites near ${joinList(campusLoci)} on possible knock-on disruption.`);
   }
 
   if (bullets.length < 3 && topCountries.length > 0) {
@@ -3095,14 +3095,14 @@ function buildPolestarView(ctx: AutoCtx): string {
     .filter((r) => !isWeakOperational(r) && !isWeakNovelty(r) && !forecastDateHasPassed(r, ctx.forecastAsOf));
   const hasDatedFuture = futureMobilisation.some((r) => !!explicitForecastDate(r));
   const trackClause = hasDatedFuture
-    ? "track confirmed protest dates and routes closely"
+    ? "track confirmed protest dates and routes closely, rather than treating the window as one of broad regional unrest"
     : futureMobilisation.length > 0
-      ? "monitor unconfirmed mobilisation signals in Watch Next rather than assuming a quiet stretch will hold"
-      : "monitor for fresh protest announcements rather than assuming a quiet stretch will hold";
+      ? "monitor unconfirmed mobilisation signals in Watch Next, rather than treating the window as one of broad regional unrest"
+      : "monitor for fresh protest announcements, rather than assuming a quiet stretch will hold or treating the window as one of broad regional unrest";
 
   return [
     `Risk level: ${posture}.`,
-    `Disruption is most likely where ${disruptionLead}. The most useful immediate step is to keep movement plans flexible, validate transport availability close to departure, and ${trackClause} rather than treating the window as one of broad regional unrest.`,
+    `Disruption is most likely where ${disruptionLead}. The most useful immediate step is to keep movement plans flexible, validate transport availability close to departure, and ${trackClause}.`,
   ].join("\n");
 }
 

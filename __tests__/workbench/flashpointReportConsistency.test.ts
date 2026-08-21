@@ -710,6 +710,30 @@ describe("flashpoint report consistency", () => {
     expect(ds.autoImplications).toMatch(/already reported in Wellington/i);
     expect(ds.autoImplications).not.toMatch(/scheduled demonstrations/i);
     expect(ds.autoPolestarView).not.toMatch(/track scheduled protest dates/i);
+    expect(ds.autoPolestarView).not.toMatch(/rather than .+ rather than/i);
+  });
+
+  test("upcoming Cebu campus signal uses upcoming wording not this week's records", () => {
+    const rows = [
+      inc({
+        title: "Philippines student groups to protest at Cebu campus next week",
+        summary: "Student organisers announced a rally but gave no firm date.",
+        country: "Philippines",
+        location: "Cebu",
+        severity: "moderate",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas, use batons to disperse youth protesters",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.autoImplications).toMatch(/Upcoming student or campus mobilisation signals name Cebu/i);
+    expect(ds.autoImplications).not.toMatch(/this week's records: brief sites near Cebu/i);
   });
 
   test("executive summary distinguishes weekly posture from peak incident rating", () => {
