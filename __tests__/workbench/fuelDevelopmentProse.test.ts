@@ -115,8 +115,9 @@ describe("Fuel Watch What Happened prose", () => {
     });
     expect(highlights).not.toBeNull();
     expect(highlights).not.toMatch(/Recent activity points to/i);
-    expect(highlights).toMatch(/Hormuz transit disruption/i);
-    expect(highlights).toMatch(/Red Sea kinetic reporting/i);
+    expect(highlights).toMatch(/War-risk premium and voyage delay/i);
+    expect(highlights).toMatch(/Bab-el-Mandeb and southern corridor risk/i);
+    expect(highlights).not.toMatch(/Hormuz transit disruption[\s\S]{0,40}Hormuz transit disruption/i);
   });
 
   it("writes distinct business significance lines in What Matters", () => {

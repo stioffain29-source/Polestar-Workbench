@@ -204,7 +204,7 @@ export function buildFuelRegionalHighlights(opts: {
   interface CountryOverlay { why: string; watch?: string }
   const COUNTRY_OVERLAY: Record<string, CountryOverlay> = {
     iran: {
-      why: "Hormuz transit disruption lifts war-risk premium and delay on dependent crude and product routes even when barrels are still moving.",
+      why: "War-risk premium and voyage delay on dependent crude and product routes persist even when barrels are still moving.",
       watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
     },
     yemen: {
@@ -266,7 +266,7 @@ export function buildFuelRegionalHighlights(opts: {
     } else {
       opener = `${titleCase(country)} adds further weight to the picture.`;
     }
-    paragraphs.push(`${opener} ${signal} ${why} ${watch}`);
+    paragraphs.push(`${opener} ${overlay ? `${why} ${watch}` : `${signal} ${why} ${watch}`}`);
   }
   return paragraphs.join("\n\n");
 }
@@ -1304,7 +1304,7 @@ export function buildFuelProducerBuyerActions(opts: {
         location: i.location,
       }),
     );
-    if (isGenericPolicyAction(action) && !hasSpecificPolicySignal(t)) continue;
+    if (isGenericPolicyAction(action)) continue;
     const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;
     const actionNorm = bulletNormKey(action);
@@ -1365,6 +1365,21 @@ export function buildFuelProducerBuyerActions(opts: {
   }
   if (raw.length === 0) return [];
 
+  const actorsWithSpecificPolicy = new Set(
+    raw
+      .filter(
+        (r) =>
+          r.category === "Government / policy action" &&
+          !isGenericPolicyAction(r.action),
+      )
+      .map((r) => r.actor.toLowerCase()),
+  );
+  const filtered = raw.filter((r) => {
+    if (r.category !== "Government / policy action") return true;
+    if (!isGenericPolicyAction(r.action)) return true;
+    return !actorsWithSpecificPolicy.has(r.actor.toLowerCase());
+  });
+
   // Group by category in the priority order so the strongest signals
   // (Producer / Buyer / Government) lead the table. Cap to PER_CATEGORY
   // rows per category and TOTAL_CAP rows overall — fewer, better rows
@@ -1384,7 +1399,7 @@ export function buildFuelProducerBuyerActions(opts: {
   const TOTAL_CAP = 8;
   const out: ProducerBuyerActionRow[] = [];
   for (const cat of ORDER) {
-    const items = raw.filter((r) => r.category === cat).slice(0, PER_CATEGORY);
+    const items = filtered.filter((r) => r.category === cat).slice(0, PER_CATEGORY);
     for (const r of items) {
       if (out.length >= TOTAL_CAP) break;
       // Drop the internal token set from the emitted row.

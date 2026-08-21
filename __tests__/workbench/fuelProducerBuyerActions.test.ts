@@ -345,6 +345,30 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     expect(rows.some((r) => /^Government policy on fuel duties/i.test(r.action))).toBe(false);
   });
 
+  it("keeps only the specific India windfall row when a generic duty headline also qualifies", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: "2026-08-21",
+      incidents: [
+        {
+          ...mk(51, "fuel", "India adjusts fuel export duty as aviation costs weigh on airlines"),
+          occurredAt: "2026-08-15T12:00:00Z",
+          country: "India",
+        },
+        {
+          ...mk(52, "fuel", "India cuts windfall tax on petrol, diesel, aviation-fuel exports"),
+          occurredAt: "2026-08-16T12:00:00Z",
+          country: "India",
+        },
+      ],
+    });
+    const indiaPolicy = rows.filter(
+      (r) => r.actor === "India" && r.category === "Government / policy action",
+    );
+    expect(indiaPolicy).toHaveLength(1);
+    expect(indiaPolicy[0]?.action).toMatch(/windfall tax/i);
+    expect(rows.some((r) => /^Government policy on fuel duties/i.test(r.action))).toBe(false);
+  });
+
   it("collapses duplicate aviation action prose across categories", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
