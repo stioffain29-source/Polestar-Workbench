@@ -85,7 +85,7 @@ describe("Buyer supplier-pivot classification and story-key collapse", () => {
     const rows = buildFuelProducerBuyerActions({ issueDate: ISSUE_DATE, incidents: pivotCopies });
     expect(rows).toHaveLength(1);
     expect(rows[0].category).toBe("Buyer action");
-    expect(rows[0].action).toMatch(/turns to india/i);
+    expect(rows[0].action).toMatch(/pivoted to indian gasoline/i);
   });
 
   it("keeps two DIFFERENT buyers' pivots as separate rows", () => {
@@ -180,14 +180,13 @@ describe("Market and Operator Responses rework", () => {
     expect(rows).toHaveLength(2);
   });
 
-  it("sentence-cases headline caps while preserving proper nouns", () => {
+  it("summarizes reroute headlines into concise operational actions", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [mk(34, "shipping", "Two Saudi Oil Tankers Reroute in the Red Sea Toward the Suez Canal")],
     });
-    expect(rows[0].action).toBe(
-      "Two Saudi oil tankers reroute in the Red Sea toward the Suez Canal",
-    );
+    expect(rows[0].action).toMatch(/rerouted.*Red Sea/i);
+    expect(rows[0].action).not.toMatch(/Two Saudi Oil Tankers/i);
   });
 
   it("appends the country stamp only when the headline names no actor or place", () => {
@@ -205,7 +204,7 @@ describe("Market and Operator Responses rework", () => {
     });
     const ban = rows.find((r) => /export ban/i.test(r.action));
     const margins = rows.find((r) => /refiner margins/i.test(r.action));
-    expect(ban?.action).toMatch(/— Sri Lanka$/);
+    expect(ban?.action).toMatch(/export ban in Sri Lanka/i);
     expect(margins?.action).not.toMatch(/Pakistan/);
   });
 

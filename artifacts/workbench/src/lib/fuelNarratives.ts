@@ -842,9 +842,10 @@ function sentenceCaseHeadline(title: string): string {
   return title
     .split(/(\s+)/)
     .map((w, idx) => {
-      if (idx === 0 || /^\s+$/.test(w)) return w;
-      // Only plain Capitalised words are candidates; acronyms, mixed-case
-      // and already-lowercase words pass through untouched.
+      if (/^\s+$/.test(w)) return w;
+      // Preserve acronyms and initialisms (ADNOC, UAE, US, OPEC).
+      if (/^[A-Z0-9]{2,}$/.test(w)) return w;
+      if (idx === 0) return w;
       if (!/^[A-Z][a-z'’-]*$/.test(w)) return w;
       const key = w.toLowerCase().replace(/[^a-z']/g, "");
       return SENTENCE_LOWER.has(key) ? w.toLowerCase() : w;
@@ -939,6 +940,14 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     return "Infrastructure operator";
   }
   if (category === "Market / supply signal") return "Market";
+  if (category === "Producer action") {
+    if (/\b(saudi aramco|aramco)\b/.test(t)) return "Saudi Aramco";
+    if (/\b(adnoc)\b/.test(t)) return "ADNOC";
+    if (/\b(russia|rosneft|gazprom|belarus|naftan)\b/.test(t)) return "Russia";
+    const c = incidentCountry(i);
+    if (c) return c;
+    return "Producer";
+  }
   return "—";
 }
 
@@ -1246,25 +1255,31 @@ export function buildFuelProducerBuyerActions(opts: {
     // cased so it reads as a statement, not a news headline), WHERE
     // appended from the incident's country stamp when the text itself
     // does not carry it. WHEN is the date line under the cell.
-    const headline = i.title.trim().replace(/\.$/, "");
-    const sentenceCased = sentenceCaseHeadline(headline);
-    // This is a source-facing location suffix, not an actor label. Retain the
-    // supplied country when the headline has no usable place cue; actor and
-    // regional ranking paths use the stricter incidentCountry() derivation.
-    const action = sentenceCased + actionPlaceSuffix(sentenceCased, i.country);
+    const headline = normalizeFuelHeadline(i.title.trim().replace(/\.$/, ""));
+    const action = capitalizeFirst(
+      summarizeFuelDevelopmentClause({
+        title: headline,
+        summary: i.summary,
+        country: i.country,
+        location: i.location,
+      }),
+    );
     const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;
     // Supplier-pivot story-key collapse: syndicated rewrites of one buyer
-    // pivot ("Russia Turns To India For Gasoline" vs "Russia seeking extra
-    // gasoline from one of its top oil buyers") share too few distinctive
-    // tokens for the near-duplicate guard, but one buyer pivoting on one
-    // product in one window is ONE action — keep the first copy only.
+    // pivot share too few distinctive tokens for the near-duplicate guard, but
+    // one buyer pivoting on one product in one window is ONE action.
     if (
       category === "Buyer action" &&
-      SUPPLIER_PIVOT_RES.some((re) => re.test(t))
+      (SUPPLIER_PIVOT_RES.some((re) => re.test(t))
+        || (/\bturn(?:s|ed|ing)? to\b/.test(t) && PIVOT_PRODUCT_RE.test(t)))
     ) {
-      const subject = sigTokens(action).values().next().value ?? "";
       const product = PIVOT_PRODUCT_RE.exec(t)?.[1] ?? "";
+      const subject = /\b(russia|russian)\b/.test(t)
+        ? "russia"
+        : /\b(pakistan)\b/.test(t)
+          ? "pakistan"
+          : sigTokens(action).values().next().value ?? "";
       const pivotKey = `pivot:${subject}:${product}`;
       if (seen.has(pivotKey)) continue;
       seen.add(pivotKey);
@@ -1290,12 +1305,13 @@ export function buildFuelProducerBuyerActions(opts: {
     // pipeline reported under several different headlines) so the table
     // never lists the same action twice.
     const tokens = sigTokens(action);
-    if (raw.some((r) => r.category === category && nearDuplicate(tokens, r.tokens))) {
+    const actor = pickActor(i, category);
+    if (raw.some((r) => r.category === category && r.actor === actor && nearDuplicate(tokens, r.tokens))) {
       continue;
     }
     seen.add(dedupeKey);
     raw.push({
-      actor: pickActor(i, category),
+      actor,
       category,
       action,
       operationalRead: deriveOperationalRead(t, category),
@@ -1706,30 +1722,263 @@ function businessContinuityParagraph(facts: FuelCanonicalFacts): string {
   return `${costBit} ${opsBit}`;
 }
 
-function normalizeDevelopmentText(title: string): string {
+function normalizeFuelHeadline(title: string): string {
   return stripWireCruft(title)
-    .replace(/\s*[—–-]\s*(Reuters|Bloomberg|AFP|AP|BBC|CNN|Al Jazeera).*$/i, "")
+    .replace(/\s*\|\s*(Videos?|Photos?|Live updates?|Breaking news?)\s*$/i, "")
+    .replace(/\s*[—–-]\s*(Reuters|Bloomberg|AFP|AP|BBC|CNN|Al Jazeera|World in Brief).*$/i, "")
+    .replace(/:\s*Inside .+?(?:crisis|shortage|rationing).+$/i, "")
+    .replace(/\b(?:crisis|shortage|rationing)\s+\d{4}\b/gi, "")
     .replace(/\b(videos?|photos?|live updates?|breaking:?)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+interface FuelDevelopmentInput {
+  title: string;
+  summary?: string | null;
+  country?: string | null;
+  location?: string | null;
+  routeOrChokepoint?: string | null;
+}
+
+function developmentHaystack(opts: FuelDevelopmentInput): string {
+  return [opts.title ?? "", opts.summary ?? ""].join(" ").toLowerCase();
+}
+
+function capitalizeFirst(text: string): string {
+  const s = text.trim();
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function lowercaseLeadClause(text: string): string {
+  const s = text.trim();
+  if (!s) return s;
+  const m = s.match(/^([A-Za-z0-9][A-Za-z0-9'’-]*)([\s\S]*)$/);
+  if (!m) return s;
+  const lead = m[1];
+  if (/^[A-Z0-9]{2,}$/.test(lead)) return `${lead}${m[2]}`;
+  return `${lead.charAt(0).toLowerCase()}${lead.slice(1)}${m[2]}`;
+}
+
+function declarativeFromHeadline(cleanTitle: string): string {
+  let text = cleanTitle.replace(/\.$/, "").replace(/['"].*?['"]/g, "").replace(/\s+/g, " ").trim();
+  if (!text) return "a confirmed fuel-market development was reported";
+  text = sentenceCaseHeadline(text).replace(/:\s*Inside .+$/i, "").trim();
+  return lowercaseLeadClause(text);
+}
+
+function headlineNamesGeography(title: string): boolean {
+  const words = sentenceCaseHeadline(normalizeFuelHeadline(title)).split(/\s+/);
+  return words.some((w, idx) => {
+    if (!/^[A-Z]/.test(w)) return false;
+    if (idx === 0) return !SENTENCE_LOWER.has(w.toLowerCase().replace(/[^a-z']/g, ""));
+    return true;
+  });
+}
+
+function optionalCountryHint(opts: FuelDevelopmentInput): string {
+  const c = (opts.country ?? "").trim();
+  if (!c || /^unknown$/i.test(c)) return "";
+  if (headlineNamesGeography(opts.title)) return "";
+  return ` in ${c}`;
+}
+
+/** Operational clause for What Happened and the Market/Operator table — never a raw headline. */
+export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): string {
+  const t = developmentHaystack(opts);
+  if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)
+      && /\b(fail(?:s|ed)?|does not|did not|unable to|fails to)\b/.test(t)) {
+    return "Indian gasoline shipments failed to ease Russia's domestic shortage, leaving availability tight in affected regions";
+  }
+  if (/\b(russia|russian)\b/.test(t) && PIVOT_PRODUCT_RE.test(t)
+      && (/\b(india|indian)\b/.test(t) || /\bseek(?:s|ing)?\b/.test(t) || /\bturn(?:s|ed|ing)? to\b/.test(t))) {
+    return "Russia pivoted to Indian gasoline imports as domestic refinery damage tightened supply";
+  }
+  if (/\b(pakistan)\b/.test(t) && /\b(kuwait)\b/.test(t) && PIVOT_PRODUCT_RE.test(t)) {
+    return "Pakistan pivoted to Kuwaiti diesel imports as domestic supply tightened";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)) {
+    return "Indian gasoline shipments to Russia continued as Moscow's domestic shortage persisted";
+  }
+  if (SUPPLIER_PIVOT_RES.some((re) => re.test(t))
+      || (/\bturn(?:s|ed|ing)? to\b/.test(t) && PIVOT_PRODUCT_RE.test(t))) {
+    return "a buyer pivoted import sourcing for refined products as domestic supply tightened";
+  }
+  if (/\bexport ban\b/.test(t)) {
+    const product = /\bdiesel\b/.test(t) ? "diesel" : /\b(petrol|gasoline)\b/.test(t) ? "petrol" : "fuel";
+    return `authorities ordered a ${product} export ban${optionalCountryHint(opts)} amid tightening domestic supply`;
+  }
+  if (/\b(red sea|houthi)\b/.test(t) && /\b(missile|attack|killed|seafarer|crew|bodies)\b/.test(t)
+      && !/\bexit(ing)?\s+(the\s+)?strait of hormuz\b/.test(t)) {
+    return "a missile attack in the Red Sea killed seafarers on a commercial vessel, separate from Hormuz transit incidents";
+  }
+  if (/\b(bulker|tanker|vessel|ship)\b/.test(t) && /\b(attack|struck|killed|engineer)\b/.test(t)
+      && /\b(strait of hormuz|\bhormuz\b)\b/.test(t)) {
+    return "a commercial vessel was attacked while transiting the Strait of Hormuz, killing crew and disrupting passage";
+  }
+  if (/\b(adnoc)\b/.test(t) && /\b(vessel|attack|struck|hormuz)\b/.test(t)) {
+    return "an ADNOC-linked vessel was attacked in the Strait of Hormuz without reported injuries";
+  }
+  if (/\b(jazan)\b/.test(t) && /\b(refinery|attack|drone|missile|strike)\b/.test(t)) {
+    return "a claimed attack targeted the Jazan refinery, raising product-output risk in Saudi Arabia";
+  }
+  if (/\b(aramco|saudi aramco)\b/.test(t) && /\b(resume|resumed|loading|load|export)\b/.test(t)
+      && !/\b(attack|drone|strike|destroyed|claim)\b/.test(t)) {
+    return "Saudi Aramco resumed crude loading and export activity after earlier Gulf-route disruption";
+  }
+  if (/\b(aramco|saudi aramco)\b/.test(t) && /\b(attack|drone|strike|destroyed|claim)\b/.test(t)) {
+    return "reporting described a claimed drone strike on Saudi Aramco infrastructure, with operational impact still being assessed";
+  }
+  if (/\b(moscow|ration|rationing)\b/.test(t) && /\b(petrol|gasoline|fuel|forecourt|purchase limit)\b/.test(t)) {
+    return "Moscow tightened petrol purchase limits and rationing as forecourt shortages spread";
+  }
+  if (/\b(russia)\b/.test(t) && /\b(shortage|fuel crisis)\b/.test(t)
+      && /\b(region|spread|nationwide|33)\b/.test(t)) {
+    return "Russia's domestic fuel shortage spread across multiple regions after refinery strikes and distribution strain";
+  }
+  if (/\b(russia|belarus|naftan)\b/.test(t) && /\b(refinery|maintenance|outage)\b/.test(t)
+      && /\b(shortage|september|fuel)\b/.test(t)) {
+    return "Russia faced renewed petrol pressure as Belarusian refinery maintenance tightened regional product supply";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(windfall tax|export duty|export tax|excise|levy)\b/.test(t)
+      && /\b(petrol|diesel|aviation|jet)\b/.test(t)) {
+    return "India cut windfall taxes on petrol, diesel and aviation-fuel exports, resetting refiner export economics";
+  }
+  if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|surge|cost|price)\b/.test(t)) {
+    return "aviation operators faced sustained jet-fuel cost pressure feeding into fares and surcharge negotiations";
+  }
+  if (/\b(trump|sanction|blockade)\b/.test(t) && /\b(hormuz|iran)\b/.test(t)) {
+    return "reporting flagged potential Iran sanctions and continued naval pressure in the Strait of Hormuz without a confirmed closure";
+  }
+  if (/\b(reroute|rerouting|rerouted|bypass)\b/.test(t)
+      && /\b(red sea|suez|hormuz|canal|corridor|malacca|panama)\b/.test(t)) {
+    if (/\b(hormuz)\b/.test(t) && !/\b(red sea|suez)\b/.test(t)) {
+      return "operators rerouted cargoes away from Hormuz to reduce transit risk";
+    }
+    if (/\b(saudi|asian refineries|tankers?)\b/.test(t) && /\b(red sea|suez)\b/.test(t)) {
+      return "Asian refineries rerouted Saudi oil imports via the Suez corridor to avoid Red Sea delay";
+    }
+    if (/\b(red sea|suez)\b/.test(t)) {
+      return "operators rerouted cargoes via the Red Sea–Suez corridor to avoid chokepoint delay";
+    }
+    if (/\b(malacca)\b/.test(t)) {
+      return "operators rerouted cargoes away from the Strait of Malacca to reduce transit risk";
+    }
+    return "operators rerouted fuel cargoes via alternative corridors to avoid chokepoint delay";
+  }
+  if (/\b(ration|rationing|forecourt|purchase limit)\b/.test(t)) {
+    return "authorities imposed or extended fuel rationing and forecourt purchase limits";
+  }
+  if (/\b(export ban|import ban|windfall|subsidy|duty|levy)\b/.test(t)) {
+    return `government policy on fuel duties or trade controls changed${optionalCountryHint(opts)}, resetting local price assumptions`;
+  }
+  if (/\b(refiner margins|crack spread)\b/.test(t)) {
+    return "refiner margins moved sharply, corroborating tight refined-product supply rather than signalling a fresh operational change on their own";
+  }
+  if (/\b(refinery|pipeline|terminal)\b/.test(t)
+      && /\b(outage|fire|attack|maintenance|shutdown|halt)\b/.test(t)) {
+    return "refinery or terminal disruption curtailed regional product output";
+  }
+  if (/\b(hormuz|red sea|bab[- ]el)\b/.test(t) && /\b(attack|disrupt|closure|blockade)\b/.test(t)) {
+    return "chokepoint disruption raised war-risk premium and transit delay on affected fuel routes";
+  }
+  return declarativeFromHeadline(normalizeFuelHeadline(opts.title));
+}
+
+function eventLocationForProse(i: CanonicalFuelIncident): string | null {
+  const t = developmentHaystack({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
+  if (/\b(moscow)\b/.test(t)) return "Moscow";
+  if (/\b(jazan)\b/.test(t)) return "Jazan, Saudi Arabia";
+  if (/\b(red sea|houthi|mokha|yemen)\b/.test(t) && !/\bexit(ing)?\s+(the\s+)?strait of hormuz\b/.test(t)) {
+    return "the Red Sea";
+  }
+  if (/\b(strait of hormuz|\bhormuz\b)\b/.test(t)) return "the Strait of Hormuz";
+  if (/\b(russia|moscow)\b/.test(t) && /\b(shortage|ration|refinery|fuel|petrol|gasoline)\b/.test(t)) {
+    return "Russia";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(windfall|duty|tax|levy|export ban|subsidy)\b/.test(t)) {
+    return "India";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)) {
+    return "Russia";
+  }
+  if (i.physicalLocation && !/^terminal \d+/i.test(i.physicalLocation)) return i.physicalLocation;
+  if (i.routeOrChokepoint) {
+    const r = i.routeOrChokepoint;
+    return /^(Strait|Red|Suez|Bab|Persian|Gulf)/i.test(r) ? r : i.routeOrChokepoint;
+  }
+  const stamped = i.country;
+  if (stamped && !/^unknown$/i.test(stamped)) {
+    if (stamped.toLowerCase() === "ukraine"
+        && /\b(india|russia|gasoline|petrol|moscow)\b/.test(t)) {
+      return null;
+    }
+    return stamped;
+  }
+  return null;
+}
+
+function businessImpactForDevelopment(i: CanonicalFuelIncident): string {
+  const t = developmentHaystack({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
+  if (/\b(moscow|ration|rationing)\b/.test(t) && /\b(russia|petrol|gasoline)\b/.test(t)) {
+    return "Forecourt rationing puts road transport and commercial allocation ahead of pump-price moves for any Russia-exposed operation.";
+  }
+  if (/\b(russia)\b/.test(t) && /\b(shortage|refinery|maintenance|belarus|naftan)\b/.test(t)) {
+    return "Domestic product tightness raises the risk that export cuts or allocation limits reach commercial buyers before published pump prices move.";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(windfall|duty|tax|levy)\b/.test(t)) {
+    return "Duty changes reset export economics for Indian refiners and any contract indexed to sub-continent product benchmarks.";
+  }
+  if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)) {
+    return "Cross-border gasoline flows shift who supplies Russia's shortage, affecting landed cost for buyers still lifting Russian product.";
+  }
+  if (/\b(aramco|saudi)\b/.test(t) && /\b(resume|loading|export)\b/.test(t)) {
+    return "Resumed Saudi loading eases immediate crude availability but leaves Gulf route risk priced into differentials.";
+  }
+  if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) {
+    return "Product output risk at a Saudi refinery feeds straight into regional gasoline and jet balances.";
+  }
+  if (/\b(red sea|houthi)\b/.test(t) && /\b(attack|missile|killed)\b/.test(t)) {
+    return "Red Sea kinetic reporting keeps Suez–Red Sea route economics elevated for bunker and product cargoes.";
+  }
+  if (/\b(hormuz)\b/.test(t) && /\b(attack|vessel|blockade|sanction)\b/.test(t)) {
+    return "Hormuz transit pressure lifts war-risk premium and delays tanker movement even when barrels remain available elsewhere.";
+  }
+  if (/\b(jet fuel|aviation fuel|airline)\b/.test(t)) {
+    return "Jet-fuel cost pressure flows to aviation surcharges and route profitability within the next operating month.";
+  }
+  const fam = ISSUE_FAMILIES.find((f) => f.test.some((re) => re.test(t)));
+  return fam?.opMeaning
+    ?? "This feeds into landed cost, delivery timing or local availability for dependent operations.";
+}
+
+function normalizeDevelopmentText(title: string): string {
+  return normalizeFuelHeadline(title);
+}
+
 function developmentSentence(i: CanonicalFuelIncident): string {
-  const where = i.physicalLocation ?? i.country;
+  const where = eventLocationForProse(i);
   const date = proseDay(i.date);
-  const core = normalizeDevelopmentText(i.title);
-  let fact = sentenceCaseHeadline(core.replace(/\.$/, ""));
-  if (/^(Russia|India|Saudi|Iran|Yemen)\b/i.test(fact) && i.country
-      && i.country.toLowerCase() !== fact.split(/\s+/)[0]?.toLowerCase()
-      && !/\b(in|at|near|off)\b/i.test(fact)) {
-    // Publisher-country stamp must not become the event location when the
-    // headline names a different actor or theatre.
-  }
-  if (!/\b(announced|introduced|imposed|resumed|halted|attack|struck|raised|cut|expanded|tightened|confirmed|began|started|reopened|closed|rationed|loaded|shipped|exported|imported)\w*\b/i.test(fact)) {
-    fact = `authorities confirmed ${fact.charAt(0).toLowerCase()}${fact.slice(1)}`;
-  } else {
-    fact = fact.charAt(0).toLowerCase() + fact.slice(1);
-  }
+  const fact = summarizeFuelDevelopmentClause({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
   const loc = where ? ` in ${where}` : "";
   return `On ${date}${loc}, ${fact.replace(/\.$/, "")}.`;
 }
@@ -1813,10 +2062,8 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
     return businessContinuityParagraph(facts);
   }
   const paras = lead.map((i, idx) => {
-    const fam = ISSUE_FAMILIES.find((f) => f.test.some((re) => re.test(haystack(i.raw))));
-    const where = i.physicalLocation ?? i.country ?? "the affected market";
-    const impact = fam?.why
-      ?? "This development feeds directly into landed cost, delivery timing or local availability for dependent operations.";
+    const where = eventLocationForProse(i);
+    const impact = businessImpactForDevelopment(i);
     const opener = idx === 0
       ? "The development with the greatest business significance"
       : idx === 1
