@@ -1,4 +1,4 @@
-import { summarizeFuelDevelopmentClause } from "@/lib/fuelNarratives";
+import { summarizeFuelDevelopmentClause, buildFuelRegionalHighlights } from "@/lib/fuelNarratives";
 import {
   buildFuelCanonicalFacts,
   buildFuelCanonicalSections,
@@ -81,7 +81,42 @@ describe("Fuel Watch What Happened prose", () => {
     expect(whatHappened).not.toMatch(/authorities confirmed indian gasoline/i);
     expect(whatHappened).not.toMatch(/\| Videos/i);
     expect(whatHappened).toMatch(/Indian gasoline shipments failed to ease Russia/i);
-    expect(whatHappened).toMatch(/in Moscow.*rationing/i);
+    expect(whatHappened).toMatch(/On 20 August 2026, Moscow tightened petrol purchase limits/i);
+    expect(whatHappened).not.toMatch(/in the Strait of Hormuz, an ADNOC-linked vessel was attacked in the Strait of Hormuz/i);
+  });
+
+  it("prioritises rationing and policy ahead of duplicate chokepoint lines in What Matters", () => {
+    const incidents = [
+      inc(1, "ADNOC vessel attacked in Strait of Hormuz, no injuries", "UAE", "2026-08-15"),
+      inc(2, "Chief Engineer Killed as Bulker is Attacked Exiting Strait of Hormuz", "Iran", "2026-08-16"),
+      inc(3, "Moscow's fuel Crisis: Inside Russia's petrol Rationing crisis 2026", "Russia", "2026-08-20"),
+      inc(4, "India cuts windfall tax on petrol, diesel, aviation-fuel exports", "India", "2026-08-16"),
+    ];
+    const facts = buildFuelCanonicalFacts({
+      issueDate: "2026-08-21",
+      incidents,
+      marketCards: [{ label: "Brent", value: 90, change: "+1.0% 7d" }],
+    });
+    const whatMatters = buildFuelCanonicalSections(facts).whatMatters;
+    expect(whatMatters).toMatch(/^The development with the greatest business significance.*Forecourt rationing/s);
+    expect(whatMatters).toMatch(/Duty changes reset export economics/i);
+    expect((whatMatters.match(/Hormuz transit pressure/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+
+  it("varies regional highlight framing instead of repeating a template opener", () => {
+    const incidents = [
+      inc(1, "Chief Engineer Killed as Bulker is Attacked Exiting Strait of Hormuz", "Iran", "2026-08-16"),
+      inc(2, "Bodies of 4 Seafarers Killed in Houthi Missile Attack in Red Sea Taken from Yemen to Saudi Arabia", "Yemen", "2026-08-20"),
+    ];
+    const highlights = buildFuelRegionalHighlights({
+      issueDate: "2026-08-21",
+      incidents,
+      window: incidents,
+    });
+    expect(highlights).not.toBeNull();
+    expect(highlights).not.toMatch(/Recent activity points to/i);
+    expect(highlights).toMatch(/Hormuz transit disruption/i);
+    expect(highlights).toMatch(/Red Sea kinetic reporting/i);
   });
 
   it("writes distinct business significance lines in What Matters", () => {

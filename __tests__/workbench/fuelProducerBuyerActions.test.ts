@@ -334,4 +334,26 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     expect(rows[0].operationalRead).toMatch(/did not materialise|persists/i);
     expect(rows[0].operationalRead).not.toMatch(/supply resuming eases/i);
   });
+
+  it("drops generic policy rows when the headline lacks a specific policy signal", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(48, "fuel", "Air India warns jet fuel costs are feeding into fares"),
+      ],
+    });
+    expect(rows.some((r) => /^Government policy on fuel duties/i.test(r.action))).toBe(false);
+  });
+
+  it("collapses duplicate aviation action prose across categories", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [
+        mk(49, "fuel", "Air India warns jet fuel costs are feeding into fares"),
+        mk(50, "fuel", "Aviation operators face sustained jet fuel cost pressure feeding into surcharge talks"),
+      ],
+    });
+    const aviationRows = rows.filter((r) => /jet-fuel cost pressure/i.test(r.action));
+    expect(aviationRows).toHaveLength(1);
+  });
 });

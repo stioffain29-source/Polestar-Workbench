@@ -203,6 +203,14 @@ export function buildFuelRegionalHighlights(opts: {
   // matched family so the records-clause stays honest to the data.
   interface CountryOverlay { why: string; watch?: string }
   const COUNTRY_OVERLAY: Record<string, CountryOverlay> = {
+    iran: {
+      why: "Hormuz transit disruption lifts war-risk premium and delay on dependent crude and product routes even when barrels are still moving.",
+      watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
+    },
+    yemen: {
+      why: "Red Sea kinetic reporting keeps Bab-el-Mandeb and southern corridor risk elevated for product tankers.",
+      watch: "Watch for further missile activity, crew casualties and Suez–Red Sea rerouting decisions.",
+    },
     india: {
       why: "Pump-price moves, forecourt disruption and transport cost are where this lands first; local movement and distribution economics absorb the shock before the published headline catches up.",
       watch: "Watch for state-level fuel-tax changes, fresh forecourt or rationing reports and any operator-side surcharge announcements on road and rail.",
@@ -212,8 +220,8 @@ export function buildFuelRegionalHighlights(opts: {
       watch: "Watch for load-shedding patterns, depot-stock advisories and any government action on fuel pricing or commercial allocation.",
     },
     russia: {
-      why: "The pressure here is on the export and sanctions side: crude and product flows, discounts and the buyers still willing to lift Russian barrels are what reset landed costs for dependent importers.",
-      watch: "Watch for sanctions-enforcement steps, price-cap changes, export-duty moves and any shift in the discount at which Russian crude and products clear.",
+      why: "Domestic rationing and refinery strain are restricting forecourt access and commercial allocation ahead of pump-price moves.",
+      watch: "Watch for purchase-limit changes, station closures and any export or allocation cuts to commercial buyers.",
     },
     ukraine: {
       why: "The pressure here is on physical supply and distribution: refinery and depot damage, import dependence and the logistics of keeping fuel moving are what determine availability on the ground.",
@@ -221,20 +229,24 @@ export function buildFuelRegionalHighlights(opts: {
     },
   };
   const paragraphs: string[] = [];
+  const usedWhy = new Set<string>();
   for (let idx = 0; idx < lead.length; idx++) {
     const [country, items] = lead[idx];
     const fam = familyFor(items);
-    const phrase = fam?.phrase ?? "fuel-operational reporting";
-    // The shared incident-country utility returns a canonical label; overlay
-    // keys remain lowercase.
     const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
-    const why = overlay?.why
+    let why = overlay?.why
       ?? fam?.why
       ?? "There is underlying pressure on local fuel availability and cost.";
+    if (usedWhy.has(why)) {
+      why = overlay?.watch
+        ? `${why} The near-term watch is on operational follow-through rather than headline volume.`
+        : `${why} The pattern differs from adjacent theatres in how it reaches buyers and transport users.`;
+    }
+    usedWhy.add(why.split(".")[0] ?? why);
     const watch = overlay?.watch
       ?? fam?.watch
       ?? "Watch the coming weeks to confirm whether the pattern persists or eases.";
-    const recordsClause = "Recent activity points to";
+    const signal = regionalSignalPhrase(country, items, fam);
     let opener: string;
     if (idx === 0) {
       // Leader phrasing is only allowed when the canonical facts ranked this
@@ -254,9 +266,37 @@ export function buildFuelRegionalHighlights(opts: {
     } else {
       opener = `${titleCase(country)} adds further weight to the picture.`;
     }
-    paragraphs.push(`${opener} ${recordsClause} ${phrase}. ${why} ${watch}`);
+    paragraphs.push(`${opener} ${signal} ${why} ${watch}`);
   }
   return paragraphs.join("\n\n");
+}
+
+function regionalSignalPhrase(
+  country: string,
+  items: TopicFastFactsIncident[],
+  fam: IssueFamily | null,
+): string {
+  const blob = items.map((i) => haystack(i)).join(" ").toLowerCase();
+  const key = country.toLowerCase();
+  if (key === "russia" && /\b(ration|rationing|shortage|moscow)\b/.test(blob)) {
+    return "Confirmed rationing and domestic shortage pressure remain the operational story there.";
+  }
+  if (key === "india" && /\b(windfall|duty|tax|levy|subsidy)\b/.test(blob)) {
+    return "Policy and export-duty moves are resetting local refiner and buyer economics.";
+  }
+  if (key === "yemen" && /\b(red sea|houthi)\b/.test(blob)) {
+    return "Red Sea kinetic reporting is keeping corridor risk live for product movement.";
+  }
+  if (key === "iran" || (key !== "yemen" && /\b(hormuz|strait of hormuz)\b/.test(blob))) {
+    return "Hormuz transit disruption is lifting war-risk and delay on dependent routes.";
+  }
+  if (fam?.key === "shortage") {
+    return "Forecourt and allocation pressure is the confirmed operational signal there.";
+  }
+  if (fam?.key === "policy") {
+    return "Government fuel-policy moves are resetting local price and pass-through assumptions.";
+  }
+  return `Material fuel-market pressure is confirmed in ${titleCase(country)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1264,8 +1304,11 @@ export function buildFuelProducerBuyerActions(opts: {
         location: i.location,
       }),
     );
+    if (isGenericPolicyAction(action) && !hasSpecificPolicySignal(t)) continue;
     const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;
+    const actionNorm = bulletNormKey(action);
+    if (seen.has(`action:${actionNorm}`)) continue;
     // Supplier-pivot story-key collapse: syndicated rewrites of one buyer
     // pivot share too few distinctive tokens for the near-duplicate guard, but
     // one buyer pivoting on one product in one window is ONE action.
@@ -1310,6 +1353,7 @@ export function buildFuelProducerBuyerActions(opts: {
       continue;
     }
     seen.add(dedupeKey);
+    seen.add(`action:${actionNorm}`);
     raw.push({
       actor,
       category,
@@ -1845,7 +1889,7 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
       && /\b(petrol|diesel|aviation|jet)\b/.test(t)) {
     return "India cut windfall taxes on petrol, diesel and aviation-fuel exports, resetting refiner export economics";
   }
-  if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|surge|cost|price)\b/.test(t)) {
+  if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|surge|costs?|prices?)\b/.test(t)) {
     return "aviation operators faced sustained jet-fuel cost pressure feeding into fares and surcharge negotiations";
   }
   if (/\b(trump|sanction|blockade)\b/.test(t) && /\b(hormuz|iran)\b/.test(t)) {
@@ -1870,7 +1914,8 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   if (/\b(ration|rationing|forecourt|purchase limit)\b/.test(t)) {
     return "authorities imposed or extended fuel rationing and forecourt purchase limits";
   }
-  if (/\b(export ban|import ban|windfall|subsidy|duty|levy)\b/.test(t)) {
+  if (/\b(export ban|import ban|windfall|subsidy|duty|levy)\b/.test(t)
+      && hasSpecificPolicySignal(t)) {
     return `government policy on fuel duties or trade controls changed${optionalCountryHint(opts)}, resetting local price assumptions`;
   }
   if (/\b(refiner margins|crack spread)\b/.test(t)) {
@@ -1969,6 +2014,148 @@ function normalizeDevelopmentText(title: string): string {
   return normalizeFuelHeadline(title);
 }
 
+function locationAlreadyInClause(clause: string, where: string): boolean {
+  const c = clause.toLowerCase();
+  const w = where.toLowerCase();
+  if (c.includes(w)) return true;
+  if (w.includes("hormuz") && /\bhormuz\b/.test(c)) return true;
+  if (w.includes("red sea") && /\bred sea\b/.test(c)) return true;
+  if (w === "moscow" && /\bmoscow\b/.test(c)) return true;
+  if (w === "russia" && /\brussia\b/.test(c)) return true;
+  if (w === "india" && /\bindia\b/.test(c)) return true;
+  return false;
+}
+
+function isGenericPolicyAction(action: string): boolean {
+  return /^Government policy on fuel duties or trade controls changed/i.test(action);
+}
+
+function hasSpecificPolicySignal(t: string): boolean {
+  return /\b(windfall|export ban|import ban|subsidy cut|duty cut|tax cut|levy cut|excise|export duty|export tax)\b/.test(t);
+}
+
+type DevelopmentTheme =
+  | "shortage"
+  | "policy"
+  | "producer"
+  | "refinery"
+  | "chokepoint-redsea"
+  | "chokepoint-hormuz"
+  | "aviation"
+  | "other";
+
+function developmentTheme(i: CanonicalFuelIncident): DevelopmentTheme {
+  const t = developmentHaystack({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
+  if (/\b(moscow|ration|rationing)\b/.test(t) && /\b(russia|petrol|gasoline)\b/.test(t)) return "shortage";
+  if (/\b(russia)\b/.test(t) && /\b(shortage|fuel crisis|refinery)\b/.test(t)) return "shortage";
+  if (/\b(india|indian)\b/.test(t) && /\b(windfall|duty|tax|levy|subsidy)\b/.test(t)) return "policy";
+  if (/\b(aramco|adnoc|saudi)\b/.test(t) && /\b(resume|loading|export|output)\b/.test(t)) return "producer";
+  if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) return "refinery";
+  if (/\b(red sea|houthi|mokha|yemen)\b/.test(t) && !/\bexit(ing)?\s+(the\s+)?strait of hormuz\b/.test(t)) {
+    return "chokepoint-redsea";
+  }
+  if (/\b(strait of hormuz|\bhormuz\b)\b/.test(t)) return "chokepoint-hormuz";
+  if (/\b(jet fuel|aviation fuel|airline|airfare)\b/.test(t)) return "aviation";
+  return "other";
+}
+
+function materialDevelopmentScore(i: CanonicalFuelIncident): number {
+  const t = developmentHaystack({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
+  let score = aggregateIncidentSignificance([
+    { ...i.raw, occurredAt: i.date, severity: i.severity },
+  ]);
+  if (/\b(ration|rationing|moscow)\b/.test(t) && /\b(russia|petrol|gasoline)\b/.test(t)) score += 30;
+  if (/\b(windfall|duty|tax|levy)\b/.test(t) && /\b(india|indian)\b/.test(t)) score += 24;
+  if (/\b(aramco|loading|resume)\b/.test(t) && /\b(saudi|export)\b/.test(t)) score += 22;
+  if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) score += 20;
+  if (/\b(red sea|houthi)\b/.test(t) && /\b(attack|missile|killed)\b/.test(t)) score += 12;
+  if (/\b(hormuz)\b/.test(t) && /\b(attack|vessel|blockade)\b/.test(t)) score += 10;
+  return score;
+}
+
+function keepMaterialDevelopment(
+  i: CanonicalFuelIncident,
+  kept: CanonicalFuelIncident[],
+  keptTokens: Set<string>[],
+): boolean {
+  const toks = sigTokens(normalizeDevelopmentText(i.title));
+  if (keptTokens.some((k) => nearDuplicate(toks, k))) return false;
+  kept.push(i);
+  keptTokens.push(toks);
+  return true;
+}
+
+function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
+  const sorted = facts.qualifyingIncidents
+    .slice()
+    .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
+  const kept: CanonicalFuelIncident[] = [];
+  const keptTokens: Set<string>[] = [];
+  const themePriority: DevelopmentTheme[] = [
+    "shortage",
+    "policy",
+    "producer",
+    "refinery",
+    "chokepoint-redsea",
+    "chokepoint-hormuz",
+  ];
+  for (const theme of themePriority) {
+    const pick = sorted.find((i) => developmentTheme(i) === theme && !kept.includes(i));
+    if (pick) keepMaterialDevelopment(pick, kept, keptTokens);
+  }
+  for (const i of sorted) {
+    if (kept.length >= 10) break;
+    if (kept.includes(i)) continue;
+    keepMaterialDevelopment(i, kept, keptTokens);
+  }
+  return kept;
+}
+
+function rankBusinessSignificantDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
+  const sorted = facts.qualifyingIncidents
+    .slice()
+    .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
+  const kept: CanonicalFuelIncident[] = [];
+  const keptTokens: Set<string>[] = [];
+  const usedThemes = new Set<DevelopmentTheme>();
+  const businessPriority: DevelopmentTheme[] = [
+    "shortage",
+    "policy",
+    "producer",
+    "refinery",
+    "chokepoint-redsea",
+    "chokepoint-hormuz",
+    "aviation",
+    "other",
+  ];
+  for (const theme of businessPriority) {
+    if (usedThemes.has(theme)) continue;
+    const pick = sorted.find((i) => developmentTheme(i) === theme && !kept.includes(i));
+    if (!pick) continue;
+    if (!keepMaterialDevelopment(pick, kept, keptTokens)) continue;
+    usedThemes.add(theme);
+    if (kept.length >= 3) break;
+  }
+  for (const i of sorted) {
+    if (kept.length >= 3) break;
+    if (kept.includes(i)) continue;
+    keepMaterialDevelopment(i, kept, keptTokens);
+  }
+  return kept.slice(0, 3);
+}
+
 function developmentSentence(i: CanonicalFuelIncident): string {
   const where = eventLocationForProse(i);
   const date = proseDay(i.date);
@@ -1979,29 +2166,9 @@ function developmentSentence(i: CanonicalFuelIncident): string {
     location: i.physicalLocation,
     routeOrChokepoint: i.routeOrChokepoint,
   });
-  const loc = where ? ` in ${where}` : "";
-  return `On ${date}${loc}, ${fact.replace(/\.$/, "")}.`;
-}
-
-function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
-  const ranked = facts.qualifyingIncidents
-    .slice()
-    .sort((a, b) =>
-      compareIncidentSignificance(
-        { ...a.raw, occurredAt: a.date, severity: a.severity },
-        { ...b.raw, occurredAt: b.date, severity: b.severity },
-      ),
-    );
-  const kept: CanonicalFuelIncident[] = [];
-  const keptTokens: Set<string>[] = [];
-  for (const i of ranked) {
-    const toks = sigTokens(normalizeDevelopmentText(i.title));
-    if (keptTokens.some((k) => nearDuplicate(toks, k))) continue;
-    kept.push(i);
-    keptTokens.push(toks);
-    if (kept.length >= 8) break;
-  }
-  return kept;
+  const factText = fact.replace(/\.$/, "");
+  const loc = where && !locationAlreadyInClause(factText, where) ? ` in ${where}` : "";
+  return `On ${date}${loc}, ${factText}.`;
 }
 
 function buildFuelExecutiveSummary(facts: FuelCanonicalFacts): string {
@@ -2057,7 +2224,7 @@ function buildFuelWhatHappenedProse(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
-  const lead = rankMaterialDevelopments(facts).slice(0, 3);
+  const lead = rankBusinessSignificantDevelopments(facts);
   if (!lead.length) {
     return businessContinuityParagraph(facts);
   }
@@ -2069,7 +2236,8 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
       : idx === 1
         ? "A second material line"
         : "Also worth weighting";
-    return `${opener} is the confirmed change${where ? ` in ${where}` : ""} on ${proseDay(i.date)}. ${impact}`;
+    const loc = where && !locationAlreadyInClause(impact, where) ? ` in ${where}` : "";
+    return `${opener} is the confirmed change${loc} on ${proseDay(i.date)}. ${impact}`;
   });
   return paras.join("\n\n");
 }
