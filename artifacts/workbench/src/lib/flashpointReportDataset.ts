@@ -858,6 +858,10 @@ const ANTI_CORRUPTION_ENFORCEMENT_RE =
 // Firearms regulation / gun-retail policy copy — not public-order activity.
 const FIREARMS_POLICY_RE =
   /\b(firearms?|gun shops?|gun stores?|gun dealers?|weapons? dealers?|gun retailers?|firearms? retailers?)\b[^.]{0,50}\b(regulation|regulations|licensing|license|licence|rules?|restrictions?|reform|bill|law|policy|policies|struggling|closure|closures|sales slump|retailers?|dealers?)\b|\b(gun control|firearms? control|weapons? control|firearm licensing|weapons licensing)\b/i;
+// Senior military / service-chief travel — "Army chief arrives in Pokhara" is a
+// visit, not a protest, even when the classifier tags the record as Protest.
+const MILITARY_OFFICIAL_VISIT_RE =
+  /\b(army chief|air chief|naval chief|service chief|chief of (?:army|staff|defence|defense|the army)|(?:army|air|naval|defence|defense) chief|general|admiral|marshal)\b[^.]{0,50}\b(arrives? in|arrives at|arrived in|arrived at|visits?|visited|landing in|landed in|touched down|reaches|reached|heads? to|heading to)\b|\b(arrives? in|arrives at|arrived in|arrived at|visits?|visited|landing in|landed in)\b[^.]{0,50}\b(army chief|air chief|naval chief|service chief|chief of (?:army|staff|defence|defense)|(?:army|air|naval|defence|defense) chief|general|admiral)\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (TOURISM_DEMO_RE.test(text)) return true;
@@ -890,6 +894,7 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (LODGE_DIPLOMATIC_PROTEST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (DIPLOMATIC_VISIT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (MILITARY_OFFICIAL_VISIT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
   // Sports keyword noise ("striker", "rally", "title march") with no live
   // public-order signal.
@@ -1177,6 +1182,16 @@ function anchorTokens(title: string): Set<string> {
     const w = canonicaliseToken(singulariseToken(raw));
     if (w.length < 3 || SAME_EVENT_NON_ANCHOR.has(w) || SAME_EVENT_GENERIC.has(w)) continue;
     out.add(w);
+  }
+  // Syndicated rewrites swap "Chabad House" for "Jewish centre" — fold both
+  // to one venue anchor so same-event clustering still links them.
+  const norm = normaliseTitle(title);
+  if (
+    /\bchabad\b/.test(norm) ||
+    /\bjewish (centre|center)\b/.test(norm) ||
+    /\bsynagogues?\b/.test(norm)
+  ) {
+    out.add("chabad");
   }
   return out;
 }
@@ -2749,7 +2764,13 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
     (country === "New Zealand" || /\b(auckland|wellington|christchurch)\b/i.test(text)) &&
     /\b(protest|march|rally|demonstration)\b/i.test(text)
   ) {
-    return `New Zealand's reported events were Low severity and largely planned, but demonstrations in central Wellington, Auckland and Christchurch can still affect traffic, venue access and staff movement in the immediate area at set times.`;
+    const nzCities = ["Auckland", "Christchurch", "Wellington"].filter((c) =>
+      new RegExp(`\\b${c}\\b`, "i").test(text),
+    );
+    if (nzCities.length > 0) {
+      return `Demonstrations already reported in ${joinList(nzCities)} were Low severity, but they can still have affected traffic and venue access on the day they occurred.`;
+    }
+    return `New Zealand's reported events were Low severity and largely planned, but city-centre demonstrations can still affect traffic and staff movement on the day they occur.`;
   }
   if (containedVenueNote(r) && (SEV_RANK[sevKey(r.severity)] ?? 0) >= 3) {
     const c = country || "the reported country";
@@ -2822,10 +2843,13 @@ function buildWhatMatters(ctx: AutoCtx): string {
       `Japan accounts for ${volumeLead.value} of the week's screened incidents. Most are low-severity administrative or symbolic gatherings rather than sustained unrest, but the volume still warrants monitoring in Tokyo and other hub cities.`,
     );
   }
-  const hubs = extractNamedHubs(ctx.usableEnriched);
+  const hubs = extractNamedHubs(ctx.usableEnriched).filter(
+    (h) => !lines.some((l) => l.toLowerCase().includes(h.toLowerCase())),
+  );
   if (hubs.length > 0) {
+    const hubLead = hubs.length === 1 ? `${hubs[0]} appears` : `${joinList(hubs)} appear`;
     lines.push(
-      `Airport, campus and city-centre locations need closer attention where forward-looking signals name them. ${joinList(hubs)} appear in upcoming or unconfirmed mobilisation reporting — not in incidents that have already passed.`,
+      `${hubLead} in upcoming or unconfirmed mobilisation reporting only — not in incidents that have already passed.`,
     );
   }
   return lines.join("\n\n");
@@ -2836,6 +2860,7 @@ function buildImplications(ctx: AutoCtx): string {
   const topCountries = ctx.countryRows.slice(0, 3).map((r) => r.label);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const bullets: string[] = [];
+  const NZ_CITIES = ["Auckland", "Christchurch", "Wellington"] as const;
 
   if (all.some((r) => (r.country ?? "").includes("Pakistan") && /\b(transporter|transport|strike|freight|supply)\b/i.test(text(r)))) {
     bullets.push(`Review freight and delivery schedules linked to Pakistan for delay risk.`);
@@ -2854,15 +2879,30 @@ function buildImplications(ctx: AutoCtx): string {
   if (all.some((r) => /\bincheon\b/i.test(text(r)) && /\b(airport|protest|labou?r)\b/i.test(text(r)))) {
     bullets.push(`Confirm access arrangements at Incheon Airport during any follow-on advocacy activity.`);
   }
-  const nzCities = new Set<string>();
+  const nzPast = new Set<string>();
+  const nzUpcoming = new Set<string>();
+  const pastIds = new Set(all.map((r) => r.id));
   for (const r of all) {
     if ((r.country ?? "") !== "New Zealand" && !/\b(auckland|wellington|christchurch)\b/i.test(text(r))) continue;
-    for (const c of ["Auckland", "Christchurch", "Wellington"]) {
-      if (new RegExp(`\\b${c}\\b`, "i").test(text(r))) nzCities.add(c);
+    if (!/\b(protest|demonstrat|rally|march)\b/i.test(text(r))) continue;
+    for (const c of NZ_CITIES) {
+      if (new RegExp(`\\b${c}\\b`, "i").test(text(r))) nzPast.add(c);
     }
   }
-  if (nzCities.size > 0) {
-    bullets.push(`Update travel plans in ${joinList([...nzCities])} around scheduled demonstrations.`);
+  for (const r of extractFutureSignals(ctx.usableEnriched)) {
+    if (pastIds.has(r.id)) continue;
+    if (isWeakOperational(r) || isWeakNovelty(r) || forecastDateHasPassed(r, ctx.forecastAsOf)) continue;
+    if (!hasUpcomingSignal(r)) continue;
+    if ((r.country ?? "") !== "New Zealand" && !/\b(auckland|wellington|christchurch)\b/i.test(text(r))) continue;
+    for (const c of NZ_CITIES) {
+      if (new RegExp(`\\b${c}\\b`, "i").test(text(r))) nzUpcoming.add(c);
+    }
+  }
+  if (nzUpcoming.size > 0) {
+    bullets.push(`Update travel plans in ${joinList([...nzUpcoming])} around announced upcoming demonstrations.`);
+  }
+  if (nzPast.size > 0) {
+    bullets.push(`Account for demonstrations already reported in ${joinList([...nzPast])} when reviewing staff movement this week.`);
   }
   if (all.some((r) => (r.country ?? "").includes("Philippines") && /\b(strike|transport)\b/i.test(text(r)))) {
     bullets.push(`Verify local transport availability in the Philippines during strike-related service disruption.`);
@@ -2893,6 +2933,23 @@ function buildImplications(ctx: AutoCtx): string {
   }
   if (campusLoci.length > 0) {
     bullets.push(`Student or campus activity appears in this week's records: brief sites near ${joinList(campusLoci)} on possible knock-on disruption.`);
+  }
+  const futureCampus: string[] = [];
+  const futureCampusSeen = new Set<string>();
+  for (const r of extractFutureSignals(ctx.usableEnriched)) {
+    if (pastIds.has(r.id)) continue;
+    if (isWeakOperational(r) || isWeakNovelty(r) || forecastDateHasPassed(r, ctx.forecastAsOf)) continue;
+    if (!hasUpcomingSignal(r) || !/\b(student|university|campus|college|faculty)\b/i.test(text(r))) continue;
+    const loc = (r.location ?? "").trim() || extractCityLabel(r);
+    if (!loc) continue;
+    const key = loc.toLowerCase();
+    if (futureCampusSeen.has(key) || campusSeen.has(key)) continue;
+    futureCampusSeen.add(key);
+    futureCampus.push(loc);
+    if (futureCampus.length >= 3) break;
+  }
+  if (futureCampus.length > 0) {
+    bullets.push(`Upcoming student or campus mobilisation signals name ${joinList(futureCampus)} — confirm dates before adjusting site access.`);
   }
 
   if (bullets.length < 3 && topCountries.length > 0) {
@@ -3034,9 +3091,18 @@ function buildPolestarView(ctx: AutoCtx): string {
     disruptionLead = `Japan carries the highest incident volume this week (${volumeLead.value} records), mostly low-severity gatherings; ${disruptionLead.charAt(0).toLowerCase()}${disruptionLead.slice(1)}`;
   }
 
+  const futureMobilisation = extractFutureSignals(ctx.usableEnriched)
+    .filter((r) => !isWeakOperational(r) && !isWeakNovelty(r) && !forecastDateHasPassed(r, ctx.forecastAsOf));
+  const hasDatedFuture = futureMobilisation.some((r) => !!explicitForecastDate(r));
+  const trackClause = hasDatedFuture
+    ? "track confirmed protest dates and routes closely"
+    : futureMobilisation.length > 0
+      ? "monitor unconfirmed mobilisation signals in Watch Next rather than assuming a quiet stretch will hold"
+      : "monitor for fresh protest announcements rather than assuming a quiet stretch will hold";
+
   return [
     `Risk level: ${posture}.`,
-    `Disruption is most likely where ${disruptionLead}. The most useful immediate step is to keep movement plans flexible, validate transport availability close to departure, and track scheduled protest dates and routes closely rather than treating the window as one of broad regional unrest.`,
+    `Disruption is most likely where ${disruptionLead}. The most useful immediate step is to keep movement plans flexible, validate transport availability close to departure, and ${trackClause} rather than treating the window as one of broad regional unrest.`,
   ].join("\n");
 }
 

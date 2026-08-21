@@ -689,6 +689,9 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // demonstration or police action against protesters.
   /\b(firearms?|gun shops?|gun stores?|gun dealers?|weapons? dealers?|gun retailers?|firearms? retailers?)\b[^.!?]{0,50}\b(regulation|regulations|licensing|license|licence|rules?|restrictions?|reform|bill|law|policy|policies|struggling|closure|closures|sales slump|retailers?|dealers?)\b/i,
   /\b(gun control|firearms? control|weapons? control|firearm licensing|weapons licensing)\b/i,
+  // Senior military / service-chief travel — not a protest event.
+  /\b(army chief|air chief|naval chief|service chief|chief of (?:army|staff|defence|defense)|(?:army|air|naval|defence|defense) chief)\b[^.!?]{0,50}\b(arrives? in|arrives at|arrived in|arrived at|visits?|visited|landing in|landed in)\b/i,
+  /\b(arrives? in|arrives at|arrived in|arrived at|visits?|visited)\b[^.!?]{0,50}\b(army chief|air chief|naval chief|service chief|chief of (?:army|staff|defence|defense)|(?:army|air|naval|defence|defense) chief|general|admiral)\b/i,
   // Product / technology "demonstration" homonym — "Startup Park … Demonstration
   // Kick-Off", "Sage Launches Demonstration of AI Control", "public and private
   // demonstration". Here "demonstration" is a product/tech DEMO, not a protest,

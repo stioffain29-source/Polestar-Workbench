@@ -302,4 +302,23 @@ describe("dedupeByTitle — same-event syndication collapse", () => {
     expect(dedupeByTitle(rows)).toHaveLength(1);
     expect(dedupeByTitle(rows)[0].severity).toBe("high");
   });
+
+  it("collapses Jewish centre and Chabad House framings of one Sri Lanka protest", () => {
+    const rows = [
+      {
+        title: "Buddhist monks lead violent protest against Jewish centre in Sri Lanka",
+        date: new Date("2026-08-18T08:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Buddhist monks, locals protest Chabad House in Sri Lanka amid threats, harassment",
+        date: new Date("2026-08-18T12:00:00Z"),
+        severity: "low",
+        country: "Sri Lanka",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(1);
+    expect(dedupeByTitle(rows)[0].severity).toBe("high");
+  });
 });

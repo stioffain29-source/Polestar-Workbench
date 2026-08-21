@@ -688,7 +688,7 @@ describe("flashpoint report consistency", () => {
   test("What Matters does not boilerplate-track past Wellington protests as imminent hubs", () => {
     const rows = [
       inc({
-        title: "Wellington Palestine solidarity march draws hundreds",
+        title: "Wellington residents protest Flock cameras",
         summary: "Demonstrators marched through central Wellington on Saturday.",
         country: "New Zealand",
         location: "Wellington",
@@ -706,6 +706,10 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     expect(ds.autoWhatMatters).not.toMatch(/imminent protest reporting/i);
     expect(ds.autoWhatMatters).not.toMatch(/Palestine solidarity/i);
+    expect(ds.autoWhatMatters).toMatch(/already reported in Wellington/i);
+    expect(ds.autoImplications).toMatch(/already reported in Wellington/i);
+    expect(ds.autoImplications).not.toMatch(/scheduled demonstrations/i);
+    expect(ds.autoPolestarView).not.toMatch(/track scheduled protest dates/i);
   });
 
   test("executive summary distinguishes weekly posture from peak incident rating", () => {

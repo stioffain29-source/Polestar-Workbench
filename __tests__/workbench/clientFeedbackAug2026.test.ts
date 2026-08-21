@@ -329,4 +329,22 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     );
     expect(sel.enriched).toHaveLength(0);
   });
+
+  it("drops Indian Army chief arrival misclassified as protest", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Indian Army chief General Dhiraj Seth arrives in Pokhara",
+          summary: "The chief of army staff arrived in Pokhara for official meetings.",
+          country: "India",
+          severity: "low",
+        }),
+        fp({ title: "Farmers march on parliament in Delhi over tax rules", country: "India", severity: "low" }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched.some((r) => /Army chief/i.test(r.title))).toBe(false);
+    expect(sel.enriched).toHaveLength(1);
+  });
 });
