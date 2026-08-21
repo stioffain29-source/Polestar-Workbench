@@ -851,6 +851,13 @@ const LODGE_DIPLOMATIC_PROTEST_RE = /\b(?:lodg|convey)\w*\s+(?:a\s+|an\s+|its\s+
 // head-of-state subject + travel verb (no standalone branch) so it cannot
 // fire on unrelated street-protest records that merely mention a great power.
 const DIPLOMATIC_VISIT_RE = /\b(president|prime minister|\bpm\b|premier|foreign minister|\bfm\b|junta chief|chancellor|monarch|crown prince|defen[cs]e minister|delegation|envoy)\b.{0,60}\b(heads? to|head to|visits?|arrives? in|to visit|pays? a\b.{0,20}\bvisit|state visit|official visit|bilateral (talks|meeting|summit))\b/i;
+// Anti-corruption / integrity enforcement on business figures — not a street
+// protest even when the classifier reads "crackdown".
+const ANTI_CORRUPTION_ENFORCEMENT_RE =
+  /\b(crackdown|clampdown|cracks? down|clamps? down|sweep|sweeps|drive)\b[^.]{0,50}\b(businessmen|businessman|business leaders?|business community|entrepreneurs?|industrialists?|tycoons?|magnates?|traders?)\b|\b(anti[- ]?corruption|anti[- ]?graft|integrity (?:unit|commission|drive|sweep)|ciaa|ac(?:b| commission))\b[^.]{0,50}\b(businessmen|businessman|business leaders?|entrepreneurs?|traders?|raid|raids|arrest|arrests|detain|detention|charge|charges|probe|investigation)\b/i;
+// Firearms regulation / gun-retail policy copy — not public-order activity.
+const FIREARMS_POLICY_RE =
+  /\b(firearms?|gun shops?|gun stores?|gun dealers?|weapons? dealers?|gun retailers?|firearms? retailers?)\b[^.]{0,50}\b(regulation|regulations|licensing|license|licence|rules?|restrictions?|reform|bill|law|policy|policies|struggling|closure|closures|sales slump|retailers?|dealers?)\b|\b(gun control|firearms? control|weapons? control|firearm licensing|weapons licensing)\b/i;
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (TOURISM_DEMO_RE.test(text)) return true;
@@ -937,6 +944,8 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // verbatim ("...Bangladesh Sangbad Sangstha (BSS)") and would
   // falsely satisfy the APAC hook.
   if (NON_APAC_FOCUS_RE.test(editorialTitle) && !APAC_HOOK_RE.test(editorialTitle)) return true;
+  if (ANTI_CORRUPTION_ENFORCEMENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (FIREARMS_POLICY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   return false;
 }
 
@@ -1149,6 +1158,9 @@ const SAME_EVENT_SYNONYM: Record<string, string> = {
   end: "end", ends: "end", ended: "end", ending: "end", concludes: "end",
   concluded: "end", concluding: "end", conclusion: "end", wraps: "end",
   over: "end", halted: "end", "called-off": "end",
+  detain: "custody", detains: "custody", detained: "custody", detention: "custody",
+  release: "custody", releases: "custody", released: "custody", freed: "custody",
+  freeing: "custody",
 };
 function canonicaliseToken(t: string): string {
   return SAME_EVENT_SYNONYM[t] ?? t;
@@ -1269,12 +1281,53 @@ function clusterSameEvent<
       const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
       const facility = (s: Set<string>) =>
         s.has("prison") || s.has("jail") || s.has("airport");
+      const namedVenue = (s: Set<string>) =>
+        s.has("chabad") || s.has("synagogue");
       // Facility-class fold runs BEFORE the distinct-subject veto so
       // "Incheon Airport labour protest" and "Incheon Airport pay protest"
       // collapse even when the grievance wording differs.
-      if (explicitSameCountry && facility(anchors[i]) && facility(anchors[j])) {
+      if (
+        explicitSameCountry &&
+        facility(anchors[i]) &&
+        facility(anchors[j]) &&
+        !distinctSubjects(subjects[i], subjects[j])
+      ) {
         parent[find(i)] = find(j);
         continue;
+      }
+      if (
+        explicitSameCountry &&
+        namedVenue(anchors[i]) &&
+        namedVenue(anchors[j]) &&
+        !distinctSubjects(subjects[i], subjects[j])
+      ) {
+        parent[find(i)] = find(j);
+        continue;
+      }
+      // A named venue token (Chabad House, synagogue) identifies one event
+      // even when follow-up headlines swap city wording or actor labels.
+      if (explicitSameCountry && anchors[i].has("chabad") && anchors[j].has("chabad")) {
+        parent[find(i)] = find(j);
+        continue;
+      }
+      // Detention and release follow-ups of the same street action — Jakarta
+      // "21 detained" / "21 released" syndication with different verbs.
+      const titlePair = `${rows[i].title} ${rows[j].title}`.toLowerCase();
+      if (
+        explicitSameCountry &&
+        /\b(detain|detained|detention|arrest|arrested)\b/.test(titlePair) &&
+        /\b(release|released|freed|freeing)\b/.test(titlePair)
+      ) {
+        let sharedSubject = 0;
+        const [smallSub, bigSub] = subjects[i].size <= subjects[j].size
+          ? [subjects[i], subjects[j]] : [subjects[j], subjects[i]];
+        for (const t of smallSub) {
+          if (bigSub.has(t)) sharedSubject++;
+        }
+        if (sharedSubject >= 1) {
+          parent[find(i)] = find(j);
+          continue;
+        }
       }
       // Same named facility city when one headline says "Incheon" and the
       // other "Incheon Airport" — syndicated rewrites often drop "airport".
@@ -1695,6 +1748,7 @@ export function buildFlashpointReportDataset(
     weakOperationalDropped,
     forecastHeld,
   });
+  const weeklyPosture = overallPostureLabel({ activismRows, unrestRows });
 
   const fastFacts: KpiCard[] = [
     { label: "Reporting Period", value: win.shortLabel },
@@ -1710,6 +1764,12 @@ export function buildFlashpointReportDataset(
       note: hs.key
         ? "Peak incident rating — not the overall week posture"
         : undefined,
+    },
+    {
+      label: "Weekly Posture",
+      value: weeklyPosture,
+      severity: sevKey(weeklyPosture.toLowerCase()) || undefined,
+      note: "Volume and enforcement mix across the window — distinct from the peak incident",
     },
     {
       label: "Top Issue Type",
@@ -1798,11 +1858,14 @@ export function buildFlashpointReportDataset(
     });
   }
   const forecastFuture = forecastDated.slice(0, 6);
+  const futureUnconfirmed = futureRaw.filter((r) => !explicitForecastDate(r));
+  const hasUnconfirmedSignals = futureUnconfirmed.length > 0;
   const forecastRead = buildForecastRead({
     activismRows,
     unrestRows,
     countryRows,
     hasFutureTable: forecastFuture.length > 0,
+    hasUnconfirmedSignals,
     forecastLeadCountry: forecastFuture[0]?.country ?? null,
     forecastLeadSignal: forecastFuture[0]?.signal ?? null,
     forecastRows: forecastFuture,
@@ -2173,6 +2236,7 @@ function buildForecastRead(opts: {
   unrestRows: EnrichedIncident[];
   countryRows: BarRow[];
   hasFutureTable: boolean;
+  hasUnconfirmedSignals?: boolean;
   forecastLeadCountry?: string | null;
   forecastLeadSignal?: string | null;
   forecastRows?: ForecastFutureRow[];
@@ -2183,6 +2247,7 @@ function buildForecastRead(opts: {
   topSeverityTie?: number;
 }): string {
   const { activismRows, unrestRows, countryRows, hasFutureTable } = opts;
+  const hasUnconfirmedSignals = opts.hasUnconfirmedSignals ?? false;
   const forecastLeadCountry = (opts.forecastLeadCountry ?? "").trim();
   const forecastLeadSignal = (opts.forecastLeadSignal ?? "").trim();
   const lead = countryRows[0];
@@ -2202,7 +2267,9 @@ function buildForecastRead(opts: {
         }
         return `Upcoming signals without confirmed dates are listed in the table above. Treat them as items to monitor rather than fixed calendar dates. The outlook below builds on those signals.`;
       })()
-    : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of likely direction from current activity, not a list of scheduled events.`;
+    : hasUnconfirmedSignals
+      ? `No confirmed upcoming dates appear in the forward-looking table. Unconfirmed mobilisation signals are listed in Watch Next below — treat those as monitor items, not fixed calendar dates. The outlook below builds on current activity only.`
+      : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of likely direction from current activity, not a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
   const lines: string[] = [futureBlock];
@@ -2307,7 +2374,11 @@ function buildForecastRead(opts: {
     );
   }
   lines.push(
-    `This outlook is based on one reporting period and on confirmed announcements only, so treat it as a starting point rather than a firm prediction.`,
+    hasFutureTable
+      ? `This outlook is based on one reporting period and on confirmed announcements only, so treat it as a starting point rather than a firm prediction.`
+      : hasUnconfirmedSignals
+        ? `This outlook is based on one reporting period only. Watch Next carries any unconfirmed signals — there are no confirmed dates to plan around yet.`
+        : `This outlook is based on one reporting period only. There are no confirmed dates to plan around; monitor for fresh announcements rather than assuming a quiet stretch will hold.`,
   );
   return lines.join("\n\n");
 }
@@ -2692,9 +2763,9 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
   return null;
 }
 
-function extractNamedHubs(all: EnrichedIncident[], enriched: EnrichedIncident[]): string[] {
+function extractNamedHubs(futureSource: EnrichedIncident[]): string[] {
   const hubs = new Set<string>();
-  const scan = [...all, ...extractFutureSignals(enriched)];
+  const scan = extractFutureSignals(futureSource);
   for (const r of scan) {
     const text = `${r.title ?? ""} ${r.summary ?? ""} ${r.location ?? ""}`;
     if (/\bincheon\b/i.test(text) && /\bairport\b/i.test(text)) hubs.add("Incheon Airport");
@@ -2728,9 +2799,14 @@ function buildWhatMatters(ctx: AutoCtx): string {
         : `The practical risk this week was localised protest activity rather than a regional campaign.`,
   );
   const seen = new Set<string>();
+  let genericTrackCount = 0;
   for (const r of sortBySignificance(all)) {
     const para = whatMattersParagraphFor(r);
     if (!para || seen.has(para)) continue;
+    if (/operational items to track/i.test(para)) {
+      if (genericTrackCount >= 1) continue;
+      genericTrackCount++;
+    }
     seen.add(para);
     lines.push(para);
     if (lines.length >= 5) break;
@@ -2746,10 +2822,10 @@ function buildWhatMatters(ctx: AutoCtx): string {
       `Japan accounts for ${volumeLead.value} of the week's screened incidents. Most are low-severity administrative or symbolic gatherings rather than sustained unrest, but the volume still warrants monitoring in Tokyo and other hub cities.`,
     );
   }
-  const hubs = extractNamedHubs(all, ctx.enriched);
+  const hubs = extractNamedHubs(ctx.usableEnriched);
   if (hubs.length > 0) {
     lines.push(
-      `Airport, campus and city-centre locations need closer attention where demonstrations are scheduled. ${joinList(hubs)} all feature in either active or imminent protest reporting.`,
+      `Airport, campus and city-centre locations need closer attention where forward-looking signals name them. ${joinList(hubs)} appear in upcoming or unconfirmed mobilisation reporting — not in incidents that have already passed.`,
     );
   }
   return lines.join("\n\n");
@@ -2839,7 +2915,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   // dated on/before the generation instant has already happened and must not be
   // listed as "upcoming" here while the forecast table (correctly) drops it.
   const futureRaw = extractFutureSignals(ctx.usableEnriched)
-    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r))
+    .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r) && !isWeakOperational(r))
     .filter((r) => !forecastDateHasPassed(r, ctx.forecastAsOf));
   // Collapse (country, signal) duplicates so the same operational
   // signal cannot appear twice (e.g. two South Korea records both
@@ -3048,7 +3124,7 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const postureLine = peakHs && peakHs !== "—" && posture.toLowerCase() !== peakHs.toLowerCase()
     ? `Overall protest posture this week is ${posture}, even though individual incidents reached ${peakHs}.`
     : peakHs && peakHs !== "—"
-      ? `Overall protest posture this week is ${posture}, in line with the peak incident rating of ${peakHs}.`
+      ? `Overall protest posture this week is ${posture}. The peak single-incident rating was also ${peakHs}; posture weighs volume and enforcement across the whole window, not that one row alone.`
       : `Overall protest posture this week is ${posture}.`;
 
   const closing = hasEnforcement

@@ -226,7 +226,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.forecastFuture).toHaveLength(0);
-    expect(ds.forecastRead).toMatch(/No confirmed upcoming protest calls/i);
+    expect(ds.forecastRead).toMatch(/No confirmed upcoming/i);
     expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
   });
 
@@ -658,5 +658,65 @@ describe("flashpoint report consistency", () => {
     const forecastHeld = Number(note.match(/(\d+) held for forecast/)?.[1] ?? 0);
     expect(forecastHeld).toBeGreaterThan(0);
     expect(screened).toBeGreaterThanOrEqual(distinct + forecastHeld);
+  });
+
+  test("forecast reconciles unconfirmed Watch Next signals when no confirmed table exists", () => {
+    const rows = [
+      inc({
+        title: "Malaysia unions announce planned protest",
+        summary: "Organisers say a rally is coming but gave no date.",
+        severity: "moderate",
+        country: "Malaysia",
+        location: "Kuala Lumpur",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Traders march on parliament in Delhi over tax rules",
+        country: "India",
+        severity: "low",
+        location: "Delhi",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.forecastFuture).toHaveLength(0);
+    expect(ds.forecastRead).toMatch(/Unconfirmed mobilisation signals are listed in Watch Next/i);
+    expect(ds.forecastRead).not.toMatch(/track scheduled events/i);
+    expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
+  });
+
+  test("What Matters does not boilerplate-track past Wellington protests as imminent hubs", () => {
+    const rows = [
+      inc({
+        title: "Wellington Palestine solidarity march draws hundreds",
+        summary: "Demonstrators marched through central Wellington on Saturday.",
+        country: "New Zealand",
+        location: "Wellington",
+        severity: "low",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+      inc({
+        title: "Indian police fire tear gas, use batons to disperse youth protesters",
+        country: "India",
+        severity: "high",
+        location: "Jharkhand",
+        occurredAt: "2026-08-10T08:00:00Z",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.autoWhatMatters).not.toMatch(/imminent protest reporting/i);
+    expect(ds.autoWhatMatters).not.toMatch(/Palestine solidarity/i);
+  });
+
+  test("executive summary distinguishes weekly posture from peak incident rating", () => {
+    const rows = [
+      inc({ title: "Nepal anti-graft raids widen against business leaders", country: "Nepal", severity: "high" }),
+      inc({ title: "Farmers march on parliament in Delhi over tax rules", country: "India", severity: "low", location: "Delhi" }),
+      inc({ title: "Traders rally in Kathmandu over fuel prices", country: "Nepal", severity: "low", location: "Kathmandu" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
+    expect(ds.fastFacts.some((k) => k.label === "Weekly Posture")).toBe(true);
+    expect(ds.autoExecutiveSummary).not.toMatch(/in line with the peak incident rating/i);
+    expect(ds.enriched.some((r) => /business leaders/i.test(r.title))).toBe(false);
   });
 });

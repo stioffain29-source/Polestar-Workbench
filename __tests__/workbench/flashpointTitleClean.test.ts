@@ -258,4 +258,48 @@ describe("dedupeByTitle — same-event syndication collapse", () => {
     ];
     expect(dedupeByTitle(rows)).toHaveLength(2);
   });
+
+  it("collapses Jakarta detention and release follow-ups of the same protest into one row", () => {
+    const rows = [
+      {
+        title: "Jakarta police detain 21 protesters after labour rally",
+        date: new Date("2026-08-10T08:00:00Z"),
+        severity: "moderate",
+        country: "Indonesia",
+      },
+      {
+        title: "Jakarta releases 21 detained protesters after labour rally",
+        date: new Date("2026-08-11T08:00:00Z"),
+        severity: "low",
+        country: "Indonesia",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(1);
+    expect(dedupeByTitle(rows)[0].severity).toBe("moderate");
+  });
+
+  it("collapses Chabad House protest syndication with different dates and severities", () => {
+    const rows = [
+      {
+        title: "Protest outside Chabad House in Colombo over visa rules",
+        date: new Date("2026-08-08T08:00:00Z"),
+        severity: "low",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Sri Lanka Jews rally at Chabad centre over visa restrictions",
+        date: new Date("2026-08-09T12:00:00Z"),
+        severity: "moderate",
+        country: "Sri Lanka",
+      },
+      {
+        title: "Demonstrators gather at Colombo Chabad House over immigration policy",
+        date: new Date("2026-08-10T18:00:00Z"),
+        severity: "high",
+        country: "Sri Lanka",
+      },
+    ];
+    expect(dedupeByTitle(rows)).toHaveLength(1);
+    expect(dedupeByTitle(rows)[0].severity).toBe("high");
+  });
 });

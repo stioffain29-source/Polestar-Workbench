@@ -7,6 +7,7 @@ import {
   drawSubtitle,
   renderProse,
   drawSectionWithProse,
+  ensureRoomForDisclaimer,
   setRoboto,
   ensureRobotoLoaded,
   drawFastFactsKpiCards,
@@ -729,8 +730,8 @@ export async function exportFlashpointReportPdf(
 
   // Source Notes / Data Notes removed per editorial direction — internal
   // methodology must not appear in client-facing Flashpoint exports.
-  // Disclaimer follows Related Incidents directly.
-
+  // Keep the disclaimer heading and body on one page (Fuel Watch pattern).
+  ensureRoomForDisclaimer(ctx);
   drawDisclaimer(ctx);
 
   drawFooters(ctx.pdf);

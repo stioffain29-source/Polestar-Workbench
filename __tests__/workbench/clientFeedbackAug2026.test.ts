@@ -295,4 +295,38 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     const draft = draftTopicReportProse({ topic: "flashpoint", issueDate: FP_ISSUE, incidents: rows });
     expect(draft.executiveSummary).toMatch(/Japan sees the most activity/i);
   });
+
+  it("drops Nepal anti-corruption enforcement on businessmen", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Nepal's crackdown on businessmen widens as CIAA probes widen",
+          summary: "Anti-graft investigators expand charges against business leaders accused of tax evasion.",
+          country: "Nepal",
+          severity: "high",
+        }),
+        fp({ title: "Students rally against tuition hikes in Kathmandu", country: "Nepal", severity: "low" }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched.some((r) => /businessmen/i.test(r.title))).toBe(false);
+    expect(sel.enriched).toHaveLength(1);
+  });
+
+  it("drops Bangkok firearms regulation / gun retail policy copy", () => {
+    const sel = selectFlashpointUsable(
+      [
+        fp({
+          title: "Bangkok crackdown on gun shops leaves firearms retailers struggling",
+          summary: "Tighter firearms licensing rules hit struggling gun dealers across the capital.",
+          country: "Thailand",
+          severity: "high",
+        }),
+      ],
+      "flashpoint",
+      FP_ISSUE,
+    );
+    expect(sel.enriched).toHaveLength(0);
+  });
 });
