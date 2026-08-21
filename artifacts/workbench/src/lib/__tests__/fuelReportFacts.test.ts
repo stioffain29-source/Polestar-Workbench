@@ -363,14 +363,18 @@ describe("validateFuelReportConsistency — the gate catches seeded contradictio
     expect(ok.filter((i) => i.code === "PRIMARY_PRESSURE")).toHaveLength(0);
   });
 
-  it("flags an untraceable count claim and passes a traceable one", () => {
+  it("flags any incident/record count language in analytical prose", () => {
     const f = facts([inc(), inc(), inc()]);
     const bad = validateFuelReportConsistency(f, {
       situation: "We logged 9 incidents this week.",
     });
     expect(bad.some((i) => i.code === "COUNT_TRACEABLE")).toBe(true);
-    const good = validateFuelReportConsistency(f, {
+    const stillBad = validateFuelReportConsistency(f, {
       situation: `We logged ${f.incidentCount} incidents this week.`,
+    });
+    expect(stillBad.some((i) => i.code === "COUNT_TRACEABLE")).toBe(true);
+    const good = validateFuelReportConsistency(f, {
+      situation: "Depot disruption and rationing kept availability tight through the week.",
     });
     expect(good.filter((i) => i.code === "COUNT_TRACEABLE")).toHaveLength(0);
   });

@@ -123,7 +123,10 @@ const LEADER_CLAIM_RE =
   /\b(clearest|primary|main|leading|dominant|principal|biggest|foremost)\b[^.!?]{0,60}\bpressure point\b(?!s)|\bpressure\b[^.!?]{0,40}\bconcentrated in\b/i;
 
 const COUNT_CLAIM_RE =
-  /\b(\d{1,4})\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+)?(incidents?|records?|events?|reports?|dates?|days?)\b/gi;
+  /\b(\d{1,4})\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(incidents?|records?|events?|reports?|dates?|days?)\b/gi;
+
+const VOLUME_PROSE_RE =
+  /\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;
 
 const OVERALL_SEVERITY_RE =
   /\boverall severity\b[^.!?]{0,40}\b(insignificant|low|moderate|high|extreme)\b|\b(insignificant|low|moderate|high|extreme)\b[^.!?]{0,25}\boverall severity\b|\brated\s+(insignificant|low|moderate|high|extreme)\s+overall\b/i;
@@ -165,12 +168,6 @@ export function validateFuelReportConsistency(
 ): FuelConsistencyIssue[] {
   const issues: FuelConsistencyIssue[] = [];
 
-  const knownCounts = new Set<number>([
-    facts.incidentCount,
-    facts.distinctDates.length,
-    ...facts.countries.map((c) => c.count),
-    ...Object.values(facts.severityDistribution),
-  ]);
   const knownPcts = facts.market.indicators
     .map((m) => m.pctChange)
     .filter((v): v is number => v !== null);
@@ -248,23 +245,22 @@ export function validateFuelReportConsistency(
       }
     }
 
-    // 3. Count traceability.
+    // 3. Count / source-volume language is banned in analytical prose.
+    if (VOLUME_PROSE_RE.test(text)) {
+      issues.push({
+        code: "COUNT_TRACEABLE",
+        section,
+        message: `Analytical prose must not carry source-volume language: "${text.match(VOLUME_PROSE_RE)?.[0] ?? text.slice(0, 80)}"`,
+      });
+    }
     let cm: RegExpExecArray | null;
     COUNT_CLAIM_RE.lastIndex = 0;
     while ((cm = COUNT_CLAIM_RE.exec(text))) {
-      const n = Number(cm[1]);
-      const noun = cm[2].toLowerCase();
-      const isDate = noun.startsWith("date") || noun.startsWith("day");
-      const ok = isDate
-        ? n === facts.distinctDates.length || knownCounts.has(n)
-        : knownCounts.has(n);
-      if (!ok) {
-        issues.push({
-          code: "COUNT_TRACEABLE",
-          section,
-          message: `Claims "${cm[0]}" but no calculated fact equals ${n} (total ${facts.incidentCount}, distinct dates ${facts.distinctDates.length}).`,
-        });
-      }
+      issues.push({
+        code: "COUNT_TRACEABLE",
+        section,
+        message: `Analytical prose must not carry incident/record totals: "${cm[0]}"`,
+      });
     }
 
     // 4. Overall severity assertion.

@@ -65,9 +65,9 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
     ]);
     const sections = buildFuelCanonicalSections(model);
     expect(model.primaryPressurePoint.label).toBe(leader);
-    for (const section of [sections.executiveSummary, sections.situation, sections.regionalHighlights, sections.whatMatters, sections.polestarView]) {
-      expect(section).toContain(leader);
-    }
+    expect(sections.regionalHighlights).toContain(leader);
+    expect(sections.polestarView).toContain(leader);
+    expect(sections.executiveSummary).not.toMatch(/\d+\s+incidents?/i);
     expect(validateFuelReportConsistency(model, sections)).toEqual([]);
   });
 
@@ -92,12 +92,15 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
     }
   });
 
-  it.each(["Low", "Moderate", "High", "Extreme"])('changing severity to %s updates every core section', (severity) => {
-    const model = facts([incident(1, "Iran", "2031-03-30", severity)]);
+  it.each(["Low", "Moderate", "High", "Extreme"])('operational severity shapes business-facing sections (%s)', (severity) => {
+    const model = facts([incident(1, "Iran", "2031-03-30", severity, {
+      title: "Fuel rationing spreads as forecourt queues grow",
+      summary: "Confirmed petrol rationing and forecourt shortages.",
+    })]);
     const sections = buildFuelCanonicalSections(model);
-    for (const section of [sections.executiveSummary, sections.situation, sections.regionalHighlights, sections.whatMatters, sections.polestarView]) {
-      expect(section).toContain(`Overall severity: ${severity}`);
-    }
+    expect(sections.operationalRead.toLowerCase()).toMatch(/shortage|rationing|forecourt|availability/);
+    expect(sections.polestarView).not.toMatch(/overall severity:/i);
+    expect(sections.executiveSummary).not.toMatch(/\d+\s+incidents?/i);
   });
 
   it("location changes do not alter actor, operator, or asset entity fields", () => {
@@ -139,20 +142,23 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
     expect(model.currentConditions).toHaveLength(0);
     expect(sections.watchNext).toContain("allocation cuts");
     expect(sections.watchNext).not.toMatch(/^- Potential:/);
-    expect(sections.situation).toContain("Nothing in the window is confirmed yet");
+    expect(sections.situation.toLowerCase()).toMatch(/market-price|reporting|window/);
   });
 
   it("the validation gate rejects generated-section attempts to override canonical facts", () => {
     const model = facts([incident(1, "Iran", "2031-03-30", "high")], "-4.0% 7d");
     const sections = buildFuelCanonicalSections(model);
-    const bad = { ...sections, situation: "Current, non-potential evidence covers 99 of the reporting period's 99 qualifying incidents. Iran is the primary pressure point. Overall severity: High.", whatMatters: "What Matters: Iran is the primary pressure point. The report contains 99 qualifying incidents. Overall severity: High.", polestarView: "Polestar View: Beta is the primary pressure point. Overall severity: Low. Brent is rising." };
+    const bad = {
+      ...sections,
+      situation: "Current, non-potential evidence covers 99 of the reporting period's 99 qualifying incidents. Iran is the primary pressure point.",
+      whatMatters: "What Matters: Iran is the primary pressure point. The report contains 99 qualifying incidents.",
+      polestarView: "Polestar View: Beta is the primary pressure point. Brent is rising.",
+    };
     const errors = validateFuelReportConsistency(model, bad);
     expect(errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({ section: "polestarView", canonicalValue: "Iran", sourceField: "primaryPressurePoint.label" }),
-      expect.objectContaining({ section: "polestarView", canonicalValue: "High", sourceField: "overallSeverity" }),
-      expect.objectContaining({ section: "polestarView", canonicalValue: "falling", sourceField: "marketIndicators.Brent.direction" }),
-      expect.objectContaining({ section: "whatMatters", canonicalValue: "1", sourceField: "incidentCount" }),
-      expect.objectContaining({ section: "situation", canonicalValue: "1", sourceField: "currentConditions" }),
+      expect.objectContaining({ section: "situation", sourceField: "incidentCount" }),
+      expect.objectContaining({ section: "whatMatters", sourceField: "incidentCount" }),
+      expect.objectContaining({ section: "polestarView", sourceField: "marketIndicators.Brent.direction" }),
     ]));
   });
 
@@ -180,6 +186,7 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
       });
       const statedCount = watch?.read.match(/(\d+)\s+distinct chokepoint incidents?/i)?.[1];
       if (statedCount !== undefined) expect(Number(statedCount)).toBeLessThanOrEqual(model.incidentCount);
+      expect(watch?.read).not.toMatch(/\d+\s+distinct chokepoint incidents?/i);
       expect(watch?.currentItems.length ?? 0).toBeLessThanOrEqual(model.incidentCount);
     }
   });

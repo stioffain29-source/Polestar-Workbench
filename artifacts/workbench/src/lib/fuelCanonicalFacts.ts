@@ -9,7 +9,7 @@
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
 import { deriveIncidentCountry } from "./shippingCountry";
 import { isSocialPostTitle } from "./fuelReportFacts";
-import { capFuelMarketSeverity } from "./fuelNarratives";
+import { capFuelMarketSeverity, buildFuelAnalyticalSections } from "./fuelNarratives";
 
 export const FUEL_SEVERITIES = ["Insignificant", "Low", "Moderate", "High", "Extreme"] as const;
 export type FuelSeverity = (typeof FUEL_SEVERITIES)[number];
@@ -402,127 +402,12 @@ function evidenceCoverageSentence(observed: number, count: number): string {
 }
 
 export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanonicalSections {
-  const count = facts.incidentCount;
-  const days = facts.distinctIncidentDates.length;
-  const severity = facts.overallSeverity;
-  const top = facts.highestPriorityIncident;
-  const pressure = pressureSentence(facts);
-  const observed = facts.currentConditions.length;
-  const secondary = facts.secondaryPressurePoints.map((p) => p.label);
-  const market = marketSentence(facts);
-  const primaryLabel = facts.primaryPressurePoint.label;
-
-  const executiveSummary = count === 0
-    ? `No fuel-market incidents were logged this period. Overall severity: ${severity}. ${market}`
-    : top
-      ? `The week is led by “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, dated ${top.date}. ${pressure} ${count} incidents were logged across ${days} reporting day${days === 1 ? "" : "s"}. Overall severity: ${severity}. ${market}`
-      : `${count} fuel-market incidents were logged across ${days} reporting day${days === 1 ? "" : "s"}. ${pressure} Overall severity: ${severity}. ${market}`;
-
-  const situation = [
-    evidenceCoverageSentence(observed, count),
-    top
-      ? `The highest-priority incident is “${proseSafeTitle(top.title)}” at ${top.physicalLocation ?? UNKNOWN}. Overall severity: ${severity}.`
-      : `Overall severity: ${severity}.`,
-    pressure,
-  ].filter(Boolean).join(" ");
-
-  const period = facts.reportingPeriod.incidentStart && facts.reportingPeriod.incidentEnd
-    ? (facts.reportingPeriod.incidentStart === facts.reportingPeriod.incidentEnd
-        ? `on ${facts.reportingPeriod.incidentStart}`
-        : `between ${facts.reportingPeriod.incidentStart} and ${facts.reportingPeriod.incidentEnd}`)
-    : "in the reporting period";
-  const whatHappened = count === 0
-    ? "No qualifying incidents were recorded in the reporting period."
-    : `${count} qualifying incident${count === 1 ? " was" : "s were"} recorded ${period}, across ${list(facts.countries.slice(0, 3).map((c) => c.label))}${facts.countries.length > 3 ? " and elsewhere" : ""}. ${top ? `The lead event, dated ${top.date}, is “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` (${top.physicalLocation})` : ""}, rated ${severityWord(top.severity)}.` : "No lead event is identified."}`;
-
-  const theatreDetail = (label: string, ids: string[]): { sentence: string; leadId: string } | null => {
-    const rows = facts.qualifyingIncidents.filter((i) => ids.includes(i.id));
-    if (!rows.length) return null;
-    const lead = rows
-      .slice()
-      .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || (a.date < b.date ? 1 : -1))[0];
-    const countClause = rows.length === 1 ? "one record" : `${rows.length} records`;
-    return {
-      leadId: lead.id,
-      sentence: `${label} carries ${countClause} this period, led by “${proseSafeTitle(lead.title)}” (${lead.date}, ${severityWord(lead.severity)} severity).`,
-    };
+  const analytical = buildFuelAnalyticalSections(facts);
+  const marketRead = marketSentence(facts);
+  return {
+    ...analytical,
+    marketRead,
   };
-  const pressureGroups: Array<{ label: string; incidentIds: string[]; kind: "country" | "route" }> =
-    facts.primaryPressurePoint.kind === "distributed"
-      ? [
-          ...facts.countries.slice(0, 3).map((c) => ({ kind: "country" as const, label: c.label, incidentIds: c.incidentIds })),
-          ...facts.routes.slice(0, 2).map((r) => ({ kind: "route" as const, label: r.label, incidentIds: r.incidentIds })),
-        ]
-      : [
-          { kind: facts.primaryPressurePoint.kind, label: facts.primaryPressurePoint.label, incidentIds: facts.primaryPressurePoint.incidentIds },
-          ...facts.secondaryPressurePoints.slice(0, 3).map((p) => ({ kind: p.kind, label: p.label, incidentIds: p.incidentIds })),
-        ];
-  const seenLeadIds = new Set<string>();
-  const theatreSentences: string[] = [];
-  for (const g of pressureGroups) {
-    const detail = theatreDetail(g.label, g.incidentIds);
-    if (!detail || seenLeadIds.has(detail.leadId)) continue;
-    seenLeadIds.add(detail.leadId);
-    theatreSentences.push(detail.sentence);
-  }
-
-  const regionalLead = facts.primaryPressurePoint.kind === "distributed"
-    ? (() => {
-        const countryLabels = facts.countries.slice(0, 3).map((c) => c.label);
-        const routeLabels = facts.routes.slice(0, 3).map((r) => r.label);
-        const parts: string[] = [];
-        if (countryLabels.length) parts.push(`country pressure is spread across ${list(countryLabels)}`);
-        if (routeLabels.length) parts.push(`routing exposure sits on ${list(routeLabels)}`);
-        return `${parts.join("; ")} rather than concentrating in one theatre. Overall severity: ${severity}.`;
-      })()
-    : facts.primaryPressurePoint.kind === "route"
-      ? `${primaryLabel} anchors routing exposure${secondary.length ? `, with secondary country pressure in ${list(secondary.filter((l) => !facts.routes.some((r) => r.label === l)))}` : ""}. Overall severity: ${severity}.`
-      : `${primaryLabel} anchors the regional picture${secondary.length ? `, with secondary routing exposure in ${list(secondary.filter((l) => !facts.countries.some((c) => c.label === l)))}` : ""}. Overall severity: ${severity}.`;
-  const regionalHighlights = [regionalLead, theatreSentences.join(" ")]
-    .filter((s) => s.trim())
-    .join("\n\n");
-
-  const whatMatters = count === 0
-    ? `${pressure} Overall severity: ${severity}. ${market}`
-    : `${pressure} With ${count} incidents this period, the supply and cost picture turns on ${primaryLabel} and adjacent routing exposure. ${market} Overall severity: ${severity}.`;
-
-  const polestarView = facts.analystReviewRequired
-    ? `Hold wider circulation until analyst review completes. ${pressure} Overall severity: ${severity}. Evidence confidence is ${facts.evidenceConfidence.toLowerCase()} on the current sourcing base.`
-    : `Polestar treats ${primaryLabel} as the anchor for continuity planning this week. Overall severity: ${severity}. Evidence confidence is ${facts.evidenceConfidence.toLowerCase()} on the qualifying record set.`;
-
-  const marketRead = market;
-
-  const opLead = `${count} incident${count === 1 ? "" : "s"} across ${days} day${days === 1 ? "" : "s"} frame the operational picture. ${pressure} Overall severity: ${severity}.`;
-  const opDetailParts: string[] = [];
-  if (top) {
-    opDetailParts.push(
-      `The period's most serious event is “${proseSafeTitle(top.title)}”${top.physicalLocation ? ` at ${top.physicalLocation}` : ""} on ${top.date}, rated ${severityWord(top.severity)}.`,
-    );
-  }
-  if (theatreSentences.length) {
-    const rest = theatreSentences.filter((s) => !top || !s.includes(proseSafeTitle(top.title)));
-    if (rest.length) opDetailParts.push(rest.join(" "));
-  }
-  if (count > 0) {
-    opDetailParts.push(
-      "Where refinery, export or chokepoint disruption persists in these theatres, expect continued cost pressure and a live risk of localised availability gaps rather than a system-wide failure.",
-    );
-  }
-  const operationalRead = [opLead, opDetailParts.join(" ")]
-    .filter((s) => s.trim())
-    .join("\n\n");
-
-  const implications = [
-    `- Align fuel continuity and generator cover to ${primaryLabel}.`,
-    `- Contract and surcharge clauses should assume ${severity} severity exposure through the next billing cycle.`,
-    `- Reconcile supplier, route and on-site stock assumptions against this week's incident set (${count} record${count === 1 ? "" : "s"}).`,
-  ].join("\n");
-
-  const watchNext = facts.watchIndicators.length
-    ? facts.watchIndicators.map((x) => `- ${x}`).join("\n")
-    : "- Monitor for new evidence before classifying a condition as current.";
-
-  return { executiveSummary, situation, whatHappened, regionalHighlights, whatMatters, polestarView, marketRead, operationalRead, implications, watchNext };
 }
 
 function err(section: string, conflictingStatement: string, canonicalValue: unknown, sourceField: string): FuelConsistencyError {
@@ -538,32 +423,35 @@ function statementSnippet(body: string, re: RegExp): string {
 /** Validate renderer-ready prose. Errors are intentionally structured for UI and PDF callers. */
 export function validateFuelReportConsistency(facts: FuelCanonicalFacts, sections: FuelCanonicalRenderableSections): FuelConsistencyError[] {
   const errors: FuelConsistencyError[] = [];
-  const canonicalSeverity = facts.overallSeverity;
   const primary = facts.primaryPressurePoint.label;
-  // When no unique leader exists the canonical label is the sentinel
-  // "Distributed pressure", but the canonical sections legitimately phrase it
-  // as "pressure is distributed across …" — accept either form so the
-  // builder's own output always passes its own gate.
   const mentionsPrimary = (body: string): boolean =>
     body.toLowerCase().includes(primary.toLowerCase()) ||
     (facts.primaryPressurePoint.kind === "distributed" && /\bdistributed\b/i.test(body));
   const directions = facts.marketIndicators;
+  const VOLUME_PROSE_RE =
+    /\b\d+\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(?:incidents?|records?|events?|reports?|days?)\b|\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;
   for (const [section, body] of Object.entries(sections)) {
     if (!body) continue;
-    const severity = extractSeverity(body);
-    if (severity && severity.toLowerCase() !== canonicalSeverity.toLowerCase()) errors.push(err(section, statementSnippet(body, /overall severity:.{0,30}/i), canonicalSeverity, "overallSeverity"));
-    if (/primary pressure point/i.test(body) && !mentionsPrimary(body)) errors.push(err(section, statementSnippet(body, /[^.]*primary pressure point[^.]*/i), primary, "primaryPressurePoint.label"));
-    const currentClaim = body.match(/Current,\s*non-potential evidence covers (\d+) of the reporting period's (\d+) qualifying incidents?/i);
-    const countClaim = body.match(/(\d+)\s+qualifying incidents?/i)?.[1];
-    if (countClaim !== undefined && currentClaim === null && Number(countClaim) !== facts.incidentCount) errors.push(err(section, statementSnippet(body, /\d+\s+qualifying incidents?/i), facts.incidentCount, "incidentCount"));
-    const dayClaim = body.match(/(\d+)\s+distinct (?:reporting )?days?/i)?.[1];
-    if (dayClaim !== undefined && Number(dayClaim) !== facts.distinctIncidentDates.length) errors.push(err(section, statementSnippet(body, /\d+\s+distinct (?:reporting )?days?/i), facts.distinctIncidentDates.length, "distinctIncidentDates"));
-    if (currentClaim !== null) {
-      if (Number(currentClaim[1]) !== facts.currentConditions.length) {
-        errors.push(err(section, statementSnippet(body, /Current,\s*non-potential evidence covers \d+ of the reporting period's \d+ qualifying incidents?/i), facts.currentConditions.length, "currentConditions"));
+    if (VOLUME_PROSE_RE.test(body)) {
+      errors.push(err(section, statementSnippet(body, VOLUME_PROSE_RE), "none in analytical prose", "incidentCount"));
+    }
+    if (/overall severity:/i.test(body)) {
+      errors.push(err(section, statementSnippet(body, /overall severity:.{0,30}/i), "omit rating boilerplate from prose", "overallSeverity"));
+    }
+    if (/qualifying record set/i.test(body)) {
+      errors.push(err(section, statementSnippet(body, /qualifying record set/i), "omit source-volume phrasing", "incidentCount"));
+    }
+    if (/primary pressure point/i.test(body) && !mentionsPrimary(body)) {
+      errors.push(err(section, statementSnippet(body, /[^.]*primary pressure point[^.]*/i), primary, "primaryPressurePoint.label"));
+    }
+    for (const indicator of directions) {
+      const name = indicator.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const nearby = new RegExp(`${name}[^.;]{0,80}`, "i").exec(body)?.[0] ?? "";
+      if (indicator.direction === "falling" && /\b(rising|firming|not retreating)\b/i.test(nearby)) {
+        errors.push(err(section, nearby, "falling", `marketIndicators.${indicator.label}.direction`));
       }
-      if (Number(currentClaim[2]) !== facts.incidentCount) {
-        errors.push(err(section, statementSnippet(body, /Current,\s*non-potential evidence covers \d+ of the reporting period's \d+ qualifying incidents?/i), facts.incidentCount, "incidentCount"));
+      if (indicator.direction === "rising" && /\b(falling|easing|retreating)\b/i.test(nearby)) {
+        errors.push(err(section, nearby, "rising", `marketIndicators.${indicator.label}.direction`));
       }
     }
     if (section === "gulfAndHormuzChokepointWatch") {
@@ -577,31 +465,6 @@ export function validateFuelReportConsistency(facts: FuelCanonicalFacts, section
         ));
       }
     }
-    // Anchor on the CLOSING title quote (greedy prefix takes the last one) so
-    // an " at " inside the incident title ("Fire at Baiji oil complex…") can't
-    // shift the capture off the actual location slot the builder emits.
-    const locationClaim = body.match(/highest-priority incident is [\s\S]*” at (.+?)\. Overall severity:/i)?.[1]?.trim();
-    if (locationClaim && locationClaim !== (facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN)) errors.push(err(section, locationClaim, facts.highestPriorityIncident?.physicalLocation ?? UNKNOWN, "qualifyingIncidents[].physicalLocation"));
-    for (const indicator of directions) {
-      const name = indicator.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      // Stop the window at a clause boundary (semicolon or full stop) so a
-      // multi-indicator sentence ("Brent crude is rising; Jet fuel is
-      // falling.") can't leak the NEXT indicator's direction word into this
-      // indicator's check — that false-blocked the whole fuel report
-      // whenever the indicators genuinely diverged. Colons deliberately do
-      // NOT stop the window: "Brent crude: rising" is a same-indicator
-      // label-to-predicate form and must stay checkable.
-      const nearby = new RegExp(`${name}[^.;]{0,80}`, "i").exec(body)?.[0] ?? "";
-      if (indicator.direction === "falling" && /\b(rising|firming|not retreating)\b/i.test(nearby)) errors.push(err(section, nearby, "falling", `marketIndicators.${indicator.label}.direction`));
-      if (indicator.direction === "rising" && /\b(falling|easing|retreating)\b/i.test(nearby)) errors.push(err(section, nearby, "rising", `marketIndicators.${indicator.label}.direction`));
-    }
-  }
-  const core: Array<[keyof FuelCanonicalSections, string]> = [["executiveSummary", "Executive Summary"], ["situation", "Situation"], ["regionalHighlights", "Regional Highlights"], ["whatMatters", "What Matters"], ["polestarView", "Polestar View"]];
-  for (const [key, label] of core) {
-    const body = sections[key];
-    if (!body) continue;
-    if (!body.includes(`Overall severity: ${canonicalSeverity}`)) errors.push(err(label, body, canonicalSeverity, "overallSeverity"));
-    if (!mentionsPrimary(body)) errors.push(err(label, body, primary, "primaryPressurePoint.label"));
   }
   return errors;
 }

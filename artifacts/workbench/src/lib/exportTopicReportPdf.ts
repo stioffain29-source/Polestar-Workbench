@@ -1011,7 +1011,11 @@ export async function exportTopicReportPdf(
   // shipping report does and pass it through; otherwise fall back to the
   // gradient hero. The image load is wrapped in try/catch so a missing or
   // unreadable asset never blocks PDF export.
-  const win = resolveReportWindow(data.topic, data.issueDate);
+  const isFuel = data.topic === "fuel";
+  const fuelIssueDate = isFuel
+    ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
+    : data.issueDate;
+  const win = resolveReportWindow(data.topic, fuelIssueDate);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   const topicCoverUrl = TOPIC_COVER_URLS[data.topic];
   if (topicCoverUrl) {
@@ -1038,17 +1042,7 @@ export async function exportTopicReportPdf(
   beginBodyPages(ctx);
 
   const aiProse = options.aiProse ?? null;
-  const isFuel = data.topic === "fuel";
-  // Canonical Fuel Watch payload — shared by preview/PDF/editor. Its Gulf &
-  // Hormuz Chokepoint Watch is a bounded canonical subset, so it cannot
-  // introduce records outside the report's qualifying incident total.
-  // Fuel Watch is market-anchored: the effective report date is the latest
-  // market close it carries (falling back to the stored issue date), exactly
-  // as the on-screen preview computes it — so the canonical facts, the
-  // incident window and the consistency gate are IDENTICAL in preview and PDF.
-  const fuelIssueDate = isFuel
-    ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
-    : data.issueDate;
+  // fuelIssueDate computed above for cover/body parity with preview.
   const fuelData = isFuel
     ? buildFuelWatchReportData(
         {

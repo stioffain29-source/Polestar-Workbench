@@ -307,23 +307,19 @@ export function buildFuelWatchReportData(
       : [];
   const jetFuelBenchmarkLabel = resolveBenchmark(report.hardNumbers);
 
-  // Fast Facts order: Brent, WTI, jet fuel, any other price cards
-  // (e.g. pump, diesel), then supply / policy / routes. Never any
-  // incident-derived fallbacks.
+  // Fast Facts order: Brent, WTI, jet fuel, then any other price cards
+  // (e.g. pump, diesel). Supply / policy / route tallies stay out of Fast
+  // Facts — they are incident-volume metrics, not market observations.
   const fastFactsCards: FuelDataCard[] = [];
   if (brent) fastFactsCards.push(brent);
   if (wti) fastFactsCards.push(wti);
   if (jetFuel) fastFactsCards.push(jetFuel);
   for (const p of prices) {
     if (p === brent || p === wti || p === jetFuel) continue;
-    // Skip a duplicate jet card if jetFuel was derived from prices[] above.
     if (jetFuel && p === jetFuel) continue;
     if (JET_RE.test(cardHaystack(p))) continue;
     fastFactsCards.push(p);
   }
-  for (const c of parsed.supply) fastFactsCards.push(c);
-  for (const c of parsed.policy) fastFactsCards.push(c);
-  for (const c of parsed.routes) fastFactsCards.push(c);
 
   // Related-incident filtering uses the topic window + topic-relevance
   // filter so a hiking story that happens to say "fuel" is dropped.
