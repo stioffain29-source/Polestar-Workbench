@@ -1,20 +1,9 @@
 /**
  * @jest-environment jsdom
  *
- * Locks the Cargo Watch report fetch.
- *
- * The server's GENERAL text-relevance gate marks most genuine cargo theft
- * (warehouse / truck / depot loss) "irrelevant"; the authoritative gate for
- * Cargo Watch is the cargo scope classifier (isCargoInScope). The cargo MONITOR
- * and CountryReport both bypass the server gate by fetching includeIrrelevant
- * and trusting the scope classifier. The report editor used a plain,
- * relevance-gated fetch, so those rows never reached the cargo report and its
- * record count collapsed to the handful the general gate let through — the
- * reported bug: "info from the cargo page isn't making it to the report".
- *
- * This test asserts the editor issues the includeIrrelevant cargo fetch so the
- * report is grounded on the same rows the monitor shows. If a future change
- * drops that fetch, the report silently starves again and this fails.
+ * Locks the product-wide relevance boundary for Cargo Watch reports. Structured
+ * promoted cargo events must be marked relevant when they are created; the
+ * report editor must never bypass persisted relevance with a raw fetch.
  */
 import { render, waitFor } from "@testing-library/react";
 
@@ -128,7 +117,7 @@ beforeEach(() => {
   listIncidentsCalls.length = 0;
 });
 
-it("fetches cargo incidents with includeIrrelevant for a Cargo Watch report", async () => {
+it("fetches Cargo Watch incidents without bypassing persisted relevance", async () => {
   mockReportData = {
     id: 1,
     topic: "cargo_watch",
@@ -137,14 +126,8 @@ it("fetches cargo incidents with includeIrrelevant for a Cargo Watch report", as
     issueDate: "2026-07-05",
   };
   render(<ReportEditor />);
-  await waitFor(() => {
-    expect(
-      listIncidentsCalls.some(
-        (c) =>
-          c != null &&
-          c.topic === "cargo_watch" &&
-          c.includeIrrelevant === true,
-      ),
-    ).toBe(true);
-  });
+  await waitFor(() =>
+    expect(listIncidentsCalls.some((c) => c?.topic === "cargo_watch")).toBe(true),
+  );
+  expect(listIncidentsCalls.some((c) => c?.includeIrrelevant === true)).toBe(false);
 });

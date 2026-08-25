@@ -19,7 +19,9 @@ DB at permissive ingest and was filtered ONLY at display-time on SOME frontend
 surfaces (Dashboard, Reports gated; Topic/Incidents/Map/Timeline + server topic
 COUNTS leaked). One engine + persisted columns + a central server filter kills the
 per-surface whack-a-mole. User preference: "signal thin > noise in" (conservative
-false-drops are acceptable).
+false-drops are acceptable). The owner subsequently clarified the product-wide
+invariant: every surface is incident-focused; geography, source membership,
+topic vocabulary, or a client-side scope filter can never admit a row by itself.
 
 **The non-obvious safety fact:** the GENERIC topic report path
 (`exportTopicReportPdf` / `draftReportProse` / `topicFastFacts`) ALREADY gated
@@ -31,9 +33,9 @@ report builder already applied the same `isTopicRelevant` — if it did, you are
 unifying, not regressing.
 
 **How to apply:**
-- Default API filter = exclude `relevanceStatus='irrelevant'`, ALLOW NULL
-  (fail-open) so nothing vanishes mid-rollout (`artifacts/api-server/src/lib/relevanceFilter.ts`).
-  Manual-created rows show until evaluated — correct (analyst added them on purpose).
+- Default API filter = allow ONLY `relevanceStatus='relevant'`; NULL/unevaluated
+  rows fail closed. Normal monitor/report consumers must never request
+  `includeIrrelevant`; that escape hatch is review/admin tooling only.
 - Admin/raw escape hatch `?includeIrrelevant=true` is read directly off `req.query`
   (NOT in the OpenAPI spec) so no codegen churn; the typed client never sends it.
 - To RE-CLEAN the whole table against changed rules: bump `RELEVANCE_RULE_VERSION`;

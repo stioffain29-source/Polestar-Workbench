@@ -131,17 +131,8 @@ function isTapaIncident(i: { analystNotes?: string | null; source?: string | nul
 }
 
 export default function CargoWatch() {
-  // includeIrrelevant=true: Cargo Watch MUST NOT inherit the server's persisted
-  // relevance verdict. That verdict is the general TOPIC classifier, which marks
-  // many genuine cargo thefts (a cigarette-distributor warehouse raid with a
-  // fatality, ship stowaways, a one-ton commodity haul, a clothing-warehouse
-  // robbery) as "irrelevant" and drops them before they ever reach the browser —
-  // leaving the 30-day view implausibly empty. This page already re-derives
-  // scope per row via classifyScope (the curated cargo gate), so we fetch raw
-  // and let that gate be the single source of truth. Mirrors CountryReport.
   const { data: incidents = [], isLoading } = useListIncidents({
     topic: "cargo_watch",
-    includeIrrelevant: true,
   } as never);
   // Defaults to 30 days — matches Cargo Watch's monthly cadence. An "all
   // time" default meant this page opened buried under the full incident

@@ -269,8 +269,7 @@ export default function ReportEditor() {
   // Window builders read these buckets: a fuel report also cross-reads shipping
   // (producer/operational actions); a flashpoint/protests report draws from
   // BOTH the live flashpoint bucket and the legacy protests bucket. Every other
-  // topic reads only its own rows (cargo adds a raw includeIrrelevant fetch
-  // below and discards the gated primary set).
+  // topic reads only its own relevance-gated rows.
   const primaryTopic = activeTopic === "protests" ? "flashpoint" : activeTopic;
   const secondaryTopic =
     activeTopic === "fuel"
@@ -333,31 +332,7 @@ export default function ReportEditor() {
     },
   });
 
-  // Cargo Watch's authoritative scope gate is isCargoInScope (APAC/ME cargo
-  // crime) — NOT the server's general text-relevance gate, which wrongly marks
-  // most genuine cargo theft "irrelevant". The cargo monitor and CountryReport
-  // both fetch includeIrrelevant for exactly this reason; the scoped fetch above
-  // is relevance-gated, so those rows never reached the cargo report and its
-  // record count collapsed to the handful the general gate let through. Fetch
-  // the raw cargo set (only while editing a cargo report) and splice it in over
-  // the gated cargo subset. Every downstream builder re-applies
-  // filterTopicReportIncidents → isCargoInScope, so this admits exactly the rows
-  // the monitor shows and leaves all other topics byte-identical.
-  const isCargoReport = activeTopic === "cargo_watch";
-  const cargoRawParams = { topic: "cargo_watch", includeIrrelevant: true };
-  const { data: rawCargoIncidents } = useListIncidents(cargoRawParams as never, {
-    query: {
-      enabled: isCargoReport,
-      queryKey: getListIncidentsQueryKey(cargoRawParams as never),
-    },
-  });
-  const incidents = useMemo(() => {
-    if (!rawIncidents) return undefined;
-    if (!isCargoReport) return rawIncidents;
-    if (!rawCargoIncidents) return undefined;
-    const nonCargo = rawIncidents.filter((i) => i.topic !== "cargo_watch");
-    return [...nonCargo, ...rawCargoIncidents];
-  }, [isCargoReport, rawIncidents, rawCargoIncidents]);
+  const incidents = rawIncidents;
   // Maritime movement (AIS) context for the Shipping Watch report. Context
   // only — never an incident; the board degrades to "movement data
   // unavailable" when empty.

@@ -6,8 +6,8 @@ import { isIndonesianPapuaTheatreContext } from "../../artifacts/workbench/src/l
 
 // The `apac_local` direct-outlet RSS topic (Jubi, PNG Post-Courier, RNZ Pacific,
 // BenarNews, …) is a broad local-coverage feed. Country briefs read incidents by
-// COUNTRY across ALL topics (no topic filter) — CountryReport fetches
-// includeIrrelevant rows and filters by country — so an `apac_local` row tagged
+// COUNTRY across ALL relevance-gated topics (no topic filter), then applies the
+// stricter country-security filter — so an `apac_local` row tagged
 // country="West Papua" flows into the West Papua brief automatically, exactly as
 // an `indonesia_local` row flows into the Indonesia/Jakarta briefs. These tests
 // PIN that behaviour end-to-end through the structured builder so a future

@@ -213,27 +213,19 @@ export default function CountryReport() {
   // Papua from Papua New Guinea. `incidentMatchesCountry` does token-
   // exact group matching (see countryMatch.ts).
   //
-  // includeIrrelevant=true: country reports MUST NOT inherit the server's
-  // persisted relevance verdict. That verdict is the general TOPIC classifier
-  // (e.g. it keeps a fuel-subsidy story as "relevant to fuel" and drops an
-  // armed-robbery story as "irrelevant to protests"), which is exactly
-  // backwards for a SECURITY country aggregate. We fetch raw and let this
-  // page's own `isCountryRelevant` gate (applied in buildCountryLayers) be the
-  // single source of truth, so the report is self-consistent and identical in
-  // dev and prod regardless of how each DB persisted relevance.
   // Server-side SUPERSET pre-filter: scope the 90-day fetch to rows whose
   // country field contains one of this report's accepted tokens. Without it the
   // server returned the ENTIRE 90-day incidents table (~16k rows) for EVERY
   // country and joined corroborations over all of them — the root cause of the
   // Indonesia tab freeze. countryFetchTokens guarantees a superset of the rows
-  // this page keeps (Jakarta scoped to the Indonesia group), so the client
-  // isCountryRelevant gate below remains the authoritative filter.
+  // this page keeps (Jakarta scoped to the Indonesia group). The persisted
+  // relevance gate runs first; isCountryRelevant then applies the stricter
+  // country-security scope.
   const incidentFetchParams = useMemo(() => {
     if (!country) return {};
     const tokens = countryFetchTokens(country.name ?? "");
     return {
       days: 90,
-      includeIrrelevant: true,
       ...(tokens.length ? { countryLike: tokens.join(",") } : {}),
     };
   }, [country]);

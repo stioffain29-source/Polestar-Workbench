@@ -37,7 +37,7 @@ function classify(title: string, summary = "") {
   return classifyNewsItem(INDONESIA_LOCAL_CONFIG, title, summary);
 }
 
-describe("indonesia_local relevance (geographic gate)", () => {
+describe("indonesia_local relevance (incident-first, then geographic scope)", () => {
   it("keeps an in-region Indonesian protest", () => {
     expect(verdict("Ribuan buruh demonstrasi tolak upah minimum di Jakarta").relevant).toBe(
       true,
@@ -68,6 +68,25 @@ describe("indonesia_local relevance (geographic gate)", () => {
 
   it("keeps the underlying disaster incident rather than its charity aftermath", () => {
     expect(verdict("Gempa rusak ratusan rumah dan melukai warga di NTT").relevant).toBe(true);
+  });
+
+  it.each([
+    "Umat Muslim Jayawijaya memperingati Maulid Nabi Muhammad",
+    "Papua government distributes school aid to local students",
+    "Biak airport hosts community preparedness seminar",
+    "Tourism activity grows across Raja Ampat",
+  ])("drops local general-news coverage with no operational incident: %s", (title) => {
+    const result = verdict(title);
+    expect(result.relevant).toBe(false);
+    expect(result.reason).toMatch(/no approved operational incident family/);
+  });
+
+  it("does not let incident vocabulary in the summary rescue a non-incident headline", () => {
+    const result = verdict(
+      "Jayawijaya community marks religious holiday",
+      "Residents later discussed assistance for earthquake victims.",
+    );
+    expect(result.relevant).toBe(false);
   });
 
   it("drops foreign wire copy with no Indonesian anchor", () => {

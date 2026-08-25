@@ -1,23 +1,20 @@
 ---
 name: Country report op-ed / debate leak
-description: Why an "irrelevant news item shows in a country report" is fixed in isCountryRelevant, not the server gate, and why foreign-language op-eds slip through.
+description: Country reports are double-gated by persisted relevance and isCountryRelevant; foreign-language op-eds require raw-title client exclusions too.
 ---
 
 # Country report op-ed / debate leak
 
-A country report (e.g. PNG / West Papua "Top 3 incidents this week") can surface a
-non-incident OPINION/DEBATE piece even when the SERVER already marked it
-`relevance_status='irrelevant'`.
+A country report is double-gated: the API first admits only rows explicitly
+persisted as relevant, then `isCountryRelevant` applies the stricter
+country-security predicate. It must never fetch `includeIrrelevant`.
 
-**Why:** the country report DELIBERATELY ignores the persisted server verdict — it
-fetches `includeIrrelevant: true` and re-derives relevance client-side via
-`isCountryRelevant` (the topic classifier is "backwards" for a security aggregate:
-it keeps a fuel-subsidy story and drops an armed robbery). So `isCountryRelevant`
-is the SINGLE authority for country-report display. Fixing "shows irrelevant item"
-means editing `isCountryRelevant` in `lib/relevance/src/topicRelevance.ts` — NOT
-the server gate, and NO `RELEVANCE_RULE_VERSION` bump (that constant only governs
-the persisted `evaluateRelevance` path; `isCountryRelevant` is frontend-only and
-takes effect immediately client-side).
+**Why:** the owner clarified that incident focus is product-wide. A topic verdict
+cannot be bypassed merely because the country aggregate has an additional scope
+classifier. `isCountryRelevant` remains necessary to reject topic-relevant but
+country-security-irrelevant material; it is defense-in-depth, not sole authority.
+Changes to the persisted engine require a relevance-version bump/backfill;
+frontend-only country exclusions do not.
 
 **Second trap:** `isCountryRelevant`'s editorial excludes (explainer/op-ed) are
 ENGLISH-keyword based, but the relevance `haystack` carries the record's RAW,
@@ -46,7 +43,8 @@ suspect" and a kidnap/hostage rescue survive. **"police" / "security forces" are
 deliberately NOT soft-signal words** — otherwise every support item rescues
 itself. Keep blotter excludes SUSPECT-anchored (`apprehend…suspect` /
 `suspect…rescued|held captive`), never a bare "rescued by police" (that would
-drop a real hostage rescue). Same frontend authority → no version bump.
+drop a real hostage rescue). A client-only country-gate edit needs no relevance
+version bump; a persisted-engine change does.
 
 **Sports leak past bare-noun gate:** `COUNTRY_SPORTS_NOISE_RE` originally matched
 only explicit sport NOUNS (soccer/tournament/league). A match write-up that

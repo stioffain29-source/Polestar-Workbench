@@ -2,7 +2,7 @@ import { isCountryRelevant, type RelevanceInput } from "@workspace/relevance";
 
 // Locks in the country-report relevance drops added for the PNG brief cleanup.
 // Country reports treat `isCountryRelevant` as the SOLE relevance authority
-// (they fetch raw with `includeIrrelevant` and ignore the stored
+// (they consume persisted-relevant rows and then apply the stricter
 // `relevance_status`), so these gates live here, not in `explainRelevance`, and
 // need no `RELEVANCE_RULE_VERSION` bump. Two non-event classes must stop
 // surfacing as incidents:

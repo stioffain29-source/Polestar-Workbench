@@ -35,7 +35,7 @@ function classify(title: string, summary = "") {
   return classifyNewsItem(APAC_LOCAL_CONFIG, title, summary);
 }
 
-describe("apac_local relevance (geographic gate)", () => {
+describe("apac_local relevance (incident-first, then geographic scope)", () => {
   it("keeps an in-region Philippine protest", () => {
     expect(verdict("Thousands protest fuel price hike in Manila").relevant).toBe(true);
   });
@@ -60,10 +60,28 @@ describe("apac_local relevance (geographic gate)", () => {
     expect(r.reason).toMatch(/out-of-region/);
   });
 
-  it("keeps a story that names both a foreign and an APAC theatre", () => {
-    expect(verdict("US envoy meets officials in Manila over security ties").relevant).toBe(
-      true,
-    );
+  it("does not let APAC geography admit a non-incident diplomatic meeting", () => {
+    const result = verdict("US envoy meets officials in Manila over security ties");
+    expect(result.relevant).toBe(false);
+    expect(result.reason).toMatch(/no approved operational incident family/);
+  });
+
+  it.each([
+    "Papua community raises funds for earthquake victims",
+    "Bangkok university hosts public safety seminar",
+    "Manila officials distribute school supplies to local families",
+    "FLASH UPDATE #2 - Earthquake and Tsunami – Flores and surrounding areas",
+  ])("drops local non-incident coverage: %s", (title) => {
+    expect(verdict(title).relevant).toBe(false);
+  });
+
+  it.each([
+    "Maymay makes landfall over Magsingal in Ilocos Sur",
+    "[Walang Pasok] Class suspensions, Thursday, August 6, 2026",
+    "Manhunt for cop killers widens",
+    "WNA mencuri baju di toko yoga di Ubud",
+  ])("keeps a concrete operational incident: %s", (title) => {
+    expect(verdict(title).relevant).toBe(true);
   });
 });
 

@@ -1090,6 +1090,21 @@ const FP_OFFSHORE_THEATRE_RE =
 const INDONESIA_ANCHOR_RE =
   /\b(?:indonesia|indonesian|indonesians|jakarta|jabodetabek|jawa|java|sumatra|sumatera|sulawesi|kalimantan|borneo|aceh|bali|lombok|maluku|nusa tenggara|papua|papua barat|west papua|jayapura|wamena|timika|nabire|merauke|manokwari|sorong|biak|surabaya|bandung|semarang|makassar|palembang|yogyakarta|jogja|bekasi|depok|tangerang|bogor|batam|pekanbaru|padang|banjarmasin|pontianak|samarinda|balikpapan|manado|denpasar|mataram|kupang|ambon|jambi|lampung|bengkulu|banten|cirebon|malang|gorontalo|ternate|palu|kendari|riau|polri|tni|bnpb|bmkg|basarnas|densus 88|jokowi|prabowo)\b/i;
 
+// indonesia_local is an INCIDENT feed, never a general local-news feed.
+// Geography only scopes an already-operational record; it cannot admit one.
+// Require the RAW headline itself (not a noisy summary) to identify one of the
+// approved incident families. Bahasa and English forms mirror the ingest feed
+// families, but deliberately omit broad venue words such as bare "bandara" /
+// "airport" and "pelabuhan" / "port", which admit PR and civic diary coverage.
+const LOCAL_OPERATIONAL_INCIDENT_TITLE_RE =
+  /\b(?:demonstrasi|unjuk rasa|kerusuhan|bentrok(?:an)?|rusuh|ricuh|aksi massa|unras|tawuran|demo (?:mahasiswa|buruh|warga|tolak|ricuh)|aksi demo|gelar demo|protests?|protesters?|riots?|unrest|clash(?:es|ed|ing)?|demonstrations?|rall(?:y|ies)|rali (?:ng|laban|kontra)|welga(?:ng bayan)?|march(?:es|ed|ing)?|picket(?:s|ed|ing)?|blockade|curfew|martial law|state of emergency|crackdown|pembunuhan|penembakan|perampokan|begal|pencurian|mencuri|dicuri|penikaman|penculikan|tindak kriminal|kriminal|curanmor|geng motor|kkb|narkoba|senpi|tewas|meninggal|kematian|murder|shooting|shot dead|robbery|theft|stabbing|kidnap(?:ping|ped)?|abduction|homicide|assault|extortion|drug bust|drug trafficking|human trafficking|gang (?:war|violence)|barilan|pamamaril|nakawan|holdap|saksak|patayan|pagpatay|manhunt|killers?|killed|dead|fatal(?:ity|ities)?|arrest(?:s|ed)?|weapons? seiz(?:e|ed|ure)|firearms?|banjir|longsor|gempa|tsunami|erupsi|gunung meletus|letusan|mengungsi|evakuasi|flood(?:ing|ed)?|landslide|mudslide|earthquake|quake|aftershock|eruption|volcano|volcanic|typhoon|cyclone|tropical storm|storm surge|landfall|bagyo|lindol|bulkan|pagguho|pagbaha|bumaha|binaha|evacuat(?:e|ed|ion)|imbauan (?:kepada|ke) warga|kebakaran|terbakar|karhutla|fires?|blaze|wildfires?|forest fire|kabut asap|polusi udara|pencemaran|limbah beracun|haze|smog|pollution|air quality|drought|dry spell|water (?:shortage|crisis|rationing|restriction|cut|outage|contamination)|kekeringan|krisis air|kecelakaan|kapal tenggelam|kapal karam|pesawat jatuh|tabrakan|tergelincir|laka lantas|accident|aksidente|banggaan|plane crash|boat sinks?|capsiz(?:e|ed)|collision|derail(?:ed|ment)?|train crash|road accident|bus crash|flight cancel|airport closure|port closure|shipwreck|runway closure|class suspensions?|walang pasok|impassable|korupsi|pemakzulan|mosi tidak percaya|krisis politik|reshuffle kabinet|corruption|impeachment|no-confidence|political crisis|cabinet reshuffle|mogok kerja|aksi buruh|serikat buruh|demo buruh|upah minimum|pemutusan hubungan kerja|phk|strikes?|walkout|layoffs?|labou?r union|minimum wage|teroris|terorisme|bom bunuh diri|serangan bom|ledakan bom|densus 88|jaringan teroris|ledakan|terror(?:ism|ist)?|suicide bomb|bomb blast|bombing|explosion|pagsabog|improvised explosive|insurgent|insurgency|extremist|bersenjata|serangan|penyerangan|ditembak|kekerasan|penyanderaan|baku tembak|operasi keamanan|armed attack|gunmen|gunfire|ambush(?:ed|es|ing)?|shootout|firefight|hostage|arson|grenade|landmine|military operation|police operation|armed men|armed group|raid on|attack|militant|separatist|pananambang|raskol|tribal (?:fight|fighting|war|violence|conflict|tension|clash)|ethnic violence|communal violence|election violence|mob violence|highlands clash|sorcery|sanguma|witchcraft accusation|payback (?:killing|attack|violence)|pack rape|gang rape|machete|bush knife|hacked to death|beaten to death|burnt alive)\b/i;
+
+const NON_INCIDENT_CHARITY_RE =
+  /\b(?:galang dana|penggalangan dana|bantu korban|bantuan (?:untuk|bagi|kepada) korban|salurkan bantuan|donasi (?:untuk|bagi|kepada)|raises? funds? for|fundrais\w* for|donat\w* (?:aid|funds?|supplies?) to|provides? aid to)\b/i;
+
+const NON_INCIDENT_FORMAT_RE =
+  /\b(?:situation report|flash update|weekly update|daily update|explainer|everything you need to know|what to know)\b/i;
+
 // Masthead-stripped GEO text — mirrors geoHaystack() in @workspace/ingest so the
 // APAC-anchor gate sees exactly the text the country resolver saw. Google News
 // appends the publisher to BOTH the title (after a trailing " - " / " | ") and,
@@ -2257,6 +2272,18 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     return { relevant: false, reason: "excluded: sports-fixture coverage (match report, no security signal)" };
   }
 
+  // Product-wide incident invariant: charity follow-ups and briefing/explainer
+  // formats describe, discuss or respond to an event but are not themselves a
+  // discrete operational incident. Run before every topic-specific allow gate
+  // so event vocabulary in the referenced disaster/conflict cannot rescue them.
+  const rawTitle = i.title ?? "";
+  if (NON_INCIDENT_CHARITY_RE.test(rawTitle)) {
+    return { relevant: false, reason: "excluded: charity / aid follow-up, not a discrete incident" };
+  }
+  if (NON_INCIDENT_FORMAT_RE.test(rawTitle)) {
+    return { relevant: false, reason: "excluded: briefing / explainer, not a discrete incident" };
+  }
+
   // Scraped Google-News SECTION / topic-page heading ("Papua New Guinea
   // Massacre News", "<Place> Crime News") that leaked in as though it were an
   // article — an aggregator feed LABEL, never a dated incident. Applies to
@@ -2350,15 +2377,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Title-bound so a genuine quake/fire report is not dropped merely because
     // its summary mentions subsequent aid. Covers Bahasa fundraising phrasing
     // seen in Papua local outlets and the equivalent translated headline.
-    const localTitle = titleHaystack(i);
-    if (
-      /\b(galang dana|penggalangan dana|bantu korban|bantuan (?:untuk|bagi|kepada) korban|salurkan bantuan|donasi (?:untuk|bagi|kepada)|raises? funds? for|fundrais\w* for|donat\w* (?:aid|funds?|supplies?) to|provides? aid to)\b/i.test(
-        localTitle,
-      )
-    ) {
+    const localTitle = i.title ?? "";
+    if (!LOCAL_OPERATIONAL_INCIDENT_TITLE_RE.test(localTitle)) {
       return {
         relevant: false,
-        reason: "excluded: indonesia_local community fundraising / charity coverage",
+        reason: "excluded: indonesia_local headline has no approved operational incident family",
       };
     }
     const geo = mastheadStrippedGeoText(i);
@@ -2375,15 +2398,21 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Broad DIRECT-outlet local-coverage feed spanning Indonesia + Jakarta,
     // West Papua, the Philippines, Thailand and Papua New Guinea: protest,
     // crime, terrorism, civil unrest, transport disruption and security
-    // incidents. Like indonesia_local the families are deliberately wide, so
-    // there is NO required incident vocabulary — the only gate is geographic.
+    // incidents. This is an INCIDENT feed: geography scopes an already-
+    // operational headline and can never admit general local news by itself.
     // Drop a story that POSITIVELY names a non-regional theatre (the Americas /
     // Middle East / Africa / non-APAC Europe-Eurasia) and carries no APAC
     // anchor: that is foreign wire copy a regional outlet merely re-ran. Keyed
     // on a positive foreign place (never a missing anchor) so a genuine
     // hyperlocal item is always kept. The APAC anchor (FP_APAC_ANCHOR_RE)
-    // already spans all six in-scope territories. New topic — no existing rows
-    // re-evaluate, so this needs no RELEVANCE_RULE_VERSION bump.
+    // already spans all six in-scope territories.
+    const localTitle = i.title ?? "";
+    if (!LOCAL_OPERATIONAL_INCIDENT_TITLE_RE.test(localTitle)) {
+      return {
+        relevant: false,
+        reason: "excluded: apac_local headline has no approved operational incident family",
+      };
+    }
     const geo = mastheadStrippedGeoText(i);
     if (FP_OFFSHORE_THEATRE_RE.test(geo) && !FP_APAC_ANCHOR_RE.test(geo)) {
       return {
