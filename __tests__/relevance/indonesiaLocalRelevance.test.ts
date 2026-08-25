@@ -56,6 +56,20 @@ describe("indonesia_local relevance (geographic gate)", () => {
     expect(verdict("Banjir rendam ratusan rumah di Makassar").relevant).toBe(true);
   });
 
+  it.each([
+    "Umat Muslim Jayawijaya Galang Dana Bantu Korban Gempa NTT di Momen Maulid Nabi Muhammad",
+    "Umat Muslim Jayawijaya bantu korban gempa NTT",
+    "Jayawijaya Muslims raise funds for NTT earthquake victims during Prophet Muhammad's birthday",
+  ])("drops community fundraising coverage: %s", (title) => {
+    const result = verdict(title);
+    expect(result.relevant).toBe(false);
+    expect(result.reason).toMatch(/fundraising|charity/);
+  });
+
+  it("keeps the underlying disaster incident rather than its charity aftermath", () => {
+    expect(verdict("Gempa rusak ratusan rumah dan melukai warga di NTT").relevant).toBe(true);
+  });
+
   it("drops foreign wire copy with no Indonesian anchor", () => {
     const r = verdict("Explosion rocks Tehran as Iran blames militants");
     expect(r.relevant).toBe(false);

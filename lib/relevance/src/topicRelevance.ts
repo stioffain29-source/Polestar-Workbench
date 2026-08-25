@@ -2346,6 +2346,21 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // conflict off-region gate; keyed on a positive foreign place (never a
     // missing anchor) so a genuine hyperlocal item is always kept. New topic —
     // no existing rows re-evaluate, so this needs no RELEVANCE_RULE_VERSION bump.
+    // Community charity / donation coverage is not an operational incident.
+    // Title-bound so a genuine quake/fire report is not dropped merely because
+    // its summary mentions subsequent aid. Covers Bahasa fundraising phrasing
+    // seen in Papua local outlets and the equivalent translated headline.
+    const localTitle = titleHaystack(i);
+    if (
+      /\b(galang dana|penggalangan dana|bantu korban|bantuan (?:untuk|bagi|kepada) korban|salurkan bantuan|donasi (?:untuk|bagi|kepada)|raises? funds? for|fundrais\w* for|donat\w* (?:aid|funds?|supplies?) to|provides? aid to)\b/i.test(
+        localTitle,
+      )
+    ) {
+      return {
+        relevant: false,
+        reason: "excluded: indonesia_local community fundraising / charity coverage",
+      };
+    }
     const geo = mastheadStrippedGeoText(i);
     if (FP_OFFSHORE_THEATRE_RE.test(geo) && !INDONESIA_ANCHOR_RE.test(geo)) {
       return {
