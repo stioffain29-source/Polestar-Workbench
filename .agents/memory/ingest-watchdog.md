@@ -15,12 +15,17 @@ top-up keeps working. Signature: incidents/sources frozen at one timestamp,
 Eventually the lock connection dies (lock frees) but the awaited fn never
 settles, so no "finished/failed" line is ever logged.
 
-**Fix (in `ingestRunner.ts`):** `withIngestLock` races `fn()` against a hard
-watchdog (`INGEST_WATCHDOG_MINUTES`, default 90). On timeout it throws with
-the LAST STAGE REACHED (`markIngestStage(...)` markers before every awaited
-stage in `runIngestOnce`, incident topics as `runIncidentIngest:<topic>`),
-the finally releases the lock, and the next tick can run. The abandoned run
-may keep writing in the background — idempotent, harmless.
+**Current watchdog tradeoff:** `withIngestLock` races the full run against a
+hard deadline and releases the advisory lock when the timer wins, but it does
+not cancel the abandoned promise. The old run can continue fetching and
+writing while a later run acquires the lock. Treat this as a real
+serialization/data-integrity risk, not as harmless idempotence: several stages
+use read-then-insert dedupe and source-health read-modify-write. **Why:** a
+watchdog timeout has been observed in production, and JavaScript promise
+rejection does not stop the underlying work. **How to apply:** cancellation or
+worker termination must complete before unlock, or every write must be fenced
+by a run owner/token; add a regression test proving a timed-out run cannot
+overlap its successor.
 
 **True root cause (found Aug 2026, after the watchdog):** the shared pg Pool
 had NO keepAlive/query_timeout. Neon kills backends mid-run ("terminating
