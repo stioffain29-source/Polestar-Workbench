@@ -38,6 +38,8 @@ const SPORTS_DROPS: Array<[string, string]> = [
   ["Indonesia crushed rivals 5-0 in the Asian Cup qualifiers", ""],
   ["Australia win dead rubber as tournament group stage closes", ""],
   ["Keeper saves last-minute shot as Malaysia edge past Laos in Suzuki Cup semi-final", ""],
+  ["Sydney Swans fans threaten SCG walkout over hotel scandal", ""],
+  ["Club supporters threaten boycott after membership dispute", ""],
 ];
 
 const SECURITY_KEEPS: Array<[string, string]> = [
@@ -79,6 +81,15 @@ describe("global sports-fixture gate", () => {
   it("labour stoppage still keeps (stoppage-time lookahead is scoped)", () => {
     const i = input("Garment workers begin stoppage at Dhaka factory over unpaid wages");
     expect(explainRelevance("flashpoint", i).relevant).toBe(true);
+    expect(isCountryRelevant(i)).toBe(true);
+  });
+
+  it("a real public-order event involving supporters survives the security override", () => {
+    const i = input(
+      "Police arrest 20 as supporters riot outside stadium after threatened walkout",
+    );
+    const v = explainRelevance("flashpoint", i);
+    if (!v.relevant) expect(v.reason).not.toMatch(/sports-fixture/);
     expect(isCountryRelevant(i)).toBe(true);
   });
 

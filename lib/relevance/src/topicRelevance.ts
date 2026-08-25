@@ -95,6 +95,12 @@ const SPORTS_FIXTURE_RE = new RegExp(
     String.raw`\b(cup|championship|champions league|tournament|qualifiers?|derby|test match|grand final|super league|premier league|sea games|friendly)\b[^.!?]{0,80}\b\d{1,2}[-–]\d{1,2}\b`,
     // Rout verbs used with scorelines ("crushed rivals 5-0", "thrashed 4-0").
     String.raw`\b(crush(?:es|ed)?|thrash(?:es|ed)?|rout(?:s|ed)?|hammer(?:s|ed)?|demolish(?:es|ed)?|outclass(?:es|ed)?)\b[^.!?]{0,40}\b\d{1,2}[-–]\d{1,2}\b`,
+    // Fan grievance / club-colour stories that borrow industrial-action terms.
+    // "Sydney Swans fans threaten SCG walkout over hotel scandal" is sports
+    // coverage, not civil unrest. Genuine disorder still survives through the
+    // unrest override below (riot, arrests, police response, casualties, etc.).
+    String.raw`\b(?:fans?|supporters?)\b[^.!?]{0,80}\b(?:threaten(?:s|ed|ing)?\s+)?(?:walkout|boycott)\b`,
+    String.raw`\b(?:walkout|boycott)\b[^.!?]{0,80}\b(?:by\s+)?(?:fans?|supporters?)\b`,
   ].join("|"),
   "i",
 );

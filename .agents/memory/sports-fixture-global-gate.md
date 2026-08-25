@@ -3,7 +3,7 @@ name: Global sports-fixture gate
 description: Owner ruling "no sport in any report" — one global gate, override design, and the summary-token trap that let sports in.
 ---
 
-**Rule:** Owner banned ALL sports coverage from every report. One global gate in the relevance lib: `SPORTS_FIXTURE_RE` (match-report idioms; result-verb OR numeric scoreline OR rout verb bound within one clause to a competition word) minus `SPORTS_UNREST_OVERRIDE_RE`, exported as `isSportsFixtureNoise`. Wired into three surfaces: `explainRelevance` (after general excludes, BEFORE title-rescue), `hitsSlopExclude` (top), and `isCountryRelevant` — plus a second rescue lane in the country sports-noise drop (`COUNTRY_SPORTS_NOISE_RE && !HARD_SECURITY && !SPORTS_UNREST_OVERRIDE`).
+**Rule:** Owner banned ALL sports coverage from every report. One global gate in the relevance lib: `SPORTS_FIXTURE_RE` (match-report idioms; result-verb OR numeric scoreline OR rout verb bound within one clause to a competition word; fan/supporter walkout or boycott grievances) minus `SPORTS_UNREST_OVERRIDE_RE`, exported as `isSportsFixtureNoise`. Wired into three surfaces: `explainRelevance` (after general excludes, BEFORE title-rescue), `hitsSlopExclude` (top), and `isCountryRelevant` — plus a second rescue lane in the country sports-noise drop (`COUNTRY_SPORTS_NOISE_RE && !HARD_SECURITY && !SPORTS_UNREST_OVERRIDE`).
 
 **Why:** A football headline ("Harimau Malaya fall to Vietnam in Asean Cup semis") reached the incident map. Root cause: keep-tier cue tokens must be SUMMARY-safe, not just title-safe — bare `stoppage` in the unambiguous public-order REQUIRED regex fired on "stoppage time" in the *summary*. Fixed via `stoppage(?!s?[ -]time)` at all 5 cue sites.
 

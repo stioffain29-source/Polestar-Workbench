@@ -39,6 +39,32 @@ const INDONESIAN_MARKER_WORDS: readonly string[] = [
   "pasukan", "serangan", "penyerangan", "penembakan", "ditembak", "kekerasan",
   "pembunuhan", "menewaskan", "peneliti", "menjelaskan", "rekomendasikan",
   "situasi", "masyarakat", "dilaporkan", "anggota", "pernah",
+  "pergeseran", "adat", "budaya", "umumkan", "mengumumkan",
+  "duka", "nasional", "gugur", "gugurnya",
+  "demonstrasi", "unjuk", "kerusuhan", "bentrok", "rusuh", "ricuh",
+  "kericuhan", "mahasiswa", "menuntut", "tuntut", "penghasutan",
+  "menggeruduk", "geruduk",
+  "kebakaran", "terbakar", "karhutla", "hangus", "kobaran",
+  "banjir", "bandang", "gempa", "longsor", "bencana", "mengungsi",
+  "pengungsi", "erupsi", "letusan",
+  "kabut", "polusi", "pencemaran", "limbah",
+  "mogok", "buruh", "pekerja", "upah", "serikat", "pesangon", "pemecatan",
+  "teroris", "ledakan", "peledakan", "densus", "bunuh",
+  "pencurian", "perampokan", "begal", "pembegalan", "maling", "penipuan",
+  "narkoba", "tersangka", "pelaku", "penganiayaan", "pencabulan",
+  "kecelakaan", "tabrakan", "tergelincir", "pelabuhan", "bandara",
+  "pesawat", "kapal",
+  "menteri", "pejabat", "presiden", "kabinet", "korupsi", "pencegahan",
+  "sidang", "penjara", "vonis", "terdakwa", "kasus", "dugaan", "suap",
+  "perkara", "penahanan", "geledah", "hakim", "kejaksaan", "penyidik",
+  "saksi", "tahun", "miliar", "rupiah",
+  "tembak", "menembak", "penembak", "tertembak",
+  "tangkap", "menangkap", "penangkapan", "tertangkap",
+  "prajurit", "satgas", "jenazah",
+  "evakuasi", "dievakuasi", "mengevakuasi",
+  "sindikat", "desak", "mendesak", "asing",
+  "sakiti", "menyakiti", "terbang", "penerbangan",
+  "langgar", "larangan", "berhasil", "ketinggian",
 ];
 
 const NON_LATIN_RE = new RegExp(`[${NON_LATIN_CLASS}]`);
@@ -70,16 +96,18 @@ export function isUntranslatedTitle(
 }
 
 /**
- * The headline to render: the English `displayTitle` when present, else the raw
- * `title`. Mirrors the ingest contract (UI prefers display_title, falls back to
- * title).
+ * The headline to render: the English `displayTitle` when present. English raw
+ * titles remain a safe fallback, but a detected foreign-language raw title is
+ * never exposed to readers while translation is pending.
  */
 export function displayIncidentTitle(
   title?: string | null,
   displayTitle?: string | null,
 ): string {
   const display = (displayTitle ?? "").trim();
-  return display || (title ?? "").trim();
+  if (display) return display;
+  const raw = (title ?? "").trim();
+  return isLikelyNonEnglish(raw) ? "Translation pending" : raw;
 }
 
 // Wire / social headlines carry video call-to-action cruft that is meaningless

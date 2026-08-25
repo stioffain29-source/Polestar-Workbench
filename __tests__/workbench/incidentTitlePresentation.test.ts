@@ -16,7 +16,17 @@ describe("translated incident titles at presentation boundaries", () => {
 
   test("shared resolver prefers a non-blank translated title", () => {
     expect(displayIncidentTitle(rawTitle, englishTitle)).toBe(englishTitle);
-    expect(displayIncidentTitle(rawTitle, "   ")).toBe(rawTitle);
+    expect(displayIncidentTitle(rawTitle, "   ")).toBe("Translation pending");
+    expect(displayIncidentTitle("Police arrest protesters in Sydney", null)).toBe(
+      "Police arrest protesters in Sydney",
+    );
+  });
+
+  test("world-map tooltips and popups stay behind the shared title resolver", () => {
+    const source = readFileSync("artifacts/workbench/src/pages/Map.tsx", "utf8");
+    expect(source).toContain("displayIncidentTitle(m.title, m.displayTitle)");
+    expect(source).toContain("displayIncidentTitle(p.title, p.displayTitle)");
+    expect(source).not.toMatch(/\\{(?:m|p)\\.title\\}/);
   });
 
   test("Shipping monitor dedupe preserves raw analysis fields and the translation", () => {
