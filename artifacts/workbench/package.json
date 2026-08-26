@@ -10,7 +10,11 @@
     "pretypecheck": "pnpm -w run typecheck:libs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "audit:flashpoint": "tsx scripts/auditFlashpoint.ts",
-    "audit:jakarta-pdf": "tsx --import ./scripts/registerLoader.mjs scripts/auditJakartaPdf.ts"
+    "audit:jakarta-pdf": "tsx --import ./scripts/registerLoader.mjs scripts/auditJakartaPdf.ts",
+    "audit:export-snapshot": "tsx scripts/exportProdIncidentsSnapshot.ts",
+    "audit:phase1-slop": "tsx scripts/runPhase1SlopAudit.ts",
+    "audit:ingestion-report": "tsx scripts/generateIngestionAuditReport.ts",
+    "audit:fetch-prod": "tsx scripts/fetchProdSnapshotFromApi.ts"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -1,0 +1,8 @@
+# Generated audit outputs
+
+Run `pnpm --filter workbench exec tsx scripts/runPhase1SlopAudit.ts` with `PROD_DATABASE_URL` set.
+
+Expected files:
+
+- `slop-audit-samples.generated.md` — kept/dropped sample tables per topic
+- `../../artifacts/workbench/scripts/AUDIT_LIVE_RELEVANCE.txt` — full relevance audit (from `auditLiveRelevance.ts`)
