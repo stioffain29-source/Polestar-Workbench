@@ -74,3 +74,18 @@ the broad-feed mislabels are a separate, pre-existing defaultCountry-leak class.
 **Mechanism reminder:** any rule change here needs a `RELEVANCE_RULE_VERSION` bump
 (`evaluate.ts`) so the api-server boot backfill re-evaluates stored rows; otherwise the
 DB keeps the old verdicts.
+
+**Specialist-format exception:** a leading “Explainer”, “Situation report” or
+similar format label is not by itself disqualifying for energy or fertiliser.
+Those monitors may legitimately use specialist reporting about a concrete
+outage, load-shedding event, shortage, tariff/price action or supply disruption.
+Their own REQUIRED and EXCLUDE stacks still decide the subject.
+
+**Why:** the owner confirmed that bona fide cargo and specialist
+energy/fertiliser evidence must survive the product-wide incident cleanup. A
+blanket format gate wrongly removed three real grid-event records and one urea
+price-policy record.
+
+**How to apply:** keep the exception limited to energy/fertiliser and require
+their topic-specific evidence. Do not generalise it to fuel travel advice or to
+local/news topics where explainers are non-discrete follow-up coverage.

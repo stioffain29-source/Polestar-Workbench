@@ -148,6 +148,20 @@ describe("explainRelevance", () => {
     });
   });
 
+  describe("fertiliser", () => {
+    it("keeps specialist explainers about a concrete urea price action", () => {
+      const result = explainRelevance(
+        "fertiliser",
+        input({
+          topic: "fertiliser",
+          title: "Explainer: Why CACP wants a hike in retail urea price",
+        }),
+      );
+      expect(result.relevant).toBe(true);
+      expect(result.reason).toContain("required topic phrase");
+    });
+  });
+
   describe("shipping", () => {
     it("drops vessel sale-and-purchase commentary", () => {
       const result = explainRelevance(

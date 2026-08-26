@@ -106,6 +106,11 @@ const KEEP_FIXTURES: Array<[string, string]> = [
   // Load-shedding warning framed around looting risk.
   ["blackout-looting warning", "There will be blackout, random looting and vandalism if we don’t implement load shedding, says De Ruyter"],
   ["regional electricity crisis", "Electricity Crisis Hits Several Regions in Indonesia"],
+  // Specialist explainers that document an actual grid incident remain valid
+  // evidence; the energy REQUIRED + EXCLUDE stack, not the label, decides.
+  ["Iberian outage explainer", "Explainer: What caused the Iberian power outage and what happens next?"],
+  ["brownout explainer", "EXPLAINER: Why rotational brownouts occur"],
+  ["Railbelt load-shedding explainer", "Explainer: Cause of massive Railbelt power outage remains unknown after ‘load shedding’ event"],
 ];
 
 describe("energy exclude stack (grid-noise regression pins)", () => {

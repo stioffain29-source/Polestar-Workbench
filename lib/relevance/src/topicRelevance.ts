@@ -1105,6 +1105,13 @@ const NON_INCIDENT_CHARITY_RE =
 const NON_INCIDENT_FORMAT_RE =
   /\b(?:situation report|flash update|weekly update|daily update|explainer|everything you need to know|what to know)\b/i;
 
+// Energy and fertiliser monitors deliberately retain specialist reporting that
+// documents a concrete outage, load-shedding event, shortage, tariff/price
+// action or supply disruption. Their topic-specific REQUIRED + EXCLUDE stacks
+// still decide whether the underlying subject is bona fide; a format label
+// alone must not erase valid specialist evidence.
+const SPECIALIST_FORMAT_TOPICS = new Set(["energy", "fertiliser"]);
+
 // Masthead-stripped GEO text — mirrors geoHaystack() in @workspace/ingest so the
 // APAC-anchor gate sees exactly the text the country resolver saw. Google News
 // appends the publisher to BOTH the title (after a trailing " - " / " | ") and,
@@ -2280,7 +2287,7 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
   if (NON_INCIDENT_CHARITY_RE.test(rawTitle)) {
     return { relevant: false, reason: "excluded: charity / aid follow-up, not a discrete incident" };
   }
-  if (NON_INCIDENT_FORMAT_RE.test(rawTitle)) {
+  if (NON_INCIDENT_FORMAT_RE.test(rawTitle) && !SPECIALIST_FORMAT_TOPICS.has(topic)) {
     return { relevant: false, reason: "excluded: briefing / explainer, not a discrete incident" };
   }
 
