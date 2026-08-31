@@ -18,6 +18,11 @@ if (!process.env.DATABASE_URL) {
 // under it) so the caller's try/catch can log and move on instead of wedging.
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // Protocol-labelled connections let the database reject writes from a
+  // pre-fence binary during a rolling deployment. Ingest workers override this
+  // with polestar-ingest:<runId>; all current API/CLI processes use app:v2.
+  application_name:
+    process.env.PGAPPNAME?.trim() || `polestar-app:v2:${process.pid}`,
   keepAlive: true,
   keepAliveInitialDelayMillis: 30_000,
   connectionTimeoutMillis: 30_000,

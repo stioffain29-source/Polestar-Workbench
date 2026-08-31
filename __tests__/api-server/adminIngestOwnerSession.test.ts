@@ -20,9 +20,9 @@ jest.mock("openid-client", () => ({}));
 // The mock's job is only to prove which HTTP auth branch let the request
 // through — success/failure of the (fake) ingest run confirms the request
 // reached the handler body at all, which only happens if it passed the gate.
-const runIngestOnce = jest.fn();
-jest.mock("../../artifacts/api-server/src/lib/ingestRunner", () => ({
-  runIngestOnce: (...args: unknown[]) => runIngestOnce(...args),
+const runIngestProcess = jest.fn();
+jest.mock("../../artifacts/api-server/src/lib/ingestProcess", () => ({
+  runIngestProcess: (...args: unknown[]) => runIngestProcess(...args),
 }));
 
 import router from "../../artifacts/api-server/src/routes";
@@ -34,7 +34,7 @@ import router from "../../artifacts/api-server/src/routes";
  * `adminAuthRuntime.test.ts` proves the anonymous/token-only boundary is
  * unchanged. This suite proves the ADDED branch: a request carrying a valid
  * owner session must reach the real ingest handler (i.e. actually calls
- * runIngestOnce) with NO token present at all, and a non-owner session must
+ * runIngestProcess) with NO token present at all, and a non-owner session must
  * still be rejected exactly like an anonymous one (503 when no token is
  * configured) rather than silently being let through.
  */
@@ -85,7 +85,7 @@ afterAll(
 );
 
 beforeEach(() => {
-  runIngestOnce.mockReset();
+  runIngestProcess.mockReset();
   // ALLOWED_USER_IDS makes isAllowedUser resolve purely from the env var,
   // with no db round trip — OWNER_ID is the allowed owner, anyone else isn't.
   process.env["ALLOWED_USER_IDS"] = OWNER_ID;
@@ -111,22 +111,22 @@ async function postIngest(
 describe("POST /api/admin/ingest — owner-session bypass", () => {
   it("owner session with NO token configured and NO token header still runs ingest (200)", async () => {
     delete process.env["INGEST_ADMIN_TOKEN"];
-    runIngestOnce.mockResolvedValue(FAKE_INGEST_RESULT());
+    runIngestProcess.mockResolvedValue(FAKE_INGEST_RESULT());
 
     const { status, json } = await postIngest({ [TEST_USER_HEADER]: OWNER_ID });
 
-    expect(runIngestOnce).toHaveBeenCalledTimes(1);
+    expect(runIngestProcess).toHaveBeenCalledTimes(1);
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
   });
 
   it("owner session takes priority even when a server token IS configured and absent from the request", async () => {
     process.env["INGEST_ADMIN_TOKEN"] = TEST_ADMIN_TOKEN;
-    runIngestOnce.mockResolvedValue(FAKE_INGEST_RESULT());
+    runIngestProcess.mockResolvedValue(FAKE_INGEST_RESULT());
 
     const { status } = await postIngest({ [TEST_USER_HEADER]: OWNER_ID });
 
-    expect(runIngestOnce).toHaveBeenCalledTimes(1);
+    expect(runIngestProcess).toHaveBeenCalledTimes(1);
     expect(status).toBe(200);
   });
 
@@ -135,21 +135,21 @@ describe("POST /api/admin/ingest — owner-session bypass", () => {
 
     const { status, json } = await postIngest({ [TEST_USER_HEADER]: "not-the-owner" });
 
-    expect(runIngestOnce).not.toHaveBeenCalled();
+    expect(runIngestProcess).not.toHaveBeenCalled();
     expect(status).toBe(503);
     expect(json.error).toBe("ingestion_disabled");
   });
 
   it("non-owner session can still fall back to a valid admin token", async () => {
     process.env["INGEST_ADMIN_TOKEN"] = TEST_ADMIN_TOKEN;
-    runIngestOnce.mockResolvedValue(FAKE_INGEST_RESULT());
+    runIngestProcess.mockResolvedValue(FAKE_INGEST_RESULT());
 
     const { status } = await postIngest({
       [TEST_USER_HEADER]: "not-the-owner",
       authorization: `Bearer ${TEST_ADMIN_TOKEN}`,
     });
 
-    expect(runIngestOnce).toHaveBeenCalledTimes(1);
+    expect(runIngestProcess).toHaveBeenCalledTimes(1);
     expect(status).toBe(200);
   });
 
@@ -158,9 +158,49 @@ describe("POST /api/admin/ingest — owner-session bypass", () => {
 
     const { status, json } = await postIngest();
 
-    expect(runIngestOnce).not.toHaveBeenCalled();
+    expect(runIngestProcess).not.toHaveBeenCalled();
     expect(status).toBe(503);
     expect(json.error).toBe("ingestion_disabled");
+  });
+
+  it("reports a supervised timeout explicitly", async () => {
+    runIngestProcess.mockResolvedValue({
+      ran: false,
+      reason: "timed_out",
+      runId: "timeout-test",
+      lastStage: "hung test stage",
+      termination: "sigkill",
+    });
+
+    const { status, json } = await postIngest({ [TEST_USER_HEADER]: OWNER_ID });
+
+    expect(status).toBe(504);
+    expect(json).toMatchObject({
+      error: "ingestion_timed_out",
+      runId: "timeout-test",
+      lastStage: "hung test stage",
+      termination: "sigkill",
+    });
+  });
+
+  it("reports supervised cancellation explicitly", async () => {
+    runIngestProcess.mockResolvedValue({
+      ran: false,
+      reason: "cancelled",
+      runId: "cancel-test",
+      lastStage: "cancelled test stage",
+      termination: "sigterm",
+    });
+
+    const { status, json } = await postIngest({ [TEST_USER_HEADER]: OWNER_ID });
+
+    expect(status).toBe(499);
+    expect(json).toMatchObject({
+      error: "ingestion_cancelled",
+      runId: "cancel-test",
+      lastStage: "cancelled test stage",
+      termination: "sigterm",
+    });
   });
 });
 

@@ -4,7 +4,6 @@ import { type IngestSummary, runConflictClustering } from "@workspace/ingest";
 import { summarizeIngestFailures } from "../lib/ingestFailureSummary";
 import { isAllowedUser } from "../lib/ownerAccess";
 import {
-  runIngestOnce,
   runReliefWebReportsOnce,
   runIccPiracyOnce,
   runCentcomOfficialOnce,
@@ -16,6 +15,7 @@ import {
   runFacebookOsintReclassifyOnce,
   runXSearchOnce,
 } from "../lib/ingestRunner";
+import { runIngestProcess } from "../lib/ingestProcess";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
 const router: IRouter = Router();
@@ -53,8 +53,9 @@ let conflictClusterRunning = false;
 //      configured AND the caller isn't the authenticated owner, the route is
 //      disabled (503) so it can never run unauthenticated.
 //
-// Concurrency: runIngestOnce serialises with a cross-instance Postgres
-// advisory lock — a second concurrent run gets 409.
+// Concurrency: the supervised worker owns the cross-instance Postgres advisory
+// lock. A second concurrent run gets 409; a timed-out worker is terminated
+// before local ownership is released.
 
 function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
@@ -115,11 +116,38 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
     }
   }
 
+  const abortController = new AbortController();
+  const cancelIfDisconnected = () => {
+    if (!res.writableEnded) abortController.abort();
+  };
+  res.once("close", cancelIfDisconnected);
+
   try {
     req.log.info("admin ingest started");
-    const result = await runIngestOnce();
+    const result = await runIngestProcess({ signal: abortController.signal });
     if (!result.ran) {
-      res.status(409).json({ error: "ingestion_in_progress" });
+      if (result.reason === "locked") {
+        res.status(409).json({ error: "ingestion_in_progress" });
+      } else {
+        req.log.error(
+          {
+            reason: result.reason,
+            runId: result.runId,
+            lastStage: result.lastStage,
+            termination: result.termination,
+          },
+          `admin ingest ${result.reason}`,
+        );
+        res.status(result.reason === "timed_out" ? 504 : 499).json({
+          error:
+            result.reason === "timed_out"
+              ? "ingestion_timed_out"
+              : "ingestion_cancelled",
+          runId: result.runId,
+          lastStage: result.lastStage,
+          termination: result.termination,
+        });
+      }
       return;
     }
 
@@ -204,6 +232,8 @@ router.post("/admin/ingest", async (req: Request, res: Response) => {
     if (!res.headersSent) {
       res.status(500).json({ ok: false, error: "ingestion_failed", message });
     }
+  } finally {
+    res.off("close", cancelIfDisconnected);
   }
 });
 

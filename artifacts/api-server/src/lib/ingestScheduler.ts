@@ -15,12 +15,12 @@ import {
   summarizeStrikesFailures,
 } from "./ingestFailureSummary";
 import {
-  runIngestOnce,
   runMarketPricesOnce,
   runMovementOnce,
   runStrikesOnce,
   runTitleTranslationOnce,
 } from "./ingestRunner";
+import { runIngestProcess } from "./ingestProcess";
 import { runCountryEngineAll } from "./countryEngine";
 import { logger } from "./logger";
 
@@ -458,9 +458,22 @@ async function monitorMovementFreshness(reason: string): Promise<void> {
  */
 async function tick(reason: string): Promise<boolean> {
   try {
-    const result = await runIngestOnce();
+    const result = await runIngestProcess();
     if (!result.ran) {
-      logger.info({ reason }, "scheduled ingest skipped (already running)");
+      if (result.reason === "locked") {
+        logger.info({ reason }, "scheduled ingest skipped (already running)");
+      } else {
+        logger.error(
+          {
+            reason,
+            outcome: result.reason,
+            runId: result.runId,
+            lastStage: result.lastStage,
+            termination: result.termination,
+          },
+          `scheduled ingest ${result.reason}`,
+        );
+      }
       return false;
     }
     const failures = summarizeIngestFailures(result);

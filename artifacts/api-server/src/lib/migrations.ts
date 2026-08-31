@@ -339,6 +339,85 @@ const RETIRED_REPORT_TITLES: string[] = [
   "PNG Election Cycle Risk Brief",
 ];
 
+async function ensureIngestRunWriteFence(): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      CREATE TABLE IF NOT EXISTS ingest_run_fence (
+        singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+        active_run_id text NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await tx.execute(sql`
+      CREATE OR REPLACE FUNCTION enforce_ingest_run_fence()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      AS $$
+      DECLARE
+        app_name text;
+        worker_run_id text;
+        active_run_id text;
+      BEGIN
+        app_name := current_setting('application_name', true);
+        IF app_name LIKE 'polestar-ingest:%' THEN
+          worker_run_id := substring(app_name FROM length('polestar-ingest:') + 1);
+          SELECT f.active_run_id
+            INTO active_run_id
+            FROM ingest_run_fence f
+           WHERE f.singleton = true
+             FOR SHARE;
+          IF active_run_id IS DISTINCT FROM worker_run_id THEN
+            RAISE EXCEPTION
+              'stale ingest worker % fenced by active run %',
+              worker_run_id,
+              active_run_id
+              USING ERRCODE = '55000';
+          END IF;
+        ELSIF app_name NOT LIKE 'polestar-app:v2:%'
+          AND app_name <> 'polestar-maintenance:v2' THEN
+          RAISE EXCEPTION
+            'database writer % does not support ingest fence protocol v2',
+            COALESCE(NULLIF(app_name, ''), '(unlabelled)')
+            USING ERRCODE = '55000';
+        END IF;
+        IF TG_OP = 'DELETE' THEN
+          RETURN OLD;
+        END IF;
+        RETURN NEW;
+      END;
+      $$
+    `);
+    await tx.execute(sql`
+      DO $$
+      DECLARE
+        target record;
+      BEGIN
+        FOR target IN
+          SELECT n.nspname AS schema_name, c.relname AS table_name
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE n.nspname = 'public'
+             AND c.relkind IN ('r', 'p')
+             AND c.relname <> 'ingest_run_fence'
+             AND NOT c.relispartition
+        LOOP
+          EXECUTE format(
+            'DROP TRIGGER IF EXISTS ingest_run_fence_guard ON %I.%I',
+            target.schema_name,
+            target.table_name
+          );
+          EXECUTE format(
+            'CREATE TRIGGER ingest_run_fence_guard BEFORE INSERT OR UPDATE OR DELETE ON %I.%I FOR EACH ROW EXECUTE FUNCTION enforce_ingest_run_fence()',
+            target.schema_name,
+            target.table_name
+          );
+        END LOOP;
+      END
+      $$
+    `);
+  });
+}
+
 /**
  * Idempotent data migrations applied at startup.
  *
@@ -347,7 +426,13 @@ const RETIRED_REPORT_TITLES: string[] = [
  */
 export async function runDataMigrations(): Promise<void> {
   logger.info("runDataMigrations: starting");
+  // Ingestion safety is fail-closed. If this atomic installation fails, reject
+  // startup migration readiness so index.ts does not start the scheduler.
+  await ensureIngestRunWriteFence();
   try {
+    // Install the database-level ingest epoch before any scheduled worker can
+    // start. It is refreshed again at the end so tables introduced by later
+    // idempotent migration blocks receive the same stale-writer trigger.
     // Repair known dashboard noise before heavier migrations so the first
     // /dashboard/overview after boot is already clean.
     try {
@@ -4946,9 +5031,14 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    await ensureIngestRunWriteFence();
     logger.info("runDataMigrations: finished");
   } catch (err) {
     logger.error({ err }, "Data migration failed (continuing startup)");
+    // A later migration may have introduced a table before failing. Refresh all
+    // guards atomically; if that cannot complete, propagate so ingestion stays
+    // disabled rather than running with partial trigger coverage.
+    await ensureIngestRunWriteFence();
   }
 }
 

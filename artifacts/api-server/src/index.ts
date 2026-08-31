@@ -35,7 +35,11 @@ app.listen(port, (err) => {
     try {
       await runDataMigrations();
     } catch (migrationErr) {
-      logger.error({ err: migrationErr }, "data migrations failed");
+      logger.error(
+        { err: migrationErr },
+        "data migrations failed; ingest scheduler not started",
+      );
+      return;
     }
     startIngestScheduler();
   })();

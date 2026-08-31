@@ -71,6 +71,8 @@ import {
   type TitleTranslationSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
+import { terminateAfterIngestLockLoss } from "./ingestLockSafety";
+import { fencePriorIngestSessions } from "./ingestSessionFence";
 
 // Shared ingest runner used by BOTH the manual admin trigger
 // (routes/admin.ts) and the automatic scheduler (lib/ingestScheduler.ts) so
@@ -88,26 +90,14 @@ import { logger } from "./logger";
 // every instance so they contend on the same lock.
 const INGEST_LOCK_KEY = 0x506f6c65;
 
-// Hard watchdog on every locked ingest pass. Root cause of the recurring
-// "map empty past 24h" prod outages: one stage of the multi-minute chain
-// hung forever on an external call (no per-run deadline existed), the
-// advisory lock stayed held, and every 12h interval tick logged
-// "scheduled ingest skipped (already running)" until the next republish
-// restarted the process. On a Reserved VM a stuck promise lives for weeks.
-// The watchdog rejects the run after INGEST_WATCHDOG_MINUTES (default 90 —
-// comfortably above the slowest observed full run, which stretches when
-// Google News throttles the prod egress IP), releases the lock, and names
-// the last stage reached so the culprit is in the log, not a mystery.
-const INGEST_WATCHDOG_MS =
-  Math.max(10, Number(process.env.INGEST_WATCHDOG_MINUTES ?? 90) || 90) *
-  60_000;
-
-// Last stage the full chain reached — read by the watchdog error so a
-// timed-out run reports WHERE it hung. Coarse by design (one mutable string;
-// only one locked run exists globally at a time).
-let currentIngestStage = "idle";
+// The parent ingest-process supervisor receives stage updates over IPC so a
+// timeout names the exact stage it terminated. The lock holder itself has no
+// Promise.race watchdog: rejecting a race does not cancel the losing promise,
+// and releasing the lock while that promise can still write permits overlap.
 function markIngestStage(stage: string): void {
-  currentIngestStage = stage;
+  if (typeof process.send === "function") {
+    process.send({ type: "stage", stage });
+  }
 }
 
 // Social-promote regression alarm. The DB→DB social promote pass runs against
@@ -634,7 +624,7 @@ async function withIngestLock<T>(
   let clientBroken = false;
   client.on("error", (err) => {
     clientBroken = true;
-    logger.error({ err }, "ingest lock connection error (terminated mid-run)");
+    terminateAfterIngestLockLoss(err, logger);
   });
   try {
     const lockRes = await client.query<{ locked: boolean }>(
@@ -643,33 +633,16 @@ async function withIngestLock<T>(
     );
     locked = lockRes.rows[0]?.locked === true;
     if (!locked) return { ran: false, reason: "locked" };
-    // Reset per run so a later, unrelated locked pass that times out doesn't
-    // report a stale stage name from a previous full chain.
     markIngestStage("(run start)");
-    // Race the run against the hard watchdog. If fn() never settles (a stage
-    // hung on an external call) the watchdog rejects, the finally block below
-    // releases the advisory lock, and the next interval tick can run. The
-    // abandoned promise may keep doing idempotent DB writes in the background;
-    // that is harmless and vastly better than a permanently-held lock.
-    let watchdogTimer: NodeJS.Timeout | undefined;
-    try {
-      const value = await Promise.race([
-        fn(),
-        new Promise<never>((_, reject) => {
-          watchdogTimer = setTimeout(() => {
-            reject(
-              new Error(
-                `ingest watchdog: run exceeded ${Math.round(INGEST_WATCHDOG_MS / 60_000)} minutes — last stage reached: ${currentIngestStage}`,
-              ),
-            );
-          }, INGEST_WATCHDOG_MS);
-          watchdogTimer.unref?.();
-        }),
-      ]);
-      return { ran: true, value };
-    } finally {
-      if (watchdogTimer) clearTimeout(watchdogTimer);
+    markIngestStage("(fencing prior ingest sessions)");
+    const fencedSessions = await fencePriorIngestSessions(client);
+    if (fencedSessions > 0) {
+      logger.warn(
+        { fencedSessions },
+        "terminated prior ingest worker database sessions before successor run",
+      );
     }
+    return { ran: true, value: await fn() };
   } finally {
     if (locked && !clientBroken) {
       try {
