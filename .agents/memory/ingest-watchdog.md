@@ -15,17 +15,24 @@ top-up keeps working. Signature: incidents/sources frozen at one timestamp,
 Eventually the lock connection dies (lock frees) but the awaited fn never
 settles, so no "finished/failed" line is ever logged.
 
-**Current watchdog tradeoff:** `withIngestLock` races the full run against a
-hard deadline and releases the advisory lock when the timer wins, but it does
-not cancel the abandoned promise. The old run can continue fetching and
-writing while a later run acquires the lock. Treat this as a real
-serialization/data-integrity risk, not as harmless idempotence: several stages
-use read-then-insert dedupe and source-health read-modify-write. **Why:** a
-watchdog timeout has been observed in production, and JavaScript promise
-rejection does not stop the underlying work. **How to apply:** cancellation or
-worker termination must complete before unlock, or every write must be fenced
-by a run owner/token; add a regression test proving a timed-out run cannot
-overlap its successor.
+**Current watchdog design:** full scheduled, boot and manual ingestion runs in
+a supervised child process. On timeout/cancellation, the parent sends SIGTERM,
+escalates to SIGKILL, and retains local ownership until the child emits `exit`.
+The worker owns the PostgreSQL advisory lock, and loss of that dedicated lock
+session is process-fatal.
+
+Database writes are also protected by an epoch fence. Each worker connection is
+labelled with its run ID; guarded mutations lock the singleton fence row and
+must match the active run. A successor advances the epoch only after
+already-started old writes finish, drains prior labelled sessions, and rejects
+later stale writes with SQLSTATE 55000. Legacy/unlabelled writers fail closed.
+**Why:** killing sessions alone cannot prevent an abandoned worker from
+reconnecting, and rejecting a JavaScript promise never cancels its underlying
+work.
+**How to apply:** every full-ingest entry point must use the supervised worker;
+every mutable public table must retain fence-trigger coverage; maintenance
+writers must use the explicit protocol label. Never restore a Promise.race
+watchdog around in-process ingestion.
 
 **True root cause (found Aug 2026, after the watchdog):** the shared pg Pool
 had NO keepAlive/query_timeout. Neon kills backends mid-run ("terminating

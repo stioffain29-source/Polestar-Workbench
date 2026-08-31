@@ -37,8 +37,9 @@ import { logger } from "./logger";
 //   * While the process stays warm (dev, or a reserved-VM / always-on
 //     deployment) a recurring timer runs the ingest every INGEST_INTERVAL_HOURS.
 //
-// All runs go through runIngestOnce(), so they share the cross-instance
-// advisory lock and never collide.
+// All full runs execute in a supervised child process. The worker owns the
+// cross-instance advisory lock, and the parent does not release local ownership
+// until that child has exited, so timed-out work cannot overlap its successor.
 //
 // Config:
 //   INGEST_SCHEDULE_ENABLED  set to "false" to disable entirely (default on)
@@ -202,7 +203,7 @@ function aisMovementActive(): boolean {
  * Hours since the newest AIS-fed maritime_movement snapshot (or null when none
  * exist). The ship-movement board flips to "stale" once its newest snapshot
  * ages past the 14-day freshness window (lib/maritimeSources.ts). Movement
- * refreshes ONLY inside a full ingest (runIngestOnce → runMaritimeMovementIngest),
+ * refreshes ONLY inside a full ingest worker (via runMaritimeMovementIngest),
  * so — like strikes and the scraped land topics — the boot catch-up must treat a
  * stale movement table as a reason to run. Without this an intermittently-failing
  * AIS pass lets the board drift stale even while incidents stay fresh (which on
@@ -280,7 +281,7 @@ async function movementProviderMismatch(): Promise<boolean> {
 /**
  * Hours since the newest stored ICC maritime-security event (or null when the
  * table is empty). Like strikes and the scraped land topics, ICC piracy events
- * refresh ONLY inside a full ingest (runIngestOnce → runIccPiracyIngest), so a
+ * refresh ONLY inside a full ingest worker (via runIccPiracyIngest), so a
  * stale-but-populated table should force a boot catch-up. IMPORTANT: unlike the
  * land topics, an EMPTY table (null) is NOT treated as a trigger — the ICC live
  * map sits behind Cloudflare and routinely blocks datacenter egress, so a never-
@@ -312,7 +313,7 @@ function kammiSourceActive(): boolean {
 
 /**
  * Hours since the newest KAMMI-sourced incident (or null when none exist). KAMMI
- * incidents are written ONLY inside a full ingest (runIngestOnce →
+ * incidents are written ONLY inside a full ingest worker (via
  * runKammiSourceIngest), so — like strikes, the land topics and AIS movement — a
  * stale-but-populated feed should force a boot catch-up. Uses created_at
  * (insertion heartbeat) so a quiet protest week does not look stale. Keyed on
@@ -392,7 +393,7 @@ function gdeltStructuredIntervalHours(): number {
 /**
  * Hours since the newest GDELT structured pull (or null when the table is
  * empty). The structured event layer refreshes ONLY inside a full ingest
- * (runIngestOnce → runGdeltStructuredIngest), so — like strikes, the land
+ * (via runGdeltStructuredIngest), so — like strikes, the land
  * topics, AIS movement and the social layers — a stale-but-populated table is a
  * reason to run. Uses fetched_at (the pull heartbeat the collector stamps on
  * every committed run) so a quiet news window does not look stale. Only

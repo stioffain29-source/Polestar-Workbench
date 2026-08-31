@@ -343,7 +343,7 @@ async function ensureIngestRunWriteFence(): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS ingest_run_fence (
-        singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+        singleton boolean PRIMARY KEY DEFAULT true,
         active_run_id text NOT NULL,
         updated_at timestamptz NOT NULL DEFAULT now()
       )

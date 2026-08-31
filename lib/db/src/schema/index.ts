@@ -25,3 +25,4 @@ export * from "./officialMilitaryMaritimeSources";
 export * from "./socialWatchItems";
 export * from "./socialRaw";
 export * from "./auth";
+export * from "./ingestRunFence";
