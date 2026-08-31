@@ -119,7 +119,7 @@ function ChoroplethLegend({ label }: { label: string }) {
 }
 
 /**
- * Full country-choropleth map block: empty state, CARTO Positron basemap, the
+ * Full country-choropleth map block: empty state, OpenStreetMap basemap, the
  * shaded polygons, the count-band legend, and an optional caption. Callers wrap
  * it in their own bordered card container.
  */
@@ -152,9 +152,8 @@ export function CountryChoroplethMap({
       <div className={`relative ${heightClass}`}>
         <MapContainer center={resolvedCenter} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
           <TileLayer
-            attribution="&copy; OpenStreetMap &copy; CARTO"
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
             maxZoom={19}
           />
           <Choropleth intensity={intensity} scope={scope} />

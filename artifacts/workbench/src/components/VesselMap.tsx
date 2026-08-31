@@ -210,9 +210,8 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
         zoomAnimation: false,
         markerZoomAnimation: false,
       });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: "&copy; OpenStreetMap &copy; CARTO",
-        subdomains: "abcd",
+      L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
         maxZoom: 19,
         crossOrigin: true,
       }).addTo(mapRef.current);
@@ -429,7 +428,7 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
             whiteSpace: "nowrap",
           }}
         >
-          Leaflet | (c) OpenStreetMap (c) CARTO
+          Leaflet | (c) OpenStreetMap contributors
         </span>
       </div>
 

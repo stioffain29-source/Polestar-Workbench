@@ -591,9 +591,8 @@ export default function MapPage() {
             style={{ height: "100%", width: "100%" }}
           >
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              subdomains={["a", "b", "c", "d"]}
+              url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
             />
             <MapZoomTracker onZoom={setZoom} />
             {renderPoints.map((p) => {

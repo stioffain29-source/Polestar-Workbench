@@ -225,9 +225,8 @@ export function DataCentreFacilityMap({
           worldCopyJump
         >
           <TileLayer
-            attribution="&copy; OpenStreetMap &copy; CARTO"
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-            subdomains="abcd"
+            attribution="&copy; OpenStreetMap contributors"
+            url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
             maxZoom={19}
           />
           <FitBounds points={allPoints} />

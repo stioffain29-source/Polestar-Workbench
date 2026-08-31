@@ -242,7 +242,7 @@ function applyMapExportLayout(
   if (!appendAttribution) return;
 
   const attribution = document.createElement("div");
-  attribution.textContent = "Leaflet | (c) OpenStreetMap (c) CARTO";
+  attribution.textContent = "Leaflet | (c) OpenStreetMap contributors";
   attribution.style.fontFamily = "Roboto, sans-serif";
   attribution.style.fontSize = "10px";
   attribution.style.color = DUSK;

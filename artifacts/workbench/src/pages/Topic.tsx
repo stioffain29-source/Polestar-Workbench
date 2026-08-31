@@ -542,7 +542,7 @@ export default function Topic() {
           ) : (
             <div className="h-[600px]">
               <MapContainer center={worldScope ? [20, 10] : [20, 80]} zoom={worldScope ? 2 : 3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.de/{z}/{x}/{y}.png" />
                 {withCoords.map((i) => {
                   const c = ratingColor(i.severity);
                   return (
