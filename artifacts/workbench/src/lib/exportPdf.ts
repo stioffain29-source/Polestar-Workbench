@@ -38,6 +38,86 @@ async function waitForFontsAndImages(element: HTMLElement): Promise<void> {
   }));
 }
 
+const EXPORT_MAP_IDS = [
+  "country-report-map",
+  "spot-report-map",
+  "special-report-map",
+] as const;
+
+/**
+ * Leaflet positions raster tiles with inline pixel transforms calculated for
+ * the live map's current dimensions. cloneForExport deliberately widens the
+ * report to a fixed 960px page width, but a cloned Leaflet tree cannot run
+ * invalidateSize(), so its old tile grid becomes a small, broken mosaic inside
+ * the wider map frame.
+ *
+ * Flatten each live map at its real rendered size before cloning the report,
+ * then replace the clone's inert Leaflet tree with that stable bitmap. The
+ * outer export may resize the bitmap, but the tile grid, HTML markers, labels,
+ * north arrow and scale remain locked together.
+ */
+async function snapshotMapsForExport(
+  source: HTMLElement,
+): Promise<Map<string, string>> {
+  const snapshots = new Map<string, string>();
+
+  for (const id of EXPORT_MAP_IDS) {
+    const liveMap = source.querySelector<HTMLElement>(`#${id}`);
+    if (!liveMap) continue;
+
+    await waitForFontsAndImages(liveMap);
+    const rect = liveMap.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+
+    const staging = liveMap.cloneNode(true) as HTMLElement;
+    staging.querySelectorAll<HTMLElement>(".leaflet-control-zoom").forEach((node) => {
+      node.style.display = "none";
+    });
+    staging.style.position = "absolute";
+    staging.style.left = "-10000px";
+    staging.style.top = "0";
+    staging.style.width = `${rect.width}px`;
+    staging.style.height = `${rect.height}px`;
+    staging.style.overflow = "hidden";
+    staging.style.transform = "none";
+    document.body.appendChild(staging);
+
+    try {
+      await waitForFontsAndImages(staging);
+      const canvas = await html2canvas(staging, {
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: "#fafafa",
+        logging: false,
+        width: Math.ceil(rect.width),
+        height: Math.ceil(rect.height),
+        windowWidth: Math.ceil(rect.width),
+        windowHeight: Math.ceil(rect.height),
+      });
+      snapshots.set(id, canvas.toDataURL("image/png"));
+    } finally {
+      staging.remove();
+    }
+  }
+
+  return snapshots;
+}
+
+function applyMapSnapshots(root: HTMLElement, snapshots: Map<string, string>): void {
+  for (const [id, dataUrl] of snapshots) {
+    const map = root.querySelector<HTMLElement>(`#${id}`);
+    if (!map) continue;
+    const image = document.createElement("img");
+    image.src = dataUrl;
+    image.alt = "";
+    image.style.display = "block";
+    image.style.width = "100%";
+    image.style.height = "100%";
+    image.style.objectFit = "fill";
+    map.replaceChildren(image);
+  }
+}
+
 function cloneForExport(element: HTMLElement): HTMLElement {
   const source = element.matches(".print-report")
     ? element
@@ -925,7 +1005,9 @@ function snapCutToBlankRasterRows(
 }
 
 export async function exportElementToPdf(element: HTMLElement, filename: string): Promise<void> {
+  const mapSnapshots = await snapshotMapsForExport(element);
   const clone = cloneForExport(element);
+  applyMapSnapshots(clone, mapSnapshots);
   document.body.appendChild(clone);
 
   try {
