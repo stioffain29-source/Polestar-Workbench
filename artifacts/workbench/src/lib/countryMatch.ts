@@ -13,6 +13,11 @@
 // New Guinea") is genuinely cross-border and is intentionally included in
 // both reports. Single-group records never cross over.
 
+import {
+  countPatternMatches,
+  isForeignSubjectDominant,
+} from "@workspace/country-engine";
+
 // Canonical report name -> accepted country tokens. Names not listed here
 // default to a single-token group of their own name, which still picks up
 // compound tags (e.g. the UAE report matches "United Arab Emirates; Iran").
@@ -174,8 +179,7 @@ const PAPUA_STRICT_LOCAL_RE =
 
 /** Count the non-overlapping matches of a regex in a string. */
 function countMatches(re: RegExp, text: string): number {
-  const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`);
-  return (text.match(g) ?? []).length;
+  return countPatternMatches(re, text);
 }
 
 /**
@@ -276,10 +280,7 @@ const INDO_LOCAL_ANCHOR_RE =
 export function isForeignSubjectForIndonesia(
   text: string | null | undefined,
 ): boolean {
-  const t = text ?? "";
-  const foreignCount = countMatches(INDO_FOREIGN_SUBJECT_RE, t);
-  if (foreignCount === 0) return false;
-  return foreignCount > countMatches(INDO_LOCAL_ANCHOR_RE, t);
+  return isForeignSubjectDominant(INDO_FOREIGN_SUBJECT_RE, INDO_LOCAL_ANCHOR_RE, text);
 }
 
 // ---------------------------------------------------------------------------

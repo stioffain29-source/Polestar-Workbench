@@ -2,7 +2,7 @@ import { explainRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 
 describe("Flashpoint relevance FP-01", () => {
   it("bumps RELEVANCE_RULE_VERSION for backfill", () => {
-    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-01.1");
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-01.2");
   });
 
   it("drops diplomatic UN retract legal-process slop", () => {

@@ -17,7 +17,8 @@
     "./narrative": "./src/narrative.ts",
     "./bannedPhrases": "./src/bannedPhrases.ts",
     "./gate": "./src/gate.ts",
-    "./config": "./src/config.ts"
+    "./config": "./src/config.ts",
+    "./foreignSubject": "./src/foreignSubject.ts"
   },
   "devDependencies": {
     "@types/node": "catalog:"

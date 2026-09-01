@@ -1844,6 +1844,10 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\binsider .{0,20}(theft|pilferage|tip-off)/,
     /\blogistics crime/,
     /\b(broken seal|seal break|seal broken)/,
+    // Bahasa cargo-crime incidents — mirror cargoAnalysis hasCargoVocab so
+    // untranslated APAC headlines are not kept at ingest then dropped at scope.
+    /\b(gudang|pergudangan|truk|kargo|peti kemas|kontainer|logistik|ekspedisi)\b.{0,40}\b(pencurian|dicuri|mencuri|rampok|dirampok|perampok|perampokan|bobol|dibobol|jarah|penjarahan)\b/i,
+    /\b(pencurian|dicuri|mencuri|rampok|dirampok|perampok|perampokan|bobol|dibobol|jarah|penjarahan)\b.{0,40}\b(gudang|pergudangan|truk|kargo|peti kemas|kontainer|logistik|ekspedisi)\b/i,
   ],
   // War / armed conflict / insurgency / armed crime. DELIBERATELY excludes the
   // protest/demonstration/strike/civil-disorder vocabulary — that is the

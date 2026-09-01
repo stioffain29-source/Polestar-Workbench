@@ -13,6 +13,8 @@ const SLOP = [
   "Tactical analysis Japan vs Sweden: clash of styles in friendly",
   "Four Israeli soldiers injured in armed clash in southern Lebanon",
   "Magnitude 7.2 earthquake shakes northern Japan, injures eleven people",
+  "Magnitude 6.2 earthquake strikes eastern Turkey, dozens injured in Istanbul",
+  "Turkey earthquake death toll rises as aftershocks hit Ankara region",
   "Knicks victory celebration in New York turns into riot, dozens arrested",
   "Shooting in Montreal, Canada leaves three dead",
   // A Toronto street-festival shooting syndicated by Bahasa-first outlets under a

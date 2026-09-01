@@ -54,6 +54,24 @@ describe("cargoScope — genuine cargo is kept", () => {
       cargoScope({ title: "Pencurian di gudang, kontainer dibobol", country: "Indonesia" }),
     ).toBe("in_scope");
   });
+
+  it("keeps a Bahasa staple-food warehouse theft (CG-01 audit FN)", () => {
+    expect(
+      cargoScope({
+        title: "Pencurian Gudang Sembako di Selomerto Wonosobo Terungkap",
+        country: "Indonesia",
+      }),
+    ).toBe("in_scope");
+  });
+
+  it("keeps a Bahasa truck-robber headline naming truk + perampok (CG-01 audit FN)", () => {
+    expect(
+      cargoScope({
+        title: "Polrestabes Medan Didesak Tangkap Perampok Truk Milik Pengusaha Eksped",
+        country: "Indonesia",
+      }),
+    ).toBe("in_scope");
+  });
 });
 
 describe("cargoScope — generic crime is dropped", () => {

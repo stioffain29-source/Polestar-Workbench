@@ -13,3 +13,4 @@ export * from "./engine";
 export * from "./narrative";
 export * from "./gate";
 export * from "./config";
+export * from "./foreignSubject";

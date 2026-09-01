@@ -158,7 +158,7 @@ const NON_CARGO_OVERSIGHT_VISIT_RE =
 // BOTH a cargo noun AND a theft verb — far stricter than the English gate — so
 // generic Indonesian theft ("pencurian motor") never leaks in.
 const CARGO_BAHASA_NOUN_RE = /\b(gudang|pergudangan|kargo|peti kemas|kontainer|truk|logistik|ekspedisi)\b/i;
-const CRIME_BAHASA_RE = /\b(pencurian|dicuri|mencuri|maling|rampok|dirampok|perampokan|jarah|dijarah|penjarahan|bobol|dibobol|pembobolan|curanmor|gasak|digasak)\b/i;
+const CRIME_BAHASA_RE = /\b(pencurian|dicuri|mencuri|maling|rampok|dirampok|perampok|perampokan|jarah|dijarah|penjarahan|bobol|dibobol|pembobolan|curanmor|gasak|digasak)\b/i;
 
 function hasCargoVocab(text: string): boolean {
   if (CARGO_INCIDENT_RE.test(text)) return true;
@@ -189,7 +189,9 @@ const CARGO_LOAD_CONTEXT_RE =
 // a parcel can be a doorstep package — so they qualify only with explicit load
 // context (a named freight commodity or quantity of goods) below.
 const STRONG_CARGO_NOUN_RE = /\b(cargo|freight|container|containers|consignment|consignments|shipment|shipments|godown|depot|logistics|lorry|lorries)\b/i;
-const STRONG_CARGO_BAHASA_RE = /\b(kargo|peti kemas|kontainer|logistik|ekspedisi)\b/i;
+// Mirror English STRONG_CARGO_NOUN_RE (godown/depot/lorry): Bahasa logistics-node
+// and goods-vehicle nouns qualify a theft verb as genuine cargo crime.
+const STRONG_CARGO_BAHASA_RE = /\b(gudang|pergudangan|truk|kargo|peti kemas|kontainer|logistik|ekspedisi)\b/i;
 
 // Named FREIGHT commodities — bulk/distribution goods that are the stolen TARGET.
 // When one of these is taken the load itself is the target, so the record is a
