@@ -402,6 +402,8 @@ Each item scored on three axes (1 = low, 5 = high):
 
 ## 6. Phase 3 implementation order (default sprint)
 
+Detailed day-by-day schedule: [phase-3-day-by-day-plan.md](../phase-3-implementation-plan/phase-3-day-by-day-plan.md)
+
 Work **top-down**; do not start lower ranks until P1 acceptance criteria are met or explicitly deferred with Steve.
 
 ```

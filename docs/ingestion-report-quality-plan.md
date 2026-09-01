@@ -171,7 +171,21 @@ Suggested default order (adjust after audit):
 
 ## Phase 3 — Implement & backfill (Days 6–12)
 
-Work top-down through the agreed backlog.
+Work top-down through the [agreed Phase 2 backlog](./phase-2-fix-plan/phase-2-prioritised-fix-backlog.md).
+
+**Deliverables:** [`docs/phase-3-implementation-plan/`](./phase-3-implementation-plan/README.md) — [day-by-day schedule (Days 6–12)](./phase-3-implementation-plan/phase-3-day-by-day-plan.md)
+
+| Day | Focus | Backlog |
+| --- | --- | --- |
+| 6 | Flashpoint selector FN recovery | FP-02 |
+| 7 | Flashpoint relevance + version bump | FP-01 |
+| 8 | Flashpoint parity + backfill deploy | FP-03 |
+| 9 | Cargo slop coupling | CG-01 |
+| 10 | Country brief foreign-subject gate | CB-01 |
+| 11 | P2 batch (masthead, Fast Facts, banned phrases) | CG-02, TC-02, CB-02 |
+| 12 | Thin content + Unknown country + Phase 4 prep | TC-01, HY-02 |
+
+P3 items (SH-01, CF-01, PV-01, ST-01, DC-01) roll to post-sprint unless Day 12 buffer allows.
 
 ### 3.1 Implementation checklist (per fix)
 
@@ -288,7 +302,7 @@ Handover audit              docs/dev-handover-audit.md
 |---|---|---|
 | **1 — Baseline audit** | Days 1–3 | Kept/dropped samples, report logic maps, stakeholder examples tagged |
 | **2 — Fix plan** | Days 4–5 | Ranked backlog drafted · [phase-2-fix-plan/](./phase-2-fix-plan/README.md) · stakeholder agreement pending |
-| **3 — Implement** | Days 6–12 | Pipeline fixes, version bumps, backfills, tests |
+| **3 — Implement** | Days 6–12 | [Day-by-day plan](./phase-3-implementation-plan/phase-3-day-by-day-plan.md): P1 + P2 fixes, backfills, tests |
 | **4 — Validation** | Days 13–14 | QA gates green, proof pack, stakeholder sign-off |
 
 **Next immediate action:** Review [Phase 2 backlog](./phase-2-fix-plan/phase-2-prioritised-fix-backlog.md) with Steve; assign P1 owners; then begin Phase 3 on FP-02 + FP-01.

@@ -770,6 +770,12 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // wages", "residents file a protest") is REAL street action and must NOT
   // match — only the no-article, adjective, or UN forms are diplomatic.
   /\b(files?|filed|lodges?|lodged|registers?|registered) (?:(?:a |an |its |another )?(?:(?:formal |official |diplomatic |strong |stern |strongly[- ]worded |fresh |renewed |new )+(?:un |u\.n\. )?|(?:un |u\.n\. ))|(?=protests?\b))protests?\b/i,
+  // UN death-toll / legal-process commentary on a past protest — not a street
+  // event (FP-01). Lawyer/spokesperson urging UN retraction, or disputing a UN
+  // report's accuracy, carries protest vocabulary but no live mobilisation.
+  /\b(?:lawyer|attorney|counsel|spokesperson|spokesman|spokeswoman)\b[^.!?]{0,40}\burges?\s+(?:the\s+)?(?:un|u\.n\.)\s+to\s+retract\b/i,
+  /\burges?\s+(?:the\s+)?(?:un|u\.n\.)\s+to\s+retract\b[^.!?]{0,40}\b(?:report|death toll|findings)\b/i,
+  /\bhighly inaccurate\b[^.!?]{0,50}\b(?:un|u\.n\.)\b/i,
   // Criminal-syndicate enforcement colour — "'Counter-setting syndicate'
   // active at Johor border, KLIA despite crackdown". A crime-syndicate story
   // is law enforcement, not civil unrest; the bare word "crackdown" would
@@ -2058,7 +2064,7 @@ function flashpointProtestCrackdownVerdict(text: string, negText: string): boole
 // strike kills three" — both have an ambiguous trigger but no
 // public-order companion, so they are not flashpoint material.
 const FLASHPOINT_PUBLIC_ORDER_CUE_RE =
-  /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage(?!s?[ -]time)|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage))\b/;
+  /\b(protest|demonstration|march|sit[- ]?in|picket|union|labour|labor|workers|workers'|trade union|activist|activists|police|arrest|arrested|detained|detention|curfew|assembly ban|section\s*144|roadblock|blockade|public disorder|civil unrest|strike notice|walkout|stoppage(?!s?[ -]time)|industrial action|crackdown|tear[- ]?gas|water cannon|baton|rubber bullet|riot police|hartal|bandh|gherao|shutter[- ]down|wheel[- ]jam|chakka jam|long march|million march|sit[- ]?in|opposition (rally|march|protest)|pti|imran khan|tehreek[- ]?e[- ]?insaf|student union|campus protest|teachers? (protest|march|strike)|nurses? (protest|march|strike)|doctors? (protest|march|strike)|chemists? (protest|march|strike|walkout|shutdown)|pharmacists? (protest|march|strike|walkout|shutdown)|lawyers? (protest|march|strike|walkout|boycott)|traders? (protest|march|strike|shutdown)|transporters? (protest|march|strike|stoppage)|gen\s*[- ]?z|no war|anti[- ]war|violence erupts?|police clash|thousands.{0,25}rally|demands?|demanding|abductee|concrete steps at.{0,20}rally)\b/;
 
 // Industrial-action recogniser. This monitor's scope explicitly includes
 // industrial action, but real labour-strike headlines often omit the
@@ -2113,6 +2119,9 @@ const FLASHPOINT_POLITICAL_RALLY_RE: RegExp[] = [
   /\banti[- ](war|government|govt|regime|coup|junta|china|chinese|india|indian|\bus\b|american|israel|israeli|muslim|hindu|christian|immigrant|migrant|dictatorship|corruption|fascis|colonial|nuclear)\b.{0,15}rall(y|ies)\b/,
   /\b(\d+[- ]party|multi[- ]party|opposition|ruling[- ]party|grand|mass|massive|election|campaign|political|protest|solidarity|may day|labour|labor|workers'?|farmers'?|hunger|sit[- ]?in) rall(y|ies)\b/,
   /\brall(y|ies|ied)\b behind\b.{0,25}\b(party|government|govt|opposition|coalition|alliance|leader|leaders|\bpm\b|president|prime minister|minister|premier|candidate|\bmp\b|chief)\b/,
+  /\b(?:families|family|abductee).{0,50}\b(?:rally|protest|march)\b/,
+  /\b(?:at|in)\s+(?:tokyo|osaka|kyoto|nagoya|sapporo|yokohama|sendai|hiroshima|fukuoka)\s+rally\b/,
+  /\bconcrete steps at\b.{0,20}\brally\b/,
 ];
 
 // Student-specific extra guard. A record whose only flashpoint hook
@@ -2730,7 +2739,9 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       const mentionsStudent = /\bstudents?\b/.test(text);
       if (mentionsStudent && !STUDENT_MOBILISATION_RE.test(text)) {
         const otherAmbiguous = /\b(rally|rallies|rallied|strike|strikes|striking|struck)\b/.test(text);
-        if (!otherAmbiguous) return { relevant: false, reason: "dropped: 'student' token without mobilisation signal" };
+        if (!otherAmbiguous && !FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
+          return { relevant: false, reason: "dropped: 'student' token without mobilisation signal" };
+        }
       }
       if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
         return { relevant: true, reason: "kept: ambiguous token (rally/strike) + public-order cue" };

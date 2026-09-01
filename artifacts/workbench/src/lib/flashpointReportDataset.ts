@@ -626,6 +626,30 @@ const MARTIAL_LAW_RE = /\bmartial law\b/i;
 // live public-order hook is also present.
 const COURT_VERDICT_RE = /\b(suspended (term|sentence)s?|get suspended|sentenc(ed|ing)|acquitt(ed|al)|indict(ed|ment)|conviction|guilty plea|plea bargain|plead(s|ed)? guilty|found guilty|guilty of (riot|rioting)|appeal (filed|dismissed|granted))\b/i;
 const LIVE_PUBLIC_ORDER_RE = /\b(protest(s|ers|ing)? today|rally today|crowd|crowds|demonstrators|protest(s)? (erupt|erupts|erupted|break|breaks|broke) out|(violence|unrest|clashes) (erupt|erupts|erupted|flare|flares|flared)|ongoing protest|tear[- ]?gas|water cannon|baton|stone[- ]?pelt|road closure|roadblock|blockad|curfew imposed|curfew extended|curfew lifted|troops deployed|martial law (imposed|declared|extended)|clash(es|ed)?|fatalit|injur(ed|ies)|mass arrest|detained at|arrested at|sit[- ]?in|march(ed|ing) on)\b/i;
+// Broader rescue hook for weak-operational filters (FP-02). LIVE_PUBLIC_ORDER_RE
+// demands live-event verbs; genuine rows about a named protest cycle (Gen Z
+// crackdown, campus clash, Tokyo anti-war rally, labour May Day rally) often
+// carry only the noun phrase. Used ONLY to rescue from weak-operational drops.
+const STRONG_PUBLIC_ORDER_CUE_RE =
+  /\b(protests?(?! note\b)|demonstrations?|demonstrators?|crackdowns?|cracks? down|clash(?:es|ed)?|gen\s*[- ]?z\b|sit[- ]?ins?|violence erupts?|police clash(?:ed|es|ing)?|spark(?:s|ed)? (?:a )?protest|(?:thousands|mass(?:ive)?) (?:of )?(?:people )?(?:join(?:s|ed|ing)?|stage[sd]?|hold|held|attend(?:s|ed|ing)?)?\s*(?:a )?(?:rally|protest|march|demonstration)|(?:anti[- ]war|no war)|(?:labor|labour|union|workers?|student(?:s)?|bayan).{0,50}\b(?:protest|rally|strike|march|walkout|sit[- ]?in)|(?:arrested|detained|summoned|charged|booked|held).{0,70}\b(?:protest|crackdown|unrest|gen\s*[- ]?z|rally|demonstration)|(?:protest|crackdown|unrest|gen\s*[- ]?z).{0,70}\b(?:arrest|detention|lethal force|killings?|clash)|chakka jam|wheel[- ]?jam|demanding justice|(?:demands?|demanding)\b.{0,30}\b(?:justice|release|accountability|reform|resignation|return)|(?:rally|protest|march|demonstration).{0,40}\b(?:against|over|demand|demanding)\b|demonstration held|campus protest|protests demanding|face(?:s|d)? raps over\b.{0,40}\b(?:rally|protest|strike|may\s*1))\b/i;
+// Legal-process commentary that names "protest" but reports no street event.
+// Belt-and-suspenders with the relevance diplomatic exclude (FP-01).
+const SELECTOR_LEGAL_COMMENTARY_ONLY_RE =
+  /\b(urges?\s+(?:the\s+)?(?:un|u\.n\.)\s+to\s+retract|lawyer urges|highly inaccurate|death toll report|on un report)\b/i;
+
+/** Rescue weak-operational drops when the row carries a genuine public-order signal. */
+export function hasStrongPublicOrderCue(text: string): boolean {
+  if (LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (
+    /\bgen\s*[- ]?z\b/i.test(text) &&
+    /\b(protest|crackdown|unrest|clash|killings?|lethal force|demonstrations?)\b/i.test(text)
+  ) {
+    return true;
+  }
+  if (!STRONG_PUBLIC_ORDER_CUE_RE.test(text)) return false;
+  if (SELECTOR_LEGAL_COMMENTARY_ONLY_RE.test(text)) return false;
+  return true;
+}
 // Retrospective accountability / legal-aftermath reporting about a PAST
 // public-order event. These are the dominant Flashpoint noise class: a
 // rights body recommending charges, an ex-official arrested or summoned
@@ -865,8 +889,8 @@ const MILITARY_OFFICIAL_VISIT_RE =
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (TOURISM_DEMO_RE.test(text)) return true;
-  if (RETROSPECTIVE_UNREST_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (RETROSPECTIVE_UNREST_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   const editorialTitle = titleWithoutSource(r.title ?? "");
   if (
     (MULTI_STORY_BRIEF_RE.test(editorialTitle) || /\bprotest in ceuta\b/i.test(editorialTitle)) &&
@@ -882,7 +906,7 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
       country &&
       country !== LOCATION_NOT_IDENTIFIED &&
       !FLASHPOINT_APAC_COUNTRIES.has(country) &&
-      !LIVE_PUBLIC_ORDER_RE.test(text)
+      !hasStrongPublicOrderCue(text)
     ) {
       return true;
     }
@@ -898,47 +922,47 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (SPORTS_LEAGUE_RE.test(text) && SPORTS_PROTEST_VERB_RE.test(text)) return true;
   // Sports keyword noise ("striker", "rally", "title march") with no live
   // public-order signal.
-  if (SPORTS_CONTEXT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (SPORTS_CONTEXT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Defence-procurement / weapons-system wire copy caught on "strike".
-  if (MILITARY_PROCUREMENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (MILITARY_PROCUREMENT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Legislative-process reporting ("passes bill") with no street event.
-  if (LEGISLATIVE_PROCESS_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (LEGISLATIVE_PROCESS_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   if (SUSPENDED_STRIKE_RE.test(text)) return true;
   if (SUSPENDED_STRIKE_REV_RE.test(text)) return true;
   // Martial-law legal-process: drop unless the same record carries a
   // live public-order hook. Bidirectional — "martial law" can precede
   // or follow the legal-process trigger word in the headline.
-  if (MARTIAL_LAW_RE.test(text) && MARTIAL_LAW_LEGAL_TRIGGER.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (MARTIAL_LAW_RE.test(text) && MARTIAL_LAW_LEGAL_TRIGGER.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Standalone court-verdict items (suspended terms, sentencings,
   // indictments) the classifier still keeps in civil-unrest because
   // of "rioters" / "courthouse" vocabulary — drop unless live public
   // order is present.
-  if (COURT_VERDICT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (COURT_VERDICT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Retrospective accountability / legal-aftermath about a PAST event
   // (rights-body charge recommendations, ex-officials arrested over an
   // old crackdown, probes, death-toll-report disputes). Drop unless the
   // same record describes a current live public-order event.
-  if (RETRO_ACCOUNTABILITY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (RETRO_ACCOUNTABILITY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Anticipatory / negated non-events ("government requests opposition not
   // to stage protests") — a request, not a street event. Drop unless the
   // protest actually went ahead (live public-order hook present).
-  if (ANTICIPATORY_NEGATED_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (ANTICIPATORY_NEGATED_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Post-event normalisation (peaceful polling / calm restored) — the
   // absence of an incident, not an incident.
   if (AFTERMATH_NORMALISATION_RE.test(text)) return true;
   // Scheduled elections / votes without live public-order signal.
-  if (SCHEDULED_ELECTION_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text) && !ELECTION_UNREST_RE.test(text)) return true;
+  if (SCHEDULED_ELECTION_RE.test(text) && !hasStrongPublicOrderCue(text) && !ELECTION_UNREST_RE.test(text)) return true;
   // Think-piece / trend analysis using protest vocabulary.
   if (ANALYSIS_COMMENTARY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (MOVEMENT_TREND_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (COLON_FEATURE_RE.test(r.title ?? "") && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (STOCK_MARKET_RALLY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (CEREMONIAL_EVENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (COLON_FEATURE_RE.test(r.title ?? "") && !hasStrongPublicOrderCue(text)) return true;
+  if (STOCK_MARKET_RALLY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (CEREMONIAL_EVENT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Drug / smuggling arrests are never public-order events — drop even when
   // the classifier or summary mis-tags "roadblock" (owner-flagged: meth seizure
   // in Thailand listed as Roadblock / access disruption).
   if (DRUG_CRIME_RE.test(text)) return true;
-  if (ROCKET_SPACE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (ROCKET_SPACE_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   // Foreign labour action mislabelled into an APAC country (Eimskip).
   if (FOREIGN_ENTITY_MISLABEL_RE.test(text)) return true;
   // SEO comma-spam / multi-script keyword-stuffed captions.
@@ -949,8 +973,8 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // verbatim ("...Bangladesh Sangbad Sangstha (BSS)") and would
   // falsely satisfy the APAC hook.
   if (NON_APAC_FOCUS_RE.test(editorialTitle) && !APAC_HOOK_RE.test(editorialTitle)) return true;
-  if (ANTI_CORRUPTION_ENFORCEMENT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (FIREARMS_POLICY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (ANTI_CORRUPTION_ENFORCEMENT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (FIREARMS_POLICY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   return false;
 }
 

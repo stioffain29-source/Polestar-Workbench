@@ -1,10 +1,20 @@
-import { selectFlashpointUsable, type FlashpointReportIncident, type FlashpointRejectStage } from "../src/lib/flashpointReportDataset";
+import { selectFlashpointUsable, buildFlashpointReportDataset, validateFlashpointReportDataset, type FlashpointReportIncident, type FlashpointRejectStage } from "../src/lib/flashpointReportDataset";
 const API="http://localhost:80";
 async function f(t:string){return await (await fetch(`${API}/api/incidents?topic=${t}&limit=5000`)).json();}
 const ISSUE = process.argv[2] ?? "2026-05-24";
 const merged=[...(await f("flashpoint")),...(await f("protests"))];
 const inp:FlashpointReportIncident[]=merged.map((r:any)=>({id:r.id,title:r.title,topic:r.topic,severity:r.severity??"Low",occurredAt:r.occurredAt??"",country:r.country,summary:r.summary,source:r.source,sourceUrl:r.sourceUrl,location:r.location??r.country}));
 const sel=selectFlashpointUsable(inp,"flashpoint",ISSUE);
+const ds=buildFlashpointReportDataset(inp,"flashpoint",ISSUE);
+const parityErrors=validateFlashpointReportDataset(ds);
+const distinctCard=ds.fastFacts.find((k)=>k.label==="Distinct Incidents");
+if(distinctCard&&distinctCard.value!==String(ds.enriched.length)){
+  parityErrors.push(`Distinct Incidents KPI "${distinctCard.value}" != enriched ${ds.enriched.length}`);
+}
+const enrichedIds=new Set(ds.enriched.map((r)=>r.id));
+for(const r of [...ds.activismRows,...ds.unrestRows]){
+  if(!enrichedIds.has(r.id)) parityErrors.push(`Table row id ${r.id} not in enriched set`);
+}
 const REASON:Record<FlashpointRejectStage,string>={
   "off-topic":"Off-topic — failed the public-order relevance gate (sports/finance/weather/military/entertainment homonym of rally/strike, or no protest/strike/unrest signal at all).",
   "kinetic-only":"Kinetic-only — militant/terror/armed violence with no protest or public-order linkage.",
@@ -21,6 +31,12 @@ w("# Flashpoint Weekly — Selection Proof");
 w(`Issue date: ${ISSUE}   |   7-day window: ${window6}`);
 w(`Raw in-window records (flashpoint + protests buckets): ${sel.rawWindowCount}`);
 w(`INCLUDED in report: ${sel.enriched.length}   |   REJECTED: ${sel.rejected.length}`);
+w(`DATASET enriched (in-period): ${ds.enriched.length}   |   PARITY: ${parityErrors.length === 0 ? "OK" : `${parityErrors.length} issue(s)`}`);
+if(parityErrors.length>0){
+  w("");
+  w("PARITY FAILURES (FP-03 — fix before deploy):");
+  for(const e of parityErrors) w(`   ✗ ${e}`);
+}
 w("");
 w("================================================================");
 w("INCLUDED — every in-scope country with genuine activity this week");
