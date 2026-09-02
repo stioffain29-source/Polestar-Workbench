@@ -100,14 +100,14 @@ REPO=$ROOT
 DATABASE_CONFIGURED=$DB_CONFIGURED
 FAILED_GATE_COUNT=$FAILED
 EOF
-  npx tsx --import "$WB/scripts/registerLoader.mjs" \
+  pnpm exec tsx --import "$WB/scripts/registerLoader.mjs" \
     "$WB/scripts/buildPhase41Report.ts" "$DETAIL_DIR" >"$SUMMARY_FILE"
 }
 
 send_summary_email() {
   local status=$1
   export VALIDATION_STATUS="$status"
-  if npx tsx --import "$WB/scripts/registerLoader.mjs" \
+  if pnpm exec tsx --import "$WB/scripts/registerLoader.mjs" \
     "$WB/scripts/sendValidationSummaryEmail.ts" "$SUMMARY_FILE"; then
     echo ">> Detailed validation report emailed."
   else

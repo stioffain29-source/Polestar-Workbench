@@ -91,7 +91,7 @@ function Write-DetailedReport($status) {
     ) | Set-Content $headerPath -Encoding utf8
 
     $Wb = Join-Path $Root "artifacts\workbench"
-    npx tsx --import "$Wb/scripts/registerLoader.mjs" `
+    pnpm exec tsx --import "$Wb/scripts/registerLoader.mjs" `
         "$Wb/scripts/buildPhase41Report.ts" `
         $DetailDir | Set-Content $SummaryFile -Encoding utf8
 }
@@ -99,7 +99,7 @@ function Write-DetailedReport($status) {
 function Send-SummaryEmail($status) {
     $env:VALIDATION_STATUS = $status
     $Wb = Join-Path $Root "artifacts\workbench"
-    npx tsx --import "$Wb/scripts/registerLoader.mjs" `
+    pnpm exec tsx --import "$Wb/scripts/registerLoader.mjs" `
         "$Wb/scripts/sendValidationSummaryEmail.ts" `
         $SummaryFile
     if ($LASTEXITCODE -eq 0) {
