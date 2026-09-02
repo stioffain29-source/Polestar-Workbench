@@ -28,6 +28,7 @@ const TOPICS = [
   "cargo_watch",
   "energy",
   "fertiliser",
+  "data_centres",
   "flashpoint",
   "protests",
 ] as const;

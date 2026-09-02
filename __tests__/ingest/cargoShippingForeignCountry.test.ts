@@ -59,7 +59,7 @@ describe("cargo foreign-country attribution", () => {
   });
 });
 
-const { classify: classifyShipping } = shippingTestHooks;
+const { classify: classifyShipping, classifyFeedItem: classifyShippingFeedItem } = shippingTestHooks;
 
 describe("shipping foreign-country attribution", () => {
   it("keeps theatre-first ordering: a Red Sea Houthi item is tagged Yemen, not the broader Saudi Arabia", () => {
@@ -106,5 +106,16 @@ describe("shipping foreign-country attribution", () => {
     );
     expect(c.kept).toBe(true);
     expect(c.country).toBe("Iran");
+  });
+
+  it("attributes Singapore Strait theatre after SCMP masthead strip (CG-02)", () => {
+    const item = classifyShippingFeedItem(
+      "Armed robbers board bulk carrier in Singapore Strait - South China Morning Post",
+      "",
+    );
+    expect(item.cleanTitle).toBe("Armed robbers board bulk carrier in Singapore Strait");
+    expect(item.sourceName).toBe("South China Morning Post");
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("Singapore");
   });
 });

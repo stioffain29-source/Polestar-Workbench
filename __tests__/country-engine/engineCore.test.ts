@@ -102,6 +102,30 @@ describe("classifyArticle exclusions (§3-4)", () => {
     expect(r.exclusionReason).toBe("commentary_or_opinion");
   });
 
+  it("excludes editorial essay patterns from the slop catalog (CB-02)", () => {
+    for (const title of [
+      "Nepal's Gen Z protests are a call for democratic renewal",
+      "Post-protest Bangladesh: Restoration more than renewal",
+      "Can Nepal actually enforce its Human Rights Commission's findings?",
+      "What's behind Bangladesh's protest against PM Sheikh Hasina?",
+    ]) {
+      const r = classifyArticle({ title }, INDONESIA);
+      expect(r.isEvent).toBe(false);
+      expect(r.exclusionReason).toBe("commentary_or_opinion");
+    }
+  });
+
+  it("keeps factual reporting when analysis appears only in the source name", () => {
+    const r = classifyArticle(
+      {
+        title: "Two killed in Jakarta market fire",
+        summary: "Two killed in Jakarta market fire - Channel News Asia Analysis Desk",
+      },
+      INDONESIA,
+    );
+    expect(r.isEvent).toBe(true);
+  });
+
   it("excludes a policy / development announcement", () => {
     const r = classifyArticle(
       { title: "Government signs MoU to launch major road project" },

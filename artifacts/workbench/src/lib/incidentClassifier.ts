@@ -86,8 +86,8 @@ function classifyFuel(t: string): string {
   if (/\bdepot\b/.test(t)) return "Depot disruption";
   if (/\brefinery\b/.test(t)) return "Refinery disruption";
   if (/\b(transport|trucker|tanker truck|haulier)\b/.test(t)) return "Transport disruption";
-  if (/\b(protest|demonstration|blockade)\b/.test(t)) return "Fuel protest";
-  if (/\bsupply (interruption|disruption|cut|halt)\b/.test(t)) return "Supply interruption";
+  if (/\b(protest|demonstration|blockade)s?\b/.test(t)) return "Fuel protest";
+  if (/\bsupply (interruption|disruption|cut|cuts|halt)\b/.test(t)) return "Supply interruption";
   return "Other fuel incident";
 }
 
@@ -119,13 +119,27 @@ function classifyFertiliser(t: string): string {
 function classifyEnergy(t: string): string {
   if (/\b(blackouts?|power outages?|outages?|power cuts?|electricity (cut|cuts|outage|outages))\b/.test(t)) return "Power outage";
   if (/\bload[ -]shedd|(power|electricity|energy) rationing\b/.test(t)) return "Load shedding";
-  if (/\bgrid (failure|disruption|collapse|trip|fault|overload|instability)\b/.test(t)) return "Grid disruption";
-  if (/\bsubstation\b/.test(t)) return "Substation incident";
+  if (/\bgrid (failures?|disruptions?|collapses?|trips?|faults?|overloads?|instabilities?)\b/.test(t)) return "Grid disruption";
+  if (/\bsubstations?\b/.test(t)) return "Substation incident";
   if (/\b(generation shortfall|capacity shortfall|under[ -]capacity|supply shortfall|power shortage|electricity shortage)\b/.test(t)) return "Generation shortfall";
-  if (/\b(transmission|pipeline|energy infrastructure|power (plant|station|line))\b/.test(t)) return "Energy infrastructure incident";
+  if (/\b(transmission|pipeline|energy infrastructure|power (plants?|stations?|lines?))\b/.test(t)) return "Energy infrastructure incident";
   if (/\b(fuel.*power|gas.*power|diesel.*power|fuel supply|gas supply)\b/.test(t)) return "Fuel-to-power disruption";
   if (/\b(tariff|electricity price|power price|fixed charge|power bill|surcharge|levy)\b/.test(t)) return "Power tariff / pricing";
   return "Other energy incident";
+}
+
+// Data Centres --------------------------------------------------------------
+function classifyDataCentre(t: string): string {
+  if (/\b(outages?|down(?:time)?|offline|power (?:failure|cut|outage|loss)|blackouts?|shutdowns?|evacuat\w*)\b[^.]{0,40}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation|colo facilities?|cloud regions?)\b/.test(t)) return "DC outage / downtime";
+  if (/\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation|colo facilities?|cloud regions?)\b[^.]{0,40}\b(outages?|down(?:time)?|offline|power (?:failure|cut|outage|loss)|blackouts?|shutdowns?|evacuat\w*)\b/.test(t)) return "DC outage / downtime";
+  if (/\b(cooling (?:failures?|loss|issues?)|overheat(?:ing|ed)?|chiller)\b[^.]{0,30}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b/.test(t)) return "Cooling / power failure";
+  if (/\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b[^.]{0,30}\b(cooling (?:failures?|loss|issues?)|overheat(?:ing|ed)?)\b/.test(t)) return "Cooling / power failure";
+  if (/\b(cyberattacks?|ransomware|breaches?|hack(?:ed|ers?)?|sabotage)\b[^.]{0,30}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation|cloud regions?)\b/.test(t)) return "Cyber / security incident";
+  if (/\b(planning (?:refused|rejected|denied|pending)|moratoriums?|permits? (?:refused|denied)|legal challenges?|scrapped?|halted|paused|suspended)\b[^.]{0,40}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b/.test(t)) return "Planning / permit risk";
+  if (/\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b[^.]{0,40}\b(planning (?:refused|rejected|denied|pending)|moratoriums?|permits? (?:refused|denied)|legal challenges?|scrapped?|halted|paused|suspended)\b/.test(t)) return "Planning / permit risk";
+  if (/\b(grid (?:connections?|access)|water (?:constraints?|shortages?|scarcity)|power constraints?)\b[^.]{0,40}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b/.test(t)) return "Grid / water constraint";
+  if (/\b(community (?:opposition|objections?)|environmental (?:reviews?|objections?)|public protests?)\b[^.]{0,40}\b(data cent(?:re|er)s?|server farms?|hyperscale|colocation)\b/.test(t)) return "Community opposition";
+  return "Other data centre incident";
 }
 
 // Protests / unrest / flashpoint / PNG country -----------------------------
@@ -196,6 +210,8 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
     case "energy":
     case "grid":
       return classifyEnergy(t);
+    case "data_centres":
+      return classifyDataCentre(t);
     case "conflict":
       // Conflict Watch owns its own kinetic vocabulary in conflictAnalysis —
       // the single source of truth shared with the monitor. Classify on the
@@ -212,7 +228,8 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
       if (/\b(hijack|warehouse|depot|container|pilferage|cargo)\b/.test(t)) return classifyCargo(i);
       if (/\bfuel|petrol|diesel|refinery\b/.test(t)) return classifyFuel(t);
       if (/\bfertili[sz]er|urea|potash|dap\b/.test(t)) return classifyFertiliser(t);
-      if (/\b(power|grid|blackout|load shedd|substation)\b/.test(t)) return classifyEnergy(t);
+      if (/\b(power|grid|blackout|outages?|load shedd|substations?)\b/.test(t)) return classifyEnergy(t);
+      if (/\b(data cent(?:re|er)s?|hyperscale|colocation|server farm)\b/.test(t)) return classifyDataCentre(t);
       if (/\b(protest|riot|strike|militant|tribal|robbery|roadblock|election|unrest)\b/.test(t)) return classifyUnrest(t);
       return FALLBACK;
   }

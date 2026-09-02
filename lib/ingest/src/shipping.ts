@@ -440,6 +440,21 @@ function classify(title: string, summary: string, feed: Feed): Classified {
   return { kept: true, reason: `allow:${allowHit}`, country };
 }
 
+// Strip the Google News " - Source Name" masthead BEFORE classify. The country
+// gate runs over title+summary, so a publisher masthead ("South China Morning
+// Post") would otherwise satisfy the China alias via "China" in the outlet name
+// and mis-tag a Singapore Strait boarding as China (CG-02).
+function classifyFeedItem(
+  rawTitle: string,
+  summary: string,
+  feed: Feed,
+): { cleanTitle: string; sourceName: string | null; result: Classified } {
+  const dashIdx = rawTitle.lastIndexOf(" - ");
+  const sourceName = dashIdx > 0 ? rawTitle.slice(dashIdx + 3).trim() : null;
+  const cleanTitle = dashIdx > 0 ? rawTitle.slice(0, dashIdx).trim() : rawTitle;
+  return { cleanTitle, sourceName, result: classify(cleanTitle, summary, feed) };
+}
+
 // Test-only surface (mirrors cargoTestHooks). Wraps the internal country-aware
 // classify so unit tests can lock the REAL attribution path without a live
 // feed. `defaultCountry` stands in for the per-feed default (e.g. Hormuz →
@@ -448,6 +463,17 @@ function classify(title: string, summary: string, feed: Feed): Classified {
 export const shippingTestHooks = {
   classify: (title: string, summary: string, defaultCountry = "Unknown"): Classified =>
     classify(title, summary, { label: "test", url: "", group: "vessel", defaultCountry }),
+  classifyFeedItem: (
+    rawTitle: string,
+    summary: string,
+    defaultCountry = "Unknown",
+  ) =>
+    classifyFeedItem(rawTitle, summary, {
+      label: "test",
+      url: "",
+      group: "vessel",
+      defaultCountry,
+    }),
   detectCountry,
   sanitizeMaritimeGeo,
 };
@@ -537,29 +563,27 @@ export async function runShippingIngest(opts: IngestOptions = {}): Promise<Inges
           continue;
         }
 
-        const c = classify(title, summary, feed);
-        if (!c.kept || !c.country) {
-          rejected.push({ title, reason: c.reason, feedLabel: feed.label });
+        const classifiedItem = classifyFeedItem(title, summary, feed);
+        if (!classifiedItem.result.kept || !classifiedItem.result.country) {
+          rejected.push({ title, reason: classifiedItem.result.reason, feedLabel: feed.label });
           perFeed[feed.label].rejected++;
           continue;
         }
 
-        // Google News titles often append " - Source Name". Extract it.
-        const dashIdx = title.lastIndexOf(" - ");
-        const sourceName = dashIdx > 0 ? title.slice(dashIdx + 3).trim() : (parsed.title ?? feed.label);
-        const cleanTitle = dashIdx > 0 ? title.slice(0, dashIdx).trim() : title;
+        const { cleanTitle, sourceName: extractedSource } = classifiedItem;
+        const sourceName = extractedSource ?? (parsed.title ?? feed.label);
 
         accepted.push({
           title: cleanTitle.slice(0, 500),
           summary: summary || cleanTitle,
-          country: c.country,
+          country: classifiedItem.result.country,
           occurredAt: when,
           source: sourceName.slice(0, 200),
           sourceUrl: link,
           feedLabel: feed.label,
           group: feed.group,
           defaultCountry: feed.defaultCountry,
-          reason: c.reason,
+          reason: classifiedItem.result.reason,
         });
         perFeed[feed.label].accepted++;
       }

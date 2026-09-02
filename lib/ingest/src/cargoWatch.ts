@@ -367,7 +367,7 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   // "tripoli" deliberately omitted — it collides with Libya (out of scope).
   { canonical: "Lebanon", aliases: ["lebanon", "beirut"] },
   { canonical: "Syria", aliases: ["syria", "damascus", "aleppo", "latakia", "tartus"] },
-  { canonical: "Singapore", aliases: ["singapore"] },
+  { canonical: "Singapore", aliases: ["singapore", "singapore strait"] },
   { canonical: "Malaysia", aliases: ["malaysia", "kuala lumpur", "penang", "johor", "port klang"] },
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "surabaya", "tanjung priok", "soekarno-hatta"] },
   { canonical: "Thailand", aliases: ["thailand", "bangkok", "laem chabang"] },

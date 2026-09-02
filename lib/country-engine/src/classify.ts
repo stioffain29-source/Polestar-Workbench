@@ -43,7 +43,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     reason: "commentary_or_opinion",
     status: "Commentary",
-    re: /\b(opinion|editorial|op[- ]?ed|commentary|analysis:|column|columnist|viewpoint|explainer:|perspective|guest essay|letter to the editor|my view|we must|it is time to)\b/i,
+    re: /\b(opinion|editorial|op[- ]?ed|commentary|analysis:|column|columnist|viewpoint|explainer:|perspective|guest essay|letter to the editor|my view|we must|it is time to|what'?s behind|why are|who was|post[- ]protest|protest[- ]fueled|democratic renewal|call for (?:democratic )?renewal|can \w+ actually enforce|tactical analysis|symboliz(?:e|es|ing)|more than renewal)\b/i,
   },
   {
     reason: "conference_or_forum",

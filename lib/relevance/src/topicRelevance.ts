@@ -3314,6 +3314,7 @@ export function sanitizeFactValue(topic: string, raw: string): string {
     if (topic === "shipping") return "Multiple maritime incident types";
     if (topic === "cargo_watch") return "Multiple cargo incident types";
     if (topic === "protests" || topic === "flashpoint") return "Multiple public order incident types";
+    if (topic === "data_centres") return "Multiple data centre incident types";
     return "Multiple incident types";
   }
   return v;

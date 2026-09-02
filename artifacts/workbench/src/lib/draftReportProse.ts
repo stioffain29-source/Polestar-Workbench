@@ -699,6 +699,82 @@ const ENERGY: ReportPack = {
 };
 
 // ---------------------------------------------------------------------------
+// Data Centres Watch
+// ---------------------------------------------------------------------------
+const DATA_CENTRES: ReportPack = {
+  exec: ({ types, lead, countries, sev, thin, total, cadence }) => {
+    const driver = types || "outages, cooling failures and planning or grid constraints";
+    const secondaries = countries && lead && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` ${lead} carried the most reporting${secondaries ? `, with more from ${secondaries}` : ""}.`
+      : "";
+    const para1 = `Data-centre risk this ${cadence === "monthly" ? "month" : "week"} is a continuity-and-permit story rather than a single facility failure. The pressure showed up as ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+    const para2 = `Behind the headlines sits a wider build-out constraint picture: power and water availability, grid connection queues, cooling design limits and community opposition can stall or derail hyperscale and colocation projects as quickly as an on-site outage.`;
+    const para3 = `For business users the priority is dependency mapping: know which cloud regions, colocation sites and third-party hosts your workloads rely on, and keep failover and contract exit paths current while permitting and utility risk is in flux.`;
+    return `${para1}\n\n${para2}\n\n${para3}`;
+  },
+  situation: ({ types, lead }) => {
+    const focus = types
+      ? `Operational and build-out risk stay front of mind, currently showing up as ${types}.`
+      : "Operational and build-out risk stay front of mind, with power, cooling and permitting the standing concerns.";
+    const where = lead ? ` ${lead} sits at the centre of the current reporting.` : "";
+    return `${focus}${where}`;
+  },
+  whatHappened: ({ types, countries, sev, lead }) => {
+    if (!types) {
+      return `Data-centre reporting was light recently, with no single pattern standing out.${sevTail(sev)}`;
+    }
+    const secondaries = countries && countries !== lead
+      ? countries.replace(`${lead}, `, "").replace(`${lead} and `, "")
+      : "";
+    const geo = lead
+      ? ` Reporting concentrated on ${lead}${secondaries ? `, with more from ${secondaries}` : ""}.`
+      : "";
+    return `Activity centred on ${types}.${geo}${sevTail(sev)}`;
+  },
+  whatMatters: ({ lead }) => {
+    const where = lead ? ` Exposure to ${lead} is the live pressure point for workload placement and vendor conversations.` : "";
+    const para1 = `Data-centre incidents and permitting delays feed straight into cloud availability, latency and contract risk — the impact lands on any business that hosts production workloads or customer data off-site.${where}`;
+    const para2 = `Where a cooling or power failure meets a grid or water constraint, the recovery timeline stretches and failover assumptions need checking. Those are the points where a local facility story becomes a wider continuity problem worth planning against now.`;
+    return `${para1}\n\n${para2}`;
+  },
+  implications: () => {
+    const lines = [
+      "Map critical workloads to named regions, colocation sites and cloud availability zones — not just vendor logos.",
+      "Confirm failover and backup paths for any region reporting outages, cooling failures or extended downtime.",
+      "Track planning refusals, moratoria and grid-connection delays that could affect announced build-outs you depend on.",
+      "Review contract exit and migration clauses where community opposition or water constraints threaten new capacity.",
+      "Stress-test incident comms with vendors when cyber or physical security events hit shared hosting partners.",
+    ];
+    return lines.map((l) => `- ${l}`).join("\n");
+  },
+  watchNext: () => {
+    const lines = [
+      "Facility outages and downtime — on-site power or cooling loss is the fastest operational tell.",
+      "Grid and water constraints — utility limits can block new capacity before a shovel reaches the ground.",
+      "Planning and permit decisions — refusals, moratoria and legal challenges reset build timelines quickly.",
+      "Community opposition — local protest can delay or halt hyperscale projects in active growth markets.",
+      "Cyber and physical security incidents — breaches and sabotage at shared facilities raise third-party risk.",
+    ];
+    return lines.join("\n");
+  },
+  polestarView: ({ lead, countries }) => {
+    const pressure = lead
+      ? ` ${lead} is the clearest country pressure point${countries && countries !== lead ? `, with the rest of the picture filled in by ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
+      : " No single country stands out right now.";
+    return `Data Centres Watch is flagging build-out and uptime risk rather than headline noise. The operational answer is dependency clarity: know where workloads run, how they fail over, and which permitting or utility constraints could remove capacity you assumed was coming.${pressure}`;
+  },
+  zeroExec: "Data-centre reporting was quiet this week. Read that as a gap in reporting rather than evidence that capacity risk has eased. Standing exposures — power, cooling, permitting and community opposition — still set the picture until fresh reporting comes through.",
+  zeroSituation: "Build-out constraints and uptime risk remain the background condition whether or not new reporting lands.",
+  zeroWhatHappened: "No notable data-centre events came through, so the picture carries forward from recent weeks.",
+  zeroWhatMatters: "Workload placement, vendor dependency and failover readiness stay the operational concern.",
+  zeroPolestar: "Nothing useful came through on data centres this week. Keep dependency and failover assumptions under review.",
+  thinNote: "Data-centre reporting was light this week. Treat that as a gap in reporting, not proof that capacity risk has eased.",
+};
+
+// ---------------------------------------------------------------------------
 // Generic civil-protest pack (used when topic is "protests" but not the
 // flashpoint surface). Kept distinct from flashpoint so adjacent prose
 // across reports does not converge.
@@ -841,6 +917,7 @@ const PACKS: Record<string, ReportPack> = {
   shipping: SHIPPING,
   flashpoint: FLASHPOINT,
   energy: ENERGY,
+  data_centres: DATA_CENTRES,
   protests: PROTESTS,
 };
 

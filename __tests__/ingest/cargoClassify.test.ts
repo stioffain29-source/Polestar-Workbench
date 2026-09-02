@@ -35,6 +35,15 @@ describe("cargo classifyFeedItem — Google News masthead must not leak country"
     expect(item.result.kept).toBe(true);
     expect(item.result.country).toBe("Japan");
   });
+
+  it("attributes Singapore Strait theatre from title after masthead strip (CG-02)", () => {
+    const item = classifyFeedItem(
+      "Container theft reported near Singapore Strait - South China Morning Post",
+      "",
+    );
+    expect(item.result.kept).toBe(true);
+    expect(item.result.country).toBe("Singapore");
+  });
 });
 
 describe("cargo classify — piracy belongs to shipping unless cargo-related", () => {

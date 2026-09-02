@@ -2676,6 +2676,35 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // 3c-2) ONE-TIME backfill of Unknown-country fuel / fertiliser rows (HY-02).
+    //       Same gazetteer as energy; marker-gated and Unknown-only.
+    {
+      const markerKey = "fuel_fertiliser_unknown_country_backfill_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const res = await runNewsCountryBackfill({
+          commit: true,
+          topics: ["fuel", "fertiliser"],
+        });
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          {
+            candidates: res.candidates,
+            resolved: res.resolved,
+            stillUnknown: res.stillUnknown,
+            perCountry: res.perCountry,
+            marker: markerKey,
+          },
+          "One-time backfill of Unknown-country fuel/fertiliser rows",
+        );
+      }
+    }
+
     // 3d-2) ONE-TIME purge of out-of-region (UK / Ireland) flashpoint rows.
     //
     //       The Protests & Civil Unrest tracker is scoped to APAC-LOCATED
