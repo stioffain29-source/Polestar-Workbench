@@ -10,6 +10,10 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:ci": "jest --passWithNoTests --coverage",
+    "validate:pdf-fonts": "bash artifacts/workbench/scripts/validateFonts.sh",
+    "validate:topic-font-audit": "bash artifacts/workbench/scripts/auditTopicFonts.sh",
+    "validate:country-brief-sweep": "bash artifacts/workbench/scripts/verifyCountryBriefs.sh",
+    "validate:phase41": "bash artifacts/workbench/scripts/runPhase41.sh",
     "audit:deps": "pnpm audit"
   },
   "private": true,
