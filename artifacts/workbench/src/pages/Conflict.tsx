@@ -16,7 +16,6 @@ import {
   CONFLICT_CATEGORIES, CATEGORY_COLOR, CATEGORY_CARD_LABEL,
   OPERATIONAL_IMPACTS, type ConflictCategory,
 } from "@/lib/conflictAnalysis";
-import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { TopicReportPanel } from "@/components/TopicReportPanel";
 import OfficialMilitaryMaritimeWatchPanel from "@/components/OfficialMilitaryMaritimeWatchPanel";
@@ -507,7 +506,6 @@ export default function Conflict() {
                           {isNaN(r.occurredDate.getTime()) ? "—" : format(r.occurredDate, "dd MMM")}
                         </span>
                         {displayTitle(r)}
-                        <UntranslatedBadge title={r.title} displayTitle={r.displayTitle} className="ml-1.5" />
                       </li>
                     ))}
                     {row.count > 3 && (
@@ -572,7 +570,6 @@ export default function Conflict() {
                     }
                   >
                     {displayTitle(i)}
-                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
                   </IncidentRowCard>
                 ))}
               </IncidentRowList>

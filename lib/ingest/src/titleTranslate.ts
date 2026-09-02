@@ -150,6 +150,30 @@ export function needsTitleTranslation(title?: string | null): boolean {
   return NON_LATIN_RE.test(t) || INDONESIAN_RE.test(t);
 }
 
+/**
+ * Server-side read gate for the English-language product. A foreign-language
+ * headline is not publishable until it has a non-foreign display title.
+ * Raw/admin queries may bypass this gate for analyst review.
+ */
+export function displayableIncidentTitleCondition(): ReturnType<typeof sql> {
+  const scriptPattern = `[${NON_LATIN_CLASS}]`;
+  const markerPattern = `\\y(${INDONESIAN_MARKER_WORDS.join("|")})\\y`;
+  return sql`(
+    (
+      ${incidentsTable.displayTitle} IS NOT NULL
+      AND btrim(${incidentsTable.displayTitle}) <> ''
+      AND NOT (
+        ${incidentsTable.displayTitle} ~ ${scriptPattern}
+        OR ${incidentsTable.displayTitle} ~* ${markerPattern}
+      )
+    )
+    OR NOT (
+      ${incidentsTable.title} ~ ${scriptPattern}
+      OR ${incidentsTable.title} ~* ${markerPattern}
+    )
+  )`;
+}
+
 type TranslateOutcome =
   | { ok: true; titleEn: string }
   | { ok: false; error: string; retryAfterMs?: number };

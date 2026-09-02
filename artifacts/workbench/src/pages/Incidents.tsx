@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TOPICS, TOPIC_LABELS, SEVERITY_LEVELS, CONFIDENCE_LEVELS, severityBadgeStyle } from "@/lib/topics";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
-import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { GdeltCoding, hasGdeltCoding } from "@/components/GdeltCoding";
 import { cn } from "@/lib/utils";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
@@ -131,7 +130,6 @@ export default function Incidents() {
                 <div className="p-3 font-medium min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate">{displayIncidentTitle(i.title, i.displayTitle)}</span>
-                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="shrink-0" />
                     <CorroborationBadge corroborations={i.corroborations} />
                   </div>
                   {hasGdeltCoding(i) ? <GdeltCoding incident={i} variant="inline" /> : null}

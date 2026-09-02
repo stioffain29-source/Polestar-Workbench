@@ -1,5 +1,6 @@
 import { incidentsTable } from "@workspace/db";
-import { eq, type SQL } from "drizzle-orm";
+import { displayableIncidentTitleCondition } from "@workspace/ingest/titleTranslate";
+import { and, eq, type SQL } from "drizzle-orm";
 
 /**
  * Default server-side relevance gate for incident reads. Fail closed: only rows
@@ -10,7 +11,10 @@ import { eq, type SQL } from "drizzle-orm";
  * incidents list, map, timeline, dashboard counts) clean.
  */
 export function defaultRelevanceCondition(): SQL {
-  return eq(incidentsTable.relevanceStatus, "relevant");
+  return and(
+    eq(incidentsTable.relevanceStatus, "relevant"),
+    displayableIncidentTitleCondition(),
+  )!;
 }
 
 /**

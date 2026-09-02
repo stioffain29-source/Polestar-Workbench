@@ -4,13 +4,12 @@
 // (`needsTitleTranslation`, `NON_LATIN_RANGES`, `INDONESIAN_MARKER_WORDS`). That
 // module imports `@workspace/db` and the OpenAI client, so it cannot be pulled
 // into the browser bundle. This file re-implements ONLY the pure, dependency-free
-// detection half so the workbench can flag an incident whose foreign-language
-// headline has NOT yet been translated (i.e. it still needs a `display_title` but
-// none was produced — usually because the AI integration is unconfigured).
+// detection half so the workbench can fail closed if a foreign-language
+// headline reaches a presentation boundary without a usable `display_title`.
 //
 // SYNC CONTRACT: if you change the non-Latin ranges or the Indonesian marker list
 // in `lib/ingest/src/titleTranslate.ts`, mirror the change here (and vice versa),
-// or the on-screen "untranslated" hint will drift from what ingest actually
+// or the client-side fail-closed check will drift from what ingest actually
 // rewrites. Keep the two constant blocks identical.
 
 // Unicode ranges that are unambiguously non-English script: Cyrillic, Arabic,
@@ -80,10 +79,9 @@ export function isLikelyNonEnglish(title?: string | null): boolean {
 }
 
 /**
- * True when an incident's headline still reads in a foreign language on screen —
- * i.e. there is no usable English `displayTitle` AND the raw `title` is non-
- * English. Surfaces the "untranslated" hint so readers know an English advisory
- * title was expected but not produced (typically: AI integration unconfigured).
+ * True when an incident has no usable English `displayTitle` and its raw title
+ * is non-English. Normal API reads exclude these rows; this is defense in depth
+ * for locally assembled or stale data.
  */
 export function isUntranslatedTitle(
   title?: string | null,
@@ -97,8 +95,8 @@ export function isUntranslatedTitle(
 
 /**
  * The headline to render: the English `displayTitle` when present. English raw
- * titles remain a safe fallback, but a detected foreign-language raw title is
- * never exposed to readers while translation is pending.
+ * titles remain a safe fallback. A detected foreign-language raw title fails
+ * closed with an empty value; normal API reads exclude the entire row.
  */
 export function displayIncidentTitle(
   title?: string | null,
@@ -107,7 +105,7 @@ export function displayIncidentTitle(
   const display = (displayTitle ?? "").trim();
   if (display) return display;
   const raw = (title ?? "").trim();
-  return isLikelyNonEnglish(raw) ? "Translation pending" : raw;
+  return isLikelyNonEnglish(raw) ? "" : raw;
 }
 
 // Wire / social headlines carry video call-to-action cruft that is meaningless

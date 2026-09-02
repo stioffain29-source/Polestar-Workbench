@@ -143,7 +143,12 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
 
 router.get("/incidents/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
-  const [row] = await db.select().from(incidentsTable).where(eq(incidentsTable.id, id));
+  const detailConditions = [eq(incidentsTable.id, id)];
+  if (!wantsRaw(req.query)) detailConditions.push(defaultRelevanceCondition());
+  const [row] = await db
+    .select()
+    .from(incidentsTable)
+    .where(and(...detailConditions));
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;

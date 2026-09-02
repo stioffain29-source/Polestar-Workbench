@@ -667,7 +667,7 @@ export function clusterSameStoryRows(
 // re-select — WITHIN THE SAME top severity tier — the NEWEST member that renders
 // in English. Never downgrades severity; picks an intact real row (no fabricated
 // or mis-attributed text). Falls back to cluster[0] when no English sibling
-// exists in that tier (an honest coverage gap the UntranslatedBadge still flags).
+// exists in that tier; untranslated rows fail closed at the API read gate.
 export function readableRepresentativeIndex(
   cluster: number[],
   rendersForeign: (idx: number) => boolean,

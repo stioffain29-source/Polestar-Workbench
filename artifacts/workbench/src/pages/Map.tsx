@@ -2,7 +2,6 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup, useMapEvents } from "react-leaflet";
 import { clusterPointsByZoom } from "@/lib/mapClustering";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
-import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import "leaflet/dist/leaflet.css";
 import { useLocation } from "wouter";
 import {
@@ -802,9 +801,6 @@ export default function MapPage() {
                       </div>
                       <div style={{ fontWeight: 700, color: "#0b0a3d", marginTop: 2 }}>
                         {displayIncidentTitle(p.title, p.displayTitle)}
-                        {p.id.startsWith("i-") && (
-                          <UntranslatedBadge title={p.title} displayTitle={p.displayTitle} className="ml-1.5" />
-                        )}
                       </div>
                       <div style={{ fontSize: 11, color: "#363636", marginTop: 4 }}>
                         <div>
@@ -844,7 +840,6 @@ export default function MapPage() {
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d" }}>
                           {displayIncidentTitle(p.title, p.displayTitle)}
-                          <UntranslatedBadge title={p.title} displayTitle={p.displayTitle} className="ml-1.5" />
                         </div>
                         {p.corroborations.length > 0 && (
                           <div style={{ marginTop: 6 }}>

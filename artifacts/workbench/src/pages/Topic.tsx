@@ -19,7 +19,6 @@ import { ExternalLink, BadgeCheck } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { GdeltCoding } from "@/components/GdeltCoding";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
-import { UntranslatedBadge } from "@/components/UntranslatedBadge";
 import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
@@ -556,7 +555,6 @@ export default function Topic() {
                         <div className="text-xs">
                           <div className="font-bold">
                             {displayIncidentTitle(i.title, i.displayTitle)}
-                            <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
                           </div>
                           <div>{i.country ?? "Location not identified"}</div>
                         </div>
@@ -638,7 +636,6 @@ export default function Topic() {
                     sourceUrl={incidentSourceUrl(i)}
                   >
                     {displayIncidentTitle(i.title, i.displayTitle)}
-                    <UntranslatedBadge title={i.title} displayTitle={i.displayTitle} className="ml-1.5" />
                     {i.corroborations?.length ? (
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="inline-flex items-center gap-1 text-[10px] font-sans font-semibold uppercase tracking-wider text-accent">

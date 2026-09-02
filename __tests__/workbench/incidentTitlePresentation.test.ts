@@ -16,7 +16,7 @@ describe("translated incident titles at presentation boundaries", () => {
 
   test("shared resolver prefers a non-blank translated title", () => {
     expect(displayIncidentTitle(rawTitle, englishTitle)).toBe(englishTitle);
-    expect(displayIncidentTitle(rawTitle, "   ")).toBe("Translation pending");
+    expect(displayIncidentTitle(rawTitle, "   ")).toBe("");
     expect(displayIncidentTitle("Police arrest protesters in Sydney", null)).toBe(
       "Police arrest protesters in Sydney",
     );

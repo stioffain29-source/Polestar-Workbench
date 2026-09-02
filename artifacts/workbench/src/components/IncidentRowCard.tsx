@@ -19,7 +19,7 @@ interface IncidentRowCardProps {
   country?: string | null;
   severity: string;
   sourceUrl?: string | null;
-  /** Headline + any inline badges (UntranslatedBadge, GdeltCoding, etc.) */
+  /** Headline + any inline metadata badges (GdeltCoding, etc.) */
   children: ReactNode;
   /** Optional extra tag(s) rendered before the date/country line, e.g. Conflict's category badge or impact text. */
   meta?: ReactNode;
