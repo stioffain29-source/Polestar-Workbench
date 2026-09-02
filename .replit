@@ -95,5 +95,6 @@ RELIEFWEB_APPNAME = "polestar-advisory-monitoring"
 AIS_COLLECT_SECONDS = "180"
 VESSEL_REGISTRY_ENABLED = "false"
 AIS_PROVIDER = "aisstream"
+RESEND_API_KEY = "re_DRMfRJGL_8WmuGFYy98hhibbqy5aaPfWy"
 
 [userenv.development]
