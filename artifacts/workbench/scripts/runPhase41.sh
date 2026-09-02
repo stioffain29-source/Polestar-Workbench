@@ -13,9 +13,9 @@
 # in Secrets; locally use the prod connection string from the deployment.
 # country-brief-sweep also needs `pdftotext` (poppler-utils).
 #
-# Email delivery uses Resend (RESEND_API_KEY) with fallbacks baked into
-# runPhase41.sh when .env.local / Secrets omit them. Email failure is logged
-# but does not change the gate exit code.
+# Email delivery reads RESEND_API_KEY from Replit Configurations / Secrets,
+# .env.local, or shell env (see resolveValidationEmailEnv.sh). Email failure
+# is logged but does not change the gate exit code.
 #
 # Usage (from repo root):
 #   PROD_DATABASE_URL="postgresql://..." bash artifacts/workbench/scripts/runPhase41.sh
@@ -26,26 +26,8 @@ WB="$ROOT/artifacts/workbench"
 cd "$ROOT"
 
 ENV_LOCAL="$ROOT/.env.local"
-if [ -f "$ENV_LOCAL" ]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "$ENV_LOCAL"
-  set +a
-fi
-
-# Fallback email settings when .env.local / Secrets omit them (env wins when set).
-if [ -z "${RESEND_API_KEY:-}" ]; then
-  RESEND_API_KEY="re_bF1VYYCG_989T6cz26c7jynNfUg9wmy3S"
-  export RESEND_API_KEY
-fi
-if [ -z "${VALIDATION_SUMMARY_FROM:-}" ]; then
-  VALIDATION_SUMMARY_FROM="Polestar Validation <onboarding@resend.dev>"
-  export VALIDATION_SUMMARY_FROM
-fi
-if [ -z "${VALIDATION_SUMMARY_TO:-}" ]; then
-  VALIDATION_SUMMARY_TO="tommyto0925@gmail.com"
-  export VALIDATION_SUMMARY_TO
-fi
+# shellcheck source=resolveValidationEmailEnv.sh
+source "$WB/scripts/resolveValidationEmailEnv.sh" "$ENV_LOCAL"
 
 # shellcheck source=resolveProdDatabaseUrl.sh
 source "$WB/scripts/resolveProdDatabaseUrl.sh"

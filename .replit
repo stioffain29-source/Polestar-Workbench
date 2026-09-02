@@ -95,5 +95,8 @@ RELIEFWEB_APPNAME = "polestar-advisory-monitoring"
 AIS_COLLECT_SECONDS = "180"
 VESSEL_REGISTRY_ENABLED = "false"
 AIS_PROVIDER = "aisstream"
+VALIDATION_SUMMARY_TO = "tommyto0925@gmail.com"
+VALIDATION_SUMMARY_FROM = "Polestar Validation <onboarding@resend.dev>"
+# RESEND_API_KEY — set in Replit Tools → Configurations (injected as env var)
 
 [userenv.development]

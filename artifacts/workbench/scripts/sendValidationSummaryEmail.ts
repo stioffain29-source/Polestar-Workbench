@@ -12,16 +12,18 @@
  */
 import { readFileSync } from "node:fs";
 import nodemailer from "nodemailer";
-
-const DEFAULT_TO = "tommyto0925@gmail.com";
-const DEFAULT_FROM = "Polestar Validation <onboarding@resend.dev>";
+import {
+  resolveResendApiKey,
+  resolveValidationEmailRecipient,
+  resolveValidationEmailSender,
+} from "./validationEmailEnv";
 
 function recipient(): string {
-  return (process.env.VALIDATION_SUMMARY_TO ?? DEFAULT_TO).trim();
+  return resolveValidationEmailRecipient();
 }
 
 function sender(): string {
-  return (process.env.VALIDATION_SUMMARY_FROM ?? DEFAULT_FROM).trim();
+  return resolveValidationEmailSender();
 }
 
 function subject(status: string): string {
@@ -46,7 +48,7 @@ async function sendViaResend(
   subj: string,
   body: string,
 ): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY?.trim();
+  const key = resolveResendApiKey();
   if (!key) return false;
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -121,7 +123,7 @@ async function main(): Promise<void> {
   }
 
   console.warn(
-    "Validation summary was NOT emailed — configure RESEND_API_KEY or SMTP_USER/SMTP_PASS.",
+    "Validation summary was NOT emailed — set RESEND_API_KEY in Replit Configurations, Secrets, or .env.local.",
   );
   console.warn(`Intended recipient: ${to}`);
   console.warn("--- summary (console fallback) ---");

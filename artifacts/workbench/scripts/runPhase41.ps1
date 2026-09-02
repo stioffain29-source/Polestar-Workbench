@@ -10,6 +10,7 @@ $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 Set-Location $Root
 
 $EnvLocal = Join-Path $Root ".env.local"
+$SavedResendApiKey = $env:RESEND_API_KEY
 if (Test-Path $EnvLocal) {
     Get-Content $EnvLocal | ForEach-Object {
         if ($_ -match '^\s*#' -or $_ -match '^\s*$') { return }
@@ -19,10 +20,8 @@ if (Test-Path $EnvLocal) {
         }
     }
 }
-
-# Fallback email settings when .env.local omits them (env wins when set).
-if (-not $env:RESEND_API_KEY) {
-    $env:RESEND_API_KEY = "re_bF1VYYCG_989T6cz26c7jynNfUg9wmy3S"
+if (-not $env:RESEND_API_KEY -and $SavedResendApiKey) {
+    $env:RESEND_API_KEY = $SavedResendApiKey
 }
 if (-not $env:VALIDATION_SUMMARY_FROM) {
     $env:VALIDATION_SUMMARY_FROM = "Polestar Validation <onboarding@resend.dev>"
