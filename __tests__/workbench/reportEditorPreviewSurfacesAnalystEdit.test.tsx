@@ -73,12 +73,27 @@ const ANALYST_WHAT_MATTERS =
   "it must render verbatim in the preview because a real analyst edit outranks " +
   "both the cached AI narrative and the deterministic template fallback beneath " +
   "it in the resolution precedence stack for every report topic.";
-const ANALYST_POLESTAR_VIEW =
+const POLESTAR_VIEW_MIN_WORDS = 120;
+const POLESTAR_VIEW_PAD =
+  "Operators should treat corridor risk as a standing continuity exposure until on-the-ground confirmation eases pressure on routing, insurance clauses, and supplier lead times before the next billing cycle reprices affected lanes. " +
+  "Where incidents cluster at ports or inland hubs, pull contingency stock forward and confirm broker coverage on the corridor. " +
+  "Physical theft and enforcement action can reprice contracts with little notice when security tightens at chokepoints.";
+
+function padPolestarView(seed: string): string {
+  let text = seed.trim();
+  while (text.split(/\s+/).filter(Boolean).length < POLESTAR_VIEW_MIN_WORDS) {
+    text += ` ${POLESTAR_VIEW_PAD}`;
+  }
+  return text;
+}
+
+const ANALYST_POLESTAR_VIEW = padPolestarView(
   "Analyst override marker yankee: this paragraph is a genuine hand-written " +
-  "Polestar View that an operator typed into the editor field, and it must " +
-  "render verbatim in the preview because a real analyst edit outranks both " +
-  "the cached AI narrative and the deterministic template fallback beneath it " +
-  "in the resolution precedence stack for every report topic without exception.";
+    "Polestar View that an operator typed into the editor field, and it must " +
+    "render verbatim in the preview because a real analyst edit outranks both " +
+    "the cached AI narrative and the deterministic template fallback beneath it " +
+    "in the resolution precedence stack for every report topic without exception.",
+);
 
 jest.mock("@workspace/api-client-react", () => ({
   __esModule: true,

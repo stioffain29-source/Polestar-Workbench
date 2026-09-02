@@ -340,6 +340,7 @@ export function buildFuelWatchReportData(
     incidents,
     qualifyingIncidents: fuelIncidents,
     marketCards: fastFactsCards,
+    jetTrajectory: trajectoryPoints.length >= 2 ? trajectoryPoints : undefined,
     watchIndicators: FUEL_DEFAULT_WATCH_NEXT,
   });
   const canonicalSections = buildFuelCanonicalSections(canonicalFacts);

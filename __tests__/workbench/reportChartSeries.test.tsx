@@ -125,7 +125,7 @@ describe("CargoTrendChart plots the weekly trend series", () => {
   });
 
   it("captions the total records and the number of weeks from the series", () => {
-    expect(html).toContain("10 records across 4 weeks");
+    expect(html).toContain("10 incidents across 4 weeks");
   });
 
   it("renders an honest empty (null) chart when the series has < 2 points", () => {
@@ -175,7 +175,7 @@ describe("CargoTrendChart plots a series built by the real trend selector", () =
 
   it("draws one bar per derived week and captions the real totals", () => {
     expect(cargoBars(html)).toHaveLength(3);
-    expect(html).toContain("3 records across 3 weeks");
+    expect(html).toContain("3 incidents across 3 weeks");
   });
 });
 

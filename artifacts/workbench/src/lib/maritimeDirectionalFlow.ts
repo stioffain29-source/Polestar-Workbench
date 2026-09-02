@@ -17,7 +17,7 @@
 // and the headless PDF exporter all build the exact same series from the same
 // rows — screen == preview == PDF by construction.
 
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 
 import type { MaritimeMovement } from "@workspace/api-client-react";
 
@@ -71,9 +71,12 @@ function safeTime(iso: string): number {
   return Number.isNaN(t) ? 0 : t;
 }
 
+const UTC_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
 function dayLabel(iso: string): string {
   try {
-    return format(parseISO(iso), "d MMM");
+    const d = parseISO(iso);
+    return `${d.getUTCDate()} ${UTC_MONTHS[d.getUTCMonth()]}`;
   } catch {
     return iso.slice(0, 10);
   }
@@ -81,7 +84,10 @@ function dayLabel(iso: string): string {
 
 function dayTimeLabel(iso: string): string {
   try {
-    return format(parseISO(iso), "d MMM HH:mm");
+    const d = parseISO(iso);
+    const hh = String(d.getUTCHours()).padStart(2, "0");
+    const mm = String(d.getUTCMinutes()).padStart(2, "0");
+    return `${d.getUTCDate()} ${UTC_MONTHS[d.getUTCMonth()]} ${hh}:${mm}`;
   } catch {
     return iso.slice(0, 16).replace("T", " ");
   }

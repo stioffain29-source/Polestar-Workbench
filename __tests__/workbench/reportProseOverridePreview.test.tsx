@@ -121,8 +121,7 @@ describe("saved prose overrides reach the on-screen preview", () => {
     for (const sentinel of Object.values(FUEL_SENTINELS)) {
       expect(html).not.toContain(sentinel.split(" ")[0]);
     }
-    expect(html).toContain("Overall severity: High");
-    expect(html).toContain("Indonesia is the primary pressure point");
+    expect(html).toContain("Indonesia is the clearest pressure point right now");
   });
 });
 

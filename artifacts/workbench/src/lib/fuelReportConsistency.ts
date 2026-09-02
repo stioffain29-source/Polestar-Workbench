@@ -456,12 +456,11 @@ function escapeRe(s: string): string {
 
 // ---------------------------------------------------------------------------
 // Effective-section resolution for the gate. Uses the SAME resolvers the
-// preview JSX and PDF builder use (pickRead / AI-aligned resolve) on the SAME
+// preview JSX and PDF builder use on the SAME
 // inputs, so the text the gate validates is byte-identical to the text that
 // renders — including analyst overrides (spec: validate the FINAL text).
 // ---------------------------------------------------------------------------
 
-import { pickRead } from "./pickRead";
 import type { TopicAiProse } from "./topicProseResolution";
 import type { FuelWatchReportData } from "./fuelWatchReport";
 
@@ -529,15 +528,9 @@ export function resolveFuelEffectiveSections(opts: {
       aiProse?.polestarView,
       canonical.polestarView,
     ),
-    marketRead: pickRead(report.fuelMarketRead, canonical.marketRead),
-    operationalRead: pickRead(
-      report.fuelOperationalRead,
-      canonical.operationalRead,
-    ),
-    regionalHighlights: pickRead(
-      report.fuelRegionalHighlights,
-      canonical.regionalHighlights,
-    ),
+    marketRead: canonical.marketRead,
+    operationalRead: canonical.operationalRead,
+    regionalHighlights: canonical.regionalHighlights,
     // Implications / Watch Next are deliberately NOT gated: they are generic
     // topped-up bullet lists (forward-looking by design) whose stock phrasing
     // carries no this-window quantitative claims — gating them lexically

@@ -40,6 +40,20 @@ jest.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 
+const POLESTAR_VIEW_MIN_WORDS = 120;
+const POLESTAR_VIEW_PAD =
+  "Operators should treat corridor risk as a standing continuity exposure until on-the-ground confirmation eases pressure on routing, insurance clauses, and supplier lead times before the next billing cycle reprices affected lanes. " +
+  "Where incidents cluster at ports or inland hubs, pull contingency stock forward and confirm broker coverage on the corridor. " +
+  "Physical theft and enforcement action can reprice contracts with little notice when security tightens at chokepoints.";
+
+function padPolestarView(seed: string): string {
+  let text = seed.trim();
+  while (text.split(/\s+/).filter(Boolean).length < POLESTAR_VIEW_MIN_WORDS) {
+    text += ` ${POLESTAR_VIEW_PAD}`;
+  }
+  return text;
+}
+
 // Sentinel AI narrative — each section carries a unique phrase that does NOT
 // appear in any deterministic template or dataset auto-prose, so finding it in
 // the rendered preview proves the AI `sections` payload was consumed.
@@ -50,7 +64,7 @@ const AI_SECTIONS = {
   whatMatters: "Zephyrine what-matters sentinel delta narrative.",
   implications: "Zephyrine implications sentinel echo narrative.",
   watchNext: "Zephyrine watch-next sentinel foxtrot narrative.",
-  polestarView: "Zephyrine polestar-view sentinel golf narrative.",
+  polestarView: padPolestarView("Zephyrine polestar-view sentinel golf narrative."),
 } as const;
 
 jest.mock("@workspace/api-client-react", () => ({

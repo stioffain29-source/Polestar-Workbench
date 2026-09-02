@@ -525,9 +525,13 @@ export function buildFuelGulfChokepointWatch(opts: {
     // leaving "marked concentration" as an unsupported adjective — this is the
     // same currentKept/distinctCurrentDays data already used to gate
     // broadCoverage above, so no new figure is introduced.
-    if (currentKept.length >= 2 && distinctCurrentDays >= 2) {
+    if (currentKept.length >= 2) {
+      const listedNote =
+        currentKept.length > shownCount
+          ? `; the ${shownCount} most significant are listed below`
+          : "";
       p1.push(
-        "Chokepoint reporting was spread across several days in the window rather than a single isolated flash.",
+        `${currentKept.length} distinct chokepoint incidents were logged across ${distinctCurrentDays} separate day${distinctCurrentDays === 1 ? "" : "s"} in the window${listedNote}.`,
       );
     }
     if (hasClosure) {

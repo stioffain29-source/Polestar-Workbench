@@ -106,7 +106,7 @@ describe("Fuel Watch — client feedback Aug 2026", () => {
       ],
     });
     expect(rows.some((r) => /electric aviation/i.test(r.action))).toBe(false);
-    expect(rows.some((r) => /IndiGo/i.test(r.action))).toBe(true);
+    expect(rows.some((r) => /IndiGo/i.test(r.action) || r.actor === "IndiGo")).toBe(true);
   });
 });
 

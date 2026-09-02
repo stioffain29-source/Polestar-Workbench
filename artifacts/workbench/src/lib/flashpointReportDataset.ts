@@ -500,7 +500,9 @@ export function resolveFlashpointAnalystProse(
   ai: string | null | undefined,
   auto: string,
 ): string {
-  const resolvedAuto = pickFlashpointAnalystProse(ai, auto);
+  const aiTrim = (ai ?? "").trim();
+  const resolvedAuto =
+    aiTrim && !isGenericFlashpointProse(aiTrim) ? aiTrim : auto;
   return pickFlashpointAnalystProse(editor, resolvedAuto);
 }
 

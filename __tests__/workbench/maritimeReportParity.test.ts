@@ -89,9 +89,9 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     const cards = maritimeExecCards(board);
     expect(cards.map((c) => c.label)).toEqual([
       "Maritime Risk Level",
-      `Confirmed Incidents ${MIDDOT} 7d`,
+      `Chokepoint Incidents ${MIDDOT} 7d`,
       "Chokepoints Affected",
-      "Business Impact",
+      "Business Impact Areas",
     ]);
   });
 
@@ -103,7 +103,7 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     expect(riskCard.value).not.toContain(EMDASH);
   });
 
-  it("keeps the middot in the 'Confirmed Incidents · 7d' label", () => {
+  it("keeps the middot in the 'Chokepoint Incidents · 7d' label", () => {
     const confirmedCard = maritimeExecCards(board)[1];
     expect(confirmedCard.label).toContain(MIDDOT);
     expect(confirmedCard.value).toBe(String(board.incidentSnapshot.total));
@@ -118,10 +118,12 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     );
   });
 
-  it("reports Business Impact as a count, or an em-dash when none", () => {
+  it("reports Business Impact Areas as a count with unit, or an em-dash when none", () => {
     const named = board.businessImpact.filter((b) => b !== "No material impact");
     const card = maritimeExecCards(board)[3];
-    expect(card.value).toBe(named.length > 0 ? String(named.length) : EMDASH);
+    expect(card.value).toBe(
+      named.length > 0 ? `${named.length} affected` : EMDASH,
+    );
   });
 
   it("produces a non-empty BLUF", () => {

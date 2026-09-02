@@ -40,19 +40,19 @@ describe("ProducerActionsTable rendered markup", () => {
   const html = renderToStaticMarkup(<ProducerActionsTable rows={rows} />);
 
   it("renders the buyer supplier-pivot row once, sentence-cased (syndicated copy collapsed)", () => {
-    expect(html).toContain("Russia turns to India for gasoline");
+    expect(html).toContain("Russia pivoted to Indian gasoline imports");
     expect(html).not.toContain("seeking extra gasoline");
     expect(html).toContain("Buyer action");
   });
 
   it("renders the refiner-margin market signal but excludes the refinery fire", () => {
-    expect(html).toContain("US refiner margins hit new records");
+    expect(html).toContain("Refiner margins moved sharply");
     expect(html).not.toContain("ablaze");
     expect(html).toContain("Market / supply signal");
   });
 
   it("renders the cross-read routing action with all four columns", () => {
-    expect(html).toContain("Two Saudi oil tankers reroute in the Red Sea toward the Suez Canal");
+    expect(html).toContain("Asian refineries rerouted Saudi oil imports via the Suez corridor");
     expect(html).toContain("Infrastructure / routing action");
     for (const col of ["Actor", "Category", "Action", "Operational Read"]) {
       expect(html).toContain(col);

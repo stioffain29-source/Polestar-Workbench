@@ -819,7 +819,10 @@ const FLASHPOINT_TITLE_HARD_EXCLUDE: RegExp[] = [
   // Trend / heat-on essays — "India's protest movement keeps heat on Modi".
   /\b(?:protest|youth|gen z|opposition)\s+movement\b[^.!?]{0,50}\bkeeps (?:the )?(?:heat|pressure) on\b/i,
   // Colon-subtitle feature essays — "From Protest to Power: BNP, …".
-  /^[^:]{10,100}:\s+[A-Z][^,]{2,},\s+[A-Z]/,
+  // Bound to protest/unrest essay vocabulary before the colon; embassy
+  // "Demonstration Alert:" / "Security Alert:" bulletins are excluded via the
+  // leading negative lookahead so they reach the safety-advisory gate instead.
+  /^(?!(?:demonstration|security|travel)\s+alert\b)(?:[^:]*\bfrom [^:]{0,40} to [^:]{0,40}[^:]*|[^:]*\bpost[- ]protest[^:]*|[^:]*\bprotest[^:]{0,60}\b(?:power|politics|movement|transition)\b[^:]*):\s+[a-z][^,]{2,},\s+[a-z]/,
   // Scheduled elections / votes as calendar events, not unrest incidents.
   /\b(presidential vote|presidential election|general election|parliamentary election|by-?election|snap election)\b[^.!?]{0,50}\b(set for|scheduled|prepare|preparing|calm|peaceful|underway peacefully)\b/i,
   // Question-framed capability/forecast analysis — "Can Nepal actually
@@ -2747,6 +2750,16 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
           return { relevant: false, reason: "dropped: 'student' token without mobilisation signal" };
         }
       }
+      // A "rally" with explicit POLITICAL-mobilisation context (against a
+      // govt/policy, for rights/a demand, anti-war/regime, opposition/grand/
+      // mass rally, rally behind a party/leader) is a genuine demonstration,
+      // distinct from the market/crypto/sports "rally" homonyms already
+      // dropped in FLASHPOINT_EXCLUDE above. Checked before the generic
+      // public-order cue so the reason string names the political-rally path.
+      const pol = firstMatch(text, FLASHPOINT_POLITICAL_RALLY_RE);
+      if (pol) {
+        return { relevant: true, reason: `kept: ambiguous token (political rally) + political context (/${pol.source}/)` };
+      }
       if (FLASHPOINT_PUBLIC_ORDER_CUE_RE.test(text)) {
         return { relevant: true, reason: "kept: ambiguous token (rally/strike) + public-order cue" };
       }
@@ -2755,15 +2768,6 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
       // when the headline omits the union/worker words the cue above needs.
       if (FLASHPOINT_INDUSTRIAL_ACTION_RE.test(text)) {
         return { relevant: true, reason: "kept: industrial action (worker stoppage at industrial site)" };
-      }
-      // A "rally" with explicit POLITICAL-mobilisation context (against a
-      // govt/policy, for rights/a demand, anti-war/regime, opposition/grand/
-      // mass rally, rally behind a party/leader) is a genuine demonstration,
-      // distinct from the market/crypto/sports "rally" homonyms already
-      // dropped in FLASHPOINT_EXCLUDE above.
-      const pol = firstMatch(text, FLASHPOINT_POLITICAL_RALLY_RE);
-      if (pol) {
-        return { relevant: true, reason: `kept: ambiguous token (political rally) + political context (/${pol.source}/)` };
       }
       return { relevant: false, reason: "dropped: ambiguous token (rally/strike) without public-order cue" };
     }

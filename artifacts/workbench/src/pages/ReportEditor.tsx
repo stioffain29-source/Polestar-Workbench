@@ -1226,6 +1226,22 @@ export default function ReportEditor() {
       return s ? (saved as string) : drafted;
     };
 
+    // Conflict / flashpoint / protests resolve preview prose via pickProse:
+    // seed ONLY persisted analyst edits into the form. A blank field lets the
+    // AI narrative (proseRes.edited ?? proseRes.sections) flow through as the
+    // fallback layer; seeding the deterministic draft here would treat it as a
+    // >=240-char "analyst edit" and silently hide a fresh or kept AI layer.
+    const usesPickProse =
+      topic === "conflict" || topic === "flashpoint" || topic === "protests";
+    const pickNarrative = (saved: string | null | undefined, drafted: string) => {
+      if (usesPickProse) {
+        if (proseIsStale) return drafted;
+        const s = (saved ?? "").trim();
+        return s ? (saved as string) : "";
+      }
+      return pick(saved, drafted);
+    };
+
     // Flashpoint/protests render four data-driven "reads" (Activism & Protest,
     // Civil Unrest & Public Order, Forecast, Regional & Country View). Build the
     // SAME dataset the preview/PDF consume so each read seeds with the exact
@@ -1249,12 +1265,12 @@ export default function ReportEditor() {
       issueDate,
       riskRating: report.riskRating ?? "",
       executiveSummary: pick(savedExec, draft.executiveSummary),
-      situation: pick(report.situation, draft.situation),
-      whatHappened: pick(report.whatHappened, draft.whatHappened),
-      whatMatters: pick(report.whatMatters, draft.whatMatters),
-      implications: pick(report.implications, draft.implications),
-      polestarView: pick(report.polestarView, draft.polestarView),
-      watchNext: pick(report.watchNext, draft.watchNext),
+      situation: pickNarrative(report.situation, draft.situation),
+      whatHappened: pickNarrative(report.whatHappened, draft.whatHappened),
+      whatMatters: pickNarrative(report.whatMatters, draft.whatMatters),
+      implications: pickNarrative(report.implications, draft.implications),
+      polestarView: pickNarrative(report.polestarView, draft.polestarView),
+      watchNext: pickNarrative(report.watchNext, draft.watchNext),
       activismRead: fpReads
         ? proseIsStale
           ? fpReads.activismRead

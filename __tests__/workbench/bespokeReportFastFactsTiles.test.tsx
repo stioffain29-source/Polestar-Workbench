@@ -171,9 +171,9 @@ describe("ShippingReportPreview summary tiles", () => {
   it("emits the Maritime Intelligence executive KPI tiles", () => {
     for (const label of [
       "Maritime Risk Level",
-      "Confirmed Incidents \u00b7 7d",
+      "Chokepoint Incidents \u00b7 7d",
       "Chokepoints Affected",
-      "Business Impact",
+      "Business Impact Areas",
     ]) {
       expect(hasTile(html, label)).toBe(true);
     }

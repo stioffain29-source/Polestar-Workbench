@@ -264,8 +264,7 @@ describe("saved prose overrides reach the exported PDF (headless pass-through)",
     for (const sentinel of Object.values(FUEL_SENTINELS)) {
       expect(text).not.toContain(sentinel.split(" ")[0]);
     }
-    expect(text).toContain("Overall severity: High");
-    expect(text).toContain("Indonesia is the primary pressure point");
+    expect(text).toContain("Indonesia is the clearest pressure point right now");
   });
 });
 

@@ -267,9 +267,34 @@ function parsePercentageChange(change: unknown): number | null {
   const match = change.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
   return match ? Number(match[1]) : null;
 }
-function marketFact(card: { label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string }): FuelMarketIndicatorFact {
+function marketFact(
+  card: { label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string },
+  jetTrajectory?: { date: string; value: number }[],
+): FuelMarketIndicatorFact {
   const current = typeof card.value === "number" ? card.value : Number(card.value);
   const numeric = Number.isFinite(current);
+  const isJet = /\bjet\b|kerosene/i.test(card.label);
+  if (isJet && jetTrajectory && jetTrajectory.length >= 2 && numeric) {
+    const first = jetTrajectory[0];
+    const last = jetTrajectory[jetTrajectory.length - 1];
+    const cur = current ?? last.value;
+    const pct = first.value !== 0 ? ((cur - first.value) / first.value) * 100 : 0;
+    const direction: FuelDirection =
+      Math.abs(pct) <= NEUTRAL_CHANGE_PCT
+        ? pct === 0 ? "unchanged" : "broadly stable"
+        : pct > 0 ? "rising" : "falling";
+    return {
+      label: card.label,
+      currentValue: card.value,
+      previousValue: first.value,
+      absoluteChange: cur - first.value,
+      percentageChange: pct,
+      direction,
+      unit: card.unit ?? null,
+      asOf: card.asOf ?? null,
+      source: card.source ?? null,
+    };
+  }
   const percentageChange = parsePercentageChange(card.change);
   const previousValue = numeric && percentageChange !== null && percentageChange !== -100
     ? current / (1 + percentageChange / 100) : null;
@@ -288,6 +313,8 @@ export function buildFuelCanonicalFacts(opts: {
   /** Pass the already filtered report record set to avoid any second filtering. */
   qualifyingIncidents?: TopicFastFactsIncident[];
   marketCards: Array<{ label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string }>;
+  /** Jet trajectory points — when present, jet-fuel pct in prose matches the gate. */
+  jetTrajectory?: { date: string; value: number }[];
   watchIndicators?: string[];
 }): FuelCanonicalFacts {
   const filtered = opts.qualifyingIncidents ?? filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
@@ -374,7 +401,7 @@ export function buildFuelCanonicalFacts(opts: {
     reportingPeriod: { issueDate: opts.issueDate, incidentStart: qualifyingIncidents.map((i) => i.date).sort()[0] ?? null, incidentEnd: qualifyingIncidents.map((i) => i.date).sort().at(-1) ?? null },
     qualifyingIncidents, incidentCount: qualifyingIncidents.length, distinctIncidentDates: [...new Set(qualifyingIncidents.map((i) => i.date))].sort(), countries, routes,
     incidentLocations: [...new Set(qualifyingIncidents.map((i) => i.physicalLocation).filter((x): x is string => Boolean(x)))].sort(), severityDistribution,
-    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: opts.marketCards.map(marketFact), overallSeverity,
+    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: opts.marketCards.map((c) => marketFact(c, opts.jetTrajectory)), overallSeverity,
     evidenceConfidence, analystReviewRequired: evidenceConfidence === "Low" && overallSeverity !== "Insignificant", currentConditions: qualifyingIncidents.filter((i) => i.evidenceStatus !== "Potential"),
     watchIndicators: [...new Set((opts.watchIndicators ?? []).map((x) => x.trim()).filter(Boolean))],
   };

@@ -145,7 +145,7 @@ describe("ReportPreview (cargo) Fast Facts tiles", () => {
   it("emits the six standard Fast Facts tiles", () => {
     for (const label of [
       "Reporting Period",
-      "Total Records",
+      "Total Incidents",
       "Highest Severity",
       "Top Issue Type",
       "Most Affected Country",
@@ -161,7 +161,7 @@ describe("ReportPreview (cargo) Fast Facts tiles", () => {
   });
 
   it("counts both in-scope cargo records", () => {
-    expect(tileValue(html, "Total Records")).toBe("2");
+    expect(tileValue(html, "Total Incidents")).toBe("2");
   });
 
   it("derives Latest Incident from the newest in-scope cargo record", () => {

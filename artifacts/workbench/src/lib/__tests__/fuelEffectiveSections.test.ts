@@ -95,13 +95,13 @@ describe("resolveFuelEffectiveSections precedence", () => {
     expect(eff.situation).toBe("AI situation.");
   });
 
-  it("reads: analyst override wins, blank falls back to canonical auto text", () => {
+  it("reads: legacy saved read fields are ignored in favour of canonical auto text", () => {
     const eff = resolveFuelEffectiveSections({
       report: { fuelMarketRead: "Analyst market read.", fuelOperationalRead: "" },
       aiProse: null,
       fuelData,
     });
-    expect(eff.marketRead).toBe("Analyst market read.");
+    expect(eff.marketRead).toBe(fuelData.narrativeData.canonicalSections.marketRead);
     expect(eff.operationalRead).toBe(
       fuelData.narrativeData.canonicalSections.operationalRead,
     );

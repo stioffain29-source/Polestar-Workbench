@@ -125,7 +125,7 @@ describe("Fast Facts tile overrides render in preview and clearing reverts", () 
     const incidents = [
       baseInc({ id: "g1", topic: "cargo_watch", country: "Indonesia", severity: "moderate", title: "Truck hijacking of an electronics consignment on the toll road", summary: "A cargo truck carrying electronics was hijacked." }),
     ];
-    run(CargoReportPreview, { report, incidents }, "Total Records");
+    run(CargoReportPreview, { report, incidents }, "Total Incidents");
   });
 
   it("generic energy", () => {

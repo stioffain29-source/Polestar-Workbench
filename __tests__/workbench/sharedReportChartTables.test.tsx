@@ -198,9 +198,7 @@ describe("ReportPreview (fuel) market tiles & Producer/Buyer Actions table", () 
 
   it("renders action-table rows with classified actors and the action text", () => {
     expect(html).toContain("Saudi Aramco");
-    expect(html).toContain(
-      "Saudi Aramco refinery outage halts crude supply and lifts fuel prices",
-    );
+    expect(html).toContain("Refinery or terminal disruption curtailed regional product output");
     expect(html).toContain(
       "Indonesia government cuts fuel subsidy, raising pump diesel prices",
     );

@@ -150,7 +150,7 @@ describe("Class 3 — sentence lists join with 'and'", () => {
     });
     expect(read).not.toBeNull();
     expect(read!).toMatch(
-      /\b(?:Iraq and Saudi Arabia|Saudi Arabia and Iraq) carry the most activity this week\./,
+      /\bPhysical restrictions are most visible in (?:Iraq and Saudi Arabia|Saudi Arabia and Iraq)\./,
     );
     expect(read!).not.toMatch(/Iraq, Saudi Arabia carr|Saudi Arabia, Iraq carr/);
   });
