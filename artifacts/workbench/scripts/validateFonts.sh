@@ -11,14 +11,16 @@
 # NOT read or write screenshots/font_proof/FONT_AUDIT.txt — it is side-effect
 # free so a validation run never mutates tracked files.
 #
-# Requires DATABASE_URL in the environment. Run from anywhere:
-#   DATABASE_URL=... bash artifacts/workbench/scripts/validateFonts.sh
+# Requires PROD_DATABASE_URL (preferred) or DATABASE_URL. Run from anywhere:
+#   PROD_DATABASE_URL=... bash artifacts/workbench/scripts/validateFonts.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+# shellcheck source=resolveProdDatabaseUrl.sh
+source "$(dirname "$0")/resolveProdDatabaseUrl.sh"
 
 if [ -z "${DATABASE_URL:-}" ]; then
-  echo "validateFonts: DATABASE_URL is not set — cannot export country briefs." >&2
+  echo "validateFonts: PROD_DATABASE_URL or DATABASE_URL is not set — cannot export country briefs." >&2
   exit 2
 fi
 

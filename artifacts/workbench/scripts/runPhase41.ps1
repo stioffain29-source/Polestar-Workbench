@@ -2,12 +2,17 @@
 # Mirrors artifacts/workbench/scripts/runPhase41.sh.
 #
 # Usage:
-#   $env:DATABASE_URL = "postgresql://..."
+#   $env:PROD_DATABASE_URL = "postgresql://..."
 #   .\artifacts\workbench\scripts\runPhase41.ps1
 
 $ErrorActionPreference = "Continue"
 $Root = Resolve-Path (Join-Path $PSScriptRoot "..\..\..")
 Set-Location $Root
+
+# @workspace/db reads DATABASE_URL; map from PROD_DATABASE_URL when set.
+if ($env:PROD_DATABASE_URL -and -not $env:DATABASE_URL) {
+    $env:DATABASE_URL = $env:PROD_DATABASE_URL
+}
 
 $Failed = 0
 
@@ -24,10 +29,10 @@ if (pnpm test) { Step-Pass "jest" } else { Step-Fail "jest" }
 Write-Host ""
 
 $Wb = Join-Path $Root "artifacts\workbench"
-if (-not $env:DATABASE_URL) {
-    Step-Skip "pdf-fonts (DATABASE_URL not set)"
-    Step-Skip "topic-font-audit (DATABASE_URL not set)"
-    Step-Skip "country-brief-sweep (DATABASE_URL not set)"
+if (-not $env:PROD_DATABASE_URL -and -not $env:DATABASE_URL) {
+    Step-Skip "pdf-fonts (PROD_DATABASE_URL not set)"
+    Step-Skip "topic-font-audit (PROD_DATABASE_URL not set)"
+    Step-Skip "country-brief-sweep (PROD_DATABASE_URL not set)"
 } else {
     Write-Host "==== Phase 4.1 — pdf-fonts ===="
     if (bash "$Wb/scripts/validateFonts.sh") { Step-Pass "pdf-fonts" } else { Step-Fail "pdf-fonts" }

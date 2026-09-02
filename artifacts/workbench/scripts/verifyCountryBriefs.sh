@@ -12,10 +12,17 @@
 # Fails loudly (non-zero exit + per-theatre FAIL lines) on any violation.
 #
 # Run from the workbench package root:
-#   DATABASE_URL=... bash scripts/verifyCountryBriefs.sh
+#   PROD_DATABASE_URL=... bash scripts/verifyCountryBriefs.sh
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
+# shellcheck source=resolveProdDatabaseUrl.sh
+source "$(dirname "$0")/resolveProdDatabaseUrl.sh"
+
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "verifyCountryBriefs: PROD_DATABASE_URL or DATABASE_URL is not set — cannot export country briefs." >&2
+  exit 2
+fi
 OUT_DIR="screenshots/country_sweep"
 mkdir -p "$OUT_DIR"
 

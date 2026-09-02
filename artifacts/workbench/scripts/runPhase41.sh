@@ -8,17 +8,20 @@
 #   4. topic-font-audit (auditTopicFonts.sh — topic report Roboto gate)
 #   5. country-brief-sweep (verifyCountryBriefs.sh — six briefs + banned phrases)
 #
-# Live PDF exports require DATABASE_URL (prod Postgres). On Replit, set it in
-# Secrets; locally copy from the deployment or use the prod connection string.
+# Live PDF exports require PROD_DATABASE_URL (prod Postgres). On Replit, set it
+# in Secrets; locally use the prod connection string from the deployment.
 # country-brief-sweep also needs `pdftotext` (poppler-utils).
 #
 # Usage (from repo root):
-#   DATABASE_URL="postgresql://..." bash artifacts/workbench/scripts/runPhase41.sh
+#   PROD_DATABASE_URL="postgresql://..." bash artifacts/workbench/scripts/runPhase41.sh
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 WB="$ROOT/artifacts/workbench"
 cd "$ROOT"
+
+# shellcheck source=resolveProdDatabaseUrl.sh
+source "$WB/scripts/resolveProdDatabaseUrl.sh"
 
 FAILED=0
 pass() { echo "PASS: $1"; }
@@ -34,9 +37,9 @@ if pnpm test; then pass jest; else fail jest; fi
 echo
 
 if [ -z "${DATABASE_URL:-}" ]; then
-  skip "pdf-fonts (DATABASE_URL not set)"
-  skip "topic-font-audit (DATABASE_URL not set)"
-  skip "country-brief-sweep (DATABASE_URL not set)"
+  skip "pdf-fonts (PROD_DATABASE_URL not set)"
+  skip "topic-font-audit (PROD_DATABASE_URL not set)"
+  skip "country-brief-sweep (PROD_DATABASE_URL not set)"
 else
   echo "==== Phase 4.1 — pdf-fonts ===="
   if bash "$WB/scripts/validateFonts.sh"; then pass pdf-fonts; else fail pdf-fonts; fi
