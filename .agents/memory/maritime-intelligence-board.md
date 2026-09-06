@@ -8,16 +8,14 @@ deterministic builder (`buildMaritimeIntelligence` in
 `artifacts/workbench/src/lib/maritimeIntelligence.ts`) so screen == report ==
 PDF stay in lockstep.
 
-## Topic-scope parity trap
-**Rule:** the shared builder MUST filter incidents to `topic === "shipping"`
-itself.
-**Why:** the monitor feeds it server-filtered shipping-only incidents
-(`useListIncidents({topic:"shipping"})`), but the report feeds it ALL topics
-(`useListIncidents({})` in `ReportEditor`). Without the builder-internal filter
-the two surfaces silently diverge (observed: report counted 8 vs monitor 6).
-**How to apply:** any new consumer can pass whatever incident set it has; never
-rely on the caller to pre-scope. Same trap applies to any future shared
-topic-builder fed by both a server-scoped monitor and the all-topic report path.
+## Two explicit input modes
+**Rule:** raw monitor input must still self-filter to `topic === "shipping"` and
+run monitor scope/credibility/dedupe/window/confirmation. Report input must be
+the already-final canonical set and skip every one of those selection gates.
+**Why:** running a second report selection pipeline made Maritime Intelligence
+totals/risk disagree with the rest of Shipping Watch.
+**How to apply:** report callers use prevalidated mode with the report dataset's
+canonical incidents; raw mode remains the monitor contract.
 
 ## Movement (AIS) is CONTEXT, never an incident
 Vessel-movement snapshots live in their OWN `maritime_movement` table, are
@@ -34,31 +32,16 @@ integer in a HAND-WRITTEN route refinement (`CreateMaritimeMovementBodyStrict`
 in `routes/maritimeMovement.ts`), not the generated schema, so a decimal direct
 call returns a clean 400 instead of a Postgres 500 on the integer columns.
 
-## Board is chokepoint-SCOPED — off-board incidents are excluded (owner directive)
-**Rule:** the whole maritime board is scoped to tracked chokepoints. In
-`buildMaritimeIntelligence`, `confirmed` is filtered to incidents whose
-`detectChokepoints()` names ≥1 `BOARD_CHOKEPOINTS` strait
-(`r.chokepoints.some(cp => BOARD_CHOKEPOINTS.includes(cp))`) at the single point
-where `confirmed` is built, so EVERY downstream surface (risk/BLUF,
-incidentSnapshot, confirmedIncidents table, cards, chokepointsAffected, KRIs,
-watch-next) derives from the board-scoped set. A confirmed incident whose only
-chokepoint is OFF-board (valid detection key like "Arabian / Persian Gulf" /
-"Gulf of Oman"), or names none, is DROPPED from the report entirely.
-**Why:** the earlier defect was an Extreme BLUF over a wall of L1 zero cards.
-The first fix surfaced off-board incidents in a "Wider waters (no named
-chokepoint)" bucket card — the owner REJECTED it ("no. the solution is to remove
-this from the report"). Scoping at source removes the contradiction: empty board
-→ risk L1 → an accurate Insignificant BLUF. Accepted trade-off: legitimate
-off-chokepoint maritime incidents don't appear on this chokepoint-scoped board
-(they still surface in the report's other sections + the live monitor).
-**How to apply:** there are ALWAYS exactly 7 cards; `chokepointCards.key` is
-`ChokepointKey` (no bucket key). Do NOT re-add a wider-waters / reconciliation
-bucket. The empty-week (L1) BLUF must stay chokepoint-SCOPED ("No confirmed
-incidents at tracked chokepoints this week"), never a blanket "no confirmed
-maritime security incidents" — an off-board incident can still appear in the
-same PDF's vessel-threat section, so an unscoped negative is falsifiable.
-`chokepointsAffected` / KPI denominators stay keyed to `BOARD_CHOKEPOINTS.length`
-(fixed "/ 7").
+## Seven route cards, but report risk uses the whole final set
+**Rule:** keep exactly seven chokepoint cards and never add a “wider waters”
+bucket. In report mode, however, overall confirmed total/risk uses every final
+canonical incident; cards are route-specific subsets of that same set.
+**Why:** the current report invariant requires one incident denominator across
+headline risk, narrative and Related Incidents. Silently dropping a confirmed
+off-card event only from Maritime Intelligence recreates split totals.
+**How to apply:** a no-chokepoint incident stays in the report total/risk and
+confirmed table but contributes to no route card. Use geography-scoped
+chokepoint detection so a country-incompatible name cannot inflate a card.
 
 ## Vessel-attack CONFIRMATION needs active-voice phrasing
 **Gotcha:** `isConfirmedOperationalIncident` confirms an attack via

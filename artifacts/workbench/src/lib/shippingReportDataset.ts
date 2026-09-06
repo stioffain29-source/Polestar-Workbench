@@ -1,4 +1,4 @@
-import { format, parseISO, max as dateMax } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { isTopicRelevant } from "./topicRelevance";
 import {
@@ -641,9 +641,8 @@ export function buildShippingReportDataset(
   // every incident table uses. The headline KPIs (Confirmed Incidents,
   // Highest Severity, Latest Significant Incident) all read from this so the
   // top-of-report numbers can never exceed what the tables below actually
-  // list. The region/country DISTRIBUTION charts keep the broader `enriched`
-  // set on purpose (they answer "where did reporting cluster", a different
-  // question) and are labelled "Records by …" so the two are never confused.
+  // list. `enriched` remains diagnostics-only; every rendered derivation,
+  // including regional/country distributions, reads canonicalIncidents.
   // Prior-period bulletins (ReCAAP weekly digests etc.) state their own
   // reporting window — when that stated window ends before this report's
   // window starts, the record is prior-period reporting surfacing on its
@@ -661,27 +660,10 @@ export function buildShippingReportDataset(
   const canonicalIncidents = sortByDateDesc(foldCanonical(confirmedIncidents));
   const articleCount = confirmedIncidents.length;
 
-  // Chokepoint Watch, Vessel Attacks and Piracy / Armed Robbery are bounded to
-  // the SAME report window as every other section. They previously used a
-  // rolling 30-day look-back, which surfaced pre-window incidents beneath a
-  // current-dated cover. Option A: a report describes one window only, so the
-  // reader never sees stale records presented as part of the current cycle.
-  const endDate = win.end;
-  const start30 = win.start;
-  const start30Ms = start30.getTime();
-  const end30Ms = endDate.getTime();
-  const raw30 = incidents.filter((i) => {
-    if (i.topic !== topic) return false;
-    try {
-      const d = parseISO(i.occurredAt);
-      if (isNaN(d.getTime())) return false;
-      const ms = d.getTime();
-      return ms >= start30Ms && ms <= end30Ms;
-    } catch { return false; }
-  });
-  const windowed30 = raw30.filter(passesShipping).map(stripIncidentWireCruft);
-  const enriched30 = sortByDateDesc(enrich(windowed30)).filter((r) => r.region !== "Out of scope");
-  const thirtyDayShortLabel = `${format(start30, "d MMM")} - ${format(endDate, "d MMM yyyy")}`;
+  // One final canonical set drives every report derivation. The historical
+  // rolling re-query path is intentionally absent: the cover and every table
+  // describe this same resolved report window.
+  const thirtyDayShortLabel = `${format(win.start, "d MMM")} - ${format(win.end, "d MMM yyyy")}`;
 
   // Chokepoint counts — derived from the report window so the headline
   // "Main Affected Chokepoint" matches the Chokepoint Watch table below.
@@ -777,7 +759,6 @@ export function buildShippingReportDataset(
   // Highest Severity reads from the confirmed pool so the chip can never be
   // driven by an advisory/claim record the incident tables do not list.
   const hsAll = highestSeverity(canonicalIncidents);
-  const latestDate = enriched.length > 0 ? dateMax(enriched.map((r) => r.date)) : null;
   // Latest Significant Incident must skip repatriation / crew-return /
   // social-handle / speculative-claim records so the headline can't be
   // hijacked by a human-interest follow-up that happens to be tagged
@@ -882,15 +863,15 @@ export function buildShippingReportDataset(
   // commentary (vessel S&P, newbuilds, fleet finance, earnings, share-price
   // moves, freight-rate-only stories with no disruption anchor) is filtered
   // out so the section does not drift into freight-market reporting.
-  const commercialRecords = dedupeByTitle(
-    enriched
+  const commercialRecords =
+    canonicalIncidents
       .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
       .filter((r) => !isShippingMarketOnly(r))
       .filter((r) => !FREIGHT_MARKET_INDEX_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
-      .filter((r) => COMMERCIAL_OPERATIONAL_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`)),
-  ).slice(0, 10);
+      .filter((r) => COMMERCIAL_OPERATIONAL_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
+      .slice(0, 10);
 
-  const transitRecords = enriched.filter(
+  const transitRecords = canonicalIncidents.filter(
     (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
   );
 
@@ -904,11 +885,11 @@ export function buildShippingReportDataset(
   // Chokepoint / Route Read (below) and the Executive Summary (seeded via
   // ds.leadDevelopment), so the report can never bury the lead story in the
   // closing table again.
-  const leadDevelopmentIncident = selectLeadDevelopment(enriched, cpRanked);
+  const leadDevelopmentIncident = selectLeadDevelopment(canonicalIncidents, cpRanked);
   const chokepointRouteRead = buildChokepointRouteRead({
     cpRanked,
     transitRecords,
-    weeklyEnriched: enriched,
+    weeklyEnriched: canonicalIncidents,
     thirtyDayLabel: thirtyDayShortLabel,
     leadDevelopment: leadDevelopmentIncident,
   });
@@ -964,7 +945,7 @@ export function buildShippingReportDataset(
   const regionalCountryRead = buildRegionalCountryRead({
     regionRows,
     countryRows,
-    weeklyCount: enriched.length,
+    weeklyCount: canonicalIncidents.length,
     locationNotIdentifiedCount,
   });
 
@@ -1001,7 +982,7 @@ export function buildShippingReportDataset(
     regionRows,
     countryRows,
     thirtyDayLabel: thirtyDayShortLabel,
-    weeklyCount: enriched.length,
+    weeklyCount: canonicalIncidents.length,
   };
   const autoWhatMatters = buildShippingWhatMatters(autoCtx);
   const autoImplications = buildShippingImplications(autoCtx);

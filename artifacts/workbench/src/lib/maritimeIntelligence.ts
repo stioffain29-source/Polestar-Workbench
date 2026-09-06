@@ -19,6 +19,7 @@ import {
   isConfirmedOperationalIncident,
   isLowCredibilityShippingRecord,
   detectChokepoints,
+  detectChokepointsScoped,
   classifyRegion,
   type Region,
   type ChokepointKey,
@@ -27,6 +28,7 @@ import {
 import { dedupeShippingMonitorRows } from "./shippingReportDataset";
 import { deriveIncidentCountry } from "./shippingCountry";
 import { displayIncidentTitle } from "./incidentTitle";
+import type { ShippingReportDataset } from "./shippingReportDataset";
 
 // ---------------------------------------------------------------------------
 // Incident input + the 11-category maritime taxonomy
@@ -105,8 +107,9 @@ const PORT_DISRUPTION_RE =
  */
 export function classifyMaritimeIncident(
   i: MaritimeRecordLike,
+  prevalidated = false,
 ): MaritimeIncidentCategory | null {
-  if (!isConfirmedOperationalIncident(i)) return null;
+  if (!prevalidated && !isConfirmedOperationalIncident(i)) return null;
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   const piracy = classifyPiracy(i);
   const vessel = classifyVesselIncident(i);
@@ -593,8 +596,8 @@ export interface MaritimeIntelligence {
   incidentSnapshot: IncidentSnapshot;
   /**
    * The seven spec chokepoints, each with its own risk / count / movement.
-   * Confirmed incidents naming no board chokepoint are out of scope and excluded
-   * from the board, so there are always exactly seven cards.
+   * The report's prevalidated mode keeps off-card incidents in the overall
+   * confirmed total/risk, while these seven cards remain route-specific.
    */
   chokepointCards: ChokepointCard[];
   /** Number of board chokepoints with ≥1 confirmed incident in the window. */
@@ -610,6 +613,11 @@ export interface MaritimeIntelligence {
 export interface BuildMaritimeIntelligenceArgs {
   incidents: MaritimeIncidentInput[];
   movement: MaritimeMovement[] | null | undefined;
+  /**
+   * Report-only path. Inputs are the final event-folded canonical incident
+   * set, so do not independently re-scope, gate, deduplicate or re-window it.
+   */
+  inputMode?: "raw" | "prevalidated";
   /** Days in the window; defaults to 7. Ignored when windowStart/End given. */
   windowDays?: number;
   /** End of window; defaults to now. */
@@ -666,12 +674,15 @@ export function buildMaritimeIntelligence(
   args: BuildMaritimeIntelligenceArgs,
 ): MaritimeIntelligence {
   const { movement } = args;
+  const prevalidated = args.inputMode === "prevalidated";
   // Scope to shipping-topic incidents so the report (which is handed ALL topics)
   // and the live Shipping monitor (server-filtered to topic "shipping") build
   // from the EXACT same incident set. Without this the two surfaces could
   // diverge — maritime-looking rows from cargo/flashpoint/fuel/energy would
   // inflate the report's incident picture but not the monitor's.
-  const incidents = args.incidents.filter((i) => i.topic === "shipping");
+  const incidents = prevalidated
+    ? args.incidents
+    : args.incidents.filter((i) => i.topic === "shipping");
   const windowDays = args.windowDays ?? 7;
   const windowEnd = args.windowEnd ?? args.asOf ?? new Date();
   const windowStart =
@@ -689,30 +700,36 @@ export function buildMaritimeIntelligence(
       occurredDate: safeDate(i.occurredAt),
     };
   });
-  const inScopeClean = enriched
-    .filter((i) => i.region !== "Out of scope")
-    .filter((i) => !isLowCredibilityShippingRecord(i));
-  const deduped = dedupeShippingMonitorRows(inScopeClean);
+  const inScopeClean = prevalidated
+    ? enriched
+    : enriched
+      .filter((i) => i.region !== "Out of scope")
+      .filter((i) => !isLowCredibilityShippingRecord(i));
+  const deduped = prevalidated ? inScopeClean : dedupeShippingMonitorRows(inScopeClean);
 
   // 2. Window the deduped set.
-  const windowRows = deduped.filter(
-    (i) =>
-      !isNaN(i.occurredDate.getTime()) &&
-      i.occurredDate >= windowStart &&
-      i.occurredDate <= windowEnd,
-  );
+  const windowRows = prevalidated
+    ? deduped
+    : deduped.filter(
+      (i) =>
+        !isNaN(i.occurredDate.getTime()) &&
+        i.occurredDate >= windowStart &&
+        i.occurredDate <= windowEnd,
+    );
 
   // 3. Keep ONLY confirmed operational incidents, each tagged with a category.
   //    classifyMaritimeIncident gates on isConfirmedOperationalIncident, so
   //    claims/threats/advisory posture/movement context are all excluded.
   const confirmed: ClassifiedIncident[] = windowRows
     .map((i) => {
-      const category = classifyMaritimeIncident(i);
+      const category = classifyMaritimeIncident(i, prevalidated);
       if (!category) return null;
       return {
         ...i,
         category,
-        chokepoints: detectChokepoints(i),
+        chokepoints: prevalidated
+          ? detectChokepointsScoped(i, i.incidentCountry)
+          : detectChokepoints(i),
       } as ClassifiedIncident;
     })
     .filter((x): x is ClassifiedIncident => x !== null)
@@ -723,7 +740,7 @@ export function buildMaritimeIntelligence(
     // is to remove it from the report entirely rather than surface it, so it can
     // never drive the overall risk / BLUF while every named card reads zero (the
     // "Extreme over a wall of zeros" contradiction).
-    .filter((r) => r.chokepoints.some((cp) => BOARD_CHOKEPOINTS.includes(cp)))
+    .filter((r) => prevalidated || r.chokepoints.some((cp) => BOARD_CHOKEPOINTS.includes(cp)))
     .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
 
   // 4. Incident snapshot.
@@ -929,4 +946,120 @@ export function buildMaritimeIntelligence(
     watchNext,
     sourceHealth,
   };
+}
+
+/**
+ * Fail closed at report rendering boundaries.  This deliberately derives a
+ * fresh prevalidated board from the final canonical set rather than comparing
+ * fields that were produced together, so a mutated dataset or board cannot
+ * silently ship contradictory headline figures.
+ */
+export function assertShippingReportConsistency(
+  ds: ShippingReportDataset,
+  board: MaritimeIntelligence,
+  renderedFastFacts: ShippingReportDataset["fastFacts"] = ds.fastFacts,
+): void {
+  const fail = (message: string) => {
+    throw new Error(`Shipping report consistency error: ${message}`);
+  };
+  const canonical = ds.canonicalIncidents;
+  const fact = (label: string) => renderedFastFacts.find((f) => f.label === label);
+  const confirmed = fact("Confirmed Incidents");
+  if (!confirmed || confirmed.value !== String(canonical.length)) {
+    fail(`Confirmed Incidents headline is ${confirmed?.value ?? "missing"}, expected ${canonical.length} canonical incidents`);
+  }
+  const rank: Record<string, number> = { insignificant: 1, low: 2, moderate: 3, high: 4, extreme: 5 };
+  const labels: Record<string, string> = { insignificant: "Insignificant", low: "Low", moderate: "Moderate", high: "High", extreme: "Extreme" };
+  const highest = canonical.reduce((best, row) =>
+    (rank[(row.severity ?? "").toLowerCase()] ?? 0) > (rank[best] ?? 0)
+      ? (row.severity ?? "").toLowerCase() : best, "");
+  const severity = fact("Highest Severity");
+  if (!severity || severity.value !== (highest ? labels[highest] ?? highest : "—")) {
+    fail(`Highest Severity headline is ${severity?.value ?? "missing"}, expected ${highest ? labels[highest] ?? highest : "—"}`);
+  }
+  const regional = new Map<string, number>();
+  const countries = new Map<string, number>();
+  for (const row of canonical) {
+    regional.set(row.region, (regional.get(row.region) ?? 0) + 1);
+    if (row.incidentCountry) countries.set(row.incidentCountry, (countries.get(row.incidentCountry) ?? 0) + 1);
+  }
+  const cpCounts = new Map<ChokepointKey, number>();
+  for (const row of canonical) for (const cp of detectChokepointsScoped(row, row.incidentCountry)) {
+    cpCounts.set(cp, (cpCounts.get(cp) ?? 0) + 1);
+  }
+  for (const row of ds.chokepointRows) {
+    const expected = cpCounts.get(row.name) ?? 0;
+    if (row.count !== expected) fail(`chokepoint ${row.name} count is ${row.count}, expected ${expected}`);
+  }
+  const top = [...cpCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const main = fact("Main Affected Chokepoint");
+  const topRegion = [...regional.entries()]
+    .filter(([name]) => name !== "Country not identified")
+    .sort((a, b) => b[1] - a[1])[0];
+  const expectedMainNote = top
+    ? `${top[1]} record${top[1] === 1 ? "" : "s"}`
+    : topRegion
+      ? `Nearest region: ${topRegion[0]} (${topRegion[1]})`
+      : "No chokepoint reported this week";
+  if (!main || main.value !== (top?.[0] ?? "—") || main.note !== expectedMainNote) {
+    fail(`Main Affected Chokepoint headline conflicts with canonical incidents`);
+  }
+  for (const row of ds.regionRows) {
+    if (row.value !== (regional.get(row.label) ?? 0)) fail(`regional row ${row.label} is ${row.value}, expected ${regional.get(row.label) ?? 0}`);
+  }
+  const expectedUnknown = regional.get("Country not identified") ?? 0;
+  if (ds.locationNotIdentifiedCount !== expectedUnknown) {
+    fail(`location-not-identified count is ${ds.locationNotIdentifiedCount}, expected ${expectedUnknown}`);
+  }
+  const assignedRegionalTotal =
+    ds.regionRows.reduce((sum, row) => sum + row.value, 0) +
+    ds.locationNotIdentifiedCount;
+  if (assignedRegionalTotal !== canonical.length) {
+    fail(`regional totals assign ${assignedRegionalTotal} incidents, expected ${canonical.length}`);
+  }
+  const expectedCountries = Array.from(countries.entries()).map(([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value).slice(0, 12);
+  if (JSON.stringify(ds.countryRows.map(({ label, value }) => ({ label, value }))) !== JSON.stringify(expectedCountries)) {
+    fail("country rows conflict with canonical incident country counts");
+  }
+  const canonicalIds = new Set(canonical.map((row) => String(row.id)));
+  const derivedRows = [
+    ...ds.vesselRows,
+    ...ds.piracyRows,
+    ...ds.commercialRows,
+    ...ds.relatedIncidents,
+  ];
+  const foreignDerived = derivedRows.find((row) => !canonicalIds.has(String(row.id)));
+  if (foreignDerived) {
+    fail(`derived incident ${String(foreignDerived.id)} is not in the canonical set`);
+  }
+  const latestSignificant =
+    canonical.find((row) => row.severity === "extreme" || row.severity === "high") ??
+    canonical[0] ??
+    null;
+  if (
+    latestSignificant &&
+    !ds.relatedIncidents.some((row) => String(row.id) === String(latestSignificant.id))
+  ) {
+    fail("Latest Significant Incident is missing from Related Incidents");
+  }
+  const expectedBoard = buildMaritimeIntelligence({
+    incidents: canonical,
+    movement: [],
+    windowStart: board.windowStart,
+    windowEnd: board.windowEnd,
+    inputMode: "prevalidated",
+  });
+  if (board.incidentSnapshot.total !== canonical.length ||
+    board.incidentSnapshot.total !== board.confirmedIncidents.length) {
+    fail(`maritime confirmed total is ${board.incidentSnapshot.total}, expected ${canonical.length}`);
+  }
+  const expectedIds = expectedBoard.confirmedIncidents.map((r) => String(r.id)).sort();
+  const boardIds = board.confirmedIncidents.map((r) => String(r.id)).sort();
+  if (JSON.stringify(boardIds) !== JSON.stringify(expectedIds)) {
+    fail("maritime confirmed incident IDs conflict with canonical incidents");
+  }
+  if (board.risk.level !== expectedBoard.risk.level || board.risk.label !== expectedBoard.risk.label) {
+    fail(`overall maritime risk is L${board.risk.level} ${board.risk.label}, expected L${expectedBoard.risk.level} ${expectedBoard.risk.label}`);
+  }
 }

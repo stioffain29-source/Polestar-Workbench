@@ -2,6 +2,11 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip, Popup as LeafletPopup, useMapEvents } from "react-leaflet";
 import { clusterPointsByZoom } from "@/lib/mapClustering";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 import "leaflet/dist/leaflet.css";
 import { useLocation } from "wouter";
 import {
@@ -590,8 +595,9 @@ export default function MapPage() {
             style={{ height: "100%", width: "100%" }}
           >
             <TileLayer
-              url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+              url={CARTO_POSITRON_TILE_URL}
+              attribution={CARTO_ATTRIBUTION}
+              subdomains={CARTO_SUBDOMAINS}
             />
             <MapZoomTracker onZoom={setZoom} />
             {renderPoints.map((p) => {

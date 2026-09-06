@@ -2,6 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
+  CARTO_ATTRIBUTION,
+  CARTO_ATTRIBUTION_TEXT,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
+import {
   useListMaritimeVessels,
   getListMaritimeVesselsQueryKey,
 } from "@workspace/api-client-react";
@@ -210,8 +216,9 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
         zoomAnimation: false,
         markerZoomAnimation: false,
       });
-      L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
+      L.tileLayer(CARTO_POSITRON_TILE_URL, {
+        attribution: CARTO_ATTRIBUTION,
+        subdomains: CARTO_SUBDOMAINS,
         maxZoom: 19,
         crossOrigin: true,
       }).addTo(mapRef.current);
@@ -428,7 +435,7 @@ export default function VesselMap({ height = 460 }: VesselMapProps) {
             whiteSpace: "nowrap",
           }}
         >
-          Leaflet | (c) OpenStreetMap contributors
+          {CARTO_ATTRIBUTION_TEXT}
         </span>
       </div>
 

@@ -62,6 +62,7 @@ import {
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
+  assertShippingReportConsistency,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
@@ -937,6 +938,28 @@ export async function exportShippingReportPdf(
   // jsPDF silently falls back to Helvetica, which the brand spec forbids.
   await ensureRobotoLoaded(ctx.pdf);
   const win = resolveReportWindow(data.topic, data.issueDate);
+  // Build the final, event-folded set before any prose or board derivation.
+  // Every rendered report surface below is driven from this one dataset.
+  const ds = buildShippingReportDataset(
+    incidents,
+    data.topic,
+    data.issueDate,
+    maritimeSecurityEvents,
+  );
+  const maritimeBoard = buildMaritimeIntelligence({
+    incidents: ds.canonicalIncidents,
+    movement,
+    windowStart: win.start,
+    windowEnd: win.end,
+    inputMode: "prevalidated",
+  });
+  const renderedFastFacts = applyFastFactOverrides(
+    ds.fastFacts,
+    sectionOverrides?.fastFactOverrides,
+  );
+  // Validate before even the cover is painted: a contradictory report must
+  // fail rather than yield a partially rendered PDF.
+  assertShippingReportConsistency(ds, maritimeBoard, renderedFastFacts);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   try {
     const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
@@ -964,7 +987,7 @@ export async function exportShippingReportPdf(
   const proseDraft = stableDraftTopicReportProse({
     topic: data.topic,
     issueDate: data.issueDate,
-    incidents: toDraftableIncidents(incidents),
+    incidents: toDraftableIncidents(ds.canonicalIncidents),
   });
   const execText = resolveSimpleProse(
     data.executiveSummary,
@@ -979,28 +1002,15 @@ export async function exportShippingReportPdf(
   // Maritime Intelligence — the one shared deterministic board, aligned to this
   // report's window so the PDF agrees with the live Shipping monitor. Drawn in
   // the SAME order ShippingReportPreview renders it (preview == PDF).
-  const maritimeBoard = buildMaritimeIntelligence({
-    incidents,
-    movement,
-    windowStart: win.start,
-    windowEnd: win.end,
-  });
   if (show("maritime-intelligence")) {
     drawMaritimeIntelligence(ctx, maritimeBoard);
   }
-
-  const ds = buildShippingReportDataset(
-    incidents,
-    data.topic,
-    data.issueDate,
-    maritimeSecurityEvents,
-  );
 
   if (show("fast-facts")) {
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(
       ctx,
-      applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+      renderedFastFacts,
     );
   }
 

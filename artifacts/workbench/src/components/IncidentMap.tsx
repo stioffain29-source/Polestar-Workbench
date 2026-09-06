@@ -3,6 +3,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import polestarLogo from "@assets/Polestar_navy_logo_hor.png";
 import { SPOT_SEV_COLOR, SPOT_SEV_LABEL, NAVY, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_ATTRIBUTION_TEXT,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 
 export interface IncidentMapPoint {
   lat: number;
@@ -102,8 +108,9 @@ export default function IncidentMap({
         zoomAnimation: false,
         markerZoomAnimation: false,
       });
-      L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
+      L.tileLayer(CARTO_POSITRON_TILE_URL, {
+        attribution: CARTO_ATTRIBUTION,
+        subdomains: CARTO_SUBDOMAINS,
         maxZoom: 19,
         crossOrigin: true,
       }).addTo(mapRef.current);
@@ -379,7 +386,7 @@ export default function IncidentMap({
               whiteSpace: "nowrap",
             }}
           >
-            Leaflet | (c) OpenStreetMap contributors
+            {CARTO_ATTRIBUTION_TEXT}
           </span>
         </div>
       ) : (

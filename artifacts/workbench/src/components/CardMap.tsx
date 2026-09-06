@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 
 export interface CardMapProps {
   lat: number;
@@ -57,8 +62,9 @@ export default function CardMap({
         keyboard: false,
         touchZoom: false,
       });
-      L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
+      L.tileLayer(CARTO_POSITRON_TILE_URL, {
+        attribution: CARTO_ATTRIBUTION,
+        subdomains: CARTO_SUBDOMAINS,
         maxZoom: 19,
         crossOrigin: true,
       }).addTo(mapRef.current);

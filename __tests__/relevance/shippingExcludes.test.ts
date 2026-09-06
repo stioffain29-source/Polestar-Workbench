@@ -128,4 +128,29 @@ describe("shipping exclude stack (off-region gate + commerce-homonym regression 
     expect(v.relevant).toBe(false);
     expect(v.reason).toContain("shipping off-topic");
   });
+
+  describe("shipping non-incident frames", () => {
+    it.each([
+      "Book a Red Sea cruise: fares, itineraries and shore excursions",
+      "UKMTO issues advisory warning to vessels transiting the Red Sea",
+      "Analysis: why Strait of Hormuz shipping disruption matters",
+      "Pirate attacks on ships in the Gulf of Aden are on the rise",
+      "Amsterdam tourism shake-up: cruise port closure under review — what global travellers should expect",
+      "US gas prices continue sinking as oil tankers transit the Strait of Hormuz",
+      "Oil prices are sinking as Iran reveals a draft peace deal to reopen the Strait of Hormuz",
+    ])("rejects non-incident content: %s", (title) => {
+      const v = verdict(title);
+      expect(v.relevant).toBe(false);
+      expect(v.reason).toContain("shipping non-incident");
+    });
+
+    it.each([
+      "UKMTO issues advisory after projectile lands near tanker in the Red Sea",
+      "Travel advisory updated after vessel on fire in the Red Sea: UKMTO",
+      "Commentary follows tanker collision and port closure in the Strait of Hormuz",
+    ])("keeps a non-incident frame when it reports a discrete event: %s", (title) => {
+      const v = verdict(title);
+      expect(v.relevant).toBe(true);
+    });
+  });
 });

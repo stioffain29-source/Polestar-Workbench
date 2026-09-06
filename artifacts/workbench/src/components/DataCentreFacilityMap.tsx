@@ -16,6 +16,11 @@ import type { DataCentreFacility } from "@workspace/api-client-react";
 import { SEVERITY_LABELS, ratingColor } from "@/lib/topics";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 
 // Purpose-built Data-Centre facility OPERATIONAL map.
 //
@@ -225,8 +230,9 @@ export function DataCentreFacilityMap({
           worldCopyJump
         >
           <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
+            attribution={CARTO_ATTRIBUTION}
+            url={CARTO_POSITRON_TILE_URL}
+            subdomains={CARTO_SUBDOMAINS}
             maxZoom={19}
           />
           <FitBounds points={allPoints} />

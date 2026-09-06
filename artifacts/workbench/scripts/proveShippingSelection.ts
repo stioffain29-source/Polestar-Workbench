@@ -13,6 +13,10 @@ import { readFileSync } from "fs";
 import { buildShippingReportDataset, type ShippingReportIncident } from "../src/lib/shippingReportDataset";
 import { draftTopicReportProse } from "../src/lib/draftReportProse";
 import {
+  assertShippingReportConsistency,
+  buildMaritimeIntelligence,
+} from "../src/lib/maritimeIntelligence";
+import {
   isLowCredibilityShippingRecord,
   isCapabilityContext,
   isConfirmedOperationalIncident,
@@ -66,6 +70,14 @@ function main() {
 
   const win = resolveReportWindow(topic, issueDate);
   const ds = buildShippingReportDataset(incidents, topic, issueDate);
+  const board = buildMaritimeIntelligence({
+    incidents: ds.canonicalIncidents,
+    movement: [],
+    windowStart: win.start,
+    windowEnd: win.end,
+    inputMode: "prevalidated",
+  });
+  assertShippingReportConsistency(ds, board);
 
   // Reconstruct the in-window, on-topic pool (pre-credibility) to compute the
   // rejected list — same scope filter the dataset applies before cleaning.
@@ -111,7 +123,11 @@ function main() {
 
   console.log(`\n--- FAULT 3: COUNTRY CONSISTENCY ---`);
   console.log(`Chart country order: ${ds.countryRows.slice(0, 5).map((c) => `${c.label}(${c.value})`).join(", ")}`);
-  const draft = draftTopicReportProse({ topic, issueDate, incidents: incidents as never });
+  const draft = draftTopicReportProse({
+    topic,
+    issueDate,
+    incidents: ds.canonicalIncidents as never,
+  });
   console.log(`Seeded Polestar View:\n   ${draft.polestarView}`);
   console.log(`Seeded Executive Summary:\n   ${draft.executiveSummary}`);
 
@@ -120,6 +136,7 @@ function main() {
   console.log(`Top chokepoint (credible-only table): ${cp ? `${cp.name} = ${cp.count}` : "none"}`);
   const latestSig = ds.fastFacts.find((f) => f.label.toLowerCase().includes("latest"));
   console.log(`Latest Significant Incident card: ${latestSig ? latestSig.value : "(see preview)"}`);
+  console.log(`Validated confirmed total / risk: ${board.incidentSnapshot.total} / ${board.risk.label}`);
 
   console.log(`\n--- FAULT 7: COMMERCIAL IMPACT (${ds.commercialRows.length} records) ---`);
   console.log(`   ${ds.commercialImpactRead.split("\n")[0]}`);

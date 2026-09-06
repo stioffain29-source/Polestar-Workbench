@@ -439,6 +439,24 @@ export default function ReportEditor() {
   const sectionGate = makeSectionGate(sectionOverrides.hiddenSections);
   const hiddenSections = sectionOverrides.hiddenSections ?? [];
 
+  // Build Shipping Watch's final canonical dataset once for this editor
+  // render. Fast Facts and summary generation then share the exact snapshot
+  // that the report preview/export pipeline consumes.
+  const shippingDataset = useMemo(() => {
+    if (form.topic !== "shipping" || !form.issueDate) return null;
+    return buildShippingReportDataset(
+      incidentsForExport,
+      form.topic,
+      form.issueDate,
+      maritimeSecurityEvents,
+    );
+  }, [
+    form.topic,
+    form.issueDate,
+    incidentsForExport,
+    maritimeSecurityEvents,
+  ]);
+
   // The AUTO Fast Facts tiles for the current topic, computed from the SAME
   // builders the preview/PDF use, so the override editor lists exactly the
   // tiles that render (matched by auto label). Empty when the report has no
@@ -477,12 +495,7 @@ export default function ReportEditor() {
         ).fastFacts;
       }
       if (form.topic === "shipping") {
-        return buildShippingReportDataset(
-          incidentsForExport,
-          form.topic,
-          form.issueDate,
-          maritimeSecurityEvents,
-        ).fastFacts;
+        return shippingDataset?.fastFacts ?? [];
       }
       if (form.topic === "flashpoint" || form.topic === "protests") {
         return buildFlashpointReportDataset(
@@ -515,6 +528,7 @@ export default function ReportEditor() {
     maritimeSecurityEvents,
     hardNumbersEdited,
     report,
+    shippingDataset,
   ]);
 
   // The AUTO Market & Operator Responses rows for a fuel report, computed
@@ -612,12 +626,7 @@ export default function ReportEditor() {
     if (!summariesEnabled) return [];
     let rows: Array<Record<string, unknown>> = [];
     if (form.topic === "shipping") {
-      rows = buildShippingReportDataset(
-        incidentsForExport,
-        form.topic,
-        form.issueDate,
-        maritimeSecurityEvents,
-      ).relatedIncidents as unknown as Array<Record<string, unknown>>;
+      rows = (shippingDataset?.relatedIncidents ?? []) as unknown as Array<Record<string, unknown>>;
     } else if (form.topic === "conflict") {
       rows = buildConflictReportDataset(
         incidentsForExport,
@@ -663,7 +672,7 @@ export default function ReportEditor() {
     form.topic,
     form.issueDate,
     incidentsForExport,
-    maritimeSecurityEvents,
+    shippingDataset,
   ]);
 
   const [summaryRes, setSummaryRes] =
@@ -3116,6 +3125,7 @@ export default function ReportEditor() {
             <ShippingReportPreview
               report={form}
               incidents={incidentsForExport}
+              dataset={shippingDataset ?? undefined}
               movement={movement}
               maritimeSecurityEvents={maritimeSecurityEvents}
               incidentSummaries={effectiveSummaries}

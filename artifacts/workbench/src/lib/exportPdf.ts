@@ -7,6 +7,7 @@ import {
   refineBreakCandidates,
   type KeepRange,
 } from "./pdfPageBreaks";
+import { CARTO_ATTRIBUTION_TEXT } from "./cartoBasemap";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
@@ -322,7 +323,7 @@ function applyMapExportLayout(
   if (!appendAttribution) return;
 
   const attribution = document.createElement("div");
-  attribution.textContent = "Leaflet | (c) OpenStreetMap contributors";
+  attribution.textContent = CARTO_ATTRIBUTION_TEXT;
   attribution.style.fontFamily = "Roboto, sans-serif";
   attribution.style.fontSize = "10px";
   attribution.style.color = DUSK;

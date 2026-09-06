@@ -5,6 +5,11 @@ import cargoScopeCountriesGeo from "@/assets/cargoScopeCountries.geo.json";
 import monitorChoroplethExtrasGeo from "@/assets/monitorChoroplethExtras.geo.json";
 import worldChoroplethExtrasGeo from "@/assets/worldChoroplethExtras.geo.json";
 import { COUNT_BANDS, countBandColor, featureCountryName } from "@/lib/cargoChoropleth";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 
 // DB country spellings that differ from the shared choropleth polygon names.
 // Folded in when building the intensity so those countries shade instead of
@@ -119,7 +124,7 @@ function ChoroplethLegend({ label }: { label: string }) {
 }
 
 /**
- * Full country-choropleth map block: empty state, OpenStreetMap basemap, the
+ * Full country-choropleth map block: empty state, CARTO Positron basemap, the
  * shaded polygons, the count-band legend, and an optional caption. Callers wrap
  * it in their own bordered card container.
  */
@@ -152,8 +157,9 @@ export function CountryChoroplethMap({
       <div className={`relative ${heightClass}`}>
         <MapContainer center={resolvedCenter} zoom={zoom} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
           <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
+            attribution={CARTO_ATTRIBUTION}
+            url={CARTO_POSITRON_TILE_URL}
+            subdomains={CARTO_SUBDOMAINS}
             maxZoom={19}
           />
           <Choropleth intensity={intensity} scope={scope} />

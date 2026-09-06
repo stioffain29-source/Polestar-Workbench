@@ -18,6 +18,7 @@ import {
 import {
   buildShippingReportDataset,
   type ShippingReportIncident,
+  type ShippingReportDataset,
   type KpiCard,
   type BarRow,
   type ChokepointRow,
@@ -31,6 +32,7 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
   buildMaritimeIntelligence,
+  assertShippingReportConsistency,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
@@ -639,6 +641,7 @@ export default function ShippingReportPreview({
   incidents,
   movement = [],
   maritimeSecurityEvents = [],
+  dataset,
   incidentSummaries = {},
   aiProse,
   hiddenSections,
@@ -648,6 +651,8 @@ export default function ShippingReportPreview({
   incidents: ShippingReportIncident[];
   movement?: MaritimeMovement[];
   maritimeSecurityEvents?: MaritimeSecurityEvent[];
+  /** Optional editor-owned snapshot so every editor surface shares one build. */
+  dataset?: ShippingReportDataset;
   incidentSummaries?: Record<string, string>;
   aiProse?: TopicAiProse | null;
   hiddenSections?: string[];
@@ -661,13 +666,14 @@ export default function ShippingReportPreview({
 
   const ds = useMemo(
     () =>
-      buildShippingReportDataset(
-        incidents,
-        topic,
-        issueDate,
-        maritimeSecurityEvents,
-      ),
-    [incidents, topic, issueDate, maritimeSecurityEvents],
+      dataset ??
+        buildShippingReportDataset(
+          incidents,
+          topic,
+          issueDate,
+          maritimeSecurityEvents,
+        ),
+    [dataset, incidents, topic, issueDate, maritimeSecurityEvents],
   );
 
   // The one shared deterministic Maritime Intelligence board, aligned to THIS
@@ -675,12 +681,22 @@ export default function ShippingReportPreview({
   const maritimeBoard = useMemo(() => {
     const win = resolveReportWindow(topic, issueDate);
     return buildMaritimeIntelligence({
-      incidents,
+      incidents: ds.canonicalIncidents,
       movement,
       windowStart: win.start,
       windowEnd: win.end,
+      inputMode: "prevalidated",
     });
-  }, [incidents, movement, topic, issueDate]);
+  }, [ds, movement, topic, issueDate]);
+
+  const renderedFastFacts = useMemo(
+    () => applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+    [ds.fastFacts, sectionOverrides?.fastFactOverrides],
+  );
+
+  // Rendering is a hard boundary: never show a report where a mutated derived
+  // field disagrees with the final canonical incident set.
+  assertShippingReportConsistency(ds, maritimeBoard, renderedFastFacts);
 
   // Deterministic shipping draft for the Executive Summary (which has no
   // dataset auto-prose). Stable incident order so the preview and the PDF
@@ -690,9 +706,9 @@ export default function ShippingReportPreview({
       stableDraftTopicReportProse({
         topic,
         issueDate,
-        incidents: toDraftableIncidents(incidents),
+        incidents: toDraftableIncidents(ds.canonicalIncidents),
       }),
-    [topic, issueDate, incidents],
+    [topic, issueDate, ds],
   );
   const execText = resolveSimpleProse(
     report.executiveSummary,
@@ -795,7 +811,7 @@ export default function ShippingReportPreview({
         )}
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
+          <KpiGrid cards={renderedFastFacts} />
         </Section>
 
         <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">

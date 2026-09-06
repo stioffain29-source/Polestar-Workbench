@@ -1309,6 +1309,43 @@ const SHIPPING_EXCLUDE: RegExp[] = [
   /\bdefender[- ]viper\b/,
 ];
 
+// Consumer cruise/travel content, advisories and general maritime commentary
+// are not Shipping Watch incidents.  Keep this separate from SHIPPING_EXCLUDE:
+// these frames may legitimately quote an actual UKMTO or operator incident, in
+// which case the discrete-event escape hatch below must retain the record.
+const SHIPPING_NON_INCIDENT_EXCLUDE: RegExp[] = [
+  // Booking / holiday planning and cruise-guide copy.  These are deliberately
+  // bound to consumer-planning language rather than a bare "cruise", because a
+  // cruise vessel can be the subject of a real collision, fire or seizure.
+  /\b(book|booking|reserve|reservation|best|cheap|discount(?:ed)?|deal|deals|fare|fares|package|packages)\b[^.]{0,50}\b(cruise|cruises|cruise ship|cruise line|shore excursion)\b/i,
+  /\b(cruise|cruises|cruise ship|cruise line)\b[^.]{0,60}\b(itinerary|itineraries|travel guide|guide to|things to do|what to (see|do)|holiday|vacation|tourism|passenger tips|shore excursion)\b/i,
+  /\b(travel guide|travel tips|holiday guide|vacation guide|visitor guide|tourist guide|things to know before (you )?(travel|sail|cruise))\b/i,
+  // A warning, advisory or safety posture on its own is useful context but is
+  // not an incident.  An article that also reports an attack/boarding/etc. is
+  // rescued below, including UKMTO reports that use advisory language.
+  /\b(ukmto|imo|maritime authority|coast ?guard|navy|shipping (?:association|body|industry))\b[^.]{0,70}\b(issues?|issued|updates?|updated|releases?|released|publishes?|published|urges?|advises?|advisory|advisories|warning|warnings|alert|alerts|guidance|recommendation|caution)\b/i,
+  /\b(advisory|advisories|warning|warnings|alert|alerts|guidance|recommendation|caution)\b[^.]{0,60}\b(mariners?|seafarers?|shipping|vessels?|ships?|tankers?|transit|navigation)\b/i,
+  // Analysis/opinion/outlook is not a dated operational occurrence merely
+  // because it names a strait or discusses piracy risk.
+  /\b(analysis|analyst(?:s)?(?:'|’) (?:view|note)|commentary|opinion|op-ed|editorial|explainer|outlook|forecast|scenario|what (?:a|the) .{0,30} means|why .{0,30} matters)\b/i,
+  // Trend/market/travel/planning headlines found in the live Shipping file.
+  // They mention attacks, tankers or a port closure but do not report one
+  // discrete event in the current article.
+  /\b(pirate|piracy|armed robbery|maritime) attacks?[^.]{0,55}\b(on the rise|rising|increase|increasing|surge|surging|spike|spiking|trend)\b/i,
+  /\b(tourism shake[- ]?up|tourist tax|global travellers?|travell?ers should expect)\b/i,
+  /\b(oil|gas|fuel) prices? (are |continue |keeps? )?(sinking|falling|dropping|sliding|rising|jumping|surging)\b/i,
+  /\bdraft (peace |framework )?deal[^.]{0,55}\b(reopen|open)\b|\b(reopen|open)[^.]{0,55}\bdraft (peace |framework )?deal\b/i,
+  /\b(port|terminal|canal|cruise port) closure[^.]{0,35}\bunder review\b/i,
+];
+
+// A concrete maritime event always wins over the non-incident frames above.
+// This intentionally includes the wording used in UKMTO reports: "received a
+// report", "vessel ... on fire", projectile near-misses and boarded vessels.
+// Do not require a named board chokepoint here; relevance determines whether a
+// row is an incident, while downstream report scope handles geography.
+const SHIPPING_DISCRETE_OPERATIONAL_EVENT_RE =
+  /\b((?:attack|assault) (?:on|against) (?:a |an |the )?(?:vessel|ship|tanker|carrier|crew|port|terminal)|(?:vessel|ship|tanker|carrier)[^.]{0,35}\battack(?:ed)?\b|board(?:ed|ing)|hijack(?:ed|ing)?|seiz(?:ed|ure|ing)|commandeer(?:ed|ing)?|projectile (?:landed|lands|fell|falls|hit|hits|near)|(?:missile|drone|rocket|mine|torpedo) (?:struck|strikes|hit|hits|landed|lands|fell|falls|near)|vessel[^.]{0,45}\b(?:on fire|ablaze|burning|boarded|seized|hijacked|struck|hit|collided|grounded|ran aground|disabled)\b|(?:port|terminal|canal|harbou?r)[^.]{0,35}\b(?:closed|shut|blocked|blockaded|strike|struck)|(?:collision|collided|grounding|grounded|ran aground|sank|sunk|capsized|fire|blast|explosion|exploded)\b)/i;
+
 // Tracked chokepoint theatres — the board follows the Gulf + Asia straits
 // (BOARD_CHOKEPOINTS). When a story names any of these it is in-scope even if it
 // also references an off-theatre sea (e.g. a comparative "from the Baltic to
@@ -2330,6 +2367,18 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     }
     const m = firstMatch(text, SHIPPING_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: shipping off-topic (/${m.source}/)` };
+    // Reject non-incident formats only when no actual operational maritime
+    // event is described. This preserves UKMTO incident reports even where
+    // their lead sentence is phrased as an advisory or safety warning.
+    if (!SHIPPING_DISCRETE_OPERATIONAL_EVENT_RE.test(text)) {
+      const nonIncident = firstMatch(text, SHIPPING_NON_INCIDENT_EXCLUDE);
+      if (nonIncident) {
+        return {
+          relevant: false,
+          reason: `excluded: shipping non-incident (/${nonIncident.source}/)`,
+        };
+      }
+    }
   }
   if (topic === "fuel") {
     const m = firstMatch(text, FUEL_EXCLUDE);

@@ -19,6 +19,11 @@ import { ExternalLink, BadgeCheck } from "lucide-react";
 import { incidentSourceUrl } from "@/lib/incidentSourceUrl";
 import { GdeltCoding } from "@/components/GdeltCoding";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 import { FuelDisruptionPanel } from "@/components/FuelDisruptionPanel";
 import { CountryChoroplethMap, buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import { IncidentRowCard, IncidentRowList } from "@/components/IncidentRowCard";
@@ -541,7 +546,11 @@ export default function Topic() {
           ) : (
             <div className="h-[600px]">
               <MapContainer center={worldScope ? [20, 10] : [20, 80]} zoom={worldScope ? 2 : 3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-                <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.de/{z}/{x}/{y}.png" />
+                <TileLayer
+                  attribution={CARTO_ATTRIBUTION}
+                  url={CARTO_POSITRON_TILE_URL}
+                  subdomains={CARTO_SUBDOMAINS}
+                />
                 {withCoords.map((i) => {
                   const c = ratingColor(i.severity);
                   return (

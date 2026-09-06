@@ -12,12 +12,13 @@ Durable rules learned making the Shipping Watch report client-ready (Cargo Watch
 - **Why:** an earlier broad regex matched bare verbs (`said`/`move`/`set`) and a lone `to` modal, suppressing genuine confirmed closures — a reviewer flagged this as blocking. Missing one speculative headline is cheaper than dropping a real disruption.
 - **How to apply:** use `isRhetoricalClosureThreat(text)` (requires waterway AND one of three tight shapes), not a single mega-regex. Same precision-first stance applies to the capability/procurement filter: never use a bare `launched new` / `to order` fragment — it eats real attack reporting ("launched new attacks", "ordered to evacuate"); require a capability noun (drone/frigate/minehunter/exercise) instead.
 
-## Counts must use credible-only records
-- Chokepoint headline / fast-fact counts must skip low-credibility rows (rhetoric, media-packaging, social, commentary), matching the credible table the report renders — otherwise the headline number (e.g. Hormuz 154) dwarfs the table (30) and reads as a lie.
-- **Why:** the user's core complaint was that the big chokepoint number didn't reconcile with the listed incidents.
+## One final canonical incident set — no split denominators
+- Every incident-derived Shipping Watch surface uses the same confirmed, event-folded canonical set: headline count/risk/severity, chokepoints, Fast Facts, vessel/piracy/commercial tables, charts, narrative, Maritime Intelligence and Related Incidents. `enriched` is diagnostics only.
+- **Why:** independent pools let headline totals, risk, narrative, charts and listed incidents disagree while each section looked locally plausible.
+- **How to apply:** build the dataset once per report snapshot; pass its canonical incidents into report-mode Maritime Intelligence and deterministic prose. Never re-query, re-window, re-dedupe or re-confirm inside a report section.
 
 ## One dataset for chart AND prose (country parity)
-- The seeded draft prose for shipping must be built from the SAME `buildShippingReportDataset` the preview/PDF use, and the four analyst sections seed straight from `ds.auto*`. Never hardcode a country in the prose (the old fallback said "China and South Korea" while the chart led Iran/Singapore) — derive the lead from `ds.countryRows`.
+- The seeded draft prose for shipping must be built from the SAME final canonical incidents the preview/PDF use, and the four analyst sections seed straight from `ds.auto*`. Never hardcode a country in the prose — derive the lead from `ds.countryRows`.
 - **Why:** screen == in-app PDF is architectural; the only way prose can contradict the chart is if it's seeded from a different derivation.
 - **How to apply:** carry id/sourceUrl/location into the seed incidents so the seeded dataset is byte-identical to the preview's (location/sourceUrl feed country + social-source detection); a thinner shape silently diverges. `DraftableIncident` now has optional `id`.
 
@@ -27,20 +28,20 @@ Durable rules learned making the Shipping Watch report client-ready (Cargo Watch
 - **How to apply:** wire the SAME gate into every operational surface in `buildShippingReportDataset` (cpCounts, chokepoint `credible` filter, latestSig pool, prioritiseRelated) — never `!isLowCredibilitySource` on some and the gate on others, or the headline count and the table diverge again. Seed prioritiseRelated with `[latestSig, vesselThreatSeed]` so the latest-significant card is GUARANTEED present in the table (consistency).
 - **Planning-veto needs a confirmed-cause escape hatch:** `PLANNING_INTENT_RE && !CONFIRMED_INCIDENT_CAUSE_RE` drops forward-looking text, but the cause set must include in-effect port/terminal/berth closures + dock/labour strikes + canal blockages + disabled vessels (not just physical causes), or a real "port closed after strike, expected to reopen" is wrongly dropped. Deliberately EXCLUDE weak route words (reroute/diverted/cape of good hope/congestion) from the escape hatch so pure claims stay out.
 - **Country conclusions get a confidence caveat:** when unattributed records >= attributed, `buildRegionalCountryRead` appends an explicit "country-level conclusions should be treated as low-confidence" qualifier rather than stating leads as fact.
+- Trend headlines, travel/booking guides, advisory-only notices and market/political commentary are not incidents merely because they mention piracy, tankers or a port closure. A discrete operational event must be present. Keep this rule mirrored in ingest relevance and the report confirmation gate, then bump the relevance version.
 
 ## "Vessel Attacks" table = physical incidents only, never advisories
 - The "Vessel Attacks" table (`ds.vesselRows`) must exclude `vesselType === "Threat"`. A `Threat` is a bare advisory (e.g. UKMTO "threat to shipping remains critical") — elevated RISK, not a physical event — and rates LOW on the 5-tier incident-severity scale. Listing it as an attack row produces a self-contradiction the user will catch on sight: a "remains critical" headline with a LOW chip.
 - **Why:** "critical" in such headlines is the source's *advisory threat-LEVEL* jargon, not our incident severity; the two scales are different axes. `isConfirmedOperationalIncident` already treats `Threat` as unconfirmed, so the table was the lone surface still leaking it.
 - **How to apply:** drop `Threat` at the `vesselAll` build in `shippingReportDataset.ts` (keep Attack/Near miss/Seized). Downstream `vesselThreat30Total`/`vAttackSeize` stay coherent because they recompute from the filtered set; the fast-fact card already counts hostile-only.
 
-## KPIs vs distribution charts — disambiguate by LABEL, don't force one denominator
-- Headline fast-fact cards (Confirmed Incidents, Highest Severity, Latest Significant Incident) must read from the `confirmedIncidents` pool so the top-of-report numbers can never exceed the incident tables. The region/country DISTRIBUTION charts deliberately keep the broader `enriched` set (they answer "where did reporting cluster") and are titled "Records by …".
-- The headline count card is labelled **"Confirmed Incidents"**, NOT "Records In Window" — the old label collided with the "Records by …" charts (same word, two denominators) and read as a 55-vs-2 overcount.
-- **Why:** forcing the charts down to the confirmed pool would shrink them to a handful of rows AND contradict the SAVED Executive Summary prose (which describes the broad chart leaders) — a new contradiction. Relabelling the KPI fixes the clash with zero saved-prose risk.
-- **How to apply:** define `confirmedIncidents` ONCE right after `enriched`; feed it to every headline KPI; keep charts/auto-prose on `enriched`; never let a headline card and a chart share the word "Records". Preview/PDF render `fastFacts` as an array (no label lookups), so relabelling a card is safe.
+## Fail closed on contradictions
+- Preview and PDF must validate the rendered Fast Facts (including analyst overrides), route counts, geographic totals, Related Incident membership, Maritime Intelligence IDs/total and recomputed risk against the canonical set before rendering.
+- **Why:** a shared builder prevents normal drift, but saved overrides or later field mutation can still create a contradictory report.
+- **How to apply:** any mismatch throws and blocks output. Do not catch-and-render around the Shipping consistency assertion.
 
 ## Proof harness
-- `artifacts/workbench/scripts/proveShippingSelection.ts` reads dumped incidents + report text and prints included/rejected-with-reasons + country/chokepoint/commercial reconciliation. Mirror this pattern when a distrustful user demands evidence a selection is correct. Its `reason()` falls through to `isConfirmedOperationalIncident` so every drop has a printed cause. Dump incidents with snake_case keys (`occurred_at`, `source_url`) — the harness maps those exact names; `/tmp/shipping_report.txt` must be `id|title|issue_date`.
+- `artifacts/workbench/scripts/proveShippingSelection.ts` reads dumped incidents + report text, validates the canonical set/risk, and prints included/rejected-with-reasons + country/chokepoint/commercial reconciliation. Its seeded prose also uses the canonical set. Dump incidents with snake_case keys (`occurred_at`, `source_url`); `/tmp/shipping_report.txt` must be `id|title|issue_date`.
 
 ## Saved prose overrides the live dataset until reset (the real fault-2 trap)
 - Seeding parity (above) only governs a FRESH draft. Once a report is saved, `ReportEditor.pick()` returns the SAVED `what_matters/implications/polestar_view/watch_next` verbatim whenever the report is not flagged stale (`computeStale` only fires when live data is newer than the issue date). So a stale saved Polestar View ("China and South Korea") keeps contradicting the live country chart even after the seeding code is fixed and the app is redeployed.

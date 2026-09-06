@@ -12,6 +12,11 @@ import type { Incident, MaritimeMovementInput } from "@workspace/api-client-reac
 import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 import { format, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
@@ -1062,8 +1067,9 @@ export default function Shipping() {
             <div className="h-[420px]">
               <MapContainer center={[15, 60]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                 <TileLayer
-                  attribution="&copy; OpenStreetMap contributors"
-                  url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
+                  attribution={CARTO_ATTRIBUTION}
+                  url={CARTO_POSITRON_TILE_URL}
+                  subdomains={CARTO_SUBDOMAINS}
                   maxZoom={19}
                 />
                 {withCoords.map((i) => {

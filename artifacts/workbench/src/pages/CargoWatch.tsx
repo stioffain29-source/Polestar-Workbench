@@ -8,6 +8,11 @@ import {
 import type { Incident } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_POSITRON_TILE_URL,
+  CARTO_SUBDOMAINS,
+} from "@/lib/cartoBasemap";
 import "leaflet/dist/leaflet.css";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import type { Layer, PathOptions } from "leaflet";
@@ -547,8 +552,9 @@ export default function CargoWatch() {
               <div className="relative h-[560px]">
                 <MapContainer center={[10, 100]} zoom={3} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
                   <TileLayer
-                    attribution="&copy; OpenStreetMap contributors"
-                    url="https://tile.openstreetmap.de/{z}/{x}/{y}.png"
+                    attribution={CARTO_ATTRIBUTION}
+                    url={CARTO_POSITRON_TILE_URL}
+                    subdomains={CARTO_SUBDOMAINS}
                     maxZoom={19}
                   />
                   <CargoChoropleth intensity={countryIntensity} />

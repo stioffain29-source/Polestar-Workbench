@@ -99,6 +99,12 @@ export const SPECULATIVE_CLAIM_RE = /(\bunconfirmed|\bunverified|\balleged|\ball
 // event rather than a report of the event itself.
 export const GENERIC_COMMENTARY_RE = /\b(explained|explainer|what (you )?(need to )?know|what to know|what (happens|happened|comes|could happen|that means|this means|it means|to expect)\b|what'?s next|here'?s what|why it matters|why it could|how (it|this) (could|will|might) (affect|hit|impact)|how [^.]{0,70}\b(complements?|complementing|underpins?|underpinning|reshapes?|reshaping|drives?|shapes?|shaping|fuels?|explains?|redefines?|transforms?)\b[^.]{0,50}\b(architecture|landscape|dynamics|ecosystem|paradigm|calculus|playbook|framework|geometry|topology|order)\b|five things|10 things|in charts|guide to|primer|deep dive|long read|backgrounder|analysis: |opinion: |commentary: |viewpoint: |q&a|qa with|interview: |podcast|listicle)\b/i;
 
+// Shipping-specific article frames that can contain strong route/event words
+// without reporting one discrete operational occurrence. These are hard
+// presentation exclusions for the report's canonical incident gate.
+export const SHIPPING_NON_INCIDENT_FRAME_RE =
+  /\b((pirate|piracy|armed robbery|maritime) attacks?[^.]{0,55}(on the rise|rising|increase|increasing|surge|surging|spike|spiking|trend)|tourism shake[- ]?up|tourist tax|global travellers?|travell?ers should expect|(oil|gas|fuel) prices? (are |continue |keeps? )?(sinking|falling|dropping|sliding|rising|jumping|surging)|draft (peace |framework )?deal[^.]{0,55}(reopen|open)|(reopen|open)[^.]{0,55}draft (peace |framework )?deal|(port|terminal|canal|cruise port) closure[^.]{0,35}under review)\b/i;
+
 // Political rhetoric / threat language about closing or sealing a waterway.
 // Iranian "vows to shut the Strait of Hormuz" / "says Hormuz will stay
 // closed" statements are rhetoric, threat or claim-pending-confirmation —
@@ -173,6 +179,7 @@ export function isLowCredibilityShippingRecord(i: MaritimeRecordLike): boolean {
   if (HUMAN_INTEREST_RE.test(text)) return true;
   if (SPECULATIVE_CLAIM_RE.test(text)) return true;
   if (GENERIC_COMMENTARY_RE.test(text)) return true;
+  if (SHIPPING_NON_INCIDENT_FRAME_RE.test(text)) return true;
   if (isRhetoricalClosureThreat(text)) return true;
   if (MEDIA_PACKAGING_RE.test(text)) return true;
   return false;
