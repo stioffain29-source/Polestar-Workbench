@@ -1,0 +1,5 @@
+# Flashpoint parity proof — Week 0 baseline
+Issue date: 2026-05-31
+Raw in-window: 96
+INCLUDED: 14  |  REJECTED: 82
+DATASET enriched: 14  |  PARITY: OK

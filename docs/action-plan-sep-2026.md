@@ -29,12 +29,25 @@
 
 **Goal:** Lock baseline so every fix is measurable.
 
+**One command (runs all steps below):**
+
+```bash
+pnpm --filter workbench run baseline:week0
+```
+
+Outputs → [`docs/phase-4-proof-pack/week0-baseline/`](./phase-4-proof-pack/week0-baseline/README.md)
+
+**Prerequisite:** Add to `.env.local` (copy from [`.env.local.example`](../.env.local.example)):
+
+- `PROD_DATABASE_URL` — prod Postgres connection string (preferred), **or**
+- `PROD_SESSION_COOKIE` — `connect.sid=…` from logged-in Replit browser session
+
 | # | Task | Command / output |
 | --- | --- | --- |
 | 0.1 | Export live prod snapshot | `pnpm --filter workbench run audit:export-snapshot` |
-| 0.2 | Capture **before** Flashpoint funnel | `ISSUE=2026-05-31 pnpm --filter workbench exec tsx scripts/diagnoseFunnel.ts` |
-| 0.3 | Capture **before** parity state | `ISSUE=2026-05-31 pnpm --filter workbench exec tsx scripts/proveFlashpointSelection.ts` |
-| 0.4 | Export **before** headless PDFs | Flashpoint, Cargo, Indonesia brief via `exportReportPdfHeadless.ts` |
+| 0.2 | Capture **before** Flashpoint funnel | `docs/phase-4-proof-pack/week0-baseline/flashpoint-funnel-2026-05-31.txt` |
+| 0.3 | Capture **before** parity state | `docs/phase-4-proof-pack/week0-baseline/flashpoint-parity-2026-05-31.txt` |
+| 0.4 | Export **before** headless PDFs | `flashpoint-before-*.pdf`, `cargo-watch-before.pdf`, `indonesia-brief-before.pdf` |
 | 0.5 | Re-send Phase 2 doc to Steve | `python scripts/generate_phase2_fix_plan_docx.py` → attach DOCX |
 | 0.6 | Log Steve's PDFs when they arrive | Tag each in [1.4 stakeholder template](./phase-1-baseline-audit/1.4-stakeholder-examples.md): slop / wrong-count / wrong-prose / wrong-country |
 

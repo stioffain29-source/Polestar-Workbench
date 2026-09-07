@@ -14,7 +14,8 @@
     "audit:export-snapshot": "tsx scripts/exportProdIncidentsSnapshot.ts",
     "audit:phase1-slop": "tsx scripts/runPhase1SlopAudit.ts",
     "audit:ingestion-report": "tsx scripts/generateIngestionAuditReport.ts",
-    "audit:fetch-prod": "tsx scripts/fetchProdSnapshotFromApi.ts"
+    "audit:fetch-prod": "tsx scripts/fetchProdSnapshotFromApi.ts",
+    "baseline:week0": "tsx scripts/runWeek0Baseline.ts"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

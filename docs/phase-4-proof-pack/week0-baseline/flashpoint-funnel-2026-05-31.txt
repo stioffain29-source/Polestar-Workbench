@@ -1,0 +1,63 @@
+# Flashpoint funnel — Week 0 baseline
+Issue date: 2026-05-31
+Captured: 2026-09-07T03:20:53.147Z
+
+raw window (in-window, flashpoint+protests): 96
+
+STAGE DROP [off-topic] = 76
+   countries: Japan:38  Malaysia:11  Bangladesh:10  Philippines:9  Indonesia:3  France:1  Papua New Guinea:1  Thailand:1  China:1  Nepal:1
+
+STAGE DROP [kinetic-only] = 0
+
+STAGE DROP [court-only] = 0
+
+STAGE DROP [out-of-scope-crime] = 0
+
+STAGE DROP [duplicate] = 1
+   countries: Japan:1
+
+STAGE DROP [weak-novelty] = 0
+
+STAGE DROP [weak-operational] = 5
+   countries: China:1  Nepal:1  Malaysia:1  Sri Lanka:1  Philippines:1
+
+================================================================================
+FINAL REPORT SET = 14
+   countries: Nepal:4  Philippines:4  Japan:3  Bangladesh:2  China:1
+================================================================================
+
+--- Nepal: 4 in final, 2 dropped ---
+     1  off-topic
+     1  weak-operational
+     [off-topic] 2026-05-28  Can Nepal actually enforce its Human Rights Commission’s findings?
+     [weak-operational] 2026-05-28  Peaceful Polling underway in Nepal after countrywide GenZ protest
+
+--- Bangladesh: 2 in final, 10 dropped ---
+    10  off-topic
+     [off-topic] 2026-05-30  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
+     [off-topic] 2026-05-30  US boat strike kills three alleged drug smugglers - Bangladesh Sangbad Sangstha (BSS)
+     [off-topic] 2026-05-30  Zelensky says Russia preparing 'new massive strike' - Bangladesh Sangbad Sangstha (BSS)
+     [off-topic] 2026-05-29  Hasina’s Lawyer Urges UN to Retract Bangladesh Protest Death Toll Report - UNITED NEWS OF INDIA
+     [off-topic] 2026-05-29  "Highly Inaccurate": Sheikh Hasina On UN Report On Bangladesh Protest Death Count - NDTV
+
+--- Philippines: 4 in final, 10 dropped ---
+     9  off-topic
+     1  weak-operational
+     [off-topic] 2026-05-30  Lightning strike kills Cebuano fisherman - Manila Bulletin
+     [off-topic] 2026-05-30  Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving Desert - The Manila Times
+     [off-topic] 2026-05-30  ArenaPlus, NBA strike sports betting deal in Philippines - Philstar.com
+     [off-topic] 2026-05-29  Announcement from Eimskip: Strike of bosuns and able seamen cancelled - The Manila Times
+     [off-topic] 2026-05-28  US military conducts another strike vs Iran after Trump says Iran is 'negotiating on fumes' - Manila Bulletin
+
+--- Japan: 3 in final, 39 dropped ---
+    38  off-topic
+     1  duplicate
+     [off-topic] 2026-05-30  Paddon 7th as Evans leads Ogier into FORUM8 Rally Japan finale - Talk Motorsport
+     [off-topic] 2026-05-30  Evans tightens WRC Rally Japan grip after a closing Solberg crashes out - RACER - Racing News
+     [off-topic] 2026-05-30  Rally Japan: Day 2 - TGR-WRT’s rally leader Evans handles the heat - Newsroom Toyota Europe
+     [off-topic] 2026-05-30  Oliver Solberg denies taking too much risk in WRC Rally Japan crash - Motorsport.com
+     [off-topic] 2026-05-30  WRC Rally Japan: Elfyn Evans leads Sebastien Ogier after Oliver Solberg’s dramatic exit - Motorsport.com
+
+--- Pakistan: 0 in final, 0 dropped ---
+
+--- South Korea: 0 in final, 0 dropped ---
