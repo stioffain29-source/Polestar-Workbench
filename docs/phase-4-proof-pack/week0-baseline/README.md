@@ -1,6 +1,6 @@
 # Week 0 baseline manifest
 
-**Captured:** 2026-09-07T03:33:13.843Z
+**Captured:** 2026-09-07T06:40:55.873Z
 **Issue date:** 2026-05-31
 
 | Step | Status | Detail |

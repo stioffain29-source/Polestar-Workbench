@@ -1,7 +1,7 @@
-# Action Plan — Post Steve Sign-off (Sep 2026)
+# Action Plan — Commodity Reports Priority (Sep 2026)
 
 **Date:** 7 September 2026  
-**Context:** Steve Ward confirmed priority order (Flashpoint selector first, then slop; parity across report surfaces; country geography; automated validation over manual PDF review).  
+**Context:** Steve Ward (7 Sep) — commodity-style reports are the priority (Flashpoint, Fuel Watch, Cargo, and similar topic reports). Country briefs are still wrong (Indonesia worst) but **secondary**. 24-hour view is tighter (good). GDELT re-subscription and Carto API are on Steve's side.  
 **Related docs:**
 
 - [Ingestion & Report Quality Plan](./ingestion-report-quality-plan.md)
@@ -11,17 +11,43 @@
 
 ---
 
+## Steve's latest feedback (7 Sep)
+
+| Item | Status | Our action |
+| --- | --- | --- |
+| 24-hour view tighter | Positive — no change needed | Note in proof pack; don't regress |
+| GDELT re-subscription | Steve's side | Monitor Source Health only |
+| Carto maps API | Steve rectified | No dev work |
+| **Commodity-style reports** | **Main concern** | Sprint 1–3 focus (see below) |
+| Country briefs (Indonesia worst) | Known issue, lower priority | Sprint 4 after commodity block |
+
+---
+
 ## Confirmed scope (from Steve)
 
 | Priority | What Steve wants | Backlog IDs |
 | --- | --- | --- |
-| **1** | Fix Flashpoint funnel **before** tightening slop rules | FP-02 → FP-03 → then FP-01 |
-| **2** | One incident set for counts, tables, Fast Facts, prose | FP-03 |
-| **3** | Country briefs = in-country events, not mention-of-country | CB-01 (+ CB-02 later) |
-| **4** | Automated audit/validation — not manual PDF spotting | Phase 4 gates + proof pack |
-| **5** | Phase 2 backlog with acceptance criteria | [phase-2-prioritised-fix-backlog.md](./phase-2-fix-plan/phase-2-prioritised-fix-backlog.md) |
+| **1** | **Commodity reports first** — Flashpoint, Cargo, Fuel Watch, then thin-content topics | FP-02 → FP-03 → FP-01 → CG-01 → TC-01 |
+| **2** | One incident set for counts, tables, Fast Facts, prose (Flashpoint parity) | FP-03 |
+| **3** | Cargo slop removed at ingest **and** report scope | CG-01, CG-02 |
+| **4** | Thin / generic prose on Energy, Fertiliser, Data Centres | TC-01, TC-02 |
+| **5** | Fuel Watch — verify canonical-facts parity (deterministic; no AI drift) | Parity audit only |
+| **6** | Country briefs = in-country events, not mention-of-country | CB-01 (+ CB-02) — **after commodity block** |
+| **7** | Automated audit/validation — not manual PDF spotting | Phase 4 gates + proof pack |
 
 **Hard rule:** Do **not** bump relevance/slop rules (FP-01) until FP-02 + FP-03 gates are green.
+
+### Commodity report scope
+
+| Report | Known issue | Sprint | Backlog |
+| --- | --- | --- | --- |
+| **Flashpoint Watch** | 528→8 funnel; count ≠ prose | **1** (Days 1–3) | FP-02, FP-03, FP-01 |
+| **Cargo Watch** | Slop through ingest; scope gate drift | **2** (Day 4) | CG-01, CG-02 |
+| **Fuel Watch** | Deterministic — verify preview == PDF | **2** (Day 5) | Parity audit |
+| **Energy / Fertiliser / Data Centres** | Thin content, "Data quality issue" Fast Facts | **3** (Days 6–7) | TC-01, TC-02 |
+| Shipping Watch | Off-region syndication | Deferred (P3) | SH-01 |
+| Conflict Watch | Secondary logic review | Deferred (P3) | CF-01 |
+| **Country briefs** | Foreign-subject rows (Indonesia worst) | **4** (Days 8–9) | CB-01, CB-02 |
 
 ---
 
@@ -135,7 +161,9 @@ pnpm test -- flashpointReportDataset
 
 ---
 
-## Sprint 2 — Cargo + Country (Days 4–5)
+## Sprint 2 — Cargo + Fuel Watch (Days 4–5)
+
+Commodity block continues. Country briefs deferred to Sprint 4.
 
 ### Day 4 — CG-01: Cargo slop coupling
 
@@ -153,9 +181,55 @@ pnpm test -- flashpointReportDataset
 - [ ] Genuine transit-hijack / Bahasa cargo theft still kept
 - [ ] 10-check `cargo-report-validation-gate` green
 
+**Deliverable to Steve:** Cargo Watch before/after PDF on issue date 2026-05-31.
+
 ---
 
-### Day 5 — CB-01: Country geography gate
+### Day 5 — Fuel Watch parity + CG-02 (Cargo masthead)
+
+**Fuel Watch** (`fuelCanonicalFacts.ts`) — deterministic report; Steve flagged it alongside Flashpoint but audit shows lower risk. Verify, don't refactor unless broken.
+
+**Work:**
+
+- [ ] Export headless Fuel Watch PDF; confirm preview == PDF
+- [ ] Run consistency gate — no AI override of analytical sections
+- [ ] If Steve sends a bad Fuel PDF → tag and add regression fixture
+
+**CG-02 (if time):** Cargo masthead → country mis-tag at ingest
+
+**Acceptance:**
+
+- [ ] Fuel Watch PDF passes font + content parity check
+- [ ] No count/prose contradiction in canonical sections
+
+**Milestone message to Steve:** *"Commodity P1 block complete — Flashpoint + Cargo fixed; Fuel Watch verified. Ready for your review. Country briefs (Indonesia first) next."*
+
+---
+
+## Sprint 3 — Thin-content commodity topics (Days 6–7)
+
+Energy, Fertiliser, Data Centres — generic `draftReportProse` path with thin ReportPack + coarse classifier.
+
+| Day | Items | Notes |
+| --- | --- | --- |
+| **6** | TC-01, TC-02 | ReportPack + classifier coupling; Fast Fact plural regex (`outages?` not `outage\b`) |
+| **7** | CG-02 (finish), HY-02 (start) | Cargo masthead mis-tag; Unknown country aliases on region feeds |
+
+**Acceptance (TC-01/02):**
+
+- [ ] No "Data quality issue" Fast Fact on sample Energy/Fertiliser issue dates
+- [ ] Section depth comparable to Shipping/Fuel templates
+- [ ] Classifier run on relevance-filtered + windowed rows only
+
+**Defer to follow-on:** HY-01 (geocode), SOC-01 (social promote), SH-01, CF-01 (P3).
+
+---
+
+## Sprint 4 — Country briefs (Days 8–9)
+
+Steve confirmed country briefs are wrong but **not the priority**. Indonesia is the worst case — fix shared engine first, then sweep all six briefs.
+
+### Day 8 — CB-01: Country geography gate
 
 **Files:** `lib/country-engine/` (shared engine, not per-theatre JSX patches)
 
@@ -171,22 +245,19 @@ pnpm test -- flashpointReportDataset
 - [ ] Genuine domestic rows with foreign nationals still kept
 - [ ] `country-brief-sweep` green for all six briefs
 
+---
+
+### Day 9 — CB-02: Editorial banned phrases + proof pack
+
+- [ ] Country brief opinion/editorial phrase guard
+- [ ] Indonesia brief before/after PDF (primary proof)
+- [ ] Sweep results for PNG, West Papua, Thailand, Philippines, Jakarta
+
 **Deliverable to Steve:** Indonesia brief before/after PDF + sweep results.
 
 ---
 
-## Sprint 3 — P2 batch + validation prep (Days 6–7)
-
-| Day | Items | Notes |
-| --- | --- | --- |
-| **6** | CG-02, TC-02, CB-02 | Masthead mis-tag, Fast Fact plural regex, editorial banned phrases |
-| **7** | TC-01, HY-02 (start) | Thin-content ReportPack + classifier; Unknown country aliases |
-
-**Defer to follow-on:** HY-01 (geocode), SOC-01 (social promote), all P3 items unless buffer allows.
-
----
-
-## Phase 4 — Automated validation (Days 8–9)
+## Phase 4 — Automated validation (Days 10–11)
 
 Addresses Steve's requirement: *"audit and validation should catch this without me spotting it manually."*
 
@@ -248,11 +319,13 @@ Use as **regression fixtures**, not primary QA:
 
 | When | What Steve gets |
 | --- | --- |
-| **Now** | Phase 2 backlog DOCX (acceptance criteria per item) |
+| **Now** | Confirm commodity-first priority aligned; request bad PDFs (Flashpoint, Fuel, Cargo) |
 | **End Sprint 1 (Day 3)** | Flashpoint proof: funnel 15–40, parity green, before/after PDF |
-| **End Sprint 2 (Day 5)** | Cargo + Indonesia brief proof |
-| **End Phase 4 (Day 9)** | Full proof pack + validation summary (PASSED/FAILED email) |
-| **Ongoing** | Short Upwork updates when each P1 acceptance block clears |
+| **End Sprint 2 (Day 5)** | Cargo + Fuel Watch proof |
+| **End Sprint 3 (Day 7)** | Energy/Fertiliser/Data Centres thin-content fixes |
+| **End Sprint 4 (Day 9)** | Indonesia brief before/after + country sweep |
+| **End Phase 4 (Day 11)** | Full proof pack + validation summary (PASSED/FAILED email) |
+| **Ongoing** | Short Upwork updates when each commodity acceptance block clears |
 
 ---
 
@@ -282,9 +355,10 @@ Use as **regression fixtures**, not primary QA:
 
 ## Immediate next actions
 
-1. **Run baseline capture** (Week 0 checklist) and save outputs for the proof pack
-2. **Start FP-02** in `flashpointReportDataset.ts` — selector recovery only, no relevance changes
-3. **Attach Phase 2 DOCX** to Upwork if not already sent; update Steve when FP-02 gate clears
+1. **Reply to Steve** — confirm commodity-first priority; ask for recent bad PDFs (Flashpoint, Fuel Watch, Cargo) as regression fixtures
+2. **Run baseline capture** (Week 0 checklist) — include `flashpoint-before`, `cargo-watch-before`, `fuel-watch-before` PDFs (not Indonesia yet)
+3. **Start FP-02** in `flashpointReportDataset.ts` — selector recovery only, no relevance changes
+4. **Do not start CB-01** until Sprint 4 — commodity block must clear first
 
 ---
 
