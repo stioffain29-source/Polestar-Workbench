@@ -41,8 +41,9 @@ briefs.** The deleted surface was: `GdeltContextSection.tsx`, `gdeltContext.ts`,
 **Why:** display-only noise the owner rejected — this is a UI decision, NOT a
 data-pipeline change. The PROMOTE pass below (events → real incidents) is
 SEPARATE and stays; promoted GDELT events still appear in the incident picture.
-**How to apply:** GDELT still promotes into incidents and still shows on the
-owner-gated `/gdelt-structured` page; only the country-brief context BOX is gone.
+**How to apply:** GDELT still promotes into incidents. Its standalone Workbench
+page and navigation are also removed: staging is internal plumbing, not a
+separate analyst product.
 
 ## The promote pass (structured EVENT → incident)
 
@@ -175,8 +176,6 @@ stops advancing.
 other live source, it must thread through: ingest module export → `runIngestOnce`
 + standalone runner → boot freshness gate (gated on its OWN configured+enabled
 check) → token-gated admin trigger → `integrationStatus` label
-(`GDELT_STRUCTURED_HEALTH_NAME`) → `recordSourceHealth` → OpenAPI route + codegen
-→ owner-gated read route → UI page + nav + Sources label. Miss one and the
-surface silently drifts stale or the health row goes empty. The promote pass adds
-its own touch-points: barrel export → both ingest runners → the backfillRelevance
-exclusion above.
+(`GDELT_STRUCTURED_HEALTH_NAME`) → `recordSourceHealth` → Sources status. Do NOT
+restore a raw-item Workbench page/nav. The promote pass adds its own touch-points:
+barrel export → both ingest runners → the backfillRelevance exclusion above.

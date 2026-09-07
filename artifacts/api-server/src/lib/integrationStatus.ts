@@ -864,7 +864,7 @@ function xOsintStatus(): IntegrationStatusItem {
 }
 
 const GDELT_STRUCTURED_DETAIL =
-  "Daily pull of GDELT Cloud v2 Events + Stories for Indonesia, the Philippines, Thailand and Papua New Guinea, bucketed into lanes (Protests, Civil unrest and riots, Security incidents, Crime, Transport disruption) with Jakarta and Indonesian-Papua sub-buckets. A standalone STRUCTURED CONTEXT layer in its own table — never an incident, so it never inflates any count or reaches a report/PDF. Self-throttles to a daily cadence with a hard per-run call cap to stay inside the free-tier QU budget.";
+  "Pulls GDELT Cloud v2 Events + Stories for Indonesia, the Philippines, Thailand and Papua New Guinea into an internal staging table. Lane-bearing events are validated and promoted into the normal Flashpoint, Conflict Watch and country-report incident feeds; stories remain audit-only and never affect incident totals. Collection is cadence-gated with a hard per-run call cap to protect the GDELT query-unit budget.";
 
 async function gdeltStructuredStatus(): Promise<IntegrationStatusItem> {
   const envVars = [
@@ -927,7 +927,7 @@ async function gdeltStructuredStatus(): Promise<IntegrationStatusItem> {
   if (!enabled) {
     status = "disabled";
     summary =
-      "Switched off (GDELT_STRUCTURED_ENABLED=false) — the structured event layer is not collected. Incident feeds are unaffected.";
+      "Switched off (GDELT_STRUCTURED_ENABLED=false) — GDELT is not contributing events to the relevant incident feeds.";
   } else if (!configured) {
     status = "not_configured";
     summary = GDELT_STRUCTURED_NOT_CONFIGURED_MESSAGE;
@@ -937,7 +937,7 @@ async function gdeltStructuredStatus(): Promise<IntegrationStatusItem> {
       "Configured, but GDELT Cloud is returning errors on consecutive runs — no structured items are being collected.";
   } else if (total > 0) {
     status = "working";
-    summary = `Holding ${total} structured event/story item(s) across ${lanes} lane(s) and ${countries} country(ies) as standalone context — never counted as incidents.`;
+    summary = `Holding ${total} staged event/story item(s) across ${lanes} lane(s) and ${countries} country(ies); eligible events feed the normal monitors through the promotion gate.`;
   } else {
     status = "no_data";
     summary =

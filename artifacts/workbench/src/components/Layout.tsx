@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Network, Server, AlertTriangle, Layers, Crosshair
+  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Server, AlertTriangle, Layers, Crosshair
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
@@ -71,7 +71,6 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Incidents", href: "/incidents", icon: Database },
         { label: "Timeline", href: "/timeline", icon: Clock },
         { label: "Data Centres", href: "/topics/data-centres", icon: Server },
-        { label: "GDELT Structured Layer", href: "/gdelt-structured", icon: Network },
         { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
         { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
         { label: "Infographic Cards", href: "/card-builder", icon: ImageIcon },

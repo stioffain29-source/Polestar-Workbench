@@ -5,12 +5,10 @@ import { ListGdeltStructuredItemsQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-// GDELT Cloud structured event layer — structured context + promote bridge.
-//
-// Rows land in gdelt_structured_items first. Lane-bearing events are promoted
-// into incidents (see gdeltPromote.ts) and feed country/topic reports via the
-// normal incident pipeline. Stories stay context-only and surface in the GDELT
-// Open-Source Context section of GDELT-monitored country reports.
+// Internal GDELT staging API. Rows land in gdelt_structured_items first;
+// lane-bearing events are promoted into incidents (see gdeltPromote.ts) and
+// feed country/topic reports via the normal incident pipeline. Stories remain
+// audit-only and never affect incident totals.
 //
 // Owner-private (mounted below requireOwner in routes/index.ts), like every
 // other data router. Returns the most recent items first, optionally narrowed
