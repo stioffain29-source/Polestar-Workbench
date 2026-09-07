@@ -3814,8 +3814,8 @@ export async function runDataMigrations(): Promise<void> {
     }
 
     // 3z) Seed the structured country-report rows that the workbench renders
-    //     as full nine-section briefs (Indonesia national + Jakarta city),
-    //     alongside the pre-existing PNG / West Papua pair. These rows must
+    //     as full briefs, alongside the pre-existing PNG / West Papua pair.
+    //     Jakarta is intentionally not a report template. These rows must
     //     exist before the baseline loop below, which resolves each baseline
     //     to a country report by case-insensitive name match. Idempotent:
     //     insert only when the slug is missing, so an analyst rename / edit
@@ -3829,7 +3829,6 @@ export async function runDataMigrations(): Promise<void> {
       { slug: "indonesia", name: "Indonesia", region: "APAC" },
       { slug: "thailand", name: "Thailand", region: "APAC" },
       { slug: "philippines", name: "Philippines", region: "APAC" },
-      { slug: "jakarta", name: "Jakarta", region: "APAC" },
     ];
     for (const seed of STRUCTURED_COUNTRY_REPORTS) {
       try {
@@ -3845,6 +3844,33 @@ export async function runDataMigrations(): Promise<void> {
         logger.info({ slug: seed.slug }, "Seeded structured country report");
       } catch (crErr) {
         logger.error({ err: crErr, slug: seed.slug }, "Failed to seed structured country report");
+      }
+    }
+
+    // Remove the retired Jakarta city-report template once in each
+    // environment. It is no longer seeded above, so it cannot return on a
+    // subsequent restart. Remove its template-owned prose and baseline rows as
+    // well so recreating the slug later cannot expose stale Jakarta content.
+    {
+      const markerKey = "remove_jakarta_city_report_template_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        await db.execute(sql`DELETE FROM country_report_prose WHERE lower(slug) = 'jakarta'`);
+        await db.execute(sql`DELETE FROM country_baselines WHERE lower(slug) = 'jakarta'`);
+        const deleted = await db.execute(sql`
+          DELETE FROM country_reports
+          WHERE lower(slug) = 'jakarta' OR lower(name) = 'jakarta'
+        `);
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { deleted: deleted.rowCount ?? 0, marker: markerKey },
+          "Removed Jakarta city report template",
+        );
       }
     }
 
