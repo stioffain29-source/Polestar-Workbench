@@ -1,38 +1,17 @@
 // Funnel diagnostic for a single Flashpoint/Protests report window.
 //
-// Fetches live incidents from the running API and runs the REAL
-// selectFlashpointUsable pipeline, then prints, per filter stage, how many
-// records and which countries are dropped. This pinpoints where in-scope
-// countries are lost. Run with:
-//   cd artifacts/workbench && npx tsx scripts/diagnoseFunnel.ts [issueDate]
+// Loads incidents via flashpointIncidentLoader (snapshot or live API) and runs
+// the REAL selectFlashpointUsable pipeline, then prints, per filter stage, how
+// many records and which countries are dropped. Run with:
+//   USE_SNAPSHOT=1 ISSUE=2026-05-31 pnpm --filter workbench exec tsx scripts/diagnoseFunnel.ts
 
 import {
   selectFlashpointUsable,
-  type FlashpointReportIncident,
   type FlashpointRejectStage,
 } from "../src/lib/flashpointReportDataset";
+import { loadFlashpointIncidents } from "./flashpointIncidentLoader";
 
-const issueDate = process.argv[2] ?? "2026-05-24";
-const API = process.env.API_BASE ?? "http://localhost:80";
-
-interface ApiIncident {
-  id: number;
-  topic: string;
-  title: string;
-  summary: string | null;
-  country: string | null;
-  location: string | null;
-  source: string | null;
-  sourceUrl: string | null;
-  occurredAt: string | null;
-  severity: string | null;
-}
-
-async function fetchAll(topic: string): Promise<ApiIncident[]> {
-  const res = await fetch(`${API}/api/incidents?topic=${topic}&limit=5000`);
-  if (!res.ok) throw new Error(`fetch ${topic} -> ${res.status}`);
-  return (await res.json()) as ApiIncident[];
-}
+const issueDate = process.env.ISSUE ?? process.argv[2] ?? "2026-05-24";
 
 function dist(items: { country: string }[]): string {
   const m = new Map<string, number>();
@@ -44,29 +23,17 @@ function dist(items: { country: string }[]): string {
 }
 
 async function main() {
-  const [flashpoint, protests] = await Promise.all([
-    fetchAll("flashpoint"),
-    fetchAll("protests"),
-  ]);
-  const merged = [...flashpoint, ...protests];
-  const asInput: FlashpointReportIncident[] = merged.map((r) => ({
-    id: r.id,
-    title: r.title,
-    topic: r.topic,
-    severity: r.severity ?? "Low",
-    occurredAt: r.occurredAt ?? "",
-    country: r.country,
-    summary: r.summary,
-    source: r.source,
-    sourceUrl: r.sourceUrl,
-    location: r.location ?? r.country,
-  }));
-
-  const sel = selectFlashpointUsable(asInput, "flashpoint", issueDate);
+  const { incidents, source, meta } = await loadFlashpointIncidents();
+  const sel = selectFlashpointUsable(incidents, "flashpoint", issueDate);
 
   console.log("#".repeat(80));
   console.log(`FLASHPOINT FUNNEL — issueDate=${issueDate}  (window = issueDate + 6 prior days)`);
-  console.log(`  source pool: flashpoint=${flashpoint.length} protests=${protests.length}`);
+  console.log(
+    `  source: ${source}${meta.path ? ` (${meta.path})` : meta.apiBase ? ` (${meta.apiBase})` : ""}`,
+  );
+  console.log(
+    `  source pool: flashpoint=${meta.flashpointCount} protests=${meta.protestsCount}`,
+  );
   console.log("#".repeat(80));
   console.log(`raw window (in-window, flashpoint+protests bucket): ${sel.rawWindowCount}`);
 
@@ -92,10 +59,10 @@ async function main() {
   console.log(`   countries: ${dist(sel.enriched.map((e) => ({ country: e.country ?? "—" })))}`);
   console.log("=".repeat(80));
 
-  // Focus: where do Pakistan and South Korea die?
-  for (const focus of ["Pakistan", "South Korea", "India", "China"]) {
+  for (const focus of ["Pakistan", "South Korea", "India", "China", "Nepal", "Bangladesh", "Philippines", "Japan"]) {
     const drops = sel.rejected.filter((r) => r.country === focus);
     const inFinal = sel.enriched.filter((e) => (e.country ?? "") === focus).length;
+    if (inFinal === 0 && drops.length === 0) continue;
     console.log("");
     console.log(`--- ${focus}: ${inFinal} in final, ${drops.length} dropped ---`);
     const byStage = new Map<string, number>();
