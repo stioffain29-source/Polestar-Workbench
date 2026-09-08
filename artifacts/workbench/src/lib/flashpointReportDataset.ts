@@ -816,7 +816,26 @@ const NON_APAC_FOCUS_RE = /\b(greenland|greenlanders|denmark|iceland|norway|swed
 // in a non-APAC dateline (Ceuta, Melilla) while the masthead country is APAC.
 const MULTI_STORY_BRIEF_RE = /\b(world in brief|news in brief|in brief|world briefing|world roundup)\b/i;
 const FOREIGN_PROTEST_VENUE_RE = /\b(ceuta|melilla|gibraltar|canary islands)\b/i;
+// Mirrors lib/ingest FOREIGN_LOCATION + FOREIGN_LOCATION_WEST (FP-06).
+const FOREIGN_LOCATION_UK_RE =
+  /\b(?:belfast|glasgow|edinburgh|cardiff|dublin|londonderry|derry)\b|\b(?:in|at|outside|near|across|to)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:london|manchester|birmingham|liverpool|leeds|sheffield|bristol|nottingham|newcastle|united kingdom|northern ireland|great britain)\b/i;
+const FOREIGN_LOCATION_WEST_RE =
+  /\b(?:los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|ottawa|toronto|montreal|montréal|vancouver|calgary|edmonton|winnipeg|mississauga|brampton|canada|ontario|quebec|québec|alberta|british columbia|manitoba|saskatchewan|nova scotia|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland)\b/i;
+// Reaction/commentary on protests — sympathy messages, lawmaker support (FP-07/08).
+const REACTION_COMMENTARY_RE =
+  /\b(messages? of support|message of sympathy|sympathy messages?|voices? (?:her|his|their) support|express(?:es|ed)? (?:her|his|their )?support)\b|\b(?:lawmaker|legislator|mp|member of parliament|senator|congress(?:man|woman|member))\b[^.]{0,80}\b(?:messages? of support|sympathy|solidarity)\b|\b(?:gets?|received|receiv(?:es|ed)|sent)\s+messages?\s+of\s+support\b|\b(?:reacts?|reacted|reaction)\s+to\b[^.!?]{0,60}\bprotest\b/i;
 // Inter-state diplomatic reaction — not a street protest in the reporting window.
+function isForeignVenueMisstamp(r: FlashpointReportIncident): boolean {
+  const country = normalizeFlashpointCountry((r.country ?? "").trim());
+  if (!country || country === LOCATION_NOT_IDENTIFIED || !FLASHPOINT_APAC_COUNTRIES.has(country)) {
+    return false;
+  }
+  const text = `${r.title ?? ""} ${r.summary ?? ""} ${r.location ?? ""}`;
+  if (FOREIGN_LOCATION_UK_RE.test(text) || FOREIGN_LOCATION_WEST_RE.test(text)) return true;
+  const loc = (r.location ?? "").trim();
+  if (loc && locationForeignToCountry(loc, country) && !APAC_HOOK_RE.test(loc)) return true;
+  return false;
+}
 const INTER_STATE_DIPLOMATIC_RE =
   /\b(crossed (?:the )?line of decency|lavrov says|foreign ministry (?:said|says|deplores)|mfa says|ministry (?:of foreign affairs )?(?:said|says)|diplomatic row|summons the ambassador)\b/i;
 const PROTEST_OVER_STATE_VISIT_RE =
@@ -977,6 +996,8 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (NON_APAC_FOCUS_RE.test(editorialTitle) && !APAC_HOOK_RE.test(editorialTitle)) return true;
   if (ANTI_CORRUPTION_ENFORCEMENT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   if (FIREARMS_POLICY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (isForeignVenueMisstamp(r)) return true;
+  if (REACTION_COMMENTARY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   return false;
 }
 
@@ -1456,6 +1477,7 @@ const OUT_OF_SCOPE_ISSUES = new Set([
   "Armed group activity",
   "Crime / public safety",
   "Piracy / armed robbery",
+  "Sports / entertainment",
 ]);
 function isOutOfScopeIssue(r: { issue: string }): boolean {
   return OUT_OF_SCOPE_ISSUES.has(r.issue);
@@ -1978,7 +2000,7 @@ export function buildFlashpointReportDataset(
     ? noteParts.join(" ")
     : "Scope: activism, protests and civil unrest only. Kinetic armed-conflict reporting without a public-order hook is excluded by design.";
 
-  return {
+  const dataset: FlashpointReportDataset = {
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: `Reporting period: ${win.label}`,
     enriched,
@@ -1999,6 +2021,8 @@ export function buildFlashpointReportDataset(
     autoPolestarView,
     dataNote,
   };
+  assertFlashpointReportDatasetValid(dataset);
+  return dataset;
 }
 
 // --- Prose builders --------------------------------------------------------
@@ -2615,6 +2639,8 @@ function prioritiseRelated(
     if (r.issue === "Armed robbery" || r.issue === "Crime / public safety" || r.issue === "Armed group activity") return false;
     if (isWeakNovelty(r)) return false;
     if (isWeakOperational(r)) return false;
+    const text = `${r.title ?? ""} ${r.summary ?? ""}`;
+    if (REACTION_COMMENTARY_RE.test(text) && !hasStrongPublicOrderCue(text)) return false;
     return r.bucket === "activism" || r.bucket === "unrest";
   });
   const score = (r: EnrichedIncident): number => {
@@ -2794,9 +2820,11 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
       new RegExp(`\\b${c}\\b`, "i").test(text),
     );
     if (nzCities.length > 0) {
-      return `Demonstrations already reported in ${joinList(nzCities)} were Low severity, but they can still have affected traffic and venue access on the day they occurred.`;
+      const sevLabel = SEV_LABEL[sevKey(r.severity)] ?? "Low";
+      return `Demonstrations already reported in ${joinList(nzCities)} were ${sevLabel} severity, but they can still have affected traffic and venue access on the day they occurred.`;
     }
-    return `New Zealand's reported events were Low severity and largely planned, but city-centre demonstrations can still affect traffic and staff movement on the day they occur.`;
+    const nzSevLabel = SEV_LABEL[sevKey(r.severity)] ?? "Low";
+    return `New Zealand's reported events were ${nzSevLabel} severity and largely planned, but city-centre demonstrations can still affect traffic and staff movement on the day they occur.`;
   }
   if (containedVenueNote(r) && (SEV_RANK[sevKey(r.severity)] ?? 0) >= 3) {
     const c = country || "the reported country";
@@ -2810,7 +2838,16 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
   return null;
 }
 
-function extractNamedHubs(futureSource: EnrichedIncident[]): string[] {
+function hubMentionedInConfirmed(hub: string, confirmed: EnrichedIncident[]): boolean {
+  const escaped = hub.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\b${escaped}\\b`, "i");
+  return confirmed.some((r) => re.test(`${r.title ?? ""} ${r.summary ?? ""} ${r.location ?? ""}`));
+}
+
+function extractNamedHubs(
+  futureSource: EnrichedIncident[],
+  confirmed: EnrichedIncident[],
+): string[] {
   const hubs = new Set<string>();
   const scan = extractFutureSignals(futureSource);
   for (const r of scan) {
@@ -2826,7 +2863,7 @@ function extractNamedHubs(futureSource: EnrichedIncident[]): string[] {
       if (city) hubs.add(city);
     }
   }
-  return [...hubs];
+  return [...hubs].filter((h) => !hubMentionedInConfirmed(h, confirmed));
 }
 
 function buildWhatMatters(ctx: AutoCtx): string {
@@ -2869,7 +2906,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
       `Japan accounts for ${volumeLead.value} of the week's screened incidents. Most are low-severity administrative or symbolic gatherings rather than sustained unrest, but the volume still warrants monitoring in Tokyo and other hub cities.`,
     );
   }
-  const hubs = extractNamedHubs(ctx.usableEnriched).filter(
+  const hubs = extractNamedHubs(ctx.usableEnriched, [...ctx.activismRows, ...ctx.unrestRows]).filter(
     (h) => !lines.some((l) => l.toLowerCase().includes(h.toLowerCase())),
   );
   if (hubs.length > 0) {
@@ -3364,5 +3401,62 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
     }
   }
 
+  // 5. Regional country paragraphs must match enriched incident counts.
+  for (const country of countries) {
+    const para = ds.regionalCountryRead
+      .split("\n\n")
+      .find((p) => p.startsWith(`${country} —`));
+    if (!para) continue;
+    const countMatch = para.match(/\((\d+) incidents?\)/);
+    if (!countMatch) continue;
+    const claimed = Number(countMatch[1]);
+    const actual = ds.enriched.filter(
+      (r) => normalizeFlashpointCountry((r.country ?? "").trim()) === country,
+    ).length;
+    if (claimed !== actual) {
+      errors.push(
+        `${country} regional read claims ${claimed} incidents but enriched set has ${actual}`,
+      );
+    }
+  }
+
+  // 6. What Matters must not contradict confirmed hub cities (Seoul FP-11).
+  const confirmedRows = [...ds.activismRows, ...ds.unrestRows];
+  const confirmedText = confirmedRows
+    .map((r) => `${r.title ?? ""} ${r.summary ?? ""} ${r.location ?? ""}`)
+    .join(" ");
+  if (/\bseoul\b/i.test(confirmedText) && /seoul.*upcoming or unconfirmed/i.test(ds.autoWhatMatters)) {
+    errors.push(
+      "What Matters claims Seoul is upcoming-only but confirmed incidents name Seoul",
+    );
+  }
+
+  // 7. NZ table severity must match What Matters prose (FP-11).
+  const nzRows = confirmedRows.filter(
+    (r) => normalizeFlashpointCountry((r.country ?? "").trim()) === "New Zealand",
+  );
+  const nzTopSev = nzRows.reduce(
+    (best, r) => Math.max(best, SEV_RANK[sevKey(r.severity)] ?? 0),
+    0,
+  );
+  const nzWm = ds.autoWhatMatters.match(
+    /New Zealand[^.]*\b(Insignificant|Low|Moderate|High|Extreme)\b severity/i,
+  );
+  if (nzTopSev >= 4 && nzWm && nzWm[1] !== "High" && nzWm[1] !== "Extreme") {
+    errors.push(
+      `What Matters says NZ ${nzWm[1]} severity but table includes High-severity NZ row`,
+    );
+  }
+
   return errors;
+}
+
+/** Hard-fail report generation when narrative contradicts underlying records (FP-10). */
+export function assertFlashpointReportDatasetValid(ds: FlashpointReportDataset): void {
+  const errors = validateFlashpointReportDataset(ds);
+  if (errors.length > 0) {
+    throw new Error(
+      `Flashpoint report dataset validation failed:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+    );
+  }
 }

@@ -407,6 +407,13 @@ const FLASHPOINT_EXCLUDE: RegExp[] = [
   /\bstrike (on|against|at|hits|hit|kills|killed|destroyed|levels?|leveled|levelled) .{0,40}(college|school|hospital|town|village|city|base|airfield|airbase|airport|port|depot|barracks|convoy|installation|facility|refinery|pipeline|grid|building|residential)/,
   /\b(intelligence[- ]based operation|\bibo\b|counter[- ]?terror(ism)? (operation|raid|action)|search (and|&) (cordon|destroy) operation|cordon and search)/,
   /\b\d+\s+(terrorists?|militants?|insurgents?|gunmen|attackers?|fighters?)\s+(killed|neutralis(e|ed)|gunned down|eliminated|dead)\b/,
+  // Naval / carrier strike groups — military posture, not labour action.
+  /\b(strike group|carrier strike group|carrier strike groups|naval strike group)\b/,
+  // Disaster "striking" an area — cyclone/typhoon/storm hitting land.
+  /\b(cyclone|typhoon|hurricane|tornado|storm|earthquake|tsunami|landslide|flood|monsoon)\b[^.!?]{0,40}\b(striking|strike|struck|strikes)\b/,
+  /\b(striking|struck|strikes?)\b[^.!?]{0,40}\b(cyclone|typhoon|hurricane|tornado|storm|earthquake|tsunami|landslide|flood|monsoon|coast|region|area|provinces?|districts?)\b/,
+  // Sports "strike" homonyms — bowling strike, three-strike rule, hat-trick.
+  /\b(bowling strike|three[- ]strike rule|hat[- ]trick|golden duck|lbw|stumping)\b/,
 
   // Entertainment / events: concert rallies, fan rallies, product
   // launch rallies, promotional rallies, "rally for <artist> concert".
@@ -1008,6 +1015,14 @@ const FP_DIPLOMATIC_PROTEST_RE =
 // stadium) — a sporting grievance, not security-relevant civil unrest.
 const FP_SPORTS_GOV_RE =
   /\b(cricket board|cricket head\s?quarters?|sports mafia|french open|wimbledon|grand slam|prize money|olympic committee|football federation|formula 1|premier league|la liga|test match|odi series)\b/i;
+// Hard sports/entertainment exclude (FP-05). Cricket match copy, player
+// discipline and franchise news must never enter Flashpoint as civil unrest.
+const FP_SPORTS_ENTERTAINMENT_RE =
+  /\b(kuggeleijn|black caps|white ferns|super smash|plunket shield|big bash|ashes series|cricket world cup|test match|\bodi\b|\bt20\b|bowler|batsman|wicketkeeper|wickets?|innings|lbw|stumping|centur(?:y|ies)|run[- ]?chase|powerplay|super over|t20 world cup|\d+\s+overs?\b|\d+[- ]?for[- ]?\d+)\b/i;
+// Reaction/commentary on a protest — sympathy messages, lawmaker support, no
+// discrete public-order event (FP-07).
+const FP_REACTION_COMMENTARY_RE =
+  /\b(messages? of support|message of sympathy|sympathy messages?|voices? (?:her|his|their) support|express(?:es|ed)? (?:her|his|their )?support)\b|\b(?:lawmaker|legislator|mp|member of parliament|senator|congress(?:man|woman|member))\b[^.!?]{0,80}\b(?:messages? of support|sympathy|solidarity)\b|\b(?:gets?|received|receiv(?:es|ed)|sent)\s+messages?\s+of\s+support\b|\b(?:reacts?|reacted|reaction)\s+to\b[^.!?]{0,60}\bprotest\b/i;
 
 // Zoo / animal novelty "protest" — a captive-animal or wildlife-park novelty
 // item where the animal itself is cast as the "protester" ("Leader vows croc
@@ -1045,8 +1060,9 @@ const FP_CALM_LIVE_RE =
 // cue includes the sports homonyms "rally"/"clash" (a "Toronto rally to beat"
 // would false-positive), and a bare country ("Canada condemns ...") is a mere
 // actor reference, not the event location.
+// Mirrors lib/ingest FOREIGN_LOCATION + FOREIGN_LOCATION_WEST (FP-06).
 const FP_OVERSEAS_VENUE_RE =
-  /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b|\b(?:in|at|outside|near|across)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:ottawa|toronto|montreal|montréal|vancouver|calgary|edmonton|winnipeg|mississauga|brampton|canada|ontario|quebec|québec|alberta|british columbia|manitoba|saskatchewan|nova scotia)\b/i;
+  /\b(oxford union|cambridge union|the white house|capitol hill|downing street|westminster hall|trafalgar square)\b|\b(?:belfast|glasgow|edinburgh|cardiff|dublin|londonderry|derry|los angeles|san francisco|philadelphia|chicago|houston|seattle|minneapolis|frankfurt|hamburg|stuttgart|dusseldorf|rotterdam|marseille)\b|\b(?:in|at|outside|near|across|to)\s+(?:the\s+|central\s+|greater\s+|downtown\s+)?(?:london|manchester|birmingham|liverpool|leeds|sheffield|bristol|nottingham|newcastle|united kingdom|northern ireland|great britain|ottawa|toronto|montreal|montréal|vancouver|calgary|edmonton|winnipeg|mississauga|brampton|canada|ontario|quebec|québec|alberta|british columbia|manitoba|saskatchewan|nova scotia|washington|new york|brooklyn|boston|atlanta|dallas|denver|phoenix|miami|detroit|las vegas|portland|sacramento|california|texas|florida|arizona|georgia|michigan|ohio|pennsylvania|wisconsin|minnesota|nevada|oregon|colorado|united states|america|usa|paris|berlin|madrid|barcelona|rome|milan|naples|munich|cologne|brussels|amsterdam|hague|vienna|warsaw|athens|lisbon|stockholm|copenhagen|oslo|helsinki|budapest|prague|zurich|geneva|france|germany|spain|italy|netherlands|belgium|portugal|greece|poland|austria|sweden|denmark|norway|finland|switzerland)\b/i;
 const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|gather)/i;
 
 // APAC regional-scope anchor — the union of every country / demonym / city /
@@ -2619,6 +2635,14 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Sports-governance protest (cricket board / prize money / stadium fans).
     if (FP_SPORTS_GOV_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "excluded: sports-governance protest (not security-relevant civil unrest)" };
+    }
+    // Hard sports/entertainment exclude — cricket copy, player news, etc.
+    if (FP_SPORTS_ENTERTAINMENT_RE.test(titleHaystack(i)) && !FP_CALM_LIVE_RE.test(text)) {
+      return { relevant: false, reason: "excluded: sports/entertainment coverage (not civil unrest)" };
+    }
+    // Reaction/commentary that mentions a protest but reports no street event.
+    if (FP_REACTION_COMMENTARY_RE.test(titleHaystack(i)) && !FP_CALM_LIVE_RE.test(text)) {
+      return { relevant: false, reason: "excluded: reaction/commentary on protest (no discrete event)" };
     }
     // Zoo / animal novelty "protest" (the captive animal cast as the protester),
     // with an animal-welfare STREET-protest override so a genuine welfare demo is

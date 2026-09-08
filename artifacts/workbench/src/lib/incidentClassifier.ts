@@ -156,9 +156,27 @@ function classifyUnrest(t: string): string {
   // into a labour, protest or generic clash bucket on the strength of a
   // shared keyword. Only an explicit protest / public-order cue in the
   // same headline can override this.
-  const kineticHit = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid))\b/.test(t);
+  const kineticHit = /\b(drone[- ]?strike|missile[- ]?strike|air[- ]?strike|airstrike|airborne attack|artillery (strike|shelling|fire)|\bshelling\b|\bambush\b|\bied\b|bomb (attack|blast|kills|detonat)|suicide bomb|car bomb|gunmen (kill|attack)|gun battle|gunbattle|militants? (kill|attack|target|ambush|fire|raid|strike)|insurgents? (kill|attack|target|ambush)|jihadist|terror(ist)? attack|armed group (attack|kill|raid)|strike group|carrier strike group)\b/.test(t);
   const protestCue = /\b(protest(?:s|ers?|ing)?|demonstrat(?:ion|ions|ors?)|rall(?:y|ies)|march(?:es)?|sit[- ]?ins?|riots?|public disorder|crackdowns?|curfews?|tear[- ]?gas|water cannon|rubber bullet|baton charge|student union|opposition (call|rally|march)|\bpti\b|imran khan|section\s*144|assembly ban|detention of (protesters|activists|students))\b/.test(t);
   if (kineticHit && !protestCue) return "Armed group activity";
+  if (
+    /\b(kuggeleijn|black caps|white ferns|super smash|plunket shield|cricket world cup|test match|odi|t20|wicketkeeper|wickets?|bowler|batsman|innings|lbw|stumping|bowling strike|hat[- ]trick|stoppage time|own goal)\b/.test(t) &&
+    !protestCue
+  ) {
+    return "Sports / entertainment";
+  }
+  if (
+    /\b(strike group|carrier strike group|bowling strike|three[- ]strike rule)\b/.test(t) &&
+    !protestCue
+  ) {
+    return "Armed group activity";
+  }
+  if (
+    /\b(cyclone|typhoon|hurricane|tornado|storm|earthquake|tsunami|landslide|flood|monsoon)\b[^.]{0,40}\b(striking|strike|struck|strikes)\b/.test(t) &&
+    !protestCue
+  ) {
+    return "Other operational incident";
+  }
 
   if (/\b(pti|imran khan|tehreek[- ]?e[- ]?insaf|section\s*144)\b/.test(t)) return "Protest";
   // "Tribhuvan University Teaching Hospital" is a hospital, not a campus —
