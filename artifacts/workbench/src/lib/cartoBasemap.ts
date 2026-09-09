@@ -1,4 +1,12 @@
-const cartoBasemapKey = import.meta.env.VITE_CARTO_BASEMAP_KEY?.trim();
+// Keep the credential lookup as a Vite compile-time replacement rather than
+// evaluating import.meta at module load. The latter is not valid in the
+// CommonJS transform used by the repository's Jest suites.
+declare const __CARTO_BASEMAP_KEY__: string | undefined;
+
+const cartoBasemapKey =
+  typeof __CARTO_BASEMAP_KEY__ === "string"
+    ? __CARTO_BASEMAP_KEY__.trim()
+    : "";
 
 if (!cartoBasemapKey) {
   throw new Error(

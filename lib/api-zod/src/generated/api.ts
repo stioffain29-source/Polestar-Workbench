@@ -244,6 +244,7 @@ export const GetDashboardOverviewResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "proseBasisFingerprint": zod.string().nullish(),
   "activismRead": zod.string().nullish(),
   "civilUnrestRead": zod.string().nullish(),
   "forecastRead": zod.string().nullish(),
@@ -1576,6 +1577,7 @@ export const ListReportsResponseItem = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "proseBasisFingerprint": zod.string().nullish(),
   "activismRead": zod.string().nullish(),
   "civilUnrestRead": zod.string().nullish(),
   "forecastRead": zod.string().nullish(),
@@ -1762,6 +1764,7 @@ export const CreateReportBody = zod.object({
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
   "watchNext": zod.string().optional(),
+  "proseBasisFingerprint": zod.string().optional(),
   "activismRead": zod.string().optional(),
   "civilUnrestRead": zod.string().optional(),
   "forecastRead": zod.string().optional(),
@@ -1923,6 +1926,7 @@ export const GetReportResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "proseBasisFingerprint": zod.string().nullish(),
   "activismRead": zod.string().nullish(),
   "civilUnrestRead": zod.string().nullish(),
   "forecastRead": zod.string().nullish(),
@@ -2112,6 +2116,7 @@ export const UpdateReportBody = zod.object({
   "implications": zod.string().optional(),
   "polestarView": zod.string().optional(),
   "watchNext": zod.string().optional(),
+  "proseBasisFingerprint": zod.string().optional(),
   "activismRead": zod.string().optional(),
   "civilUnrestRead": zod.string().optional(),
   "forecastRead": zod.string().optional(),
@@ -2296,6 +2301,7 @@ export const UpdateReportResponse = zod.object({
   "implications": zod.string().nullish(),
   "polestarView": zod.string().nullish(),
   "watchNext": zod.string().nullish(),
+  "proseBasisFingerprint": zod.string().nullish(),
   "activismRead": zod.string().nullish(),
   "civilUnrestRead": zod.string().nullish(),
   "forecastRead": zod.string().nullish(),
@@ -5715,6 +5721,7 @@ export const GenerateReportProseBody = zod.object({
   "issueDate": zod.string(),
   "force": zod.boolean().optional(),
   "facts": zod.string().optional(),
+  "generationBasisFingerprint": zod.string().optional(),
   "incidents": zod.array(zod.object({
   "id": zod.string().nullish(),
   "topic": zod.string().nullish(),
@@ -5731,6 +5738,8 @@ export const GenerateReportProseBody = zod.object({
 export const GenerateReportProseResponse = zod.object({
   "available": zod.boolean(),
   "fingerprint": zod.string(),
+  "generationBasisFingerprint": zod.string().nullable(),
+  "editedGenerationBasisFingerprint": zod.string().nullable(),
   "sections": zod.union([zod.object({
   "executiveSummary": zod.string(),
   "situation": zod.string(),
@@ -5761,6 +5770,7 @@ export const EditReportProseParams = zod.object({
 
 export const EditReportProseBody = zod.object({
   "fingerprint": zod.string(),
+  "generationBasisFingerprint": zod.string().optional(),
   "sections": zod.object({
   "executiveSummary": zod.string(),
   "situation": zod.string(),
@@ -5775,6 +5785,8 @@ export const EditReportProseBody = zod.object({
 export const EditReportProseResponse = zod.object({
   "available": zod.boolean(),
   "fingerprint": zod.string(),
+  "generationBasisFingerprint": zod.string().nullable(),
+  "editedGenerationBasisFingerprint": zod.string().nullable(),
   "sections": zod.union([zod.object({
   "executiveSummary": zod.string(),
   "situation": zod.string(),

@@ -1,6 +1,6 @@
 import Parser from "rss-parser";
-import { db, incidentsTable, sourcesTable } from "@workspace/db";
-import { sql, eq, or, gte, isNotNull } from "drizzle-orm";
+import { db, incidentsTable, sourcesTable, incidentValidityAuditTable } from "@workspace/db";
+import { sql, eq, or, gte, isNotNull, and, inArray, desc } from "drizzle-orm";
 import { cleanText, hasWord, parseDate, stripAttributionMentions } from "./text";
 import { classifySeverity } from "./severity";
 import { geocode } from "./geocode";
@@ -10,6 +10,9 @@ import { recordSourceHealth, categorizeFeedFailure } from "./sourceHealth";
 import { detectStaleEventDate, isKnownStaleSyndication } from "./structuredExtract";
 import { extractPngItem, derivePngProvince, derivePngIncidentDate } from "./pngExtract";
 import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaExtract";
+import { validateFlashpointEvent, FLASHPOINT_VALIDITY_VERSION } from "./flashpointValidity";
+import { backfillFlashpointValidity } from "./backfillFlashpointValidity";
+import { flashpointContentFingerprint } from "./flashpointFingerprint";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
 
 // Feed fetching is centralised in feedFetch.ts: a real browser User-Agent,
@@ -799,7 +802,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   let pngRejectedDuplicates = 0;
   for (const a of accepted) {
     const k = dedupeKey(a.title, a.occurredAt, a.country);
-    if (seenKeys.has(k) || seenUrls.has(a.sourceUrl)) {
+    if (seenUrls.has(a.sourceUrl)) {
       if (a.isPng) pngRejectedDuplicates++;
       continue;
     }
@@ -818,6 +821,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       country: incidentsTable.country,
       topic: incidentsTable.topic,
       sourceUrl: incidentsTable.sourceUrl,
+      validityStatus: incidentsTable.validityStatus,
     })
     .from(incidentsTable)
     .where(or(gte(incidentsTable.occurredAt, cutoff), isNotNull(incidentsTable.sourceUrl)));
@@ -830,7 +834,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const existingSignatures: { ms: number; country: string; sig: Set<string>; title: string }[] = [];
   for (const row of existing) {
     if (row.sourceUrl) existingUrls.add(row.sourceUrl);
-    if (row.topic === "flashpoint") {
+    if (row.topic === "flashpoint" && row.validityStatus === "valid") {
       existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
       const sig = eventSignatureTrigrams(row.title);
       if (sig.size > 0)
@@ -873,25 +877,91 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   let dupeInDb = 0;
   let rehashSkipped = 0;
   for (const a of uniqueAccepted) {
-    if (existingUrls.has(a.sourceUrl) || existingKeys.has(dedupeKey(a.title, a.occurredAt, a.country))) {
+    if (existingUrls.has(a.sourceUrl)) {
       dupeInDb++;
-      if (a.isPng) pngRejectedDuplicates++;
-      continue;
-    }
-    if (isSyndicatedRehash(a)) {
-      rehashSkipped++;
       if (a.isPng) pngRejectedDuplicates++;
       continue;
     }
     toInsert.push(a);
   }
 
+  const fingerprint = (a: Accepted) => flashpointContentFingerprint({
+    topic: "flashpoint", title: a.title, displayTitle: null, summary: a.summary,
+    source: a.source, sourceUrl: a.sourceUrl, country: a.country,
+    location: geocode(a.country, `${a.title} ${a.summary}`)?.location ?? null,
+    occurredAt: a.occurredAt,
+    incidentDate: null,
+  });
+  const prior = new Map<string, (typeof incidentValidityAuditTable.$inferSelect)>();
+  const urls = toInsert.map((a) => a.sourceUrl).filter(Boolean);
+  if (urls.length) {
+    const rows = await db.select().from(incidentValidityAuditTable)
+      .where(and(
+        eq(incidentValidityAuditTable.classifierVersion, FLASHPOINT_VALIDITY_VERSION),
+        inArray(incidentValidityAuditTable.sourceUrl, urls),
+      ))
+      .orderBy(
+        desc(incidentValidityAuditTable.createdAt),
+        desc(incidentValidityAuditTable.id),
+      );
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (!row.sourceUrl || !row.contentFingerprint) continue;
+      const key = `${row.sourceUrl}|${row.contentFingerprint}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // An expired latest transient decision deliberately leaves the key out of
+      // the cache so this run retries it; never fall back to an older verdict.
+      if (!row.retryAfter || row.retryAfter.getTime() > Date.now()) prior.set(key, row);
+    }
+  }
+  const validity: Array<{ item: Accepted; result: Awaited<ReturnType<typeof validateFlashpointEvent>> }> = [];
+  for (let i = 0; i < toInsert.length; i += 4) {
+    const batch = await Promise.all(toInsert.slice(i, i + 4).map(async (a) => ({
+      item: a,
+      result: prior.get(`${a.sourceUrl}|${fingerprint(a)}`)?.gates
+        ? prior.get(`${a.sourceUrl}|${fingerprint(a)}`)!.gates as Awaited<ReturnType<typeof validateFlashpointEvent>>
+        : await validateFlashpointEvent({
+            title: a.title,
+            summary: a.summary,
+            source: a.source,
+            sourceUrl: a.sourceUrl,
+            assignedCountry: a.country,
+            assignedLocation: geocode(a.country, `${a.title} ${a.summary}`)?.location ?? null,
+            publishedAt: a.occurredAt,
+            // No distinct event date has been extracted at this stage. The
+            // semantic validator must infer one from the article facts rather
+            // than treating the RSS publication timestamp as event evidence.
+            candidateEventDate: null,
+          }),
+    })));
+    validity.push(...batch);
+  }
+  if (commit && validity.length) {
+    await db.insert(incidentValidityAuditTable).values(validity.map(({ item, result }) => ({
+      title: item.title, summary: item.summary, source: item.source, sourceUrl: item.sourceUrl,
+      feed: item.feedLabel, verdict: result.verdict, reason: result.reason,
+      gates: result, classifierVersion: FLASHPOINT_VALIDITY_VERSION, contentFingerprint: fingerprint(item),
+      retryAfter: /unavailable|HTTP|failed|malformed|incoherent/i.test(result.reason) ? new Date(Date.now() + 60 * 60 * 1000) : null,
+    })));
+  }
+  const semanticallyValid: Accepted[] = [];
+  for (const { item, result } of validity) {
+    if (result.verdict !== "valid") continue;
+    if (existingKeys.has(dedupeKey(item.title, item.occurredAt, item.country)) || isSyndicatedRehash(item)) {
+      rehashSkipped++;
+      continue;
+    }
+    semanticallyValid.push(item);
+  }
+  const validityByUrl = new Map(validity.map(({ item, result }) => [item.sourceUrl, result]));
+
   // PNG ingest diagnostics for this run. rejectedOld = promoted PNG candidates
   // whose occurrence date is older than 30 days (still inserted; flagged as
   // outside the recent reporting horizon for the report's gaps section).
   const PNG_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
-  const pngPromoted = toInsert.filter((a) => a.isPng);
+  const pngPromoted = semanticallyValid.filter((a) => a.isPng);
   const pngDiagnostics: PngIngestDiagnostics = {
     articlesBySource: Object.entries(pngArticlesBySource).sort((a, b) => b[1] - a[1]),
     matchedPng: pngMatched,
@@ -931,7 +1001,8 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   log(`  Accepted (unique)   : ${uniqueAccepted.length}`);
   log(`  Duplicate in DB     : ${dupeInDb}`);
   log(`  Rehash skipped      : ${rehashSkipped}`);
-  log(`  New to insert       : ${toInsert.length}`);
+  log(`  Semantic held       : ${validity.filter(({ result }) => result.verdict !== "valid").length}`);
+  log(`  New to insert       : ${semanticallyValid.length}`);
   log(`  Rejected            : ${rejected.length}`);
 
   // Diagnostic: dump rejected items (optionally filtered by substring) so we
@@ -956,7 +1027,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     acceptedRaw: accepted.length,
     acceptedUnique: uniqueAccepted.length,
     duplicateInDb: dupeInDb,
-    newToInsert: toInsert.length,
+    newToInsert: semanticallyValid.length,
     rejected: rejected.length,
     perFeed: fetchable.map((s) => perFeed[s.name]),
     countryCoverage: [...countryCoverage.entries()].sort((a, b) => b[1] - a[1]),
@@ -978,7 +1049,11 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     return { ...summaryBase, inserted: 0, totalAfter: null, latestRecord: null, lastUpdated: null, logLines };
   }
 
-  if (toInsert.length === 0) {
+  // Bounded convergence hook for recent legacy/promoted rows. This never scans
+  // the full table and shares the same four-request concurrency ceiling.
+  await backfillFlashpointValidity(20);
+
+  if (semanticallyValid.length === 0) {
     log("\nNothing to insert.");
     const stats = await topicStats();
     return { ...summaryBase, inserted: 0, ...stats, logLines };
@@ -986,7 +1061,8 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
 
   let geocoded = 0;
   const ungeocoded: string[] = [];
-  const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
+  const rows: (typeof incidentsTable.$inferInsert)[] = semanticallyValid.map((a) => {
+    const semantic = validityByUrl.get(a.sourceUrl)!;
     const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
@@ -1030,7 +1106,9 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       category: structured?.category ?? null,
       businessImpact: structured?.businessImpact ?? null,
       severity: classifySeverity(a.title, a.summary, "flashpoint"),
-      confidence: "low",
+      confidence: Math.min(semantic.confidence.event, semantic.confidence.classification, semantic.confidence.geography, semantic.confidence.date) >= 0.85
+        ? "high"
+        : Math.min(semantic.confidence.event, semantic.confidence.classification, semantic.confidence.geography, semantic.confidence.date) >= 0.75 ? "medium" : "low",
       source: a.source,
       sourceUrl: a.sourceUrl,
       analystNotes: `auto-scraped:${a.feedLabel}`,
@@ -1039,6 +1117,12 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       relevanceReason: rel.reason,
       relevanceVersion: rel.version,
       relevanceEvaluatedAt: new Date(),
+      validityStatus: semantic.verdict,
+      validityScore: Math.min(semantic.confidence.event, semantic.confidence.classification, semantic.confidence.geography, semantic.confidence.date),
+      validityReason: semantic.reason,
+      validityVersion: semantic.version,
+      validityEvaluatedAt: new Date(),
+      validityGates: semantic,
     };
   });
 

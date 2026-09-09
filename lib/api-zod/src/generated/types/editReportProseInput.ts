@@ -9,5 +9,6 @@ import type { TopicProseSections } from './topicProseSections';
 
 export interface EditReportProseInput {
   fingerprint: string;
+  generationBasisFingerprint?: string;
   sections: TopicProseSections;
 }

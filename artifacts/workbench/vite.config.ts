@@ -32,6 +32,11 @@ export default defineConfig({
   base: basePath,
   define: {
     __BUILD_TIME__: JSON.stringify(buildTime),
+    // Replaced in the browser bundle at build time. Keep the empty value
+    // explicit so a missing production key still fails closed in cartoBasemap.
+    __CARTO_BASEMAP_KEY__: JSON.stringify(
+      process.env.VITE_CARTO_BASEMAP_KEY ?? "",
+    ),
   },
   plugins: [
     react(),

@@ -130,6 +130,7 @@ import { exportFlashpointReportPdf } from "../../artifacts/workbench/src/lib/exp
 import { exportShippingReportPdf } from "../../artifacts/workbench/src/lib/exportShippingReportPdf";
 import { exportConflictReportPdf } from "../../artifacts/workbench/src/lib/exportConflictReportPdf";
 import { exportTopicReportPdf } from "../../artifacts/workbench/src/lib/exportTopicReportPdf";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 const pdfChromeMock = jest.requireMock(PDF_CHROME_PATH) as {
   __textCalls: string[];
@@ -170,7 +171,7 @@ function baseInc(over: {
   summary?: string;
   location?: string | null;
 }) {
-  return {
+  const base = {
     occurredAt: "2026-06-16T08:00:00+00:00",
     summary: over.summary ?? null,
     source: "Test Wire",
@@ -178,6 +179,9 @@ function baseInc(over: {
     location: over.location ?? null,
     ...over,
   };
+  return over.topic === "flashpoint"
+    ? { ...base, ...validFlashpointSemantic(base) }
+    : base;
 }
 
 describe("topic report — hidden sections & curated incidents disappear from the PDF", () => {

@@ -15,6 +15,11 @@
  */
 import { clearIntegrationEnv } from "./__tests__/api-server/integrationEnvTestHelpers";
 
+// Vite replaces this compile-time global in production. Jest runs the source
+// through CommonJS, so provide only a non-secret key-shaped test value.
+(globalThis as typeof globalThis & { __CARTO_BASEMAP_KEY__?: string })
+  .__CARTO_BASEMAP_KEY__ = "jest-carto-basemap-key";
+
 beforeEach(() => {
   clearIntegrationEnv();
 });

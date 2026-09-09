@@ -232,13 +232,10 @@ describe("decideSocialPromotion", () => {
     });
   });
 
-  it("blocks a duplicate of an already-tracked incident", () => {
+  it("does not let an unvalidated fuzzy duplicate suppress a Flashpoint candidate", () => {
     const d = decideSocialPromotion(row({ sourceTier: "official" }), [inc()]);
-    expect(d).toEqual({
-      promote: false,
-      reason: "duplicate",
-      duplicateOf: 900,
-    });
+    expect(d.promote).toBe(true);
+    if (d.promote) expect(d.row.validityStatus).toBe("needs_review");
   });
 });
 

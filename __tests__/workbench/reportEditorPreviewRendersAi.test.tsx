@@ -89,13 +89,25 @@ jest.mock("@workspace/api-client-react", () => ({
   // empty, so AI occupies the top of the fallback layer).
   useGenerateReportProse: () => ({
     mutate: (
-      _vars: unknown,
+      vars: unknown,
       opts?: { onSuccess?: (res: unknown) => void },
     ) => {
+      const facts = (vars as { data?: { facts?: string } })?.data?.facts;
+      let fingerprint = "test-generation-basis";
+      try {
+        const parsed = JSON.parse(facts ?? "") as { datasetFingerprint?: string };
+        fingerprint = parsed.datasetFingerprint ?? fingerprint;
+      } catch {
+        // Non-Flashpoint facts are not the canonical JSON basis payload.
+      }
       opts?.onSuccess?.({
         available: true,
+        fingerprint: "sha256-cache-identity-distinct-from-fp1",
+        generationBasisFingerprint: fingerprint,
+        editedGenerationBasisFingerprint: null,
         sections: { ...AI_SECTIONS },
         edited: null,
+        stale: false,
       });
     },
     isPending: false,

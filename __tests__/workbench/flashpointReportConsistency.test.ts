@@ -22,12 +22,16 @@ import {
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
 import { locationForeignToCountry } from "../../artifacts/workbench/src/lib/upcomingSignals";
 import { parseBullets } from "../../artifacts/workbench/src/lib/pdfChrome";
+import {
+  invalidFlashpointSemantic,
+  validFlashpointSemantic,
+} from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE = "2026-07-27";
 
 let nextId = 1;
 function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
-  return {
+  const base = {
     id: nextId++,
     title: "Workers stage protest over wages in Lahore",
     summary: "Union members marched through the city centre.",
@@ -38,6 +42,7 @@ function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident 
     occurredAt: "2026-07-24T08:00:00Z",
     ...over,
   } as unknown as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("flashpoint report consistency", () => {
@@ -233,9 +238,9 @@ describe("flashpoint report consistency", () => {
 
   test("analysis essays and elections are excluded from the incident count", () => {
     const rows = [
-      inc({ title: "From Protest to Power: BNP, Student Politics and Campus Violence", country: "Bangladesh", severity: "moderate" }),
-      inc({ title: "India's protest movement keeps heat on Modi", country: "India", severity: "low" }),
-      inc({ title: "Bangladesh presidential vote set for August as parties prepare", country: "Bangladesh", severity: "moderate" }),
+      inc({ title: "From Protest to Power: BNP, Student Politics and Campus Violence", country: "Bangladesh", severity: "moderate", ...invalidFlashpointSemantic("commentary") }),
+      inc({ title: "India's protest movement keeps heat on Modi", country: "India", severity: "low", ...invalidFlashpointSemantic("commentary") }),
+      inc({ title: "Bangladesh presidential vote set for August as parties prepare", country: "Bangladesh", severity: "moderate", ...invalidFlashpointSemantic("scheduled election") }),
       inc({ title: "Garment workers block road in Dhaka over wage arrears", country: "Bangladesh", severity: "moderate", location: "Dhaka" }),
       inc({ title: "Traders march on parliament in Delhi over tax rules", country: "India", severity: "low", location: "Delhi" }),
     ];
@@ -299,10 +304,10 @@ describe("flashpoint report consistency", () => {
 
   test("stock rally, ceremonial demo, drug crime and rocket launch are excluded", () => {
     const rows = [
-      inc({ title: "Samsung and SK Hynix rally as foreign interest returns to South Korea", country: "South Korea" }),
-      inc({ title: "The moment of the 81st Anniversary of the Independence of the Republic of Indonesia, involving 81 TNI aircraft", country: "Indonesia" }),
-      inc({ title: "Malaysian driver held in Thailand with 166kg of meth", country: "Thailand", location: "Bangkok" }),
-      inc({ title: "China says Long March 7A rocket launch failed after flight anomaly", country: "China" }),
+      inc({ title: "Samsung and SK Hynix rally as foreign interest returns to South Korea", country: "South Korea", ...invalidFlashpointSemantic("stock-market homonym") }),
+      inc({ title: "The moment of the 81st Anniversary of the Independence of the Republic of Indonesia, involving 81 TNI aircraft", country: "Indonesia", ...invalidFlashpointSemantic("ceremonial display") }),
+      inc({ title: "Malaysian driver held in Thailand with 166kg of meth", country: "Thailand", location: "Bangkok", ...invalidFlashpointSemantic("ordinary crime") }),
+      inc({ title: "China says Long March 7A rocket launch failed after flight anomaly", country: "China", ...invalidFlashpointSemantic("space launch") }),
       inc({ title: "Indian police fire tear gas to disperse youth protesters", country: "India", severity: "high", location: "Delhi" }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
@@ -335,6 +340,7 @@ describe("flashpoint report consistency", () => {
         country: "Thailand",
         location: "Bangkok",
         severity: "moderate",
+        ...invalidFlashpointSemantic("ordinary drug crime"),
       }),
       inc({ title: "Indian police fire tear gas to disperse youth protesters", country: "India", severity: "high", location: "Delhi" }),
     ];
@@ -413,7 +419,7 @@ describe("flashpoint report consistency", () => {
     expect(ds.forecastFuture.some((r) => r.country === "New Zealand")).toBe(true);
   });
 
-  test("screening note accounts for every exclusion between screened and distinct counts", () => {
+  test("client Fast Facts expose no screening or rejection commentary", () => {
     const rows = [
       inc({ title: "Samsung shares rally as foreign interest returns", country: "South Korea" }),
       inc({ title: "From Protest to Power: campus politics essay", country: "Bangladesh", severity: "moderate" }),
@@ -435,14 +441,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     const note = ds.fastFacts.find((k) => k.label === "Distinct Incidents")?.note ?? "";
-    expect(note).toMatch(/records screened/);
-    expect(note).toMatch(/distinct incident/);
-    const screened = Number(note.match(/(\d+) records screened/)?.[1] ?? 0);
-    const distinct = Number(note.match(/(\d+) distinct incident/)?.[1] ?? 0);
-    const dupes = Number(note.match(/(\d+) syndicated duplicate/)?.[1] ?? 0);
-    const excluded = Number(note.match(/(\d+) excluded as off-topic or low-signal/)?.[1] ?? 0);
-    const forecastHeld = Number(note.match(/(\d+) held for forecast/)?.[1] ?? 0);
-    expect(screened).toBe(distinct + dupes + excluded + forecastHeld);
+    expect(note).toBe("");
   });
 
   test("events dated on the issue date are not labelled upcoming when the report is generated that day", () => {
@@ -461,7 +460,7 @@ describe("flashpoint report consistency", () => {
     expect(ds.autoWatchNext).not.toMatch(/upcoming, (?:unconfirmed|date confirmed)/i);
   });
 
-  test("events dated 13 August are not upcoming when generated on 13 August even if the window ended 12 August", () => {
+  test("forecast membership is deterministic across generatedAt values", () => {
     const rows = [
       inc({
         title: "Pakistan nationwide strike 13 August",
@@ -483,13 +482,16 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12", {
       generatedAt: "2026-08-13T11:31:00+08:00",
     });
-    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(false);
+    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(true);
     expect(ds.forecastFuture.some((r) => r.country === "South Korea")).toBe(true);
-    expect(ds.forecastRead).not.toMatch(/Pakistan/);
-    expect(ds.autoWatchNext).not.toMatch(/Pakistan — .{0,80}upcoming/i);
+    const later = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12", {
+      generatedAt: "2026-08-20T11:31:00+08:00",
+    });
+    expect(later.forecastFuture).toEqual(ds.forecastFuture);
+    expect(later.forecastRead).toBe(ds.forecastRead);
   });
 
-  test("events dated 13 August are not upcoming when the PDF is generated on 14 August", () => {
+  test("PDF-generation wall clock does not alter the forecast", () => {
     const rows = [
       inc({
         title: "India transport unions announce statewide strike set for 13 August",
@@ -511,10 +513,17 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12", {
       generatedAt: "2026-08-14T11:31:00+08:00",
     });
-    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(false);
+    expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(true);
     expect(ds.forecastFuture.some((r) => r.country === "South Korea" && /16 August/.test(r.date ?? ""))).toBe(true);
     expect(ds.forecastRead).toMatch(/Confirmed upcoming events/i);
-    expect(ds.autoWatchNext).not.toMatch(/13 August/);
+    const sameIssueDifferentClock = buildFlashpointReportDataset(
+      rows,
+      "flashpoint",
+      "2026-08-12",
+      { generatedAt: "2030-01-01T00:00:00Z" },
+    );
+    expect(sameIssueDifferentClock.forecastFuture).toEqual(ds.forecastFuture);
+    expect(sameIssueDifferentClock.autoWatchNext).toBe(ds.autoWatchNext);
   });
 
   test("activism main event prefers higher-severity confirmed operational incidents", () => {
@@ -553,6 +562,12 @@ describe("flashpoint report consistency", () => {
         severity: "high",
         location: "Jharkhand",
         occurredAt: "2026-08-10T08:00:00Z",
+        validityGates: validFlashpointSemantic({
+          title: "Indian police fire tear gas, use batons to disperse youth protesters",
+          country: "India",
+          location: "Jharkhand",
+          occurredAt: "2026-08-10T08:00:00Z",
+        }).validityGates,
       }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
@@ -624,6 +639,12 @@ describe("flashpoint report consistency", () => {
         severity: "high",
         location: "Jharkhand",
         occurredAt: "2026-08-10T08:00:00Z",
+        validityGates: validFlashpointSemantic({
+          title: "Indian police fire tear gas, use batons to disperse youth protesters",
+          country: "India",
+          location: "Jharkhand",
+          occurredAt: "2026-08-10T08:00:00Z",
+        }).validityGates,
       }),
       inc({
         title: "All Pakistan Goods Transport Ittehad will strike nationwide on 10 August in protest over government policy",
@@ -645,7 +666,7 @@ describe("flashpoint report consistency", () => {
     expect(ds.activismRead).not.toMatch(/Prison riot/i);
   });
 
-  test("screening note counts forecast-held records so figures fully reconcile", () => {
+  test("forecast-held records add no client-visible screening note", () => {
     const rows = [
       inc({
         title: "India transport unions announce statewide strike set for 13 August",
@@ -664,12 +685,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     const note = ds.fastFacts.find((k) => k.label === "Distinct Incidents")?.note ?? "";
-    expect(note).toMatch(/held for forecast/);
-    const screened = Number(note.match(/(\d+) records screened/)?.[1] ?? 0);
-    const distinct = Number(note.match(/(\d+) distinct incident/)?.[1] ?? 0);
-    const forecastHeld = Number(note.match(/(\d+) held for forecast/)?.[1] ?? 0);
-    expect(forecastHeld).toBeGreaterThan(0);
-    expect(screened).toBeGreaterThanOrEqual(distinct + forecastHeld);
+    expect(note).toBe("");
   });
 
   test("forecast reconciles unconfirmed Watch Next signals when no confirmed table exists", () => {

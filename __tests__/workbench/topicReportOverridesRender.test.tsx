@@ -27,6 +27,7 @@ import ShippingReportPreview from "../../artifacts/workbench/src/components/Ship
 import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
 import CargoReportPreview from "../../artifacts/workbench/src/components/CargoReportPreview";
 import ReportPreview from "../../artifacts/workbench/src/components/ReportPreview";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE_DATE = "2026-06-20";
 const OV_VALUE = "ZZOVERRIDDENVALUEZZ";
@@ -41,7 +42,7 @@ function baseInc(over: {
   summary?: string;
   location?: string | null;
 }) {
-  return {
+  const base = {
     occurredAt: "2026-06-16T08:00:00+00:00",
     summary: over.summary ?? null,
     source: "Test Wire",
@@ -49,6 +50,9 @@ function baseInc(over: {
     location: over.location ?? null,
     ...over,
   };
+  return over.topic === "flashpoint"
+    ? { ...base, ...validFlashpointSemantic(base) }
+    : base;
 }
 
 const PROSE_FIELDS = {
@@ -72,6 +76,7 @@ describe("Fast Facts tile overrides render in preview and clearing reverts", () 
     Component: unknown,
     props: Record<string, unknown>,
     autoLabel: string,
+    allowOverride = true,
   ) {
     const el = (ov?: TopicSectionOverrides) =>
       createElement(Component as never, {
@@ -87,8 +92,12 @@ describe("Fast Facts tile overrides render in preview and clearing reverts", () 
         },
       }),
     );
-    expect(withOv).toContain(OV_VALUE);
-    expect(withOv.toUpperCase()).toContain(OV_LABEL);
+    if (allowOverride) {
+      expect(withOv).toContain(OV_VALUE);
+      expect(withOv.toUpperCase()).toContain(OV_LABEL);
+    } else {
+      expect(withOv).toBe(base);
+    }
     // Clearing (blank fields) reverts to auto — identical to base render.
     const cleared = renderToStaticMarkup(
       el({ fastFactOverrides: { [autoLabel]: { label: "", value: "" } } }),
@@ -101,7 +110,7 @@ describe("Fast Facts tile overrides render in preview and clearing reverts", () 
     const incidents = [
       baseInc({ id: "f1", topic: "flashpoint", country: "Indonesia", severity: "high", title: "Mass protest demonstrators clash with police", summary: "Demonstrators clashed with police." }),
     ];
-    run(FlashpointReportPreview, { report, incidents }, "Reporting Period");
+    run(FlashpointReportPreview, { report, incidents }, "Reporting Period", false);
   });
 
   it("shipping", () => {

@@ -9,6 +9,7 @@ import { buildCargoGroupedDataset } from "../../artifacts/workbench/src/lib/carg
 import { buildMaritimeIntelligence } from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import { toDraftableIncidents } from "../../artifacts/workbench/src/lib/topicProseResolution";
 import { incidentBlock } from "../../artifacts/api-server/src/lib/countryProse";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 describe("translated incident titles at presentation boundaries", () => {
   const rawTitle = "Mahasiswa menggelar demonstrasi di Jayapura";
@@ -164,15 +165,25 @@ describe("translated incident titles at presentation boundaries", () => {
           summary: "Students staged a peaceful protest in Jayapura.",
           source: "Test Wire",
           sourceUrl: "https://example.com/flashpoint",
+          ...validFlashpointSemantic({
+            title: englishTitle,
+            summary: "Students staged a peaceful protest in Jayapura.",
+            country: "Indonesia",
+            location: "Jayapura",
+            occurredAt: "2026-08-18T08:00:00Z",
+          }),
         },
       ],
       "flashpoint",
       "2026-08-20",
     );
 
-    const renderedData = JSON.stringify(dataset);
-    expect(renderedData).toContain(englishTitle);
-    expect(renderedData).not.toContain(rawTitle);
+    const presentedTitles = [
+      ...dataset.enriched.map((row) => row.title),
+      ...dataset.relatedIncidents.map((row) => row.title),
+    ];
+    expect(presentedTitles).toContain(englishTitle);
+    expect(presentedTitles).not.toContain(rawTitle);
   });
 
   test("deterministic topic prose receives the English title", () => {

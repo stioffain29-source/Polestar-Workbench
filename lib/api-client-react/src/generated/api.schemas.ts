@@ -581,6 +581,8 @@ export interface Report {
   /** @nullable */
   watchNext?: string | null;
   /** @nullable */
+  proseBasisFingerprint?: string | null;
+  /** @nullable */
   activismRead?: string | null;
   /** @nullable */
   civilUnrestRead?: string | null;
@@ -648,6 +650,7 @@ export interface ReportInput {
   implications?: string;
   polestarView?: string;
   watchNext?: string;
+  proseBasisFingerprint?: string;
   activismRead?: string;
   civilUnrestRead?: string;
   forecastRead?: string;
@@ -698,6 +701,7 @@ export interface ReportUpdate {
   implications?: string;
   polestarView?: string;
   watchNext?: string;
+  proseBasisFingerprint?: string;
   activismRead?: string;
   civilUnrestRead?: string;
   forecastRead?: string;
@@ -2025,17 +2029,23 @@ export interface GenerateReportProseInput {
   issueDate: string;
   force?: boolean;
   facts?: string;
+  generationBasisFingerprint?: string;
   incidents: ProseIncidentInput[];
 }
 
 export interface EditReportProseInput {
   fingerprint: string;
+  generationBasisFingerprint?: string;
   sections: TopicProseSections;
 }
 
 export interface ReportProseResult {
   available: boolean;
   fingerprint: string;
+  /** @nullable */
+  generationBasisFingerprint: string | null;
+  /** @nullable */
+  editedGenerationBasisFingerprint: string | null;
   sections?: TopicProseSections | null;
   edited?: TopicProseSections | null;
   stale?: boolean;

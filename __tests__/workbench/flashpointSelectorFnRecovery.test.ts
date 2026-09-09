@@ -3,11 +3,15 @@ import {
   hasStrongPublicOrderCue,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import {
+  invalidFlashpointSemantic,
+  validFlashpointSemantic,
+} from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE = "2026-05-31";
 
 function fp(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
-  return {
+  const base = {
     id: over.id ?? Math.random(),
     title: over.title ?? "Workers protest in Kathmandu",
     summary: over.summary ?? "",
@@ -18,6 +22,7 @@ function fp(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
     occurredAt: over.occurredAt ?? "2026-05-28T08:00:00Z",
     ...over,
   } as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("Flashpoint selector FN recovery (FP-02)", () => {
@@ -121,6 +126,7 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
           title: "Ogier extends WRC Rally Japan lead after SS12",
           summary: "The rally leader pulled away on the dirt stages near Sapporo.",
           country: "Japan",
+          ...invalidFlashpointSemantic("motorsport homonym"),
         }),
         fp({
           title: "Thousands rally in Tokyo against Takaichi moves under 'No War' banner",
@@ -141,6 +147,7 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
           title:
             "Hasina's Lawyer Urges UN to Retract Bangladesh Protest Death Toll Report",
           country: "Bangladesh",
+          ...invalidFlashpointSemantic("legal commentary, not a current event"),
         }),
       ],
       "flashpoint",
@@ -155,6 +162,7 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
         fp({
           title: "Samsung shares rally as foreign interest returns to KOSPI",
           country: "South Korea",
+          ...invalidFlashpointSemantic("stock-market homonym"),
         }),
       ],
       "flashpoint",

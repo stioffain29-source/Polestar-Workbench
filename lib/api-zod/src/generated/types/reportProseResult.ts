@@ -10,6 +10,10 @@ import type { TopicProseSections } from './topicProseSections';
 export interface ReportProseResult {
   available: boolean;
   fingerprint: string;
+  /** @nullable */
+  generationBasisFingerprint: string | null;
+  /** @nullable */
+  editedGenerationBasisFingerprint: string | null;
   sections?: TopicProseSections | null;
   edited?: TopicProseSections | null;
   stale?: boolean;

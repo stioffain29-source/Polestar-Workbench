@@ -124,6 +124,9 @@ export const reportsTable = pgTable(
     implications: text("implications"),
     polestarView: text("polestar_view"),
     watchNext: text("watch_next"),
+    // Canonical snapshot against which saved analyst narrative was written.
+    // NULL legacy prose is intentionally stale for fail-closed report topics.
+    proseBasisFingerprint: text("prose_basis_fingerprint"),
     // Flashpoint/protests data-driven "reads" — editable analyst overrides.
     // Blank/NULL falls back to the dataset-generated read so the on-screen
     // preview, the in-app PDF and the headless PDF stay identical and no prose

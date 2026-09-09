@@ -34,10 +34,14 @@
  * Per-topic preview components render FOR REAL; only the heavy chart/map leaf
  * children (recharts/leaflet) are stubbed via jest.config `moduleNameMapper`.
  */
-import { render, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, waitFor, within } from "@testing-library/react";
+import { buildFlashpointReportDataset } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import { applyIncidentCurations } from "../../artifacts/workbench/src/lib/countrySectionOverrides";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 let mockReportData: Record<string, unknown> | undefined;
 let mockIncidents: Array<Record<string, unknown>> = [];
+const mockUpdateReport = jest.fn();
 
 jest.mock("wouter", () => ({
   __esModule: true,
@@ -98,7 +102,7 @@ const ANALYST_POLESTAR_VIEW = padPolestarView(
 jest.mock("@workspace/api-client-react", () => ({
   __esModule: true,
   useGetReport: () => ({ data: mockReportData, isLoading: false }),
-  useUpdateReport: () => ({ mutate: jest.fn(), isPending: false }),
+  useUpdateReport: () => ({ mutate: mockUpdateReport, isPending: false }),
   useListIncidents: () => ({ data: mockIncidents }),
   useListLatestMaritimeMovement: () => ({ data: [] }),
   useListMaritimeMovement: () => ({ data: [] }),
@@ -428,11 +432,21 @@ const TOPICS = [
 ] as const;
 
 describe("ReportEditor — a saved analyst edit outranks the AI narrative in the preview", () => {
+  beforeEach(() => mockUpdateReport.mockReset());
   it.each(TOPICS)(
     "renders the saved analyst edit (not the AI sentinel) in the right column (%s)",
     async (topic) => {
       mockReportData = report(topic);
       mockIncidents = incidentsFor(topic);
+      if (topic === "flashpoint" || topic === "protests") {
+        const renderedIssueDate = String(mockIncidents[0]?.occurredAt).slice(0, 10);
+        mockReportData.proseBasisFingerprint =
+          buildFlashpointReportDataset(
+            applyIncidentCurations(mockIncidents, {}),
+            topic,
+            renderedIssueDate,
+          ).canonical.fingerprint;
+      }
 
       const { container } = render(<ReportEditor />);
 
@@ -478,4 +492,82 @@ describe("ReportEditor — a saved analyst edit outranks the AI narrative in the
       expect(cols[0].querySelector("input")).not.toBeNull();
     },
   );
+
+  it("persists the canonical Flashpoint basis when analyst prose is saved", async () => {
+    const topic = "flashpoint";
+    mockReportData = report(topic);
+    mockIncidents = incidentsFor(topic).map((incident) => ({
+      ...incident,
+      ...validFlashpointSemantic(incident),
+    }));
+    const fingerprint = buildFlashpointReportDataset(
+      applyIncidentCurations(mockIncidents, {}),
+      topic,
+      String(mockIncidents[0]?.occurredAt).slice(0, 10),
+    ).canonical.fingerprint;
+    mockReportData.proseBasisFingerprint = fingerprint;
+    const { getByRole } = render(<ReportEditor />);
+    fireEvent.click(getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mockUpdateReport).toHaveBeenCalled());
+    expect(mockUpdateReport.mock.calls[0][0].data.proseBasisFingerprint).toBe(
+      fingerprint,
+    );
+  });
+
+  it("does not rebind an fpA analyst edit when incidents refresh to fpB", async () => {
+    const topic = "flashpoint";
+    mockReportData = {
+      ...report(topic),
+      whatMatters: "",
+      polestarView: "",
+    };
+    mockIncidents = incidentsFor(topic).map((incident) => ({
+      ...incident,
+      ...validFlashpointSemantic(incident),
+    }));
+    const curatedA = applyIncidentCurations(mockIncidents, {});
+    const issueDate = String(mockIncidents[0]?.occurredAt).slice(0, 10);
+    const fpA = buildFlashpointReportDataset(
+      curatedA,
+      topic,
+      issueDate,
+    ).canonical.fingerprint;
+    mockReportData.proseBasisFingerprint = fpA;
+
+    const view = render(<ReportEditor />);
+    let textarea: HTMLTextAreaElement | null = null;
+    await waitFor(() => {
+      textarea =
+        view.getAllByText("What Matters")
+          .map((node) => node.parentElement?.querySelector("textarea") ?? null)
+          .find((node): node is HTMLTextAreaElement => node != null) ?? null;
+      expect(textarea).not.toBeNull();
+    });
+    fireEvent.change(textarea!, { target: { value: ANALYST_WHAT_MATTERS } });
+
+    mockIncidents = mockIncidents.map((incident, index) =>
+      index === 0
+        ? { ...incident, sourceUrl: "https://example.com/refreshed-fpB" }
+        : incident,
+    );
+    const fpB = buildFlashpointReportDataset(
+      applyIncidentCurations(mockIncidents, {}),
+      topic,
+      issueDate,
+    ).canonical.fingerprint;
+    expect(fpB).not.toBe(fpA);
+    view.rerender(<ReportEditor />);
+
+    await waitFor(() => {
+      const preview = view.container.querySelector(
+        "div.bg-white.border.border-border.rounded-sm.overflow-hidden",
+      );
+      expect(preview?.textContent ?? "").not.toContain(ANALYST_WHAT_MATTERS);
+    });
+    fireEvent.click(view.getByRole("button", { name: "Save" }));
+    expect(mockUpdateReport).not.toHaveBeenCalled();
+    expect(view.container.textContent).toContain(
+      "edited against an older canonical dataset",
+    );
+  });
 });

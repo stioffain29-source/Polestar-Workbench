@@ -39,6 +39,8 @@ export interface Report {
   /** @nullable */
   watchNext?: string | null;
   /** @nullable */
+  proseBasisFingerprint?: string | null;
+  /** @nullable */
   activismRead?: string | null;
   /** @nullable */
   civilUnrestRead?: string | null;

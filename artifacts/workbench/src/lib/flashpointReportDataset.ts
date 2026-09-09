@@ -1,8 +1,8 @@
 import { format, parseISO, max as dateMax, differenceInCalendarDays } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
-import { isTopicRelevant } from "./topicRelevance";
 import { classifyIncidentType } from "./incidentClassifier";
 import { displayIncidentTitle, stripWireCruft } from "./incidentTitle";
+import { pickFlashpointRead } from "./pickRead";
 import {
   extractFutureSignals,
   hasUpcomingSignal,
@@ -20,6 +20,11 @@ import {
 // Subpath import only — the @workspace/ingest ROOT barrel drags pg/rss-parser
 // into the browser bundle and crashes the app ("Buffer is not defined").
 import { isReactionLed } from "@workspace/ingest/severity";
+import {
+  FLASHPOINT_VALIDITY_VERSION,
+  validateFlashpointSemanticContract,
+  type FlashpointSemanticGates,
+} from "@workspace/relevance";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -56,10 +61,40 @@ export interface FlashpointReportIncident {
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
+  /** Additive ingest verdict. NULL/undefined identifies an unbackfilled legacy row. */
+  validityStatus?: string | null;
+  validityReason?: string | null;
+  validityVersion?: string | null;
+  validityGates?: FlashpointValidityGates | null;
+}
+
+export interface FlashpointValidityGates {
+  policy?: string | null;
+  eventOccurred?: boolean | null;
+  actor?: string | null;
+  activity?: string | null;
+  physicalLocation?: string | null;
+  country?: string | null;
+  eventType?: string | null;
+  eventDate?: string | null;
+  currentness?: string | null;
+  assignedCountrySupported?: boolean | null;
+  confidence?: Record<string, number> | null;
+  contradictions?: string[] | null;
+  verdict?: string | null;
+  reason?: string | null;
+  version?: string | null;
+  evidence?: unknown;
+  provider?: string | null;
+  lane?: string | null;
 }
 
 export interface EnrichedIncident extends FlashpointReportIncident {
+  /** Immutable source title retained for provenance and fingerprinting. */
+  rawTitle: string;
   date: Date;
+  /** Persisted semantic event date used for both display and period membership. */
+  semanticEventDate: string;
   issue: string;
   bucket: "activism" | "unrest" | "other";
 }
@@ -78,6 +113,8 @@ export interface BarRow {
 }
 
 export interface ForecastFutureRow {
+  /** Canonical incident that supplied this signal (internal audit provenance). */
+  sourceIncidentId: number | string;
   country: string;
   signal: string;
   meaning: string;
@@ -101,7 +138,20 @@ const BARE_FORECAST_DATE_RE = new RegExp(
   `\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${FORECAST_MONTH}\\b`,
   "i",
 );
-function explicitForecastDate(r: { title?: string | null; summary?: string | null }): string | null {
+function explicitForecastDate(r: {
+  title?: string | null;
+  summary?: string | null;
+  validityGates?: FlashpointValidityGates | null;
+}): string | null {
+  if (
+    r.validityGates?.currentness === "future" &&
+    r.validityGates.eventDate
+  ) {
+    const semanticDate = parseISO(r.validityGates.eventDate);
+    if (!Number.isNaN(semanticDate.getTime())) {
+      return format(semanticDate, "d MMMM");
+    }
+  }
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   const m = FORECAST_DATE_RE.exec(text);
   if (m) {
@@ -197,6 +247,9 @@ function effectiveEventDate(
   r: EnrichedIncident,
   referenceEnd: Date,
 ): Date {
+  // Canonical rows carry a persisted semantic date. Never re-interpret their
+  // headline with a competing lexical date extractor.
+  if (r.semanticEventDate) return r.date;
   const stated = normalizeStatedEventDate(r, referenceEnd);
   if (!stated) return r.date;
   // A live street/enforcement account published in-window stays on its
@@ -242,10 +295,19 @@ function isScheduledOutsideReportingPeriod(
 }
 
 function forecastDateHasPassed(
-  r: { title?: string | null; summary?: string | null },
+  r: {
+    title?: string | null;
+    summary?: string | null;
+    validityGates?: FlashpointValidityGates | null;
+  },
   asOf: Date,
 ): boolean {
   const refEnd = endOfReportDay(asOf);
+  if (r.validityGates?.currentness === "future" && r.validityGates.eventDate) {
+    const semanticDate = parseISO(r.validityGates.eventDate);
+    return !Number.isNaN(semanticDate.getTime()) &&
+      semanticDate.getTime() <= refEnd.getTime();
+  }
   const stated = normalizeStatedEventDate(r, refEnd);
   if (!stated) return false;
   return stated.getTime() <= refEnd.getTime();
@@ -261,6 +323,7 @@ function buildScreeningNote(args: {
   outOfScopeCrimeDropped: number;
   weakNoveltyDropped: number;
   weakOperationalDropped: number;
+  semanticValidityDropped: number;
   /** Usable rows whose stated event date falls outside the reporting window. */
   forecastHeld: number;
 }): string {
@@ -270,7 +333,8 @@ function buildScreeningNote(args: {
     args.courtDropped +
     args.outOfScopeCrimeDropped +
     args.weakNoveltyDropped +
-    args.weakOperationalDropped;
+    args.weakOperationalDropped +
+    args.semanticValidityDropped;
   const parts: string[] = [`${args.rawWindowCount} records screened`];
   if (args.dedupedDropped > 0) {
     parts.push(
@@ -317,6 +381,8 @@ function topSeverityTieCount(
 export interface FlashpointReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
+  /** The one authoritative incident universe from which every fact is derived. */
+  canonical: FlashpointCanonicalIncidentSet;
   enriched: EnrichedIncident[];
   fastFacts: KpiCard[];
   activismRows: EnrichedIncident[];
@@ -336,9 +402,57 @@ export interface FlashpointReportDataset {
   dataNote: string;
 }
 
+export interface FlashpointCanonicalIncidentSet {
+  readonly provenance: "flashpoint-canonical-final-set-v1";
+  readonly issueDate: string;
+  readonly periodRows: readonly EnrichedIncident[];
+  readonly futureRows: readonly EnrichedIncident[];
+  readonly acceptedIds: readonly (number | string)[];
+  readonly fingerprint: string;
+  readonly rejected: readonly Readonly<FlashpointRejectedRecord>[];
+}
+
 export interface FlashpointReportOptions {
   /** Report-generation instant. Forecast "upcoming" is computed against this. */
   generatedAt?: Date | string;
+}
+
+export interface FlashpointResolvedProseInput {
+  executiveSummary?: string | null;
+  activismRead?: string | null;
+  civilUnrestRead?: string | null;
+  forecastRead?: string | null;
+  regionalCountryRead?: string | null;
+  whatMatters?: string | null;
+  implications?: string | null;
+  watchNext?: string | null;
+  polestarView?: string | null;
+  /** Fingerprint the saved text was authored against, when persisted. */
+  datasetFingerprint?: string | null;
+  /** Persisted report-row name for the same canonical provenance value. */
+  proseBasisFingerprint?: string | null;
+}
+
+export interface FlashpointResolvedAiInput extends FlashpointResolvedProseInput {
+  stale?: boolean;
+}
+
+export interface FlashpointRenderedModel {
+  dataset: FlashpointReportDataset;
+  fingerprint: string;
+  acceptedIds: readonly (number | string)[];
+  fastFacts: readonly KpiCard[];
+  prose: {
+    executiveSummary: string;
+    activismRead: string;
+    civilUnrestRead: string;
+    forecastRead: string;
+    regionalCountryRead: string;
+    whatMatters: string;
+    implications: string;
+    watchNext: string;
+    polestarView: string;
+  };
 }
 
 // APAC sub-region map. Used by the Regional and Country View and the
@@ -1463,9 +1577,12 @@ function clusterSameEvent<
 
 export function dedupeByTitle<T extends { title: string; date: Date; severity: string; country?: string | null }>(rows: T[]): T[] {
   const byTitle = new Map<string, T>();
+  let emptyKeyIndex = 0;
   for (const r of rows) {
     const k = titleKey(r.title);
-    if (!k) { byTitle.set(`__${Math.random()}`, r); continue; }
+    // Stable fallback: report construction and its audit fingerprint must never
+    // depend on process randomness, even for a malformed punctuation-only title.
+    if (!k) { byTitle.set(`__empty_${emptyKeyIndex++}`, r); continue; }
     const prev = byTitle.get(k);
     if (!prev || sevDateBetter(r, prev)) byTitle.set(k, r);
   }
@@ -1523,20 +1640,29 @@ function bucketFor(issue: string): "activism" | "unrest" | "other" {
 function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
   return rows
     .map((r) => {
+      const semantic = r.validityGates;
+      const eventDateText = semantic!.eventDate!.trim();
       let date: Date;
-      try { date = parseISO(r.occurredAt); } catch { date = new Date(NaN); }
-      const issue = classifyIncidentType({
-        topic: r.topic,
-        title: r.title,
-        summary: r.summary ?? null,
-        source: r.source ?? null,
-        sourceUrl: r.sourceUrl ?? null,
-        location: r.location ?? null,
-      });
+      try { date = parseISO(eventDateText); } catch { date = new Date(NaN); }
       // Resolve physical incident location from title, summary and location
       // text. The raw country tag can be source attribution and is not trusted
       // without corroboration.
-      const country = normalizeFlashpointCountry(deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED);
+      const country = normalizeFlashpointCountry(
+        (
+          semantic!.country!.trim() ||
+          LOCATION_NOT_IDENTIFIED
+        ),
+      );
+      const semanticIssue: Record<string, string> = {
+        protest: "Protest",
+        demonstration: "Protest",
+        labour_strike: "Strike / labour action",
+        blockade: "Roadblock / access disruption",
+        riot_public_disorder: "Riot / public disorder",
+        political_mobilisation: "Political unrest",
+        other_public_order: "Political unrest",
+      };
+      const issue = semanticIssue[semantic!.eventType!]!;
       // Keep classification above on the raw source title, then cross the
       // presentation boundary once: previews, tables and PDF exporters all
       // receive the English advisory title where the ingest translator supplied
@@ -1546,12 +1672,25 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
       );
       const displayTitle = normalizeWestPapuaRegionInTitle(cleanedTitle, country);
       const location = (() => {
-        const loc = (r.location ?? "").trim();
-        return /^west papua$/i.test(loc) ? "West Papua, Indonesia" : r.location;
+        const authoritativeLocation =
+          semantic!.physicalLocation!.trim();
+        const loc = (authoritativeLocation ?? "").trim();
+        return /^west papua$/i.test(loc) ? "West Papua, Indonesia" : authoritativeLocation;
       })();
       // Clean the rendered title (drop publisher masthead + "Watch:" / "VIDEO
       // BY" video cruft). Classification above runs on the ORIGINAL title.
-      return { ...r, title: displayTitle, location, country, date, issue, bucket: bucketFor(issue) };
+      return {
+        ...r,
+        rawTitle: r.title,
+        title: displayTitle,
+        location:
+          semantic!.physicalLocation!.trim() || location,
+        country,
+        date,
+        semanticEventDate: eventDateText,
+        issue,
+        bucket: bucketFor(issue),
+      };
     })
     .filter((r) => !isNaN(r.date.getTime()));
 }
@@ -1594,6 +1733,8 @@ function joinList(items: string[]): string {
 
 // --- Dataset builder -------------------------------------------------------
 export type FlashpointRejectStage =
+  | "semantic-validity"
+  | "invalid-date"
   | "off-topic"
   | "kinetic-only"
   | "court-only"
@@ -1603,7 +1744,9 @@ export type FlashpointRejectStage =
   | "weak-operational";
 
 export interface FlashpointRejectedRecord {
+  id: number | string;
   stage: FlashpointRejectStage;
+  reason: string;
   country: string;
   title: string;
   date: string;
@@ -1622,11 +1765,132 @@ export interface FlashpointSelection {
   dedupedDropped: number;
   weakNoveltyDropped: number;
   weakOperationalDropped: number;
+  semanticValidityDropped: number;
   weakDropped: number;
   /** How many records were in the window+bucket before any filtering. */
   rawWindowCount: number;
   /** Every record dropped at any stage, with the reason — the proof set. */
   rejected: FlashpointRejectedRecord[];
+}
+
+function incidentIdentity(id: number | string): string {
+  return `${typeof id}:${String(id)}`;
+}
+
+function stableFingerprint(parts: string[]): string {
+  // FNV-1a, expressed without Node crypto so preview and server-side export
+  // calculate exactly the same value.
+  let hash = 0x811c9dc5;
+  for (const ch of parts.join("\u001f")) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fp1-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`)
+    .join(",")}}`;
+}
+
+function deepFrozenCopy<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((v) => deepFrozenCopy(v))) as T;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    out[k] = deepFrozenCopy(v);
+  }
+  return Object.freeze(out) as T;
+}
+
+function canonicalRows(canonical: FlashpointCanonicalIncidentSet): EnrichedIncident[] {
+  const byId = new Map<string, EnrichedIncident>();
+  for (const row of [...canonical.periodRows, ...canonical.futureRows]) {
+    byId.set(incidentIdentity(row.id), row);
+  }
+  return Array.from(byId.values());
+}
+
+function canonicalFingerprint(
+  rows: readonly EnrichedIncident[],
+  periodIds: ReadonlySet<string>,
+  issueDate: string,
+): string {
+  return stableFingerprint([
+    issueDate,
+    ...rows
+      .map((r) => stableJson({
+        id: incidentIdentity(r.id),
+        rawTitle: r.rawTitle,
+        displayTitle: r.displayTitle ?? null,
+        renderedTitle: r.title,
+        summary: r.summary ?? null,
+        severity: sevKey(r.severity),
+        source: r.source ?? null,
+        sourceUrl: r.sourceUrl ?? null,
+        occurredAt: r.occurredAt,
+        semanticEventDate: r.semanticEventDate,
+        semanticEventType: r.validityGates?.eventType ?? null,
+        semanticLocation: r.validityGates?.physicalLocation ?? null,
+        semanticCountry: r.validityGates?.country ?? null,
+        renderedLocation: r.location ?? null,
+        renderedCountry: r.country ?? null,
+        issue: r.issue,
+        bucket: r.bucket,
+        validityStatus: r.validityStatus ?? null,
+        validityReason: r.validityReason ?? null,
+        validityVersion: r.validityVersion ?? null,
+        validityGates: r.validityGates ?? null,
+        membership: periodIds.has(incidentIdentity(r.id)) ? "period" : "future",
+      }))
+      .sort(),
+  ]);
+}
+
+function makeCanonicalIncidentSet(
+  validatedRows: EnrichedIncident[],
+  periodRows: EnrichedIncident[],
+  rejected: FlashpointRejectedRecord[],
+  issueDate: string,
+): FlashpointCanonicalIncidentSet {
+  const periodIds = new Set(periodRows.map((r) => incidentIdentity(r.id)));
+  // This subset includes every accepted non-period row and any in-period row
+  // carrying an upcoming signal. Thus periodRows ∪ futureRows is exactly the
+  // accepted universe while forecast provenance remains explicit.
+  const futureRows = validatedRows.filter(
+    (r) => !periodIds.has(incidentIdentity(r.id)) || hasUpcomingSignal(r),
+  );
+  const acceptedIds = validatedRows
+    .map((r) => r.id)
+    .sort((a, b) => incidentIdentity(a).localeCompare(incidentIdentity(b)));
+  const freezeRow = (row: EnrichedIncident): EnrichedIncident =>
+    Object.freeze({
+      ...row,
+      date: Object.freeze(new Date(row.date.getTime())),
+      validityGates: row.validityGates
+        ? deepFrozenCopy(row.validityGates)
+        : row.validityGates,
+    });
+  const frozenById = new Map(
+    validatedRows.map((row) => [incidentIdentity(row.id), freezeRow(row)]),
+  );
+  const frozenPeriod = periodRows.map((row) => frozenById.get(incidentIdentity(row.id))!);
+  const frozenFuture = futureRows.map((row) => frozenById.get(incidentIdentity(row.id))!);
+  return Object.freeze({
+    provenance: "flashpoint-canonical-final-set-v1" as const,
+    issueDate,
+    periodRows: Object.freeze(frozenPeriod),
+    futureRows: Object.freeze(frozenFuture),
+    acceptedIds: Object.freeze(acceptedIds),
+    fingerprint: canonicalFingerprint(validatedRows, periodIds, issueDate),
+    rejected: Object.freeze(rejected.map((r) => Object.freeze({ ...r }))),
+  });
 }
 
 /**
@@ -1645,100 +1909,102 @@ export function selectFlashpointUsable(
   // `protests` (legacy import) buckets — operationally the same bucket.
   const isFlashpointBucket = (i: FlashpointReportIncident) =>
     i.topic === "flashpoint" || i.topic === "protests";
-  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate).filter(isFlashpointBucket);
-  const passesRelevance = (i: FlashpointReportIncident) =>
-    isTopicRelevant(topic, {
-      topic: i.topic,
-      title: i.title,
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: i.sourceUrl ?? null,
-      location: i.location ?? null,
-    });
+  const publishedWindowIds = new Set(
+    filterIncidentsToWindow(incidents, topic, issueDate).map((r) =>
+      incidentIdentity(r.id),
+    ),
+  );
+  const reportWindow = resolveReportWindow(topic, issueDate);
+  const windowStart = Date.UTC(
+    reportWindow.start.getUTCFullYear(),
+    reportWindow.start.getUTCMonth(),
+    reportWindow.start.getUTCDate(),
+  );
+  const windowEnd = endOfReportDay(reportWindow.end).getTime();
+  const rawWindow = incidents.filter((r) => {
+    if (!isFlashpointBucket(r)) return false;
+    if (publishedWindowIds.has(incidentIdentity(r.id))) return true;
+    const semanticDate = r.validityGates?.eventDate;
+    if (!semanticDate) return false;
+    const ms = parseISO(semanticDate).getTime();
+    return !Number.isNaN(ms) && ms >= windowStart && ms <= windowEnd;
+  });
   const rejected: FlashpointRejectedRecord[] = [];
   const reject = (
     stage: FlashpointRejectStage,
     r: FlashpointReportIncident,
+    reason: string = stage,
   ) => {
     rejected.push({
+      id: r.id,
       stage,
+      reason,
       country: deriveIncidentCountry(r) ?? LOCATION_NOT_IDENTIFIED,
       title: r.title ?? "",
       date: (r.occurredAt ?? "").slice(0, 10),
     });
   };
 
-  const onTopic: FlashpointReportIncident[] = [];
+  // Final report membership is persisted-verdict only. Bounded backfill means
+  // NULL/blank is no longer a legacy exception.
+  const semanticEligible: FlashpointReportIncident[] = [];
+  let semanticValidityDropped = 0;
   for (const r of rawWindow) {
-    if (passesRelevance(r)) onTopic.push(r);
-    else reject("off-topic", r);
+    const status = (r.validityStatus ?? "").trim().toLowerCase();
+    const gates = r.validityGates;
+    const contract = gates
+      ? validateFlashpointSemanticContract(gates as FlashpointSemanticGates)
+      : { valid: false, failures: ["missing_semantic_gates"] };
+    const failures = [
+      ...(status === "valid" ? [] : [`persisted_status:${status || "blank"}`]),
+      ...(r.validityVersion === FLASHPOINT_VALIDITY_VERSION
+        ? []
+        : [`stale_validity_version:${r.validityVersion || "blank"}`]),
+      ...(gates?.version === FLASHPOINT_VALIDITY_VERSION
+        ? []
+        : [`stale_gate_version:${gates?.version || "blank"}`]),
+      ...contract.failures,
+    ];
+    if (failures.length > 0) {
+      semanticValidityDropped++;
+      reject(
+        "semantic-validity",
+        r,
+        failures.join(","),
+      );
+      continue;
+    }
+    semanticEligible.push(r);
   }
 
-  let kineticDropped = 0;
-  let courtDropped = 0;
-  const scoped: FlashpointReportIncident[] = [];
-  for (const r of onTopic) {
-    if (isKineticOnly(r)) { kineticDropped++; reject("kinetic-only", r); continue; }
-    if (isCourtOnly(r)) { courtDropped++; reject("court-only", r); continue; }
-    scoped.push(r);
-  }
-
-  // Flashpoint is activism, protests and civil unrest only — not crime.
-  // Drop armed-robbery / armed-group / generic-crime classifications.
-  const enrichedAll = sortByDateDesc(enrich(scoped));
-  const enrichedInScope: EnrichedIncident[] = [];
-  let outOfScopeCrimeDropped = 0;
-  for (const r of enrichedAll) {
-    if (isOutOfScopeIssue(r)) {
-      outOfScopeCrimeDropped++;
-      reject("out-of-scope-crime", r);
-    } else enrichedInScope.push(r);
-  }
-  // Two-pass dedupe so syndicated rewrites of the same protest don't
-  // dominate the operational read.
-  const enrichedDeduped = dedupeByTitle(enrichedInScope);
-  const keptIds = new Set(enrichedDeduped.map((r) => r.id));
-  for (const r of enrichedInScope) if (!keptIds.has(r.id)) reject("duplicate", r);
-  // Single usable set: also strip novelty and weak-operational noise
-  // (sports "strikes", defence-procurement wire copy, legislative-process
-  // items, suspended strikes, stock-photo captions). This is what every
-  // surface counts and renders, so Fast Facts, prose and the Related
-  // Incidents table all agree.
-  const enriched: EnrichedIncident[] = [];
-  let weakNoveltyDropped = 0;
-  let weakOperationalDropped = 0;
-  for (const r of enrichedDeduped) {
-    if (isArchivalOutsideWindow(r, issueDate)) {
-      weakOperationalDropped++;
-      reject("weak-operational", r);
-      continue;
+  // Classification, geography, date and currentness above have already been
+  // adjudicated semantically. Lexical strict gates remain available elsewhere
+  // for diagnostics/backfill, but may not contradict this final membership.
+  const enrichedAll = sortByDateDesc(enrich(semanticEligible));
+  const enrichedIds = new Set(enrichedAll.map((r) => incidentIdentity(r.id)));
+  for (const r of semanticEligible) {
+    if (!enrichedIds.has(incidentIdentity(r.id))) {
+      reject("invalid-date", r, "occurredAt is not a valid date");
     }
-    if (isWeakNovelty(r)) {
-      weakNoveltyDropped++;
-      reject("weak-novelty", r);
-      continue;
-    }
-    if (
-      isWeakOperational(r) &&
-      !(hasUpcomingSignal(r) && isScheduledOutsideReportingPeriod(r, topic, issueDate))
-    ) {
-      weakOperationalDropped++;
-      reject("weak-operational", r);
-      continue;
-    }
-    enriched.push(r);
   }
+  const validated = enrichedAll;
+  // Only semantically/strictly validated rows are allowed to compete for the
+  // syndicated survivor slot.
+  const enriched = dedupeByTitle(validated);
+  const keptIds = new Set(enriched.map((r) => r.id));
+  for (const r of validated) if (!keptIds.has(r.id)) reject("duplicate", r);
 
   return {
     enriched,
-    offTopicDropped: rawWindow.length - onTopic.length,
-    kineticDropped,
-    courtDropped,
-    outOfScopeCrimeDropped,
-    dedupedDropped: enrichedInScope.length - enrichedDeduped.length,
-    weakNoveltyDropped,
-    weakOperationalDropped,
-    weakDropped: weakNoveltyDropped + weakOperationalDropped,
+    offTopicDropped: 0,
+    kineticDropped: 0,
+    courtDropped: 0,
+    outOfScopeCrimeDropped: 0,
+    dedupedDropped: validated.length - enriched.length,
+    weakNoveltyDropped: 0,
+    weakOperationalDropped: 0,
+    semanticValidityDropped,
+    weakDropped: 0,
     rawWindowCount: rawWindow.length,
     rejected,
   };
@@ -1751,30 +2017,35 @@ export function buildFlashpointReportDataset(
   opts?: FlashpointReportOptions,
 ): FlashpointReportDataset {
   const win = resolveReportWindow(topic, issueDate);
-  const forecastAsOf = resolveForecastAsOf(win.end, opts?.generatedAt);
+  // Deterministic report snapshot: wall-clock render/export time must never
+  // change facts. generatedAt remains accepted for API compatibility only.
+  void opts;
+  const forecastAsOf = endOfReportDay(win.end);
 
   const {
     enriched: usableEnriched,
-    offTopicDropped,
-    kineticDropped,
-    courtDropped,
-    outOfScopeCrimeDropped,
-    dedupedDropped,
-    weakNoveltyDropped,
-    weakOperationalDropped,
-    rawWindowCount,
+    rejected,
   } = selectFlashpointUsable(incidents, topic, issueDate);
 
   // Period totals use the stated EVENT date when the source text names one,
   // not the article publication date — future-dated announcements published
   // inside the window belong in the forecast only.
-  const enriched = usableEnriched.filter((r) => isInReportingPeriod(r, win));
+  const periodRows = usableEnriched.filter((r) => isInReportingPeriod(r, win));
+  const canonical = makeCanonicalIncidentSet(
+    usableEnriched,
+    periodRows,
+    rejected,
+    issueDate,
+  );
+  // From this point onward raw input and selector output are intentionally out
+  // of scope: every report fact is computed from this canonical object.
+  const enriched = Array.from(canonical.periodRows);
+  const acceptedUniverse = canonicalRows(canonical);
 
   // Bucketed views for the operational reads and tables. `enriched` is
   // already clean, so these are simple bucket splits ranked for table display.
   const activismRows = sortRowsForTable(enriched.filter((r) => r.bucket === "activism"));
   const unrestRows = sortRowsForTable(enriched.filter((r) => r.bucket === "unrest"));
-  const forecastHeld = usableEnriched.length - enriched.length;
   const activismLeadPool = sortRowsForTable([
     ...activismRows,
     ...unrestRows.filter(
@@ -1830,18 +2101,6 @@ export function buildFlashpointReportDataset(
       )
     : "—";
 
-  const screeningNote = buildScreeningNote({
-    rawWindowCount,
-    distinct: enriched.length,
-    dedupedDropped,
-    offTopicDropped,
-    kineticDropped,
-    courtDropped,
-    outOfScopeCrimeDropped,
-    weakNoveltyDropped,
-    weakOperationalDropped,
-    forecastHeld,
-  });
   const weeklyPosture = overallPostureLabel({ activismRows, unrestRows });
 
   const fastFacts: KpiCard[] = [
@@ -1849,7 +2108,6 @@ export function buildFlashpointReportDataset(
     {
       label: "Distinct Incidents",
       value: String(enriched.length),
-      note: screeningNote,
     },
     {
       label: "Highest Severity",
@@ -1922,7 +2180,11 @@ export function buildFlashpointReportDataset(
   // Operational meaning table rather than a quoted paragraph dump.
   // Forecast draws from the full usable set (including future-dated rows
   // excluded from period totals) so announcements stay in the outlook.
-  const futureRaw = extractFutureSignals(usableEnriched)
+  const futureRaw = Array.from(canonical.futureRows)
+    .filter(
+      (r) =>
+        r.validityGates?.currentness === "future" || hasUpcomingSignal(r),
+    )
     .filter((r) => !isLowCredibility(r) && !isWeakNovelty(r) && !isWeakOperational(r));
   // Build forecast rows, then collapse any (country, signal) duplicate
   // so the same operational signal cannot appear twice (e.g. two
@@ -1945,6 +2207,7 @@ export function buildFlashpointReportDataset(
     // a table labelled as confirmed schedule items).
     if (!statedDate) continue;
     forecastDated.push({
+      sourceIncidentId: r.id,
       country,
       signal,
       meaning: forecastMeaningFor(r),
@@ -1994,7 +2257,7 @@ export function buildFlashpointReportDataset(
     unrestRows,
     countryRows,
     enriched,
-    usableEnriched,
+    usableEnriched: acceptedUniverse,
     topSeverity,
     windowEnd: win.end,
     forecastAsOf,
@@ -2022,29 +2285,14 @@ export function buildFlashpointReportDataset(
     autoPolestarView: autoPolestarViewBuilt,
   });
 
-  // Data note. Mirrors shipping's compact note: surface filter counts so
-  // the reader understands what scope was applied, without leaking
-  // internal classifier vocabulary.
-  const noteParts: string[] = [];
-  if (kineticDropped > 0) {
-    noteParts.push(`${kineticDropped} kinetic armed-conflict record${kineticDropped === 1 ? "" : "s"} without a public-order hook were excluded so this report stays focused on activism, protests and civil unrest.`);
-  }
-  if (courtDropped > 0) {
-    noteParts.push(`${courtDropped} court-only legal-process record${courtDropped === 1 ? " was" : "s were"} excluded for lack of a civil-unrest hook.`);
-  }
-  if (dedupedDropped > 0) {
-    noteParts.push(`${dedupedDropped} duplicate report${dedupedDropped === 1 ? "" : "s"} of the same stories ${dedupedDropped === 1 ? "was" : "were"} removed.`);
-  }
-  if (weakNoveltyDropped + weakOperationalDropped > 0) {
-    noteParts.push(`${weakNoveltyDropped + weakOperationalDropped} low-signal record${weakNoveltyDropped + weakOperationalDropped === 1 ? " was" : "s were"} excluded — stories about past events (court cases, probes, arrests over earlier incidents), sports, procurement, legislative-process and stock-photo items that use protest or strike wording without any live event.`);
-  }
-  const dataNote = noteParts.length > 0
-    ? noteParts.join(" ")
-    : "Scope: activism, protests and civil unrest only. Kinetic armed-conflict reporting without a public-order hook is excluded by design.";
+  // Internal rejection detail lives exclusively in canonical.rejected/audit.
+  // This field remains for backwards-compatible callers but is never populated.
+  const dataNote = "";
 
   const dataset: FlashpointReportDataset = {
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: `Reporting period: ${win.label}`,
+    canonical,
     enriched,
     fastFacts,
     activismRows,
@@ -3303,23 +3551,168 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
 
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
   const errors: string[] = [];
+  const canonical = ds.canonical;
+  if (!canonical || canonical.provenance !== "flashpoint-canonical-final-set-v1") {
+    return ["canonical final incident set is missing or has invalid provenance"];
+  }
+  const key = (r: { id: number | string }) => incidentIdentity(r.id);
+  const periodKeys = canonical.periodRows.map(key);
+  const periodSet = new Set(periodKeys);
+  const canonicalPeriodById = new Map(
+    canonical.periodRows.map((r) => [key(r), r]),
+  );
+  const futureSet = new Set(canonical.futureRows.map(key));
+  const acceptedSet = new Set(canonical.acceptedIds.map(incidentIdentity));
+  const rejectedSet = new Set(canonical.rejected.map((r) => incidentIdentity(r.id)));
+  const distinctPeriod = new Set(periodKeys);
+
+  if (periodKeys.length !== distinctPeriod.size) {
+    errors.push("canonical period rows contain duplicate incident IDs");
+  }
+  const canonicalUnion = new Set([...periodSet, ...futureSet]);
+  if (
+    canonicalUnion.size !== acceptedSet.size ||
+    [...canonicalUnion].some((id) => !acceptedSet.has(id))
+  ) {
+    errors.push("canonical accepted IDs do not equal period/future row union");
+  }
+  const recomputedFingerprint = canonicalFingerprint(
+    canonicalRows(canonical),
+    periodSet,
+    canonical.issueDate,
+  );
+  if (canonical.fingerprint !== recomputedFingerprint) {
+    errors.push(`canonical fingerprint "${canonical.fingerprint}" does not match accepted rows`);
+  }
+  const rejectedAccepted = [...rejectedSet].filter((id) => acceptedSet.has(id));
+  if (rejectedAccepted.length > 0) {
+    errors.push(`rejected IDs appear in canonical accepted set: ${rejectedAccepted.join(", ")}`);
+  }
+  const renderedPeriodSections: Array<[string, readonly EnrichedIncident[]]> = [
+    ["enriched", ds.enriched],
+    ["activism table", ds.activismRows],
+    ["unrest table", ds.unrestRows],
+    ["related incidents", ds.relatedIncidents],
+  ];
+  for (const [name, rows] of renderedPeriodSections) {
+    const ids = rows.map(key);
+    if (new Set(ids).size !== ids.length) {
+      errors.push(`${name} contains duplicate incident IDs`);
+    }
+    const outside = ids.filter((id) => !periodSet.has(id));
+    if (outside.length > 0) {
+      errors.push(`${name} contains rows outside canonical period set: ${outside.join(", ")}`);
+    }
+    const rejected = ids.filter((id) => rejectedSet.has(id));
+    if (rejected.length > 0) {
+      errors.push(`${name} renders rejected IDs: ${rejected.join(", ")}`);
+    }
+    for (const row of rows) {
+      const authoritative = canonicalPeriodById.get(key(row));
+      if (
+        authoritative &&
+        (row.date.getTime() !== authoritative.date.getTime() ||
+          row.semanticEventDate !== authoritative.semanticEventDate)
+      ) {
+        errors.push(`${name} displays a non-canonical event date for ID ${String(row.id)}`);
+      }
+      if (authoritative && row.title !== authoritative.title) {
+        errors.push(`${name} displays a non-canonical title for ID ${String(row.id)}`);
+      }
+    }
+  }
+  const tableIds = [...ds.activismRows, ...ds.unrestRows].map(key);
+  if (new Set(tableIds).size !== tableIds.length) {
+    errors.push("activism and unrest tables are not unique subsets");
+  }
+  if (
+    ds.enriched.length !== canonical.periodRows.length ||
+    ds.enriched.some((r) => !periodSet.has(key(r)))
+  ) {
+    errors.push("dataset enriched rows do not exactly match canonical period rows");
+  }
+
+  const totalCard = ds.fastFacts.find((k) => k.label === "Distinct Incidents");
+  if (totalCard?.value !== String(distinctPeriod.size)) {
+    errors.push(
+      `Fast Facts period total "${totalCard?.value ?? "missing"}" != distinct canonical period rows "${distinctPeriod.size}"`,
+    );
+  }
+
+  const expectedCountryCounts = countriesOf(Array.from(canonical.periodRows));
+  const countrySignificance = new Map<string, number>();
+  for (const country of expectedCountryCounts.keys()) {
+    countrySignificance.set(
+      country,
+      aggregateIncidentSignificance(
+        canonical.periodRows.filter(
+          (r) => normalizeFlashpointCountry((r.country ?? "").trim()) === country,
+        ),
+      ),
+    );
+  }
+  const expectedChart = [...expectedCountryCounts.entries()]
+    .sort(
+      (a, b) =>
+        b[1] - a[1] ||
+        (countrySignificance.get(b[0]) ?? 0) -
+          (countrySignificance.get(a[0]) ?? 0) ||
+        a[0].localeCompare(b[0]),
+    )
+    .slice(0, 12);
+  if (
+    expectedChart.length !== ds.countryRows.length ||
+    expectedChart.some(
+      ([label, value], i) =>
+        ds.countryRows[i]?.label !== label || ds.countryRows[i]?.value !== value,
+    )
+  ) {
+    errors.push("country chart totals/order do not equal canonical country grouping");
+  }
+
+  const latestCard = ds.fastFacts.find((k) => k.label === "Latest Incident");
+  const canonicalIssueEnd = endOfReportDay(parseISO(canonical.issueDate));
+  const latestExpected = canonical.periodRows.length
+    ? format(
+        dateMax(
+          canonical.periodRows.map((r) =>
+            effectiveEventDate(r, canonicalIssueEnd),
+          ),
+        ),
+        "dd MMM yyyy",
+      )
+    : "—";
+  if (latestCard?.value !== latestExpected) {
+    errors.push(`Fast Facts latest date "${latestCard?.value ?? "missing"}" != canonical latest "${latestExpected}"`);
+  }
+
+  const forecastIds = ds.forecastFuture.map((r) => incidentIdentity(r.sourceIncidentId));
+  const invalidForecastIds = forecastIds.filter(
+    (id) => !futureSet.has(id) || !acceptedSet.has(id) || rejectedSet.has(id),
+  );
+  if (invalidForecastIds.length > 0) {
+    errors.push(`forecast signals do not originate from canonical future rows: ${invalidForecastIds.join(", ")}`);
+  }
+  if (new Set(forecastIds).size !== forecastIds.length) {
+    errors.push("forecast table contains duplicate source incident IDs");
+  }
 
   // 1. Fast Facts severity == actual highest severity in the usable set.
   const card = ds.fastFacts.find((k) => k.label === "Highest Severity");
-  const top = topSeverityIncident(ds.enriched);
+  const top = topSeverityIncident(Array.from(canonical.periodRows));
   const expected = top ? (SEV_LABEL[sevKey(top.severity)] ?? top.severity) : "—";
-  if (card && card.value !== expected) {
+  if (!card || card.value !== expected) {
     errors.push(
-      `Fast Facts severity "${card.value}" != actual highest "${expected}"`,
+      `Fast Facts severity "${card?.value ?? "missing"}" != actual highest "${expected}"`,
     );
   }
 
   // 1b. Most Affected Country must match the volume leader on the chart.
   const countryCard = ds.fastFacts.find((k) => k.label === "Most Affected Country");
-  const chartLead = ds.countryRows[0]?.label;
-  if (countryCard && chartLead && countryCard.value !== chartLead) {
+  const chartLead = ds.countryRows[0]?.label ?? "—";
+  if (!countryCard || countryCard.value !== chartLead) {
     errors.push(
-      `Fast Facts country "${countryCard.value}" != chart leader "${chartLead}"`,
+      `Fast Facts country "${countryCard?.value ?? "missing"}" != chart leader "${chartLead}"`,
     );
   }
 
@@ -3481,6 +3874,372 @@ export function assertFlashpointReportDatasetValid(ds: FlashpointReportDataset):
   if (errors.length > 0) {
     throw new Error(
       `Flashpoint report dataset validation failed:\n${errors.map((e) => `- ${e}`).join("\n")}`,
+    );
+  }
+}
+
+function proseBasisIsCurrent(
+  basis: {
+    datasetFingerprint?: string | null;
+    proseBasisFingerprint?: string | null;
+    stale?: boolean;
+  } | null | undefined,
+  fingerprint: string,
+): boolean {
+  if (!basis || basis.stale) return false;
+  return (
+    (basis.datasetFingerprint ?? basis.proseBasisFingerprint) === fingerprint
+  );
+}
+
+/**
+ * One final output resolver shared by preview and PDF. Data-derived Fast Facts
+ * are deliberately not overrideable; saved display overrides cannot repaint a
+ * canonical count, country, severity or date.
+ */
+export function resolveFlashpointRenderedModel(args: {
+  dataset: FlashpointReportDataset;
+  report?: FlashpointResolvedProseInput | null;
+  ai?: FlashpointResolvedAiInput | null;
+}): FlashpointRenderedModel {
+  const { dataset: ds } = args;
+  assertFlashpointReportDatasetValid(ds);
+  const report = proseBasisIsCurrent(args.report, ds.canonical.fingerprint)
+    ? args.report ?? {}
+    : {};
+  const ai = proseBasisIsCurrent(args.ai, ds.canonical.fingerprint)
+    ? args.ai ?? {}
+    : {};
+  const executiveSummary =
+    (report.executiveSummary ?? "").trim() ||
+    (ai.executiveSummary ?? "").trim() ||
+    ds.autoExecutiveSummary;
+  const prose = {
+    executiveSummary,
+    activismRead: pickFlashpointRead(report.activismRead, ds.activismRead),
+    civilUnrestRead: pickFlashpointRead(report.civilUnrestRead, ds.civilUnrestRead),
+    forecastRead: pickFlashpointRead(report.forecastRead, ds.forecastRead),
+    regionalCountryRead: pickFlashpointRead(
+      report.regionalCountryRead,
+      ds.regionalCountryRead,
+    ),
+    whatMatters: resolveFlashpointAnalystProse(
+      report.whatMatters,
+      ai.whatMatters,
+      ds.autoWhatMatters,
+    ),
+    implications: resolveFlashpointAnalystProse(
+      report.implications,
+      ai.implications,
+      ds.autoImplications,
+    ),
+    watchNext: resolveFlashpointAnalystProse(
+      report.watchNext,
+      ai.watchNext,
+      ds.autoWatchNext,
+    ),
+    polestarView: resolveFlashpointAnalystProse(
+      report.polestarView,
+      ai.polestarView,
+      ds.autoPolestarView,
+    ),
+  };
+  const makeModel = (resolvedProse: typeof prose): FlashpointRenderedModel => ({
+    dataset: ds,
+    fingerprint: ds.canonical.fingerprint,
+    acceptedIds: ds.canonical.acceptedIds,
+    fastFacts: Object.freeze(ds.fastFacts.map((card) => Object.freeze({ ...card }))),
+    prose: Object.freeze(resolvedProse),
+  });
+  const model = makeModel(prose);
+  if (validateFlashpointRenderedModel(model).length === 0) {
+    return Object.freeze(model);
+  }
+  // Persisted prose is untrusted display input. Contradictory/stale prose must
+  // never crash React rendering or PDF export; recover to canonical auto prose.
+  const safe = makeModel({
+    executiveSummary: ds.autoExecutiveSummary,
+    activismRead: ds.activismRead,
+    civilUnrestRead: ds.civilUnrestRead,
+    forecastRead: ds.forecastRead,
+    regionalCountryRead: ds.regionalCountryRead,
+    whatMatters: ds.autoWhatMatters,
+    implications: ds.autoImplications,
+    watchNext: ds.autoWatchNext,
+    polestarView: ds.autoPolestarView,
+  });
+  if (validateFlashpointRenderedModel(safe).length === 0) {
+    return Object.freeze(safe);
+  }
+  // Last-resort canonical prose deliberately contains no numeric claims. It is
+  // derived only from accepted-row geography/severity plus standard operational
+  // guidance, so a prose-detector regression cannot take down preview/PDF.
+  // Structural dataset/chart/ID problems were already hard-failed above.
+  const countries = Array.from(
+    new Set(
+      ds.canonical.periodRows
+        .map((row) => row.country)
+        .filter((country): country is string => Boolean(country)),
+    ),
+  );
+  const geography = countries.length
+    ? `Accepted reporting names ${joinList(countries)}.`
+    : "Accepted reporting does not establish a country concentration.";
+  const activity = ds.canonical.periodRows.length
+    ? "Confirmed public-order activity is present in the accepted reporting."
+    : "No confirmed public-order activity is present in the accepted reporting.";
+  const countFree = makeModel({
+    executiveSummary: `${activity} Maintain proportionate monitoring and verify changes against confirmed sources.`,
+    activismRead: `${activity} Track mobilisation notices and access disruption without inferring activity beyond the accepted record.`,
+    civilUnrestRead: "Monitor police statements, access controls and visible escalation indicators. Do not infer enforcement action without confirmation.",
+    forecastRead: "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
+    regionalCountryRead: `${geography} Treat the accepted geography as the limit of the current assessment.`,
+    whatMatters: "Use the accepted record to review staff movement, site access and communications readiness. Escalate only on confirmed changes.",
+    implications: "Keep movement plans flexible, verify transport conditions close to departure and maintain practical communications contingencies.",
+    watchNext: "Watch for confirmed mobilisation, enforcement notices, transport disruption and changes to access conditions.",
+    polestarView: "Maintain proportionate precautions based on the accepted record and refresh plans when confirmed reporting changes.",
+  });
+  assertFlashpointRenderedModelValid(countFree);
+  return Object.freeze(countFree);
+}
+
+export function validateFlashpointRenderedModel(
+  model: FlashpointRenderedModel,
+): string[] {
+  const errors = validateFlashpointReportDataset(model.dataset);
+  const ds = model.dataset;
+  const acceptedTitles = new Set(
+    canonicalRows(ds.canonical).map((r) => r.title.toLowerCase()),
+  );
+  const rejectedTitles = ds.canonical.rejected
+    .map((r) => r.title.trim().toLowerCase())
+    .filter(Boolean);
+  const allowedCountries = new Set(
+    canonicalRows(ds.canonical)
+      .map((r) => normalizeFlashpointCountry((r.country ?? "").trim()))
+      .filter((c) => c && c !== LOCATION_NOT_IDENTIFIED),
+  );
+  const highest = highestSeverity(Array.from(ds.canonical.periodRows)).label;
+  const canonicalTotal = ds.canonical.periodRows.length;
+  const categoryCounts = new Map<string, number>();
+  for (const row of ds.canonical.periodRows) {
+    const semanticType = row.validityGates?.eventType ?? "";
+    const category = ["protest", "demonstration"].includes(semanticType)
+      ? "protest"
+      : semanticType;
+    categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+  }
+  const categoryAliases: Record<string, string> = {
+    protest: "protest",
+    protests: "protest",
+    demonstration: "protest",
+    demonstrations: "protest",
+    strike: "labour_strike",
+    strikes: "labour_strike",
+    blockade: "blockade",
+    blockades: "blockade",
+    riot: "riot_public_disorder",
+    riots: "riot_public_disorder",
+  };
+  const smallNumbers: Record<string, number> = {
+    zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5,
+    six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+    sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+    thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+    eighty: 80, ninety: 90,
+  };
+  const numberWord =
+    "(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion)";
+  // Captures ordinary English integers, including "twenty-one", "one hundred
+  // and four" and larger scale compounds. The surrounding claim regex provides
+  // the noun boundary, preventing free prose from being consumed greedily.
+  const countToken = `(\\d+|${numberWord}(?:[\\s-]+(?:and[\\s-]+)?${numberWord})*)`;
+  const parseCount = (token: string): number => {
+    if (/^\d+$/.test(token)) return Number(token);
+    const words = token.toLowerCase().replace(/-/g, " ").split(/\s+/)
+      .filter((word) => word && word !== "and");
+    let total = 0;
+    let group = 0;
+    for (const word of words) {
+      if (word in smallNumbers) {
+        group += smallNumbers[word];
+      } else if (word === "hundred") {
+        group = (group || 1) * 100;
+      } else {
+        const scale =
+          word === "thousand" ? 1_000 :
+          word === "million" ? 1_000_000 :
+          word === "billion" ? 1_000_000_000 : 0;
+        if (!scale) return Number.NaN;
+        total += (group || 1) * scale;
+        group = 0;
+      }
+    }
+    return total + group;
+  };
+  const monthNames =
+    "january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec";
+  const countNoun =
+    /\b(incidents?|events?|reports?|protests?|demonstrations?|strikes?|blockades?|riots?)\b/gi;
+  const cardinal = new RegExp(`\\b${countToken}\\b`, "gi");
+  const sentenceCountErrors = (section: string, text: string) => {
+    for (const sentenceMatch of text.matchAll(/[^.!?\n]+[.!?]?/g)) {
+      const sentence = sentenceMatch[0];
+      const nouns = Array.from(sentence.matchAll(countNoun)).map((match) => ({
+        noun: match[1].toLowerCase(),
+        index: match.index ?? 0,
+        end: (match.index ?? 0) + match[0].length,
+      }));
+      const countryMentions = ds.countryRows.flatMap((row) =>
+        Array.from(
+          sentence.matchAll(
+            new RegExp(
+              `\\b${row.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+              "gi",
+            ),
+          ),
+        ).map((match) => ({
+          row,
+          index: match.index ?? 0,
+          end: (match.index ?? 0) + match[0].length,
+        })),
+      );
+      // Each cardinal is assigned once, to its globally nearest count noun.
+      // This prevents "21 incidents near a riot" from becoming two claims.
+      for (const match of sentence.matchAll(cardinal)) {
+        const token = match[1];
+        const index = match.index ?? 0;
+        const end = index + match[0].length;
+        const nearestNoun = nouns
+          .map((noun) => ({
+            ...noun,
+            distance: Math.min(
+              Math.abs(end - noun.index),
+              Math.abs(index - noun.end),
+            ),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0];
+        if (!nearestNoun || nearestNoun.distance > 80) continue;
+        const before = sentence.slice(Math.max(0, index - 16), index);
+        const after = sentence.slice(end, Math.min(sentence.length, end + 20));
+        const between =
+          index > nearestNoun.index
+            ? sentence.slice(nearestNoun.end, index)
+            : sentence.slice(end, nearestNoun.index);
+        const explicitDurationOrDate =
+          /^\s*(?:%|percent(?:age)?\b)/i.test(after) ||
+          new RegExp(
+            `^\\s*(?:days?|hours?|weeks?|months?|years?|minutes?)\\b(?:\\s+(?:ago|since|on|by))?`,
+            "i",
+          ).test(after) ||
+          new RegExp(`^\\s*(?:${monthNames})\\b`, "i").test(after) ||
+          new RegExp(`(?:${monthNames})\\s*$`, "i").test(before) ||
+          (index > nearestNoun.index &&
+            /\b(?:on|by|since)\s*$/i.test(between));
+        const value = parseCount(token);
+        if (explicitDurationOrDate || !Number.isFinite(value)) continue;
+        const nearestCountry = countryMentions
+          .map((country) => ({
+            ...country,
+            distance: Math.min(
+              Math.abs(country.end - nearestNoun.index),
+              Math.abs(country.index - nearestNoun.end),
+              Math.abs(country.end - index),
+              Math.abs(country.index - end),
+            ),
+          }))
+          .sort((a, b) => a.distance - b.distance)[0];
+        const country =
+          nearestCountry && nearestCountry.distance <= 80
+            ? nearestCountry.row
+            : null;
+        const category = categoryAliases[nearestNoun.noun];
+        const expected = category
+          ? country
+            ? ds.canonical.periodRows.filter((row) => {
+                const semanticType = row.validityGates?.eventType ?? "";
+                const rowCategory = ["protest", "demonstration"].includes(semanticType)
+                  ? "protest"
+                  : semanticType;
+                return row.country === country.label && rowCategory === category;
+              }).length
+            : categoryCounts.get(category) ?? 0
+          : country
+            ? country.value
+            : canonicalTotal;
+        if (value !== expected) {
+          const scope = category
+            ? `${country ? `${country.label} ` : ""}${category}`
+            : country
+              ? country.label
+              : "canonical total";
+          errors.push(
+            `${section} claims ${value} ${nearestNoun.noun} but ${scope} count is ${expected}`,
+          );
+        }
+      }
+    }
+  };
+  for (const [section, text] of Object.entries(model.prose)) {
+    const lower = text.toLowerCase();
+    for (const title of rejectedTitles) {
+      if (title.length >= 12 && !acceptedTitles.has(title) && lower.includes(title)) {
+        errors.push(`${section} leaks rejected incident title "${title.slice(0, 80)}"`);
+      }
+    }
+    sentenceCountErrors(section, text);
+    for (const country of allowedCountries) {
+      const escaped = country.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const allowedDates = new Set(
+        canonicalRows(ds.canonical)
+          .filter((r) => r.country === country)
+          .map((r) => format(r.date, "d MMMM").toLowerCase()),
+      );
+      for (const match of text.matchAll(
+        new RegExp(`\\b${escaped}\\b[^.\\n]{0,80}?\\bon\\s+(\\d{1,2}\\s+[A-Za-z]+)\\b`, "gi"),
+      )) {
+        if (!allowedDates.has(match[1].toLowerCase())) {
+          errors.push(`${section} claims a non-canonical event date for ${country}`);
+        }
+      }
+    }
+    const severityClaim = text.match(/\b(Insignificant|Low|Moderate|High|Extreme)(?:-severity| severity| severity incident)/i);
+    if (
+      severityClaim &&
+      /\b(highest|peak|most serious|severity ceiling)\b/i.test(text) &&
+      severityClaim[1].toLowerCase() !== highest.toLowerCase()
+    ) {
+      errors.push(`${section} contradicts canonical highest severity ${highest}`);
+    }
+    for (const country of Object.keys(SUBREGION)) {
+      if (
+        new RegExp(`\\b${country.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(text) &&
+        !allowedCountries.has(country)
+      ) {
+        errors.push(`${section} names non-canonical country ${country}`);
+      }
+    }
+  }
+  if (model.fingerprint !== ds.canonical.fingerprint) {
+    errors.push("rendered model fingerprint differs from canonical dataset");
+  }
+  if (
+    stableJson(Array.from(model.acceptedIds).map(incidentIdentity).sort()) !==
+    stableJson(Array.from(ds.canonical.acceptedIds).map(incidentIdentity).sort())
+  ) {
+    errors.push("rendered model accepted IDs differ from canonical dataset");
+  }
+  return errors;
+}
+
+export function assertFlashpointRenderedModelValid(
+  model: FlashpointRenderedModel,
+): void {
+  const errors = validateFlashpointRenderedModel(model);
+  if (errors.length) {
+    throw new Error(
+      `Flashpoint final output validation failed:\n${errors.map((e) => `- ${e}`).join("\n")}`,
     );
   }
 }

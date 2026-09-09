@@ -1,0 +1,149 @@
+Do not patch individual incidents, countries, headlines or keywords.
+
+The objective is to prevent the same classes of failure recurring with different stories.
+
+Review the full Flashpoint pipeline from ingestion through relevance, classification, geography, report selection and final prose generation.
+
+1. Build a proper event validity gate
+
+Before any record can enter Flashpoint, confirm that the source actually describes a qualifying real world event.
+
+A qualifying record must contain evidence of an actual protest, demonstration, strike, labour action, civil disorder, public order event, political mobilisation or closely related disruption.
+
+A story merely mentioning one of those concepts is not sufficient.
+
+If there is no identifiable event, actor, activity and location, reject it.
+
+2. Separate subject matter from event type
+
+Do not classify an article based only on keywords, headline language or entities mentioned.
+
+Determine what actually happened.
+
+For example, an article about politics, technology, legislation, business, court proceedings or international affairs must not become a protest incident simply because protest related language appears somewhere in the text.
+
+Classification must be based on the described event itself.
+
+3. Validate geography from the event
+
+Country assignment must reflect where the event physically occurred.
+
+Do not infer event geography from:
+the nationality of the actors
+the subject of the protest
+countries mentioned in the headline
+the publisher location
+organisations discussed in the article
+
+Require positive evidence for the event location before assigning it to a country.
+
+If location cannot be established confidently, hold the record rather than assigning it.
+
+4. Add confidence thresholds
+
+Relevance, event type and geography should each have their own confidence score or validation state.
+
+A record should only enter the final incident set when all required fields pass the threshold.
+
+Low confidence records should be held for review or excluded from client output.
+
+Do not force uncertain records into a category simply to complete the dataset.
+
+5. Use layered validation
+
+The pipeline should validate records at multiple stages:
+
+ingestion relevance
+event validity
+event classification
+physical geography
+duplicate resolution
+Flashpoint scope
+report selector
+final client output
+
+A record passing an early relevance filter does not automatically qualify for the report.
+
+6. Add contradiction checks
+
+Before final acceptance, look for contradictions such as:
+
+headline implies protest but body describes no protest
+assigned country differs from physical event location
+event category is unsupported by the event description
+security or crime story has no civil unrest element
+forecast item is actually historical
+article is commentary rather than an event report
+
+Contradictory records should be rejected or held.
+
+7. Validate the final incident set before calculations
+
+Only after validation is complete should the system calculate:
+
+incident totals
+country rankings
+issue totals
+severity
+weekly posture
+charts
+tables
+Fast Facts
+country commentary
+analytical prose
+
+Nothing should calculate from the raw or partially cleaned dataset.
+
+8. Make every report component use the same validated dataset
+
+There must be one canonical final incident set.
+
+Charts, tables, counts and prose must not run separate selectors that can produce different versions of reality.
+
+9. Add automated regression testing
+
+Create tests using multiple categories of deliberately misleading stories.
+
+Test examples should include:
+
+keyword false positives
+foreign subject versus physical location
+non event commentary
+business or technology stories containing protest terminology
+crime stories incorrectly interpreted as civil unrest
+historical events presented as current
+duplicate syndicated reporting
+ambiguous geography
+ambiguous event type
+
+The tests must verify the general logic rather than hardcoding particular headlines.
+
+10. Add a final sanity check
+
+Before rendering the client report, examine each selected record and ask:
+
+Did an actual qualifying event occur?
+Is the event type supported?
+Is the geography supported?
+Is it inside the reporting period?
+Is it within Flashpoint scope?
+Is it genuinely distinct?
+Would an analyst reasonably expect to see this in a civil unrest report?
+
+If any answer is no or materially uncertain, exclude or hold the record.
+
+11. Keep an internal rejection log
+
+Record why each rejected or held item failed validation.
+
+This is for debugging and audit only.
+
+None of this backend commentary should appear in the client report.
+
+12. Do not solve this with expanding keyword blacklists
+
+Keyword exclusions can support the system but must not be the primary defence.
+
+The fix needs to be semantic and event based so that new types of irrelevant stories are caught even when they have never appeared before.
+
+Inspect the existing code and identify where each validation step currently occurs, where invalid records can bypass it, and then implement the changes across the pipeline.

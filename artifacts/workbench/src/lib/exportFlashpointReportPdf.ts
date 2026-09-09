@@ -38,19 +38,19 @@ import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import {
   makeSectionGate,
-  applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
-import { aiOr, type TopicAiProse } from "./topicProseResolution";
+import { type TopicAiProse } from "./topicProseResolution";
 import {
   buildFlashpointReportDataset,
-  resolveFlashpointAnalystProse,
+  resolveFlashpointRenderedModel,
+  assertFlashpointRenderedModelValid,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
   type ForecastFutureRow,
+  type FlashpointRenderedModel,
 } from "./flashpointReportDataset";
-import { pickFlashpointRead } from "./pickRead";
 
 // Flashpoint PDF. Section order (per final spec):
 //   Cover -> Executive Summary -> Fast Facts ->
@@ -565,6 +565,7 @@ export async function exportFlashpointReportPdf(
   aiProse?: TopicAiProse | null,
   hiddenSections?: string[],
   sectionOverrides?: TopicSectionOverrides | null,
+  renderedModel?: FlashpointRenderedModel,
 ): Promise<void> {
   const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
@@ -576,6 +577,14 @@ export async function exportFlashpointReportPdf(
   } catch {
     /* keep */
   }
+
+  const model = renderedModel ?? resolveFlashpointRenderedModel({
+    dataset: buildFlashpointReportDataset(incidents, data.topic, data.issueDate),
+    report: data,
+    ai: aiProse,
+  });
+  const ds = model.dataset;
+  assertFlashpointRenderedModelValid(model);
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
   await ensureRobotoLoaded(ctx.pdf);
@@ -603,27 +612,16 @@ export async function exportFlashpointReportPdf(
   void cadence;
   beginBodyPages(ctx);
 
-  const ds = buildFlashpointReportDataset(
-    incidents,
-    data.topic,
-    data.issueDate,
-    { generatedAt: new Date() },
-  );
-
   if (show("executive-summary")) {
     drawSectionHeading(ctx, "Executive Summary");
-    const execText = (data.executiveSummary ?? "").trim();
-    renderProse(
-      ctx,
-      execText || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary),
-    );
+    renderProse(ctx, model.prose.executiveSummary);
   }
 
   if (show("fast-facts")) {
     drawSectionHeading(ctx, "Fast Facts");
     drawFastFactsKpiCards(
       ctx,
-      applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
+      [...model.fastFacts],
     );
   }
 
@@ -632,7 +630,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Activism and Protest Read",
-      pickFlashpointRead(data.activismRead, ds.activismRead),
+      model.prose.activismRead,
     );
     drawIncidentTable(
       ctx,
@@ -647,7 +645,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Civil Unrest and Public Order Read",
-      pickFlashpointRead(data.civilUnrestRead, ds.civilUnrestRead),
+      model.prose.civilUnrestRead,
     );
     drawIncidentTable(
       ctx,
@@ -665,7 +663,7 @@ export async function exportFlashpointReportPdf(
     if (ds.forecastFuture.length > 0) {
       drawForecastFutureTable(ctx, ds.forecastFuture);
     }
-    renderProse(ctx, pickFlashpointRead(data.forecastRead, ds.forecastRead));
+    renderProse(ctx, model.prose.forecastRead);
   }
 
   // Regional and Country View — keep section heading + chart on one page
@@ -685,7 +683,7 @@ export async function exportFlashpointReportPdf(
       caption: chartCaption,
       skipEnsureSpace: true,
     });
-    renderProse(ctx, pickFlashpointRead(data.regionalCountryRead, ds.regionalCountryRead));
+    renderProse(ctx, model.prose.regionalCountryRead);
   }
 
   // Editor-authored analyst sections. Editor text wins only when it
@@ -693,26 +691,25 @@ export async function exportFlashpointReportPdf(
   // Mirror FlashpointReportPreview.pickProse exactly: recognised generic
   // seed text is always replaced by the data-driven auto-prose so the PDF
   // can never show boilerplate the preview suppresses.
-  const pickProse = resolveFlashpointAnalystProse;
   if (show("what-matters")) {
     drawSectionWithProse(
       ctx,
       "What Matters",
-      pickProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
+      model.prose.whatMatters,
     );
   }
   if (show("implications")) {
     drawBulletSection(
       ctx,
       "Implications for Business",
-      pickProse(data.implications, aiProse?.implications, ds.autoImplications),
+      model.prose.implications,
     );
   }
   if (show("watch-next")) {
     drawBulletSection(
       ctx,
       "Watch Next",
-      pickProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
+      model.prose.watchNext,
       8,
     );
   }
@@ -720,7 +717,7 @@ export async function exportFlashpointReportPdf(
     drawSectionWithProse(
       ctx,
       "Polestar View",
-      pickProse(data.polestarView, aiProse?.polestarView, ds.autoPolestarView),
+      model.prose.polestarView,
     );
   }
 

@@ -21,6 +21,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { applyIncidentCurations } from "../../artifacts/workbench/src/lib/topicSectionOverrides";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 import FlashpointReportPreview from "../../artifacts/workbench/src/components/FlashpointReportPreview";
 import ShippingReportPreview from "../../artifacts/workbench/src/components/ShippingReportPreview";
 import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
@@ -38,7 +39,7 @@ function baseInc(over: {
   summary?: string;
   location?: string | null;
 }) {
-  return {
+  const base = {
     occurredAt: "2026-06-16T08:00:00+00:00",
     summary: over.summary ?? null,
     source: "Test Wire",
@@ -46,6 +47,9 @@ function baseInc(over: {
     location: over.location ?? null,
     ...over,
   };
+  return over.topic === "flashpoint"
+    ? { ...base, ...validFlashpointSemantic(base) }
+    : base;
 }
 
 // Empty-string prose scaffold — the generic `ReportPreview` runs its narrative

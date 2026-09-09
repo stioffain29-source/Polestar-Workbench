@@ -85,7 +85,10 @@ import {
 } from "@/components/OrphanedFuelOverridesPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
-import { buildFlashpointReportDataset } from "@/lib/flashpointReportDataset";
+import {
+  buildFlashpointReportDataset,
+  resolveFlashpointRenderedModel,
+} from "@/lib/flashpointReportDataset";
 import { resolveFlashpointReadOverride } from "@/lib/pickRead";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
@@ -243,6 +246,9 @@ export default function ReportEditor() {
   const { data: report, isLoading } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [flashpointProseDirty, setFlashpointProseDirty] = useState(false);
+  const [flashpointEditBasisFingerprint, setFlashpointEditBasisFingerprint] =
+    useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   // Id of the report whose data the seed effect below has populated into `form`.
   // Drives `activeTopic`: before the CURRENT report is seeded we scope the
@@ -502,7 +508,6 @@ export default function ReportEditor() {
           incidentsForExport,
           form.topic,
           form.issueDate,
-          { generatedAt: new Date() },
         ).fastFacts;
       }
       if (form.topic === "conflict") {
@@ -748,6 +753,15 @@ export default function ReportEditor() {
     form.topic === "flashpoint" ||
     form.topic === "protests";
 
+  const flashpointProseDataset = useMemo(() => {
+    if (form.topic !== "flashpoint" && form.topic !== "protests") return null;
+    return buildFlashpointReportDataset(
+      incidentsForExport,
+      form.topic,
+      form.issueDate,
+    );
+  }, [form.topic, form.issueDate, incidentsForExport]);
+
   // Ground on the same set the report renders (parity with the cache
   // fingerprint). Summaries-enabled topics (conflict/shipping/cargo_watch/
   // energy/fertiliser) already build the EXACT rendered related set;
@@ -755,9 +769,15 @@ export default function ReportEditor() {
   // windowed incident set the report actually renders.
   const proseGrounding = useMemo(() => {
     if (!proseEnabled) return [];
-    const groundingRows = summariesEnabled
-      ? relatedForSummaries
-      : filterTopicReportIncidents(
+    const groundingRows = flashpointProseDataset
+      ? flashpointProseDataset.canonical.acceptedIds.map((id) => {
+          const k = `${typeof id}:${String(id)}`;
+          return [...flashpointProseDataset.canonical.periodRows, ...flashpointProseDataset.canonical.futureRows]
+            .find((r) => `${typeof r.id}:${String(r.id)}` === k)!;
+        })
+      : summariesEnabled
+        ? relatedForSummaries
+        : filterTopicReportIncidents(
           incidentsForExport,
           form.topic,
           form.issueDate,
@@ -778,12 +798,16 @@ export default function ReportEditor() {
         location: typeof i.location === "string" ? i.location : "",
         country: typeof i.country === "string" ? i.country : "",
         severity: typeof i.severity === "string" ? i.severity : "",
-        occurredAt: typeof i.occurredAt === "string" ? i.occurredAt : "",
+        occurredAt:
+          flashpointProseDataset && "semanticEventDate" in i
+            ? `${String(i.semanticEventDate)}T00:00:00Z`
+            : typeof i.occurredAt === "string" ? i.occurredAt : "",
         source: typeof i.source === "string" ? i.source : "",
       };
     });
   }, [
     proseEnabled,
+    flashpointProseDataset,
     summariesEnabled,
     relatedForSummaries,
     incidentsForExport,
@@ -796,6 +820,19 @@ export default function ReportEditor() {
   // gate will later enforce. Part of the prose cache key: a direction flip or
   // leader change regenerates the narrative.
   const proseFacts = useMemo(() => {
+    if (flashpointProseDataset) {
+      return JSON.stringify({
+        datasetFingerprint: flashpointProseDataset.canonical.fingerprint,
+        incidents: flashpointProseDataset.canonical.periodRows.map((r) => ({
+          id: r.id,
+          eventDate: r.semanticEventDate,
+          eventType: r.validityGates?.eventType,
+          country: r.country,
+          location: r.location,
+          severity: r.severity,
+        })),
+      });
+    }
     if (form.topic !== "fuel" || !form.issueDate) return null;
     const hn = hardNumbersEdited ?? report?.hardNumbers;
     const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
@@ -809,7 +846,7 @@ export default function ReportEditor() {
         incidentsForExport,
       ).reportFacts,
     );
-  }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport]);
+  }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport, flashpointProseDataset]);
   const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
   const prosePeriodWord =
     reportCadence(form.topic) === "monthly" ? "this month" : "this week";
@@ -855,6 +892,12 @@ export default function ReportEditor() {
           issueDate: form.issueDate,
           incidents: proseGrounding,
           ...(proseFacts ? { facts: proseFacts } : {}),
+          ...(flashpointProseDataset
+            ? {
+                generationBasisFingerprint:
+                  flashpointProseDataset.canonical.fingerprint,
+              }
+            : {}),
           force: false,
         },
       },
@@ -881,7 +924,51 @@ export default function ReportEditor() {
   // AI narrative handed to the preview + PDF as the fallback layer. The full
   // 7-section result is structurally compatible with the 4-field
   // ConflictAiProse prop (extra keys are ignored).
-  const aiProseSections = proseRes?.edited ?? proseRes?.sections ?? null;
+  const aiProseSections = proseRes
+    ? (() => {
+        const editedIsCurrent =
+          !!proseRes.edited &&
+          (!flashpointProseDataset ||
+            (!proseRes.stale &&
+              proseRes.editedGenerationBasisFingerprint ===
+                flashpointProseDataset.canonical.fingerprint));
+        const useEdited = !!proseRes.edited && editedIsCurrent;
+        const generationBasisFingerprint = useEdited
+          ? proseRes.editedGenerationBasisFingerprint
+          : proseRes.generationBasisFingerprint;
+        return {
+          ...(useEdited ? proseRes.edited : proseRes.sections ?? {}),
+          datasetFingerprint: generationBasisFingerprint ?? undefined,
+          stale: flashpointProseDataset
+            ? generationBasisFingerprint !==
+              flashpointProseDataset.canonical.fingerprint
+            : !!proseRes.stale,
+        };
+      })()
+    : null;
+  const flashpointRenderedModel = useMemo(
+    () =>
+      flashpointProseDataset
+        ? resolveFlashpointRenderedModel({
+            dataset: flashpointProseDataset,
+            report: {
+              ...form,
+              datasetFingerprint: flashpointProseDirty
+                ? flashpointEditBasisFingerprint ?? undefined
+                : report?.proseBasisFingerprint ?? undefined,
+            },
+            ai: aiProseSections,
+          })
+        : null,
+    [
+      flashpointProseDataset,
+      form,
+      aiProseSections,
+      flashpointProseDirty,
+      flashpointEditBasisFingerprint,
+      report?.proseBasisFingerprint,
+    ],
+  );
 
   // ---- Fuel Watch direct-edit prefill --------------------------------------
   // The owner edits Fuel Watch by cutting/replacing the rendered text in
@@ -1078,6 +1165,7 @@ export default function ReportEditor() {
           aiProseSections,
           hiddenSections,
           sectionOverrides,
+          flashpointRenderedModel ?? undefined,
         );
       } else if (form.topic === "shipping") {
         await exportShippingReportPdf(
@@ -1208,8 +1296,16 @@ export default function ReportEditor() {
     // An auto-advanced draft's saved prose was written against the old window,
     // so it is stale by definition — reseed it. Otherwise fall back to the
     // live data-vs-issue-date staleness check.
+    const seededFlashpointDataset =
+      topic === "flashpoint" || topic === "protests"
+        ? buildFlashpointReportDataset(incidents ?? [], topic, issueDate)
+        : null;
     const proseIsStale =
-      draftAdvanced || computeStale(topic, issueDate) != null;
+      draftAdvanced ||
+      computeStale(topic, issueDate) != null ||
+      (!!seededFlashpointDataset &&
+        report.proseBasisFingerprint !==
+          seededFlashpointDataset.canonical.fingerprint);
 
     // Topics whose previews/PDFs resolve prose via resolveSimpleProse seed
     // SAVED-ONLY: the AI narrative + deterministic auto occupy the fallback
@@ -1257,16 +1353,13 @@ export default function ReportEditor() {
     // generated text the analyst edits; pick() then applies the identical
     // staleness/saved-override rules used by every other section. Other topics
     // never render these reads, so leave them blank.
-    const fpReads =
-      topic === "flashpoint" || topic === "protests"
-        ? buildFlashpointReportDataset(incidents ?? [], topic, issueDate, {
-            generatedAt: new Date(),
-          })
-        : null;
+    const fpReads = seededFlashpointDataset;
 
     // Replace empty titles and the well-known old regional defaults (e.g.
     // "APAC Fuel Watch", "Hormuz Maritime Watch") with the canonical title.
     // Any other stored title is treated as a manual edit and preserved.
+    setFlashpointProseDirty(false);
+    setFlashpointEditBasisFingerprint(null);
     setForm({
       title: resolveReportTitle(topic, report.title),
       topic,
@@ -1399,8 +1492,34 @@ export default function ReportEditor() {
     setSampleAutoSeeded(false);
   }, [report]);
 
-  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+    if (
+      [
+        "executiveSummary",
+        "situation",
+        "whatHappened",
+        "whatMatters",
+        "implications",
+        "polestarView",
+        "watchNext",
+        "activismRead",
+        "civilUnrestRead",
+        "forecastRead",
+        "regionalCountryRead",
+      ].includes(k)
+    ) {
+      setFlashpointProseDirty(true);
+      if (
+        (form.topic === "flashpoint" || form.topic === "protests") &&
+        flashpointProseDataset
+      ) {
+        setFlashpointEditBasisFingerprint(
+          (basis) => basis ?? flashpointProseDataset.canonical.fingerprint,
+        );
+      }
+    }
     setForm((f) => ({ ...f, [k]: v }));
+  };
 
   const save = (opts?: { force?: boolean }) => {
     // Orphaned Fast Facts guard: saving would persist owner edits keyed to a
@@ -1497,8 +1616,16 @@ export default function ReportEditor() {
         incidentsForExport,
         form.topic,
         form.issueDate,
-        { generatedAt: new Date() },
       );
+      if (
+        flashpointProseDirty &&
+        flashpointEditBasisFingerprint !== gen.canonical.fingerprint
+      ) {
+        setSaveBlocked(
+          "Not saved — Flashpoint prose was edited against an older canonical dataset. Discard or reapply the edit against the current incidents.",
+        );
+        return;
+      }
       payload.activismRead = resolveFlashpointReadOverride(
         form.activismRead,
         gen.activismRead,
@@ -1515,6 +1642,9 @@ export default function ReportEditor() {
         form.regionalCountryRead,
         gen.regionalCountryRead,
       );
+      payload.proseBasisFingerprint = flashpointProseDirty
+        ? flashpointEditBasisFingerprint
+        : report?.proseBasisFingerprint ?? null;
     } else if (form.topic === "conflict") {
       // Conflict reads seed SAVED-ONLY too. Prune blank per-theatre entries so
       // the JSONB map holds only genuine analyst overrides (each absent key
@@ -1608,6 +1738,14 @@ export default function ReportEditor() {
           setHardNumbersEdited(undefined);
           setSampleAutoSeeded(false);
           clearLegacyExecSummary(id);
+          if (
+            (form.topic === "flashpoint" || form.topic === "protests") &&
+            flashpointEditBasisFingerprint ===
+              flashpointProseDataset?.canonical.fingerprint
+          ) {
+            setFlashpointProseDirty(false);
+            setFlashpointEditBasisFingerprint(null);
+          }
         },
       },
     );
@@ -3140,6 +3278,7 @@ export default function ReportEditor() {
               aiProse={aiProseSections}
               hiddenSections={hiddenSections}
               sectionOverrides={sectionOverrides}
+              renderedModel={flashpointRenderedModel ?? undefined}
             />
           ) : form.topic === "conflict" ? (
             <ConflictReportPreview

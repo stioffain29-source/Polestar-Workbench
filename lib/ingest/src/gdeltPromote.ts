@@ -8,6 +8,7 @@ import {
   type SeverityTopic,
 } from "./severity";
 import { geocode } from "./geocode";
+import { FLASHPOINT_VALIDITY_VERSION } from "./flashpointValidity";
 import {
   RELEVANCE_RULE_VERSION,
   hitsSlopExclude,
@@ -248,6 +249,34 @@ export function decidePromotion(item: GdeltPromoteInput): PromoteDecision {
   const relevanceReason = slop.relevant
     ? `gdelt lane: ${item.lane}`
     : `gdelt lane: ${item.lane} — slop-gated (${slop.reason})`;
+  const structuredActor = deriveActors(item.actors);
+  const structuredLocation = item.location ?? null;
+  const structuredEventType =
+    item.lane === "Protests" ? "protest" :
+    item.lane === "Civil unrest and riots" ? "riot_public_disorder" : null;
+  const structuredActivity = item.lane;
+  // This provider payload has no explicit per-dimension confidence values.
+  // Never manufacture them: route the row through bounded semantic backfill.
+  const trustedStructured = false;
+  const trustedGates = {
+    policy: "trusted_structured",
+    verdict: trustedStructured ? "valid" : "needs_review",
+    eventOccurred: true,
+    actor: structuredActor,
+    activity: structuredActivity,
+    eventType: structuredEventType ?? "unknown",
+    physicalLocation: structuredLocation,
+    country: storedCountry,
+    eventDate: occurredAt.toISOString(),
+    currentness: "current",
+    assignedCountrySupported: !!structuredLocation && !!storedCountry,
+    confidence: {
+      event: 0, classification: 0, geography: 0, date: 0,
+    },
+    contradictions: [],
+    evidence: { provider: "GDELT", lane: item.lane, externalId: item.externalId },
+    provider: "GDELT",
+  };
 
   const row: InsertIncident = {
     topic: mapping.topic,
@@ -264,13 +293,23 @@ export function decidePromotion(item: GdeltPromoteInput): PromoteDecision {
     sourceUrl: item.primaryStoryUrl ?? item.url ?? null,
     category: item.lane,
     fatalities: item.fatalities ?? null,
-    actors: deriveActors(item.actors),
+    actors: structuredActor,
     analystNotes: promoteMarker(item.externalId),
     relevanceStatus,
     relevanceScore,
     relevanceReason,
     relevanceVersion: RELEVANCE_RULE_VERSION,
     relevanceEvaluatedAt: new Date(),
+    ...(mapping.topic === "flashpoint" ? {
+      validityStatus: trustedStructured ? "valid" : "needs_review",
+      validityScore: trustedStructured ? Math.min(...Object.values(trustedGates.confidence)) : 0,
+      validityReason: trustedStructured
+        ? "trusted_structured: complete GDELT actor, activity, geography, date and event type"
+        : "structured GDELT evidence incomplete; semantic review required",
+      validityVersion: trustedStructured ? FLASHPOINT_VALIDITY_VERSION : null,
+      validityEvaluatedAt: trustedStructured ? new Date() : null,
+      validityGates: trustedGates,
+    } : {}),
   };
 
   return { promote: true, topic: mapping.topic, lane: item.lane, row };

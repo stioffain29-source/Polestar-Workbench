@@ -4,21 +4,21 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import {
   makeSectionGate,
-  applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
-import { aiOr, type TopicAiProse } from "@/lib/topicProseResolution";
+import { type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildFlashpointReportDataset,
-  resolveFlashpointAnalystProse,
+  resolveFlashpointRenderedModel,
+  assertFlashpointRenderedModelValid,
   type FlashpointReportIncident,
   type KpiCard,
   type BarRow,
   type EnrichedIncident,
+  type FlashpointRenderedModel,
   FLASHPOINT_SEV_LABEL,
 } from "@/lib/flashpointReportDataset";
-import { pickFlashpointRead } from "@/lib/pickRead";
 import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
@@ -62,14 +62,6 @@ function sevKey(s: string | null | undefined): string {
 // Match exportFlashpointReportPdf: editor text replaces auto ONLY when it is
 // a substantive custom write (>= 240 chars). Thin stubs use auto alone so
 // What Matters never stacks two near-duplicate blocks.
-function pickProse(
-  editor: string | null | undefined,
-  ai: string | null | undefined,
-  auto: string,
-): string {
-  return resolveFlashpointAnalystProse(editor, ai, auto);
-}
-
 export interface FlashpointPreviewReport {
   title?: string;
   topic?: string;
@@ -142,7 +134,7 @@ function Section({ title, children, hidden }: { title: string; children: React.R
   );
 }
 
-function KpiGrid({ cards }: { cards: KpiCard[] }) {
+function KpiGrid({ cards }: { cards: readonly KpiCard[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {cards.map((c, i) => {
@@ -369,12 +361,14 @@ export default function FlashpointReportPreview({
   aiProse,
   hiddenSections,
   sectionOverrides,
+  renderedModel,
 }: {
   report: FlashpointPreviewReport;
   incidents: FlashpointReportIncident[];
   aiProse?: TopicAiProse | null;
   hiddenSections?: string[];
   sectionOverrides?: TopicSectionOverrides | null;
+  renderedModel?: FlashpointRenderedModel;
 }) {
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "flashpoint";
@@ -382,13 +376,20 @@ export default function FlashpointReportPreview({
   const resolvedTitle = resolveReportTitle(topic, report.title);
   const coverUrl = TOPIC_COVER_URLS[topic];
 
-  const ds = useMemo(
-    () =>
-      buildFlashpointReportDataset(incidents, topic, issueDate, {
-        generatedAt: new Date(),
-      }),
-    [incidents, topic, issueDate],
+  const model = useMemo(
+    () => {
+      if (renderedModel) return renderedModel;
+      const built = buildFlashpointReportDataset(incidents, topic, issueDate);
+      return resolveFlashpointRenderedModel({
+        dataset: built,
+        report,
+        ai: aiProse,
+      });
+    },
+    [incidents, topic, issueDate, report, aiProse, renderedModel],
   );
+  const ds = model.dataset;
+  assertFlashpointRenderedModelValid(model);
 
   // Mirror the PDF: the Executive Summary renders the data-driven
   // ds.autoExecutiveSummary unless the analyst has written a genuine
@@ -397,9 +398,7 @@ export default function FlashpointReportPreview({
   // Mirror exportFlashpointReportPdf exactly: any non-empty analyst edit wins,
   // otherwise AI-or-deterministic (no 240-char substantive threshold here —
   // the PDF applies none for the Executive Summary).
-  const execEdit = (report.executiveSummary ?? "").trim();
-  const execText =
-    execEdit || aiOr(aiProse?.executiveSummary, ds.autoExecutiveSummary);
+  const execText = model.prose.executiveSummary;
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -449,11 +448,11 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
+          <KpiGrid cards={model.fastFacts} />
         </Section>
 
         <Section hidden={!show("activism")} title="Activism and Protest Read">
-          <Paragraphs text={pickFlashpointRead(report.activismRead, ds.activismRead)} />
+          <Paragraphs text={model.prose.activismRead} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.activismRows}
@@ -463,7 +462,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("civil-unrest")} title="Civil Unrest and Public Order Read">
-          <Paragraphs text={pickFlashpointRead(report.civilUnrestRead, ds.civilUnrestRead)} />
+          <Paragraphs text={model.prose.civilUnrestRead} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.unrestRows}
@@ -497,7 +496,7 @@ export default function FlashpointReportPreview({
               </table>
             </div>
           )}
-          <Paragraphs text={pickFlashpointRead(report.forecastRead, ds.forecastRead)} />
+          <Paragraphs text={model.prose.forecastRead} />
         </Section>
 
         <Section hidden={!show("regional")} title="Regional and Country View">
@@ -518,20 +517,20 @@ export default function FlashpointReportPreview({
             )}
             <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No countries with reported activity this week." />
           </div>
-          <Paragraphs text={pickFlashpointRead(report.regionalCountryRead, ds.regionalCountryRead)} />
+          <Paragraphs text={model.prose.regionalCountryRead} />
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">
-          <Paragraphs text={pickProse(report.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters)} />
+          <Paragraphs text={model.prose.whatMatters} />
         </Section>
         <Section hidden={!show("implications")} title="Implications for Business">
-          <Bullets text={pickProse(report.implications, aiProse?.implications, ds.autoImplications)} />
+          <Bullets text={model.prose.implications} />
         </Section>
         <Section hidden={!show("watch-next")} title="Watch Next">
-          <Bullets text={pickProse(report.watchNext, aiProse?.watchNext, ds.autoWatchNext)} max={8} />
+          <Bullets text={model.prose.watchNext} max={8} />
         </Section>
         <Section hidden={!show("polestar-view")} title="Polestar View">
-          <Paragraphs text={pickProse(report.polestarView, aiProse?.polestarView, ds.autoPolestarView)} />
+          <Paragraphs text={model.prose.polestarView} />
         </Section>
 
         <Section hidden={!show("related-incidents")} title="Related Incidents">

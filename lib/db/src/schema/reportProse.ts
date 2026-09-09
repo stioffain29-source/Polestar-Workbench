@@ -33,13 +33,19 @@ export const reportProseTable = pgTable("report_prose", {
   id: serial("id").primaryKey(),
   reportId: integer("report_id").notNull().unique(),
   topic: text("topic").notNull(),
+  // SHA-256 cache identity computed by the API from the complete request.
   fingerprint: text("fingerprint").notNull(),
+  // Caller-supplied canonical data snapshot identity. This is deliberately
+  // separate from the cache hash: clients must never compare the SHA-256 cache
+  // key with a domain fingerprint such as Flashpoint's fp1 value.
+  generationBasisFingerprint: text("generation_basis_fingerprint"),
   sections: jsonb("sections").$type<TopicProseSections>().notNull(),
   edited: jsonb("edited").$type<TopicProseSections | null>(),
   // The fingerprint the current `edited` override was written against. When it
   // differs from `fingerprint`, the edit predates the current data basis and is
   // stale (kept, but flagged to the analyst). NULL when there is no edit.
   editedFingerprint: text("edited_fingerprint"),
+  editedGenerationBasisFingerprint: text("edited_generation_basis_fingerprint"),
   model: text("model").notNull(),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

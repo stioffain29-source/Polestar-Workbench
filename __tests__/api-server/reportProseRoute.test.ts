@@ -77,6 +77,7 @@ const BODY = {
   periodWord: "this week",
   issueDate: "2026-06-13",
   incidents: INCIDENTS,
+  generationBasisFingerprint: "fp1-canonical-shipping-basis",
 };
 
 const FINGERPRINT = computeReportProseFingerprint({
@@ -86,6 +87,7 @@ const FINGERPRINT = computeReportProseFingerprint({
   issueDate: BODY.issueDate,
   basisDays: BODY.basisDays,
   incidents: INCIDENTS,
+  generationBasisFingerprint: BODY.generationBasisFingerprint,
 });
 
 let app: Express;
@@ -153,6 +155,10 @@ describe("POST /reports/:id/prose — LLM unavailable", () => {
     expect(json.available).toBe(false);
     expect(json.model).toBe("unavailable");
     expect(json.fingerprint).toBe(FINGERPRINT);
+    expect(json.fingerprint).not.toBe(BODY.generationBasisFingerprint);
+    expect(json.generationBasisFingerprint).toBe(
+      BODY.generationBasisFingerprint,
+    );
     expect(json.sections).toBeNull();
     expect(generateReportProse as jest.Mock).not.toHaveBeenCalled();
     expect(insertSpy).not.toHaveBeenCalled();
@@ -191,6 +197,7 @@ describe("POST /reports/:id/prose — cache hit", () => {
               reportId: REPORT_ID,
               topic: "shipping",
               fingerprint: FINGERPRINT,
+              generationBasisFingerprint: BODY.generationBasisFingerprint,
               sections: { executiveSummary: "Cached narrative." },
               edited: null,
               model: "gpt-5.4",
@@ -207,6 +214,10 @@ describe("POST /reports/:id/prose — cache hit", () => {
     expect(status).toBe(200);
     expect(json.available).toBe(true);
     expect(json.sections.executiveSummary).toBe("Cached narrative.");
+    expect(json.fingerprint).toBe(FINGERPRINT);
+    expect(json.generationBasisFingerprint).toBe(
+      BODY.generationBasisFingerprint,
+    );
     expect(json.stale).toBe(false);
     expect(generateReportProse as jest.Mock).not.toHaveBeenCalled();
   });
@@ -222,9 +233,11 @@ describe("POST /reports/:id/prose — cache hit", () => {
               reportId: REPORT_ID,
               topic: "shipping",
               fingerprint: FINGERPRINT,
+              generationBasisFingerprint: BODY.generationBasisFingerprint,
               sections: { executiveSummary: "Cached narrative." },
               edited: { executiveSummary: "Analyst edit." },
               editedFingerprint: "old-fingerprint",
+              editedGenerationBasisFingerprint: "fp1-old-basis",
               model: "gpt-5.4",
               generatedAt: "2026-06-10T00:00:00.000Z",
             },
@@ -267,6 +280,7 @@ describe("POST /reports/:id/prose — cache hit", () => {
         reportId: REPORT_ID,
         topic: "shipping",
         fingerprint: FINGERPRINT,
+        generationBasisFingerprint: BODY.generationBasisFingerprint,
         sections: { executiveSummary: "Fresh narrative." },
         edited: null,
         model: "gpt-5.4",

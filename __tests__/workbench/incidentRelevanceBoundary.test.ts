@@ -17,6 +17,9 @@ describe("incident consumers preserve the shared relevance boundary", () => {
   it("fails closed at the API boundary for unevaluated rows", () => {
     const apiGate = source("artifacts/api-server/src/lib/relevanceFilter.ts");
     expect(apiGate).toContain('eq(incidentsTable.relevanceStatus, "relevant")');
+    expect(apiGate).toContain('eq(incidentsTable.validityStatus, "valid")');
+    expect(apiGate).toContain("FLASHPOINT_VALIDITY_VERSION");
+    expect(apiGate).toContain("validityGates");
     expect(apiGate).not.toContain("isNull(incidentsTable.relevanceStatus)");
   });
 });

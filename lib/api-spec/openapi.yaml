@@ -2440,6 +2440,7 @@ components:
         implications: { type: ["string", "null"] }
         polestarView: { type: ["string", "null"] }
         watchNext: { type: ["string", "null"] }
+        proseBasisFingerprint: { type: ["string", "null"] }
         activismRead: { type: ["string", "null"] }
         civilUnrestRead: { type: ["string", "null"] }
         forecastRead: { type: ["string", "null"] }
@@ -2591,6 +2592,7 @@ components:
         implications: { type: string }
         polestarView: { type: string }
         watchNext: { type: string }
+        proseBasisFingerprint: { type: string }
         activismRead: { type: string }
         civilUnrestRead: { type: string }
         forecastRead: { type: string }
@@ -2629,6 +2631,7 @@ components:
         implications: { type: string }
         polestarView: { type: string }
         watchNext: { type: string }
+        proseBasisFingerprint: { type: string }
         activismRead: { type: string }
         civilUnrestRead: { type: string }
         forecastRead: { type: string }
@@ -4093,6 +4096,9 @@ components:
         # market directions the model must treat as authoritative — it may
         # explain them but never recalculate or contradict them.
         facts: { type: string }
+        # Canonical domain snapshot identity supplied by the caller. This is
+        # provenance, not the API's independent SHA-256 cache identity.
+        generationBasisFingerprint: { type: string }
         incidents:
           type: array
           items: { $ref: "#/components/schemas/ProseIncidentInput" }
@@ -4102,14 +4108,20 @@ components:
       required: [fingerprint, sections]
       properties:
         fingerprint: { type: string }
+        generationBasisFingerprint: { type: string }
         sections: { $ref: "#/components/schemas/TopicProseSections" }
 
     ReportProseResult:
       type: object
-      required: [available, fingerprint, model, generatedAt]
+      required:
+        [available, fingerprint, generationBasisFingerprint, editedGenerationBasisFingerprint, model, generatedAt]
       properties:
         available: { type: boolean }
         fingerprint: { type: string }
+        generationBasisFingerprint:
+          type: [string, "null"]
+        editedGenerationBasisFingerprint:
+          type: [string, "null"]
         sections:
           oneOf:
             - { $ref: "#/components/schemas/TopicProseSections" }

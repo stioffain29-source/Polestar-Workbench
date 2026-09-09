@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, doublePrecision, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, doublePrecision, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const incidentsTable = pgTable("incidents", {
   id: serial("id").primaryKey(),
@@ -51,6 +51,12 @@ export const incidentsTable = pgTable("incidents", {
   relevanceReason: text("relevance_reason"),
   relevanceVersion: text("relevance_version"),
   relevanceEvaluatedAt: timestamp("relevance_evaluated_at", { withTimezone: true }),
+  validityStatus: text("validity_status"),
+  validityScore: doublePrecision("validity_score"),
+  validityReason: text("validity_reason"),
+  validityVersion: text("validity_version"),
+  validityEvaluatedAt: timestamp("validity_evaluated_at", { withTimezone: true }),
+  validityGates: jsonb("validity_gates"),
   // Last time the ReliefWeb corroboration pass examined this incident. Nullable
   // = never checked. Drives the bounded back-match: the pass re-checks recent
   // rows (official sitreps lag the news) and back-fills never-checked older rows

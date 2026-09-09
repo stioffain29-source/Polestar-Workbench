@@ -13,11 +13,12 @@ import { join } from "node:path";
  *   - access  (lets the browser learn whether the session is the owner)
  *   - admin   (token-gated via requireAdminToken, for external schedulers/curl)
  *   - backfill(token-gated via requireAdminToken)
+ *   - flashpoint validity backfill (token-gated via requireAdminToken)
  *
  * A newly added data router accidentally mounted BEFORE the `requireOwner` line
  * (or a router that forgets the gate entirely) would silently expose operational
  * data to the public internet. This guard parses the mount order and fails
- * loudly if any router other than the documented public five is mounted before
+ * loudly if any router other than the documented public/token-gated six is mounted before
  * the owner gate — or if the owner gate is missing altogether.
  */
 const INDEX_PATH = join(
@@ -32,6 +33,7 @@ const PUBLIC_ROUTERS = new Set([
   "accessRouter",
   "adminRouter",
   "backfillRouter",
+  "flashpointValidityAdminRouter",
 ]);
 
 const OWNER_GATE = "requireOwner";

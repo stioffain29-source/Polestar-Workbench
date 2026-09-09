@@ -28,6 +28,7 @@ import officialMilitaryMaritimeSourcesRouter from "./officialMilitaryMaritimeSou
 import integrationsRouter from "./integrations";
 import adminRouter from "./admin";
 import backfillRouter from "./backfill";
+import flashpointValidityAdminRouter from "./flashpointValidityAdmin";
 import cardsRouter from "./cards";
 import { requireOwner } from "../lib/ownerAccess";
 
@@ -44,6 +45,7 @@ router.use(authRouter);
 router.use(accessRouter);
 router.use(adminRouter);
 router.use(backfillRouter);
+router.use(flashpointValidityAdminRouter);
 
 // Everything below is private to the authenticated owner.
 router.use(requireOwner);

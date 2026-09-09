@@ -19,6 +19,10 @@ export interface RelevanceInput {
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
+  category?: string | null;
+  country?: string | null;
+  occurredAt?: Date | null;
+  incidentDate?: Date | null;
 }
 
 // Exclusions for clearly off-topic items. Keep these narrow so they only

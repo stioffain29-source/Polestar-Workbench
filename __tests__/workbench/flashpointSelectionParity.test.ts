@@ -5,6 +5,7 @@ import {
   FLASHPOINT_TABLE_ROW_CAP,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE = "2026-05-31";
 
@@ -12,7 +13,7 @@ function fp(
   id: number,
   over: Partial<FlashpointReportIncident>,
 ): FlashpointReportIncident {
-  return {
+  const base = {
     id,
     title: over.title ?? "Workers protest in Dhaka over wages",
     summary: over.summary ?? "Demonstrators marched through the city centre.",
@@ -23,6 +24,7 @@ function fp(
     occurredAt: over.occurredAt ?? "2026-05-28T08:00:00Z",
     ...over,
   } as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("Flashpoint selection parity (FP-03)", () => {

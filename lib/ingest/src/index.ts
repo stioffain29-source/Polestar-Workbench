@@ -1,4 +1,8 @@
 export { runFlashpointIngest, resolveFlashpointCountry } from "./flashpoint";
+export { validateFlashpointEvent, FLASHPOINT_VALIDITY_VERSION } from "./flashpointValidity";
+export { isTransientFlashpointValidityReason } from "./flashpointValidity";
+export { backfillFlashpointValidity, flashpointEvidenceSnapshotMatches, isFlashpointBackfillCandidate } from "./backfillFlashpointValidity";
+export type { FlashpointBackfillDependencies, IncidentSnapshot } from "./backfillFlashpointValidity";
 export { runFlashpointMastheadRelocate } from "./flashpointMastheadRelocate";
 export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute";
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";

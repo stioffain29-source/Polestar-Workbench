@@ -12,7 +12,10 @@ import {
   selectFlashpointUsable,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
-import { draftTopicReportProse } from "../../artifacts/workbench/src/lib/draftReportProse";
+import {
+  invalidFlashpointSemantic,
+  validFlashpointSemantic,
+} from "../../test-utils/flashpointTestFixtures";
 
 const FUEL_ISSUE = "2026-08-17";
 const FP_ISSUE = "2026-08-17";
@@ -37,7 +40,7 @@ function fuel(
 }
 
 function fp(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
-  return {
+  const base = {
     id: over.id ?? 1,
     title: over.title ?? "Workers protest in Tokyo",
     summary: over.summary ?? "Demonstrators marched through the city centre.",
@@ -48,6 +51,7 @@ function fp(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
     occurredAt: over.occurredAt ?? "2026-08-14T08:00:00Z",
     ...over,
   } as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("Fuel Watch — client feedback Aug 2026", () => {
@@ -118,6 +122,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           title: "2008 USS George Washington protest remembered in Yokosuka feature",
           summary: "A look back at the 2008 demonstration against the carrier visit.",
           country: "Japan",
+          ...invalidFlashpointSemantic("archival retrospective, not a current event"),
         }),
         fp({ title: "Teachers march on Tokyo ward office over pay", country: "Japan" }),
       ],
@@ -129,7 +134,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
 
   it("drops sleep tourism demonstration false positive", () => {
     const sel = selectFlashpointUsable(
-      [fp({ title: "Sleep Tourism demonstration promotes wellness travel in Osaka", country: "Japan" })],
+      [fp({ title: "Sleep Tourism demonstration promotes wellness travel in Osaka", country: "Japan", ...invalidFlashpointSemantic("commercial demonstration homonym") })],
       "flashpoint",
       FP_ISSUE,
     );
@@ -138,7 +143,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
 
   it("drops Ceuta unrest mis-stamped as Indonesia", () => {
     const sel = selectFlashpointUsable(
-      [fp({ title: "Clashes erupt in Ceuta after migrant crossing attempt", country: "Indonesia" })],
+      [fp({ title: "Clashes erupt in Ceuta after migrant crossing attempt", country: "Indonesia", ...invalidFlashpointSemantic("event geography contradicts assigned country") })],
       "flashpoint",
       FP_ISSUE,
     );
@@ -151,6 +156,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
         fp({
           title: "World in Brief: Indonesia hit by earthquake; migrants stage protest in Ceuta",
           country: "Indonesia",
+          ...invalidFlashpointSemantic("multi-story digest with contradictory event geography"),
         }),
       ],
       "flashpoint",
@@ -166,6 +172,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           title: "Japan 'crossed line of decency' with protest over Putin's Kuril Islands visit: Russia",
           summary: "Moscow said Tokyo crossed a diplomatic line over the Kuril visit.",
           country: "Japan",
+          ...invalidFlashpointSemantic("diplomatic commentary, not public-order activity"),
         }),
       ],
       "flashpoint",
@@ -181,6 +188,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           title: "Russia protests after Japan protested over Northern Territories",
           summary: "Moscow and Tokyo traded diplomatic statements over the disputed islands.",
           country: "Japan",
+          ...invalidFlashpointSemantic("diplomatic statements, not public-order activity"),
         }),
       ],
       "flashpoint",
@@ -192,7 +200,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
   it("drops APTOPIX and bare wire photo-desk protest captions", () => {
     for (const title of ["APTOPIX Indonesia Protest", "Indonesia Protest"]) {
       const sel = selectFlashpointUsable(
-        [fp({ title, summary: "Photo desk caption with no operational detail.", country: "Indonesia" })],
+        [fp({ title, summary: "Photo desk caption with no operational detail.", country: "Indonesia", ...invalidFlashpointSemantic("bare photo caption") })],
         "flashpoint",
         FP_ISSUE,
       );
@@ -221,6 +229,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           title: "Israeli cabinet debate over Gaza policy draws regional attention",
           summary: "Analysts reviewed the diplomatic fallout from the cabinet session.",
           country: "Israel",
+          ...invalidFlashpointSemantic("policy commentary without a public-order event"),
         }),
       ],
       "flashpoint",
@@ -232,8 +241,8 @@ describe("Flashpoint — client feedback Aug 2026", () => {
   it("folds West Papua into Indonesia country roll-ups", () => {
     const ds = buildFlashpointReportDataset(
       [
-        fp({ title: "Large demos across West Papua meet with mixed responses by police", country: "West Papua", location: "West Papua" }),
-        fp({ title: "Student protest in Jakarta", country: "Indonesia", location: "Jakarta" }),
+        fp({ id: 1, title: "Large demos across West Papua meet with mixed responses by police", country: "West Papua", location: "West Papua" }),
+        fp({ id: 2, title: "Student protest in Jakarta", country: "Indonesia", location: "Jakarta" }),
       ],
       "flashpoint",
       FP_ISSUE,
@@ -241,7 +250,11 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     const indonesia = ds.countryRows.find((r) => r.label === "Indonesia");
     expect(indonesia?.value).toBe(2);
     expect(ds.countryRows.some((r) => r.label === "West Papua")).toBe(false);
-    expect(ds.activismRows.some((r) => /West Papua, Indonesia/.test(r.title))).toBe(true);
+    expect(
+      ds.canonical.periodRows.some(
+        (r) => r.id === 1 && r.country === "Indonesia",
+      ),
+    ).toBe(true);
   });
 
   it("names Japan in Country View when Japan leads incident volume", () => {
@@ -272,7 +285,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     expect(ds.autoPolestarView).not.toMatch(/Japan carries the highest incident volume/i);
   });
 
-  it("draft exec summary names the same volume lead as the country chart", () => {
+  it("canonical exec summary names the same volume lead as the country chart", () => {
     const tokyoTitles = [
       "Dockworkers walk out at Yokohama port",
       "Nurses rally outside Osaka university hospital",
@@ -293,8 +306,9 @@ describe("Flashpoint — client feedback Aug 2026", () => {
       }),
     );
     rows.push(fp({ id: 99, title: "Farmers protest in Dhaka over crop prices", country: "Bangladesh", severity: "moderate" }));
-    const draft = draftTopicReportProse({ topic: "flashpoint", issueDate: FP_ISSUE, incidents: rows });
-    expect(draft.executiveSummary).toMatch(/Japan leads on volume|Activity clusters in Japan|heaviest volume/i);
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", FP_ISSUE);
+    expect(ds.countryRows[0]?.label).toBe("Japan");
+    expect(ds.autoExecutiveSummary).toMatch(/Japan/i);
   });
 
   it("drops Nepal anti-corruption enforcement on businessmen", () => {
@@ -305,6 +319,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           summary: "Anti-graft investigators expand charges against business leaders accused of tax evasion.",
           country: "Nepal",
           severity: "high",
+          ...invalidFlashpointSemantic("ordinary anti-corruption enforcement"),
         }),
         fp({ title: "Students rally against tuition hikes in Kathmandu", country: "Nepal", severity: "low" }),
       ],
@@ -323,6 +338,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           summary: "Tighter firearms licensing rules hit struggling gun dealers across the capital.",
           country: "Thailand",
           severity: "high",
+          ...invalidFlashpointSemantic("firearms retail policy, not public-order activity"),
         }),
       ],
       "flashpoint",
@@ -339,6 +355,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
           summary: "The chief of army staff arrived in Pokhara for official meetings.",
           country: "India",
           severity: "low",
+          ...invalidFlashpointSemantic("official military travel, not public-order activity"),
         }),
         fp({ title: "Farmers march on parliament in Delhi over tax rules", country: "India", severity: "low" }),
       ],

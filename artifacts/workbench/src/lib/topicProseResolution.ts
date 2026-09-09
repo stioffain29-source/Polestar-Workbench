@@ -27,6 +27,9 @@ import { displayIncidentTitle } from "./incidentTitle";
 // Cached AI narrative sections. Mirrors the server TopicProseSections shape;
 // every field optional/nullable so a partial or absent payload degrades safely.
 export interface TopicAiProse {
+  /** Canonical report dataset this prose was generated/edited against. */
+  datasetFingerprint?: string | null;
+  stale?: boolean;
   executiveSummary?: string | null;
   situation?: string | null;
   whatHappened?: string | null;

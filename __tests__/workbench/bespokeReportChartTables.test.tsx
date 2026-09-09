@@ -11,6 +11,7 @@ import type {
   PngReportDataset,
   PngReportItem,
 } from "../../artifacts/workbench/src/lib/pngReportDataset";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 // Sibling to `bespokeReportFastFactsTiles.test.tsx` (which guards the Fast Facts
 // / stat-tile CONTENT of the four bespoke previews) and to
@@ -76,7 +77,7 @@ const report = {
 // ---------------------------------------------------------------------------
 
 describe("FlashpointReportPreview charts & tables", () => {
-  const incidents: FlashpointReportIncident[] = [
+  const incidents = [
     {
       id: "f1",
       topic: "flashpoint",
@@ -110,7 +111,7 @@ describe("FlashpointReportPreview charts & tables", () => {
       source: "Test Wire",
       sourceUrl: "https://example.com/f3",
     },
-  ];
+  ].map((row) => ({ ...row, ...validFlashpointSemantic(row) })) as FlashpointReportIncident[];
 
   const html = renderToStaticMarkup(
     <FlashpointReportPreview

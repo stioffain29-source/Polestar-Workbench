@@ -180,6 +180,14 @@ router.post("/incidents", requireAdminToken, async (req, res): Promise<void> => 
       relevanceReason: rel.reason,
       relevanceVersion: rel.version,
       relevanceEvaluatedAt: new Date(),
+      ...(parsed.data.topic === "flashpoint" || parsed.data.topic === "protests" ? {
+        validityStatus: "needs_review",
+        validityScore: 0,
+        validityReason: "awaiting source-backed semantic validation",
+        validityVersion: null,
+        validityEvaluatedAt: null,
+        validityGates: null,
+      } : {}),
     })
     .returning();
   res.status(201).json(row);
@@ -192,9 +200,18 @@ router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const validityEvidenceChanged = [
+    "topic", "title", "displayTitle", "summary", "source", "sourceUrl",
+    "country", "location", "occurredAt", "incidentDate",
+  ]
+    .some((key) => Object.prototype.hasOwnProperty.call(parsed.data, key));
   const [row] = await db
     .update(incidentsTable)
-    .set(parsed.data)
+    .set(validityEvidenceChanged ? {
+      ...parsed.data,
+      validityStatus: null, validityScore: null, validityReason: null,
+      validityVersion: null, validityEvaluatedAt: null, validityGates: null,
+    } : parsed.data)
     .where(eq(incidentsTable.id, id))
     .returning();
   if (!row) {

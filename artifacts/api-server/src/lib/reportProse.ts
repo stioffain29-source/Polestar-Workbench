@@ -51,6 +51,7 @@ export interface GenerateReportProseInput {
    *  builder. The model must treat these as authoritative — it may explain
    *  them, never recalculate or contradict them. */
   facts?: string | null;
+  generationBasisFingerprint?: string | null;
 }
 
 export type ReportProseOutcome =
@@ -146,6 +147,7 @@ export function computeReportProseFingerprint(input: {
   basisDays: number;
   incidents: ProseIncidentInput[];
   facts?: string | null;
+  generationBasisFingerprint?: string | null;
 }): string {
   const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
@@ -160,6 +162,7 @@ export function computeReportProseFingerprint(input: {
     // facts change (market direction flips, leader changes), the cached
     // prose is stale and must regenerate.
     facts: input.facts ?? "",
+    generationBasisFingerprint: input.generationBasisFingerprint ?? "",
     ids,
   });
   return createHash("sha256").update(payload).digest("hex");

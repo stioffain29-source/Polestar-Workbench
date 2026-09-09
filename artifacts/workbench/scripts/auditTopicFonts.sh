@@ -15,9 +15,10 @@
 #   PROD_DATABASE_URL=... bash scripts/auditTopicFonts.sh
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
 # shellcheck source=resolveProdDatabaseUrl.sh
-source "$(dirname "$0")/resolveProdDatabaseUrl.sh"
+source "$SCRIPT_DIR/resolveProdDatabaseUrl.sh"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "auditTopicFonts: PROD_DATABASE_URL or DATABASE_URL is not set — cannot export topic reports." >&2

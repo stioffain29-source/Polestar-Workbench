@@ -16,6 +16,8 @@ headroom, NOT output cost.
 
 **How to apply:** any chat-completions call to a gpt-5* model MUST set
 `max_completion_tokens` ≥ 8192 and never lower (matches the OpenAI integration skill).
+Do not send `temperature` to the configured gpt-5* fast model; the integration rejects
+that otherwise-valid structured-output request with HTTP 400.
 It is an UPPER bound, not a target, so cost/latency rise only with actual reasoning.
 Failure is INTERMITTENT: short/simple inputs fit under a small cap (some rows succeed),
 harder ones blow it — so "most rows work, a few ship raw" is the signature, not a

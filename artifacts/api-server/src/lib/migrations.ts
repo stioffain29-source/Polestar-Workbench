@@ -643,6 +643,15 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(
       sql`ALTER TABLE report_prose ADD COLUMN IF NOT EXISTS edited_fingerprint text`,
     );
+    await db.execute(
+      sql`ALTER TABLE report_prose ADD COLUMN IF NOT EXISTS generation_basis_fingerprint text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE report_prose ADD COLUMN IF NOT EXISTS edited_generation_basis_fingerprint text`,
+    );
+    await db.execute(
+      sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS prose_basis_fingerprint text`,
+    );
 
     // 0a) Schema: per-feed consecutive-failure counter on `sources`.
     //     drizzle `push` adds this in dev, but the writable prod DB is reached
@@ -1448,8 +1457,11 @@ export async function runDataMigrations(): Promise<void> {
         report_id integer NOT NULL UNIQUE,
         topic text NOT NULL,
         fingerprint text NOT NULL,
+        generation_basis_fingerprint text,
         sections jsonb NOT NULL,
         edited jsonb,
+        edited_fingerprint text,
+        edited_generation_basis_fingerprint text,
         model text NOT NULL,
         generated_at timestamptz NOT NULL DEFAULT now(),
         created_at timestamptz NOT NULL DEFAULT now()
@@ -1661,6 +1673,27 @@ export async function runDataMigrations(): Promise<void> {
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_sub_event_type text`);
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_confidence double precision`);
     await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS gdelt_enriched_at timestamptz`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_status text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_score double precision`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_reason text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_version text`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_evaluated_at timestamptz`);
+    await db.execute(sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS validity_gates jsonb`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS incident_validity_audit (
+      id serial PRIMARY KEY, title text NOT NULL, summary text, source text, source_url text,
+      feed text, verdict text NOT NULL, reason text, gates jsonb,
+      classifier_version text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
+    )`);
+    await db.execute(sql`ALTER TABLE incident_validity_audit ADD COLUMN IF NOT EXISTS content_fingerprint text`);
+    await db.execute(sql`ALTER TABLE incident_validity_audit ADD COLUMN IF NOT EXISTS retry_after timestamptz`);
+    await db.execute(sql`DROP INDEX IF EXISTS incident_validity_audit_url_version_idx`);
+    // Audit is append-only history: identical evidence may first receive a
+    // transient hold and later a substantive verdict. The former unique index
+    // collapsed those attempts, so remove it and retain only a lookup index
+    // ordered by creation time for latest-decision cache reads.
+    await db.execute(sql`DROP INDEX IF EXISTS incident_validity_audit_url_version_fingerprint_idx`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS incident_validity_audit_lookup_idx
+      ON incident_validity_audit (source_url, classifier_version, content_fingerprint, created_at)`);
 
     // Schema: analyst review override (additive, nullable boolean). Set true
     // when an analyst resolves a Cargo Watch "needs review" incident by
@@ -5118,6 +5151,10 @@ export async function backfillRelevance(): Promise<{
       source: incidentsTable.source,
       sourceUrl: incidentsTable.sourceUrl,
       location: incidentsTable.location,
+      category: incidentsTable.category,
+      country: incidentsTable.country,
+      occurredAt: incidentsTable.occurredAt,
+      incidentDate: incidentsTable.incidentDate,
     })
     .from(incidentsTable)
     .where(
@@ -5163,6 +5200,10 @@ export async function backfillRelevance(): Promise<{
       source: r.source ?? "",
       sourceUrl: r.sourceUrl ?? "",
       location: r.location ?? null,
+      category: r.category ?? null,
+      country: r.country ?? null,
+      occurredAt: r.occurredAt ?? null,
+      incidentDate: r.incidentDate ?? null,
     });
     const bucket = perTopic.get(r.topic) ?? { relevant: 0, irrelevant: 0 };
     if (v.relevant) bucket.relevant++;

@@ -11,12 +11,16 @@ import {
   validateFlashpointReportDataset,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import {
+  invalidFlashpointSemantic,
+  validFlashpointSemantic,
+} from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE = "2026-09-07";
 
 let nextId = 1;
 function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
-  return {
+  const base = {
     id: nextId++,
     title: "Workers stage protest over wages in Lahore",
     summary: "Union members marched through the city centre.",
@@ -27,6 +31,7 @@ function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident 
     occurredAt: "2026-09-04T08:00:00Z",
     ...over,
   } as unknown as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("Sprint 1b Steve PDF hygiene", () => {
@@ -86,6 +91,7 @@ describe("Sprint 1b Steve PDF hygiene", () => {
           summary: "The fast bowler struck twice in the powerplay.",
           country: "New Zealand",
           severity: "high",
+          ...invalidFlashpointSemantic("sports event"),
         }),
         inc({ title: "Farmers march to parliament over crop prices", country: "India", location: "Delhi" }),
       ];
@@ -113,6 +119,7 @@ describe("Sprint 1b Steve PDF hygiene", () => {
           country: "Bangladesh",
           location: "Washington",
           severity: "moderate",
+          ...invalidFlashpointSemantic("event geography is outside the assigned country"),
         }),
         inc({ title: "Students rally in Dhaka over tuition hikes", country: "Bangladesh", location: "Dhaka" }),
       ];
@@ -136,7 +143,7 @@ describe("Sprint 1b Steve PDF hygiene", () => {
 
     it("selector drops bare wire-caption rows", () => {
       const rows = [
-        inc({ title: "South Korea US Protest", country: "South Korea", severity: "high" }),
+        inc({ title: "South Korea US Protest", country: "South Korea", severity: "high", ...invalidFlashpointSemantic("bare wire-caption row") }),
         inc({ title: "Farmers march to parliament over crop prices", country: "India", location: "Delhi" }),
       ];
       const sel = selectFlashpointUsable(rows, "flashpoint", ISSUE);
@@ -169,12 +176,14 @@ describe("Sprint 1b Steve PDF hygiene", () => {
           title: "Japan fusion energy project reaches new research milestone",
           country: "Japan",
           severity: "moderate",
+          ...invalidFlashpointSemantic("science project"),
         }),
         inc({
           title: "Anti-gang police operation nets 12 suspects in Jakarta",
           country: "Indonesia",
           location: "Jakarta",
           severity: "high",
+          ...invalidFlashpointSemantic("ordinary security operation"),
         }),
         inc({ title: "Students rally in Dhaka over tuition hikes", country: "Bangladesh", location: "Dhaka" }),
       ];

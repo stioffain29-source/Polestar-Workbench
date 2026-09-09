@@ -80,4 +80,5 @@ describe("evaluateIncidentRelevance", () => {
     });
     expect(verdict.relevant).toBe(true);
   });
+
 });

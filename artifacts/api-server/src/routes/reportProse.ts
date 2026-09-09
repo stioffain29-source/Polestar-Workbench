@@ -22,10 +22,15 @@ function reportIdOf(raw: string | string[] | undefined): number | null {
 // empty sections. NOTHING is persisted: a transient/never-configured LLM must
 // not poison the cache with blank rows. The client falls back to its
 // deterministic draftTopicReportProse template.
-function unavailableProse(fingerprint: string) {
+function unavailableProse(
+  fingerprint: string,
+  generationBasisFingerprint: string | null,
+) {
   return {
     available: false as const,
     fingerprint,
+    generationBasisFingerprint,
+    editedGenerationBasisFingerprint: null,
     sections: null,
     edited: null,
     stale: false,
@@ -40,12 +45,17 @@ function unavailableProse(fingerprint: string) {
 function isProseEditStale(
   liveFingerprint: string,
   editedFingerprint: string | null | undefined,
+  liveGenerationBasisFingerprint: string | null | undefined,
+  editedGenerationBasisFingerprint: string | null | undefined,
   edited: unknown,
 ): boolean {
   return (
     edited != null &&
-    editedFingerprint != null &&
-    editedFingerprint !== liveFingerprint
+    (
+      editedFingerprint == null ||
+      editedFingerprint !== liveFingerprint ||
+      editedGenerationBasisFingerprint !== liveGenerationBasisFingerprint
+    )
   );
 }
 
@@ -66,6 +76,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     return;
   }
   const body = parsed.data;
+  const generationBasisFingerprint = body.generationBasisFingerprint ?? null;
 
   const [report] = await db
     .select()
@@ -92,6 +103,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     basisDays: body.basisDays,
     incidents,
     facts: body.facts ?? null,
+    generationBasisFingerprint,
   });
 
   const [existing] = await db
@@ -103,9 +115,18 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     res.json({
       available: true,
       fingerprint,
+      generationBasisFingerprint: existing.generationBasisFingerprint ?? null,
+      editedGenerationBasisFingerprint:
+        existing.editedGenerationBasisFingerprint ?? null,
       sections: existing.sections,
       edited: existing.edited ?? null,
-      stale: isProseEditStale(fingerprint, existing.editedFingerprint, existing.edited),
+      stale: isProseEditStale(
+        fingerprint,
+        existing.editedFingerprint,
+        existing.generationBasisFingerprint,
+        existing.editedGenerationBasisFingerprint,
+        existing.edited,
+      ),
       model: existing.model,
       generatedAt: existing.generatedAt,
     });
@@ -113,7 +134,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
   }
 
   if (!isLlmAvailable()) {
-    res.json(unavailableProse(fingerprint));
+    res.json(unavailableProse(fingerprint, generationBasisFingerprint));
     return;
   }
 
@@ -129,7 +150,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
 
   if (!outcome.ok) {
     req.log.warn({ reportId, error: outcome.error }, "report prose generation failed");
-    res.json(unavailableProse(fingerprint));
+    res.json(unavailableProse(fingerprint, generationBasisFingerprint));
     return;
   }
 
@@ -140,6 +161,8 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
   // re-saves it against the new one.
   const keptEdited = existing?.edited ?? null;
   const keptEditedFingerprint = existing?.editedFingerprint ?? null;
+  const keptEditedGenerationBasisFingerprint =
+    existing?.editedGenerationBasisFingerprint ?? null;
   const now = new Date();
   const [row] = await db
     .insert(reportProseTable)
@@ -147,9 +170,11 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
       reportId,
       topic: body.topic,
       fingerprint,
+      generationBasisFingerprint,
       sections: outcome.sections,
       edited: keptEdited,
       editedFingerprint: keptEditedFingerprint,
+      editedGenerationBasisFingerprint: keptEditedGenerationBasisFingerprint,
       model: outcome.model,
       generatedAt: now,
     })
@@ -158,9 +183,11 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
       set: {
         topic: body.topic,
         fingerprint,
+        generationBasisFingerprint,
         sections: outcome.sections,
         edited: keptEdited,
         editedFingerprint: keptEditedFingerprint,
+        editedGenerationBasisFingerprint: keptEditedGenerationBasisFingerprint,
         model: outcome.model,
         generatedAt: now,
       },
@@ -170,9 +197,18 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
   res.json({
     available: true,
     fingerprint: row.fingerprint,
+    generationBasisFingerprint: row.generationBasisFingerprint ?? null,
+    editedGenerationBasisFingerprint:
+      row.editedGenerationBasisFingerprint ?? null,
     sections: row.sections,
     edited: row.edited ?? null,
-    stale: isProseEditStale(row.fingerprint, row.editedFingerprint, row.edited),
+    stale: isProseEditStale(
+      row.fingerprint,
+      row.editedFingerprint,
+      row.generationBasisFingerprint,
+      row.editedGenerationBasisFingerprint,
+      row.edited,
+    ),
     model: row.model,
     generatedAt: row.generatedAt,
   });
@@ -207,6 +243,17 @@ router.put("/reports/:id/prose/edit", async (req, res): Promise<void> => {
     res.status(409).json({ error: "stale", fingerprint: existing.fingerprint });
     return;
   }
+  if (
+    (body.generationBasisFingerprint ?? null) !==
+    (existing.generationBasisFingerprint ?? null)
+  ) {
+    res.status(409).json({
+      error: "stale",
+      fingerprint: existing.fingerprint,
+      generationBasisFingerprint: existing.generationBasisFingerprint ?? null,
+    });
+    return;
+  }
 
   const [row] = await db
     .update(reportProseTable)
@@ -215,6 +262,8 @@ router.put("/reports/:id/prose/edit", async (req, res): Promise<void> => {
     .set({
       edited: body.sections as TopicProseSections,
       editedFingerprint: existing.fingerprint,
+      editedGenerationBasisFingerprint:
+        body.generationBasisFingerprint ?? null,
     })
     .where(eq(reportProseTable.reportId, reportId))
     .returning();
@@ -222,9 +271,18 @@ router.put("/reports/:id/prose/edit", async (req, res): Promise<void> => {
   res.json({
     available: true,
     fingerprint: row.fingerprint,
+    generationBasisFingerprint: row.generationBasisFingerprint ?? null,
+    editedGenerationBasisFingerprint:
+      row.editedGenerationBasisFingerprint ?? null,
     sections: row.sections,
     edited: row.edited ?? null,
-    stale: isProseEditStale(row.fingerprint, row.editedFingerprint, row.edited),
+    stale: isProseEditStale(
+      row.fingerprint,
+      row.editedFingerprint,
+      row.generationBasisFingerprint,
+      row.editedGenerationBasisFingerprint,
+      row.edited,
+    ),
     model: row.model,
     generatedAt: row.generatedAt,
   });

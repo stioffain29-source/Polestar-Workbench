@@ -8,12 +8,13 @@ import {
   validateFlashpointReportDataset,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 
 const ISSUE = "2026-09-07";
 
 let nextId = 1;
 function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
-  return {
+  const base = {
     id: nextId++,
     title: "Workers stage protest over wages in Lahore",
     summary: "Union members marched through the city centre.",
@@ -24,6 +25,7 @@ function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident 
     occurredAt: "2026-09-04T08:00:00Z",
     ...over,
   } as unknown as FlashpointReportIncident;
+  return { ...base, ...validFlashpointSemantic(base), ...over };
 }
 
 describe("Sprint 1c FP-14 editorial voice", () => {

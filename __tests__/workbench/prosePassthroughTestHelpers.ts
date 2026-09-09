@@ -11,6 +11,8 @@
  *
  * Named *TestHelpers.ts so jest's testPathIgnorePatterns skips it as a suite.
  */
+import { buildFlashpointReportDataset } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+
 export const ISSUE_DATE = "2026-06-20";
 
 // pickProse (flashpoint core prose) only lets editor text REPLACE the
@@ -62,18 +64,6 @@ export const FLASHPOINT_SENTINELS: Record<string, string> = {
   polestarView: longProse("ZZ-POLESTAR-OVERRIDE-ZZ"),
 };
 
-export const FLASHPOINT_REPORT = {
-  id: 1,
-  topic: "flashpoint",
-  status: "published",
-  issueDate: ISSUE_DATE,
-  title: "Flashpoint Watch",
-  situation: "",
-  whatHappened: "",
-  author: "Test",
-  ...FLASHPOINT_SENTINELS,
-};
-
 export const FLASHPOINT_INCIDENTS = [
   baseInc({
     id: "f1",
@@ -92,6 +82,25 @@ export const FLASHPOINT_INCIDENTS = [
     summary: "A street rally protested rising fuel prices.",
   }),
 ];
+
+// Explicitly bind these saved analyst overrides to the canonical empty set
+// produced by the legacy-invalid fixture rows. Missing provenance is stale.
+export const FLASHPOINT_REPORT = {
+  id: 1,
+  topic: "flashpoint",
+  status: "published",
+  issueDate: ISSUE_DATE,
+  title: "Flashpoint Watch",
+  situation: "",
+  whatHappened: "",
+  author: "Test",
+  proseBasisFingerprint: buildFlashpointReportDataset(
+    FLASHPOINT_INCIDENTS,
+    "flashpoint",
+    ISSUE_DATE,
+  ).canonical.fingerprint,
+  ...FLASHPOINT_SENTINELS,
+};
 
 // ---------------------------------------------------------------------------
 // Shipping — 5 section reads.

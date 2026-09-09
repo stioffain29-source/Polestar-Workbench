@@ -225,7 +225,9 @@ export function decideSocialPromotion(
 
   // Duplicate-block against live incidents so a promote can never double-count
   // an event already tracked.
-  const dup = pickDuplicate(post, candidates);
+  // Flashpoint candidates are not yet semantically validated here. A fuzzy
+  // title/date match against an unvalidated row must never suppress them.
+  const dup = topic === "flashpoint" ? null : pickDuplicate(post, candidates);
   if (dup) {
     return { promote: false, reason: "duplicate", duplicateOf: dup.incident.id };
   }
@@ -271,6 +273,11 @@ export function decideSocialPromotion(
     relevanceReason: rel.reason,
     relevanceVersion: rel.version,
     relevanceEvaluatedAt: new Date(),
+    ...(topic === "flashpoint" ? {
+      validityStatus: "needs_review", validityScore: 0,
+      validityReason: "awaiting source-backed semantic validation",
+      validityVersion: null, validityEvaluatedAt: null, validityGates: null,
+    } : {}),
   };
 
   return {

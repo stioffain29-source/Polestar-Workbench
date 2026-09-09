@@ -5,6 +5,7 @@ import ShippingReportPreview from "../../artifacts/workbench/src/components/Ship
 import ConflictReportPreview from "../../artifacts/workbench/src/components/ConflictReportPreview";
 import PngCountryReportBody from "../../artifacts/workbench/src/components/PngCountryReportBody";
 import type { FlashpointReportIncident } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
+import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
 import type { ShippingReportIncident } from "../../artifacts/workbench/src/lib/shippingReportDataset";
 import type { ConflictReportIncident } from "../../artifacts/workbench/src/lib/conflictReportDataset";
 import type {
@@ -55,7 +56,7 @@ const report = {
 // ---------------------------------------------------------------------------
 
 describe("FlashpointReportPreview Fast Facts tiles", () => {
-  const incidents: FlashpointReportIncident[] = [
+  const incidents = [
     {
       id: "f1",
       topic: "flashpoint",
@@ -89,7 +90,7 @@ describe("FlashpointReportPreview Fast Facts tiles", () => {
       source: "Test Wire",
       sourceUrl: "https://example.com/f3",
     },
-  ];
+  ].map((row) => ({ ...row, ...validFlashpointSemantic(row) })) as FlashpointReportIncident[];
 
   const html = renderToStaticMarkup(
     <FlashpointReportPreview
