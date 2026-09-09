@@ -1023,6 +1023,14 @@ const FP_SPORTS_ENTERTAINMENT_RE =
 // discrete public-order event (FP-07).
 const FP_REACTION_COMMENTARY_RE =
   /\b(messages? of support|message of sympathy|sympathy messages?|voices? (?:her|his|their) support|express(?:es|ed)? (?:her|his|their )?support)\b|\b(?:lawmaker|legislator|mp|member of parliament|senator|congress(?:man|woman|member))\b[^.!?]{0,80}\b(?:messages? of support|sympathy|solidarity)\b|\b(?:gets?|received|receiv(?:es|ed)|sent)\s+messages?\s+of\s+support\b|\b(?:reacts?|reacted|reaction)\s+to\b[^.!?]{0,60}\bprotest\b/i;
+// Gang/criminal/security enforcement without a public-order event (FP-13).
+const FP_SCOPE_CRIME_RE =
+  /\b(gang (?:war|shootout|violence|fight|member|leader|arrest|raid|clash)|drug bust|narcotics? bust|anti-gang|anti-crime|cartel|syndicate|police (?:raid|operation|crackdown)|security force operation|armed robbery|hold[- ]?up|shootout|drive[- ]by|extrajudicial killing)\b/i;
+// Infrastructure / science project copy mis-tagged as protest (FP-13).
+const FP_SCOPE_INFRA_SCIENCE_RE =
+  /\b(fusion (?:reactor|project|energy|power|research|startup|experiment|plant|facility)|\biter\b|tokamak|nuclear fusion|scientific demonstration|research demonstration|demonstration reactor|demonstration plant|prototype reactor)\b/i;
+const FP_PUBLIC_ORDER_CUE_RE =
+  /\b(protest(?:s|ers?|ing)?|demonstrat(?:ion|ions|ors?)?|rall(?:y|ies)|march(?:es)?|riot(?:s)?|unrest|sit[- ]?in|blockade|strike|walkout|tear ?gas|water cannon|rubber bullet|baton charge|curfew|crackdown)\b/i;
 
 // Zoo / animal novelty "protest" — a captive-animal or wildlife-park novelty
 // item where the animal itself is cast as the "protester" ("Leader vows croc
@@ -2639,6 +2647,14 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // Hard sports/entertainment exclude — cricket copy, player news, etc.
     if (FP_SPORTS_ENTERTAINMENT_RE.test(titleHaystack(i)) && !FP_CALM_LIVE_RE.test(text)) {
       return { relevant: false, reason: "excluded: sports/entertainment coverage (not civil unrest)" };
+    }
+    // Infrastructure/science project — fusion reactor, research demo, etc.
+    if (FP_SCOPE_INFRA_SCIENCE_RE.test(titleHaystack(i)) && !FP_PUBLIC_ORDER_CUE_RE.test(text)) {
+      return { relevant: false, reason: "excluded: infrastructure/science project (not civil unrest)" };
+    }
+    // Gang/criminal/security enforcement without a protest or unrest event.
+    if (FP_SCOPE_CRIME_RE.test(titleHaystack(i)) && !FP_PUBLIC_ORDER_CUE_RE.test(text)) {
+      return { relevant: false, reason: "excluded: gang/criminal/security enforcement (not civil unrest)" };
     }
     // Reaction/commentary that mentions a protest but reports no street event.
     if (FP_REACTION_COMMENTARY_RE.test(titleHaystack(i)) && !FP_CALM_LIVE_RE.test(text)) {

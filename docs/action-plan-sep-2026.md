@@ -1,9 +1,11 @@
 # Action Plan — Commodity Reports Priority (Sep 2026)
 
-**Date:** 8 September 2026 (revised)  
-**Context:** Steve Ward (7 Sep) — commodity-style reports are the priority (Flashpoint, Fuel Watch, Cargo, and similar topic reports). Country briefs are still wrong (Indonesia worst) but **secondary**. 24-hour view is tighter (good). GDELT re-subscription and Carto API are on Steve's side.  
+**Date:** 9 September 2026 (revised)  
+**Context:** Steve Ward (7–8 Sep) — commodity-style reports are the priority (Flashpoint, Fuel Watch, Cargo, and similar topic reports). Country briefs are still wrong (Indonesia worst) but **secondary**. 24-hour view is tighter (good). GDELT re-subscription and Carto API are on Steve's side.  
 
-**7 Sep evening — Steve PDF review** (`polestar-report-flashpoint-202609072120.pdf`): Sprint 1a (selector + parity + relevance) shipped and republished, but the live Flashpoint PDF still has **data-hygiene and selector gaps**. Steve's directive: **fix relevance/classification before any PDF design work**. Keep forecast logic and current report layout; do not change presentation until the incident set is clean.
+**7 Sep evening — Steve PDF review** (`polestar-report-flashpoint-202609072120.pdf`): Sprint 1a (selector + parity + relevance) shipped and republished, but the live Flashpoint PDF still has **data-hygiene and selector gaps**. Steve's directive: **fix relevance/classification before any PDF design work**.
+
+**8 Sep — Steve PDF review** (`polestar-report-flashpoint-202609082050.pdf`): Hygiene gaps **persist** (fusion project as protest, diaspora geography, gang/security rows, raw-feed titles). Steve adds a **second block**: prose is generic, repetitive and templated — sections restate the same conclusions; copy narrates the dataset and explains software mechanics instead of delivering analyst judgement. **Editorial voice is now an explicit gate**, but still **after** the incident set is clean. Keep forecast logic and current report layout; no PDF design work.
 
 **Related docs:**
 
@@ -45,38 +47,57 @@ Tagged in [1.4 stakeholder examples](./phase-1-baseline-audit/1.4-stakeholder-ex
 | R11 | **Keep** forecast logic (confirmed vs unconfirmed mobilisation) | keep | — | No change |
 | R12 | **Keep** report structure and visual design | keep | — | No PDF/design work |
 
+### 8 Sep — Flashpoint PDF review (`polestar-report-flashpoint-202609082050.pdf`)
+
+Tagged in [1.4 stakeholder examples](./phase-1-baseline-audit/1.4-stakeholder-examples.md). **Primary regression fixture** — supersedes 7 Sep PDF for acceptance. Editorial benchmark: **APAC Fuel Crisis Report** (2026-04-21, pre-workbench manual report).
+
+| # | Steve requirement | Tag | Backlog | Status |
+| --- | --- | --- | --- | --- |
+| R13 | **Client-facing title quality gate** — raw-feed titles (e.g. "South Korea US Protest") must not render | slop-in | FP-12 | Open |
+| R14 | **Scope classification** — gang/criminal/security-force stories excluded unless clear protest or civil-unrest relevance | slop-in | FP-13 | Open |
+| R15 | **Infrastructure/science misclassification** — e.g. Japan fusion project must not enter as protest | slop-in | FP-13 | Open |
+| R16 | Reconfirm **event location, not subject-country** — Bangladesh diaspora protest ≠ APAC incident | wrong-country | FP-06 | Open |
+| R17 | Reconfirm **single validated incident set** — Fast Facts, charts, country counts, prose all from same cleaned set | wrong-count | FP-09 | Open |
+| R18 | **Section distinctness** — Executive Summary, Country View, What Matters, Polestar View must not repeat the same conclusions | wrong-prose | FP-14 | Open |
+| R19 | **Stop dataset narration + template filler** — no phrases like "driven by protest activity, mostly protests…"; no posture-score or "next section" meta copy | wrong-prose | FP-14 | Open |
+| R20 | **Polestar voice** — concise, operational, specific, judgement-led; every paragraph answers "so what?" | wrong-prose | FP-14 | Open |
+
+**Sequence (Steve, 8 Sep):** data hygiene **first** (R13–R17) → editorial voice **second** (R18–R20) → send revised PDF. No layout changes (R12).
+
 ---
 
 ## Confirmed scope (from Steve)
 
 | Priority | What Steve wants | Backlog IDs |
 | --- | --- | --- |
-| **1** | **Flashpoint data hygiene** — relevance, classifier, selector, metrics, narrative validation (Steve PDF R1–R10) | FP-04 → FP-11 |
+| **1** | **Flashpoint data hygiene** — relevance, classifier, selector, title gate, metrics, narrative consistency (R1–R10, R13–R17) | FP-04 → FP-13 |
 | **2** | One incident set for counts, tables, Fast Facts, prose, Related Incidents, posture | FP-09, FP-03 (extend) |
 | **3** | Automated generation gate — fail on count/severity/country contradictions | FP-10, FP-11 |
-| **4** | Cargo slop removed at ingest **and** report scope | CG-01, CG-02 — **after Flashpoint block green** |
-| **5** | Thin / generic prose on Energy, Fertiliser, Data Centres | TC-01, TC-02 |
-| **6** | Fuel Watch — verify canonical-facts parity (deterministic; no AI drift) | Parity audit only |
-| **7** | Country briefs = in-country events, not mention-of-country | CB-01 (+ CB-02) — **after commodity block** |
-| **8** | Automated audit/validation — not manual PDF spotting | Phase 4 gates + proof pack |
+| **4** | **Flashpoint editorial voice** — distinct sections, banned template phrases, Polestar judgement (R18–R20) | FP-14 |
+| **5** | Cargo slop removed at ingest **and** report scope | CG-01, CG-02 — **after Flashpoint block green** |
+| **6** | Thin / generic prose on Energy, Fertiliser, Data Centres | TC-01, TC-02 |
+| **7** | Fuel Watch — verify canonical-facts parity (deterministic; no AI drift) | Parity audit only |
+| **8** | Country briefs = in-country events, not mention-of-country | CB-01 (+ CB-02) — **after commodity block** |
+| **9** | Automated audit/validation — not manual PDF spotting | Phase 4 gates + proof pack |
 
 **Hard rules:**
 
-- **No PDF or visual design changes** until FP-04–FP-11 gates are green (Steve R1, R12).
-- **Do not start Cargo / Fuel / country briefs** until Steve's Flashpoint PDF fixture passes.
+- **No PDF or visual design changes** until FP-04–FP-14 gates are green (Steve R1, R12).
+- **Do not start Cargo / Fuel / country briefs** until Steve's Flashpoint PDF fixture passes (hygiene **and** editorial).
+- **Hygiene before copy** — FP-04–FP-13 must pass before FP-14 editorial work starts (Steve R13–R17 before R18–R20).
 - **Keep** forecast logic (confirmed vs unconfirmed) — do not regress (Steve R11).
 
 ### Commodity report scope
 
 | Report | Known issue | Sprint | Backlog |
 | --- | --- | --- | --- |
-| **Flashpoint Watch** | Sprint 1a shipped; Steve PDF still shows slop, wrong geography, Related Incidents noise, Seoul/NZ prose contradictions | **1** (Days 1–6) | FP-02–FP-03–FP-01 ✅ then **FP-04–FP-11** |
+| **Flashpoint Watch** | Sprint 1a shipped; 8 Sep PDF still shows slop, wrong geography, raw titles, templated prose across sections | **1** (Days 1–8) | FP-02–FP-03–FP-01 ✅ then **FP-04–FP-14** |
 | **Cargo Watch** | Slop through ingest; scope gate drift | **2** (paused) | CG-01, CG-02 |
-| **Fuel Watch** | Deterministic — verify preview == PDF | **2** (Day 5) | Parity audit |
-| **Energy / Fertiliser / Data Centres** | Thin content, "Data quality issue" Fast Facts | **3** (Days 6–7) | TC-01, TC-02 |
+| **Fuel Watch** | Deterministic — verify preview == PDF | **2** (Day 10) | Parity audit |
+| **Energy / Fertiliser / Data Centres** | Thin content, "Data quality issue" Fast Facts | **3** (Days 11–12) | TC-01, TC-02 |
 | Shipping Watch | Off-region syndication | Deferred (P3) | SH-01 |
 | Conflict Watch | Secondary logic review | Deferred (P3) | CF-01 |
-| **Country briefs** | Foreign-subject rows (Indonesia worst) | **4** (Days 8–9) | CB-01, CB-02 |
+| **Country briefs** | Foreign-subject rows (Indonesia worst) | **4** (Days 13–14) | CB-01, CB-02 |
 
 ---
 
@@ -104,15 +125,15 @@ Outputs → [`docs/phase-4-proof-pack/week0-baseline/`](./phase-4-proof-pack/wee
 | 0.3 | Capture **before** parity state | `docs/phase-4-proof-pack/week0-baseline/flashpoint-parity-2026-05-31.txt` |
 | 0.4 | Export **before** headless PDFs | `flashpoint-before-*.pdf`, `cargo-watch-before.pdf`, `indonesia-brief-before.pdf` |
 | 0.5 | Re-send Phase 2 doc to Steve | `python scripts/generate_phase2_fix_plan_docx.py` → attach DOCX |
-| 0.6 | Log Steve's PDFs when they arrive | ✅ `polestar-report-flashpoint-202609072120.pdf` → [1.4 stakeholder template](./phase-1-baseline-audit/1.4-stakeholder-examples.md) |
+| 0.6 | Log Steve's PDFs when they arrive | ✅ `…072120.pdf` (7 Sep); ✅ `…082050.pdf` (8 Sep) → [1.4 stakeholder template](./phase-1-baseline-audit/1.4-stakeholder-examples.md) |
 
 **Exit criteria:** Baseline recorded (528→8 funnel, 8 final rows, parity failures if any). Proof pack folder started.
 
 ---
 
-## Sprint 1 — Flashpoint block (Days 1–6)
+## Sprint 1 — Flashpoint block (Days 1–8)
 
-Steve's top item. **Sprint 1a** (selector recovery + parity + relevance) is shipped; **Sprint 1b** (Steve PDF hygiene) is now the gate before Cargo or any PDF design work.
+Steve's top item. **Sprint 1a** (selector recovery + parity + relevance) is shipped. **Sprint 1b** (data hygiene) and **Sprint 1c** (editorial voice) are both gates before Cargo or any PDF design work.
 
 ### Sprint 1a — Shipped (7 Sep)
 
@@ -122,31 +143,34 @@ Steve's top item. **Sprint 1a** (selector recovery + parity + relevance) is ship
 | 2 | FP-03 parity proof | ✅ Shipped | KPI = tables = enriched set; parity tests green |
 | 3 | FP-01 relevance slop | ✅ Shipped | `RELEVANCE_RULE_VERSION = 2026-09-01.3`; boot backfill |
 
-**Steve feedback:** Report is fuller but still not acceptable — see R2–R10 above. Do **not** treat Sprint 1a as closed.
+**Steve feedback:** Report is fuller but still not acceptable — see R2–R20 above. Do **not** treat Sprint 1a as closed.
 
 ---
 
-### Sprint 1b — Steve PDF hygiene (Days 4–6) — **current focus**
+### Sprint 1b — Data hygiene (Days 4–6) — **current focus**
 
-**Regression fixture:** `polestar-report-flashpoint-202609072120.pdf` (issue generated 7 Sep 2026).
+**Regression fixture:** `polestar-report-flashpoint-202609082050.pdf` (8 Sep 2026). Also replay `…072120.pdf` — both must pass.
 
 **Files (primary):**
 
-- `lib/relevance/src/topicRelevance.ts` — FP-04, FP-05, FP-07
-- `artifacts/workbench/src/lib/incidentClassifier.ts` — FP-05 (severity typing)
+- `lib/relevance/src/topicRelevance.ts` — FP-04, FP-05, FP-07, FP-13
+- `lib/ingest/src/titleTranslate.ts` + incident title render path — FP-12
+- `artifacts/workbench/src/lib/incidentClassifier.ts` — FP-05, FP-13 (severity typing)
 - `artifacts/workbench/src/lib/flashpointReportDataset.ts` — FP-06, FP-09
 - `artifacts/workbench/src/lib/relatedIncidents.ts` — FP-08
-- `artifacts/workbench/src/lib/draftReportProse.ts` + country read builders — FP-11
-- `validateFlashpointReportDataset` / export gate — FP-10
+- `artifacts/workbench/src/lib/draftReportProse.ts` + country read builders — FP-11 (consistency only; voice in FP-14)
+- `validateFlashpointReportDataset` / export gate — FP-10, FP-12
 
 #### Day 4 — FP-04 + FP-05 + FP-06: Ingest relevance & geography
 
 **Work:**
 
-- [ ] **FP-04** Add explicit **strike** homonym excludes: military strike groups, airstrikes, disaster “striking” an area, sports strikes, lightning/storm strike — must not classify as labour action
-- [ ] **FP-05** Hard **sports/entertainment** exclude at relevance + classifier — Scott Kuggeleijn cricket story must never enter Flashpoint as High-severity protest
-- [ ] **FP-06** **Event location, not subject-country** for geography — a Bangladesh-related protest in US/UK is not a Bangladesh/APAC incident
-- [ ] Bump `RELEVANCE_RULE_VERSION` + boot backfill if relevance rules change
+- [x] **FP-04** Add explicit **strike** homonym excludes: military strike groups, airstrikes, disaster “striking” an area, sports strikes, lightning/storm strike — must not classify as labour action
+- [x] **FP-05** Hard **sports/entertainment** exclude at relevance + classifier — Scott Kuggeleijn cricket story must never enter Flashpoint as High-severity protest
+- [x] **FP-06** **Event location, not subject-country** for geography — a Bangladesh diaspora protest in US/UK is not a Bangladesh/APAC incident (Steve R4, R16)
+- [x] **FP-12** **Client-facing title quality gate** — reject or rewrite raw-feed titles before render (e.g. "South Korea US Protest"); fail export if title fails gate
+- [x] **FP-13** **Scope classification** — drop gang/criminal/security-force and infrastructure/science rows (e.g. Japan fusion project) unless clear protest or civil-unrest relevance
+- [x] Bump `RELEVANCE_RULE_VERSION` + boot backfill if relevance rules change (`2026-09-09.1`)
 
 **Verify:**
 
@@ -162,6 +186,8 @@ pnpm --filter workbench exec tsx scripts/replayFlashpointRelevance.ts
 | Military/airstrike/disaster/sports “strike” rows | Dropped at relevance or selector |
 | Cricket/sports entertainment (Kuggeleijn-class) | **0** in Flashpoint final set |
 | Foreign-venue protest with APAC subject-country only | Dropped or re-tagged to correct theatre |
+| Raw-feed title ("South Korea US Protest") | Blocked at title gate (FP-12) |
+| Gang/criminal/security or fusion/infra without protest hook | **0** in Flashpoint final set (FP-13) |
 | Motorsport rally homonym drops | No regression |
 
 ---
@@ -170,8 +196,8 @@ pnpm --filter workbench exec tsx scripts/replayFlashpointRelevance.ts
 
 **Work:**
 
-- [ ] **FP-07** Reject **reaction/commentary** stories that mention protests but do not describe a discrete public-order event
-- [ ] **FP-08** Tighten **Related Incidents** selector — drop sympathy/support/commentary rows (e.g. Thai lawmaker messages of support from Myanmar citizens after protest)
+- [x] **FP-07** Reject **reaction/commentary** stories that mention protests but do not describe a discrete public-order event
+- [x] **FP-08** Tighten **Related Incidents** selector — drop sympathy/support/commentary rows (e.g. Thai lawmaker messages of support from Myanmar citizens after protest)
 
 **Verify:**
 
@@ -186,17 +212,17 @@ pnpm test -- relatedIncidentsCap flashpointReportConsistency
 | --- | --- |
 | Commentary-only protest mentions | Dropped |
 | Related Incidents ⊆ `selectFlashpointUsable().enriched` | Proven by script |
-| Steve fixture rows (Kuggeleijn, lawmaker/support) | Absent from tables + Related |
+| Steve fixture rows (Kuggeleijn, lawmaker/support, fusion, gang/security) | Absent from tables + Related |
 
 ---
 
-#### Day 6 — FP-09 + FP-10 + FP-11: Metrics, validation, narrative consistency
+#### Day 6 — FP-09 + FP-10 + FP-11: Metrics, validation, narrative consistency (hygiene)
 
 **Work:**
 
-- [ ] **FP-09** Recalculate **distinct incidents, protest count, country count, highest severity, weekly posture** only from the final validated incident set (no wider window, no forecast rows in confirmed counts)
-- [ ] **FP-10** Add **generation validation** — report build **fails** if country or severity narrative contradicts underlying records
-- [ ] **FP-11** Fix **Seoul** contradiction (country section vs What Matters upcoming-only) and **NZ** contradiction (table High vs What Matters Low)
+- [x] **FP-09** Recalculate **distinct incidents, protest count, country count, highest severity, weekly posture** only from the final validated incident set (no wider window, no forecast rows in confirmed counts)
+- [x] **FP-10** Add **generation validation** — report build **fails** if country or severity narrative contradicts underlying records
+- [x] **FP-11** Fix **Seoul** contradiction (country section vs What Matters upcoming-only) and **NZ** contradiction (table High vs What Matters Low)
 - [ ] **Do not change** forecast logic (confirmed vs unconfirmed mobilisation) — Steve confirmed this works
 
 **Verify:**
@@ -216,11 +242,70 @@ TOPIC=flashpoint ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./s
 | Seoul: confirmed vs upcoming language | Consistent across country section + What Matters |
 | NZ: table severity vs What Matters | Consistent |
 | `validateFlashpointReportDataset` | Hard-fail on contradiction (FP-10) |
-| Steve PDF fixture replay | **0** tagged slop classes; contradictions resolved |
+| Steve PDF fixture replay (both PDFs) | **0** tagged slop classes; contradictions resolved |
+| Title gate | No raw-feed rubbish in client-facing titles |
 
-**Deliverable to Steve:** Updated Flashpoint PDF on the **same issue date as his review PDF** + short delta (what was dropped/fixed). **No layout changes.**
+**Sprint 1b exit:** Hygiene gates green on `…082050.pdf` issue date. **Do not send to Steve yet** — editorial pass (Sprint 1c) required.
 
-**Milestone message to Steve:** *"Flashpoint hygiene pass complete — strike/sports slop removed, geography on event location, Related Incidents tightened, metrics and narrative validated. Please re-read the report; structure and forecast logic unchanged."*
+**Milestone (internal):** *"Flashpoint hygiene pass complete — scope/title/geography/selector/metrics validated. Starting editorial voice pass."*
+
+---
+
+### Sprint 1c — Editorial voice (Days 7–8) — **after Sprint 1b green**
+
+**Benchmark:** APAC Fuel Crisis Report (2026-04-21) — pre-workbench manual report; target tone for Flashpoint prose.
+
+**Files (primary):**
+
+- `artifacts/workbench/src/lib/draftReportProse.ts` — section templates, banned phrases
+- Flashpoint country read / What Matters / Polestar View builders — section role separation
+- `lib/country-engine/src/narrative.ts` — shared phrase guards (reuse CB-02 patterns where applicable)
+- `validateFlashpointReportDataset` / export gate — extend FP-10 for editorial checks
+
+#### Day 7 — FP-14a: Section distinctness + banned template phrases
+
+**Work:**
+
+- [ ] **FP-14** Define **one job per section** — Executive Summary (headline judgement), Country View (theatre-specific operational read), What Matters (priority risks + upcoming), Polestar View (client-facing recommendation); no cross-section repetition of the same conclusion
+- [ ] Add **banned phrase list** for dataset narration ("driven by protest activity", "mostly protests and organised action", posture-score explanations, "the following section…")
+- [ ] Prose generated **only from** `selectFlashpointUsable().enriched` — no orphan references to dropped rows
+
+**Acceptance:**
+
+| Criterion | Target |
+| --- | --- |
+| Exec Summary vs Country View vs What Matters vs Polestar View | Distinct claims; automated or review checklist shows no repeated conclusion triplets |
+| Banned template phrases | **0** in `pdftotext` output on fixture issue date |
+| Every paragraph | Answers "so what?" — operational implication, not dataset description |
+
+#### Day 8 — FP-14b: Polestar voice + Steve deliverable
+
+**Work:**
+
+- [ ] Rewrite section prompts/templates toward **concise, operational, judgement-led** copy — match APAC Fuel Crisis tone, not generic LLM filler
+- [ ] Extend **FP-10 validation** — fail generation on banned phrases or section repetition heuristics
+- [ ] Headless PDF export on Steve's issue date; replay both regression PDFs
+
+**Verify:**
+
+```bash
+pnpm test -- flashpointReportConsistency flashpointProseVoice
+ISSUE=<steve-pdf-issue-date> pnpm --filter workbench exec tsx scripts/proveFlashpointSelection.ts
+TOPIC=flashpoint ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./scripts/registerLoader.mjs scripts/exportReportPdfHeadless.ts
+```
+
+**Acceptance:**
+
+| Criterion | Target |
+| --- | --- |
+| Voice vs APAC Fuel benchmark | Steve-readable: specific, not templated |
+| Software/meta filler | **0** posture-score or section-preview explanations |
+| Hygiene regression | Sprint 1b acceptance still green |
+| Both Steve PDF fixtures | Replay passes |
+
+**Deliverable to Steve:** Updated Flashpoint PDF on the **same issue date as `…082050.pdf`** + short delta (rows dropped, sections reworked). **No layout changes.**
+
+**Milestone message to Steve:** *"Flashpoint pass complete — incident set cleaned (scope, geography, titles, single metrics source) and prose reworked for distinct sections and Polestar voice. Structure and forecast logic unchanged. Please re-read against the 8 Sep PDF."*
 
 ---
 
@@ -255,13 +340,13 @@ TOPIC=flashpoint ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./s
 
 ---
 
-## Sprint 2 — Cargo + Fuel Watch (Days 7–8) — **paused**
+## Sprint 2 — Cargo + Fuel Watch (Days 9–10) — **paused**
 
-**Gate:** Do not start until Sprint 1b (FP-04–FP-11) passes Steve's PDF fixture.
+**Gate:** Do not start until Sprint 1b + 1c (FP-04–FP-14) pass Steve's PDF fixture.
 
 Commodity block continues after Flashpoint hygiene. Country briefs deferred to Sprint 4.
 
-### Day 7 — CG-01: Cargo slop coupling
+### Day 9 — CG-01: Cargo slop coupling
 
 **Files:** `lib/relevance/src/cargoSlop.ts` + `artifacts/workbench/src/lib/cargoAnalysis.ts` (mirror both layers)
 
@@ -281,7 +366,7 @@ Commodity block continues after Flashpoint hygiene. Country briefs deferred to S
 
 ---
 
-### Day 8 — Fuel Watch parity + CG-02 (Cargo masthead)
+### Day 10 — Fuel Watch parity + CG-02 (Cargo masthead)
 
 **Fuel Watch** (`fuelCanonicalFacts.ts`) — deterministic report; Steve flagged it alongside Flashpoint but audit shows lower risk. Verify, don't refactor unless broken.
 
@@ -302,14 +387,14 @@ Commodity block continues after Flashpoint hygiene. Country briefs deferred to S
 
 ---
 
-## Sprint 3 — Thin-content commodity topics (Days 9–10)
+## Sprint 3 — Thin-content commodity topics (Days 11–12)
 
 Energy, Fertiliser, Data Centres — generic `draftReportProse` path with thin ReportPack + coarse classifier.
 
 | Day | Items | Notes |
 | --- | --- | --- |
-| **9** | TC-01, TC-02 | ReportPack + classifier coupling; Fast Fact plural regex |
-| **10** | CG-02 (finish), HY-02 (start) | Cargo masthead mis-tag; Unknown country aliases on region feeds |
+| **11** | TC-01, TC-02 | ReportPack + classifier coupling; Fast Fact plural regex |
+| **12** | CG-02 (finish), HY-02 (start) | Cargo masthead mis-tag; Unknown country aliases on region feeds |
 
 **Acceptance (TC-01/02):**
 
@@ -321,11 +406,11 @@ Energy, Fertiliser, Data Centres — generic `draftReportProse` path with thin R
 
 ---
 
-## Sprint 4 — Country briefs (Days 11–12)
+## Sprint 4 — Country briefs (Days 13–14)
 
 Steve confirmed country briefs are wrong but **not the priority**. Indonesia is the worst case — fix shared engine first, then sweep all six briefs.
 
-### Day 11 — CB-01: Country geography gate
+### Day 13 — CB-01: Country geography gate
 
 **Files:** `lib/country-engine/` (shared engine, not per-theatre JSX patches)
 
@@ -343,7 +428,7 @@ Steve confirmed country briefs are wrong but **not the priority**. Indonesia is 
 
 ---
 
-### Day 12 — CB-02: Editorial banned phrases + proof pack
+### Day 14 — CB-02: Editorial banned phrases + proof pack
 
 - [ ] Country brief opinion/editorial phrase guard
 - [ ] Indonesia brief before/after PDF (primary proof)
@@ -353,7 +438,7 @@ Steve confirmed country briefs are wrong but **not the priority**. Indonesia is 
 
 ---
 
-## Phase 4 — Automated validation (Days 13–14)
+## Phase 4 — Automated validation (Days 15–16)
 
 Addresses Steve's requirement: *"audit and validation should catch this without me spotting it manually."*
 
@@ -374,7 +459,7 @@ Gates include:
 
 ### 4.2 Proof pack (per fixed backlog item)
 
-For each shipped item (FP-04–FP-11, then CG-01, CB-01):
+For each shipped item (FP-04–FP-14, then CG-01, CB-01):
 
 | Artifact | Purpose |
 | --- | --- |
@@ -382,11 +467,11 @@ For each shipped item (FP-04–FP-11, then CG-01, CB-01):
 | Funnel + selection proof output | Quantified fix |
 | Kept/dropped diff | Ingestion/selector changes |
 | Parity + validation test log | Counts = prose = tables; FP-10 gate |
-| Steve PDF mapped to stage | `polestar-report-flashpoint-202609072120.pdf` → regression fixture locked |
+| Steve PDF mapped to stage | `…082050.pdf` (primary) + `…072120.pdf` → regression fixtures locked |
 
 ### 4.3 Stakeholder review
 
-- [ ] Re-run gates on **Steve's PDF issue date** (7 Sep 2026 generation)
+- [ ] Re-run gates on **Steve's PDF issue date** (8 Sep 2026 generation)
 - [ ] Map any new PDFs Steve sends → pipeline stage → acceptance criterion
 - [ ] Agree closure per backlog item; document accepted residual noise
 
@@ -402,11 +487,12 @@ For each shipped item (FP-04–FP-11, then CG-01, CB-01):
 
 ## Steve's bad PDFs — how to use them
 
-**Primary fixture:** `polestar-report-flashpoint-202609072120.pdf` (7 Sep 2026)
+**Primary fixture:** `polestar-report-flashpoint-202609082050.pdf` (8 Sep 2026)  
+**Secondary fixture:** `polestar-report-flashpoint-202609072120.pdf` (7 Sep 2026)
 
 Use as **regression fixtures**, not primary QA:
 
-1. Tag each example (slop-in / wrong-count / wrong-prose / wrong-country) — see R2–R10 table above
+1. Tag each example (slop-in / wrong-count / wrong-prose / wrong-country) — see R2–R20 tables above
 2. Map to pipeline stage (relevance → classifier → selector → Related Incidents → prose)
 3. Add to proof pack as "must pass" after fix
 4. If audit should have caught it but didn't → add/extend a gate (FP-10 validation, parity test, funnel script)
@@ -422,6 +508,14 @@ Use as **regression fixtures**, not primary QA:
 | selector | Thai lawmaker Myanmar support after protest in Related | Related Incidents (FP-08) |
 | wrong-prose | Seoul 18 incidents vs upcoming-only in What Matters | prose validation (FP-11) |
 | wrong-prose | NZ High in table vs Low in What Matters | prose validation (FP-11) |
+| slop-in | Japan fusion project as protest | scope classifier (FP-13) |
+| slop-in | Gang/criminal/security-force without protest hook | scope classifier (FP-13) |
+| slop-in | "South Korea US Protest" raw title | title gate (FP-12) |
+| wrong-prose | Same conclusion in Exec Summary, Country View, What Matters, Polestar View | editorial templates (FP-14) |
+| wrong-prose | "Driven by protest activity…" dataset narration | banned phrases (FP-14) |
+| wrong-prose | Posture-score / "next section" meta copy | banned phrases (FP-14) |
+
+**Editorial benchmark:** APAC Fuel Crisis Report (2026-04-21) — tone reference for FP-14 acceptance reviews.
 
 ---
 
@@ -430,11 +524,13 @@ Use as **regression fixtures**, not primary QA:
 | When | What Steve gets |
 | --- | --- |
 | **7 Sep** | Sprint 1a deployed — Steve reviewed PDF, returned hygiene requirements |
-| **End Sprint 1b (Day 6)** | Flashpoint PDF replay on his issue date — data fixes only, no design change |
-| **End Sprint 2 (Day 8)** | Cargo + Fuel Watch proof — **after** Flashpoint fixture green |
-| **End Sprint 3 (Day 10)** | Energy/Fertiliser/Data Centres thin-content fixes |
-| **End Sprint 4 (Day 12)** | Indonesia brief before/after + country sweep |
-| **End Phase 4 (Day 14)** | Full proof pack + validation summary (PASSED/FAILED email) |
+| **8 Sep** | Steve second PDF — hygiene gaps persist; editorial voice added as explicit requirement |
+| **End Sprint 1b (Day 6)** | Hygiene gates green internally — scope, geography, titles, metrics |
+| **End Sprint 1c (Day 8)** | Flashpoint PDF to Steve — hygiene + editorial voice, no design change |
+| **End Sprint 2 (Day 10)** | Cargo + Fuel Watch proof — **after** Flashpoint fixture green |
+| **End Sprint 3 (Day 12)** | Energy/Fertiliser/Data Centres thin-content fixes |
+| **End Sprint 4 (Day 14)** | Indonesia brief before/after + country sweep |
+| **End Phase 4 (Day 16)** | Full proof pack + validation summary (PASSED/FAILED email) |
 | **Ongoing** | Short updates when each acceptance block clears |
 
 ---
@@ -443,7 +539,9 @@ Use as **regression fixtures**, not primary QA:
 
 | Risk | Mitigation |
 | --- | --- |
-| PDF design churn distracts from data fixes | **Hard stop:** no layout/CSS changes until FP-04–FP-11 green (Steve R12) |
+| PDF design churn distracts from data/copy fixes | **Hard stop:** no layout/CSS changes until FP-04–FP-14 green (Steve R12) |
+| Editorial rewrite on dirty incident set | **Sequence lock:** FP-14 starts only after FP-04–FP-13 green |
+| Templated prose passes hygiene but fails voice review | FP-14 banned-phrase + section-distinctness gates; APAC Fuel benchmark review |
 | Strike/sports excludes drop real labour action | Precision-first patterns; replay labour-strike positives; unit tests per class |
 | Event-location rule drops genuine cross-border protests | Require APAC venue anchor OR live public-order hook; test BD-in-US/UK negatives |
 | FP-09 metrics still use wider window somewhere | Audit every Fast Fact / chart / posture builder; single `enriched` source |
@@ -455,25 +553,25 @@ Use as **regression fixtures**, not primary QA:
 
 ## Per-fix checklist (copy per shipped item)
 
-| Item | FP-04 | FP-05 | FP-06 | FP-07 | FP-08 | FP-09 | FP-10 | FP-11 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Change in shared lib (not preview/PDF duplicate) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| `RELEVANCE_RULE_VERSION` bumped if needed | ☐ | ☐ | n/a | ☐ | n/a | n/a | n/a | n/a |
-| Boot migration / marker-gated backfill | ☐ | ☐ | n/a | ☐ | n/a | n/a | n/a | n/a |
-| Unit / render tests updated | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Steve PDF fixture row passes | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
-| Preview == PDF verified (data only) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Item | FP-04 | FP-05 | FP-06 | FP-07 | FP-08 | FP-09 | FP-10 | FP-11 | FP-12 | FP-13 | FP-14 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Change in shared lib (not preview/PDF duplicate) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| `RELEVANCE_RULE_VERSION` bumped if needed | ☐ | ☐ | n/a | ☐ | n/a | n/a | n/a | n/a | n/a | ☐ | n/a |
+| Boot migration / marker-gated backfill | ☐ | ☐ | n/a | ☐ | n/a | n/a | n/a | n/a | n/a | ☐ | n/a |
+| Unit / render tests updated | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Steve PDF fixture row passes | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
+| Preview == PDF verified (data only) | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 ---
 
 ## Immediate next actions
 
-1. **Tag Steve's PDF** in [1.4 stakeholder examples](./phase-1-baseline-audit/1.4-stakeholder-examples.md) — lock `polestar-report-flashpoint-202609072120.pdf` as regression fixture
-2. **Start FP-04** — strike homonym excludes in `topicRelevance.ts` (military/airstrike/disaster/sports)
-3. **Start FP-05** — hard sports/entertainment exclude + classifier severity guard (Kuggeleijn-class)
-4. **Start FP-06** — event-location geography in selector/relevance
-5. **Do not** change PDF layout, CSS, or chart design
-6. **Do not start CG-01 / Cargo** until Sprint 1b acceptance passes on Steve's issue date
+1. **Tag Steve's PDFs** in [1.4 stakeholder examples](./phase-1-baseline-audit/1.4-stakeholder-examples.md) — lock `…082050.pdf` as primary fixture; keep `…072120.pdf` as secondary
+2. **Sprint 1b (Days 4–6):** FP-04 → FP-13 — strike/sports slop, event-location geography, title gate, gang/security/fusion scope, Related Incidents, metrics validation
+3. **Sprint 1c (Days 7–8):** FP-14 — section distinctness, banned template phrases, Polestar voice (benchmark: APAC Fuel Crisis Report 2026-04-21)
+4. **Do not** change PDF layout, CSS, or chart design
+5. **Do not start CG-01 / Cargo** until Sprint 1b + 1c pass on Steve's issue date
+6. **Do not send Steve a PDF** after hygiene only — editorial pass is part of acceptance
 7. **Preserve** forecast logic (confirmed vs unconfirmed) — regression test before deploy
 
 ---
@@ -485,10 +583,10 @@ Use as **regression fixtures**, not primary QA:
 pnpm --filter workbench run audit:export-snapshot
 ISSUE=2026-05-31 pnpm --filter workbench run audit:ingestion-report
 
-# Flashpoint (Sprint 1b — Steve PDF fixture)
+# Flashpoint (Sprint 1b/1c — Steve PDF fixtures)
 ISSUE=<steve-pdf-issue-date> pnpm --filter workbench exec tsx scripts/diagnoseFunnel.ts
 ISSUE=<steve-pdf-issue-date> pnpm --filter workbench exec tsx scripts/proveFlashpointSelection.ts
-pnpm test -- flashpointTitleExcludes flashpointFp01Relevance flashpointSelectionParity relatedIncidentsCap
+pnpm test -- flashpointTitleExcludes flashpointFp01Relevance flashpointSelectionParity relatedIncidentsCap flashpointProseVoice
 pnpm --filter workbench exec tsx scripts/replayFlashpointRelevance.ts
 
 # Cargo / country

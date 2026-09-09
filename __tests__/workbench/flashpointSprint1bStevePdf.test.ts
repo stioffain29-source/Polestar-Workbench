@@ -6,6 +6,7 @@ import { explainRelevance, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { classifyIncidentType } from "../../artifacts/workbench/src/lib/incidentClassifier";
 import {
   buildFlashpointReportDataset,
+  passesClientTitleQualityGate,
   selectFlashpointUsable,
   validateFlashpointReportDataset,
   type FlashpointReportIncident,
@@ -30,7 +31,7 @@ function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident 
 
 describe("Sprint 1b Steve PDF hygiene", () => {
   it("bumps RELEVANCE_RULE_VERSION for backfill", () => {
-    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-08.1");
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-09.1");
   });
 
   describe("FP-04 strike homonyms", () => {
@@ -118,6 +119,69 @@ describe("Sprint 1b Steve PDF hygiene", () => {
       const sel = selectFlashpointUsable(rows, "flashpoint", ISSUE);
       expect(sel.enriched.some((r) => /washington/i.test(`${r.title} ${r.location}`))).toBe(false);
       expect(sel.enriched.some((r) => /dhaka/i.test(`${r.title} ${r.location}`))).toBe(true);
+    });
+  });
+
+  describe("FP-12 client-facing title quality gate", () => {
+    it("blocks raw-feed keyword soup titles", () => {
+      expect(passesClientTitleQualityGate("South Korea US Protest")).toBe(false);
+      expect(passesClientTitleQualityGate("Bangladesh India Protest")).toBe(false);
+    });
+
+    it("allows real event headlines", () => {
+      expect(
+        passesClientTitleQualityGate("Students rally in Dhaka over tuition hikes"),
+      ).toBe(true);
+    });
+
+    it("selector drops bare wire-caption rows", () => {
+      const rows = [
+        inc({ title: "South Korea US Protest", country: "South Korea", severity: "high" }),
+        inc({ title: "Farmers march to parliament over crop prices", country: "India", location: "Delhi" }),
+      ];
+      const sel = selectFlashpointUsable(rows, "flashpoint", ISSUE);
+      expect(sel.enriched.some((r) => /south korea us protest/i.test(r.title ?? ""))).toBe(false);
+    });
+  });
+
+  describe("FP-13 scope classification", () => {
+    it("drops Japan fusion project at relevance", () => {
+      const v = explainRelevance("flashpoint", {
+        topic: "flashpoint",
+        title: "Japan moves forward on fusion reactor prototype project",
+      });
+      expect(v.relevant).toBe(false);
+      expect(v.reason).toMatch(/infrastructure|science|not civil unrest/i);
+    });
+
+    it("drops gang shootout without protest hook", () => {
+      const v = explainRelevance("flashpoint", {
+        topic: "flashpoint",
+        title: "Police raid targets gang members in Manila suburb",
+      });
+      expect(v.relevant).toBe(false);
+      expect(v.reason).toMatch(/gang|criminal|security|not civil unrest/i);
+    });
+
+    it("never enters Flashpoint final set for fusion or gang/security rows", () => {
+      const rows = [
+        inc({
+          title: "Japan fusion energy project reaches new research milestone",
+          country: "Japan",
+          severity: "moderate",
+        }),
+        inc({
+          title: "Anti-gang police operation nets 12 suspects in Jakarta",
+          country: "Indonesia",
+          location: "Jakarta",
+          severity: "high",
+        }),
+        inc({ title: "Students rally in Dhaka over tuition hikes", country: "Bangladesh", location: "Dhaka" }),
+      ];
+      const sel = selectFlashpointUsable(rows, "flashpoint", ISSUE);
+      expect(sel.enriched.some((r) => /fusion/i.test(r.title ?? ""))).toBe(false);
+      expect(sel.enriched.some((r) => /anti-gang/i.test(r.title ?? ""))).toBe(false);
+      expect(sel.enriched.some((r) => /dhaka/i.test(r.title ?? ""))).toBe(true);
     });
   });
 

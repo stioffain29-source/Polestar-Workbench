@@ -727,9 +727,17 @@ function isBareWireCaptionTitle(title: string): boolean {
   if (!t) return false;
   if (/^(?:APTOPIX|PICTURE|PHOTOS?|IMAGES?|SLIDESHOW|PIXSTORY)\b/i.test(t)) return true;
   const words = t.split(/\s+/);
-  if (words.length > 3) return false;
+  if (words.length > 6) return false;
   if (!/^(?:protest|strike|rally|demonstration)$/i.test(words[words.length - 1] ?? "")) return false;
   return words.slice(0, -1).every((w) => /^[A-Z]/.test(w));
+}
+
+/** Client-facing title quality gate (FP-12). Blocks raw-feed keyword soup. */
+export function passesClientTitleQualityGate(title: string): boolean {
+  const t = cleanDisplayTitle(title ?? "").trim();
+  if (!t) return false;
+  if (isBareWireCaptionTitle(t)) return false;
+  return true;
 }
 function isSpamCaption(title: string): boolean {
   if (!title) return false;
@@ -824,6 +832,10 @@ const FOREIGN_LOCATION_WEST_RE =
 // Reaction/commentary on protests — sympathy messages, lawmaker support (FP-07/08).
 const REACTION_COMMENTARY_RE =
   /\b(messages? of support|message of sympathy|sympathy messages?|voices? (?:her|his|their) support|express(?:es|ed)? (?:her|his|their )?support)\b|\b(?:lawmaker|legislator|mp|member of parliament|senator|congress(?:man|woman|member))\b[^.]{0,80}\b(?:messages? of support|sympathy|solidarity)\b|\b(?:gets?|received|receiv(?:es|ed)|sent)\s+messages?\s+of\s+support\b|\b(?:reacts?|reacted|reaction)\s+to\b[^.!?]{0,60}\bprotest\b/i;
+const SCOPE_CRIME_RE =
+  /\b(gang (?:war|shootout|violence|fight|member|leader|arrest|raid|clash)|drug bust|narcotics? bust|anti-gang|anti-crime|cartel|syndicate|police (?:raid|operation|crackdown)|security force operation|armed robbery|hold[- ]?up|shootout|drive[- ]by|extrajudicial killing)\b/i;
+const SCOPE_INFRA_SCIENCE_RE =
+  /\b(fusion (?:reactor|project|energy|power|research|startup|experiment|plant|facility)|\biter\b|tokamak|nuclear fusion|scientific demonstration|research demonstration|demonstration reactor|demonstration plant|prototype reactor)\b/i;
 // Inter-state diplomatic reaction — not a street protest in the reporting window.
 function isForeignVenueMisstamp(r: FlashpointReportIncident): boolean {
   const country = normalizeFlashpointCountry((r.country ?? "").trim());
@@ -998,6 +1010,8 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (FIREARMS_POLICY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   if (isForeignVenueMisstamp(r)) return true;
   if (REACTION_COMMENTARY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (SCOPE_INFRA_SCIENCE_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (SCOPE_CRIME_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   return false;
 }
 
@@ -1478,6 +1492,7 @@ const OUT_OF_SCOPE_ISSUES = new Set([
   "Crime / public safety",
   "Piracy / armed robbery",
   "Sports / entertainment",
+  "Security force operation",
 ]);
 function isOutOfScopeIssue(r: { issue: string }): boolean {
   return OUT_OF_SCOPE_ISSUES.has(r.issue);
@@ -3446,6 +3461,14 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
     errors.push(
       `What Matters says NZ ${nzWm[1]} severity but table includes High-severity NZ row`,
     );
+  }
+
+  // 8. Client-facing title quality gate (FP-12).
+  for (const r of [...ds.activismRows, ...ds.unrestRows, ...ds.relatedIncidents]) {
+    const title = r.title ?? "";
+    if (!passesClientTitleQualityGate(title)) {
+      errors.push(`Client-facing title fails quality gate: "${title.slice(0, 80)}"`);
+    }
   }
 
   return errors;
