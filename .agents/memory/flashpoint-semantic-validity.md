@@ -20,6 +20,11 @@ observable and forces deliberate re-adjudication when the rules change.
   event type, supported date/currentness, no contradictions, and independent
   confidence thresholds. Hold uncertainty; never upgrade a provider's invalid
   or needs-review verdict.
+- Normalize provider representation mismatches before the contract: an exact,
+  parseable ISO timestamp may project to its date, while arbitrary date text
+  stays held. For a future event, treat literal `eventOccurred=false` as
+  established only when the provider verdict is already valid; never upgrade a
+  provider `needs_review` decision.
 - Bump the semantic version whenever acceptance meaning changes. Old versions
   stay hidden until backfilled; incomplete manual, social, or structured-source
   writes remain review candidates rather than receiving synthetic confidence.

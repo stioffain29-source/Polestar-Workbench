@@ -1,4 +1,4 @@
-export const FLASHPOINT_VALIDITY_VERSION = "2026-09-09.semantic.4";
+export const FLASHPOINT_VALIDITY_VERSION = "2026-09-09.semantic.6";
 export const FLASHPOINT_EVENT_TYPES = [
   "protest", "demonstration", "labour_strike", "blockade", "riot_public_disorder",
   "political_mobilisation", "other_public_order", "non_flashpoint", "unknown",

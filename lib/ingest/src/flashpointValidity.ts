@@ -6,6 +6,13 @@ export type FlashpointValidityStatus = FlashpointProviderVerdict;
 export function isTransientFlashpointValidityReason(reason: string | null | undefined): boolean {
   return /(unavailable|http|timeout|failed|malformed|incoherent)/i.test(reason ?? "");
 }
+export function normalizeFlashpointEventDate(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/);
+  if (!match || !Number.isFinite(Date.parse(trimmed))) return trimmed;
+  return match[1];
+}
 export interface FlashpointValidity {
   eventOccurred: boolean | null;
   actor: string | null;
@@ -32,7 +39,8 @@ reference, legislation, court discussion, business/technology mention, commentar
 historical retrospective, or hypothetical as the physical event geography. Distinguish
 where the event happened from who/what the story discusses. The assigned country is NOT
 evidence: title/summary must positively support the physical geography. If facts are uncertain,
-contradictory, or unavailable, verdict must be needs_review, never valid.`;
+contradictory, or unavailable, verdict must be needs_review, never valid.
+Return eventDate as YYYY-MM-DD only, never as a timestamp.`;
 
 export async function validateFlashpointEvent(input: {
   title: string; summary: string; source?: string | null; sourceUrl?: string | null;
@@ -76,10 +84,19 @@ export async function validateFlashpointEvent(input: {
     if (!res.ok) return unavailable(`semantic validator HTTP ${res.status}`);
     const body = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
     clearTimeout(timer);
-    const parsed = JSON.parse(body.choices?.[0]?.message?.content ?? "");
+    const rawParsed = JSON.parse(body.choices?.[0]?.message?.content ?? "");
+    const normalized = rawParsed && typeof rawParsed === "object"
+      ? { ...rawParsed, eventDate: normalizeFlashpointEventDate(rawParsed.eventDate) }
+      : rawParsed;
+    const parsed = normalized?.verdict === "valid" &&
+      normalized?.eventOccurred === false &&
+      normalized?.currentness === "future"
+      ? { ...normalized, eventOccurred: true }
+      : normalized;
     if (!parsed || !["valid", "invalid", "needs_review"].includes(parsed.verdict)) return unavailable("malformed semantic response");
     const check = validateFlashpointSemanticContract({ ...parsed, version: FLASHPOINT_VALIDITY_VERSION } as FlashpointSemanticGates);
-    const definiteInvalid = parsed.verdict === "invalid" || parsed.eventOccurred === false ||
+    const definiteInvalid = parsed.verdict === "invalid" ||
+      (parsed.eventOccurred === false && parsed.currentness !== "future") ||
       parsed.assignedCountrySupported === false || parsed.eventType === "non_flashpoint" || parsed.currentness === "historical";
     const verdict: FlashpointValidityStatus = check.valid ? "valid" : definiteInvalid ? "invalid" : "needs_review";
     return { ...parsed, verdict, reason: check.valid ? String(parsed.reason ?? "valid event").slice(0, 240) : check.failures.join(", ").slice(0, 240), version: FLASHPOINT_VALIDITY_VERSION } as FlashpointValidity;
