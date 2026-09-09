@@ -1,131 +1,16 @@
 # Flashpoint Weekly — Selection Proof
-Issue date: 2026-05-31   |   7-day window: 2026-05-25 → 2026-05-31
+Issue date: 2026-09-08   |   7-day window: 2026-09-02 → 2026-09-08
 Data source: snapshot (C:\Users\nhangto\Documents\Polestar-Workbench-stoff\artifacts\workbench\scripts\.prod-incidents.json)
-Raw in-window records (flashpoint + protests buckets): 96
-INCLUDED in report: 14   |   REJECTED: 82
-DATASET enriched (in-period): 14   |   PARITY: OK
+Raw in-window records (flashpoint + protests buckets): 0
+INCLUDED in report: 0   |   REJECTED: 0
+DATASET enriched (in-period): 0   |   PARITY: OK
 
 ================================================================
 INCLUDED — every in-scope country with genuine activity this week
 ================================================================
 
-Nepal (4)
-   • 2026-05-29  Nepal Rights Body Urges Charges Against Ex-PM Over Gen Z Protest Deaths
-   • 2026-05-28  Use of lethal force, Oli & Lamichhane under lens—Nepal’s NHRC on Gen Z protest that toppled govt
-   • 2026-05-27  NHRC recommends action against Oli, Lekhak, Gurung over Gen Z protest rights violations
-   • 2026-05-27  Former Nepal PM K P Sharma Oli arrested over Gen Z protest crackdown
-
-Philippines (4)
-   • 2026-05-28  Fisherfolk protest rising commercial fishing in municipal waters
-   • 2026-05-27  BAYAN, labor leaders face raps over May 1 rally in Manila
-   • 2026-05-26  Protest vs tree cutting in Manila
-   • 2026-05-24  Benguet students protest against Villanueva as Senate education chair
-
-Japan (3)
-   • 2026-05-30  Tokyo rally demands return of Japanese abductees in N Korea
-   • 2026-05-30  Abductees' families urge govt. to take concrete steps at Tokyo rally
-   • 2026-05-30  Thousands rally in Tokyo against Takaichi moves under 'No War' banner
-
-Bangladesh (2)
-   • 2026-05-28  Bangladesh Editors, Media Owners to Protest Mob Attacks on Press and Cultural Institutions
-   • 2026-05-28  Violence Erupts in Bangladesh as Police Clash with Dhaka University Students During Quota Reform Protest
-
-China (1)
-   • 2026-05-30  Thousands rally in Tokyo against Takaichi government's dangerous policy moves
-
-Country spread (ranked): Nepal 4  ·  Philippines 4  ·  Japan 3  ·  Bangladesh 2  ·  China 1
+Country spread (ranked): 
 
 ================================================================
 REJECTED — with reason (proof that noise was removed deliberately)
 ================================================================
-
-[off-topic] — 76
-   reason: Off-topic — failed the public-order relevance gate (sports/finance/weather/military/entertainment homonym of rally/strike, or no protest/strike/unrest signal at all).
-   ✕ [France] 2026-05-30  Gauff’s French Open title defence ends, Sabalenka, Osaka set up last-16 clash
-   ✕ [Japan] 2026-05-30  Paddon 7th as Evans leads Ogier into FORUM8 Rally Japan finale - Talk Motorsport
-   ✕ [Bangladesh] 2026-05-30  Bangladesh lodges protest with Indian High Commission over Hasina’s activities in India - Newsonair
-   ✕ [Philippines] 2026-05-30  Lightning strike kills Cebuano fisherman - Manila Bulletin
-   ✕ [Japan] 2026-05-30  Evans tightens WRC Rally Japan grip after a closing Solberg crashes out - RACER - Racing News
-   ✕ [Japan] 2026-05-30  Rally Japan: Day 2 - TGR-WRT’s rally leader Evans handles the heat - Newsroom Toyota Europe
-   ✕ [Japan] 2026-05-30  Oliver Solberg denies taking too much risk in WRC Rally Japan crash - Motorsport.com
-   ✕ [Japan] 2026-05-30  WRC Rally Japan: Elfyn Evans leads Sebastien Ogier after Oliver Solberg’s dramatic exit - Motorsport.com
-   ✕ [Philippines] 2026-05-30  Taklimakan Rally 2026: GWM TANK Dominates the Unforgiving Desert - The Manila Times
-   ✕ [Japan] 2026-05-30  Rally Japan – SS14: Elfyn Evans holds a commanding lead, Sébastien Ogier 2nd - autohebdof1.com
-   ✕ [Japan] 2026-05-30  Evans leads Ogier into FORUM8 Rally Japan finale after Solberg exit - WRC.com
-   ✕ [Japan] 2026-05-30  Solberg’s reply to Ogier after Rally Japan crash - DirtFish
-   ✕ [Japan] 2026-05-30  WRC Rally Japan: Solberg crashes out while fighting for the lead - Autosport
-   ✕ [Japan] 2026-05-30  WRC Rally Japan: Oliver Solberg crashes out while fighting for the lead - Motorsport.com
-   ✕ [Japan] 2026-05-30  Oliver Solberg crashes out of Rally Japan - Motorsport Week
-   ✕ [Japan] 2026-05-30  Ogier slams Solberg who crashed out of Rally Japan - DirtFish
-   ✕ [Japan] 2026-05-30  Ogier slams Solberg’s Rally Japan crash - DirtFish
-   ✕ [Japan] 2026-05-30  Rally Japan: Oliver Solberg turns up pressure on Elfyn Evans - Motorsport.com
-   ✕ [Indonesia] 2026-05-30  Barito Group Rally Helps Limit JCI Losses - Jakarta Globe
-   ✕ [Japan] 2026-05-30  Rally Japan – SS9: New fastest time for Oliver Solberg, Elfyn Evans still leads - autohebdof1.com
-   ✕ [Bangladesh] 2026-05-30  US boat strike kills three alleged drug smugglers - Bangladesh Sangbad Sangstha (BSS)
-   ✕ [Bangladesh] 2026-05-30  Zelensky says Russia preparing 'new massive strike' - Bangladesh Sangbad Sangstha (BSS)
-   ✕ [Philippines] 2026-05-30  ArenaPlus, NBA strike sports betting deal in Philippines - Philstar.com
-   ✕ [Japan] 2026-05-30  Solberg catching Evans for Rally Japan lead - DirtFish
-   ✕ [Japan] 2026-05-30  Space rally gets reality check with Blue Origin blowup - The Japan Times
-   ✕ [Philippines] 2026-05-29  Announcement from Eimskip: Strike of bosuns and able seamen cancelled - The Manila Times
-   ✕ [Papua New Guinea] 2026-05-29  Papuan Women Call for Resistance Against Oppression and National Strategic Projects (PSN)
-   ✕ [Malaysia] 2026-05-29  US to consider selling Naval Strike Missile to Malaysia - mediaselangor.com
-   ✕ [Malaysia] 2026-05-29  US to consider selling naval strike missiles to Malaysia, says Khaled - Free Malaysia Today
-   ✕ [Japan] 2026-05-29  WRC Rally Japan: Elfyn Evans leads as deer delay Oliver Solberg - Motorsport.com
-   ✕ [Japan] 2026-05-29  WRC Rally Japan: Elfyn Evans makes road position count to maintain lead - Motorsport.com
-   ✕ [Malaysia] 2026-05-29  US to consider sale of naval strike missiles to Malaysia — defence minister - The Edge Malaysia
-   ✕ [Malaysia] 2026-05-29  Wall Street extends rally on Mideast peace deal hopes; Dell surges - The Edge Malaysia
-   ✕ [Thailand] 2026-05-29  SoftBank Clears Thailand Hurdle While $64.6 Billion OpenAI Bet Fuels Rally - AD HOC NEWS
-   ✕ [Bangladesh] 2026-05-29  Hasina’s Lawyer Urges UN to Retract Bangladesh Protest Death Toll Report - UNITED NEWS OF INDIA
-   ✕ [Japan] 2026-05-29  Sweat is compromising Armstrong’s Rally Japan - DirtFish
-   ✕ [Bangladesh] 2026-05-29  "Highly Inaccurate": Sheikh Hasina On UN Report On Bangladesh Protest Death Count - NDTV
-   ✕ [Japan] 2026-05-29  WRC FORUM8 Rally Japan 2026 - WRC.com
-   ✕ [Japan] 2026-05-29  Japan passes bill to raise co-payments for prescription drugs similar to OTC counterparts
-   ✕ [Japan] 2026-05-29  Evans leads Solberg and Ogier after Rally Japan’s first day - DirtFish
-   ✕ [Indonesia] 2026-05-29  Rupiah Stuck Near Rp 18,000 as Oil Shock, Dollar Rally Bite - Jakarta Globe
-   ✕ [China] 2026-05-29  India Offers 400km-Range BrahMos ER Missile to Philippines, Expanding South China Sea Strike Envelope as Coastal Defence Batteries Near Combat Readiness - Defence Security Asia
-   ✕ [Bangladesh] 2026-05-29  Anika’s 11-second strike matches one of football’s fastest goals - Dhaka Tribune
-   ✕ [Japan] 2026-05-29  Evans dominates early Rally Japan running - DirtFish
-   ✕ [Japan] 2026-05-29  Evans takes charge on FORUM8 Rally Japan's opening loop - WRC.com
-   ✕ [Japan] 2026-05-28  Ogier heads Toyota 1-2-3 on WRC Rally Japan shakedown - RACER - Racing News
-   ✕ [Bangladesh] 2026-05-28  Rapid strike keeps Bangladesh women ahead at half-time against Maldives - The Financial Express
-   ✕ [Japan] 2026-05-28  Japan could be Paddon’s final Rally1 event - DirtFish
-   ✕ [Philippines] 2026-05-28  US military conducts another strike vs Iran after Trump says Iran is 'negotiating on fumes' - Manila Bulletin
-   ✕ [Japan] 2026-05-28  Ogier tops Toyota 1-2-3 in FORUM8 Rally Japan shakedown - WRC.com
-   ✕ [Nepal] 2026-05-28  Can Nepal actually enforce its Human Rights Commission’s findings?
-   ✕ [Japan] 2026-05-28  Ogier lays down marker in Rally Japan shakedown - DirtFish
-   ✕ [Philippines] 2026-05-27  For one Ukrainian war amputee, rebuilding is painful after a Russian strike killed her husband - The Manila Times
-   ✕ [Malaysia] 2026-05-27  Wall Street indexes post closing record highs, AI rally pauses - Free Malaysia Today
-   ✕ [Japan] 2026-05-27  Japan's Nikkei retreats from record high as AI rally sparks caution - Reuters
-   ✕ [Japan] 2026-05-27  WATCH: Ready for Rally | FORUM8 Rally Japan 2026 - WRC.com
-   ✕ [Philippines] 2026-05-27  Israel kills chief of Hamas armed wing in Gaza strike - The Manila Times
-   ✕ [Japan] 2026-05-27  Nikolay Gryazin targets Rally Japan challenge with the Lancia Ypsilon Rally2 HF Integrale - Stellantis Media
-   ✕ [Malaysia] 2026-05-27  AI chip rally props up South Korea, Taiwan stocks; emerging FX subdued - The Edge Malaysia
-   ✕ [Japan] 2026-05-27  Preview: FORUM8 Rally Japan - WRC.com
-   ✕ [Bangladesh] 2026-05-27  US strike in Pacific kills one, strands two - Bangladesh Sangbad Sangstha (BSS)
-   ✕ [Japan] 2026-05-26  Japan's Nikkei to set record 69,000 in 2027 as blistering rally outpaces peers: Reuters poll - Reuters
-   ✕ [Japan] 2026-05-26  New date brings new challenges at WRC Rally Japan - RACER - Racing News
-   ✕ [Malaysia] 2026-05-26  Nokia’s 140% rally turns AI comeback into valuation puzzle - The Edge Malaysia
-   ✕ [Malaysia] 2026-05-26  Bursa Tech Index nears two-year high on chip rally; MPI, Unisem and THMY hit records - The Edge Malaysia
-   ✕ [Indonesia] 2026-05-26  Vanguard FTSE All-World ETF: Tech-Driven Rally Masks a Drastic Index Cleanse in Jakarta - AD HOC NEWS
-   ✕ [Bangladesh] 2026-05-26  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo News Malaysia
-   ✕ [Bangladesh] 2026-05-26  Video shows procession in Bangladesh, not protest over West Bengal's roadside prayer ban - Yahoo
-   ✕ [Malaysia] 2026-05-26  Asia EM rally fizzles as fresh US strikes on Iran fade peace hopes - The Edge Malaysia
-   ✕ [Philippines] 2026-05-26  Protest held vs tree cutting in Manila | Photos | GMA News Online - GMA Network
-   ✕ [Japan] 2026-05-26  Japan cable maker rout exposes cracks in AI infrastructure rally - The Japan Times
-   ✕ [Japan] 2026-05-26  What WRC crews can expect from a springtime Rally Japan - WRC.com
-   ✕ [Malaysia] 2026-05-26  Malaysia Smelting hits record as tin rally lifts profit fivefold - NST Online
-   ✕ [Japan] 2026-05-25  How to watch WRC FORUM8 Rally Japan on DAZN: Date, schedule, time and livestream info - DAZN
-   ✕ [Philippines] 2026-05-25  Negotiations have not yet succeeded, and a strike has begun on Eimskip's own vessels - The Manila Times
-   ✕ [Malaysia] 2026-05-25  Malaysia awarded takraw title after Thailand protest referee’s call - Thai PBS World
-
-[weak-operational] — 5
-   reason: Weak-operational — surface keyword only, no live operational signal (stock-photo caption, suspended/cancelled strike, diplomatic démarche, legislative process, legal aftermath, anticipatory/negated non-event, or a non-APAC story syndicated by an APAC outlet).
-   ✕ [China] 2026-05-30  Myanmar’s junta chief turned president heads to India, with an eye on China
-   ✕ [Nepal] 2026-05-28  Peaceful Polling underway in Nepal after countrywide GenZ protest
-   ✕ [Malaysia] 2026-05-26  Thousands rally for EU on Georgia’s independence day
-   ✕ [Sri Lanka] 2026-05-25  Former Sri Lankan IGP arrested in connection with May 2022 attack on protest site in Colombo
-   ✕ [Philippines] 2026-05-25  Thousands rally in Spain's capital against increasing housing costs
-
-[duplicate] — 1
-   reason: Duplicate — a syndicated rewrite of another kept incident (deduped so one event is not double-counted).
-   ✕ [Japan] 2026-05-30  Thousands rally in Tokyo against Takaichi government's dangerous policy moves

@@ -16,6 +16,7 @@ import {
   buildFlashpointReportDataset,
   validateFlashpointReportDataset,
   pickFlashpointAnalystProse,
+  resolveFlashpointAnalystProse,
   cleanDisplayTitle,
   type FlashpointReportIncident,
 } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
@@ -315,6 +316,15 @@ describe("flashpoint report consistency", () => {
     const thin = "The practical concerns are staff movement, site access and keeping staff informed.";
     expect(pickFlashpointAnalystProse(thin, auto)).toBe(auto);
     expect(pickFlashpointAnalystProse("", auto)).toBe(auto);
+  });
+
+  test("resolveFlashpointAnalystProse rejects stale Risk level Polestar AI prose", () => {
+    const auto =
+      "Keep journey plans flexible in South Korea and validate transport availability close to departure. Refresh movement plans if new protest announcements land mid-week.";
+    const staleAi =
+      "Risk level: Moderate. Disruption is most likely to remain localised around protest gatherings, march routes and strike-related pressure points in Dhaka, Kathmandu and Seoul, while the most acute escalation concern sits in Papua New Guinea after the Mt. Hagen clash. Prioritise route checks, short-notice movement planning and rapid staff updates in those locations.";
+    expect(resolveFlashpointAnalystProse(null, staleAi, auto)).toBe(auto);
+    expect(resolveFlashpointAnalystProse(staleAi, null, auto)).toBe(auto);
   });
 
   test("drug crime is excluded even when summary mentions roadblock", () => {

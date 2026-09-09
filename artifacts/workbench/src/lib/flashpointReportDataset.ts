@@ -464,12 +464,28 @@ const GENERIC_FLASHPOINT_PROSE: string[] = [
   "this week has both organised protests and police enforcement against them",
   "review staff movement and journey plans in",
   "polestar's view: this was an active week",
+  "risk level:",
+  "disruption is most likely to remain localised",
+  "prioritise route checks, short-notice movement planning and rapid",
+];
+
+/** Saved AI/editor analyst prose that predates FP-14 voice rules. */
+const STALE_FLASHPOINT_ANALYST_RE: RegExp[] = [
+  /\bRisk level:\s*(?:Insignificant|Low|Moderate|High|Extreme)\b/i,
+  /\bDisruption is most likely to remain localised\b/i,
+  /\bPrioritise route checks, short-notice movement planning and rapid\s+staff updates\b/i,
 ];
 
 export function isGenericFlashpointProse(text: string | null | undefined): boolean {
   const t = (text ?? "").trim().toLowerCase();
   if (!t) return false;
   return GENERIC_FLASHPOINT_PROSE.some((sig) => t.includes(sig));
+}
+
+export function flashpointAnalystProsePassesVoiceGate(text: string | null | undefined): boolean {
+  const t = (text ?? "").trim();
+  if (!t || isGenericFlashpointProse(t)) return false;
+  return !STALE_FLASHPOINT_ANALYST_RE.some((re) => re.test(t));
 }
 
 /**
@@ -484,7 +500,7 @@ export function pickFlashpointAnalystProse(
   auto: string,
 ): string {
   const t = (editor ?? "").trim();
-  if (!t || isGenericFlashpointProse(t)) return auto;
+  if (!t || !flashpointAnalystProsePassesVoiceGate(t)) return auto;
   // Saved seed packs can exceed 240 chars but still be template filler —
   // prefer data-driven auto when the editor opens like canned prose.
   if (/^what matters most this week is that activity is spread across/i.test(t)) return auto;
@@ -502,7 +518,7 @@ export function resolveFlashpointAnalystProse(
 ): string {
   const aiTrim = (ai ?? "").trim();
   const resolvedAuto =
-    aiTrim && !isGenericFlashpointProse(aiTrim) ? aiTrim : auto;
+    aiTrim && flashpointAnalystProsePassesVoiceGate(aiTrim) ? aiTrim : auto;
   return pickFlashpointAnalystProse(editor, resolvedAuto);
 }
 
@@ -1953,7 +1969,7 @@ export function buildFlashpointReportDataset(
     // many incidents share the top tier.
     topSeverityTie: topSeverityTieCount(enriched, topSeverity ?? null),
   });
-  const regionalCountryRead = buildRegionalCountryRead({
+  const regionalCountryReadBuilt = buildRegionalCountryRead({
     enriched,
     countryRows,
   });
@@ -1983,17 +1999,28 @@ export function buildFlashpointReportDataset(
     windowEnd: win.end,
     forecastAsOf,
   };
-  const autoExecutiveSummary = buildAutoExecutiveSummary({
+  const autoExecutiveSummaryBuilt = buildAutoExecutiveSummary({
     ...autoCtx,
     windowLabel: win.shortLabel,
   });
-  const autoWhatMatters = buildWhatMatters(autoCtx);
+  const autoWhatMattersBuilt = buildWhatMatters(autoCtx);
   const autoImplications = buildImplications(autoCtx);
   // Watch Next is built from actual upcoming signals in the file
   // wherever available, with a clear fallback note when no future-dated
   // items were identified.
   const autoWatchNext = buildWatchNextFromSignals(autoCtx);
-  const autoPolestarView = buildPolestarView(autoCtx);
+  const autoPolestarViewBuilt = buildPolestarView(autoCtx);
+  const {
+    executiveSummary: autoExecutiveSummary,
+    regionalCountryRead,
+    autoWhatMatters,
+    autoPolestarView,
+  } = dedupeClientFacingProse({
+    executiveSummary: autoExecutiveSummaryBuilt,
+    regionalCountryRead: regionalCountryReadBuilt,
+    autoWhatMatters: autoWhatMattersBuilt,
+    autoPolestarView: autoPolestarViewBuilt,
+  });
 
   // Data note. Mirrors shipping's compact note: surface filter counts so
   // the reader understands what scope was applied, without leaking
@@ -2463,6 +2490,44 @@ function buildForecastRead(opts: {
   return lines.join("\n\n");
 }
 
+/** Drop repeated long sentences from later client-facing sections (FP-14). */
+function dedupeClientFacingProse(sections: {
+  executiveSummary: string;
+  regionalCountryRead: string;
+  autoWhatMatters: string;
+  autoPolestarView: string;
+}): {
+  executiveSummary: string;
+  regionalCountryRead: string;
+  autoWhatMatters: string;
+  autoPolestarView: string;
+} {
+  const seen = new Set<string>();
+  const dedupeBlock = (text: string): string => {
+    const paras: string[] = [];
+    for (const part of text.split("\n\n")) {
+      const kept: string[] = [];
+      for (const sent of part.split(/(?<=[.!?])\s+/)) {
+        const s = sent.trim();
+        if (!s) continue;
+        const key = s.toLowerCase();
+        if (s.length >= 50 && seen.has(key)) continue;
+        if (s.length >= 50) seen.add(key);
+        kept.push(s);
+      }
+      const joined = kept.join(" ").trim();
+      if (joined) paras.push(joined);
+    }
+    return paras.join("\n\n");
+  };
+  return {
+    executiveSummary: dedupeBlock(sections.executiveSummary),
+    regionalCountryRead: dedupeBlock(sections.regionalCountryRead),
+    autoWhatMatters: dedupeBlock(sections.autoWhatMatters),
+    autoPolestarView: dedupeBlock(sections.autoPolestarView),
+  };
+}
+
 function buildRegionalCountryRead(opts: {
   enriched: EnrichedIncident[];
   countryRows: BarRow[];
@@ -2820,7 +2885,7 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
   const city = extractCityLabel(r);
   if ((SEV_RANK[sevKey(r.severity)] ?? 0) >= 3 && (country || city)) {
     const where = city && country ? `${city}, ${country}` : country || city;
-    return `${shortSignalLabel(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is among the operational items to track for access and movement impacts.`;
+    return `${shortSignalLabel(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is the week's sharpest access-and-movement concern in that market.`;
   }
   return null;
 }
@@ -2864,7 +2929,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
   for (const r of sortBySignificance(all)) {
     const para = whatMattersParagraphFor(r);
     if (!para || seen.has(para)) continue;
-    if (/operational items to track/i.test(para)) {
+    if (/access-and-movement concern in that market/i.test(para)) {
       if (genericTrackCount >= 1) continue;
       genericTrackCount++;
     }
