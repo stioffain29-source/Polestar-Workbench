@@ -244,7 +244,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     expect(ds.activismRows.some((r) => /West Papua, Indonesia/.test(r.title))).toBe(true);
   });
 
-  it("names Japan in What Matters when Japan leads incident volume", () => {
+  it("names Japan in Country View when Japan leads incident volume", () => {
     const tokyoTitles = [
       "Dockworkers walk out at Yokohama port",
       "Nurses rally outside Osaka university hospital",
@@ -267,8 +267,9 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     rows.push(fp({ id: 99, title: "Farmers protest in Dhaka over crop prices", country: "Bangladesh", severity: "moderate" }));
     const ds = buildFlashpointReportDataset(rows, "flashpoint", FP_ISSUE);
     expect(ds.countryRows[0]?.label).toBe("Japan");
-    expect(ds.autoWhatMatters).toMatch(/Japan accounts for/i);
-    expect(ds.autoPolestarView).toMatch(/Japan carries the highest incident volume/i);
+    expect(ds.regionalCountryRead).toMatch(/Japan \(8 incidents\)/i);
+    expect(ds.autoWhatMatters).not.toMatch(/Japan accounts for/i);
+    expect(ds.autoPolestarView).not.toMatch(/Japan carries the highest incident volume/i);
   });
 
   it("draft exec summary names the same volume lead as the country chart", () => {
@@ -293,7 +294,7 @@ describe("Flashpoint — client feedback Aug 2026", () => {
     );
     rows.push(fp({ id: 99, title: "Farmers protest in Dhaka over crop prices", country: "Bangladesh", severity: "moderate" }));
     const draft = draftTopicReportProse({ topic: "flashpoint", issueDate: FP_ISSUE, incidents: rows });
-    expect(draft.executiveSummary).toMatch(/Japan sees the most activity/i);
+    expect(draft.executiveSummary).toMatch(/Japan leads on volume|Activity clusters in Japan|heaviest volume/i);
   });
 
   it("drops Nepal anti-corruption enforcement on businessmen", () => {

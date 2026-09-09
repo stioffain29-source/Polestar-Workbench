@@ -190,7 +190,7 @@ WRITING RULES:
 PLAIN-ENGLISH RULES — mandatory:
 - Use plain, easy-to-read English. Short, direct sentences with a clear subject. Every sentence must be understandable on first reading by a non-specialist.
 - For each significant development: explain the event, its likely business impact, and the action required.
-- BANNED phrasings — never use these or close variants: "the week reads as", "reads as", "the practical weight sits", "the picture is led by", "the picture", "activity is being driven by", "two different readings sit side by side", "on the reported record", "weighted towards", "operating posture", "the sharper case", "where events fall on the areas the business uses".
+- BANNED phrasings — never use these or close variants: "the week reads as", "reads as", "the practical weight sits", "the picture is led by", "the picture", "activity is being driven by", "driven by protest activity", "mostly protests and organised action", "two different readings sit side by side", "on the reported record", "weighted towards", "operating posture", "Overall protest posture this week", "Risk level:", "the sharper case", "where events fall on the areas the business uses", "sections follow", "the practical risk this week was", "posture weighs volume".
 - Never copy an article headline into a sentence. Rewrite the information as normal prose.
 - Never confuse the number of events with their severity. If one country has more events but another has a more serious incident, state both plainly.
 - Keep contained incidents in context. An event inside a prison or other closed facility, however serious, is not evidence of wider public disorder — say so explicitly.

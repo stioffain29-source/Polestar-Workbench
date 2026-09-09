@@ -179,7 +179,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.countryRows[0]?.label).toBe("Australia");
-    expect(ds.regionalCountryRead).toMatch(/followed by Nepal, South Korea and Philippines/);
+    expect(ds.regionalCountryRead).toMatch(/with Nepal, South Korea and Philippines also reporting multiple events/);
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 
@@ -271,7 +271,7 @@ describe("flashpoint report consistency", () => {
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 
-  test("Polestar View uses five-tier severity vocabulary not elevated", () => {
+  test("Polestar View gives actionable movement guidance without posture-score label", () => {
     const rows = [
       inc({ title: "PTI supporters clash with police outside Adiala jail", severity: "high", country: "Pakistan", location: "Rawalpindi" }),
       inc({ title: "Chemists walk out over e-pharmacy rules in Lahore", severity: "moderate", country: "Pakistan", location: "Lahore" }),
@@ -280,7 +280,8 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.autoPolestarView).not.toMatch(/\belevated\b/i);
-    expect(ds.autoPolestarView).toMatch(/Risk level: (High|Moderate|Low)/i);
+    expect(ds.autoPolestarView).not.toMatch(/^Risk level:/i);
+    expect(ds.autoPolestarView).toMatch(/journey|transport|movement|flexible/i);
   });
 
   test("implications name specific countries and campus sites when available", () => {
@@ -342,7 +343,8 @@ describe("flashpoint report consistency", () => {
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.autoWhatMatters).toMatch(/Pakistan/);
     expect(ds.autoWhatMatters).not.toMatch(/spread across South Asia, East Asia/);
-    expect(ds.autoPolestarView).toMatch(/Risk level: Moderate\./);
+    expect(ds.autoPolestarView).not.toMatch(/^Risk level:/i);
+    expect(ds.autoPolestarView).toMatch(/journey|transport|movement|flexible/i);
     expect(ds.autoPolestarView).not.toMatch(/Polestar's view: this was an active week and the risk level is High/i);
   });
 

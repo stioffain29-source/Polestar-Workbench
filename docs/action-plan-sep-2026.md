@@ -266,9 +266,9 @@ TOPIC=flashpoint ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./s
 
 **Work:**
 
-- [ ] **FP-14** Define **one job per section** — Executive Summary (headline judgement), Country View (theatre-specific operational read), What Matters (priority risks + upcoming), Polestar View (client-facing recommendation); no cross-section repetition of the same conclusion
-- [ ] Add **banned phrase list** for dataset narration ("driven by protest activity", "mostly protests and organised action", posture-score explanations, "the following section…")
-- [ ] Prose generated **only from** `selectFlashpointUsable().enriched` — no orphan references to dropped rows
+- [x] **FP-14** Define **one job per section** — Executive Summary (headline judgement), Country View (theatre-specific operational read), What Matters (priority risks + upcoming), Polestar View (client-facing recommendation); no cross-section repetition of the same conclusion
+- [x] Add **banned phrase list** for dataset narration ("driven by protest activity", "mostly protests and organised action", posture-score explanations, "the following section…")
+- [x] Prose generated **only from** `selectFlashpointUsable().enriched` — no orphan references to dropped rows
 
 **Acceptance:**
 
@@ -282,8 +282,8 @@ TOPIC=flashpoint ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./s
 
 **Work:**
 
-- [ ] Rewrite section prompts/templates toward **concise, operational, judgement-led** copy — match APAC Fuel Crisis tone, not generic LLM filler
-- [ ] Extend **FP-10 validation** — fail generation on banned phrases or section repetition heuristics
+- [x] Rewrite section prompts/templates toward **concise, operational, judgement-led** copy — match APAC Fuel Crisis tone, not generic LLM filler
+- [x] Extend **FP-10 validation** — fail generation on banned phrases or section repetition heuristics
 - [ ] Headless PDF export on Steve's issue date; replay both regression PDFs
 
 **Verify:**
