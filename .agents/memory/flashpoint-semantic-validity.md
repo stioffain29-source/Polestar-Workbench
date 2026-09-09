@@ -28,6 +28,10 @@ observable and forces deliberate re-adjudication when the rules change.
 - Bump the semantic version whenever acceptance meaning changes. Old versions
   stay hidden until backfilled; incomplete manual, social, or structured-source
   writes remain review candidates rather than receiving synthetic confidence.
+- A semantic-version publish must converge newest stale decisions independently
+  of full ingest: finish one recent batch before the scheduler starts, then
+  cover the report window in bounded background batches. Never infer production
+  recovery from development backfill counts.
 - Audit coverage must report current-version `needs_review` rows as adjudicated
   holds, separately from genuinely blank or stale decisions. Treating a hold as
   "unadjudicated" defeats the required three-state model and creates false gaps.

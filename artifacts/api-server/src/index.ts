@@ -3,6 +3,7 @@ import { loadDevEnv } from "./lib/loadDevEnv.js";
 import { logger } from "./lib/logger";
 import { runDataMigrations } from "./lib/migrations";
 import { startIngestScheduler } from "./lib/ingestScheduler";
+import { convergeFlashpointValidity } from "./lib/flashpointValidityConvergence";
 
 loadDevEnv();
 
@@ -41,6 +42,23 @@ app.listen(port, "0.0.0.0", (err) => {
       );
       return;
     }
+    // Converge the newest semantic rows before launching the much larger
+    // multi-topic ingest. This prevents a semantic-version publish from leaving
+    // the fail-closed 24-hour map empty while the full ingest runs.
+    try {
+      await convergeFlashpointValidity(20);
+    } catch (validityErr) {
+      logger.error(
+        { err: validityErr },
+        "initial flashpoint semantic convergence failed",
+      );
+    }
     startIngestScheduler();
+    // Continue through the current report window in the background. The first
+    // 20 newest rows above restore recent map coverage as quickly as possible.
+    void convergeFlashpointValidity(400).then(
+      (result) => logger.info(result, "flashpoint semantic convergence finished"),
+      (err) => logger.error({ err }, "flashpoint semantic convergence failed"),
+    );
   })();
 });
