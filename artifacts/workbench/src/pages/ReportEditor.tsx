@@ -237,6 +237,30 @@ const EMPTY: FormState = {
   author: "",
 };
 
+// Shipping's interior was redesigned around the seven-page reader journey.
+// Keep the persisted section keys stable: the shipping preview/PDF map these
+// existing keys to the redesigned surfaces, while the editor exposes the
+// reader-facing labels from the new spec. Do not use the generic labels here
+// (they describe the pre-redesign layout).
+const SHIPPING_EDITOR_SECTION_KEYS: ReadonlyArray<{
+  key: string;
+  label: string;
+}> = [
+  { key: "maritime-intelligence", label: "Maritime Situation Map" },
+  { key: "executive-summary", label: "BLUF" },
+  { key: "fast-facts", label: "Fast Facts" },
+  { key: "chokepoint-route", label: "Chokepoint Watch" },
+  { key: "vessel-piracy", label: "Threat Picture" },
+  { key: "maritime-security", label: "Piracy and Armed Robbery" },
+  { key: "commercial-impact", label: "Commercial Impact" },
+  { key: "regional", label: "Regional Picture" },
+  { key: "what-matters", label: "What Matters" },
+  { key: "implications", label: "Implications for Business" },
+  { key: "watch-next", label: "Watch Next" },
+  { key: "polestar-view", label: "Polestar View" },
+  { key: "related-incidents", label: "Related Incidents" },
+];
+
 const SEVERITY_ORDER: Record<string, number> = {
   insignificant: 0,
   low: 1,
@@ -512,6 +536,72 @@ export default function ReportEditor() {
     maritimeSecurityEvents,
   ]);
 
+  // Shipping's new five-card surface is not the seven-card dataset helper's
+  // legacy presentation. Keep the editor on the same canonical publication
+  // snapshot as the renderers: risk and affected chokepoints are derived
+  // board values (read-only here), while these existing fact labels continue
+  // to be the only safe display overrides.
+  const shippingFastFactProjection = useMemo<{
+    editable: Array<{ label: string; value: string; note?: string }>;
+    readonly: Array<{ label: string; value: string; note?: string }>;
+  } | null>(() => {
+    if (form.topic !== "shipping" || !form.issueDate || !shippingDataset) {
+      return null;
+    }
+    try {
+      const publication = finalizeShippingPublication({
+        report: { topic: "shipping", issueDate: form.issueDate },
+        topic: "shipping",
+        issueDate: form.issueDate,
+        incidents: incidentsForExport as never,
+        movement,
+        maritimeSecurityEvents,
+        dataset: shippingDataset,
+      });
+      const byLabel = new Map(
+        publication.fastFacts.map((fact) => [fact.label, fact]),
+      );
+      const editableLabels = [
+        "Confirmed Incidents",
+        "Vessel Attacks / Seizures",
+        "Main Affected Chokepoint",
+      ] as const;
+      const editable = editableLabels.flatMap((label) => {
+        const fact = byLabel.get(label);
+        return fact
+          ? [{ label: fact.label, value: fact.value, note: fact.note }]
+          : [];
+      });
+      return {
+        editable,
+        readonly: [
+          {
+            label: "Overall Risk",
+            value: publication.maritimeBoard.risk.label,
+            note:
+              publication.maritimeBoard.risk.label === "Assessment pending"
+                ? "Derived from current maritime validation"
+                : `Confidence: ${publication.maritimeBoard.risk.confidence}`,
+          },
+          {
+            label: "Chokepoints Affected",
+            value: `${publication.maritimeBoard.chokepointsAffected} / 7`,
+            note: "Derived from tracked routes",
+          },
+        ],
+      };
+    } catch {
+      return null;
+    }
+  }, [
+    form.topic,
+    form.issueDate,
+    incidentsForExport,
+    movement,
+    maritimeSecurityEvents,
+    shippingDataset,
+  ]);
+
   // The AUTO Fast Facts tiles for the current topic, computed from the SAME
   // builders the preview/PDF use, so the override editor lists exactly the
   // tiles that render (matched by auto label). Empty when the report has no
@@ -550,7 +640,7 @@ export default function ReportEditor() {
         ).fastFacts;
       }
       if (form.topic === "shipping") {
-        return shippingDataset?.fastFacts ?? [];
+        return shippingFastFactProjection?.editable ?? [];
       }
       if (form.topic === "flashpoint" || form.topic === "protests") {
         return buildFlashpointReportDataset(
@@ -583,7 +673,25 @@ export default function ReportEditor() {
     hardNumbersEdited,
     report,
     shippingDataset,
+    shippingFastFactProjection,
   ]);
+
+  const fastFactEditorRows =
+    form.topic === "shipping"
+      ? (() => {
+          const readonly = shippingFastFactProjection?.readonly ?? [];
+          const editable = shippingFastFactProjection?.editable ?? [];
+          const byLabel = (rows: typeof readonly | typeof editable, label: string) =>
+            rows.find((fact) => fact.label === label);
+          return [
+            byLabel(readonly, "Overall Risk"),
+            byLabel(editable, "Confirmed Incidents"),
+            byLabel(readonly, "Chokepoints Affected"),
+            byLabel(editable, "Vessel Attacks / Seizures"),
+            byLabel(editable, "Main Affected Chokepoint"),
+          ].flatMap((fact) => (fact ? [{ ...fact, editable: fact.label !== "Overall Risk" && fact.label !== "Chokepoints Affected" }] : []));
+        })()
+      : autoFastFacts.map((fact) => ({ ...fact, editable: true }));
 
   // The AUTO Market & Operator Responses rows for a fuel report, computed
   // from the SAME canonical builder the preview/PDF use, so the override
@@ -2264,7 +2372,10 @@ export default function ReportEditor() {
               Section visibility
             </div>
             <div className="grid grid-cols-2 gap-1.5">
-              {topicSectionKeys(form.topic).map(({ key, label }) => {
+              {(form.topic === "shipping"
+                ? SHIPPING_EDITOR_SECTION_KEYS
+                : topicSectionKeys(form.topic)
+              ).map(({ key, label }) => {
                 const hidden = hiddenSections.includes(key);
                 return (
                   <label
@@ -2295,19 +2406,21 @@ export default function ReportEditor() {
               value changes week to week. Blank field = keep the auto text;
               clearing every field reverts the tile fully to auto. Applied
               identically in the preview AND the PDF exporters. */}
-          {autoFastFacts.length > 0 && (
+          {fastFactEditorRows.length > 0 && (
             <div className="border-t border-border pt-3 mt-1">
               <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
                 Fast Facts overrides
               </div>
               <p className="text-[11px] text-muted-foreground mb-2">
-                Blank fields keep the computed value. Clear all three to revert
-                a tile to auto.
+                {form.topic === "shipping"
+                  ? "Risk and chokepoint totals are derived from the canonical maritime board. Blank editable fields keep the computed value; clear all three editable fields to revert to auto."
+                  : "Blank fields keep the computed value. Clear all three to revert a tile to auto."}
               </p>
               <div className="flex flex-col gap-2">
-                {autoFastFacts.map((card) => {
-                  const ov: FastFactOverride =
-                    sectionOverrides.fastFactOverrides?.[card.label] ?? {};
+                {fastFactEditorRows.map((card) => {
+                  const ov: FastFactOverride = card.editable
+                    ? sectionOverrides.fastFactOverrides?.[card.label] ?? {}
+                    : {};
                   const setF = (field: keyof FastFactOverride, v: string) =>
                     setSectionOverrides((prev) => ({
                       ...prev,
@@ -2325,29 +2438,36 @@ export default function ReportEditor() {
                       className="border border-border rounded-sm p-2"
                     >
                       <div className="text-[11px] text-muted-foreground mb-1.5">
-                        {card.label} — auto: {card.value}
+                        {card.label} —{" "}
+                        {card.editable ? "auto" : "derived"}: {card.value}
                         {card.note ? ` · ${card.note}` : ""}
                       </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <Input
-                          placeholder="Label"
-                          value={ov.label ?? ""}
-                          onChange={(e) => setF("label", e.target.value)}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Value"
-                          value={ov.value ?? ""}
-                          onChange={(e) => setF("value", e.target.value)}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                        <Input
-                          placeholder="Note"
-                          value={ov.note ?? ""}
-                          onChange={(e) => setF("note", e.target.value)}
-                          className="rounded-sm text-[12px] h-8"
-                        />
-                      </div>
+                      {card.editable ? (
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <Input
+                            placeholder="Label"
+                            value={ov.label ?? ""}
+                            onChange={(e) => setF("label", e.target.value)}
+                            className="rounded-sm text-[12px] h-8"
+                          />
+                          <Input
+                            placeholder="Value"
+                            value={ov.value ?? ""}
+                            onChange={(e) => setF("value", e.target.value)}
+                            className="rounded-sm text-[12px] h-8"
+                          />
+                          <Input
+                            placeholder="Note"
+                            value={ov.note ?? ""}
+                            onChange={(e) => setF("note", e.target.value)}
+                            className="rounded-sm text-[12px] h-8"
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Read-only canonical value
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -2573,9 +2693,12 @@ export default function ReportEditor() {
           )}
 
           {/* Conflict Watch is location-led: Situation leads and the
-              Executive Summary section is dropped entirely. */}
+              Executive Summary section is dropped entirely. Shipping keeps
+              the stored executiveSummary field, but presents it as BLUF. */}
           {form.topic !== "conflict" && (
-            <Field label="Executive Summary">
+            <Field
+              label={form.topic === "shipping" ? "BLUF" : "Executive Summary"}
+            >
               <Textarea
                 rows={4}
                 value={form.executiveSummary}
@@ -2633,7 +2756,7 @@ export default function ReportEditor() {
               SAVED-ONLY, so an empty field means "use the auto read". */}
           {form.topic === "shipping" && (
             <>
-              <Field label="Chokepoint / Route Read">
+              <Field label="Chokepoint Watch Read">
                 <Textarea
                   rows={5}
                   value={form.chokepointRouteRead}
@@ -2644,7 +2767,7 @@ export default function ReportEditor() {
                   Clear any read to restore the auto-generated text.
                 </p>
               </Field>
-              <Field label="Vessel Threat and Piracy Read">
+              <Field label="Threat Picture Read">
                 <Textarea
                   rows={5}
                   value={form.vesselPiracyRead}
@@ -2652,7 +2775,7 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
               </Field>
-              <Field label="Maritime Security (ICC CCS / IMB) Read">
+              <Field label="Piracy and Armed Robbery Read">
                 <Textarea
                   rows={5}
                   value={form.maritimeSecurityRead}
@@ -2660,7 +2783,7 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
               </Field>
-              <Field label="Commercial Impact on Shipping Read">
+              <Field label="Commercial Impact Read">
                 <Textarea
                   rows={5}
                   value={form.commercialImpactRead}
@@ -2668,7 +2791,7 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
               </Field>
-              <Field label="Regional and Country View">
+              <Field label="Regional Picture Read">
                 <Textarea
                   rows={5}
                   value={form.regionalCountryRead}

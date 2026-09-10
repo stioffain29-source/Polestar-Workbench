@@ -1,0 +1,261 @@
+PAGE 1 – COVER
+
+Keep the existing cover broadly as it is.
+
+Retain the strong maritime image, Polestar Advisory branding, Shipping Watch title, Polestar Insights branding, reporting period and website.
+
+Do not add additional information to the cover.
+
+PAGE 2 – MARITIME SITUATION
+
+FAST FACTS
+
+Fast Facts must sit at the very top of the page, immediately below the header.
+
+Use one clean horizontal row of five key metrics:
+
+OVERALL RISK
+EXTREME
+
+CONFIRMED INCIDENTS
+6
+
+CHOKEPOINTS AFFECTED
+3 / 7
+
+VESSEL ATTACKS / SEIZURES
+3
+
+MAIN AFFECTED CHOKEPOINT
+STRAIT OF HORMUZ
+
+BLUF
+
+Place immediately below Fast Facts.
+
+Use a full width Midnight Blue panel with white text.
+
+This should be the dominant assessment on the page and give the reader the key judgement in one short paragraph.
+
+Do not use a separate Executive Summary section. The BLUF performs that function.
+
+MARITIME SITUATION MAP
+
+Use the remainder of the page for a regional maritime map showing:
+
+Strait of Hormuz
+Bab el Mandeb
+Red Sea
+Suez Canal
+Gulf of Aden
+Singapore Strait
+Malacca Strait
+
+Show the risk level at each location using clear markers.
+
+Keep the map visually dominant and uncluttered.
+
+The page hierarchy should be:
+
+FAST FACTS
+BLUF
+MARITIME SITUATION MAP
+
+The reader should get the numbers first, the assessment second and the geographical picture third.
+
+PAGE 3 – CHOKEPOINT WATCH
+
+Replace the current long bullet format with a single clean chokepoint matrix.
+
+Each chokepoint should appear as one horizontal row.
+
+Use the following structure:
+
+CHOKEPOINT NAME | RISK LEVEL | INCIDENTS | MOVEMENT | LATEST INCIDENT
+
+Under each row, include one short operational impact line only.
+
+Example:
+
+STRAIT OF HORMUZ | EXTREME | 2 INCIDENTS | 170 VESSELS TRACKED | LATEST 09 SEP
+
+Operational impact: Route disruption, war risk insurance pressure and increased voyage planning requirements.
+
+Repeat the same structure for:
+
+Strait of Hormuz
+Bab el Mandeb
+Red Sea
+Suez Canal
+Gulf of Aden
+Singapore Strait
+Malacca Strait
+
+Avoid separate boxes for every data point.
+
+Avoid large bullet lists.
+
+The page should allow the reader to scan all seven chokepoints quickly and compare them visually.
+
+PAGE 4 – THREAT PICTURE
+
+Use this page for vessel attacks, seizures, piracy and armed robbery.
+
+Do not present the main threat picture as another large spreadsheet.
+
+Use a timeline or incident sequence for the major events.
+
+Each incident should show:
+
+Date
+Location
+Incident type
+Severity
+Short title
+
+Major incidents should carry greater visual weight than minor incidents.
+
+Include a secondary section for piracy and armed robbery beneath or alongside the main threat timeline.
+
+AIS and vessel movement data should be presented as context, not as a separate incident category.
+
+Where useful, include a compact vessel movement graphic for the major routes rather than repeating long movement sentences.
+
+PAGE 5 – COMMERCIAL AND REGIONAL IMPACT
+
+Use the top half for commercial impact on shipping.
+
+Present the key commercial consequences clearly, including:
+
+Port disruption
+Transit delay
+Rerouting pressure
+Insurance pressure
+Chartering and fixture considerations
+Cargo delivery impact
+
+Use the lower half for visual regional analysis.
+
+Include:
+
+INCIDENTS BY REGION
+
+RECORDS BY COUNTRY
+
+Keep both charts on the same page.
+
+Do not split charts across pages.
+
+Avoid large blocks of explanatory text around the charts.
+
+The graphics should do most of the work.
+
+PAGE 6 – WHAT MATTERS
+
+This should be the main analytical page.
+
+Use three clear sections:
+
+WHAT MATTERS
+
+This is the main analytical judgement and should explain what the combined maritime picture means.
+
+IMPLICATIONS FOR BUSINESS
+
+Use concise operational implications for clients.
+
+WATCH NEXT
+
+Show the key indicators and developments that should be monitored during the next reporting period.
+
+This page should feel analytical rather than data heavy.
+
+Use strong section hierarchy and more white space than the data pages.
+
+PAGE 7 – POLESTAR VIEW AND RELATED INCIDENTS
+
+POLESTAR VIEW
+
+Place the Polestar View at the top of the page in a prominent assessment panel.
+
+This should be one of the strongest branded elements in the report.
+
+The reader should immediately understand Polestar’s judgement on the current maritime risk picture.
+
+RELATED INCIDENTS
+
+Place the related incident register underneath.
+
+Keep this compact.
+
+Use columns for:
+
+DATE
+ISSUE
+TITLE
+SEVERITY
+
+Avoid long explanatory paragraphs inside every table cell.
+
+The incident table should support the assessment, not dominate the page.
+
+DISCLAIMER
+
+Do not use a standalone disclaimer page.
+
+Move the existing disclaimer to the bottom of the final report page.
+
+Use a shallow Polar Gray footer panel.
+
+Use smaller Roboto text.
+
+Retain the existing disclaimer wording unchanged.
+
+The disclaimer should be visually separate from the analytical content but should not consume meaningful page space.
+
+OVERALL DESIGN RULES
+
+Use one consistent interior design language across the whole report.
+
+Use Polestar colours only:
+
+Midnight Blue #0b0a3d
+Electric Blue #465bff
+Dusk Gray #363636
+Polar Gray #e2e2e2
+
+Use Roboto and Roboto Light throughout.
+
+Avoid charcoal and taupe.
+
+Reduce the number of outlined boxes significantly.
+
+Use strong full width bands, clean tables, charts and deliberate spacing instead.
+
+Do not allow sections to break awkwardly across pages.
+
+Do not begin a chart or section on one page and continue it on the next.
+
+Major incidents and major risk areas should carry greater visual weight than quiet routes or low confidence reporting.
+
+Do not give every piece of information equal visual importance.
+
+The report should look like a premium maritime intelligence product, not a database export.
+
+The reader journey should be:
+
+FAST FACTS
+BLUF
+MAP
+CHOKEPOINT PICTURE
+THREAT PICTURE
+COMMERCIAL IMPACT
+REGIONAL PICTURE
+WHAT MATTERS
+IMPLICATIONS FOR BUSINESS
+WATCH NEXT
+POLESTAR VIEW
+RELATED INCIDENTS
+DISCLAIMER
+
+The report should be shorter, cleaner, more visual and easier to scan.

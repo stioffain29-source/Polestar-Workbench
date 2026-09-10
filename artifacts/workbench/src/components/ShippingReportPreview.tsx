@@ -8,6 +8,10 @@ import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import type { TopicAiProse } from "@/lib/topicProseResolution";
+import { ShippingSituationMap } from "./shipping-report/ShippingSituationMap";
+import { ShippingReportMatrix } from "./shipping-report/ShippingReportMatrix";
+import { ShippingThreatTimeline } from "./shipping-report/ShippingThreatTimeline";
+import { buildShippingCommercialCategories } from "@/lib/shippingCommercialCategories";
 import {
   type ShippingReportIncident,
   type ShippingReportDataset,
@@ -32,6 +36,7 @@ import {
   shippingPublicationIssueAction,
   shippingPublicationIssueSection,
 } from "@/lib/shippingPublication";
+import type { ShippingSevenPageRegisterRow } from "@/lib/shippingSevenPagePresentation";
 import {
   MARITIME_CHOKEPOINT_CARDS_TITLE,
   MARITIME_COVERAGE_STATUS_LABEL,
@@ -126,7 +131,7 @@ function Bullets({ text, max = 7 }: { text?: string | null; max?: number }) {
   );
 }
 
-function Paragraphs({ text }: { text?: string | null }) {
+function Paragraphs({ text, color = DUSK }: { text?: string | null; color?: string }) {
   if (!text) return null;
   const parts = text.split(/\n+/).filter(Boolean);
   return (
@@ -135,7 +140,7 @@ function Paragraphs({ text }: { text?: string | null }) {
         <p
           key={i}
           className="text-[14px] leading-[1.7] mb-3 font-light"
-          style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+          style={{ color, fontFamily: "Roboto, sans-serif" }}
         >
           {p}
         </p>
@@ -259,7 +264,7 @@ function KpiGrid({ cards }: { cards: KpiCard[] }) {
 
 function SeverityChip({ sevKey: k, label }: { sevKey: string; label: string }) {
   if (!k) return <span style={{ color: DUSK, fontSize: 11 }}>—</span>;
-  const bg = SHIPPING_SEV_COLOR[k] ?? "#999";
+  const bg = k === "high" || k === "extreme" ? NAVY : k === "moderate" ? ELECTRIC : DUSK;
   return (
     <span
       className="uppercase inline-block text-center"
@@ -417,13 +422,13 @@ function HorizontalBarChart({ rows, labelW = 160 }: { rows: BarRow[]; labelW?: n
   const ticks: number[] = [];
   for (let v = 0; v <= max; v += step) ticks.push(v);
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-4">
       {rows.map((r, i) => {
         const pct = (r.value / max) * 100;
         return (
           <div key={i} className="flex items-center gap-3" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: NAVY }}>
             <div style={{ width: labelW, flexShrink: 0, fontWeight: 700 }}>{r.label}</div>
-            <div className="flex-1 relative" style={{ background: "#F3F4F8", height: 18 }}>
+            <div className="flex-1 relative" style={{ background: "#fff", height: 28 }}>
               {ticks.map((v) => (
                 <div
                   key={v}
@@ -441,8 +446,8 @@ function HorizontalBarChart({ rows, labelW = 160 }: { rows: BarRow[]; labelW?: n
                 style={{
                   width: `${pct}%`,
                   height: "100%",
-                  background: rgba(r.color ?? ELECTRIC, 0.85),
-                  border: `1px solid ${darken(r.color ?? ELECTRIC, 0.25)}`,
+                  background: r.color ?? ELECTRIC,
+                  border: `1px solid ${r.color ?? ELECTRIC}`,
                   boxSizing: "border-box",
                   position: "relative",
                 }}
@@ -475,21 +480,27 @@ function HorizontalBarChart({ rows, labelW = 160 }: { rows: BarRow[]; labelW?: n
   );
 }
 
-function RelatedIncidentsTable({ rows, summaries }: { rows: EnrichedIncident[]; summaries: Record<string, string> }) {
+function RelatedIncidentsTable({
+  rows,
+  summaries = {},
+}: {
+  rows: Array<EnrichedIncident | ShippingSevenPageRegisterRow>;
+  summaries?: Record<string, string>;
+}) {
   if (rows.length === 0) return null;
   return (
-    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+    <div className="w-full" data-shipping-register style={{ borderTop: `1px solid ${POLAR}`, flexShrink: 0 }}>
       <div
         className="grid uppercase tracking-widest"
         style={{
-          gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
+          gridTemplateColumns: "0.55fr .85fr 2.6fr .7fr",
           background: NAVY,
           color: "#fff",
           fontFamily: "Roboto, sans-serif",
           fontWeight: 700,
           fontSize: 10,
-          padding: "8px 10px",
-          gap: 10,
+          padding: "6px 7px",
+          gap: 8,
         }}
       >
         <div>Date</div>
@@ -502,23 +513,26 @@ function RelatedIncidentsTable({ rows, summaries }: { rows: EnrichedIncident[]; 
           key={String(r.id)}
           className="grid"
           style={{
-            gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
-            padding: "8px 10px",
-            gap: 10,
+            gridTemplateColumns: "0.55fr .85fr 2.6fr .7fr",
+            padding: "5px 7px",
+            gap: 8,
             borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
             fontFamily: "Roboto, sans-serif",
-            fontSize: 12,
+            fontSize: 10,
+            lineHeight: 1.35,
             color: DUSK,
             alignItems: "flex-start",
           }}
         >
-          <div>{format(r.date, "dd MMM yyyy")}</div>
-          <div>{r.issue}</div>
+          <div>{format(r.date, "dd MMM")}</div>
+          <div>{"issue" in r ? r.issue : r.type}</div>
           <div style={{ color: NAVY }}>
             {r.title}
-            <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
-              {resolveIncidentSummary(r, summaries)}
-            </div>
+            {"topic" in r && (
+              <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
+                {resolveIncidentSummary(r, summaries)}
+              </div>
+            )}
           </div>
           <div>
             <SeverityChip
@@ -765,305 +779,329 @@ export default function ShippingReportPreview({
   // The PDF exporter still calls assertShippingPublication and therefore
   // remains fail-closed; the preview must keep the cover, tables and saved
   // analyst edits visible so the owner can fix the associated section.
+
+  const presentation = publication.sevenPage;
+  const fastFactByAutoLabel = (label: string) => {
+    const autoIndex = publication.dataset.fastFacts.findIndex((fact) => fact.label === label);
+    return (
+      (autoIndex >= 0 ? publication.fastFacts[autoIndex] : undefined) ??
+      publication.fastFacts.find((fact) => fact.label === label)
+    );
+  };
+
+  const riskFact = publication.maritimeBoard.risk;
+  const confirmedCount =
+    fastFactByAutoLabel("Confirmed Incidents")?.value ??
+    String(presentation.canonicalIncidentCount);
+  const affectedChokepoints = publication.maritimeBoard.chokepointsAffected;
+  const vesselAttacks =
+    fastFactByAutoLabel("Vessel Attacks / Seizures")?.value ??
+    String(publication.dataset.vesselAttackSeizureCount);
+  const mainAffected =
+    fastFactByAutoLabel("Main Affected Chokepoint")?.value ??
+    "N/A";
+
+  const riskLabel = riskFact.label.toLowerCase();
+  const isPending =
+    !publication.completeness.complete ||
+    riskFact.level === 1 ||
+    riskLabel.includes("pending") ||
+    riskLabel.includes("not assessed");
+  const showSituation =
+    show("maritime-intelligence") ||
+    show("executive-summary") ||
+    show("fast-facts");
+  const showImpact = show("commercial-impact") || show("regional");
+  const showAssessment =
+    show("what-matters") ||
+    show("implications") ||
+    show("watch-next");
+  const showClosing = show("polestar-view") || show("related-incidents");
   return (
-    <>
+    <div className="shipping-report-preview-root">
+      <style>{`
+        .shipping-page {
+          width: 210mm;
+          min-height: 297mm;
+          height: 297mm;
+          background: white;
+          margin: 0 auto 2rem auto;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          padding: 15mm 20mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          overflow: visible;
+          page-break-after: always;
+        }
+        .page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 2px solid #465bff;
+          padding-bottom: 8px;
+          margin-bottom: 24px;
+        }
+        .page-title {
+          color: #0b0a3d;
+          font-family: 'Roboto', sans-serif;
+          font-size: 18px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .page-footer {
+          position: absolute;
+          bottom: 10mm;
+          left: 20mm;
+          right: 20mm;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-top: 1px solid #e2e2e2;
+          padding-top: 8px;
+          font-size: 9px;
+          color: #363636;
+          text-transform: uppercase;
+        }
+        @media print {
+          .shipping-report-preview-root { background: transparent; padding: 0; }
+          .shipping-page { margin: 0; box-shadow: none; border: none; height: 297mm; overflow: visible; }
+        }
+      `}</style>
       <ShippingPublicationWarnings issues={publication.auditIssues} />
-      <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-      <div className="pdf-cover-page">
-      {/* 1. Top gradient band — full width, logo left, no margins. */}
-      <div
-        className="flex items-center"
-        style={{ background: BRAND_GRADIENT, color: "#fff", height: 64, paddingLeft: 24, paddingRight: 24 }}
-      >
-        <img src={polestarLogo} alt="Polestar Advisory" style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }} />
+
+      {/* PAGE 1: COVER */}
+      <div className="shipping-page p-0 relative overflow-hidden" data-shipping-page="1">
+         <div className="absolute inset-0 bg-[#0b0a3d]" />
+         <img src={shippingCoverUrl} alt="" className="absolute inset-0 w-full h-[65%] object-cover opacity-80 mix-blend-luminosity" />
+         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0a3d]/80 to-[#0b0a3d]" />
+         <div className="relative z-10 h-full flex flex-col justify-between p-[20mm]">
+           <div>
+             <img src={polestarLogo} alt="Polestar Insights" className="h-10 mb-8" />
+             <div className="text-[#465bff] text-[14px] font-bold tracking-[0.2em] uppercase mb-2">Polestar Insights</div>
+             <h1 className="text-white text-[48px] font-bold uppercase tracking-wide leading-none mb-4">Shipping Watch</h1>
+             <div className="text-white text-[18px] font-light">{resolvedTitle}</div>
+           </div>
+           <div>
+             <div className="text-white text-[14px] font-light border-t border-[#465bff] pt-4">
+               Reporting Period: {issueDate ? format(parseISO(issueDate), "MMMM yyyy") : "Current"} <br/>
+               polestaradvisory.com
+             </div>
+           </div>
+         </div>
       </div>
 
-      {/* 2. Hero image — full width, cropped, no borders. */}
-      <div style={{ width: "100%", aspectRatio: "16 / 9", overflow: "hidden", display: "block" }}>
-        <img
-          src={shippingCoverUrl}
-          alt=""
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
+      {/* PAGE 2: MARITIME SITUATION */}
+       {showSituation && (
+       <div className="shipping-page" data-shipping-page="2">
+         <div className="page-header">
+           <div className="page-title">Maritime Situation</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+
+          {show("fast-facts") && <div className="flex items-center justify-between border-y-2 border-[#0b0a3d] py-4 mb-6">
+           {[
+             { label: "Overall Risk", value: isPending ? "PENDING" : riskFact.label.toUpperCase() },
+              { label: "Confirmed Incidents", value: confirmedCount },
+             { label: "Chokepoints Affected", value: `${affectedChokepoints} / 7` },
+             { label: "Vessel Attacks / Seizures", value: String(vesselAttacks) },
+             { label: "Main Affected Chokepoint", value: mainAffected.toUpperCase() }
+           ].map((f, i, arr) => (
+              <div key={i} className={`flex flex-col text-center px-4 ${i !== arr.length - 1 ? 'border-r border-[#e2e2e2]' : ''} flex-1`}>
+                 <span className="text-[10px] uppercase font-bold tracking-widest text-[#363636] mb-1">{f.label}</span>
+                 <span className="text-[14px] font-bold text-[#0b0a3d] leading-none">{f.value}</span>
+               </div>
+           ))}
+          </div>}
+
+         {show("executive-summary") && (
+           <div className="bg-[#0b0a3d] text-white p-6 rounded-sm mb-6 flex-shrink-0 shadow-md">
+             <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Bottom Line Up Front</h3>
+             <p className="font-light leading-relaxed text-[15px]">{publication.prose.executiveSummary}</p>
+           </div>
+         )}
+
+          {show("maritime-intelligence") && <div className="flex-1 min-h-0 w-full relative pb-[15mm]">
+            <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Regional Maritime Map</h3>
+             <ShippingSituationMap chokepoints={presentation.matrix.map(row => ({
+               name: row.key,
+               level: row.risk.level ?? 1,
+               label: row.risk.display,
+             }))} />
+          </div>}
+         <div className="page-footer"><span>Shipping Watch</span><span>Page 2</span></div>
+       </div>
+       )}
+
+      {/* PAGE 3: CHOKEPOINT WATCH */}
+      {show("chokepoint-route") && (
+      <div className="shipping-page" data-shipping-page="3">
+         <div className="page-header">
+           <div className="page-title">Chokepoint Watch</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+         <ShippingReportMatrix rows={presentation.matrix} />
+         <div className="page-footer"><span>Shipping Watch</span><span>Page 3</span></div>
       </div>
+      )}
 
-      {/* 3. Bottom gradient title block — full width, title + subtitle + period + website. */}
-      <div
-        style={{
-          background: BRAND_GRADIENT,
-          color: "#fff",
-          paddingLeft: 32,
-          paddingRight: 32,
-          paddingTop: 40,
-          paddingBottom: 28,
-        }}
-      >
-        <h1
-          className="mb-4"
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 700,
-            fontSize: 44,
-            lineHeight: 1.05,
-            letterSpacing: "0",
-            textTransform: "uppercase",
-          }}
-        >
-          {resolvedTitle || "Untitled report"}
-        </h1>
-        <div
-          className="uppercase"
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: "0.22em",
-            marginBottom: 6,
-          }}
-        >
-          POLESTAR INSIGHTS
-        </div>
-        <div
-          className="uppercase"
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 400,
-            fontSize: 12,
-            letterSpacing: "0.18em",
-            color: "rgba(255,255,255,0.92)",
-          }}
-        >
-          {ds.reportingPeriodLong.toUpperCase()}
-        </div>
-        <div
-          className="uppercase"
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 700,
-            fontSize: 11,
-            letterSpacing: "0.18em",
-            marginTop: 32,
-          }}
-        >
-          polestar-advisory.com
-        </div>
+      {/* PAGE 4: THREAT PICTURE */}
+       {(show("vessel-piracy") || show("maritime-security")) && (
+      <div className="shipping-page" data-shipping-page="4">
+         <div className="page-header">
+           <div className="page-title">Threat Picture</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+         <div className="flex flex-col gap-6">
+           {show("vessel-piracy") && (
+           <div>
+             <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] font-bold">Major Incidents Timeline</h3>
+             {presentation.timeline.countNote && (
+               <div className="flex flex-col gap-1 mb-2">
+                 <div className="text-[11px] text-[#363636] font-light">
+                   {presentation.timeline.countNote}
+                 </div>
+               </div>
+             )}
+             <ShippingThreatTimeline incidents={presentation.timeline.rows} />
+           </div>
+           )}
+           
+            {show("maritime-security") && (
+           <div className={show("vessel-piracy") ? "mt-8 border-t border-[#e2e2e2] pt-6" : ""}>
+             <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] font-bold mb-4">Piracy and Armed Robbery</h3>
+             {presentation.piracySecondary.rows.length > 0 ? (
+               <>
+                 {presentation.piracySecondary.countNote && (
+                   <div className="text-[11px] text-[#363636] font-light mb-2">
+                     {presentation.piracySecondary.countNote}
+                   </div>
+                 )}
+                 <ShippingThreatTimeline incidents={presentation.piracySecondary.rows} />
+               </>
+             ) : (
+               <div className="text-[14px] text-[#363636] font-light leading-relaxed">
+                 No validated piracy or armed-robbery event is reported.
+               </div>
+             )}
+           </div>
+           )}
+         </div>
+         {presentation.matrix.some(row => row.movement) && <div style={{ marginTop: 24, paddingTop: 10, borderTop: `1px solid ${POLAR}`, fontSize: 10, lineHeight: 1.5, color: DUSK }}>
+           <strong>AIS movement context — </strong>
+           {presentation.matrix.filter(row => row.movement).map(row => `${row.key}: ${format(new Date(row.movement!.dataAsOf), "dd MMM")}, ${row.movement!.totalVessels == null ? "sample size unavailable" : `${row.movement!.totalVessels} vessels tracked`}`).join(" · ")}
+         </div>}
+         <div className="page-footer"><span>Shipping Watch</span><span>Page 4</span></div>
       </div>
-      </div>
+      )}
 
-      <div className="px-10 py-10">
-        {prose.executiveSummary.trim() && (
-          <Section hidden={!show("executive-summary")} title="Executive Summary">
-            <Paragraphs text={prose.executiveSummary} />
-          </Section>
-        )}
-
-        {show("maritime-intelligence") && (
-          <MaritimeIntelligenceReportSection
-            board={maritimeBoard}
-            completeness={publication.completeness}
-          />
-        )}
-
-        <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <KpiGrid cards={renderedFastFacts} />
-        </Section>
-
-        <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">
-          <Paragraphs text={prose.chokepointRouteRead} />
-          {ds.chokepointRows.some((row) => row.count > 0) && (
-            <div className="mt-4">
-              <ChokepointTable rows={ds.chokepointRows} />
+      {/* PAGE 5: COMMERCIAL AND REGIONAL IMPACT */}
+      {(show("commercial-impact") || show("regional")) && (
+      <div className="shipping-page" data-shipping-page="5">
+         <div className="page-header">
+           <div className="page-title">Commercial & Regional Impact</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+         <div className="flex-1 flex flex-col gap-8">
+            {show("commercial-impact") && (
+            <div className="flex-shrink-0">
+               <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Commercial Impact on Shipping</h3>
+               <div className="text-[14px] text-[#363636] font-light leading-relaxed mb-6"><Paragraphs text={publication.prose.commercialImpactRead} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px 24px", marginBottom: 12 }}>
+               {buildShippingCommercialCategories(presentation.commercialEffects).map(group => (
+                 <div key={group.title} style={{ borderTop: "1px solid #e2e2e2", paddingTop: 8, gridColumn: group.title === "Other documented effects" ? "1 / -1" : undefined }}>
+                   <div style={{ textTransform: "uppercase", fontSize: 11, color: NAVY, fontWeight: 700, marginBottom: 5 }}>{group.title}</div>
+                   {(group.lines.length ? group.lines : ["Not established in available reporting."]).map((line, i) =>
+                     <p key={i} style={{ fontSize: 11, lineHeight: 1.5, color: DUSK, fontWeight: 300, marginBottom: 4 }}>{line}</p>)}
+                 </div>
+               ))}
             </div>
-          )}
-        </Section>
-
-        <Section hidden={!show("vessel-piracy")} title="Vessel Threat and Piracy Read">
-          <Paragraphs text={prose.vesselPiracyRead} />
-          {ds.vesselRows.length > 0 && (
-            <>
-              <div
-                className="uppercase mb-2 mt-4"
-                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-              >
-                Vessel Attacks ({ds.thirtyDayShortLabel})
-              </div>
-              <IncidentTable
-                rows={ds.vesselRows}
-                actLabel="Act"
-                actFor={(r) => r.vesselType}
-                emptyMessage="No hostile vessel incidents reported this week."
-              />
-            </>
-          )}
-          {ds.piracyRows.length > 0 && (
-            <>
-              <div
-                className="uppercase mb-2 mt-4"
-                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-              >
-                Piracy and Armed Robbery ({ds.thirtyDayShortLabel})
-              </div>
-              <IncidentTable
-                rows={ds.piracyRows}
-                actLabel="Act"
-                actFor={(r) => r.act}
-                emptyMessage="No piracy or armed-robbery reports this week."
-              />
-            </>
-          )}
-        </Section>
-
-        <Section hidden={!show("maritime-security")} title="Maritime Security (ICC CCS / IMB)">
-          <Paragraphs text={prose.maritimeSecurityRead} />
-          {ds.maritimeSecurity.byType.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4 mb-3">
-              {ds.maritimeSecurity.byType.map((b) => (
-                <span
-                  key={b.type}
-                  style={{
-                    fontFamily: "Roboto, sans-serif",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#fff",
-                    backgroundColor: maritimeTypeColor(b.type),
-                    padding: "3px 9px",
-                    borderRadius: 2,
-                  }}
-                >
-                  {b.type}: {b.count}
-                </span>
-              ))}
+            
             </div>
-          )}
-          {ds.maritimeSecurity.rows.length > 0 ? (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-              <thead>
-                <tr>
-                  {["Date", "Type", "Location", "Coastal State"].map((h) => (
-                    <th
-                      key={h}
-                      className="uppercase"
-                      style={{
-                        textAlign: "left",
-                        fontFamily: "Roboto, sans-serif",
-                        fontWeight: 700,
-                        fontSize: 9,
-                        letterSpacing: "0.1em",
-                        color: DUSK,
-                        borderBottom: `1px solid ${POLAR}`,
-                        padding: "5px 8px",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {ds.maritimeSecurity.rows.map((r) => (
-                  <tr key={r.id}>
-                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px", whiteSpace: "nowrap" }}>
-                      {r.date ? format(r.date, "dd MMM yyyy") : "—"}
-                    </td>
-                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
-                      <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 2, backgroundColor: maritimeTypeColor(r.type), marginRight: 6, verticalAlign: "middle" }} />
-                      {r.type}
-                    </td>
-                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
-                      {r.location ?? "—"}
-                    </td>
-                    <td style={{ fontFamily: "Roboto, sans-serif", fontSize: 11, color: NAVY, borderBottom: `1px solid ${POLAR}`, padding: "5px 8px" }}>
-                      {r.country ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p style={{ fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, marginTop: 8 }}>
-              No piracy or armed-robbery activity recorded for this period by the {MARITIME_SECURITY_SOURCE_LABEL}.
-            </p>
-          )}
-        </Section>
-
-        <Section hidden={!show("commercial-impact")} title="Commercial Impact on Shipping">
-          <Paragraphs text={prose.commercialImpactRead} />
-          {ds.commercialRows.length > 0 && (
-            <div className="mt-4">
-              <IncidentTable
-                rows={ds.commercialRows}
-                actLabel="Issue"
-                actFor={(r) => r.issue}
-                emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
-              />
+            )}
+            {show("regional") && (
+            <div className={`flex flex-col gap-4 flex-1 min-h-0 ${show("commercial-impact") ? 'pt-4 border-t border-[#e2e2e2]' : ''}`}>
+               <div className="flex gap-8 flex-1">
+                 <div className="flex-1">
+                   <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-4 font-bold">Incidents by Region</h3>
+                   <HorizontalBarChart rows={presentation.geography.regions.rows} labelW={120} />
+                 </div>
+                 <div className="flex-1">
+                   <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-4 font-bold">Records by Country</h3>
+                   <HorizontalBarChart rows={presentation.geography.countries.rows} labelW={120} />
+                 </div>
+               </div>
+               
+               {(presentation.geography.regions.unknownCount > 0 || presentation.geography.countries.unknownCount > 0) && (
+                 <div className="text-[11px] text-[#363636] font-light mt-2 pt-2 border-t border-dashed border-[#e2e2e2]">
+                   {[
+                     presentation.geography.regions.unknownCount > 0 ? `${presentation.geography.regions.unknownCount} incidents have no established region` : null,
+                     presentation.geography.countries.unknownCount > 0 ? `${presentation.geography.countries.unknownCount} incidents have no established country` : null,
+                   ].filter(Boolean).join("; ")}. Unknown records remain in the totals.
+                 </div>
+               )}
             </div>
-          )}
-        </Section>
+            )}
+         </div>
+         <div className="page-footer"><span>Shipping Watch</span><span>Page 5</span></div>
+      </div>
+      )}
 
-        <Section hidden={!show("regional")} title="Regional and Country View">
-          <Paragraphs text={prose.regionalCountryRead} />
-          {ds.regionRows.some((row) => row.value > 0) && (
-            <div className="mt-4 mb-5">
-              <div
-                className="uppercase mb-2"
-                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-              >
-                Incidents by Region
-              </div>
-              <HorizontalBarChart rows={ds.regionRows.filter((row) => row.value > 0)} labelW={180} />
+      {/* PAGE 6: WHAT MATTERS */}
+       {showAssessment && (
+       <div className="shipping-page" data-shipping-page="6">
+         <div className="page-header">
+           <div className="page-title">Analytical Assessment</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+         <div className="flex flex-col gap-10 mt-6">
+             {show("what-matters") && <div>
+               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">What Matters</h3>
+               <div className="text-[16px] leading-relaxed text-[#363636] font-light"><Paragraphs text={publication.prose.whatMatters} /></div>
+             </div>}
+             {show("implications") && <div>
+               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">Implications for Business</h3>
+               <div className="text-[15px] leading-relaxed text-[#0b0a3d] font-medium"><Paragraphs text={publication.prose.implications} /></div>
+             </div>}
+             {show("watch-next") && <div>
+               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">Watch Next</h3>
+               <div className="text-[15px] leading-relaxed text-[#363636]"><Paragraphs text={publication.prose.watchNext} /></div>
+             </div>}
+          </div>
+          <div className="page-footer"><span>Shipping Watch</span><span>Page 6</span></div>
+       </div>
+       )}
+
+      {/* PAGE 7: POLESTAR VIEW AND RELATED INCIDENTS */}
+       {showClosing && (
+       <div className="shipping-page" data-shipping-page="7">
+         <div className="page-header">
+           <div className="page-title">Polestar View</div>
+           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+         </div>
+
+          {show("polestar-view") && <div className="bg-[#0b0a3d] text-white p-6 rounded-sm mb-6 flex-shrink-0 shadow-md">
+           <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Current Judgement</h3>
+           <div className="font-light leading-relaxed text-[15px]"><Paragraphs text={publication.prose.polestarView} color="#fff" /></div>
+          </div>}
+
+           {show("related-incidents") && <div className="flex-1 min-h-0 flex flex-col mb-4">
+           <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Related Incidents</h3>
+           <div className="text-[11px] text-[#363636] font-light mb-2">
+             {presentation.register.countNote || `Compact register: latest ${presentation.register.shownCount} prioritised developments.`}
             </div>
-          )}
-          {ds.countryRows.length > 0 && (
-            <>
-              <div
-                className="uppercase mb-2"
-                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-              >
-                {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
-              </div>
-              <HorizontalBarChart rows={ds.countryRows} labelW={180} />
-            </>
-          )}
-        </Section>
+            <RelatedIncidentsTable rows={presentation.register.rows} />
+          </div>}
 
-        <Section hidden={!show("what-matters")} title="What Matters">
-          <Paragraphs text={prose.whatMatters} />
-        </Section>
-        <Section hidden={!show("implications")} title="Implications for Business">
-          <Bullets text={prose.implications} />
-        </Section>
-        <Section hidden={!show("watch-next")} title="Watch Next">
-          <Bullets text={prose.watchNext} max={8} />
-        </Section>
-        <Section hidden={!show("polestar-view")} title="Polestar View">
-          <Paragraphs text={prose.polestarView} />
-        </Section>
-
-        {ds.relatedIncidents.length > 0 && (
-          <Section hidden={!show("related-incidents")} title="Related Incidents">
-            <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={publication.incidentSummaries} />
-          </Section>
-        )}
-
-        <Section title="Disclaimer">
-          <p
-            className="text-[12px] leading-[1.7]"
-            style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
-          >
-            {DISCLAIMER_TEXT}
-          </p>
-        </Section>
+         <div className="bg-[#e2e2e2] p-4 text-[10px] text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-sm mt-auto mb-[15mm]">
+           {DISCLAIMER_TEXT}
+          </div>
+         <div className="page-footer"><span>Shipping Watch</span><span>Page 7</span></div>
       </div>
+       )}
 
-      <div
-        className="pdf-preview-footer px-10 flex items-center justify-between"
-        style={{ background: POLAR, color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 11, minHeight: 36 }}
-      >
-        <span>polestar-advisory.com</span>
-        <span>info@polestar-advisory.com</span>
-        <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
-      </div>
-      </div>
-    </>
+    </div>
   );
 }

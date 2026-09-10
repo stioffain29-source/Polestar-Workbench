@@ -55,6 +55,10 @@ import {
   auditFinalReportEvidence,
   type FinalReportTypedReference,
 } from "./finalReportEvidenceAudit";
+import {
+  buildShippingSevenPagePresentation,
+  type ShippingSevenPagePresentation,
+} from "./shippingSevenPagePresentation";
 
 const SEVERITY_RANK: Record<string, number> = {
   insignificant: 1,
@@ -315,6 +319,12 @@ export interface ShippingPublicationBundle {
     regions: BarRow[];
     countries: BarRow[];
   };
+  /**
+   * Canonical, renderer-neutral facts for the fixed seven-page Shipping Watch
+   * product. Unlike the editor tables, this projection intentionally retains
+   * source-backed event rows that are already represented on the board.
+   */
+  sevenPage: ShippingSevenPagePresentation;
   incidentSummaries: Record<string, string>;
   hiddenSections: Set<string>;
   auditIssues: ShippingPublicationIssue[];
@@ -538,12 +548,11 @@ function clientMaritimeBoard(
         : risk.label === "Not assessed"
         ? "Maritime risk is not assessed because no maritime incident was reported in this window."
         : `Maritime risk is ${risk.label}. ${riskRationale}`,
-    // Empty route cards are not a client-facing finding.  Movement-only
-    // theatres and the fixed board vocabulary must not become seven rows
-    // saying "None in window"; retain only routes with a current confirmed
-    // incident or an explicitly confirmed indirect route consequence.
+    // Keep the board's fixed seven-route vocabulary intact. The seven-page
+    // presentation derives its matrix from these authoritative cards rather
+    // than from the older, potentially truncated route table. Quiet routes
+    // remain explicit, while the presentation layer qualifies their risk.
     chokepointCards: board.chokepointCards
-      .filter((card) => card.incidentCount > 0)
       .map((card) => ({
         ...card,
         lastConfirmed: card.lastConfirmed
@@ -1825,7 +1834,7 @@ export function finalizeShippingPublication(
     issues,
   );
 
-  return {
+  const publication: Omit<ShippingPublicationBundle, "sevenPage"> = {
     dataset,
     completeness,
     maritimeBoard,
@@ -1848,6 +1857,15 @@ export function finalizeShippingPublication(
     incidentSummaries: summaries,
     hiddenSections: new Set(options.hiddenSections ?? []),
     auditIssues: issues,
+  };
+  return {
+    ...publication,
+    sevenPage: buildShippingSevenPagePresentation({
+      dataset,
+      completeness,
+      maritimeBoard,
+      incidentSummaries: summaries,
+    }),
   };
 }
 

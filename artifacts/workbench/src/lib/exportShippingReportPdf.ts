@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { buildShippingCommercialCategories } from "./shippingCommercialCategories";
 import { resolveIncidentSummary } from "./incidentSummary";
 import {
   createCtx,
@@ -19,6 +20,9 @@ import {
   prepareCoverImage,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
+  HEADER_BAND_H,
+  FOOTER_BAND_H,
+  DISCLAIMER_TEXT,
   setFill,
   setStroke,
   setText,
@@ -37,10 +41,7 @@ import {
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
-import {
-  makeSectionGate,
-  type TopicSectionOverrides,
-} from "./topicSectionOverrides";
+import type { TopicSectionOverrides } from "./topicSectionOverrides";
 import type { TopicAiProse } from "./topicProseResolution";
 import { LOCATION_NOT_IDENTIFIED as _LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
 import {
@@ -76,6 +77,14 @@ import {
   formatMaritimeMovementSample,
   type MaritimeReportCompleteness,
 } from "./maritimeReportView";
+import {
+  projectShippingRegionalPoint,
+  SHIPPING_REGIONAL_MAP_BOUNDS,
+  SHIPPING_REGIONAL_GEO,
+  SHIPPING_REGIONAL_MAP_POINTS,
+  SHIPPING_REGIONAL_MAP_LABEL_OFFSETS,
+} from "./shippingRegionalMap";
+import type { ShippingSevenPagePresentation } from "./shippingSevenPagePresentation";
 
 void _LOCATION_NOT_IDENTIFIED;
 
@@ -119,20 +128,11 @@ function darkenHex(hex: string, amount: number): string {
   return toHex(r * f, g * f, b * f);
 }
 
-// Shipping report PDF. Section order (per final spec):
-//   Cover -> Executive Summary -> Fast Facts ->
-//   Chokepoint / Route Read (prose + chokepoint table) ->
-//   Vessel Threat and Piracy Read (prose + vessel table + piracy table) ->
-//   Commercial Impact on Shipping (prose + commercial table) ->
-//   Regional and Country View (prose + region bar + country bar) ->
-//   What Matters -> Implications for Business ->
-//   Watch Next -> Polestar View ->
-//   Related Incidents ->
-//   Source Notes / Data Notes -> Disclaimer.
-// Drops (vs. previous draft): Issue Type Breakdown, Daily Intelligence
-// Summary, Incident Timeline, Severity Distribution, the standalone
-// "Incidents by Country" heading. Everything in the body comes from
-// shippingReportDataset so the preview and the PDF cannot drift.
+// Shipping report PDF. The current publication order is implemented as six
+// explicit interior pages after the existing cover:
+//   Maritime Situation -> Chokepoint Watch -> Threat Picture ->
+//   Commercial and Regional Impact -> What Matters -> Polestar View.
+// Every body surface reads from the final Shipping publication bundle.
 
 export interface ShippingReportData {
   title: string;
@@ -810,7 +810,7 @@ function drawMaritimeIntelligence(
 
   drawSectionHeading(ctx, "Maritime Intelligence");
 
-  // Executive summary KPI cards (risk, confirmed incidents, affected
+  // Situation KPI cards (risk, confirmed incidents, affected
   // chokepoints and, when populated, business impact). Built from the SHARED
   // view contract (maritimeReportView) so they are byte-identical to the
   // on-screen board.
@@ -889,6 +889,965 @@ function drawMaritimeIntelligence(
   // Next in the standalone sections. Mirrors the preview byte-for-byte.
 }
 
+// Seven-page Shipping Watch layout -------------------------------------------
+//
+// The older renderer above is retained for the other report adapters that
+// still import its small drawing primitives.  Shipping Watch itself uses the
+// explicit page renderer below.  Every page is opened deliberately; none of
+// these page-local surfaces call ensureSpace/newPage, which makes the
+// publication contract (cover + six interior pages) deterministic even when a
+// saved analyst paragraph is unusually long.
+
+function normalizeMapKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function fitTextLines(
+  ctx: Ctx,
+  text: string,
+  width: number,
+  maxHeight: number,
+  opts: {
+    color?: string;
+    font?: "light" | "regular" | "bold";
+    maxSize?: number;
+    minSize?: number;
+    lineFactor?: number;
+    paragraphGap?: number;
+  } = {},
+  originX = 0,
+  originY = 0,
+): number {
+  const { pdf } = ctx;
+  const paragraphs = sanitize(text)
+    .split(/\n+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (paragraphs.length === 0 || maxHeight <= 0) return 0;
+
+  const maxSize = opts.maxSize ?? 10;
+  const minSize = opts.minSize ?? 4;
+  const lineFactor = opts.lineFactor ?? 1.28;
+  const paragraphGap = opts.paragraphGap ?? 3;
+  let size = maxSize;
+  let measured: Array<string[]> = [];
+  let lineH = size * lineFactor;
+  let height = Number.POSITIVE_INFINITY;
+  while (size >= minSize) {
+    setRoboto(pdf, opts.font ?? "light");
+    pdf.setFontSize(size);
+    measured = paragraphs.map((p) => pdf.splitTextToSize(p, width));
+    lineH = size * lineFactor;
+    height =
+      measured.reduce((sum, lines) => sum + lines.length * lineH, 0) +
+      Math.max(0, measured.length - 1) * paragraphGap;
+    if (height <= maxHeight) break;
+    size -= 0.25;
+  }
+  // An analyst can paste arbitrary-length text.  Continue reducing the text
+  // size (rather than clipping or silently dropping prose) so all of it stays
+  // on the designated page.
+  if (height > maxHeight) {
+    setRoboto(pdf, opts.font ?? "light");
+    pdf.setFontSize(minSize);
+    measured = paragraphs.map((p) => pdf.splitTextToSize(p, width));
+    const rawLines = measured.reduce((sum, lines) => sum + lines.length, 0);
+    const gaps = Math.max(0, measured.length - 1) * paragraphGap;
+    size = Math.max(2.8, (maxHeight - gaps) / Math.max(1, rawLines * lineFactor));
+    setRoboto(pdf, opts.font ?? "light");
+    pdf.setFontSize(size);
+    measured = paragraphs.map((p) => pdf.splitTextToSize(p, width));
+    lineH = size * lineFactor;
+  }
+
+  if (opts.color) setText(pdf, opts.color);
+  let y = 0;
+  for (const [paragraphIndex, lines] of measured.entries()) {
+    for (const line of lines) {
+      pdf.text(line, originX, originY + y + size);
+      y += lineH;
+    }
+    if (paragraphIndex < measured.length - 1) y += paragraphGap;
+  }
+  return y;
+}
+
+/**
+ * Draw fitTextLines at a real origin. Keeping the fit calculation in one
+ * helper prevents analyst edits from being cut off by fixed page geometry.
+ */
+function drawFitText(
+  ctx: Ctx,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  maxHeight: number,
+  opts: Parameters<typeof fitTextLines>[4] = {},
+): number {
+  // fitTextLines uses native jsPDF text calls, so analyst prose stays
+  // selectable in the generated PDF.
+  return fitTextLines(ctx, text, width, maxHeight, opts, x, y);
+}
+
+function drawInteriorTitle(ctx: Ctx, title: string, subtitle?: string) {
+  const { pdf, MX } = ctx;
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(15);
+  pdf.text(sanitize(title.toUpperCase()), MX, HEADER_BAND_H + 15);
+  setStroke(pdf, ELECTRIC);
+  pdf.setLineWidth(1.3);
+  pdf.line(MX, HEADER_BAND_H + 23, MX + ctx.CW, HEADER_BAND_H + 23);
+  if (subtitle) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "light");
+    pdf.setFontSize(7.5);
+    pdf.text(sanitize(subtitle), MX, HEADER_BAND_H + 36);
+  }
+}
+
+function startInteriorPage(ctx: Ctx, title: string, subtitle?: string) {
+  newPage(ctx);
+  drawInteriorTitle(ctx, title, subtitle);
+}
+
+function publicationFact(
+  publication: ReturnType<typeof finalizeShippingPublication>,
+  label: string,
+): KpiCardData | undefined {
+  const autoIndex = publication.dataset.fastFacts.findIndex((item) => item.label === label);
+  const fact =
+    (autoIndex >= 0 ? publication.fastFacts[autoIndex] : undefined) ??
+    publication.fastFacts.find((item) => item.label === label);
+  return fact
+    ? {
+        label: fact.label,
+        value: fact.value,
+        note: fact.note,
+        severity: fact.severity,
+        accent: fact.accent,
+      }
+    : undefined;
+}
+
+function brandRiskAccent(label: string, pending: boolean): string {
+  if (pending) return POLAR;
+  const normalized = label.toLowerCase();
+  if (normalized === "extreme") return NAVY;
+  if (normalized === "high" || normalized === "moderate") return ELECTRIC;
+  return POLAR;
+}
+
+function drawFiveFastFacts(
+  ctx: Ctx,
+  publication: ReturnType<typeof finalizeShippingPublication>,
+) {
+  const { pdf, MX, CW } = ctx;
+  const board = publication.maritimeBoard;
+  const riskLabel = board.risk.label.toLowerCase();
+  const pending =
+    !publication.completeness.complete ||
+    board.risk.level === 1 ||
+    riskLabel.includes("pending") ||
+    riskLabel.includes("not assessed");
+  const main = publicationFact(publication, "Main Affected Chokepoint");
+  const facts: KpiCardData[] = [
+    {
+      label: "Overall Risk",
+      value: board.risk.label,
+      note: pending ? "Coverage incomplete" : `Confidence: ${board.risk.confidence}`,
+      accent: brandRiskAccent(board.risk.label, pending),
+    },
+    publicationFact(publication, "Confirmed Incidents") ?? {
+      label: "Confirmed Incidents",
+      value: String(board.incidentSnapshot.total),
+    },
+    {
+      label: "Chokepoints Affected",
+      value: `${board.chokepointsAffected} / 7`,
+      note: "Tracked routes",
+      accent: ELECTRIC,
+    },
+    {
+      label: "Vessel Attacks / Seizures",
+      // This is intentionally the uncapped canonical count. vesselRows is a
+      // bounded display table and must never drive this Fast Fact.
+      value:
+        publicationFact(publication, "Vessel Attacks / Seizures")?.value ??
+        String(publication.dataset.vesselAttackSeizureCount),
+      note:
+        publicationFact(publication, "Vessel Attacks / Seizures")?.note ??
+        "Full count",
+      accent: ELECTRIC,
+    },
+    {
+      label: "Main Affected Chokepoint",
+      value: main?.value ?? "—",
+      note: main?.note,
+      accent: ELECTRIC,
+    },
+  ];
+
+  const cardW = CW / facts.length;
+  const rowH = 70;
+  const y = HEADER_BAND_H + 34;
+  setStroke(pdf, NAVY);
+  pdf.setLineWidth(1);
+  pdf.line(MX, y, MX + CW, y);
+  pdf.line(MX, y + rowH, MX + CW, y + rowH);
+  for (const [index, card] of facts.entries()) {
+    const x = MX + index * cardW;
+    if (index > 0) {
+      setStroke(pdf, POLAR);
+      pdf.setLineWidth(0.5);
+      pdf.line(x, y + 8, x, y + rowH - 8);
+    }
+    setText(pdf, DUSK);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.3);
+    const labelLines = pdf.splitTextToSize(sanitize(card.label.toUpperCase()), cardW - 12);
+    pdf.text(labelLines.slice(0, 2), x + cardW / 2, y + 15, {
+      align: "center",
+      lineHeightFactor: 1.1,
+    });
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    let valueSize = card.value.length > 18 ? 9 : 13;
+    while (valueSize > 7 && (setRoboto(pdf, "bold"), pdf.setFontSize(valueSize), pdf.getTextWidth(sanitize(card.value)) > cardW - 12)) {
+      valueSize -= 0.25;
+    }
+    pdf.setFontSize(valueSize);
+    pdf.text(sanitize(card.value), x + cardW / 2, y + 39, { align: "center" });
+    if (card.note) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(5.6);
+      pdf.text(pdf.splitTextToSize(sanitize(card.note), cardW - 12).slice(0, 2), x + cardW / 2, y + 57, {
+        align: "center",
+        lineHeightFactor: 1.05,
+      });
+    }
+  }
+  ctx.y = y + rowH + 12;
+}
+
+function drawBlufPanel(ctx: Ctx, text: string) {
+  const { pdf, MX, CW } = ctx;
+  const y = ctx.y;
+  const h = 76;
+  setFill(pdf, NAVY);
+  pdf.rect(MX, y, CW, h, "F");
+  setText(pdf, POLAR);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(7);
+  pdf.text("BLUF", MX + 12, y + 14);
+  drawFitText(ctx, text, MX + 12, y + 20, CW - 24, h - 27, {
+    color: WHITE,
+    font: "light",
+    maxSize: 10.5,
+    minSize: 3.6,
+    lineFactor: 1.25,
+    paragraphGap: 3,
+  });
+  ctx.y = y + h + 12;
+}
+
+function drawShippingRegionalMap(
+  ctx: Ctx,
+  presentation: ShippingSevenPagePresentation,
+) {
+  const { pdf, MX, CW } = ctx;
+  const frame = {
+    x: MX,
+    y: ctx.y + 20,
+    width: CW,
+    height: Math.min(330, ctx.H - ctx.BOTTOM - (ctx.y + 55)),
+  };
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(9);
+  pdf.text("MARITIME SITUATION MAP", MX, ctx.y + 10);
+
+  setFill(pdf, WHITE);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.5);
+  pdf.rect(frame.x, frame.y, frame.width, frame.height, "FD");
+
+  // Longitude/latitude graticule makes the geographic placement explicit
+  // even in headless/native PDF exports where a tile basemap is unavailable.
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.3);
+  for (let longitude = 30; longitude <= 110; longitude += 10) {
+    const p = projectShippingRegionalPoint(
+      { longitude, latitude: SHIPPING_REGIONAL_MAP_BOUNDS.minLatitude },
+      frame,
+    );
+    pdf.line(p.x, frame.y, p.x, frame.y + frame.height);
+  }
+  for (let latitude = 0; latitude <= 30; latitude += 5) {
+    const p = projectShippingRegionalPoint(
+      { longitude: SHIPPING_REGIONAL_MAP_BOUNDS.minLongitude, latitude },
+      frame,
+    );
+    pdf.line(frame.x, p.y, frame.x + frame.width, p.y);
+  }
+
+  // Draw the same filtered country GeoJSON used by ShippingSituationMap.tsx.
+  // This is intentionally not a hand-drawn regional silhouette: the native
+  // exporter uses the real local polygons so browser preview and PDF geography
+  // remain recognisably the same.
+  setFill(pdf, POLAR);
+  setStroke(pdf, WHITE);
+  pdf.setLineWidth(0.35);
+  const drawRing = (ring: unknown, style: "FD" | "S") => {
+    if (!Array.isArray(ring) || ring.length < 3) return;
+    const coordinates = ring as Array<[number, number]>;
+    const points = coordinates.map(([longitude, latitude]) =>
+      projectShippingRegionalPoint({ longitude, latitude }, frame),
+    );
+    const first = points[0];
+    if (!first) return;
+    const vectors = points.slice(1).map((point, index) => [
+      point.x - points[index].x,
+      point.y - points[index].y,
+    ]);
+    // `lines` is the jsPDF native path primitive and stays selectable/vector
+    // in both browser and Node exports. Fill outer rings and retain interior
+    // rings as stroked holes; this preserves the source topology without
+    // inventing a hand-drawn coastline.
+    pdf.lines(vectors, first.x, first.y, [1, 1], style, true);
+  };
+  pdf.saveGraphicsState();
+  pdf.rect(frame.x, frame.y, frame.width, frame.height);
+  pdf.clip();
+  pdf.discardPath();
+  for (const feature of SHIPPING_REGIONAL_GEO.features) {
+    const geometry = feature.geometry as
+      | { type: "Polygon"; coordinates: unknown[] }
+      | { type: "MultiPolygon"; coordinates: unknown[][] }
+      | null;
+    if (!geometry) continue;
+    if (geometry.type === "Polygon") {
+      geometry.coordinates.forEach((ring, index) =>
+        drawRing(ring, index === 0 ? "FD" : "S"),
+      );
+    } else if (geometry.type === "MultiPolygon") {
+      for (const polygon of geometry.coordinates) {
+        polygon.forEach((ring, index) =>
+          drawRing(ring, index === 0 ? "FD" : "S"),
+        );
+      }
+    }
+  }
+
+  pdf.restoreGraphicsState();
+  for (const [pointIndex, point] of SHIPPING_REGIONAL_MAP_POINTS.entries()) {
+    const row = presentation.matrix.find(
+      (candidate) => normalizeMapKey(candidate.key) === normalizeMapKey(point.key),
+    );
+    const projected = projectShippingRegionalPoint(point, frame);
+    // A non-complete publication is explicitly ungraded. Do not let a
+    // bounded row's historical severity leak onto the map while the overall
+    // coverage state is pending.
+    const active = Boolean(row && !row.risk.pending && row.incidents > 0);
+    const marker = active ? ELECTRIC : WHITE;
+    setFill(pdf, marker);
+    setStroke(pdf, NAVY);
+    pdf.setLineWidth(0.8);
+    pdf.circle(projected.x, projected.y, active ? 5 : 3.5, "FD");
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    const [dx, dy] = SHIPPING_REGIONAL_MAP_LABEL_OFFSETS[pointIndex];
+    const labelX = Math.min(frame.x + frame.width - 40, Math.max(frame.x + 40, projected.x + dx * frame.width / 750));
+    const labelY = projected.y + dy * frame.height / 340;
+    pdf.line(projected.x, projected.y, labelX, labelY);
+    setFill(pdf, WHITE);
+    pdf.rect(labelX - 48, labelY - 9, 96, active ? 22 : 14, "F");
+    pdf.text(
+      sanitize(point.key),
+      labelX,
+      labelY,
+      { align: "center" },
+    );
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(5.4);
+    const risk = row?.risk.pending
+      ? row.risk.display
+      : active
+        ? row?.risk.display ?? "Assessment pending"
+        : "No confirmed incident";
+    if (active) pdf.text(sanitize(risk), labelX, labelY + 10, { align: "center" });
+  }
+
+  setText(pdf, DUSK);
+  setRoboto(pdf, "light");
+  pdf.setFontSize(6.2);
+  pdf.text(
+    "Outlined markers: assessment pending. AIS is not used to rate incident risk.",
+    frame.x,
+    frame.y + frame.height + 13,
+  );
+  ctx.y = frame.y + frame.height + 22;
+}
+
+function movementForChokepoint(
+  board: MaritimeIntelligence,
+  name: string,
+) {
+  const theatres = maritimeReportMovementTheatres(board);
+  const normalized = normalizeMapKey(name);
+  return theatres.find((theatre) => {
+    const values = [theatre.theatre, theatre.chokepoint ?? ""].map(normalizeMapKey);
+    return values.some((value) => value.includes(normalized) || normalized.includes(value));
+  });
+}
+
+function drawChokepointMatrix(
+  ctx: Ctx,
+  presentation: ShippingSevenPagePresentation,
+) {
+  const { pdf, MX, CW } = ctx;
+  const rows = presentation.matrix;
+  const columns = {
+    name: 91,
+    risk: 54,
+    incidents: 43,
+    movement: 111,
+  };
+  const latest = CW - columns.name - columns.risk - columns.incidents - columns.movement;
+  const headerH = 20;
+  let y = ctx.TOP + 40;
+  setFill(pdf, NAVY);
+  pdf.rect(MX, y, CW, headerH, "F");
+  setText(pdf, WHITE);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(6.4);
+  const headers = [
+    ["CHOKEPOINT NAME", 6],
+    ["RISK LEVEL", columns.name + 6],
+    ["INCIDENTS", columns.name + columns.risk + 6],
+    ["MOVEMENT", columns.name + columns.risk + columns.incidents + 6],
+    ["LATEST INCIDENT", CW - latest + 6],
+  ] as const;
+  for (const [label, offset] of headers) pdf.text(label, MX + offset, y + 13);
+  y += headerH;
+
+  // Always render the fixed seven-route vocabulary, including quiet routes.
+  for (const row of rows) {
+    const movementText = row.movement
+      ? `${formatMaritimeMovementDate(row.movement.dataAsOf)}\n${row.movement.totalVessels == null ? "Sample size unavailable" : `${row.movement.totalVessels} vessels tracked`}`
+      : "No AIS sample";
+    const latestText = row.latestIncident
+      ? format(row.latestIncident.date, "dd MMM yyyy")
+      : "—";
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(7);
+    const movementLines = pdf.splitTextToSize(
+      sanitize(movementText),
+      columns.movement - 9,
+    );
+    const latestLines = pdf.splitTextToSize(sanitize(latestText), latest - 9);
+    const rowH = Math.max(
+      60,
+      Math.max(movementLines.length, latestLines.length) * 8 + 12,
+    );
+    setFill(pdf, row.incidents > 0 ? POLAR : WHITE);
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.45);
+    pdf.rect(MX, y, CW, rowH, "FD");
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7.2);
+    pdf.text(sanitize(row.key), MX + 6, y + 13);
+    setText(pdf, row.risk.pending ? DUSK : ELECTRIC);
+    setRoboto(pdf, "bold");
+    pdf.text(
+      sanitize(row.risk.pending ? "Pending" : row.risk.label),
+      MX + columns.name + 6,
+      y + 13,
+    );
+    setText(pdf, DUSK);
+    setRoboto(pdf, "bold");
+    pdf.text(String(row.incidents), MX + columns.name + columns.risk + 6, y + 13);
+    setRoboto(pdf, "regular");
+    pdf.text(
+      movementLines,
+      MX + columns.name + columns.risk + columns.incidents + 6,
+      y + 12,
+      { lineHeightFactor: 1.15 },
+    );
+    pdf.text(
+      latestLines,
+      MX + CW - latest + 6,
+      y + 12,
+      { lineHeightFactor: 1.15 },
+    );
+    const impact = row.operationalRead;
+    setText(pdf, DUSK);
+    setRoboto(pdf, "light");
+    pdf.setFontSize(6.1);
+    const impactLines = pdf.splitTextToSize(
+      sanitize(`Operational impact: ${impact}`),
+      CW - 12,
+    );
+    pdf.text(impactLines, MX + 6, y + rowH - 10, { lineHeightFactor: 1.1 });
+    y += rowH;
+  }
+  ctx.y = y;
+}
+
+function drawThreatRow(
+  ctx: Ctx,
+  row: {
+    date: Date;
+    location: string;
+    type: string;
+    severity: string;
+    title: string;
+  },
+  y: number,
+  width: number,
+  major: boolean,
+): number {
+  const { pdf, MX } = ctx;
+  const titleLines = pdf.splitTextToSize(sanitize(row.title), width - 190);
+  const rowH = Math.max(52, titleLines.length * 8 + 22);
+  setFill(pdf, major ? POLAR : WHITE);
+  setStroke(pdf, POLAR);
+  pdf.setLineWidth(0.45);
+  pdf.rect(MX, y, width, rowH, "FD");
+  setFill(pdf, major ? NAVY : ELECTRIC);
+  pdf.circle(MX + 10, y + 12, major ? 4 : 3, "F");
+  setText(pdf, DUSK);
+  setRoboto(pdf, "regular");
+  pdf.setFontSize(7);
+  pdf.text(format(row.date, "dd MMM"), MX + 20, y + 13);
+  pdf.text(sanitize(row.location), MX + 65, y + 13);
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(6.8);
+  pdf.text(sanitize(row.type), MX + 65, y + 24);
+  setText(pdf, ELECTRIC);
+  pdf.text(sanitize(row.severity.toUpperCase()), MX + 65, y + 37);
+  setText(pdf, NAVY);
+  setRoboto(pdf, "regular");
+  pdf.text(titleLines, MX + 190, y + 13, { lineHeightFactor: 1.15 });
+  return rowH;
+}
+
+function drawThreatPicture(
+  ctx: Ctx,
+  presentation: ShippingSevenPagePresentation,
+  visible: { vessel: boolean; piracy: boolean },
+) {
+  const { pdf, MX, CW } = ctx;
+  const toThreatRow = (row: ShippingSevenPagePresentation["timeline"]["rows"][number]) => ({
+    date: row.date,
+    location: row.physicalLocation ?? row.country ?? "Location not established",
+    type: row.type,
+    severity: row.severityLabel,
+    title: row.title,
+    major: row.major,
+  });
+  const vesselRows = presentation.timeline.rows.map(toThreatRow);
+  const piracyRows = presentation.piracySecondary.rows.map(toThreatRow);
+
+  let y = ctx.TOP + 43;
+  const shownVessel = vesselRows.slice(0, 6);
+  const shownPiracy = piracyRows.slice(0, 4);
+  if (visible.vessel) {
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(9);
+    pdf.text("THREAT TIMELINE", MX, y);
+    y += 8;
+    if (presentation.timeline.countNote) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(6.6);
+      pdf.text(presentation.timeline.countNote, MX, y + 10);
+      y += 18;
+    } else {
+      y += 6;
+    }
+    for (const row of shownVessel) {
+      y += drawThreatRow(ctx, row, y, CW, row.major) + 4;
+    }
+    if (presentation.timeline.capped) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(6.3);
+      pdf.text(
+        presentation.timeline.countNote ??
+          `Showing ${shownVessel.length} of ${presentation.timeline.totalCount} incidents.`,
+        MX,
+        y,
+      );
+      y += 13;
+    }
+    if (shownVessel.length === 0) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(8);
+      pdf.text("No validated commercial-vessel attack or seizure event is reported.", MX, y + 9);
+      y += 22;
+    }
+  }
+
+  if (visible.piracy) {
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(9);
+    pdf.text("PIRACY AND ARMED ROBBERY", MX, y + 8);
+    y += 17;
+    for (const row of shownPiracy) {
+      y += drawThreatRow(ctx, row, y, CW, row.major) + 3;
+    }
+    if (presentation.piracySecondary.capped) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(6.3);
+      pdf.text(
+        presentation.piracySecondary.countNote ??
+          `Showing ${shownPiracy.length} of ${presentation.piracySecondary.totalCount} incidents.`,
+        MX,
+        y,
+      );
+      y += 12;
+    }
+    if (shownPiracy.length === 0) {
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(8);
+      pdf.text("No validated piracy or armed-robbery event is reported.", MX, y + 9);
+      y += 22;
+    }
+  }
+
+  // AIS is explicitly a context strip, never another incident category.
+  const theatres = presentation.matrix
+    .map((row) => row.movement)
+    .filter((movement): movement is NonNullable<typeof movement> => Boolean(movement));
+  if (theatres.length > 0 && y < ctx.H - ctx.BOTTOM - 36) {
+    setFill(pdf, POLAR);
+    setStroke(pdf, POLAR);
+    pdf.rect(MX, y + 3, CW, 25, "FD");
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.2);
+    pdf.text("AIS MOVEMENT CONTEXT", MX + 7, y + 14);
+    setText(pdf, DUSK);
+    setRoboto(pdf, "light");
+    pdf.setFontSize(5.8);
+    const movement = theatres
+      .slice(0, 4)
+      .map((theatre) => `${theatre.theatre}: ${formatMaritimeMovementSample(theatre)}`)
+      .join("  |  ");
+    pdf.text(pdf.splitTextToSize(sanitize(movement), CW - 105).slice(0, 2), MX + 105, y + 11);
+  }
+}
+
+function drawCommercialConsequenceGrid(
+  ctx: Ctx,
+  presentation: ShippingSevenPagePresentation,
+) {
+  const { pdf, MX, CW } = ctx;
+  const groups = buildShippingCommercialCategories(presentation.commercialEffects);
+  const gap = 18;
+  const width = (CW - gap) / 2;
+  let y = ctx.y;
+  for (let offset = 0; offset < groups.length; offset += 2) {
+    let height = 42;
+    for (const [column, group] of groups.slice(offset, offset + 2).entries()) {
+      const fullWidth = group.title === "Other documented effects";
+      const w = fullWidth ? CW : width;
+      const x = MX + column * (width + gap);
+      setStroke(pdf, POLAR);
+      pdf.setLineWidth(.5);
+      pdf.line(x, y, x + w, y);
+      setText(pdf, NAVY);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(8);
+      pdf.text(group.title.toUpperCase(), x, y + 12);
+      setText(pdf, DUSK);
+      setRoboto(pdf, "light");
+      pdf.setFontSize(8);
+      const text = group.lines.length ? group.lines.join("\n") : "Not established in available reporting.";
+      const lines = pdf.splitTextToSize(sanitize(text), w);
+      pdf.text(lines, x, y + 25, { lineHeightFactor: 1.2 });
+      height = Math.max(height, 33 + lines.length * 9.6);
+    }
+    y += height + 8;
+  }
+  ctx.y = y;
+}
+
+function drawCompactBarChart(
+  ctx: Ctx,
+  title: string,
+  rows: BarRow[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const { pdf } = ctx;
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(7.5);
+  pdf.text(sanitize(title.toUpperCase()), x, y + 8);
+  // Keep the explicit residual bucket visible even when its value is zero;
+  // otherwise "all geography known" is indistinguishable from missing data.
+  const visible = rows.filter((row) => row.value > 0 || row.label === "Unknown");
+  if (visible.length === 0) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "light");
+    pdf.setFontSize(6.8);
+    pdf.text("No identified records", x, y + 28);
+    return;
+  }
+  const max = Math.max(...visible.map((row) => row.value), 1);
+  const labelW = Math.min(72, width * 0.38);
+  const barW = width - labelW - 20;
+  const rowH = Math.min(32, (height - 18) / visible.length);
+  for (const [index, row] of visible.entries()) {
+    const rowY = y + 19 + index * rowH;
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(6.1);
+    pdf.text(pdf.splitTextToSize(sanitize(row.label), labelW - 4).slice(0, 1), x, rowY + 8);
+    setFill(pdf, WHITE);
+    setStroke(pdf, POLAR);
+    pdf.rect(x + labelW, rowY + 2, barW, 8, "S");
+    const fillW = (row.value / max) * barW;
+    setFill(pdf, row.label === "Unknown" ? POLAR : title.includes("Region") ? NAVY : ELECTRIC);
+    if (fillW > 0) pdf.rect(x + labelW, rowY + 2, fillW, 8, "F");
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.2);
+    pdf.text(String(row.value), x + labelW + barW + 5, rowY + 9);
+  }
+}
+
+function drawCommercialAndRegional(
+  ctx: Ctx,
+  publication: ReturnType<typeof finalizeShippingPublication>,
+  presentation: ShippingSevenPagePresentation,
+  visible: { commercial: boolean; regional: boolean },
+) {
+  const { pdf, MX, CW } = ctx;
+  let y = ctx.TOP + 43;
+  if (visible.commercial) {
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(9);
+    pdf.text("COMMERCIAL IMPACT ON SHIPPING", MX, y);
+    y += 14;
+    drawFitText(ctx, publication.prose.commercialImpactRead, MX, y, CW, 48, {
+      color: DUSK,
+      font: "light",
+      maxSize: 8.8,
+      minSize: 4.2,
+      lineFactor: 1.2,
+    });
+    ctx.y = y + 57;
+    drawCommercialConsequenceGrid(ctx, presentation);
+    y = ctx.y + 8;
+  }
+  if (visible.regional) {
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.5);
+    pdf.line(MX, y, MX + CW, y);
+    // Keep both charts in the lower half of the page, beneath the sourced
+    // commercial-effect read, rather than leaving a large uninformative void.
+    const chartY = Math.max(y + 10, ctx.H / 2 + 10);
+    const chartW = (CW - 14) / 2;
+    drawCompactBarChart(ctx, "Incidents by Region", presentation.geography.regions.rows, MX, chartY, chartW, 190);
+    drawCompactBarChart(ctx, "Records by Country", presentation.geography.countries.rows, MX + chartW + 14, chartY, chartW, 190);
+  }
+}
+
+function reportBullets(text: string, max = 8): string[] {
+  const normalized = sanitize(text ?? "").trim();
+  if (!normalized) return [];
+  const marked = normalized
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^[-*•]\s+/.test(line))
+    .map((line) => line.replace(/^[-*•]\s+/, "").trim())
+    .filter(Boolean);
+  if (marked.length > 0) return marked.slice(0, max);
+  return normalized
+    .split(/\n\s*\n/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function drawAnalysisPage(
+  ctx: Ctx,
+  publication: ReturnType<typeof finalizeShippingPublication>,
+  visible: { whatMatters: boolean; implications: boolean; watchNext: boolean },
+) {
+  const { pdf, MX, CW } = ctx;
+  const top = ctx.TOP + 43;
+  const title = (text: string, x: number, y: number, width: number) => {
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8.5);
+    pdf.text(sanitize(text.toUpperCase()), x, y);
+    setStroke(pdf, ELECTRIC);
+    pdf.setLineWidth(0.9);
+    pdf.line(x, y + 6, x + width, y + 6);
+  };
+  if (visible.whatMatters) {
+    title("What Matters", MX, top, CW);
+    drawFitText(ctx, publication.prose.whatMatters, MX, top + 13, CW, 114, {
+      color: DUSK,
+      font: "light",
+      maxSize: 10,
+      minSize: 3.8,
+      lineFactor: 1.3,
+      paragraphGap: 5,
+    });
+  }
+
+  const lowerY = top + 145;
+  const gap = 18;
+  const colW = (CW - gap) / 2;
+  if (visible.implications) title("Implications for Business", MX, lowerY, colW);
+  if (visible.watchNext) title("Watch Next", MX + colW + gap, lowerY, colW);
+  const implicationBullets = visible.implications
+    ? reportBullets(publication.prose.implications, 8)
+    : [];
+  const watchBullets = visible.watchNext
+    ? reportBullets(publication.prose.watchNext, 8)
+    : [];
+  const renderBulletColumn = (items: string[], x: number) => {
+    if (items.length === 0) return;
+    const text = items.map((item) => `- ${item}`).join("\n");
+    drawFitText(ctx, text, x + 8, lowerY + 15, colW - 8, 220, {
+      color: DUSK,
+      font: "light",
+      maxSize: 9,
+      minSize: 3.8,
+      lineFactor: 1.3,
+      paragraphGap: 5,
+    });
+  };
+  if (visible.implications) renderBulletColumn(implicationBullets, MX);
+  if (visible.watchNext) renderBulletColumn(watchBullets, MX + colW + gap);
+}
+
+function drawPolestarPanel(
+  ctx: Ctx,
+  publication: ReturnType<typeof finalizeShippingPublication>,
+) {
+  const { pdf, MX, CW } = ctx;
+  const y = ctx.TOP + 43;
+  const h = 150;
+  setFill(pdf, NAVY);
+  pdf.rect(MX, y, CW, h, "F");
+  setFill(pdf, ELECTRIC);
+  pdf.rect(MX, y, 5, h, "F");
+  setText(pdf, WHITE);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(10);
+  pdf.text("POLESTAR VIEW", MX + 14, y + 20);
+  setText(pdf, POLAR);
+  setRoboto(pdf, "light");
+  pdf.setFontSize(6.7);
+  pdf.text("CURRENT JUDGEMENT", MX + 14, y + 33);
+  drawFitText(ctx, publication.prose.polestarView, MX + 14, y + 42, CW - 28, h - 52, {
+    color: WHITE,
+    font: "light",
+    maxSize: 10,
+    minSize: 3.5,
+    lineFactor: 1.28,
+    paragraphGap: 5,
+  });
+  ctx.y = y + h + 18;
+}
+
+function drawRelatedRegistry(
+  ctx: Ctx,
+  presentation: ShippingSevenPagePresentation,
+) {
+  const { pdf, MX, CW } = ctx;
+  setText(pdf, NAVY);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(9);
+  const rows = presentation.register.rows;
+  pdf.text("RELATED INCIDENTS", MX, ctx.y + 9);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "light");
+  pdf.setFontSize(6.2);
+  pdf.text(
+    presentation.register.countNote ??
+      `Compact register: latest ${presentation.register.shownCount} prioritised developments.`,
+    MX,
+    ctx.y + 20,
+  );
+  let y = ctx.y + 29;
+  const dateW = 57;
+  const issueW = 112;
+  const sevW = 55;
+  const titleW = CW - dateW - issueW - sevW;
+  const rowH = 27;
+  setFill(pdf, NAVY);
+  pdf.rect(MX, y, CW, 18, "F");
+  setText(pdf, WHITE);
+  setRoboto(pdf, "bold");
+  pdf.setFontSize(6.2);
+  pdf.text("DATE", MX + 5, y + 12);
+  pdf.text("ISSUE", MX + dateW + 5, y + 12);
+  pdf.text("TITLE", MX + dateW + issueW + 5, y + 12);
+  pdf.text("SEVERITY", MX + CW - sevW + 5, y + 12);
+  y += 18;
+  for (const row of rows) {
+    setFill(pdf, WHITE);
+    setStroke(pdf, POLAR);
+    pdf.rect(MX, y, CW, rowH, "FD");
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(6.3);
+    pdf.text(format(row.date, "dd MMM yyyy"), MX + 5, y + 12);
+    pdf.text(pdf.splitTextToSize(sanitize(row.type), issueW - 9).slice(0, 2), MX + dateW + 5, y + 10, { lineHeightFactor: 1.1 });
+    setText(pdf, NAVY);
+    const titleLines = pdf.splitTextToSize(sanitize(row.title), titleW - 9);
+    pdf.text(titleLines.slice(0, 2), MX + dateW + issueW + 5, y + 10, { lineHeightFactor: 1.1 });
+    const severity = row.severityLabel || "Not assessed";
+    setText(pdf, ELECTRIC);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.2);
+    pdf.text(sanitize(severity.toUpperCase()), MX + CW - sevW + 5, y + 12);
+    y += rowH;
+  }
+  if (rows.length === 0) {
+    setText(pdf, DUSK);
+    setRoboto(pdf, "light");
+    pdf.setFontSize(7);
+    pdf.text("No related incident was identified outside the detailed report surfaces.", MX + 5, y + 13);
+    y += rowH;
+  }
+  ctx.y = y;
+}
+
+function drawShallowDisclaimerFooter(ctx: Ctx) {
+  const { pdf, MX, CW, H } = ctx;
+  setRoboto(pdf, "light");
+  pdf.setFontSize(6.1);
+  const lines = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW - 14);
+  const h = Math.max(30, lines.length * 7 + 12);
+  const y = H - FOOTER_BAND_H - h - 5;
+  setFill(pdf, POLAR);
+  pdf.rect(MX, y, CW, h, "F");
+  setText(pdf, DUSK);
+  pdf.text(lines, MX + 7, y + 10, { lineHeightFactor: 1.1 });
+}
+
 // Exporter ------------------------------------------------------------------
 
 export async function exportShippingReportPdf(
@@ -926,11 +1885,12 @@ export async function exportShippingReportPdf(
       sectionOverrides,
     }),
   );
-  const show = makeSectionGate([...publication.hiddenSections]);
-  const ds = publication.dataset;
-  const maritimeBoard = publication.maritimeBoard;
-  const renderedFastFacts = publication.fastFacts;
-  const prose = publication.prose;
+  // The compact product has one renderer-neutral presentation contract. The
+  // preview already consumes this finalizer-owned boundary; native PDF must
+  // consume the exact same canonical timeline, matrix, charts, effects, and
+  // bounded register rather than re-deriving rows from capped tables.
+  const presentation = publication.sevenPage;
+  const show = (key: string) => !publication.hiddenSections.has(key);
   const win = resolveReportWindow(data.topic, data.issueDate);
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
@@ -957,163 +1917,68 @@ export async function exportShippingReportPdf(
     coverImage,
   });
   void cadence;
+
+  // The Shipping Watch contract is an actual seven-page product:
+  // cover, maritime situation, chokepoint watch, threat picture, commercial
+  // and regional impact, analytical judgement, and Polestar view/registry.
+  // Page-local renderers deliberately keep sections together and never create
+  // an eighth page for long analyst prose.
   beginBodyPages(ctx);
 
-  if (show("executive-summary") && prose.executiveSummary.trim()) {
-    drawSectionHeading(ctx, "Executive Summary");
-    renderProse(ctx, prose.executiveSummary);
+  // PAGE 2 — Fast Facts, BLUF, useful coordinate-true regional map.
+  const showSituation =
+    show("maritime-intelligence") ||
+    show("executive-summary") ||
+    show("fast-facts");
+  if (showSituation) {
+    drawInteriorTitle(ctx, "Maritime Situation");
+    if (show("fast-facts")) drawFiveFastFacts(ctx, publication);
+    if (show("executive-summary")) drawBlufPanel(ctx, publication.prose.executiveSummary);
+    if (show("maritime-intelligence")) drawShippingRegionalMap(ctx, presentation);
   }
 
-  // Maritime Intelligence — the one shared deterministic board, aligned to this
-  // report's window so the PDF agrees with the live Shipping monitor. Drawn in
-  // the SAME order ShippingReportPreview renders it (preview == PDF).
-  if (show("maritime-intelligence")) {
-    drawMaritimeIntelligence(ctx, maritimeBoard, publication.completeness);
-  }
-
-  if (show("fast-facts")) {
-    drawSectionHeading(ctx, "Fast Facts");
-    drawFastFactsKpiCards(
-      ctx,
-      renderedFastFacts,
-    );
-  }
-
-  // Chokepoint / Route Read — prose leads the chokepoint table.
+  // PAGE 3 — one seven-route chokepoint matrix.
   if (show("chokepoint-route")) {
-    drawSectionWithProse(
-      ctx,
-      "Chokepoint / Route Read",
-      prose.chokepointRouteRead,
-    );
-    drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
+    startInteriorPage(ctx, "Chokepoint Watch");
+    drawChokepointMatrix(ctx, presentation);
   }
 
-  // Vessel Threat and Piracy Read — prose leads both window tables.
-  if (show("vessel-piracy")) {
-    drawSectionWithProse(
-      ctx,
-      "Vessel Threat and Piracy Read",
-      prose.vesselPiracyRead,
-    );
-    drawIncidentTable<VesselRow>(
-      ctx,
-      `Vessel Attacks (${ds.thirtyDayShortLabel})`,
-      ds.vesselRows,
-      {
-        showActColumn: true,
-        actFor: (r) => r.vesselType,
-        emptyMessage: "No hostile vessel incidents reported this week.",
-      },
-    );
-    drawIncidentTable<PiracyRow>(
-      ctx,
-      `Piracy and Armed Robbery (${ds.thirtyDayShortLabel})`,
-      ds.piracyRows,
-      {
-        showActColumn: true,
-        actFor: (r) => r.act,
-        emptyMessage: "No piracy or armed-robbery reports this week.",
-      },
-    );
-  }
-
-  // Maritime Security (ICC CCS / IMB) — standalone source, drawn in the SAME
-  // order ShippingReportPreview renders it (preview == PDF). These events are
-  // never part of any incident count above.
-  if (show("maritime-security")) {
-    drawMaritimeSecurity(
-      ctx,
-      ds.maritimeSecurity,
-      prose.maritimeSecurityRead,
-    );
-  }
-
-  // Commercial Impact on Shipping — prose leads the operational
-  // commercial-pressure table; pure market commentary is filtered out
-  // upstream in the dataset.
-  if (show("commercial-impact")) {
-    drawSectionWithProse(
-      ctx,
-      "Commercial Impact on Shipping",
-      prose.commercialImpactRead,
-    );
-    drawIncidentTable<EnrichedIncident>(ctx, null, ds.commercialRows, {
-      showActColumn: true,
-      actFor: (r) => r.issue,
-      emptyMessage:
-        "No port, freight, insurance or commercial-shipping disruption records in the weekly window.",
+  // PAGE 4 — threat timeline, separate piracy read, AIS context only.
+  if (show("vessel-piracy") || show("maritime-security")) {
+    startInteriorPage(ctx, "Threat Picture");
+    drawThreatPicture(ctx, presentation, {
+      vessel: show("vessel-piracy"),
+      piracy: show("maritime-security"),
     });
   }
 
-  // Regional and Country View — prose leads the region and country bars.
-  if (show("regional")) {
-    drawSectionWithProse(
-      ctx,
-      "Regional and Country View",
-      prose.regionalCountryRead,
-    );
-    drawHorizontalBarChart(
-      ctx,
-      "Incidents by Region",
-      ds.regionRows.filter((row) => row.value > 0),
-      {
-        labelW: 160,
-        emptyMessage: "No regional classifications reported this week.",
-      },
-    );
-    drawHorizontalBarChart(
-      ctx,
-      ds.countryRows.length >= 12
-        ? "Records by Country (Top 12)"
-        : "Records by Country",
-      ds.countryRows,
-      {
-        labelW: 160,
-        emptyMessage: "No identified incident countries reported this week.",
-      },
-    );
+  // PAGE 5 — commercial consequences and both charts on the same page.
+  if (show("commercial-impact") || show("regional")) {
+    startInteriorPage(ctx, "Commercial and Regional Impact");
+    drawCommercialAndRegional(ctx, publication, presentation, {
+      commercial: show("commercial-impact"),
+      regional: show("regional"),
+    });
   }
 
-  // Narrative sections resolve through the SHARED resolver so the PDF and the
-  // on-screen preview can never disagree: a genuine analyst edit wins, else the
-  // cached AI narrative, else the deterministic dataset auto-prose.
-  if (show("what-matters")) {
-    drawSectionWithProse(
-      ctx,
-      "What Matters",
-      prose.whatMatters,
-    );
-  }
-  if (show("implications")) {
-    drawBulletSection(
-      ctx,
-      "Implications for Business",
-      prose.implications,
-    );
-  }
-  if (show("watch-next")) {
-    drawBulletSection(
-      ctx,
-      "Watch Next",
-      prose.watchNext,
-      8,
-    );
-  }
-  if (show("polestar-view")) {
-    drawSectionWithProse(
-      ctx,
-      "Polestar View",
-      prose.polestarView,
-    );
+  // PAGE 6 — the analytical judgement and client-facing actions.
+  if (show("what-matters") || show("implications") || show("watch-next")) {
+    startInteriorPage(ctx, "What Matters");
+    drawAnalysisPage(ctx, publication, {
+      whatMatters: show("what-matters"),
+      implications: show("implications"),
+      watchNext: show("watch-next"),
+    });
   }
 
-  if (show("related-incidents")) {
-    drawRelatedIncidents(ctx, ds.relatedIncidents, publication.incidentSummaries);
+  // PAGE 7 — prominent Polestar judgement, compact registry, shallow footer.
+  if (show("polestar-view") || show("related-incidents")) {
+    startInteriorPage(ctx, "Polestar View and Related Incidents");
+    if (show("polestar-view")) drawPolestarPanel(ctx, publication);
+    if (show("related-incidents")) drawRelatedRegistry(ctx, presentation);
+    drawShallowDisclaimerFooter(ctx);
   }
 
-  drawDisclaimer(ctx);
-
-  drawFooters(ctx.pdf);
+  drawFooters(ctx.pdf, undefined, undefined, true);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }

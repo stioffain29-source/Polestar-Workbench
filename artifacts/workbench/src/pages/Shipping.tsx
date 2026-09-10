@@ -381,7 +381,9 @@ export default function Shipping() {
   const transitRecords = sortedEnriched.filter(
     (i) => i.issue === "Route diversion" || detectChokepoints(i).length > 0,
   );
-  const commercialRecords = sortedEnriched.filter(hasEvidenceBackedCommercialConsequence);
+  const commercialRecords = sortedEnriched.filter((record) =>
+    hasEvidenceBackedCommercialConsequence(record),
+  );
 
   // --- Chokepoint Watch ---------------------------------------------------
   // For each chokepoint: count, highest severity, latest incident, short

@@ -26,3 +26,15 @@ Do not stop at one passing issue date when correcting publication blockers; repl
 **Why:** a passing older week concealed a commercial-target blocker in the owner's current week. A wider replay then exposed count-definition mismatches, provider route-name aliases and generated commercial prose that failed its own audit.
 
 **How to apply:** verify the exact editor window first, then a bounded date sweep. Do not guess that saved prose is historical boilerplate: retain exact generated-candidate matching. Even fully anchored template regexes can discard analyst edits inserted into their variable slots.
+
+The owner's explicit seven-page Shipping specification supersedes the earlier instruction to omit quiet-route cards: show all seven tracked routes in one comparison matrix, not seven expanded cards.
+
+**Why:** the owner now wants a consistent scan across every chokepoint, with an operational line per row. Their supplied Extreme/count values are layout examples, not permission to invent or override assessed data.
+
+**How to apply:** keep missing movement distinct from zero vessels and pending risk distinct from Low. Repetition rules must not remove the identifying information readers need in a timeline or supporting register.
+
+Fixed-page dimension checks are not enough to approve a report redesign.
+
+**Why:** a fixed-height page can pass its size checks while a nested flexible table clips rows, map labels collide, or dark text disappears into a dark panel.
+
+**How to apply:** inspect the populated preview and actual browser-produced PDF, including the final register row and every densely labelled page. Page count alone is not proof of readable or complete output.

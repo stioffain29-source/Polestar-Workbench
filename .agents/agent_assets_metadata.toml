@@ -989,3 +989,17 @@ mtime_ms = 1789055935355
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/ab8fa080-ff84-43df-915c-a44b256f0798/dfc9bc4a-279e-45b6-89dc-6dccf53dee7f"
 storage_version_token = "1789055998788015"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Bp8h72US8u9KSzEh6ser7"
+uri = "file://screenshots/shipping-seven-page-proof/shipping-watch.pdf"
+type = "pdf"
+title = "Shipping Watch — seven-page development proof"
+description = "Actual PDF export using saved development data for 4–10 September 2026. Seven A4 pages, visually checked. Not published."
+logical_id = "339406d2-3d4f-420b-a20b-8943fb1a1040"
+content_hash = "sha256:d081300027f4db3353b9b063fde89ef90c1cc1b489a0c53a67ec76b245aee3cd"
+size = 1286553
+mtime_ms = 1789059341986
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/339406d2-3d4f-420b-a20b-8943fb1a1040/b23420c3-5aa4-4c4f-98cd-763ec9fd05eb"
+storage_version_token = "1789059483357759"
+content_type = "application/pdf"

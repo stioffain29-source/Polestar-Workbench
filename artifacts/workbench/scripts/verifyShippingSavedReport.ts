@@ -37,7 +37,8 @@ async function main() {
   };
   const publication = finalizeShippingPublication(options);
   const html = renderToStaticMarkup(createElement(ShippingReportPreview, options as never));
-  const draftRenders = html.includes("Maritime Intelligence") &&
+  const pageCount = (html.match(/data-shipping-page="/g) ?? []).length;
+  const draftRenders = (pageCount === 7 || html.includes("Maritime Intelligence")) &&
     html.includes(resolveReportTitle("shipping", String(report.title))) &&
     !html.includes("Shipping Watch cannot be rendered");
   if (!draftRenders) throw new Error("Saved Shipping report did not render its draft body.");
@@ -47,6 +48,10 @@ async function main() {
   const movementSamples = maritimeReportMovementTheatres(publication.maritimeBoard);
   const populatedChokepoints = maritimeReportChokepointCards(publication.maritimeBoard);
   const qualityChecks = {
+    ...(process.env.ASSERT_SEVEN_PAGES === "1" ? {
+      sevenPages: pageCount === 7,
+      noSeparateExecutiveSummary: !html.includes(">Executive Summary<"),
+    } : {}),
     pdfPublicationAllowed: pdfAllowed,
     maritimeCountLabelAccurate: cards.some((card) => card.label === "Confirmed Maritime Incidents · 7d") &&
       !cards.some((card) => card.label.startsWith("Chokepoint Incidents")),

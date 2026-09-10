@@ -115,12 +115,11 @@ describe("Shipping publication surface integration", () => {
       } as never),
     );
 
-    expect(html).toContain("Maritime Intelligence");
+    expect(html).toContain("Maritime Situation");
     expect(html).toContain("Shipping Watch");
-    expect(html).toContain("Assessment pending");
-    expect(html).toContain("Coverage is incomplete");
+    expect(html).toContain("PENDING");
     expect(html).not.toContain("cannot be rendered");
-    expect((html.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(1);
+    expect((html.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(html).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
   });
 
@@ -144,8 +143,7 @@ describe("Shipping publication surface integration", () => {
     expect(html).toContain("PDF export is blocked");
     expect(html).toContain("What Matters");
     expect(html).toContain("Action:");
-    expect(html).toContain("Maritime Intelligence");
-    expect(html).toContain("Fast Facts");
+    expect(html).toContain("Maritime Situation");
     expect(html).toContain("Saved analyst note for Bab el-Mandeb review.");
     expect(html).not.toContain("Shipping Watch cannot be rendered");
   });
@@ -163,15 +161,14 @@ describe("Shipping publication surface integration", () => {
     );
     const text = chrome.__textCalls.join("\n");
 
-    expect(text).toContain("BOTTOM LINE UP FRONT");
+    expect(text).not.toContain("BOTTOM LINE UP FRONT");
     expect(text).toContain("overall maritime risk");
     expect(text).toContain("Assessment pending");
-    expect(text).toContain("Coverage is incomplete");
-    expect((text.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(1);
+    expect((text.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(3);
     expect(text).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
   });
 
-  it("keeps the coverage disclosure when Executive Summary is hidden", async () => {
+  it("hides the BLUF when Executive Summary is hidden", async () => {
     const hidden = renderToStaticMarkup(
       createElement(ShippingReportPreview, {
         report,
@@ -181,9 +178,7 @@ describe("Shipping publication surface integration", () => {
         hiddenSections: ["executive-summary"],
       } as never),
     );
-    expect(hidden).not.toContain(">Executive Summary</h2>");
-    expect(hidden).toContain("Assessment pending");
-    expect(hidden).toContain("Coverage is incomplete");
+    expect(hidden).not.toContain("Bottom Line Up Front");
 
     const chrome = jest.requireMock("../../artifacts/workbench/src/lib/pdfChrome") as { __textCalls: string[]; __reset: () => void };
     chrome.__reset();
@@ -200,7 +195,6 @@ describe("Shipping publication surface integration", () => {
     const text = chrome.__textCalls.join("\n");
     expect(text).not.toContain("EXECUTIVE SUMMARY");
     expect(text).toContain("Assessment pending");
-    expect(text).toContain("Coverage is incomplete");
   });
 
   it("omits empty maritime cards and subheadings on both surfaces", async () => {
@@ -212,8 +206,7 @@ describe("Shipping publication surface integration", () => {
         maritimeSecurityEvents: [],
       } as never),
     );
-    expect(emptyHtml).toContain("Confirmed Maritime Incidents · 7d");
-    expect(emptyHtml).toContain("L1 · Not assessed");
+    expect(emptyHtml).toContain("Confirmed Incidents");
     expect(emptyHtml).not.toContain("Chokepoint Cards");
     expect(emptyHtml).not.toContain("Business Impact Areas");
     expect(emptyHtml).not.toContain("Maritime Context");
@@ -232,5 +225,41 @@ describe("Shipping publication surface integration", () => {
     expect(text).not.toContain("Chokepoint Cards");
     expect(text).not.toContain("Business Impact Areas");
     expect(text).not.toContain("Maritime Context");
+  });
+
+  it("hides entire pages when all sections on the page are disabled", async () => {
+    const hiddenPageHtml = renderToStaticMarkup(
+      createElement(ShippingReportPreview, {
+        report,
+        incidents,
+        movement: [],
+        maritimeSecurityEvents: [],
+        hiddenSections: ["commercial-impact", "regional"],
+      } as never),
+    );
+    // Page 5 title should be missing because both its sections are hidden
+    expect(hiddenPageHtml).not.toContain("Commercial &amp; Regional Impact");
+    expect(hiddenPageHtml).not.toContain("Incidents by Region");
+    // But other pages are still present
+    expect(hiddenPageHtml).toContain("Analytical Assessment");
+  });
+
+  it("retains editable fast fact overrides from publication", async () => {
+    const overriddenHtml = renderToStaticMarkup(
+      createElement(ShippingReportPreview, {
+        report,
+        incidents,
+        movement: [],
+        maritimeSecurityEvents: [],
+        sectionOverrides: {
+          fastFactOverrides: {
+            "Main Affected Chokepoint": { value: "SUEZ CANAL", note: "Changed by analyst" },
+            "Confirmed Incidents": { value: "99", note: "Override count" }
+          }
+        },
+      } as never),
+    );
+    expect(overriddenHtml).toContain("SUEZ CANAL");
+    expect(overriddenHtml).toContain("99");
   });
 });

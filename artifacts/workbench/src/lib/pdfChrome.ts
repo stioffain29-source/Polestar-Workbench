@@ -838,12 +838,16 @@ export function drawFooters(
   pdf: jsPDF,
   _reportDate?: string,
   debugLine?: string,
+  includeCover = false,
 ) {
   void _reportDate; // intentionally unused — date no longer in footer per brand spec
   const pageCount = pdf.getNumberOfPages();
   const W = pdf.internal.pageSize.getWidth();
   const H = pdf.internal.pageSize.getHeight();
-  // Body pages are 2..N; page 1 is the cover.
+  // Legacy report exports use body-relative numbering (Page 1 of N-1).
+  // Shipping Watch opts into physical numbering so its browser/PDF pages
+  // agree (page 2 is "Page 2 of 7"). Keep the old default for every other
+  // report family.
   for (let p = 2; p <= pageCount; p++) {
     pdf.setPage(p);
     setFill(pdf, POLAR);
@@ -854,9 +858,18 @@ export function drawFooters(
     const ty = H - FOOTER_BAND_H / 2 + 3;
     pdf.text(sanitize(POLESTAR_URL), 18, ty);
     pdf.text(sanitize(POLESTAR_EMAIL), W / 2, ty, { align: "center" });
-    pdf.text(sanitize(`Page ${p - 1} of ${pageCount - 1}`), W - 18, ty, {
+    pdf.text(
+      sanitize(
+        includeCover
+          ? `Page ${p} of ${pageCount}`
+          : `Page ${p - 1} of ${pageCount - 1}`,
+      ),
+      W - 18,
+      ty,
+      {
       align: "right",
-    });
+      },
+    );
     // Temporary diagnostic proof line, sits just above the footer band.
     // Used to verify which exporter / dataset / build is actually
     // producing the rendered PDF. Removable once the runtime path is

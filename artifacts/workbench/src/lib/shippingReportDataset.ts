@@ -568,30 +568,66 @@ function isShippingMarketOnly(r: ShippingReportIncident): boolean {
   return false;
 }
 
+type CommercialConsequenceSelection = "routing" | "commercial";
+
+type CommercialConsequenceEvidence = {
+  status?: string | null;
+  claim?: string | null;
+  evidenceQuote?: string | null;
+  kind?: string | null;
+};
+
+function hasSourceBackedConsequence(
+  consequence: CommercialConsequenceEvidence | null | undefined,
+): boolean {
+  return (
+    (consequence?.status === "confirmed" ||
+      consequence?.status === "assessed") &&
+    typeof consequence.claim === "string" &&
+    consequence.claim.trim().length > 0 &&
+    typeof consequence.evidenceQuote === "string" &&
+    consequence.evidenceQuote.trim().length > 0
+  );
+}
+
+/**
+ * True only for a commercial/routing consequence with its own source-backed
+ * claim and quote. Route-disruption events are deliberately narrower: only a
+ * reported or observed routing consequence can support the commercial read.
+ *
+ * The optional selector lets presentation boundaries apply the exact same
+ * gate to the individual consequence they are about to render, rather than
+ * allowing a valid routing consequence to smuggle a status-only commercial
+ * consequence into the table.
+ */
 export function hasEvidenceBackedCommercialConsequence(
   r: ShippingReportIncident,
+  selection?: CommercialConsequenceSelection,
 ): boolean {
   const evidence = r.maritimeSemantic;
   if (!evidence) return false;
   const eventClass = semanticEventClass(r);
   const routing = evidence.routingConsequence;
   const commercial = evidence.commercialConsequence;
-  if (
+  const routeDisruption =
     eventClass === "route_disruption" ||
     eventClass === "routing_consequence" ||
-    eventClass === "chokepoint_disruption"
-  ) {
-    return (
-      (routing?.status === "confirmed" || routing?.status === "assessed") &&
-      (routing?.kind === "observed" || routing?.kind === "reported")
-    );
+    eventClass === "chokepoint_disruption";
+  const sourceBackedRouting =
+    hasSourceBackedConsequence(routing) &&
+    (routing?.kind === "observed" || routing?.kind === "reported");
+  const sourceBackedCommercial = hasSourceBackedConsequence(commercial);
+
+  if (routeDisruption) {
+    return selection === "commercial"
+      ? false
+      : selection === "routing"
+        ? sourceBackedRouting
+        : sourceBackedRouting;
   }
-  return (
-    routing?.status === "confirmed" ||
-    routing?.status === "assessed" ||
-    commercial?.status === "confirmed" ||
-    commercial?.status === "assessed"
-  );
+  if (selection === "routing") return hasSourceBackedConsequence(routing);
+  if (selection === "commercial") return sourceBackedCommercial;
+  return hasSourceBackedConsequence(routing) || sourceBackedCommercial;
 }
 
 // Stronger commercial-operational anchor than OPERATIONAL_HOOK_RE alone.
