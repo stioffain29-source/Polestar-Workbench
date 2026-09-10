@@ -121,6 +121,32 @@ describe("Shipping publication surface integration", () => {
     expect(html).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
   });
 
+  it("keeps the full draft preview visible when validation fails", () => {
+    const html = renderToStaticMarkup(
+      createElement(ShippingReportPreview, {
+        report: {
+          ...report,
+          // This is intentionally unsupported.  The saved executive-summary
+          // wording must still survive beside the actionable warning.
+          executiveSummary: "Saved analyst note for Bab el-Mandeb review.",
+          whatMatters: "Insurance premiums doubled without source evidence.",
+        },
+        incidents,
+        movement: [],
+        maritimeSecurityEvents: [],
+      } as never),
+    );
+
+    expect(html).toContain("Draft preview");
+    expect(html).toContain("PDF export is blocked");
+    expect(html).toContain("What Matters");
+    expect(html).toContain("Action:");
+    expect(html).toContain("Maritime Intelligence");
+    expect(html).toContain("Fast Facts");
+    expect(html).toContain("Saved analyst note for Bab el-Mandeb review.");
+    expect(html).not.toContain("Shipping Watch cannot be rendered");
+  });
+
   it("renders the same valid final bundle through the PDF boundary", async () => {
     const chrome = jest.requireMock("../../artifacts/workbench/src/lib/pdfChrome") as { __textCalls: string[]; __reset: () => void };
     chrome.__reset();

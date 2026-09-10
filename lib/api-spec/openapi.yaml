@@ -2224,9 +2224,23 @@ components:
         description: { type: ["string", "null"] }
         evidence: { type: ["string", "null"] }
 
+    MaritimeValidation:
+      type: object
+      required: [status, version, reason, evaluatedAt]
+      properties:
+        # `pending` includes both a row awaiting its first projection and a
+        # source snapshot whose prior projection is stale. It must not be
+        # rendered as a confirmed zero.
+        status:
+          type: string
+          enum: [validated, rejected, pending, not_applicable]
+        version: { type: ["string", "null"] }
+        reason: { type: ["string", "null"] }
+        evaluatedAt: { type: ["string", "null"], format: date-time }
+
     Incident:
       type: object
-      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt, corroborations, maritimeSemantic]
+      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt, corroborations, maritimeSemantic, maritimeValidation]
       properties:
         id: { type: integer }
         topic: { $ref: "#/components/schemas/Topic" }
@@ -2278,6 +2292,8 @@ components:
           allOf:
             - $ref: "#/components/schemas/MaritimeSemanticEvidence"
           nullable: true
+        maritimeValidation:
+          $ref: "#/components/schemas/MaritimeValidation"
 
     IncidentInput:
       type: object

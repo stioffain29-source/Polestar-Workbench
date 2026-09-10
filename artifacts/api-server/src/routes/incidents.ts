@@ -39,6 +39,39 @@ function isMaritimeTopic(topic: string | null | undefined): boolean {
   return topic === "shipping" || topic === "maritime";
 }
 
+function maritimeValidation(
+  row: IncidentRow,
+  semantic: typeof maritimeSemanticEvidenceTable.$inferSelect | undefined,
+) {
+  if (!isMaritimeTopic(row.topic)) {
+    return {
+      status: "not_applicable" as const,
+      version: null,
+      reason: null,
+      evaluatedAt: null,
+    };
+  }
+  if (!semantic) {
+    return {
+      status: "pending" as const,
+      version: null,
+      reason: "awaiting current source-backed semantic validation",
+      evaluatedAt: null,
+    };
+  }
+  return {
+    status:
+      semantic.verdict === "valid"
+        ? ("validated" as const)
+        : semantic.verdict === "invalid"
+          ? ("rejected" as const)
+          : ("pending" as const),
+    version: semantic.version,
+    reason: semantic.reason,
+    evaluatedAt: semantic.evaluatedAt,
+  };
+}
+
 /**
  * Attach each incident's OFFICIAL corroborating references (ReliefWeb etc.) as
  * a `corroborations` array. Batched (one query for all ids) and grouped in
@@ -94,9 +127,16 @@ export async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]
   }
   return withCorr.map((row) => {
     const semantic = semanticByIncident.get(row.id);
-    if (!semantic) return { ...row, maritimeSemantic: null };
+    if (!semantic) {
+      return {
+        ...row,
+        maritimeSemantic: null,
+        maritimeValidation: maritimeValidation(row, undefined),
+      };
+    }
     return {
       ...row,
+      maritimeValidation: maritimeValidation(row, semantic),
       maritimeSemantic: {
         version: semantic.version,
         verdict: semantic.verdict,

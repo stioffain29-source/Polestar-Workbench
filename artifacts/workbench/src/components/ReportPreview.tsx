@@ -841,6 +841,17 @@ export default function ReportPreview({
         style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
         data-fuel-validation-blocked="true"
       >
+        <h1
+          style={{
+            fontFamily: "Roboto, sans-serif",
+            fontWeight: 700,
+            fontSize: 28,
+            lineHeight: 1.1,
+            marginBottom: 24,
+          }}
+        >
+          {resolvedTitle || "Untitled report"}
+        </h1>
         <div style={{ border: "2px solid #A33232", padding: 24 }}>
           <div
             style={{

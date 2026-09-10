@@ -30,6 +30,8 @@ import {
 } from "@/lib/maritimeIntelligence";
 import {
   finalizeShippingPublication,
+  shippingPublicationIssueAction,
+  shippingPublicationIssueSection,
 } from "@/lib/shippingPublication";
 import {
   MARITIME_SUBSECTION_ORDER,
@@ -155,6 +157,61 @@ function Section({ title, children, hidden }: { title: string; children: React.R
       </h2>
       {children}
     </div>
+  );
+}
+
+function ShippingPublicationWarnings({
+  issues,
+}: {
+  issues: Array<{
+    code: string;
+    section?: string;
+    message: string;
+    incidentIds?: Array<number | string>;
+  }>;
+}) {
+  if (issues.length === 0) return null;
+  return (
+    <aside
+      aria-label="Shipping Watch draft validation warnings"
+      data-testid="shipping-publication-warnings"
+      className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
+    >
+      <h2 className="font-semibold">
+        Draft preview — PDF export is blocked until these checks are resolved
+      </h2>
+      <p className="mt-1 leading-6">
+        The report below is still your live draft. Saved edits and all report
+        sections remain visible while you address the warnings.
+      </p>
+      <ul className="mt-3 space-y-3">
+        {issues.map((item, index) => {
+          const section = shippingPublicationIssueSection(item);
+          const action = shippingPublicationIssueAction(item);
+          return (
+            <li
+              key={`${item.code}-${item.section ?? "report"}-${index}`}
+              data-testid="shipping-publication-warning"
+              className="border-l-2 border-amber-500 pl-3 leading-6"
+            >
+              <div>
+                <strong>{section}</strong>
+                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
+                  {item.code}
+                </span>
+              </div>
+              <div>{item.message}</div>
+              <div>
+                <strong>Action:</strong> {action}
+                {item.incidentIds && item.incidentIds.length > 0
+                  ? ` Incident ${item.incidentIds.join(", ")}.`
+                  : ""}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </aside>
   );
 }
 
@@ -668,23 +725,14 @@ export default function ShippingReportPreview({
   const prose = publication.prose;
   const show = makeSectionGate([...publication.hiddenSections]);
 
-  // The finalizer runs before any report page (including the cover) is
-  // rendered.  A validation card is an editor state, not a published report.
-  if (publication.auditIssues.length > 0) {
-    return (
-      <div className="rounded border border-red-300 bg-red-50 p-5 text-sm text-red-900">
-        <strong>Shipping Watch cannot be rendered.</strong>
-        <ul className="mt-2 list-disc pl-5">
-          {publication.auditIssues.map((item, index) => (
-            <li key={`${item.code}-${index}`}>{item.message}</li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
-
+  // Validation is an editor warning state, not a reason to replace the draft.
+  // The PDF exporter still calls assertShippingPublication and therefore
+  // remains fail-closed; the preview must keep the cover, tables and saved
+  // analyst edits visible so the owner can fix the associated section.
   return (
-    <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+    <>
+      <ShippingPublicationWarnings issues={publication.auditIssues} />
+      <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
       <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div
@@ -958,6 +1006,7 @@ export default function ShippingReportPreview({
         <span>info@polestar-advisory.com</span>
         <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

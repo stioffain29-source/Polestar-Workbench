@@ -238,9 +238,18 @@ export async function validateMaritimeEvent(
   const cfg = readOpenAiConfig();
   if (!cfg) return unavailable("semantic validator unavailable");
 
+  const model = openAiFastModel();
+  // Reasoning models can spend 10–20 seconds on this deliberately strict
+  // evidence contract.  Keep a bounded request while leaving enough room for
+  // the low-effort gpt-5 path to finish; the contract check remains fail-closed.
+  const timeoutMs = 30_000;
+  const reasoningOptions = /^gpt-5(?:-|$)/i.test(model)
+    ? { reasoning_effort: "low" as const }
+    : {};
+  let lastFailure = "semantic validator failed";
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 20_000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(`${cfg.baseUrl}/chat/completions`, {
         method: "POST",
@@ -250,7 +259,14 @@ export async function validateMaritimeEvent(
         },
         signal: controller.signal,
         body: JSON.stringify({
-          model: openAiFastModel(),
+          model,
+          // The fast model in Replit's model farm is a reasoning model. Without
+          // an explicit low-effort budget it can spend the entire request
+          // timeout reasoning about the large strict schema and return no
+          // completion at all (the historical "semantic validator failed"
+          // rows). The contract validator below remains the hard gate. Do not
+          // send this parameter to non-gpt-5 providers that may reject it.
+          ...reasoningOptions,
           max_completion_tokens: 8192,
           messages: [
             { role: "system", content: SYSTEM },
@@ -321,15 +337,21 @@ export async function validateMaritimeEvent(
             ? parsed.reason || "provider marked item invalid"
             : check.failures.join(", ").slice(0, 240),
       };
-    } catch {
+    } catch (error) {
+      lastFailure =
+        controller.signal.aborted
+          ? `semantic validator timeout after ${timeoutMs}ms`
+          : error instanceof Error && error.name === "TypeError"
+            ? "semantic validator connectivity failed"
+            : "semantic validator request failed";
       if (attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, 250));
         continue;
       }
-      return unavailable("semantic validator failed");
+      return unavailable(lastFailure);
     } finally {
       clearTimeout(timer);
     }
   }
-  return unavailable("semantic validator failed");
+  return unavailable(lastFailure);
 }

@@ -119,6 +119,12 @@ import {
 const legacyExecSummaryStorageKey = (id: number) =>
   `polestar:exec-summary:report:${id}`;
 
+// Semantic convergence runs asynchronously after ingestion. Poll the scoped
+// incident bucket at a bounded cadence so pending rows can become validated in
+// an open editor. The seed effect below is keyed to the report id, so a query
+// refresh updates status/datasets without overwriting analyst edits.
+const REPORT_INCIDENTS_REFETCH_MS = 60_000;
+
 function readLegacyExecSummary(id: number): string {
   try {
     return typeof window !== "undefined" && window.localStorage
@@ -290,6 +296,8 @@ export default function ReportEditor() {
     query: {
       enabled: !!primaryTopic,
       queryKey: getListIncidentsQueryKey(primaryParams as never),
+      refetchInterval:
+        primaryTopic === "shipping" ? REPORT_INCIDENTS_REFETCH_MS : false,
     },
   });
   const secondaryParams = { topic: secondaryTopic };
@@ -297,6 +305,8 @@ export default function ReportEditor() {
     query: {
       enabled: !!secondaryTopic,
       queryKey: getListIncidentsQueryKey(secondaryParams as never),
+      refetchInterval:
+        secondaryTopic === "shipping" ? REPORT_INCIDENTS_REFETCH_MS : false,
     },
   });
   // Fuel also cross-reads energy: fuel-to-power continuity failures (gas
@@ -308,6 +318,7 @@ export default function ReportEditor() {
     query: {
       enabled: !!tertiaryTopic,
       queryKey: getListIncidentsQueryKey(tertiaryParams as never),
+      refetchInterval: false,
     },
   });
   // Merge the scoped buckets (disjoint topics → plain concat). Return undefined
@@ -342,6 +353,33 @@ export default function ReportEditor() {
 
   const incidents = rawIncidents;
   const incidentWindowReady = rawIncidents !== undefined;
+  // Shipping rows are deliberately admitted to the API before semantic
+  // validation completes so an analyst can see what is being held. Keep that
+  // state visible in the editor: a zero canonical incident count with pending
+  // rows is not a confirmed zero, and those rows must not feed auto-risk.
+  const maritimeValidationSummary = useMemo(() => {
+    if (form.topic !== "shipping" || !form.issueDate || !incidents) return null;
+    const windowRows = filterTopicReportIncidents(
+      incidents,
+      form.topic,
+      form.issueDate,
+    );
+    let pending = 0;
+    let validated = 0;
+    let rejected = 0;
+    for (const row of windowRows) {
+      const status = row.maritimeValidation?.status;
+      if (status === "pending") pending++;
+      else if (status === "validated") validated++;
+      else if (status === "rejected") rejected++;
+    }
+    return {
+      sourceRows: windowRows.length,
+      pending,
+      validated,
+      rejected,
+    };
+  }, [form.topic, form.issueDate, incidents]);
 
   useEffect(() => {
     if (pendingTopic === null) return;
@@ -1913,8 +1951,14 @@ export default function ReportEditor() {
   // blank: worst credible tier among scoped incidents, else the prose
   // heuristic. Built from the live form so it tracks topic / issue-date /
   // prose edits, mirroring exactly what cardAutofill.reportToCard computes.
+  const maritimeRiskBlocked =
+    form.topic === "shipping" &&
+    maritimeValidationSummary !== null &&
+    (maritimeValidationSummary.pending > 0 ||
+      (maritimeValidationSummary.sourceRows > 0 &&
+        maritimeValidationSummary.validated === 0));
   const computedRating =
-    report != null
+    report != null && !maritimeRiskBlocked
       ? autoReportRating(
           {
             ...report,
@@ -1925,7 +1969,11 @@ export default function ReportEditor() {
             implications: form.implications,
             whatHappened: form.whatHappened,
           },
-          incidents ?? [],
+          form.topic === "shipping"
+            ? (incidents ?? []).filter(
+                (i) => i.maritimeValidation?.status === "validated",
+              )
+            : incidents ?? [],
         )
       : undefined;
   // Live freshness warning — recomputes as the author edits the issue date.
@@ -2198,6 +2246,8 @@ export default function ReportEditor() {
             <p className="text-[11px] text-muted-foreground mt-1">
               {form.riskRating
                 ? "Overrides the rating computed from incidents when this report is pulled into a card."
+                : maritimeRiskBlocked
+                  ? "Left on Auto: rating is held until every in-window maritime row has current semantic validation."
                 : computedRating
                   ? `Left on Auto: this report rates ${CARD_RATING_LABELS[computedRating]} from its incidents.`
                   : "Left on Auto: rating is computed from incidents when pulled into a card."}
@@ -3290,6 +3340,51 @@ export default function ReportEditor() {
             persist, or change the issue date to re-cover the latest window.
           </div>
         )}
+
+        {maritimeValidationSummary &&
+          maritimeValidationSummary.pending > 0 && (
+            <div
+              className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+              style={{
+                borderColor: "#9a6700",
+                background: "#fff8e6",
+                color: "#6b4a00",
+              }}
+              role="status"
+              aria-live="polite"
+            >
+              <span style={{ fontWeight: 700 }}>
+                Maritime validation pending.
+              </span>{" "}
+              {maritimeValidationSummary.pending} in-window{" "}
+              {maritimeValidationSummary.pending === 1 ? "record is" : "records are"}{" "}
+              awaiting current source-backed validation and are excluded from
+              confirmed incidents. The report is not a confirmed zero, and auto
+              risk is held until validation completes.
+            </div>
+          )}
+        {maritimeValidationSummary &&
+          maritimeValidationSummary.pending === 0 &&
+          maritimeValidationSummary.sourceRows > 0 &&
+          maritimeValidationSummary.validated === 0 && (
+            <div
+              className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+              style={{
+                borderColor: "#6b7280",
+                background: "#f5f5f5",
+                color: "#374151",
+              }}
+              role="status"
+            >
+              <span style={{ fontWeight: 700 }}>
+                No confirmed maritime incidents in this window.
+              </span>{" "}
+              The {maritimeValidationSummary.rejected} source{" "}
+              {maritimeValidationSummary.rejected === 1 ? "record was" : "records were"}{" "}
+              rejected by semantic validation; this is a confirmed zero, not
+              pending validation.
+            </div>
+          )}
 
         {proseEnabled && proseUnavailable && (
           <div

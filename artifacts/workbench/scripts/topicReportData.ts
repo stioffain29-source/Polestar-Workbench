@@ -18,9 +18,11 @@ import {
   reportsTable,
   incidentsTable,
   incidentCorroborationsTable,
+  maritimeSemanticEvidenceTable,
   maritimeMovementTable,
   marketPricesTable,
 } from "@workspace/db";
+import { currentMaritimeSemanticProjectionCondition } from "../../api-server/src/lib/relevanceFilter";
 
 // JSON-roundtrip a Drizzle row set so Date columns become ISO strings exactly
 // as Express's res.json() → client r.json() would, guaranteeing the headless
@@ -59,7 +61,123 @@ async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
     if (bucket) bucket.push(rest);
     else byIncident.set(incidentId, [rest]);
   }
-  return rows.map((r) => ({ ...r, corroborations: byIncident.get(r.id) ?? [] }));
+  const semantics = await db
+    .select({ semantic: maritimeSemanticEvidenceTable })
+    .from(maritimeSemanticEvidenceTable)
+    .innerJoin(
+      incidentsTable,
+      eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
+    )
+    .where(
+      and(
+        inArray(maritimeSemanticEvidenceTable.incidentId, ids),
+        currentMaritimeSemanticProjectionCondition(),
+      ),
+    )
+    .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt));
+  const semanticByIncident = new Map<
+    number,
+    (typeof semantics)[number]["semantic"]
+  >();
+  for (const joined of semantics) {
+    if (!semanticByIncident.has(joined.semantic.incidentId)) {
+      semanticByIncident.set(joined.semantic.incidentId, joined.semantic);
+    }
+  }
+  return rows.map((r) => {
+    const semantic = semanticByIncident.get(r.id);
+    const maritime = r.topic === "shipping" || r.topic === "maritime";
+    const maritimeValidation = !maritime
+      ? {
+          status: "not_applicable" as const,
+          version: null,
+          reason: null,
+          evaluatedAt: null,
+        }
+      : semantic
+        ? {
+            status:
+              semantic.verdict === "valid"
+                ? ("validated" as const)
+                : semantic.verdict === "invalid"
+                  ? ("rejected" as const)
+                  : ("pending" as const),
+            version: semantic.version,
+            reason: semantic.reason,
+            evaluatedAt: semantic.evaluatedAt,
+          }
+        : {
+            status: "pending" as const,
+            version: null,
+            reason: "awaiting current source-backed semantic validation",
+            evaluatedAt: null,
+          };
+    return {
+      ...r,
+      corroborations: byIncident.get(r.id) ?? [],
+      maritimeValidation,
+      maritimeSemantic: semantic
+        ? {
+            version: semantic.version,
+            verdict: semantic.verdict,
+            reason: semantic.reason,
+            eventOccurred: semantic.eventOccurred,
+            eventClass: semantic.eventClass,
+            commercialTargetValidated: semantic.commercialTargetValidated,
+            commercialTarget: semantic.commercialTarget,
+            commercialTargetName: semantic.commercialTargetName,
+            commercialTargetEvidence: semantic.commercialTargetEvidence,
+            physicalLocation: semantic.physicalLocation,
+            physicalLocationEvidence: semantic.physicalLocationEvidence,
+            country: semantic.country,
+            coastalState: semantic.coastalState,
+            routeRelationship: {
+              kind: semantic.routeKind,
+              routeName: semantic.routeName,
+              evidence: semantic.routeEvidence,
+            },
+            routingConsequence: {
+              kind: semantic.consequenceKind,
+              status: semantic.consequenceStatus,
+              claim: semantic.consequenceClaim,
+              evidenceQuote: semantic.consequenceEvidenceQuote,
+              confidence: semantic.consequenceConfidence,
+              description: semantic.consequenceDescription,
+              evidence: semantic.consequenceEvidence,
+            },
+            commercialConsequence: {
+              status: semantic.commercialConsequenceStatus,
+              claim: semantic.commercialConsequenceClaim,
+              evidenceQuote: semantic.commercialConsequenceEvidenceQuote,
+              confidence: semantic.commercialConsequenceConfidence,
+            },
+            geopolitical: {
+              relevant: semantic.geopoliticalRelevant,
+              claim: semantic.geopoliticalClaim,
+              evidenceQuote: semantic.geopoliticalEvidenceQuote,
+            },
+            eventDate: semantic.eventDate,
+            developmentKey: semantic.developmentKey,
+            severity: semantic.severity,
+            severityJustification: semantic.severityJustification,
+            severityEvidenceQuote: semantic.severityEvidenceQuote,
+            confidence: {
+              event: semantic.confidenceEvent,
+              classification: semantic.confidenceClassification,
+              commercialTarget: semantic.confidenceCommercialTarget,
+              geography: semantic.confidenceGeography,
+              routeRelationship: semantic.confidenceRoute,
+              consequence: semantic.confidenceConsequence,
+              date: semantic.confidenceDate,
+            },
+            contradictions: semantic.contradictions,
+            sourceQuotes: semantic.sourceQuotes,
+            evidence: semantic.evidence,
+            evaluatedAt: semantic.evaluatedAt,
+          }
+        : null,
+    };
+  });
 }
 
 // Mirror of defaultRelevanceCondition() in lib/relevanceFilter.ts: drop rows

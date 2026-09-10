@@ -178,6 +178,8 @@ export * from './maritimeSemanticEvidenceSourceQuotesItem';
 export * from './maritimeSemanticEvidenceVerdict';
 export * from './maritimeSourceHealthItem';
 export * from './maritimeSourceState';
+export * from './maritimeValidation';
+export * from './maritimeValidationStatus';
 export * from './maritimeVessel';
 export * from './maritimeVesselVesselClass';
 export * from './marketPrice';

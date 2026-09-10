@@ -7,7 +7,16 @@ import type {
 } from "@workspace/api-client-react";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import { CARD_RATINGS } from "./cardTemplates";
-import { clampIssueDateToLatestRecord, filterIncidentsToWindow } from "./reportWindow";
+import {
+  clampIssueDateToLatestRecord,
+  filterIncidentsToWindow,
+  resolveReportWindow,
+} from "./reportWindow";
+import {
+  buildShippingCanonicalIncidents,
+  type ShippingReportIncident,
+} from "./shippingReportDataset";
+import { buildMaritimeIntelligence } from "./maritimeIntelligence";
 
 // Sources an analyst can pull card content from.
 export type CardSourceKind = "country" | "incident" | "spot" | "report";
@@ -124,6 +133,46 @@ export function autoReportRating(
   rep: Report,
   incidents: Incident[] = [],
 ): string | undefined {
+  // Shipping risk is the board's overall canonical risk, not a max over raw
+  // article severity. The status gate is intentionally strict: an object
+  // without maritimeValidation is not trusted as a validated source row.
+  if (rep.topic === "shipping") {
+    const maritimeRows = incidents.filter((incident) => incident.topic === "shipping");
+    const statusRows = filterIncidentsToWindow(
+      maritimeRows,
+      rep.topic,
+      rep.issueDate,
+    );
+    const pending = statusRows.some(
+      (incident) => incident.maritimeValidation?.status === "pending",
+    );
+    if (
+      pending ||
+      statusRows.some((incident) => !incident.maritimeValidation)
+    ) {
+      return undefined;
+    }
+
+    const window = resolveReportWindow(rep.topic, rep.issueDate);
+    // resolveReportWindow's end is the calendar day's midnight; report
+    // incidents are inclusive through the end of that UTC day.
+    const windowEnd = new Date(window.end.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const canonical = buildShippingCanonicalIncidents(
+      statusRows
+        .filter((incident) => incident.maritimeValidation?.status === "validated")
+        .map((incident) => incident as unknown as ShippingReportIncident),
+      "shipping",
+      { start: window.start, end: windowEnd },
+    );
+    const board = buildMaritimeIntelligence({
+      incidents: canonical.canonicalIncidents,
+      movement: [],
+      inputMode: "prevalidated",
+      windowStart: window.start,
+      windowEnd,
+    });
+    return CARD_RATINGS[board.overallRisk.level - 1];
+  }
   return (
     ratingFromScopedIncidents(rep, incidents) ??
     inferRatingFromProse(

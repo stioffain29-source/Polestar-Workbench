@@ -170,7 +170,13 @@ export const GetDashboardOverviewResponse = zod.object({
 })),
   "evidence": zod.array(zod.string()),
   "evaluatedAt": zod.coerce.date()
-}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable(),
+  "maritimeValidation": zod.object({
+  "status": zod.enum(['validated', 'rejected', 'pending', 'not_applicable']),
+  "version": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "evaluatedAt": zod.coerce.date().nullable()
+})
 })),
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
@@ -1056,7 +1062,13 @@ export const ListIncidentsResponseItem = zod.object({
 })),
   "evidence": zod.array(zod.string()),
   "evaluatedAt": zod.coerce.date()
-}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable(),
+  "maritimeValidation": zod.object({
+  "status": zod.enum(['validated', 'rejected', 'pending', 'not_applicable']),
+  "version": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "evaluatedAt": zod.coerce.date().nullable()
+})
 })
 export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
@@ -1216,7 +1228,13 @@ export const GetIncidentResponse = zod.object({
 })),
   "evidence": zod.array(zod.string()),
   "evaluatedAt": zod.coerce.date()
-}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable(),
+  "maritimeValidation": zod.object({
+  "status": zod.enum(['validated', 'rejected', 'pending', 'not_applicable']),
+  "version": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "evaluatedAt": zod.coerce.date().nullable()
+})
 })
 
 
@@ -1372,7 +1390,13 @@ export const UpdateIncidentResponse = zod.object({
 })),
   "evidence": zod.array(zod.string()),
   "evaluatedAt": zod.coerce.date()
-}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable(),
+  "maritimeValidation": zod.object({
+  "status": zod.enum(['validated', 'rejected', 'pending', 'not_applicable']),
+  "version": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "evaluatedAt": zod.coerce.date().nullable()
+})
 })
 
 
@@ -1523,7 +1547,13 @@ export const GetRecentIncidentsResponseItem = zod.object({
 })),
   "evidence": zod.array(zod.string()),
   "evaluatedAt": zod.coerce.date()
-}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable(),
+  "maritimeValidation": zod.object({
+  "status": zod.enum(['validated', 'rejected', 'pending', 'not_applicable']),
+  "version": zod.string().nullable(),
+  "reason": zod.string().nullable(),
+  "evaluatedAt": zod.coerce.date().nullable()
+})
 })
 export const GetRecentIncidentsResponse = zod.array(GetRecentIncidentsResponseItem)
 

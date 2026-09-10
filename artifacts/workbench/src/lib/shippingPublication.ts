@@ -201,6 +201,96 @@ export interface ShippingPublicationIssue {
   incidentIds?: Array<number | string>;
 }
 
+/**
+ * Turn the internal validator section key into the label an analyst sees in
+ * the editor.  The validator intentionally uses precise keys (for example
+ * `incident:42` or `board.chokepoint:Red Sea`); exposing those raw keys makes
+ * an otherwise useful warning hard to act on.
+ */
+export function shippingPublicationIssueSection(
+  publicationIssue: ShippingPublicationIssue,
+): string {
+  const section = trim(publicationIssue.section);
+  if (!section) return "Report-wide consistency";
+  if (section === "prose") return "Report prose";
+  if (section === "fastFacts") return "Fast Facts";
+  if (section === "chokepoints" || section === "route") {
+    return "Chokepoint / Route Read";
+  }
+  if (section === "vessel") return "Vessel Threat and Piracy Read";
+  if (section === "piracy") return "Vessel Threat and Piracy Read";
+  if (section === "tables") return "Report tables";
+  if (section === "board" || section.startsWith("board.")) {
+    return "Maritime Intelligence";
+  }
+  if (section === "incidentSummary") return "Related Incidents";
+  if (section.startsWith("incident:")) {
+    return `Incident ${section.slice("incident:".length)}`;
+  }
+  if (section === "risk") return "Overall risk";
+  if (section.includes("/")) {
+    return section
+      .split("/")
+      .map((part) => shippingPublicationIssueSection({ ...publicationIssue, section: part }))
+      .join(" / ");
+  }
+  const labels: Record<string, string> = {
+    executiveSummary: "Executive Summary",
+    whatMatters: "What Matters",
+    implications: "Implications for Business",
+    watchNext: "Watch Next",
+    polestarView: "Polestar View",
+    chokepointRouteRead: "Chokepoint / Route Read",
+    vesselPiracyRead: "Vessel Threat and Piracy Read",
+    maritimeSecurityRead: "Maritime Security",
+    commercialImpactRead: "Commercial Impact on Shipping",
+    regionalCountryRead: "Regional and Country View",
+    canonical: "Canonical incident set",
+    summaries: "Related Incidents",
+  };
+  return labels[section] ?? section;
+}
+
+/**
+ * Keep remediation guidance next to the original evidence warning.  This is
+ * presentation guidance only: the validator and the PDF fail-closed gate
+ * remain unchanged.
+ */
+export function shippingPublicationIssueAction(
+  publicationIssue: ShippingPublicationIssue,
+): string {
+  const code = publicationIssue.code;
+  if (
+    code.includes("UNSUPPORTED") ||
+    code.includes("UNGROUNDED") ||
+    code.includes("UNVALIDATED")
+  ) {
+    return "Remove the unsupported claim, or rewrite it as a clearly qualified assessment tied to the cited incident evidence.";
+  }
+  if (code.includes("LOCATION") || code.includes("COUNTRY")) {
+    return "Use the physical location in the incident evidence, or remove the unsupported geography.";
+  }
+  if (code.includes("RISK")) {
+    return "Match the wording to the authoritative overall risk in Maritime Intelligence, or explain a supported change in assessment.";
+  }
+  if (code.includes("SEVERITY")) {
+    return "Use the highest individual incident severity from the canonical set; do not label a lower tier as the maximum.";
+  }
+  if (code.includes("FAST_FACT") || code.includes("COUNT") || code.includes("TABLE")) {
+    return "Clear the override or edit it to match the canonical incident set shown by the report.";
+  }
+  if (code.includes("BACKEND") || code.includes("COMMENTARY")) {
+    return "Rewrite this in reader-facing language and remove references to internal validation, datasets, tables or pipelines.";
+  }
+  if (code.includes("DUPLICATE")) {
+    return "Keep the development in one detailed section and use the other section for a distinct operational assessment.";
+  }
+  if (code.includes("EMPTY")) {
+    return "Add a concise, evidence-grounded sentence to this visible section.";
+  }
+  return "Review this section against the current canonical incident evidence before exporting the PDF.";
+}
+
 export interface ShippingPublicationBundle {
   dataset: ShippingReportDataset;
   maritimeBoard: MaritimeIntelligence;
@@ -285,6 +375,14 @@ function firstGeography(dataset: ShippingReportDataset): string {
   const country = dataset.countryRows.find((row) => row.value > 0)?.label;
   if (country) return country;
   const row = dataset.canonicalIncidents[0];
+  // A feed location or route mention is not physical incident evidence once a
+  // semantic projection exists. In particular, a tanker headline can carry
+  // "Strait of Hormuz" while the semantic result explicitly says that no
+  // physical location was established. Do not let that raw text leak into
+  // generated prose and trigger an unsupported-location audit.
+  if (row && semanticFor(row)) {
+    return row.incidentCountry ?? "";
+  }
   return row?.incidentCountry ?? row?.location ?? "";
 }
 
@@ -328,7 +426,7 @@ function safeDeterministicProse(
     : "No route-related incident is identified in this window.";
   const geographySentence = geography
     ? `The leading reported location is ${geography}.`
-    : "The available reports do not identify a leading physical geography.";
+    : "No physical incident geography is established in the available evidence for this window.";
 
   const direct = dataset.vesselRows.length;
   const piracy = dataset.piracyRows.length;
@@ -342,7 +440,7 @@ function safeDeterministicProse(
   return {
     executiveSummary:
       `Shipping Watch assesses overall maritime risk as ${risk}. ` +
-      `${event} is the clearest reported signal in ${place}; ` +
+      `The assessment treats a ${event} as the clearest reported signal in ${place}; ` +
       `the highest individual incident severity is ${highest}. ` +
       `Overall risk and individual incident severity are separate judgements.`,
     chokepointRouteRead:
@@ -1310,6 +1408,47 @@ function auditWithGenericEvidence(
   }
 }
 
+type ShippingNarrativeField =
+  keyof Pick<
+    ShippingPublicationReport,
+    "executiveSummary" | "whatMatters" | "implications" | "watchNext" | "polestarView"
+  >;
+
+type ShippingReadField =
+  keyof Pick<
+    ShippingPublicationReport,
+    | "chokepointRouteRead"
+    | "vesselPiracyRead"
+    | "maritimeSecurityRead"
+    | "commercialImpactRead"
+    | "regionalCountryRead"
+  >;
+
+/**
+ * Older editor versions persisted the generated Shipping paragraphs into the
+ * report row.  A later dataset or prose-rule change then made those values
+ * look like analyst overrides, so the final validator audited stale
+ * implementation commentary and blocked the whole report.  Keep genuine
+ * saved edits (which are never equal to a generated candidate) while
+ * recognising generated text from both the current raw incident pool and the
+ * already-built canonical dataset.
+ */
+function generatedTextKey(value: unknown): string {
+  return trim(value).replace(/\s+/g, " ");
+}
+
+function addGeneratedCandidate(
+  candidates: Map<string, Set<string>>,
+  field: string,
+  value: unknown,
+): void {
+  const key = generatedTextKey(value);
+  if (!key) return;
+  const current = candidates.get(field) ?? new Set<string>();
+  current.add(key);
+  candidates.set(field, current);
+}
+
 /**
  * Build the complete, renderer-independent Shipping Watch publication model.
  * This function does not throw for evidence failures: callers can show the
@@ -1346,7 +1485,10 @@ export function finalizeShippingPublication(
     incidents: baseDataset.canonicalIncidents,
     movement: options.movement ?? [],
     windowStart: window.start,
-    windowEnd: window.end,
+    // resolveReportWindow's end is the issue-date midnight. The dataset
+    // includes the complete issue-date calendar day, so the shared board must
+    // use the same inclusive end or it silently drops same-day incidents.
+    windowEnd: new Date(window.end.getTime() + 24 * 60 * 60 * 1000 - 1),
     inputMode: "prevalidated",
   });
   for (const row of builtMaritimeBoard.confirmedIncidents) {
@@ -1415,22 +1557,106 @@ export function finalizeShippingPublication(
   });
   const ai = options.aiProse?.stale ? null : options.aiProse;
   const report = options.report ?? {};
+  const generatedCandidates = new Map<string, Set<string>>();
+  const narrativeFields: ShippingNarrativeField[] = [
+    "executiveSummary",
+    "whatMatters",
+    "implications",
+    "watchNext",
+    "polestarView",
+  ];
+  const readFields: ShippingReadField[] = [
+    "chokepointRouteRead",
+    "vesselPiracyRead",
+    "maritimeSecurityRead",
+    "commercialImpactRead",
+    "regionalCountryRead",
+  ];
+  for (const field of narrativeFields) {
+    addGeneratedCandidate(generatedCandidates, field, draft[field]);
+    addGeneratedCandidate(generatedCandidates, field, deterministic[field]);
+  }
+  for (const field of readFields) {
+    addGeneratedCandidate(generatedCandidates, field, deterministic[field]);
+  }
+  // ReportEditor historically seeded the first draft from the unprojected
+  // incident query, while this boundary uses the validated canonical set.
+  // Recognise both forms so an untouched automatic seed does not become a
+  // false analyst override after canonicalisation.
+  const rawDraftDates = new Set(
+    [issueDate, trim(report.issueDate)].filter(Boolean),
+  );
+  for (const draftIssueDate of rawDraftDates) {
+    const rawDraft = stableDraftTopicReportProse({
+      topic,
+      issueDate: draftIssueDate,
+      incidents: toDraftableIncidents(options.incidents),
+    });
+    for (const field of narrativeFields) {
+      addGeneratedCandidate(generatedCandidates, field, rawDraft[field]);
+    }
+  }
+  // The first Shipping implementation also persisted the four dataset
+  // auto-prose fields. Retain an exact-match compatibility path for those
+  // rows, but never treat unrelated analyst wording as generated.
+  const legacyAutoNarrativeFields: Record<
+    Exclude<ShippingNarrativeField, "executiveSummary">,
+    keyof ShippingReportDataset
+  > = {
+    whatMatters: "autoWhatMatters",
+    implications: "autoImplications",
+    watchNext: "autoWatchNext",
+    polestarView: "autoPolestarView",
+  };
+  for (const field of Object.keys(legacyAutoNarrativeFields) as Array<
+    Exclude<ShippingNarrativeField, "executiveSummary">
+  >) {
+    addGeneratedCandidate(
+      generatedCandidates,
+      field,
+      baseDataset[legacyAutoNarrativeFields[field]],
+    );
+  }
+  // The legacy Shipping report stored these dataset-generated reads directly.
+  // They are still useful as internal fallbacks, but must not be mistaken for
+  // an analyst edit (or leak their implementation language to the client).
+  const legacyAutoFields: Record<ShippingReadField, keyof ShippingReportDataset> = {
+    chokepointRouteRead: "chokepointRouteRead",
+    vesselPiracyRead: "vesselPiracyRead",
+    maritimeSecurityRead: "maritimeSecurity",
+    commercialImpactRead: "commercialImpactRead",
+    regionalCountryRead: "regionalCountryRead",
+  };
+  for (const field of readFields) {
+    addGeneratedCandidate(
+      generatedCandidates,
+      field,
+      baseDataset[legacyAutoFields[field]],
+    );
+  }
+  const isGeneratedCandidate = (field: string, value: unknown): boolean => {
+    const key = generatedTextKey(value);
+    return Boolean(key && generatedCandidates.get(field)?.has(key));
+  };
   const resolveNarrative = (
-    field: keyof Pick<ShippingPublicationReport, "executiveSummary" | "whatMatters" | "implications" | "watchNext" | "polestarView">,
+    field: ShippingNarrativeField,
     fallback: string,
   ): string => {
     const saved = trim(report[field]);
-    // ReportEditor seeds these fields with draftReportProse.  Treat an exact
-    // generated seed as blank so a stale seed cannot veto the live finalizer.
-    const seeded = trim(draft[field]);
-    const analyst = saved && saved !== seeded ? saved : "";
+    // Treat an exact generated seed as blank so a stale automatic paragraph
+    // cannot veto the live finalizer.  Any other non-empty value remains a
+    // genuine analyst edit and is still subject to the strict audit below.
+    const analyst = saved && !isGeneratedCandidate(field, saved) ? saved : "";
     const aiText = trim(ai?.[field]);
     return analyst || aiText || fallback;
   };
   const resolveRead = (
-    field: keyof Pick<ShippingPublicationReport, "chokepointRouteRead" | "vesselPiracyRead" | "maritimeSecurityRead" | "commercialImpactRead" | "regionalCountryRead">,
+    field: ShippingReadField,
     fallback: string,
-  ): string => trim(report[field]) || fallback;
+  ): string => {
+    const saved = trim(report[field]);
+    return saved && !isGeneratedCandidate(field, saved) ? saved : fallback;
+  };
   const prose: ShippingPublicationProse = {
     executiveSummary: resolveNarrative("executiveSummary", deterministic.executiveSummary),
     chokepointRouteRead: resolveRead("chokepointRouteRead", deterministic.chokepointRouteRead),

@@ -368,6 +368,26 @@ export interface MaritimeSemanticEvidence {
   evaluatedAt: string;
 }
 
+export type MaritimeValidationStatus = typeof MaritimeValidationStatus[keyof typeof MaritimeValidationStatus];
+
+
+export const MaritimeValidationStatus = {
+  validated: 'validated',
+  rejected: 'rejected',
+  pending: 'pending',
+  not_applicable: 'not_applicable',
+} as const;
+
+export interface MaritimeValidation {
+  status: MaritimeValidationStatus;
+  /** @nullable */
+  version: string | null;
+  /** @nullable */
+  reason: string | null;
+  /** @nullable */
+  evaluatedAt: string | null;
+}
+
 export interface Incident {
   id: number;
   topic: Topic;
@@ -420,6 +440,7 @@ export interface Incident {
   /** @nullable */
   analystInScope?: boolean | null;
   maritimeSemantic: MaritimeSemanticEvidence | null;
+  maritimeValidation: MaritimeValidation;
 }
 
 export interface IncidentInput {

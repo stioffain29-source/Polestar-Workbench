@@ -1000,12 +1000,17 @@ export function draftTopicReportProse(opts: {
       executiveSummary: sTotal === 0 ? SHIPPING.zeroExec : SHIPPING.exec(shipCtx),
       situation: sTotal === 0 ? SHIPPING.zeroSituation : SHIPPING.situation(shipCtx),
       whatHappened: sTotal === 0 ? SHIPPING.zeroWhatHappened : SHIPPING.whatHappened(shipCtx),
-      // These four come straight from the dataset's auto-prose so the seeded
-      // form text is byte-identical to what the preview/PDF fall back to.
-      whatMatters: ds.autoWhatMatters,
-      implications: ds.autoImplications,
-      watchNext: ds.autoWatchNext,
-      polestarView: ds.autoPolestarView,
+      // Keep the persisted draft compatible with the client-facing prose
+      // contract.  The old Shipping auto-prose used implementation terms
+      // such as "canonical set", "source-grounded" and "shown in the chart
+      // below".  Those strings were useful while debugging the dataset, but
+      // became stale saved edits when an older report was reopened.  Use the
+      // reader-facing Shipping pack here instead; publication still resolves
+      // the live, evidence-bound fallback at render time.
+      whatMatters: sTotal === 0 ? SHIPPING.zeroWhatMatters : SHIPPING.whatMatters(shipCtx),
+      implications: SHIPPING.implications(shipCtx),
+      watchNext: SHIPPING.watchNext(shipCtx),
+      polestarView: sTotal === 0 ? SHIPPING.zeroPolestar : SHIPPING.polestarView(shipCtx),
     };
   }
   // Conflict Watch reports seed their persisted prose directly from the

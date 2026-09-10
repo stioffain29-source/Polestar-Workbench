@@ -4,6 +4,8 @@ import {
   type ShippingPublicationOptions,
 } from "../../artifacts/workbench/src/lib/shippingPublication";
 import type { ShippingReportIncident } from "../../artifacts/workbench/src/lib/shippingReportDataset";
+import { buildShippingReportDataset } from "../../artifacts/workbench/src/lib/shippingReportDataset";
+import { draftTopicReportProse } from "../../artifacts/workbench/src/lib/draftReportProse";
 import { MARITIME_SEMANTIC_VERSION } from "@workspace/relevance";
 import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
@@ -111,6 +113,34 @@ describe("Shipping publication final boundary", () => {
       Object.values(publication.prose).join("\n"),
     ).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
     expect(publication.incidentSummaries["1"]).toBeUndefined();
+    expect(() => assertShippingPublication(publication)).not.toThrow();
+  });
+
+  it("keeps a same-day event with unknown physical geography aligned across board and prose", () => {
+    const unknownGeography = incident(3, {
+      occurredAt: "2026-06-15T08:00:00.000Z",
+      location: "Strait of Hormuz",
+      maritimeSemantic: semantic({
+        eventDate: null,
+        physicalLocation: null,
+        physicalLocationEvidence: null,
+        country: null,
+        coastalState: null,
+        routeRelationship: { kind: "none", routeName: null, evidence: null },
+      }),
+    });
+    const publication = finalizeShippingPublication(
+      validOptions({
+        incidents: [unknownGeography],
+        issueDate: ISSUE_DATE,
+      }),
+    );
+
+    expect(publication.dataset.canonicalIncidents).toHaveLength(1);
+    expect(publication.maritimeBoard.confirmedIncidents).toHaveLength(1);
+    expect(publication.auditIssues).toEqual([]);
+    expect(publication.prose.executiveSummary).not.toContain("Strait of Hormuz");
+    expect(publication.prose.whatMatters).not.toContain("Strait of Hormuz");
     expect(() => assertShippingPublication(publication)).not.toThrow();
   });
 
@@ -285,6 +315,55 @@ describe("Shipping publication final boundary", () => {
 
     expect(publication.prose.executiveSummary).toContain("Overall maritime risk is Low in Oman.");
     expect(publication.auditIssues.map((issue) => issue.code)).toContain("RISK_CONTRADICTION");
+  });
+
+  it("treats current and legacy automatic prose as fallback text, not analyst edits", () => {
+    const draft = draftTopicReportProse({
+      topic: "shipping",
+      issueDate: ISSUE_DATE,
+      incidents: [incident(1)],
+    });
+    const legacyDataset = buildShippingReportDataset(
+      [incident(1)],
+      "shipping",
+      ISSUE_DATE,
+      [],
+    );
+    const publication = finalizeShippingPublication(
+      validOptions({
+        report: {
+          executiveSummary: draft.executiveSummary,
+          whatMatters: legacyDataset.autoWhatMatters,
+          implications: legacyDataset.autoImplications,
+          watchNext: legacyDataset.autoWatchNext,
+          polestarView: legacyDataset.autoPolestarView,
+          vesselPiracyRead: legacyDataset.vesselPiracyRead,
+          commercialImpactRead: legacyDataset.commercialImpactRead,
+        },
+      }),
+    );
+
+    expect(publication.auditIssues).toEqual([]);
+    expect(Object.values(publication.prose).join("\n")).not.toMatch(
+      /\b(canonical set|source[- ]grounded|shown in the chart below|internal validation)\b/i,
+    );
+  });
+
+  it("keeps a non-generated saved edit while automatic prose follows the live fallback", () => {
+    const savedEdit =
+      "Review Bab el-Mandeb escalation triggers against the confirmed incident and keep the route response conditional.";
+    const publication = finalizeShippingPublication(
+      validOptions({
+        report: {
+          whatMatters: savedEdit,
+        },
+      }),
+    );
+
+    expect(publication.prose.whatMatters).toBe(savedEdit);
+    expect(publication.auditIssues.map((item) => item.code)).not.toContain(
+      "BACKEND_COMMENTARY",
+    );
   });
 
   it("publishes a safe zero-data branch without fabricating a route or consequence", () => {

@@ -922,22 +922,22 @@ export function buildMaritimeIntelligence(
     confirmed.some((r) => KINETIC_CATEGORIES.has(r.category) && r.chokepoints.length > 0)
   ) {
     watchNext.push(
-      `Monitor ${topChokepoint ?? "the affected chokepoint"} for additional validated kinetic or route-linked evidence.`,
+      `Monitor ${topChokepoint ?? "the affected chokepoint"} for additional kinetic events or route-linked developments.`,
     );
   } else if ([...cats].some((c) => KINETIC_CATEGORIES.has(c))) {
-    watchNext.push("Monitor for additional validated kinetic evidence or a changed semantic route relationship.");
+    watchNext.push("Monitor for additional kinetic events or a changed route relationship.");
   }
   if (cats.has("Port closure / disruption") || cats.has("Maritime protest / labour disruption")) {
-    watchNext.push("Monitor for additional validated port-disruption or structured consequence evidence.");
+    watchNext.push("Monitor for additional port disruption or a reported consequence.");
   }
   if (cats.has("Piracy / armed robbery") || cats.has("Boarding") || cats.has("Suspicious approach")) {
-    watchNext.push("Monitor for additional validated piracy, boarding or suspicious-approach evidence.");
+    watchNext.push("Monitor for additional piracy, boarding or suspicious-approach events.");
   }
   if (!movementSnapshot) {
     watchNext.push("Movement context is unavailable for this window.");
   }
   if (watchNext.length === 0) {
-    watchNext.push("No validated maritime driver is available for a watch-next assessment.");
+    watchNext.push("No maritime driver is available for a watch-next assessment.");
   }
 
   // 9. BLUF — bottom line up front.
