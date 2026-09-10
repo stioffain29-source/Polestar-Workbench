@@ -1,0 +1,42 @@
+{
+  "reportId": 12,
+  "issueDate": "2026-09-09",
+  "draftRenders": true,
+  "pdfAllowed": true,
+  "auditIssues": [],
+  "fastFacts": [
+    {
+      "label": "Reporting Period",
+      "value": "3 Sep - 9 Sep 2026"
+    },
+    {
+      "label": "Confirmed Incidents",
+      "value": "1"
+    },
+    {
+      "label": "Highest Severity",
+      "value": "High",
+      "severity": "high"
+    },
+    {
+      "label": "Main Affected Chokepoint",
+      "value": "—",
+      "note": "No chokepoint reported this week"
+    },
+    {
+      "label": "Vessel Attacks / Seizures",
+      "value": "1"
+    },
+    {
+      "label": "Piracy / Armed Robbery",
+      "value": "0",
+      "note": "None reported this week"
+    },
+    {
+      "label": "Latest Significant Incident",
+      "value": "09 Sep 2026",
+      "severity": "high",
+      "note": "Incident reported"
+    }
+  ]
+}

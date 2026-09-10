@@ -35,744 +35,868 @@ id = "aG0_NFVvJ-AacOw78yV51"
 uri = "file://screenshots/flashpoint_preview_final.jpg"
 type = "image"
 title = "Flashpoint preview (after fix) — lead is now 'Chemists strike', no quadcopter rows, Highest Severity = High"
+logical_id = "2db30cea-d17f-4bd3-9720-c41681599a96"
 
 [[outputs]]
 id = "Jh-UsUrCoAUQJnJyhpXyZ"
 uri = "file://screenshots/flashpoint_report.pdf"
 type = "pdf"
 title = "Flashpoint PDF (regenerated from same dataset) — full 6-page export"
+logical_id = "a46538cc-514a-4bb4-be50-6905ebf3cf47"
 
 [[outputs]]
 id = "1bpbjgaacJbESepk4MAgK"
 uri = "file://screenshots/flashpoint_pdf_page-1.jpg"
 type = "image"
 title = "PDF page 1 — Executive Summary, Fast Facts, Activism table (no quadcopter, no Quetta militant kill)"
+logical_id = "8502cae4-95b2-47e5-8f4d-168562e89b39"
 
 [[outputs]]
 id = "NauV3FEWTY0xNaFdEOD47"
 uri = "file://screenshots/flashpoint_pdf_page-2.jpg"
 type = "image"
 title = "PDF page 2 — Civil Unrest, Forecast, Regional & Country View (single-country labels)"
+logical_id = "432ebc39-ab9c-4c23-a6c3-0e32687115b8"
 
 [[outputs]]
 id = "v5Ml9-rY81L8IgrBEGu1V"
 uri = "file://screenshots/flashpoint_pdf_page-3.jpg"
 type = "image"
 title = "PDF page 3 — Coverage check naming Nepal present and Australia/PNG/Indonesia/Philippines/Japan absent; country chart"
+logical_id = "16f5478f-5e6a-499d-a496-06782bd5152b"
 
 [[outputs]]
 id = "-JfdczopEk9yuvtsq8JRX"
 uri = "file://screenshots/flashpoint_pdf_page-4.jpg"
 type = "image"
 title = "PDF page 4 — Implications and Watch Next (dated, specific, not generic)"
+logical_id = "0f32b59f-85c9-4190-b9d3-881c049b3051"
 
 [[outputs]]
 id = "XE68T058PR1m7Ina6dsDr"
 uri = "file://screenshots/font_proof/FONT_AUDIT.txt"
 type = "text"
 title = "Font audit — Roboto-only proof for all 4 topics"
+logical_id = "20bda6f2-c711-4541-89dd-7e1013c83278"
 
 [[outputs]]
 id = "VEUzfqRgOU-zPRWzMV6w-"
 uri = "file://screenshots/font_proof/fuel.pdf"
 type = "pdf"
 title = "Fuel report"
+logical_id = "1f6f758a-0388-447f-b0a5-4e0cb7dd4747"
 
 [[outputs]]
 id = "Dqcr4P91yNqCNM0VQfdeB"
 uri = "file://screenshots/font_proof/shipping.pdf"
 type = "pdf"
 title = "Shipping report"
+logical_id = "58fea52e-ad71-426b-be77-07cb091e7947"
 
 [[outputs]]
 id = "oJgIMrv0Z5_fZewLRziUm"
 uri = "file://screenshots/font_proof/cargo.pdf"
 type = "pdf"
 title = "Cargo Watch report"
+logical_id = "8668820d-2cba-4153-bd52-29981b05518b"
 
 [[outputs]]
 id = "KepINUFMTpMJRiWR2pOl-"
 uri = "file://screenshots/font_proof/flashpoint.pdf"
 type = "pdf"
 title = "Flashpoint report"
+logical_id = "fbbee6e1-87f3-4a34-a5ff-6ffbee704125"
 
 [[outputs]]
 id = "V-f95BKY2gZplBSuwv5fG"
 uri = "file://screenshots/font_proof/fuel_p1-1.jpg"
 type = "image"
 title = "Fuel — cover page (logo now embedded)"
+logical_id = "9b02ba52-454b-4dd6-925b-a9e9a5203d4e"
 
 [[outputs]]
 id = "X0zqxhzKG_ZoNeGlmizjM"
 uri = "file://screenshots/font_proof/shipping_p1-1.jpg"
 type = "image"
 title = "Shipping — cover page (logo now embedded)"
+logical_id = "1a0d749b-dfdb-4e2c-a19c-f916710921f4"
 
 [[outputs]]
 id = "2abIE8Qp8lCXzGEdCQklw"
 uri = "file://screenshots/font_proof/cargo_p1-1.jpg"
 type = "image"
 title = "Cargo — cover page (logo now embedded)"
+logical_id = "2ad4ee9f-3d23-4401-a229-19d4098ecd30"
 
 [[outputs]]
 id = "9mAyYjsshQFMeb8WxlFR3"
 uri = "file://screenshots/font_proof/flashpoint_p1-1.jpg"
 type = "image"
 title = "Flashpoint — cover page (logo now embedded)"
+logical_id = "542d0e5a-0204-425b-82b0-70a1e48d933f"
 
 [[outputs]]
 id = "nloHA--Dz45JkY_rcM7SS"
 uri = "file://screenshots/font_proof/cargo_watch.pdf"
 type = "pdf"
 title = "Cargo Watch report"
+logical_id = "15e232e0-2928-4309-9472-a100383533e3"
 
 [[outputs]]
 id = "90NJUPsCrHb4q1FjayEbB"
 uri = "file://attached_assets/flashpoint_data_coverage_audit.md"
 type = "text"
 title = "Flashpoint data coverage audit"
+logical_id = "97cc42ae-a897-4486-8400-be6e3385a761"
 
 [[outputs]]
 id = "1Z7EUoe0E3-_nYsYROd8p"
 uri = "file://deliverables/flashpoint_proof.pdf"
 type = "pdf"
 title = "Flashpoint report — rebuilt prose"
+logical_id = "d1b7d903-e73d-42dc-9676-693638552ca0"
 
 [[outputs]]
 id = "QEcCxhigDqM5A45EnOEzB"
 uri = "file://screenshots/flashpoint_preview.jpg"
 type = "image"
 title = "Flashpoint preview pane (workbench /reports/13)"
+logical_id = "b7333504-1d24-46ce-a86e-d143724ae3ea"
 
 [[outputs]]
 id = "3rYOh6yPsXuOcN0zZlLqK"
 uri = "file://exports/png-country-report-full.jpg"
 type = "image"
 title = "Papua New Guinea report — corrected (zero-count coverage-gap prose)"
+logical_id = "c96a074d-c826-4536-bf6c-4bb6978b563b"
 
 [[outputs]]
 id = "3mElQlhogKkcbhv5xvH35"
 uri = "file://exports/papua-country-report-full.jpg"
 type = "image"
 title = "Papua report — corrected (zero-count coverage-gap prose)"
+logical_id = "a641541f-d379-4966-a94c-0488b73852a4"
 
 [[outputs]]
 id = "UC40h51tHn1mJbQd1F0MS"
 uri = "file://screenshots/png_report.jpg"
 type = "image"
 title = "Papua New Guinea Report"
+logical_id = "2532690b-6be7-4d66-a2cb-203ddc64fadc"
 
 [[outputs]]
 id = "YrIcT72QnveY33HD9_-JD"
 uri = "file://screenshots/papua_report.jpg"
 type = "image"
 title = "Papua Report"
+logical_id = "e6cfe3c5-e164-46da-b469-5308b2b3b4c9"
 
 [[outputs]]
 id = "upgucgCee04SNIvtHxUcL"
 uri = "file://proof/1-fuel-watch-screen.png"
 type = "image"
 title = "1 · Fuel Watch — LIVE prod screen"
+logical_id = "5287c0d0-a3fc-4cd3-9176-468e59987cd9"
 
 [[outputs]]
 id = "KZNUpSb053sLDLLo-w01R"
 uri = "file://proof/1-fuel-watch.pdf"
 type = "pdf"
 title = "1 · Fuel Watch — PDF from that screen"
+logical_id = "8b1395e8-1e9e-448e-939a-acb78f58c549"
 
 [[outputs]]
 id = "PmcIiSphY3TqyBAYIqxR6"
 uri = "file://proof/2-fertiliser-watch-screen.png"
 type = "image"
 title = "2 · Fertiliser Watch — LIVE prod screen"
+logical_id = "36936ea0-f7ba-4904-b1bc-63a0c21a4e06"
 
 [[outputs]]
 id = "0u-pm78ZZtoImTAZeye1e"
 uri = "file://proof/2-fertiliser-watch.pdf"
 type = "pdf"
 title = "2 · Fertiliser Watch — PDF from that screen"
+logical_id = "af1c97d6-27f5-488c-9929-672fdd944608"
 
 [[outputs]]
 id = "rfXgLVRxGQex2QLVnjP5h"
 uri = "file://proof/3-cargo-watch-screen.png"
 type = "image"
 title = "3 · Cargo Watch — LIVE prod screen"
+logical_id = "348eef4a-fad0-46e7-96e8-c2c88d35e746"
 
 [[outputs]]
 id = "_GUzHTnFWw_ZBNIQcwHlJ"
 uri = "file://proof/3-cargo-watch.pdf"
 type = "pdf"
 title = "3 · Cargo Watch — PDF from that screen"
+logical_id = "f59daaf7-a0a8-48df-a2bd-e4306cad9b72"
 
 [[outputs]]
 id = "0lrH1os4CiBXO4SIgtcHL"
 uri = "file://proof/4-shipping-watch-screen.png"
 type = "image"
 title = "4 · Shipping Watch — LIVE prod screen"
+logical_id = "c1a2d180-49cf-4aa3-b28c-1d4398fef466"
 
 [[outputs]]
 id = "HW9pR6CPC0hGBVUVSoo9m"
 uri = "file://proof/4-shipping-watch.pdf"
 type = "pdf"
 title = "4 · Shipping Watch — PDF from that screen"
+logical_id = "dee0fe71-24d1-4065-8a81-7286803ee01f"
 
 [[outputs]]
 id = "11HlNCn7cnF16BOCmceG_"
 uri = "file://proof/5-flashpoint-screen.png"
 type = "image"
 title = "5 · Flashpoint — LIVE prod screen"
+logical_id = "5d51da48-772f-4d9a-8a24-67f2a2a74ba2"
 
 [[outputs]]
 id = "dEAswblZnToo8wNn7fPG9"
 uri = "file://proof/5-flashpoint.pdf"
 type = "pdf"
 title = "5 · Flashpoint — PDF from that screen"
+logical_id = "41d88fc3-880f-415c-8c49-26f8e15f9ec1"
 
 [[outputs]]
 id = "LFfUhPcfozjDL_T5ZV7cZ"
 uri = "file://proof/6-energy-watch-screen.png"
 type = "image"
 title = "6 · Energy Watch — LIVE prod screen"
+logical_id = "c6f6f70e-beb2-4f7b-94bd-bada1449bb08"
 
 [[outputs]]
 id = "RnI8rlX-tfHTrpVLFXsDD"
 uri = "file://proof/6-energy-watch.pdf"
 type = "pdf"
 title = "6 · Energy Watch — PDF from that screen"
+logical_id = "5d5a8c14-41db-4502-9510-180175793a27"
 
 [[outputs]]
 id = "cqsskv-Y5dkThebr0PF-P"
 uri = "file://proof/7-png-country-screen.png"
 type = "image"
 title = "7 · Papua New Guinea — LIVE prod screen"
+logical_id = "ba0b06f0-8bb8-47fe-b08f-8e73e5486773"
 
 [[outputs]]
 id = "Zg9L0VeBsXWsjrtpzUvOD"
 uri = "file://proof/7-png-country.pdf"
 type = "pdf"
 title = "7 · Papua New Guinea — PDF from that screen"
+logical_id = "708e7973-8db0-42c0-beac-0f081c6d1258"
 
 [[outputs]]
 id = "vNE-onuXJrSI0eAK0PO5l"
 uri = "file://proof/8-papua-country-screen.png"
 type = "image"
 title = "8 · Papua — LIVE prod screen"
+logical_id = "75a0cc17-2232-4086-8f02-ca556caea593"
 
 [[outputs]]
 id = "My1aCQpol0UEZX_VCzDyM"
 uri = "file://proof/8-papua-country.pdf"
 type = "pdf"
 title = "8 · Papua — PDF from that screen"
+logical_id = "31d47a0c-db46-428e-ace5-8c33c4bfa764"
 
 [[outputs]]
 id = "GkObjBriDCXWpxxnc1tiC"
 uri = "file://screenshots/prod_proof/papua.png"
 type = "image"
 title = "LIVE Production — Papua report (Indonesian West Papua, specific prose)"
+logical_id = "6a948bd9-5d96-408e-8d50-699fb9b5b746"
 
 [[outputs]]
 id = "EDtXH63yshNcDXkuqIylH"
 uri = "file://screenshots/prod_proof/papua-new-guinea.png"
 type = "image"
 title = "LIVE Production — Papua New Guinea report (separate, PNG-specific)"
+logical_id = "87dff483-2be6-4363-96c1-60e5d6ad71fb"
 
 [[outputs]]
 id = "zQcncY2aI68P5rX3PGUhU"
 uri = "file://exports/papua-report-fullbody.png"
 type = "image"
 title = "Papua — full report body (live screen)"
+logical_id = "59652712-9a24-4858-bc41-21c44dafd010"
 
 [[outputs]]
 id = "yiiHYP0gU9rUgVtBjQzT8"
 uri = "file://exports/polestar-country-report-papua.pdf"
 type = "pdf"
 title = "Papua — full PDF (exported from live screen)"
+logical_id = "4d406eda-58dd-4921-a9e6-363d07c14086"
 
 [[outputs]]
 id = "3cpQvm_1VSoYxKKVeAica"
 uri = "file://exports/papua-new-guinea-report-fullbody.png"
 type = "image"
 title = "Papua New Guinea — full report body (live screen)"
+logical_id = "07b6da41-ce1c-44f9-9436-2a84dbd0a01b"
 
 [[outputs]]
 id = "dSxBP0vsELp-iVkKizNJm"
 uri = "file://exports/polestar-country-report-papua-new-guinea.pdf"
 type = "pdf"
 title = "Papua New Guinea — full PDF (exported from live screen)"
+logical_id = "7863784d-b589-48ad-837d-6d18cfabcfe1"
 
 [[outputs]]
 id = "DU2asJVZC45AGdXvNS9Ro"
 uri = "file://exports/papua-pages/page-1.png"
 type = "image"
 title = "Papua — p1: Data status, Exec summary, Fast Facts"
+logical_id = "69062bf4-dc35-4b2c-9397-56b0c641fe9e"
 
 [[outputs]]
 id = "dywA4V8k2YOlxw-c-LuNN"
 uri = "file://exports/papua-pages/page-2.png"
 type = "image"
 title = "Papua — p2: 30/90-day context, Map, Severity"
+logical_id = "798295ad-ebb0-478b-be7b-8be0b659bd8e"
 
 [[outputs]]
 id = "rE9UzK-Fs88topvVnBuUi"
 uri = "file://exports/papua-pages/page-3.png"
 type = "image"
 title = "Papua — p3: Implications, Location Watchlist"
+logical_id = "225e167b-3c68-4803-9694-1504757b2865"
 
 [[outputs]]
 id = "sS_q4Kk2RY9JpTQ-8et9C"
 uri = "file://exports/papua-pages/page-4.png"
 type = "image"
 title = "Papua — p4: Incident breakdown, Watch Next, Polestar View"
+logical_id = "f60ec637-3659-4026-b67f-a6158bab9ebe"
 
 [[outputs]]
 id = "irpazG1z3emH6c7VNQGZa"
 uri = "file://exports/papua-pages/page-5.png"
 type = "image"
 title = "Papua — p5: Related Incidents (1 of 3)"
+logical_id = "749a36f9-24a9-427a-9af0-0a4569ba0603"
 
 [[outputs]]
 id = "_YwXLxFv-ya-edS9q3yJT"
 uri = "file://exports/papua-pages/page-6.png"
 type = "image"
 title = "Papua — p6: Related Incidents (2 of 3)"
+logical_id = "dd95712c-a8b3-4bc4-8879-7c1a46b1e3a4"
 
 [[outputs]]
 id = "CmKju1yMc9INtzfDHB_pg"
 uri = "file://exports/papua-pages/page-7.png"
 type = "image"
 title = "Papua — p7: Related Incidents (3 of 3)"
+logical_id = "1214aeb8-37bd-4830-8b13-77165a359bbf"
 
 [[outputs]]
 id = "rC1mJvAFNRFUuLkwgcvqr"
 uri = "file://exports/papua-pages/page-8.png"
 type = "image"
 title = "Papua — p8: cover"
+logical_id = "9cedf7ab-e6f4-41fe-8fbf-10d825b463cf"
 
 [[outputs]]
 id = "hoC-2B79i6akjzWaGLjXH"
 uri = "file://exports/png-pages/page-1.png"
 type = "image"
 title = "Papua New Guinea — p1: Data status, Exec summary, Fast Facts"
+logical_id = "d003f367-a7a8-4253-8ea7-6a96a0418481"
 
 [[outputs]]
 id = "KuOuoVp20zJ5bgdp7liMp"
 uri = "file://exports/png-pages/page-2.png"
 type = "image"
 title = "Papua New Guinea — p2: 30/90-day context, Map, Severity"
+logical_id = "8a27d75f-39c3-4828-9dec-591d9512ddd5"
 
 [[outputs]]
 id = "wOY6YPdCWQZ456MjRV2SQ"
 uri = "file://exports/png-pages/page-3.png"
 type = "image"
 title = "Papua New Guinea — p3: Implications, Location Watchlist"
+logical_id = "13e93ab2-2a1f-412e-a1e3-fc05ef88420f"
 
 [[outputs]]
 id = "ZD4_3DwxcjTticbZ6gfCw"
 uri = "file://exports/png-pages/page-4.png"
 type = "image"
 title = "Papua New Guinea — p4: Incident breakdown, Watch Next, Polestar View"
+logical_id = "a9f3564a-b3d7-43ac-8f39-4b7ed2a6a82e"
 
 [[outputs]]
 id = "kjAyVc1MKHq0QKe_TzWiS"
 uri = "file://exports/png-pages/page-5.png"
 type = "image"
 title = "Papua New Guinea — p5: Related Incidents (1 of 2)"
+logical_id = "713a7174-d73f-42f7-ac77-030f5325f05a"
 
 [[outputs]]
 id = "yvUQ7Blw0FhKNxqHEX9PZ"
 uri = "file://exports/png-pages/page-6.png"
 type = "image"
 title = "Papua New Guinea — p6: Related Incidents (2 of 2)"
+logical_id = "5f33e239-8953-4d4d-b497-018d0ae5fdde"
 
 [[outputs]]
 id = "5HkVaJz1C1o46QT_lCpqC"
 uri = "file://exports/png-pages/page-7.png"
 type = "image"
 title = "Papua New Guinea — p7: cover"
+logical_id = "b65253fb-fff2-4884-bd38-53ce2d76be6b"
 
 [[outputs]]
 id = "PkTw6oJQJCAa8y_s0bt37"
 uri = "file://scripts/exports/polestar-country-report-papua-new-guinea.pdf"
 type = "pdf"
 title = "PNG report PDF — empty week → COVERAGE WARNING"
+logical_id = "95328542-2025-4f31-8637-2de8c26bfd62"
 
 [[outputs]]
 id = "wUlzGhNA7qWrrpiEUZJ5R"
 uri = "file://scripts/exports/polestar-country-report-papua.pdf"
 type = "pdf"
 title = "Papua report PDF — week has records → no warning"
+logical_id = "2d2764d8-3317-4545-80d8-5ab06e9d7024"
 
 [[outputs]]
 id = "wmEDrj3DieuSUCg--wQ3X"
 uri = "file://scripts/exports/papua-new-guinea-report.png"
 type = "image"
 title = "PNG report — full-page screenshot"
+logical_id = "7dcb78c8-ae53-476e-9971-15aa7b7b420e"
 
 [[outputs]]
 id = "F22lZy20WRoRapEkwMWwm"
 uri = "file://scripts/exports/papua-report.png"
 type = "image"
 title = "Papua report — full-page screenshot"
+logical_id = "997b0507-e646-48b8-99b3-b4190a983c66"
 
 [[outputs]]
 id = "9xcShd3g3mqiS7BbLWJUB"
 uri = "file://scripts/exports/proof/png_page2.jpg"
 type = "image"
 title = "PNG report PDF (page 2) — COVERAGE WARNING, 0 records in weekly window"
+logical_id = "0b5e6ccc-cbd8-4830-9b92-25b15962f2e7"
 
 [[outputs]]
 id = "XwlfcjJ_JdcrUcYKaqkok"
 uri = "file://scripts/exports/proof/papua_page2.jpg"
 type = "image"
 title = "Papua report PDF (page 2) — no warning"
+logical_id = "e2c71da3-0c4a-4c60-b7a7-453d87b98fe9"
 
 [[outputs]]
 id = "Ziw0Ydjl2C2_K9oZofV9r"
 uri = "file://screenshots/prod_acceptance/flashpoint.pdf"
 type = "pdf"
 title = "Flashpoint — PDF from live prod screen"
+logical_id = "0d06a1c3-361a-426c-9bea-b46da6dac6f8"
 
 [[outputs]]
 id = "OuemwYq3VWUl7uPZyEdV1"
 uri = "file://screenshots/prod_acceptance/cargo_watch.pdf"
 type = "pdf"
 title = "Cargo Watch — PDF from live prod screen"
+logical_id = "3122b818-d770-48e0-883e-ee7dcdb42e5e"
 
 [[outputs]]
 id = "ZVAELMLh1a3hT1hF-TGic"
 uri = "file://screenshots/prod_acceptance/papua.pdf"
 type = "pdf"
 title = "Papua — PDF from live prod screen"
+logical_id = "55be7b1d-73f2-42ce-8358-a47b1f25e3b8"
 
 [[outputs]]
 id = "Ydqp0v9VDSBWkhwV2XTsy"
 uri = "file://screenshots/prod_acceptance/papua_new_guinea.pdf"
 type = "pdf"
 title = "Papua New Guinea — PDF from live prod screen"
+logical_id = "dbe64aec-4810-42a7-8cf3-702aa85d03ff"
 
 [[outputs]]
 id = "oEZpspSZ4uxxmgccldNPE"
 uri = "file://screenshots/prod_acceptance/papua.png"
 type = "image"
 title = "Papua — live prod screenshot"
+logical_id = "e8cff5fb-5755-40c0-851a-dd815c31523d"
 
 [[outputs]]
 id = "H7lgxgyiQQ3LqO76v2Gfz"
 uri = "file://screenshots/prod_acceptance/papua_new_guinea.png"
 type = "image"
 title = "Papua New Guinea — live prod screenshot"
+logical_id = "20a23722-3334-4418-b70d-13fce9460f74"
 
 [[outputs]]
 id = "8kfoUUsc_B-VYEtPE1-nR"
 uri = "file://screenshots/prod_acceptance/cargo_watch.png"
 type = "image"
 title = "Cargo Watch — live prod screenshot"
+logical_id = "3e3ecdf3-fe23-4d3f-ab28-daab2c6d6e50"
 
 [[outputs]]
 id = "1hYCrlMZPoTD2xJAsXShc"
 uri = "file://screenshots/prod_acceptance/flashpoint.png"
 type = "image"
 title = "Flashpoint — live prod screenshot"
+logical_id = "3b163f6a-accc-483a-8c7f-1e1a58bd8f59"
 
 [[outputs]]
 id = "cJ2v-oPrC0WhfuOVrcSSh"
 uri = "file://artifacts/workbench/screenshots/Flashpoint_2026-05-30.pdf"
 type = "pdf"
 title = "Flashpoint / Protests — 24–30 May 2026 (22 records, cleaned)"
+logical_id = "61a3aef9-3a3d-472d-8a51-9c1de34b536d"
 
 [[outputs]]
 id = "u3Y0K44v9hGsrLsLUrNp-"
 uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_2026-05-30.pdf"
 type = "pdf"
 title = "Shipping (Hormuz) PDF"
+logical_id = "53fad355-c892-45af-9db8-2fcb211ea6a0"
 
 [[outputs]]
 id = "eJvTqkZHI12VqiwC1_AfG"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_2026-05-30.pdf"
 type = "pdf"
 title = "Cargo Watch PDF"
+logical_id = "447774d2-09c9-4200-a71d-b78b6bf97600"
 
 [[outputs]]
 id = "D5kM6rnaWWj5BD9UnQSjT"
 uri = "file://artifacts/workbench/screenshots/FuelWatch_2026-05-30.pdf"
 type = "pdf"
 title = "Fuel Watch PDF"
+logical_id = "c35299f5-d2aa-4ec8-822c-cba283c62852"
 
 [[outputs]]
 id = "B93-lzuRVEpatwaadgFqj"
 uri = "file://artifacts/workbench/screenshots/Flashpoint_Protests_2026-05-30.pdf"
 type = "pdf"
 title = "Flashpoint (Protests) PDF"
+logical_id = "69f260a9-9537-4adb-ab3d-75b9b884c6de"
 
 [[outputs]]
 id = "M5_ZmWxr4zQERLvor3lkJ"
 uri = "file://artifacts/workbench/screenshots/PROOF_PACK.md"
 type = "text"
 title = "Report Suite Proof Pack"
+logical_id = "4fcad1d0-1d8f-4655-b89c-98ad443f3fe4"
 
 [[outputs]]
 id = "RyO3r0yIdNvxtjkCnqhau"
 uri = "file://artifacts/workbench/screenshots/FertiliserWatch_2026-05-30.pdf"
 type = "pdf"
 title = "Fertiliser PDF"
+logical_id = "d52d27ad-a65a-4278-928f-5a660eed0c5f"
 
 [[outputs]]
 id = "i1L7c4WMfteSlT5T-DRgx"
 uri = "file://artifacts/workbench/screenshots/EnergyWatch_2026-05-30.pdf"
 type = "pdf"
 title = "Energy PDF"
+logical_id = "7e2bd221-b252-45dc-9edb-3c6cb5b99ca1"
 
 [[outputs]]
 id = "FwFr6wbIRwK_wzym92dFB"
 uri = "file://artifacts/workbench/screenshots/Flashpoint_Protests_live_2026-05-30.png"
 type = "image"
 title = "Flashpoint (Protests) — live report"
+logical_id = "88f68188-7c98-4af2-9c4a-d9a7c545b112"
 
 [[outputs]]
 id = "NNO-0OLsMiSS4f3n7dJmu"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_live_2026-05-30.png"
 type = "image"
 title = "Cargo Watch — live report"
+logical_id = "e5d76e5f-1489-4404-a155-ed6b3ed22669"
 
 [[outputs]]
 id = "EVnThl0SwhSNYqKvRpMBY"
 uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_live_2026-05-30.png"
 type = "image"
 title = "Shipping (Hormuz) — live report"
+logical_id = "607ec5ab-2195-4ac9-9969-b54c9ad2c0ad"
 
 [[outputs]]
 id = "P0ilHsZVINwWwYtdBChLU"
 uri = "file://artifacts/workbench/screenshots/FuelWatch_live_2026-05-30.png"
 type = "image"
 title = "Fuel Watch — live report"
+logical_id = "d4771698-652e-4166-94b5-bbc8a8ac699a"
 
 [[outputs]]
 id = "8nKbncrfKR6OglYurFpI9"
 uri = "file://artifacts/workbench/screenshots/FertiliserWatch_live_2026-05-30.png"
 type = "image"
 title = "Fertiliser — live report"
+logical_id = "93f54cc8-cdc9-4d25-b86a-d04dccc4e57d"
 
 [[outputs]]
 id = "61zqK6BMQN5ZVYAhoyTZ3"
 uri = "file://artifacts/workbench/screenshots/EnergyWatch_live_2026-05-30.png"
 type = "image"
 title = "Energy — live report"
+logical_id = "8dda4aae-20ca-4fce-86ae-c9bc0bfff958"
 
 [[outputs]]
 id = "t3mxLoZG4tPTFmWzsUPRO"
 uri = "file://artifacts/workbench/screenshots/flashpoint_selection_proof.txt"
 type = "text"
 title = "Flashpoint Weekly — Selection Proof (included + rejected with reasons)"
+logical_id = "49e5d332-ebd9-46d4-94f9-e594982208b5"
 
 [[outputs]]
 id = "GeL3B8pWSyihX5XE16AmD"
 uri = "file://artifacts/workbench/screenshots/Shipping_Hormuz_revised_2026-06-01.pdf"
 type = "pdf"
 title = "Shipping Watch — revised, client-ready (report #12)"
+logical_id = "d188f76e-ca01-4de4-aebf-36a2a7a3dfd4"
 
 [[outputs]]
 id = "A8qb5fodR9EhJZiSKNhpp"
 uri = "file://artifacts/workbench/screenshots/Shipping_Watch_revised.pdf"
 type = "pdf"
 title = "Shipping Watch — revised (confirmed incidents only)"
+logical_id = "df1ebbf8-eb44-4e10-8a13-8ac9c1569afd"
 
 [[outputs]]
 id = "DWOmJPsAsEYlYMna4stie"
 uri = "file://AUDIT.md"
 type = "text"
 title = "Polestar Workbench — Honest Code Audit"
+logical_id = "b8cc3e48-99bb-4a2d-ba4b-6df007e125e1"
 
 [[outputs]]
 id = "eJu5woVjWhf0KUDfBACVD"
 uri = "file://.local/prod_map.png"
 type = "image"
 title = "Live production map — document-asset-manager-stioffain29.replit.app/countries/papua (10 markers)"
+logical_id = "cf81a79c-f1eb-497d-bcfc-c39ae5c1b411"
 
 [[outputs]]
 id = "fjQUuS1Fj15ZLIARNvBRY"
 uri = "file://screenshots/conflict_cover.jpg"
 type = "image"
 title = "Conflict Watch — Cover"
+logical_id = "b1c56165-e6d9-4344-b8aa-34e81fa35df8"
 
 [[outputs]]
 id = "3wG8GZnqGa0iJ-nV5eLaY"
 uri = "file://docs/workbench-audit-2026-06-17.md"
 type = "text"
 title = "Workbench Audit — 17 Jun 2026"
+logical_id = "5cd47779-5eb3-46b3-a242-7b604f7cfc4f"
 
 [[outputs]]
 id = "3dIDGVbwnyJMCcmtx3efU"
 uri = "file://screenshots/jakarta-exposure-map-sample.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — redesigned sample"
+logical_id = "4a78b488-e0ec-461b-b121-2d7620108d59"
 
 [[outputs]]
 id = "BXUXjwFt0wDWasGlzjkJU"
 uri = "file://screenshots/jakarta_exposure_map_sample.jpg"
 type = "image"
 title = "Jakarta — Operational Exposure Map (final polish: labels restored, operational panel, port corridor re-routed)"
+logical_id = "c6d6a6ca-728b-47ff-bbe5-320b34a6fbd5"
 
 [[outputs]]
 id = "cBcedpXF94zA3gvCsQDZf"
 uri = "file://screenshots/jakarta_exposure_map_v2.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — key sites + movement corridors"
+logical_id = "7e3d3174-9247-4f95-864e-4a90525417e0"
 
 [[outputs]]
 id = "ecVHxbh7U8qzyshQSQhYO"
 uri = "file://screenshots/jakarta_exposure_map_v3.jpg"
 type = "image"
 title = "Jakarta — Operational Exposure Map (sharpened)"
+logical_id = "60e85394-ae4e-4ad5-a9aa-b6f1811de861"
 
 [[outputs]]
 id = "z8jWyAHfFWM9p9eaHQ48x"
 uri = "file://screenshots/jakarta_exposure_map_v4.jpg"
 type = "image"
 title = "Jakarta — Operational Exposure Map (translucent overlays)"
+logical_id = "74e5acfd-dc11-436e-b281-fa3211683227"
 
 [[outputs]]
 id = "lZsyC27roRbIa1YvHFamk"
 uri = "file://screenshots/jakarta_exposure_map_v5.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map — redesign sample"
+logical_id = "85542eb5-6d26-4cbe-888d-eed81fca70ac"
 
 [[outputs]]
 id = "kWd7gvs74BOzl9OjaAotX"
 uri = "file://screenshots/jakarta_exposure_map_v9.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map (redesigned)"
+logical_id = "35608b17-dec1-4885-a90d-3cb1f1ddc4af"
 
 [[outputs]]
 id = "AR3lE83k1xQxUN9UIiaPk"
 uri = "file://attached_assets/image_1782704366565.png"
 type = "image"
 title = "Reference (Crisis24 / Control Risks)"
+logical_id = "ce382352-9d15-4e48-bebc-2b79cd463d9d"
 
 [[outputs]]
 id = "6NozUZH2b5TFzuLyF2PnJ"
 uri = "file://screenshots/jakarta_exposure_map_v10.jpg"
 type = "image"
 title = "Jakarta Operational Exposure Map (sharpened)"
+logical_id = "29360620-d6aa-4865-89dd-565ee0155af1"
 
 [[outputs]]
 id = "IHuxCCQobig2qzPGPEf9b"
 uri = "file://screenshots/jakarta-exposure-map.jpg"
 type = "image"
 title = "Updated render — tighter framing, bold zones"
+logical_id = "612967d0-0be0-434c-a644-8cb4f84340b1"
 
 [[outputs]]
 id = "Yk17-Yw55F9siLlnmt73M"
 uri = "file://attached_assets/download_1782711875187.png"
 type = "image"
 title = "Your confirmed target"
+logical_id = "b19a5bbf-b910-4014-8935-522376296e9f"
 
 [[outputs]]
 id = "Oy8bwGGvezJ7ML3o4lqbN"
 uri = "file://tapa_apac_incidents_clean.csv"
 type = "table"
 title = "TAPA APAC incidents (deduped, from uploaded page 2)"
+logical_id = "d237e820-22a8-4d58-8d35-81462156f993"
 
 [[outputs]]
 id = "EQCsUU9EmyEzpSuDSoR5N"
 uri = "file://tapa_apac_incidents_raw.csv"
 type = "table"
 title = "TAPA APAC incidents — RAW (all rows, no dedupe)"
+logical_id = "ff6c7d82-84cb-4af2-817e-d7f15fd2eb5a"
 
 [[outputs]]
 id = "Fgvqyn6RXALnWx4mn-GNn"
 uri = "file://tapa_apac_incidents_possible_duplicates.csv"
 type = "table"
 title = "TAPA APAC — possible duplicates (analyst review)"
+logical_id = "babe6a59-1a05-4d7e-919c-c4d8a7975385"
 
 [[outputs]]
 id = "jmAtmGxddhCkJUZeBm3dU"
 uri = "file://screenshots/cargo_breakdown.jpg"
 type = "image"
 title = "Cargo Watch — Captured Incidents by Country & Cargo"
+logical_id = "59b35b8e-3615-47dc-9724-2868b442a784"
 
 [[outputs]]
 id = "wemQzbuov4FADqJd8omMO"
 uri = "file://screenshots/jakarta-trial-map.jpg"
 type = "image"
 title = "Jakarta operational-exposure map — trial (second revision)"
+logical_id = "1ec52ec7-8147-4f2f-9268-bb6e680df03a"
 
 [[outputs]]
 id = "OEPfnXOrvUgxnx8xHzmWz"
 uri = "file://screenshots/jakarta_trial_map.jpg"
 type = "image"
 title = "Jakarta City Movement Posture — trial map"
+logical_id = "9823ea11-3307-4274-9168-06771edd5544"
 
 [[outputs]]
 id = "54QPMdE0sIepskHq5WsPi"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify.pdf"
 type = "pdf"
 title = "Cargo Watch report — real data (1,244 incidents, 10pp, gate PASS)"
+logical_id = "9f042b8c-7948-4795-8359-1c626e3c7891"
 
 [[outputs]]
 id = "HB-nFFjd5iPDfbE81rZbA"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse.pdf"
 type = "pdf"
 title = "Cargo Watch report — sparse period (thin-week fallbacks)"
+logical_id = "6ed20417-0f9c-4b67-a48e-dfadadb2dc25"
 
 [[outputs]]
 id = "6DbKqQKve28YQN81TVPab"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_small.pdf"
 type = "pdf"
 title = "Cargo Watch report — real data (1,244 incidents, 10pp, gate PASS)"
+logical_id = "3d18bbb3-55ce-4c18-bac9-8f9b4f863284"
 
 [[outputs]]
 id = "LD8DxYYc1W-Uw-l9fRv0g"
 uri = "file://artifacts/workbench/screenshots/CargoWatch_Pattern_verify_sparse_small.pdf"
 type = "pdf"
 title = "Cargo Watch report — sparse period (thin-week fallbacks, 6pp)"
+logical_id = "8a8847f3-d1c6-4822-b185-c4f46950a1db"
 
 [[outputs]]
 id = "pkCxMzbBa5YSTQ2AeJccK"
 uri = "file://exports/cargo_watch_report.pdf"
 type = "pdf"
 title = "Cargo Watch report (openable)"
+logical_id = "0e32078c-c392-4099-a8f8-e3559019dee9"
 
 [[outputs]]
 id = "RCLqIm9Gl2qALLFGNCpn_"
 uri = "file://exports/cargo_pages/page1.png"
 type = "image"
 title = "Cargo Watch — page 1"
+logical_id = "bf1c7a99-bbc7-480b-8043-d076c4342889"
 
 [[outputs]]
 id = "jc2IIIfLEt86Q0IwsGiiX"
 uri = "file://exports/cargo_pages/page2.png"
 type = "image"
 title = "Cargo Watch — page 2"
+logical_id = "2eaefaba-6039-41b6-97a3-84db62932f08"
 
 [[outputs]]
 id = "FkqKxKaBTbC2PdYVCzsQg"
 uri = "file://exports/cargo_pages/page3.png"
 type = "image"
 title = "Cargo Watch — page 3"
+logical_id = "8ed4db2d-5599-40df-842c-9b224a71c365"
 
 [[outputs]]
 id = "Lz1CO8UibmGaEtqpsScss"
 uri = "file://exports/cargo_pages/page4.png"
 type = "image"
 title = "Cargo Watch — page 4"
+logical_id = "ce01c314-7520-479c-b3e4-b33ee53e95d3"
 
 [[outputs]]
 id = "6fUGb9Ccy-wBupoQ3PCZY"
 uri = "file://exports/cargo_pages/page5.png"
 type = "image"
 title = "Cargo Watch — page 5"
+logical_id = "4897808d-3cc4-4724-9735-42b5db5d704b"
 
 [[outputs]]
 id = "wsHeOXuUPBwarE50Yrg7a"
 uri = "file://exports/cargo_pages/page6.png"
 type = "image"
 title = "Cargo Watch — page 6"
+logical_id = "4c671fc5-7605-4d43-8571-a7ba6878d1f0"
 
 [[outputs]]
 id = "DOwySQxi5F-1J77ZHG_SH"
 uri = "file://screenshots/jakarta-brief-proof.pdf"
 type = "pdf"
 title = "Jakarta City Brief — freshly exported proof PDF"
+logical_id = "5f91881b-9522-4d52-b662-f4b300c32ed8"
 
 [[outputs]]
 id = "JDXFnNjL9g9n1FvpGw5sp"
@@ -780,3 +904,32 @@ uri = "file://docs/dev-handover-audit.pdf"
 type = "pdf"
 title = "Workbench Developer Handover Audit"
 description = "Up-to-date technical audit of the Polestar Advisory Workbench for developer handover — architecture, pipeline, reports, deployment, QA, and open items. Source markdown at docs/dev-handover-audit.md."
+logical_id = "f1990d37-2fe0-45ed-8449-ad455cc32e42"
+
+[[outputs]]
+id = "dpZhPropJFOD5Z6x_2ICE"
+uri = "file://screenshots/shipping-fix-proof/saved-report.png"
+type = "image"
+title = "Saved Shipping report — rendered development preview"
+description = "Actual saved development report 12, rendered with the application’s report component for 3–9 September 2026. Not a screenshot of the published site."
+logical_id = "21e61509-fdec-4521-a4fe-f1f6b195c679"
+content_hash = "sha256:95bd3a3b77db07a2830f7e88512abad407ebd3edc930225a493f72bff21ecf83"
+size = 1243174
+mtime_ms = 1789045813669
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/21e61509-fdec-4521-a4fe-f1f6b195c679/afdee05a-d110-4ff2-b74f-cd79a3675a4d"
+storage_version_token = "1789045843457106"
+content_type = "image/png"
+
+[[outputs]]
+id = "Xi9xXcMtFMgYvA1VmbZAC"
+uri = "file://screenshots/shipping-fix-proof/saved-report.pdf"
+type = "pdf"
+title = "Saved Shipping report — preview PDF"
+description = "Browser-printed copy of the same rendered development preview. This is an inspection copy, not a download captured from the authenticated live site."
+logical_id = "c58ab31b-ff73-4654-89ff-ebb8344075ee"
+content_hash = "sha256:b74884ccffec20ab972c2980cb118a6e50cc231666cb8faee95cf20feb00ea42"
+size = 7448521
+mtime_ms = 1789045816573
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/c58ab31b-ff73-4654-89ff-ebb8344075ee/6696b905-7e6d-4b2a-96a1-625fd778df3c"
+storage_version_token = "1789045845088341"
+content_type = "application/pdf"
