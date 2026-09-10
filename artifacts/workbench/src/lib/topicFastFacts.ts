@@ -10,6 +10,7 @@ import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
 import { isTopicRelevant, sanitizeFactValue, splitAttributedCountries } from "./topicRelevance";
 import { isCargoInScope } from "./cargoAnalysis";
+import type { ShippingMaritimeSemanticEvidence } from "./shippingAnalysis";
 
 export interface TopicFastFactsIncident {
   id?: number | string;
@@ -23,6 +24,8 @@ export interface TopicFastFactsIncident {
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
+  /** Current source-grounded maritime classification, when topic is shipping. */
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
 }
 
 export interface TopicFastFactCard {

@@ -4,6 +4,10 @@ import { logger } from "./lib/logger";
 import { runDataMigrations } from "./lib/migrations";
 import { startIngestScheduler } from "./lib/ingestScheduler";
 import { convergeFlashpointValidity } from "./lib/flashpointValidityConvergence";
+import {
+  convergeMaritimeSemantic,
+  startMaritimeSemanticConvergence,
+} from "./lib/maritimeSemanticConvergence";
 
 loadDevEnv();
 
@@ -53,12 +57,25 @@ app.listen(port, "0.0.0.0", (err) => {
         "initial flashpoint semantic convergence failed",
       );
     }
+    try {
+      await convergeMaritimeSemantic(20);
+    } catch (semanticErr) {
+      logger.error(
+        { err: semanticErr },
+        "initial maritime semantic convergence failed",
+      );
+    }
     startIngestScheduler();
+    startMaritimeSemanticConvergence();
     // Continue through the current report window in the background. The first
     // 20 newest rows above restore recent map coverage as quickly as possible.
     void convergeFlashpointValidity(400).then(
       (result) => logger.info(result, "flashpoint semantic convergence finished"),
       (err) => logger.error({ err }, "flashpoint semantic convergence failed"),
+    );
+    void convergeMaritimeSemantic(400).then(
+      (result) => logger.info(result, "maritime semantic convergence finished"),
+      (err) => logger.error({ err }, "maritime semantic convergence failed"),
     );
   })();
 });

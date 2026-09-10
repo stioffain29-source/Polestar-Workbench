@@ -1,19 +1,22 @@
 import { format, parseISO } from "date-fns";
-import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
-import { isTopicRelevant } from "./topicRelevance";
+import { resolveReportWindow } from "./reportWindow";
 import {
   CHOKEPOINTS, detectChokepoints, detectChokepointsScoped, classifyPiracy,
-  statedPeriodEnd,
   classifyVesselIncident, type VesselIncidentType,
   classifyIssue,
   classifyRegion, REGION_COLOR, type Region,
-  TRANSIT_ISSUES, COMMERCIAL_ISSUES,
   type ChokepointKey,
-  isLowCredibilityShippingRecord,
   isConfirmedOperationalIncident,
+  isLowCredibilityShippingRecord,
   FREIGHT_MARKET_INDEX_RE,
+  hasValidMaritimeSemantic,
+  isSemanticallyValidatedMaritimeIncident,
+  semanticPhysicalCountry,
+  semanticPhysicalLocation,
+  semanticEventClass,
+  semanticSeverity,
+  type ShippingMaritimeSemanticEvidence,
 } from "./shippingAnalysis";
-import { deriveIncidentCountry, LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
 import { displayIncidentTitle, stripWireCruft } from "./incidentTitle";
 import {
   buildMaritimeSecuritySummary,
@@ -41,14 +44,19 @@ export interface ShippingReportIncident {
   occurredAt: string;
   country?: string | null;
   summary?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   source?: string | null;
   sourceUrl?: string | null;
   location?: string | null;
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
 }
 
 export interface EnrichedIncident extends ShippingReportIncident {
   date: Date;
   incidentCountry: string | null;
+  /** Source-grounded physical event location, never a route mention. */
+  physicalLocation: string | null;
   region: Region;
   issue: string;
 }
@@ -72,6 +80,8 @@ export interface SupportingArticle {
  * presented as additional incidents.
  */
 export interface CanonicalIncident extends EnrichedIncident {
+  /** Validated development key; null means this article could not be folded. */
+  developmentKey: string | null;
   /** Other articles reporting the SAME event (representative excluded). */
   supportingArticles: SupportingArticle[];
 }
@@ -175,12 +185,23 @@ function enrich(rows: ShippingReportIncident[]): EnrichedIncident[] {
   return rows
     .map((r) => {
       let date: Date;
-      try { date = parseISO(r.occurredAt); } catch { date = new Date(NaN); }
-      const incidentCountry = deriveIncidentCountry(r);
+      const eventDate =
+        typeof r.maritimeSemantic?.eventDate === "string" &&
+        r.maritimeSemantic.eventDate.trim()
+          ? r.maritimeSemantic.eventDate
+          : r.occurredAt;
+      try { date = parseISO(eventDate); } catch { date = new Date(NaN); }
+      // Country and location are taken only from validated physical-location
+      // evidence. Feed-assigned country and route/chokepoint mentions are not
+      // incident geography.
+      const incidentCountry = semanticPhysicalCountry(r);
       return {
         ...r,
+        severity: semanticSeverity(r) ?? r.severity,
+        occurredAt: eventDate,
         date,
         incidentCountry,
+        physicalLocation: semanticPhysicalLocation(r),
         region: classifyRegion(incidentCountry),
         issue: classifyIssue(r),
       };
@@ -389,15 +410,11 @@ function dedupeVesselEventsClustered<T extends { title: string; date: Date; seve
 }
 
 // --- Canonical incident fold -----------------------------------------------
-// The report's core dataset: fold every article reporting the SAME underlying
-// event into ONE canonical incident carrying its supporting articles. Three
-// member-preserving passes mirror the existing dedupe logic exactly:
-//   1. exact title-key groups (direct republishing),
-//   2. date-bucketed noun-signature groups (reworded syndication),
-//   3. for vessel-typed events, {act, coarse theatre} time-chained clusters
-//      (the ADNOC/UKMTO problem — one seizure under many wires across days).
-// Representative = highest severity, then most recent (same rule as the
-// dedupe helpers). Every incident count, table and chart reads from this.
+// The report's core dataset: fold articles only when the semantic provider
+// supplied the same validated developmentKey. Title similarity, publication
+// date, theatre, route mentions and source syndication are deliberately not
+// event identity. This keeps a materially changed development in its own
+// incident and makes folding invariant across publication dates.
 function foldCanonical(rows: EnrichedIncident[]): CanonicalIncident[] {
   const better = (a: EnrichedIncident, b: EnrichedIncident) => {
     const sa = SEV_RANK[sevKey(a.severity)] ?? 0;
@@ -405,57 +422,39 @@ function foldCanonical(rows: EnrichedIncident[]): CanonicalIncident[] {
     if (sa !== sb) return sa > sb;
     return a.date.getTime() >= b.date.getTime();
   };
-  type Group = { rep: EnrichedIncident; members: EnrichedIncident[] };
+  type Group = {
+    key: string | null;
+    rep: EnrichedIncident;
+    members: EnrichedIncident[];
+  };
   const addTo = (map: Map<string, Group>, key: string, g: Group) => {
     const prev = map.get(key);
     if (!prev) { map.set(key, g); return; }
     prev.members.push(...g.members);
     if (better(g.rep, prev.rep)) prev.rep = g.rep;
   };
-  // Pass 1 — exact title key.
-  const p1 = new Map<string, Group>();
-  let uniq = 0;
+  const groups = new Map<string, Group>();
+  let unique = 0;
   for (const r of rows) {
-    const k = titleKey(r.title) || `__u${uniq++}`;
-    addTo(p1, k, { rep: r, members: [r] });
+    const developmentKey =
+      typeof r.maritimeSemantic?.developmentKey === "string" &&
+      r.maritimeSemantic.developmentKey.trim()
+        ? r.maritimeSemantic.developmentKey.trim()
+        : null;
+    // A missing development key is not permission to infer one from text.
+    // Keep the article as a distinct canonical incident instead.
+    const mapKey = developmentKey
+      ? `development:${developmentKey}`
+      : `article:${String(r.id)}:${unique++}`;
+    addTo(groups, mapKey, {
+      key: developmentKey,
+      rep: r,
+      members: [r],
+    });
   }
-  // Pass 2 — date-bucketed noun signature over pass-1 representatives.
-  const p2 = new Map<string, Group>();
-  for (const g of p1.values()) addTo(p2, topicSignature(g.rep.title, g.rep.date), g);
-  // Pass 3 — vessel-event clustering: same act + coarse theatre, single-linked
-  // in time (gap ≤ EVENT_GAP_DAYS, span ≤ EVENT_SPAN_DAYS). Non-vessel groups
-  // and no-theatre groups pass through untouched.
-  const DAY = 86_400_000;
-  const byTheatre = new Map<string, Group[]>();
-  const out: Group[] = [];
-  for (const g of p2.values()) {
-    const vt = classifyVesselIncident(g.rep);
-    const region = vt ? coarseRegion(g.rep.title) : "";
-    if (!vt || !region) { out.push(g); continue; }
-    const gk = `${vt.toLowerCase()}|${region}`;
-    const arr = byTheatre.get(gk);
-    if (arr) arr.push(g); else byTheatre.set(gk, [g]);
-  }
-  for (const grp of byTheatre.values()) {
-    const sorted = [...grp].sort((a, b) => a.rep.date.getTime() - b.rep.date.getTime());
-    let cluster: Group | null = null;
-    let prevMs = -Infinity, startMs = -Infinity;
-    for (const g of sorted) {
-      const t = g.rep.date.getTime();
-      if (cluster && t - prevMs <= EVENT_GAP_DAYS * DAY && t - startMs <= EVENT_SPAN_DAYS * DAY) {
-        cluster.members.push(...g.members);
-        if (better(g.rep, cluster.rep)) cluster.rep = g.rep;
-        prevMs = t;
-      } else {
-        if (cluster) out.push(cluster);
-        cluster = { rep: g.rep, members: [...g.members] };
-        startMs = t; prevMs = t;
-      }
-    }
-    if (cluster) out.push(cluster);
-  }
-  return out.map((g) => ({
+  return Array.from(groups.values()).map((g) => ({
     ...g.rep,
+    developmentKey: g.key,
     supportingArticles: g.members
       .filter((m) => m.id !== g.rep.id)
       .map((m) => ({
@@ -493,19 +492,14 @@ function dedupeByTitle<T extends { title: string; date: Date; severity: string }
   return Array.from(bySig.values());
 }
 
-// Monitor-side deduplication. The Shipping monitor page (Shipping.tsx) renders
-// a cleaned + deduplicated SUMMARY — one card per real event. It runs the same
-// noise filter and title/signature dedupe as the report, but for vessel rows it
-// uses the wider `dedupeVesselEventsClustered` (same act + coarse theatre within
-// a few days collapses to one) instead of the report's conservative exact-day
-// `dedupeByEventKey`. This is deliberate: the same seizure drifts across several
-// calendar days under different wire headlines, and the monitor must show it as
-// ONE card (never both Extreme and Low). The report keeps the conservative pass
-// because it is the comprehensive product and must not risk merging two distinct
-// incidents. Clustering is applied ONLY to vessel rows — running it across all
-// rows would wrongly merge unrelated same-theatre items.
+// Monitor-side canonical adapter. The Shipping monitor page (Shipping.tsx)
+// receives the same one-event-per-validated-development set as the report.
+// This function is retained for older callers, but semantic rows are folded
+// only by their provider development key; rows without semantic admission are
+// rejected rather than merged by title, date, theatre or route wording.
 export function dedupeShippingMonitorRows<
   T extends {
+    id?: number | string;
     title: string;
     displayTitle?: string | null;
     severity: string;
@@ -514,35 +508,37 @@ export function dedupeShippingMonitorRows<
     location?: string | null;
     source?: string | null;
     sourceUrl?: string | null;
+    maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
   },
 >(rows: T[]): T[] {
-  const tagged = rows.map((r) => ({
-    ...r,
-    date: r.occurredDate,
-    vesselType: classifyVesselIncident(r),
-  }));
-  // Rows with an unparseable date can't be keyed (the dedupe helpers call
-  // `date.toISOString()`, which throws on an invalid Date). They were never
-  // deduped under the old monitor pipeline either, so pass them through
-  // untouched rather than dropping them or crashing.
-  const validDate = (r: { date: Date }) => !isNaN(r.date.getTime());
-  const undatable = tagged.filter((r) => !validDate(r));
-  const datable = tagged.filter(validDate);
-  const vessel = datable.filter(
-    (r): r is typeof r & { vesselType: VesselIncidentType } => r.vesselType !== null,
-  );
-  const nonVessel = datable.filter((r) => r.vesselType === null);
-  const deduped = [
-    ...dedupeVesselEventsClustered(dedupeByTitle(vessel)),
-    ...dedupeByTitle(nonVessel),
-    ...undatable,
-  ];
-  // Deduplication/classification above intentionally use raw source headlines.
-  // Keep the cleaned RAW headline after those analytical decisions. Callers
-  // still perform additional issue/chokepoint/category analysis, so translated
-  // wording must not replace the analytical title here. Presentation surfaces
-  // resolve displayTitle only after their remaining analysis is complete.
-  return deduped.map(stripIncidentWireCruft) as unknown as T[];
+  // Canonical maritime callers must never fall back to title/signature or
+  // theatre clustering. Development identity is supplied by validated
+  // semantic evidence and remains stable across publication dates.
+  if (rows.some((r) => Object.prototype.hasOwnProperty.call(r, "maritimeSemantic"))) {
+    const groups = new Map<string, T>();
+    let unique = 0;
+    const better = (a: T, b: T) => {
+      const sa = SEV_RANK[sevKey(a.maritimeSemantic?.severity ?? a.severity)] ?? 0;
+      const sb = SEV_RANK[sevKey(b.maritimeSemantic?.severity ?? b.severity)] ?? 0;
+      if (sa !== sb) return sa > sb;
+      return a.occurredDate.getTime() >= b.occurredDate.getTime();
+    };
+    for (const row of rows) {
+      if (!isSemanticallyValidatedMaritimeIncident(row)) continue;
+      const key =
+        typeof row.maritimeSemantic?.developmentKey === "string" &&
+        row.maritimeSemantic.developmentKey.trim()
+          ? `development:${row.maritimeSemantic.developmentKey.trim()}`
+          : `article:${String(row.id ?? "")}:${unique++}`;
+      const previous = groups.get(key);
+      if (!previous || better(row, previous)) groups.set(key, row);
+    }
+    return Array.from(groups.values()).map(stripIncidentWireCruft) as T[];
+  }
+  // A row without semantic evidence is not eligible for Shipping monitor
+  // admission. In particular, do not revive the historical title/signature
+  // fallback: canonical identity is a validated development key, never text.
+  return [];
 }
 
 // Pure shipping-market / corporate-finance items with no operational hook
@@ -553,6 +549,7 @@ const MARKET_ONLY_RE = /\b(newbuild|newbuilds|orderbook|order\s*book|sale\s*and\
 const OPERATIONAL_HOOK_RE = /\b(port|strike|closure|closes?|closed|delay|delayed|diversion|diverted|detain|detained|seizure|seized|attack|attacked|hijack|piracy|advisory|advisories|war[\s-]?risk|insurance|premium|premiums|sanction|sanctions|disruption|congest|congestion|backlog|blocked|blockade|terminal|berth|cargo\s*flow|chokepoint|hormuz|red\s*sea|bab[\s-]?el[\s-]?mandeb|suez|malacca|hostilit|crew\s*change|missile|drone|houthi|ukmtu|ukmto|imb|p&i|protection\s*and\s*indemnity)\b/i;
 
 function isShippingMarketOnly(r: ShippingReportIncident): boolean {
+  if (Object.prototype.hasOwnProperty.call(r, "maritimeSemantic")) return false;
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (MARKET_ONLY_RE.test(text) && !OPERATIONAL_HOOK_RE.test(text)) return true;
   // Pure freight-market index commentary (Drewry / WCI / BDI / SCFI /
@@ -560,6 +557,32 @@ function isShippingMarketOnly(r: ShippingReportIncident): boolean {
   // headline also carries a true operational anchor.
   if (FREIGHT_MARKET_INDEX_RE.test(text) && !OPERATIONAL_HOOK_RE.test(text)) return true;
   return false;
+}
+
+export function hasEvidenceBackedCommercialConsequence(
+  r: ShippingReportIncident,
+): boolean {
+  const evidence = r.maritimeSemantic;
+  if (!evidence) return false;
+  const eventClass = semanticEventClass(r);
+  const routing = evidence.routingConsequence;
+  const commercial = evidence.commercialConsequence;
+  if (
+    eventClass === "route_disruption" ||
+    eventClass === "routing_consequence" ||
+    eventClass === "chokepoint_disruption"
+  ) {
+    return (
+      (routing?.status === "confirmed" || routing?.status === "assessed") &&
+      (routing?.kind === "observed" || routing?.kind === "reported")
+    );
+  }
+  return (
+    routing?.status === "confirmed" ||
+    routing?.status === "assessed" ||
+    commercial?.status === "confirmed" ||
+    commercial?.status === "assessed"
+  );
 }
 
 // Stronger commercial-operational anchor than OPERATIONAL_HOOK_RE alone.
@@ -604,6 +627,60 @@ function toShippingPresentationCanonical<T extends CanonicalIncident>(i: T): T {
   };
 }
 
+export interface ShippingCanonicalBuild {
+  /** Valid semantic articles surviving topic, window and geography scope. */
+  articles: EnrichedIncident[];
+  /** One row per validated development key (or one row per unkeyed article). */
+  canonicalIncidents: CanonicalIncident[];
+  articleCount: number;
+  outOfScopeCount: number;
+}
+
+/**
+ * Build the canonical shipping set used by both the report and the live
+ * monitor. Admission is fail-closed: a shipping row without current,
+ * source-grounded semantic evidence never reaches this function's output.
+ *
+ * `start`/`end` are optional so the monitor can fold development keys across
+ * its full source response before applying its selected display window.
+ */
+export function buildShippingCanonicalIncidents(
+  incidents: ShippingReportIncident[],
+  topic: string,
+  window?: { start?: Date; end?: Date },
+): ShippingCanonicalBuild {
+  const semanticallyValid = incidents.filter((i) =>
+    i.topic === topic &&
+    hasValidMaritimeSemantic(i) &&
+    isSemanticallyValidatedMaritimeIncident(i),
+  );
+  const allEnriched = sortByDateDesc(enrich(semanticallyValid));
+  const inWindow = allEnriched.filter((r) => {
+    if (!window?.start && !window?.end) return true;
+    const time = r.date.getTime();
+    if (!Number.isFinite(time)) return false;
+    if (window.start && time < window.start.getTime()) return false;
+    if (window.end && time > window.end.getTime()) return false;
+    // Event date is semantic evidence and takes precedence over publication
+    // date when it explicitly places a digest outside the reporting window.
+    const eventDate = r.maritimeSemantic?.eventDate;
+    if (eventDate && window.start) {
+      const eventMs = parseISO(eventDate).getTime();
+      if (Number.isFinite(eventMs) && eventMs < window.start.getTime()) return false;
+    }
+    return true;
+  });
+  const inScope = inWindow.filter((r) => r.region !== "Out of scope");
+  const outOfScopeCount = inWindow.length - inScope.length;
+  const canonicalIncidents = sortByDateDesc(foldCanonical(inScope));
+  return {
+    articles: inScope,
+    canonicalIncidents,
+    articleCount: inScope.length,
+    outOfScopeCount,
+  };
+}
+
 export function buildShippingReportDataset(
   incidents: ShippingReportIncident[],
   topic: string,
@@ -621,44 +698,17 @@ export function buildShippingReportDataset(
     limit: 40,
   });
 
-  // Same scope filter as the Shipping dashboard: shipping topic only, strip
-  // off-topic noise, then drop records that classify outside APAC + ME.
-  const rawWindow = filterIncidentsToWindow(incidents, topic, issueDate, { byTopic: true });
-  const passesShipping = (i: ShippingReportIncident) =>
-    isTopicRelevant(topic, {
-      topic: i.topic,
-      title: i.title,
-      summary: i.summary ?? null,
-      source: i.source ?? null,
-      sourceUrl: i.sourceUrl ?? null,
-      location: i.location ?? null,
-    });
-  const windowed = rawWindow.filter(passesShipping).map(stripIncidentWireCruft);
-  const enrichedAll = sortByDateDesc(enrich(windowed));
-  const enriched = enrichedAll.filter((r) => r.region !== "Out of scope");
-  const outOfScopeCount = enrichedAll.length - enriched.length;
-  // Single canonical pool of CONFIRMED operational incidents — the same gate
-  // every incident table uses. The headline KPIs (Confirmed Incidents,
-  // Highest Severity, Latest Significant Incident) all read from this so the
-  // top-of-report numbers can never exceed what the tables below actually
-  // list. `enriched` remains diagnostics-only; every rendered derivation,
-  // including regional/country distributions, reads canonicalIncidents.
-  // Prior-period bulletins (ReCAAP weekly digests etc.) state their own
-  // reporting window — when that stated window ends before this report's
-  // window starts, the record is prior-period reporting surfacing on its
-  // publication date and is excluded from the incident pool.
-  const isPriorPeriod = (r: EnrichedIncident) => {
-    const end = statedPeriodEnd(`${r.title} ${r.summary ?? ""}`, win.end);
-    return end !== null && end.getTime() < win.start.getTime();
-  };
-  const confirmedIncidents = enriched
-    .filter((r) => isConfirmedOperationalIncident(r))
-    .filter((r) => !isPriorPeriod(r));
-  // THE canonical incident pool: one row per underlying real-world event,
-  // syndicated articles folded beneath as supporting sources. Every incident
-  // count, table and chart below reads from this — never from raw articles.
-  const canonicalIncidents = sortByDateDesc(foldCanonical(confirmedIncidents));
-  const articleCount = confirmedIncidents.length;
+  // One strict semantic gate and one development-key fold feed every report
+  // derivation. No title, summary, route mention or feed-country classifier can
+  // admit a row into the maritime dataset.
+  const canonicalBuild = buildShippingCanonicalIncidents(incidents, topic, {
+    start: win.start,
+    end: new Date(win.end.getTime() + 24 * 60 * 60 * 1000 - 1),
+  });
+  const enriched = canonicalBuild.articles;
+  const outOfScopeCount = canonicalBuild.outOfScopeCount;
+  const canonicalIncidents = canonicalBuild.canonicalIncidents;
+  const articleCount = canonicalBuild.articleCount;
 
   // One final canonical set drives every report derivation. The historical
   // rolling re-query path is intentionally absent: the cover and every table
@@ -717,10 +767,9 @@ export function buildShippingReportDataset(
       // contradiction (critical-sounding headline, LOW chip). Keep only the
       // concrete physical types (Attack / Near miss / Seized).
       .filter((r): r is VesselRow => r.vesselType !== null && r.vesselType !== "Threat")
-      // Drop repatriation / crew-return human-interest items, speculative
-      // "X claims missile strike" rumour traffic, generic commentary and
-      // social/handle sources before they reach the table or the prose.
-      .filter((r) => !isLowCredibilitySource(r)),
+      // Semantic admission already carries the provider's event and validity
+      // verdict. Do not let a raw headline denylist silently contradict that
+      // source-grounded assessment.
   );
   // Canonical incidents are already event-folded (title, signature and
   // theatre-cluster passes), so no further dedupe is applied here — one
@@ -839,7 +888,10 @@ export function buildShippingReportDataset(
     const credibleLatest = credibleSorted[0] ?? null;
     let readText: string;
     if (credible.length === 0) {
-      readText = "Quiet this week, with little reported here.";
+      // Empty route rows carry no prose. The renderer may omit or compact the
+      // row; do not turn absence of an incident into a quiet-week or reporting
+      // gap claim.
+      readText = "";
     } else if (credible.length === 1) {
       readText = `Activity here came down to a single event this week, "${shippingPresentationTitle(credibleLatest!)}".`;
     } else {
@@ -865,14 +917,11 @@ export function buildShippingReportDataset(
   // out so the section does not drift into freight-market reporting.
   const commercialRecords =
     canonicalIncidents
-      .filter((r) => COMMERCIAL_ISSUES.has(r.issue))
-      .filter((r) => !isShippingMarketOnly(r))
-      .filter((r) => !FREIGHT_MARKET_INDEX_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
-      .filter((r) => COMMERCIAL_OPERATIONAL_RE.test(`${r.title ?? ""} ${r.summary ?? ""}`))
+      .filter((r) => hasEvidenceBackedCommercialConsequence(r))
       .slice(0, 10);
 
   const transitRecords = canonicalIncidents.filter(
-    (r) => TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
+    (r) => r.issue === "Route diversion" || detectChokepoints(r).length > 0,
   );
 
   // Chokepoint / Route Read — analyst prose over the 30-day chokepoint
@@ -904,7 +953,6 @@ export function buildShippingReportDataset(
     vesselTableShown: vesselRows.length,
     vesselRows30: vesselRows.map(toShippingPresentationCanonical),
     piracyRows30: piracyRows.map(toShippingPresentationCanonical),
-    vAttackSeize30: vAttackSeize,
     thirtyDayLabel: thirtyDayShortLabel,
   });
 
@@ -1061,25 +1109,25 @@ function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
   const lines: string[] = [];
   if (cp) {
     lines.push(
-      `The main pressure point this week is ${cp.name}${cp2 ? `, ahead of ${cp2.name}` : ""}. That matters for route planning, because each new warning makes transit times less predictable and feeds straight into ship scheduling and fuel planning for any company moving cargo through the region.`,
+      `Validated physical/direct-passage evidence places the main route-linked activity at ${cp.name}${cp2 ? `, followed by ${cp2.name}` : ""}. The route table records the underlying incident classifications and source-grounded severity.`,
     );
   } else {
     lines.push(
-      `No single chokepoint stood out this week, which sounds reassuring but usually points to a gap in reporting rather than a real easing. Treat the calm as fragile: when activity returns, it tends to hit the same two or three shipping routes.`,
+      "No validated physical/direct-passage chokepoint relationship was identified in this window.",
     );
   }
   if (ctx.vesselHostile.length > 0 || ctx.piracyRows.length > 0) {
     lines.push(
-      `Attacks on ships remain the biggest risk, with vessel attacks, seizures, and piracy or armed robbery all reported recently (${ctx.thirtyDayLabel}). Any company sailing through the affected routes should be reviewing where crews are changed over, its war-risk and insurance costs, and the point at which its security advisers would recommend taking a different route.`,
+      `The canonical set contains ${ctx.vesselHostile.length + ctx.piracyRows.length} validated hostile-vessel or piracy record${ctx.vesselHostile.length + ctx.piracyRows.length === 1 ? "" : "s"} in the selected window.`,
     );
   } else {
     lines.push(
-      `Little was reported on vessel attacks or piracy this week. The threat in this region has not been calm for long, so a quiet spell is better read as a gap in reporting than as a lasting drop in the risk to crews, ships or cargo.`,
+      "No validated hostile-vessel, seizure or piracy record was identified in this window.",
     );
   }
   if (ctx.commercialRecords.length > 0) {
     lines.push(
-      `On the commercial side, there were reports this week of port disruption, schedule delays, and shifts in war-risk or insurance costs tied to real events. These feed directly into cargo planning, the order of port calls, and the freight costs passed on to shippers.`,
+      `${ctx.commercialRecords.length} canonical incident${ctx.commercialRecords.length === 1 ? "" : "s"} carries structured commercial or routing-consequence evidence.`,
     );
   }
   if (region) {
@@ -1091,55 +1139,38 @@ function buildShippingWhatMatters(ctx: ShippingAutoCtx): string {
 }
 
 function buildShippingImplications(ctx: ShippingAutoCtx): string {
-  const cp = ctx.cpRanked[0];
-  const where = cp ? cp.name : "the affected corridors";
-  const bullets: string[] = [
-    `Review ship scheduling, the order of port calls and fuel planning against the latest advisories for ${where}.`,
-    `Assess war-risk and insurance exposure now — premium changes usually follow a week or two after the activity picks up.`,
-    `Line up alternative routes and the option to skip port calls on affected services; brief commercial teams on the risk of delays and added costs.`,
-  ];
+  const bullets: string[] = [];
+  if (ctx.cpRanked.length > 0) {
+    bullets.push(
+      `Route-linked evidence is present for ${joinList(ctx.cpRanked.slice(0, 3).map((r) => r.name))}; consult the incident rows for the stated relationship and severity.`,
+    );
+  }
   if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
     bullets.push(
-      `Re-check where crews are changed over on voyages through the affected routes, and move to safer ports where possible.`,
-    );
-    bullets.push(
-      `Confirm naval-escort or convoy options with security advisers for the highest-risk routes.`,
+      `${ctx.vesselHostile.length + ctx.piracyRows.length} validated hostile-vessel or piracy record${ctx.vesselHostile.length + ctx.piracyRows.length === 1 ? "" : "s"} is present; the vessel and piracy tables identify the event classes.`,
     );
   }
   if (ctx.commercialRecords.length > 0) {
     bullets.push(
-      `Build expected surcharges into cargo planning — port disruption usually turns into surcharges within one to two weeks.`,
-    );
-  } else {
-    bullets.push(
-      `Add flexibility clauses to near-term shipping contracts — a single port closure or war-risk change can push surcharges across a route within days.`,
+      `${ctx.commercialRecords.length} incident${ctx.commercialRecords.length === 1 ? "" : "s"} includes structured commercial or routing-consequence evidence.`,
     );
   }
+  if (bullets.length === 0) bullets.push("No validated maritime consequence evidence is available for an implications assessment.");
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
 function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
-  const cp = ctx.cpRanked[0];
-  const where = cp ? cp.name : "Hormuz, Bab-el-Mandeb, the Red Sea and Malacca";
-  const bullets: string[] = [
-    `New naval and maritime advisories on ${where}: the earliest sign of where pressure is building.`,
-    `UKMTO, IMB and coalition-force bulletins: these move ahead of headline freight rates.`,
-    `War-risk and insurance premium changes on affected routes: the clearest confirmation that the activity is now hitting costs.`,
-    `Decisions by operators to divert or skip a port call: a prompt to review schedule reliability and delay costs.`,
-    `A step-up in naval escorts or convoys: a sign that security advisers are taking the threat more seriously.`,
-  ];
-  if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
-    bullets.push(
-      `Crew-change advisories and flag-state guidance updates: a reason to re-check crewing plans on voyages through the area.`,
-    );
-    bullets.push(
-      `War-risk insurance being extended to nearby waters: the clearest sign the danger zone is widening, not easing.`,
-    );
-  } else {
-    bullets.push(
-      `Any extension of war-risk insurance terms: an early sign the threat is building again.`,
-    );
+  const bullets: string[] = [];
+  if (ctx.cpRanked.length > 0) {
+    bullets.push(`Monitor for new validated physical/direct-passage evidence at ${joinList(ctx.cpRanked.slice(0, 3).map((r) => r.name))}.`);
   }
+  if (ctx.vesselHostile.length + ctx.piracyRows.length > 0) {
+    bullets.push("Monitor the validated hostile-vessel and piracy event classes for new records or severity changes.");
+  }
+  if (ctx.commercialRecords.length > 0) {
+    bullets.push("Monitor new source-grounded routing or commercial-consequence evidence attached to canonical incidents.");
+  }
+  if (bullets.length === 0) bullets.push("No validated maritime driver is available for a watch-next assessment.");
   return bullets.map((b) => `- ${b}`).join("\n");
 }
 
@@ -1153,7 +1184,7 @@ function buildShippingWatchNext(ctx: ShippingAutoCtx): string {
 function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
   const cp = ctx.cpRanked[0];
   const vesselThreat30 = ctx.vesselHostile.length + ctx.piracyRows.length;
-  const pressurePoint = cp ? cp.name : "Hormuz and the Red Sea corridor";
+  const pressurePoint = cp?.name;
 
   // Name every chokepoint the report rates High or Extreme, so this closing
   // judgement can never read "risk is low everywhere" while the front of the
@@ -1166,13 +1197,17 @@ function buildShippingPolestarView(ctx: ShippingAutoCtx): string {
     ? ` This week's confirmed incidents put ${joinList(elevated.map((r) => `${r.name} at ${r.highestSeverityLabel}`))} — the routes where that risk is live now, not background.`
     : "";
 
-  const para1Pressure = `${pressurePoint} remains the main pressure point for shipping, and that is where the underlying risk continues to sit, no matter how busy or quiet a given week looks.${elevatedLine}`;
+  const para1Pressure = pressurePoint
+    ? `${pressurePoint} has the strongest validated route-linked signal in this window.${elevatedLine}`
+    : `No validated route-linked chokepoint signal was identified in this window.${elevatedLine}`;
   const para1Vessel = vesselThreat30 > 0
-    ? ` The threat to ships — recent attacks, seizures, and piracy or armed robbery — still matters. A quiet spell in this region is normal, not a sign things have improved, so it is better read as a gap in reporting than as a lasting easing.`
-    : ` Activity against ships is limited this week, but the threat still matters: these same routes have not been clear for long, so a quiet spell is better read as background noise than as a lasting easing.`;
+    ? ` The canonical set contains ${vesselThreat30} validated hostile-vessel or piracy record${vesselThreat30 === 1 ? "" : "s"}.`
+    : ` No validated hostile-vessel or piracy record was identified.`;
   const para1 = `${para1Pressure}${para1Vessel}`;
 
-  const para2 = `Operators should treat the current situation as a matter of route planning, insurance and keeping an eye on advisories rather than a wholesale shutdown of the region's shipping. The practical levers are war-risk and insurance reviews, where crews are changed over on voyages through ${pressurePoint}, and the port-call decisions that follow fresh advisories — not any expectation that the whole region will grind to a halt.`;
+  const para2 = ctx.commercialRecords.length > 0
+    ? `${ctx.commercialRecords.length} canonical incident${ctx.commercialRecords.length === 1 ? "" : "s"} carries structured commercial or routing-consequence evidence; the commercial-impact section identifies the supported consequence types.`
+    : "No structured commercial or routing-consequence evidence was identified in the canonical set.";
 
   return `${para1}\n\n${para2}`;
 }
@@ -1197,63 +1232,21 @@ function joinList(items: string[]): string {
 // quote or paste article headlines into report sentences (natural-prose
 // standard + Flashpoint-aligned ban on headline paste).
 export function describeShippingLead(r: EnrichedIncident): string {
-  const text = `${r.title} ${r.summary ?? ""}`.toLowerCase();
-  const named = detectChokepoints(r)[0]
-    ?? (Object.entries(CHOKEPOINT_NAME_RE).find(([, re]) => re.test(text))?.[0] as ChokepointKey | undefined);
+  const named = detectChokepoints(r)[0];
   const at = named ? ` around ${named}` : "";
-  if (/\bre-?open(?:ing|s|ed)?\b|\bresume(?:s|d|)\b|\bresumption\b/.test(text)) {
-    return named
-      ? `reports that ${named} may reopen`
-      : "reports that a key chokepoint may reopen";
-  }
-  if (/\bclos(?:e|ed|ing|ure)\b|\bblock(?:ade|ed|ing)?\b|\bshut\b/.test(text)) {
-    return `closure or blockade pressure${at || " on a major route"}`;
-  }
-  if (/\bdivert|diversion|re-?rout/.test(text)) {
-    return `vessel diversion pressure${at || " on major routes"}`;
-  }
-  if (/\badvisor(?:y|ies)\b|\bwarning\b|\bnotice\b/.test(text)) {
-    return `a fresh maritime advisory${at}`;
-  }
-  if (/\battac|\bmissile\b|\bdrone\b|\bstrike\b|\bhit\b/.test(text)) {
-    return `an attack or strike report${at}`;
-  }
-  if (/\bwar[- ]?risk\b|\bpremium\b|\binsurance\b/.test(text)) {
-    return `war-risk insurance pressure${at}`;
-  }
-  if (/\bpiracy\b|\barmed robber|\bboard(?:ed|ing)\b/.test(text)) {
-    return `a piracy or armed-robbery report${at}`;
-  }
-  const issue = (r.issue || "").trim();
-  if (named) {
-    return issue && issue !== "Unclassified maritime record"
-      ? `${issue.toLowerCase()} pressure around ${named}`
-      : `chokepoint pressure around ${named}`;
-  }
-  return issue && issue !== "Unclassified maritime record"
-    ? `${issue.toLowerCase()} pressure on major routes`
-    : "a dominant chokepoint development this week";
+  const eventClass = semanticEventClass(r);
+  const labels: Record<string, string> = {
+    commercial_attack: "a validated commercial-vessel attack",
+    commercial_seizure: "a validated commercial-vessel seizure",
+    piracy_or_armed_robbery: "a validated piracy or armed-robbery event",
+    collision_or_grounding: "a validated collision or grounding",
+    route_disruption: "validated route-disruption evidence",
+    chokepoint_disruption: "validated chokepoint-disruption evidence",
+    port_disruption: "validated port-disruption evidence",
+    maritime_advisory: "a validated maritime advisory",
+  };
+  return `${labels[eventClass ?? ""] ?? "a validated maritime development"}${at}`;
 }
-
-// Name-only chokepoint matchers for LEAD-development selection. detectChokepoints
-// (used for the route-count table) deliberately requires an operational maritime
-// keyword so a passing policy/commentary "Hormuz" mention does not inflate the
-// route counts. But the development DOMINATING a week is frequently a political
-// headline — "US-Iran deal, Strait of Hormuz to reopen" — that names the
-// chokepoint with NO operational word, so it fails that gate and would be
-// invisible to the lead picker. The lead pool therefore keys on the chokepoint
-// NAME alone, keeping such headlines eligible to lead.
-const CHOKEPOINT_NAME_RE: Record<ChokepointKey, RegExp> = {
-  "Strait of Hormuz": /\bhormuz\b/i,
-  "Gulf of Oman": /\bgulf of oman\b/i,
-  "Arabian / Persian Gulf": /\b(arabian|persian)\s+gulf\b/i,
-  "Red Sea": /\bred sea\b/i,
-  "Bab el-Mandeb": /\b(bab[\s-]?el[\s-]?mandeb|mandeb)\b/i,
-  "Suez Canal": /\bsuez(\s+canal)?\b/i,
-  "Gulf of Aden": /\bgulf of aden\b/i,
-  "Singapore Strait": /\b(strait of singapore|singapore strait)\b/i,
-  "Malacca Strait": /\bmalacca\b/i,
-};
 
 // The single dominant chokepoint development in the window — the headline the
 // report names up front. Among records that NAME the busiest chokepoint, it
@@ -1268,13 +1261,8 @@ function selectLeadDevelopment(
   rows: EnrichedIncident[],
   cpRanked: ChokepointRow[],
 ): EnrichedIncident | null {
-  const leadName = cpRanked[0]?.name;
-  const nameRe = leadName ? CHOKEPOINT_NAME_RE[leadName] : undefined;
-  const blobOf = (r: EnrichedIncident) =>
-    `${r.title} ${r.summary ?? ""} ${r.location ?? ""}`;
-  const onLead = nameRe ? rows.filter((r) => nameRe.test(blobOf(r))) : [];
   const onChokepoint = rows.filter((r) => detectChokepoints(r).length > 0);
-  const pool = onLead.length > 0 ? onLead : onChokepoint;
+  const pool = onChokepoint;
   if (pool.length === 0) return null;
   // Significant-token set per headline (drop stopwords + short words).
   const toks = pool.map(
@@ -1325,13 +1313,13 @@ function buildChokepointRouteRead(opts: {
 }): string {
   const { cpRanked, transitRecords, weeklyEnriched, thirtyDayLabel, leadDevelopment } = opts;
   if (cpRanked.length === 0 && transitRecords.length === 0) {
-    return `Little was reported on chokepoints or route disruption recently (${thirtyDayLabel}). Read this as a gap in reporting rather than proof that pressure has eased — warnings on these routes come in bursts, and a quiet spell does not change the underlying risk around Hormuz, Bab-el-Mandeb or the Red Sea.\n\nKeep watching maritime advisories, naval movements and any operator decisions on routing or war-risk insurance. A return of activity usually shows up in advisories before it reaches commercial freight rates.`;
+    return `No validated physical/direct-passage chokepoint or route-disruption record was identified in the selected window (${thirtyDayLabel}).`;
   }
   const lead = cpRanked[0];
   const second = cpRanked[1];
   const cpPhrase = lead
-    ? `The busiest route this week is ${lead.name}${lead.highestSeverityKey ? `, where the most serious incident reached ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} comes next.` : ""}`
-    : "Little was reported on chokepoints this week, but movement along the routes still deserves attention.";
+    ? `Validated route-linked incidents are concentrated at ${lead.name}${lead.highestSeverityKey ? `, where the highest severity was ${lead.highestSeverityLabel.toLowerCase()}` : ""}.${second ? ` ${second.name} also has validated route evidence.` : ""}`
+    : "No validated chokepoint relationship was identified.";
   // Name the development driving the cycle in plain English (e.g. Hormuz
   // reopening pressure) instead of only citing severity/count — and without
   // pasting the raw article headline into the sentence.
@@ -1339,15 +1327,12 @@ function buildChokepointRouteRead(opts: {
     ? ` The main development this week is ${describeShippingLead(leadDevelopment)}.`
     : "";
   const weeklyTransit = weeklyEnriched.filter((r) =>
-    TRANSIT_ISSUES.has(r.issue) || detectChokepoints(r).length > 0,
+    r.issue === "Route diversion" || detectChokepoints(r).length > 0,
   ).length;
   const transitLine = weeklyTransit > 0
-    ? `This week, reporting pointed specifically to transit problems, diversions or advisory pressure — a closer view of what shippers actually faced.`
-    : `No new transit advisories came through this week, so route risk still rests on the broader chokepoint view above.`;
-  const watch = lead
-    ? `Keep an eye on new naval advisories for ${lead.name}, any changes to war-risk insurance and what operators say about rerouting. These are the early warning signs of escalation; freight rates follow a few days later.`
-    : `Keep an eye on new advisories and any operator decisions to divert — these move ahead of headline freight rates and show where pressure is building.`;
-  return `${cpPhrase}${leadLine}\n\n${transitLine}\n\n${watch}`;
+    ? `${weeklyTransit} validated route-linked incident${weeklyTransit === 1 ? "" : "s"} occurred in the current seven-day slice.`
+    : "No validated route-linked incident occurred in the current seven-day slice.";
+  return `${cpPhrase}${leadLine}\n\n${transitLine}`;
 }
 
 function buildVesselPiracyRead(opts: {
@@ -1355,12 +1340,11 @@ function buildVesselPiracyRead(opts: {
   vesselTableShown: number;
   vesselRows30: VesselRow[];
   piracyRows30: PiracyRow[];
-  vAttackSeize30: number;
   thirtyDayLabel: string;
 }): string {
-  const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, vAttackSeize30, thirtyDayLabel } = opts;
+  const { vesselThreat30Total, vesselTableShown, vesselRows30, piracyRows30, thirtyDayLabel } = opts;
   if (vesselThreat30Total + piracyRows30.length === 0) {
-    return `No attacks on ships and no piracy or armed robbery were reported recently (${thirtyDayLabel}). The threat in this region has not been calm for long, so treat the quiet spell as a gap in reporting and keep crew changes, advisories and naval patrols on the watchlist.\n\nA return to attacks is usually flagged first by naval forces, then by maritime risk bulletins, before it shows up in insurance or war-risk costs.`;
+    return `No validated commercial-vessel attack, seizure, boarding, piracy or armed-robbery record was identified in the selected window (${thirtyDayLabel}).`;
   }
   // Lead-title quotes must come from a credible maritime / security /
   // industry / news source. The vessel pipeline is already filtered for
@@ -1376,13 +1360,12 @@ function buildVesselPiracyRead(opts: {
     ? ` The table below highlights the most serious of these, focusing on attacks and seizures.`
     : "";
   const vesselSegment = vesselThreat30Total > 0
-    ? `Threats to ships were reported recently, including attacks and seizures rather than just lower-level boardings or approaches.${capNote}${vesselLead ? ` The standout was "${vesselLead.title}".` : ""}`
-    : `No attacks or seizures of ships were reported recently, though piracy activity was still reported.`;
+    ? `The canonical set contains ${vesselThreat30Total} validated vessel-threat incident${vesselThreat30Total === 1 ? "" : "s"}${capNote}${vesselLead ? ` The latest listed record is "${vesselLead.title}".` : ""}`
+    : `No validated attacks or seizures of ships were identified, though piracy activity was recorded.`;
   const piracySegment = piracyRows30.length > 0
-    ? `Piracy and armed robbery were also reported over the same period${piracyLead ? `, with "${piracyLead.title}" the clearest case.` : `, though no single reliable case stands out, as the reporting is weak or unconfirmed.`}`
-    : `No piracy or armed robbery was reported recently, which is unusual rather than reassuring for this part of the world.`;
-  const watch = `Keep an eye on maritime advisories, naval statements and any change in war-risk or insurance costs on affected routes. These are the clearest early signs of whether attacks are picking up or easing.`;
-  return `${vesselSegment} ${piracySegment}\n\n${watch}`;
+    ? `${piracyRows30.length} validated piracy or armed-robbery incident${piracyRows30.length === 1 ? "" : "s"}${piracyLead ? `; the latest listed record is "${piracyLead.title}".` : "."}`
+    : `No validated piracy or armed-robbery record was identified.`;
+  return `${vesselSegment}. ${piracySegment}`;
 }
 
 function buildCommercialImpactRead(
@@ -1390,30 +1373,17 @@ function buildCommercialImpactRead(
   hasUpstreamDisruption: boolean,
 ): string {
   if (commercialRecords.length === 0) {
-    // Never claim "no disruption" while the vessel / chokepoint sections in
-    // the SAME report describe attacks or rerouting pressure — that reads as
-    // a contradiction. Say precisely what this section measures instead.
-    if (hasUpstreamDisruption) {
-      return `No record this week met this section's bar for a confirmed commercial impact — a specific port closure, schedule change, or a war-risk or insurance move tied to a named route. That is narrower than the security picture above: the attack and chokepoint pressure described earlier normally takes one to two weeks to show up here as premium changes and surcharges, so expect this section to fill in if that pressure continues.\n\nKeep an eye on new port advisories, schedule delays at the major container and tanker hubs, and any insurance changes tied to specific routes. These are the next signs that commercial pressure is building.`;
-    }
-    return `No port, freight, insurance or commercial shipping disruption was reported this week. General market news — new ship orders, vessel sales, fleet finance, earnings, share-price moves — is deliberately left out of this section, so a quiet week here means real disruption was genuinely low rather than simply unreported.\n\nKeep an eye on new port advisories, schedule delays at the major container and tanker hubs, and any insurance changes tied to specific routes. These are the next signs that commercial pressure is building.`;
+    return hasUpstreamDisruption
+      ? "No canonical incident in this window carries structured commercial-consequence evidence; the security and route-linked counts are reported separately."
+      : "No canonical incident in this window carries structured commercial-consequence evidence.";
   }
   const n = commercialRecords.length;
   const lead = commercialRecords[0];
   const second = commercialRecords[1];
-  const intro = `Commercial pressure on shipping this week centres on port disruption, freight or insurance changes tied to real events, and disruption linked directly to ships or cargo flows. Cases of this kind were reported.`;
-  // With one or two records the commercial picture is too thin to read as a
-  // trend. Say the signal is limited and treat it as a watch item rather than
-  // overstating a broad commercial impact the data does not support.
-  const limited =
-    n <= 2
-      ? ` Over a single week this is only a rough guide rather than a confirmed trend — treat it as something to watch, not proof of widespread commercial disruption.`
-      : "";
   const examples = second
-    ? `The clearest case is "${lead.title}" (${lead.issue.toLowerCase()}), with "${second.title}" alongside it (${second.issue.toLowerCase()}).`
-    : `The clearest case is "${lead.title}" (${lead.issue.toLowerCase()}).`;
-  const watch = `Keep an eye on knock-on schedule disruption, premium changes on affected routes, and any operator decisions to divert or skip ports. Costs usually reach shippers one to two weeks after the activity.`;
-  return `${intro}${limited} ${examples}\n\n${watch}`;
+    ? `Examples include "${lead.title}" (${lead.issue.toLowerCase()}) and "${second.title}" (${second.issue.toLowerCase()}).`
+    : `The listed example is "${lead.title}" (${lead.issue.toLowerCase()}).`;
+  return `${n} canonical incident${n === 1 ? "" : "s"} carries structured commercial-consequence evidence. ${examples}`;
 }
 
 function buildRegionalCountryRead(opts: {
@@ -1424,7 +1394,7 @@ function buildRegionalCountryRead(opts: {
 }): string {
   const { regionRows, countryRows, weeklyCount, locationNotIdentifiedCount } = opts;
   if (weeklyCount === 0) {
-    return `Little was reported across APAC and the Middle East this week. The underlying picture has not been calm for long, so a quiet week is better treated as a gap in reporting than as a lasting easing of regional risk.`;
+    return "No validated canonical maritime incident was identified in APAC or the Middle East in this window.";
   }
   const regionRanked = [...regionRows].filter((r) => r.value > 0).sort((a, b) => b.value - a.value);
   const lead = regionRanked[0];
@@ -1457,11 +1427,12 @@ function buildRegionalCountryRead(opts: {
 // Weak: residual "Other" / "Unclassified" buckets and any record we
 // already flagged as pure shipping-market noise.
 function prioritiseRelated(
-  rows: EnrichedIncident[],
-  seeds: Array<EnrichedIncident | null> = [],
+  rows: Array<EnrichedIncident & { developmentKey: string | null }>,
+  seeds: Array<(EnrichedIncident & { developmentKey: string | null }) | null> = [],
 ): EnrichedIncident[] {
-  const strong: EnrichedIncident[] = [];
-  const rest: EnrichedIncident[] = [];
+  type CanonicalLike = EnrichedIncident & { developmentKey: string | null };
+  const strong: CanonicalLike[] = [];
+  const rest: CanonicalLike[] = [];
   for (const r of rows) {
     if (isShippingMarketOnly(r)) continue;
     // Mirror the Commercial Impact gate: pure freight-market / rate-tracker
@@ -1469,7 +1440,11 @@ function prioritiseRelated(
     // appear here either. If Commercial Impact excludes it, Related
     // Incidents excludes it.
     const text2 = `${r.title ?? ""} ${r.summary ?? ""}`;
-    if (FREIGHT_MARKET_INDEX_RE.test(text2) && !COMMERCIAL_OPERATIONAL_RE.test(text2)) continue;
+    if (
+      !Object.prototype.hasOwnProperty.call(r, "maritimeSemantic") &&
+      FREIGHT_MARKET_INDEX_RE.test(text2) &&
+      !COMMERCIAL_OPERATIONAL_RE.test(text2)
+    ) continue;
     // Confirmed-operational gate: only events that actually occurred (attack,
     // seizure, piracy, concrete port/route/physical disruption) may appear as
     // related incidents. Claims, threats, planning/intent, predictions,
@@ -1484,13 +1459,22 @@ function prioritiseRelated(
     else if (!isWeakBucket) rest.push(r);
   }
   // Seed the supplied records (Latest Significant Incident, then the
-  // strongest vessel-threat record) at the head of the list. dedupeByTitle
-  // below collapses any overlap with weekly-window rows. Every seed is
-  // confirmed-operational by construction, so seeding never reintroduces a
-  // claim, advisory, repatriation or generic-commentary item.
-  const seedList = seeds.filter((s): s is EnrichedIncident => s !== null);
-  const seeded = [...seedList, ...strong, ...rest];
-  const ordered = dedupeByTitle(seeded);
+  // strongest vessel-threat record) at the head of the list. Seeds are already
+  // canonical rows; deduplicate only by the validated development key so this
+  // presentation ordering can never merge separate developments by headline
+  // text.
+  const seedList = seeds.filter((s): s is CanonicalLike => s !== null);
+  const seeded: CanonicalLike[] = [...seedList, ...strong, ...rest];
+  const seenDevelopments = new Set<string>();
+  const ordered = seeded.filter((row) => {
+    const developmentKey = row.developmentKey?.trim();
+    const key = developmentKey
+      ? `development:${developmentKey}`
+      : `article:${String(row.id)}`;
+    if (seenDevelopments.has(key)) return false;
+    seenDevelopments.add(key);
+    return true;
+  });
   // Cap tight so the Disclaimer block can be pulled back onto the same
   // page rather than orphaned on a near-empty final page.
   return ordered.slice(0, SHIPPING_RELATED_ROW_CAP);

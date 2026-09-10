@@ -1,5 +1,6 @@
 export * from "./incidents";
 export * from "./incidentValidityAudit";
+export * from "./maritimeSemanticEvidence";
 export * from "./corroborations";
 export * from "./reliefwebReports";
 export * from "./gdeltStructuredItems";

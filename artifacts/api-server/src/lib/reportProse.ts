@@ -70,7 +70,7 @@ const TOPIC_PROSE_META: Record<
   shipping: {
     label: "Shipping & Maritime Security",
     focus:
-      "vessel attack, port and chokepoint disruption, route diversion, naval advisories and freight pressure across the tracked maritime theatres",
+      "validated vessel, port, chokepoint and route developments across the tracked maritime theatres; commercial consequences only where explicitly reported",
   },
   cargo_watch: {
     label: "Cargo Watch",
@@ -169,9 +169,22 @@ export function computeReportProseFingerprint(input: {
 }
 
 function systemPrompt(label: string, focus: string, polestarViewMinWords?: number): string {
+  const maritimeGuardrails =
+    label === "Shipping & Maritime Security"
+      ? `
+MARITIME GROUNDING — additional non-negotiable rules:
+- Treat the supplied semantic incident classifications, physical locations, commercial targets, route relationships and explicitly evidenced consequences as authoritative.
+- Do not turn naval, military, drone, exercise, advisory or movement/AIS context into a commercial incident unless the incident evidence explicitly identifies a commercial vessel, port or terminal target.
+- Do not infer an incident country from a vessel flag, route name or chokepoint label. Use only the physical location stated in the incident evidence.
+- Do not assert freight, insurance, rerouting, delay, transit-time, cost or cargo consequences unless that consequence is explicitly reported in the supplied incident evidence. Otherwise frame it conditionally as a watch item or omit it.
+- Keep the overall maritime risk assessment separate from the highest individual incident severity. Do not invent a risk level or severity.
+- Do not retell the same development in multiple sections or append a new unsupported event, location, route, target or consequence.
+`
+      : "";
   return `You are a senior security-intelligence analyst writing the ${label} report for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded over a reporting window and you produce the narrative sections of the report.
 
 This report covers ${focus}.
+${maritimeGuardrails}
 
 GROUNDING — non-negotiable:
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.

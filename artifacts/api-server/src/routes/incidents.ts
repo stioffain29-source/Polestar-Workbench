@@ -1,5 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, incidentsTable, incidentCorroborationsTable } from "@workspace/db";
+import {
+  db,
+  incidentsTable,
+  incidentCorroborationsTable,
+  maritimeSemanticEvidenceTable,
+} from "@workspace/db";
 import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   CreateIncidentBody,
@@ -8,9 +13,17 @@ import {
   GetRecentIncidentsQueryParams,
   GetIncidentCountsByTopicQueryParams,
 } from "@workspace/api-zod";
-import { defaultRelevanceCondition, wantsRaw } from "../lib/relevanceFilter";
+import {
+  defaultRelevanceCondition,
+  currentMaritimeSemanticProjectionCondition,
+  validatedMaritimeIncidentCondition,
+  wantsRaw,
+} from "../lib/relevanceFilter";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { requireAdminToken } from "../lib/adminAuth";
+import {
+  validateAndPersistMaritimeWriterRows,
+} from "@workspace/ingest";
 
 const router: IRouter = Router();
 
@@ -22,6 +35,10 @@ function parseId(raw: string | string[] | undefined): number {
 
 type IncidentRow = typeof incidentsTable.$inferSelect;
 
+function isMaritimeTopic(topic: string | null | undefined): boolean {
+  return topic === "shipping" || topic === "maritime";
+}
+
 /**
  * Attach each incident's OFFICIAL corroborating references (ReliefWeb etc.) as
  * a `corroborations` array. Batched (one query for all ids) and grouped in
@@ -29,7 +46,7 @@ type IncidentRow = typeof incidentsTable.$inferSelect;
  * with an always-present (possibly empty) array. Corroboration is a SEPARATE
  * signal — it is additive read-only context and never alters `confidence`.
  */
-async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
+export async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const links = await db
@@ -52,7 +69,111 @@ async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
     if (bucket) bucket.push(rest);
     else byIncident.set(incidentId, [rest]);
   }
-  return rows.map((r) => ({ ...r, corroborations: byIncident.get(r.id) ?? [] }));
+  const withCorr = rows.map((r) => ({
+    ...r,
+    corroborations: byIncident.get(r.id) ?? [],
+  }));
+  const semantics = await db
+    .select({ semantic: maritimeSemanticEvidenceTable })
+    .from(maritimeSemanticEvidenceTable)
+    .innerJoin(
+      incidentsTable,
+      eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
+    )
+    .where(and(
+      inArray(maritimeSemanticEvidenceTable.incidentId, ids),
+      currentMaritimeSemanticProjectionCondition(),
+    ))
+    .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt));
+  const semanticByIncident = new Map<number, (typeof semantics)[number]["semantic"]>();
+  for (const joined of semantics) {
+    const row = joined.semantic;
+    if (!semanticByIncident.has(row.incidentId)) {
+      semanticByIncident.set(row.incidentId, row);
+    }
+  }
+  return withCorr.map((row) => {
+    const semantic = semanticByIncident.get(row.id);
+    if (!semantic) return { ...row, maritimeSemantic: null };
+    return {
+      ...row,
+      maritimeSemantic: {
+        version: semantic.version,
+        verdict: semantic.verdict,
+        reason: semantic.reason,
+        eventOccurred: semantic.eventOccurred,
+        eventClass: semantic.eventClass,
+        commercialTargetValidated: semantic.commercialTargetValidated,
+        commercialTarget: semantic.commercialTarget,
+        commercialTargetName: semantic.commercialTargetName,
+        commercialTargetEvidence: semantic.commercialTargetEvidence,
+        physicalLocation: semantic.physicalLocation,
+        physicalLocationEvidence: semantic.physicalLocationEvidence,
+        country: semantic.country,
+        coastalState: semantic.coastalState,
+        routeRelationship: {
+          kind: semantic.routeKind,
+          routeName: semantic.routeName,
+          evidence: semantic.routeEvidence,
+        },
+        routingConsequence: {
+          kind: semantic.consequenceKind,
+          status: semantic.consequenceStatus,
+          claim: semantic.consequenceClaim,
+          evidenceQuote: semantic.consequenceEvidenceQuote,
+          confidence: semantic.consequenceConfidence,
+          description: semantic.consequenceDescription,
+          evidence: semantic.consequenceEvidence,
+        },
+        commercialConsequence: {
+          status: semantic.commercialConsequenceStatus,
+          claim: semantic.commercialConsequenceClaim,
+          evidenceQuote: semantic.commercialConsequenceEvidenceQuote,
+          confidence: semantic.commercialConsequenceConfidence,
+        },
+        geopolitical: {
+          relevant: semantic.geopoliticalRelevant,
+          claim: semantic.geopoliticalClaim,
+          evidenceQuote: semantic.geopoliticalEvidenceQuote,
+        },
+        eventDate: semantic.eventDate,
+        developmentKey: semantic.developmentKey,
+        severity: semantic.severity,
+        severityJustification: semantic.severityJustification,
+        severityEvidenceQuote: semantic.severityEvidenceQuote,
+        confidence: {
+          event: semantic.confidenceEvent,
+          classification: semantic.confidenceClassification,
+          commercialTarget: semantic.confidenceCommercialTarget,
+          geography: semantic.confidenceGeography,
+          routeRelationship: semantic.confidenceRoute,
+          consequence: semantic.confidenceConsequence,
+          date: semantic.confidenceDate,
+        },
+        contradictions: semantic.contradictions,
+        sourceQuotes: semantic.sourceQuotes,
+        evidence: semantic.evidence,
+        evaluatedAt: semantic.evaluatedAt,
+      },
+    };
+  });
+}
+
+async function validateAndPersistMaritime(row: IncidentRow): Promise<IncidentRow> {
+  if (!isMaritimeTopic(row.topic)) {
+    // Topic changes invalidate the current projection, while the append-only
+    // decision ledger remains available for audit.
+    await db
+      .delete(maritimeSemanticEvidenceTable)
+      .where(eq(maritimeSemanticEvidenceTable.incidentId, row.id));
+    return row;
+  }
+  await validateAndPersistMaritimeWriterRows([row]);
+  const [current] = await db
+    .select()
+    .from(incidentsTable)
+    .where(eq(incidentsTable.id, row.id));
+  return current ?? row;
 }
 
 router.get("/incidents", async (req, res): Promise<void> => {
@@ -128,7 +249,12 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
   const days = parsed.success ? parsed.data.days ?? 30 : 30;
   const since = new Date(Date.now() - days * 86400000);
   const byTopicConds = [gte(incidentsTable.occurredAt, since)];
-  if (!wantsRaw(req.query)) byTopicConds.push(defaultRelevanceCondition());
+  if (!wantsRaw(req.query)) {
+    byTopicConds.push(
+      defaultRelevanceCondition(),
+      validatedMaritimeIncidentCondition(),
+    );
+  }
   const rows = await db
     .select({
       topic: incidentsTable.topic,
@@ -138,6 +264,40 @@ router.get("/incidents/by-topic", async (req, res): Promise<void> => {
     .from(incidentsTable)
     .where(and(...byTopicConds))
     .groupBy(incidentsTable.topic);
+  if (!wantsRaw(req.query)) {
+    const [shipping] = await db
+      .select({
+        count: sql<number>`count(distinct ${maritimeSemanticEvidenceTable.developmentKey})::int`,
+        criticalCount: sql<number>`count(distinct case
+          when ${maritimeSemanticEvidenceTable.severity} = 'extreme'
+          then ${maritimeSemanticEvidenceTable.developmentKey}
+          else null end)::int`,
+      })
+      .from(incidentsTable)
+      .innerJoin(
+        maritimeSemanticEvidenceTable,
+        and(
+          eq(maritimeSemanticEvidenceTable.incidentId, incidentsTable.id),
+          currentMaritimeSemanticProjectionCondition(),
+        ),
+      )
+      .where(and(
+        eq(incidentsTable.topic, "shipping"),
+        gte(incidentsTable.occurredAt, since),
+        defaultRelevanceCondition(),
+        validatedMaritimeIncidentCondition(),
+      ));
+    const withoutShipping = rows.filter((row) => row.topic !== "shipping");
+    if ((shipping?.count ?? 0) > 0) {
+      withoutShipping.push({
+        topic: "shipping",
+        count: shipping?.count ?? 0,
+        criticalCount: shipping?.criticalCount ?? 0,
+      });
+    }
+    res.json(withoutShipping);
+    return;
+  }
   res.json(rows);
 });
 
@@ -171,10 +331,15 @@ router.post("/incidents", requireAdminToken, async (req, res): Promise<void> => 
     sourceUrl: parsed.data.sourceUrl ?? "",
     location: parsed.data.location ?? null,
   });
+  const isMaritime = isMaritimeTopic(parsed.data.topic);
   const [row] = await db
     .insert(incidentsTable)
     .values({
       ...parsed.data,
+      // Legacy incidents.country is not semantic evidence. Maritime rows
+      // remain unassigned until the source-grounded semantic projection says
+      // otherwise; the API never trusts a client-supplied country here.
+      ...(isMaritime ? { country: "Unknown" } : {}),
       relevanceStatus: rel.status,
       relevanceScore: rel.score,
       relevanceReason: rel.reason,
@@ -190,7 +355,9 @@ router.post("/incidents", requireAdminToken, async (req, res): Promise<void> => 
       } : {}),
     })
     .returning();
-  res.status(201).json(row);
+    const current = await validateAndPersistMaritime(row);
+    const [withSemantic] = await withCorroborations([current]);
+   res.status(201).json(withSemantic);
 });
 
 router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void> => {
@@ -200,6 +367,13 @@ router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const [existing] = await db
+    .select({ topic: incidentsTable.topic })
+    .from(incidentsTable)
+    .where(eq(incidentsTable.id, id));
+  const maritimeAfterUpdate = isMaritimeTopic(
+    parsed.data.topic ?? existing?.topic,
+  );
   const validityEvidenceChanged = [
     "topic", "title", "displayTitle", "summary", "source", "sourceUrl",
     "country", "location", "occurredAt", "incidentDate",
@@ -209,16 +383,22 @@ router.patch("/incidents/:id", requireAdminToken, async (req, res): Promise<void
     .update(incidentsTable)
     .set(validityEvidenceChanged ? {
       ...parsed.data,
+      ...(maritimeAfterUpdate ? { country: "Unknown" } : {}),
       validityStatus: null, validityScore: null, validityReason: null,
       validityVersion: null, validityEvaluatedAt: null, validityGates: null,
-    } : parsed.data)
+      } : {
+        ...parsed.data,
+        ...(maritimeAfterUpdate ? { country: "Unknown" } : {}),
+      })
     .where(eq(incidentsTable.id, id))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(row);
+    const current = await validateAndPersistMaritime(row);
+    const [withSemantic] = await withCorroborations([current]);
+   res.json(withSemantic);
 });
 
 router.delete("/incidents/:id", requireAdminToken, async (req, res): Promise<void> => {

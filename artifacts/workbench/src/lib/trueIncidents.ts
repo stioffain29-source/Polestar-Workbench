@@ -5,10 +5,9 @@
 //
 // Per-topic selection mirrors EXACTLY what each topic page treats as a real
 // event, so the dashboard card and the page can never diverge:
-//   shipping     → in-scope region → drop low-credibility noise → collapse
-//                  syndication via dedupeShippingMonitorRows (the Shipping
-//                  page's exact pipeline; this is a list-level transform, not
-//                  a per-record predicate)
+//   shipping     → current semantic admission → development-key canonical
+//                  resolution (the Shipping page/report exact pipeline; this
+//                  is a list-level transform, not a per-record predicate)
 //   cargo_watch  → cargo scope classifier (APAC/ME cargo crime only)
 //   flashpoint   → topic relevance gate, then collapse syndicated rewrites of
 //                  the same event with the report builder's exact title+
@@ -31,7 +30,10 @@ import {
   isLowCredibilityShippingRecord,
 } from "./shippingAnalysis";
 import { deriveIncidentCountry } from "./shippingCountry";
-import { dedupeShippingMonitorRows } from "./shippingReportDataset";
+import {
+  buildShippingCanonicalIncidents,
+  type ShippingReportIncident,
+} from "./shippingReportDataset";
 import { isCargoInScope } from "./cargoAnalysis";
 
 export interface TrueIncidentLike {
@@ -42,6 +44,7 @@ export interface TrueIncidentLike {
   sourceUrl?: string | null;
   location?: string | null;
   country?: string | null;
+  maritimeSemantic?: unknown;
 }
 
 function relevanceInput(i: TrueIncidentLike) {
@@ -65,9 +68,16 @@ function relevanceInput(i: TrueIncidentLike) {
 export function isTrueIncident(topic: string, i: TrueIncidentLike): boolean {
   switch (topic) {
     case "shipping": {
-      const country = deriveIncidentCountry(i);
+      // Shipping has one authoritative semantic admission/folding path. Raw
+      // text, feed country and title similarity cannot seed the monitor card.
+      const canonical = buildShippingCanonicalIncidents(
+        [i] as unknown as ShippingReportIncident[],
+        "shipping",
+      );
+      if (canonical.canonicalIncidents.length !== 1) return false;
+      const country = deriveIncidentCountry(canonical.canonicalIncidents[0]);
       if (classifyShippingRegion(country) === "Out of scope") return false;
-      return !isLowCredibilityShippingRecord(i);
+      return !isLowCredibilityShippingRecord(canonical.canonicalIncidents[0]);
     }
     case "cargo_watch":
       return isCargoInScope(i);
@@ -79,31 +89,18 @@ export function isTrueIncident(topic: string, i: TrueIncidentLike): boolean {
   }
 }
 
-// Reproduces the Shipping monitor page's exact base-list pipeline
-// (Shipping.tsx: scope to APAC + ME → drop isLowCredibilityShippingRecord →
-// dedupeShippingMonitorRows) so the dashboard card and the page can never
-// disagree. The original `occurredAt`/`severity` fields are preserved on the
-// returned rows, so downstream windowing and severity counts still work.
+// Reproduces the Shipping monitor/report canonical pipeline so the dashboard
+// card and the page can never disagree. The original fields remain on each
+// representative row, so downstream windowing and severity counts still work.
 function resolveShippingTrue<T extends TrueIncidentLike>(incidents: T[]): T[] {
-  const enriched = incidents.map((i) => {
-    const rec = i as TrueIncidentLike & {
-      occurredAt?: string | null;
-      severity?: string | null;
-    };
-    let occurredDate: Date;
-    try {
-      occurredDate = rec.occurredAt ? parseISO(rec.occurredAt) : new Date(NaN);
-    } catch {
-      occurredDate = new Date(NaN);
-    }
-    return { ...i, occurredDate, severity: rec.severity ?? "" };
-  });
-  const scoped = enriched.filter(
-    (i) =>
-      classifyShippingRegion(deriveIncidentCountry(i)) !== "Out of scope" &&
-      !isLowCredibilityShippingRecord(i),
+  // The dashboard card must consume the same semantic, development-key folded
+  // set as Shipping.tsx and Shipping Watch. No title/signature fallback merge
+  // is allowed here.
+  const canonical = buildShippingCanonicalIncidents(
+    incidents as unknown as ShippingReportIncident[],
+    "shipping",
   );
-  return dedupeShippingMonitorRows(scoped) as unknown as T[];
+  return canonical.canonicalIncidents as unknown as T[];
 }
 
 // Flashpoint/protests: relevance gate THEN collapse syndicated rewrites of the

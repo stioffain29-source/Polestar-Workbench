@@ -10,6 +10,7 @@ import {
 import type { ConflictReportIncident } from "../../artifacts/workbench/src/lib/conflictReportDataset";
 import type { ShippingReportIncident } from "../../artifacts/workbench/src/lib/shippingReportDataset";
 import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 // Render-parity guard for the per-incident summary line under each Related
 // Incidents row. The editor preview and EVERY PDF exporter render that line
@@ -140,30 +141,30 @@ describe("Related Incidents summary line — render parity", () => {
 // ---------------------------------------------------------------------------
 
 const SHIP_INCIDENTS: ShippingReportIncident[] = [
-  {
-    id: "s1",
-    topic: "shipping",
-    title: "Tanker attacked by armed skiffs in the Gulf of Aden",
-    severity: "high",
-    occurredAt: "2026-06-14T08:00:00+00:00",
-    country: "Yemen",
-    summary: "Armed men in skiffs attacked a tanker underway.",
-    source: "Test Wire",
-    sourceUrl: "https://example.com/s1",
-    location: null,
-  },
-  {
-    id: "s2",
-    topic: "shipping",
-    title: "Cargo vessel boarded and crew robbed in the Singapore Strait",
-    severity: "moderate",
-    occurredAt: "2026-06-12T08:00:00+00:00",
-    country: "Singapore",
-    summary: "Robbers boarded a bulk carrier and stole stores.",
-    source: "Test Wire",
-    sourceUrl: "https://example.com/s2",
-    location: null,
-  },
+  semanticIncident(
+    "s1",
+    "Tanker collided with another vessel in the Gulf of Aden",
+    {
+      eventClass: "collision_or_grounding",
+      severity: "high",
+      eventDate: "2026-06-14",
+      country: "Yemen",
+      physicalLocation: "Gulf of Aden",
+      developmentKey: "shipping-summary-collision-1",
+    },
+  ),
+  semanticIncident(
+    "s2",
+    "Cargo vessel grounded in the Singapore Strait",
+    {
+      eventClass: "collision_or_grounding",
+      severity: "moderate",
+      eventDate: "2026-06-12",
+      country: "Singapore",
+      physicalLocation: "Singapore Strait",
+      developmentKey: "shipping-summary-collision-2",
+    },
+  ),
 ];
 
 function renderShipping(summaries: Record<string, string>): string {
@@ -177,39 +178,41 @@ function renderShipping(summaries: Record<string, string>): string {
 }
 
 describe("ShippingReportPreview — Related Incidents summary line render parity", () => {
-  it("renders the generated AI summary under each related incident row", () => {
+  it("does not retell a canonical incident already shown in Maritime Intelligence", () => {
     const summaries = {
-      s1: "A tanker came under skiff attack in the Gulf of Aden.",
-      s2: "Robbers boarded a cargo vessel in the Singapore Strait.",
+      s1: "A collision was reported in the Gulf of Aden.",
+      s2: "A grounding was reported in the Singapore Strait.",
     };
     const html = renderShipping(summaries);
     for (const text of Object.values(summaries)) {
-      expect(html).toContain(text);
+      expect(html).not.toContain(text);
     }
+    expect((html.match(/Tanker collided with another vessel in the Gulf of Aden/g) ?? []).length).toBe(1);
+    expect((html.match(/Cargo vessel grounded in the Singapore Strait/g) ?? []).length).toBe(1);
   });
 
-  it("shows the analyst's saved EDIT in place of the generated line", () => {
+  it("does not render an analyst summary edit for a duplicate detail row", () => {
     const edited = {
-      s1: "ANALYST EDIT: a laden tanker was fired on by skiffs off Yemen.",
-      s2: "Robbers boarded a cargo vessel in the Singapore Strait.",
+      s1: "ANALYST EDIT: the collision was reported off Yemen.",
+      s2: "A grounding was reported in the Singapore Strait.",
     };
     const html = renderShipping(edited);
-    expect(html).toContain(edited.s1);
+    expect(html).not.toContain(edited.s1);
     // The edited row's text is exactly what the shared selector returns for it.
     expect(resolveIncidentSummary(SHIP_INCIDENTS[0] as never, edited)).toBe(edited.s1);
   });
 
-  it("falls back to the deterministic line when a row has no summary", () => {
+  it("keeps deterministic fallback resolution without rendering a duplicate line", () => {
     // Only s1 is summarised; s2 must render its deterministic, source-free
     // fallback rather than an empty cell.
     const partial = {
-      s1: "A tanker came under skiff attack in the Gulf of Aden.",
+      s1: "A collision was reported in the Gulf of Aden.",
     };
     const html = renderShipping(partial);
 
     const fallback = deterministicIncidentSummary(SHIP_INCIDENTS[1] as never);
     expect(fallback.length).toBeGreaterThan(0);
-    expect(html).toContain(fallback);
+    expect(html).not.toContain(fallback);
     expect(resolveIncidentSummary(SHIP_INCIDENTS[1] as never, partial)).toBe(fallback);
   });
 });

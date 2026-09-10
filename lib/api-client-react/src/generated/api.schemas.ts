@@ -153,6 +153,221 @@ export interface Corroboration {
   matchScore: number;
 }
 
+export type MaritimeSemanticEvidenceVerdict = typeof MaritimeSemanticEvidenceVerdict[keyof typeof MaritimeSemanticEvidenceVerdict];
+
+
+export const MaritimeSemanticEvidenceVerdict = {
+  valid: 'valid',
+  invalid: 'invalid',
+  needs_review: 'needs_review',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MaritimeSemanticEvidenceEventClass = typeof MaritimeSemanticEvidenceEventClass[keyof typeof MaritimeSemanticEvidenceEventClass] | null;
+
+
+export const MaritimeSemanticEvidenceEventClass = {
+  commercial_attack: 'commercial_attack',
+  commercial_seizure: 'commercial_seizure',
+  piracy_or_armed_robbery: 'piracy_or_armed_robbery',
+  collision_or_grounding: 'collision_or_grounding',
+  port_disruption: 'port_disruption',
+  chokepoint_disruption: 'chokepoint_disruption',
+  route_disruption: 'route_disruption',
+  environmental_maritime_event: 'environmental_maritime_event',
+  naval_activity: 'naval_activity',
+  military_naval_activity: 'military_naval_activity',
+  drone_activity: 'drone_activity',
+  military_exercise: 'military_exercise',
+  geopolitical_maritime_development: 'geopolitical_maritime_development',
+  protest_or_labour: 'protest_or_labour',
+  other_maritime_event: 'other_maritime_event',
+  non_event: 'non_event',
+} as const;
+
+export type MaritimeSemanticEvidenceCommercialTarget = typeof MaritimeSemanticEvidenceCommercialTarget[keyof typeof MaritimeSemanticEvidenceCommercialTarget];
+
+
+export const MaritimeSemanticEvidenceCommercialTarget = {
+  vessel: 'vessel',
+  cargo: 'cargo',
+  port_facility: 'port_facility',
+  shipping_operations: 'shipping_operations',
+  none: 'none',
+  unknown: 'unknown',
+} as const;
+
+export type MaritimeSemanticEvidenceRouteRelationshipKind = typeof MaritimeSemanticEvidenceRouteRelationshipKind[keyof typeof MaritimeSemanticEvidenceRouteRelationshipKind];
+
+
+export const MaritimeSemanticEvidenceRouteRelationshipKind = {
+  physical: 'physical',
+  direct_passage: 'direct_passage',
+  indirect: 'indirect',
+  none: 'none',
+} as const;
+
+export type MaritimeSemanticEvidenceRouteRelationship = {
+  kind: MaritimeSemanticEvidenceRouteRelationshipKind;
+  /** @nullable */
+  routeName: string | null;
+  /** @nullable */
+  evidence: string | null;
+};
+
+export type MaritimeSemanticEvidenceGeopolitical = {
+  relevant: boolean;
+  /** @nullable */
+  claim: string | null;
+  /** @nullable */
+  evidenceQuote: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type MaritimeSemanticEvidenceSeverity = typeof MaritimeSemanticEvidenceSeverity[keyof typeof MaritimeSemanticEvidenceSeverity] | null;
+
+
+export const MaritimeSemanticEvidenceSeverity = {
+  insignificant: 'insignificant',
+  low: 'low',
+  moderate: 'moderate',
+  high: 'high',
+  extreme: 'extreme',
+} as const;
+
+export type MaritimeSemanticEvidenceConfidence = {
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  event: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  classification: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  commercialTarget: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  geography: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  routeRelationship: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  consequence: number;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  date: number;
+};
+
+export type MaritimeSemanticEvidenceSourceQuotesItem = {
+  quote: string;
+  claim: string;
+};
+
+export type MaritimeConsequenceStatus = typeof MaritimeConsequenceStatus[keyof typeof MaritimeConsequenceStatus];
+
+
+export const MaritimeConsequenceStatus = {
+  none: 'none',
+  confirmed: 'confirmed',
+  assessed: 'assessed',
+} as const;
+
+export type MaritimeConsequenceKind = typeof MaritimeConsequenceKind[keyof typeof MaritimeConsequenceKind];
+
+
+export const MaritimeConsequenceKind = {
+  none: 'none',
+  observed: 'observed',
+  reported: 'reported',
+  potential: 'potential',
+  unknown: 'unknown',
+} as const;
+
+export interface MaritimeConsequence {
+  status: MaritimeConsequenceStatus;
+  /** @nullable */
+  claim: string | null;
+  /** @nullable */
+  evidenceQuote: string | null;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  confidence: number | null;
+  kind?: MaritimeConsequenceKind;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  evidence?: string | null;
+}
+
+/**
+ * Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS/movement is not included in this contract.
+
+ */
+export interface MaritimeSemanticEvidence {
+  version: string;
+  verdict: MaritimeSemanticEvidenceVerdict;
+  reason: string;
+  /** @nullable */
+  eventOccurred: boolean | null;
+  /** @nullable */
+  eventClass: MaritimeSemanticEvidenceEventClass;
+  commercialTargetValidated: boolean;
+  commercialTarget: MaritimeSemanticEvidenceCommercialTarget;
+  /** @nullable */
+  commercialTargetName: string | null;
+  /** @nullable */
+  commercialTargetEvidence: string | null;
+  /** @nullable */
+  physicalLocation: string | null;
+  /** @nullable */
+  physicalLocationEvidence: string | null;
+  /** @nullable */
+  country: string | null;
+  /** @nullable */
+  coastalState: string | null;
+  routeRelationship: MaritimeSemanticEvidenceRouteRelationship;
+  routingConsequence: MaritimeConsequence;
+  commercialConsequence: MaritimeConsequence;
+  geopolitical: MaritimeSemanticEvidenceGeopolitical;
+  /** @nullable */
+  eventDate: string | null;
+  /** @nullable */
+  developmentKey: string | null;
+  /** @nullable */
+  severity: MaritimeSemanticEvidenceSeverity;
+  /** @nullable */
+  severityJustification: string | null;
+  /** @nullable */
+  severityEvidenceQuote: string | null;
+  confidence: MaritimeSemanticEvidenceConfidence;
+  contradictions: string[];
+  sourceQuotes: MaritimeSemanticEvidenceSourceQuotesItem[];
+  evidence: string[];
+  evaluatedAt: string;
+}
+
 export interface Incident {
   id: number;
   topic: Topic;
@@ -204,6 +419,7 @@ export interface Incident {
   gdeltEnrichedAt?: string | null;
   /** @nullable */
   analystInScope?: boolean | null;
+  maritimeSemantic: MaritimeSemanticEvidence | null;
 }
 
 export interface IncidentInput {

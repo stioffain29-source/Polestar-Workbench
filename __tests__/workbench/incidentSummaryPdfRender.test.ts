@@ -130,6 +130,8 @@ import {
   deterministicIncidentSummary,
   resolveIncidentSummary,
 } from "../../artifacts/workbench/src/lib/incidentSummary";
+import { finalizeShippingPublication } from "../../artifacts/workbench/src/lib/shippingPublication";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 // Read the recorded text + reset hook back off the mocked module.
 const pdfChromeMock = jest.requireMock(PDF_CHROME_PATH) as {
@@ -287,30 +289,30 @@ describe("Conflict PDF — Related Incidents summary line emitted", () => {
 // ---------------------------------------------------------------------------
 
 const SHIP_INCIDENTS: ShippingReportIncident[] = [
-  {
-    id: "s1",
-    topic: "shipping",
-    title: "Tanker attacked by armed skiffs in the Gulf of Aden",
-    severity: "high",
-    occurredAt: "2026-06-14T08:00:00+00:00",
-    country: "Yemen",
-    summary: "Armed men in skiffs attacked a tanker underway.",
-    source: "Test Wire",
-    sourceUrl: "https://example.com/s1",
-    location: null,
-  },
-  {
-    id: "s2",
-    topic: "shipping",
-    title: "Cargo vessel boarded and crew robbed in the Singapore Strait",
-    severity: "moderate",
-    occurredAt: "2026-06-12T08:00:00+00:00",
-    country: "Singapore",
-    summary: "Robbers boarded a bulk carrier and stole stores.",
-    source: "Test Wire",
-    sourceUrl: "https://example.com/s2",
-    location: null,
-  },
+  semanticIncident(
+    "s1",
+    "Tanker collided with another vessel in the Gulf of Aden",
+    {
+      eventClass: "collision_or_grounding",
+      severity: "high",
+      eventDate: "2026-06-14",
+      country: "Yemen",
+      physicalLocation: "Gulf of Aden",
+      developmentKey: "shipping-pdf-summary-collision-1",
+    },
+  ),
+  semanticIncident(
+    "s2",
+    "Cargo vessel grounded in the Singapore Strait",
+    {
+      eventClass: "collision_or_grounding",
+      severity: "moderate",
+      eventDate: "2026-06-12",
+      country: "Singapore",
+      physicalLocation: "Singapore Strait",
+      developmentKey: "shipping-pdf-summary-collision-2",
+    },
+  ),
 ];
 
 const SHIP_DATA = {
@@ -325,7 +327,7 @@ function shippingRows() {
 }
 
 describe("Shipping PDF — Related Incidents summary line emitted", () => {
-  it("draws the generated AI summary under each related incident row", async () => {
+  it("does not redraw canonical incidents already shown in Maritime Intelligence", async () => {
     const rows = shippingRows();
     expect(rows.length).toBeGreaterThan(0);
     const summaries: Record<string, string> = {};
@@ -344,15 +346,15 @@ describe("Shipping PDF — Related Incidents summary line emitted", () => {
       ),
     );
 
-    for (const summary of Object.values(summaries)) {
-      expect(text).toContain(summary);
-    }
+    for (const summary of Object.values(summaries)) expect(text).not.toContain(summary);
+    expect(text.filter((line) => line.includes("Tanker collided with another vessel in the Gulf of Aden")).length).toBe(1);
+    expect(text.filter((line) => line.includes("Cargo vessel grounded in the Singapore Strait")).length).toBe(1);
   });
 
-  it("draws the analyst's saved EDIT in place of the generated line", async () => {
+  it("does not draw an analyst edit for a duplicate detail row", async () => {
     const rows = shippingRows();
     const target = rows[0];
-    const edit = "ANALYST EDIT: a laden tanker was fired on by skiffs off Yemen.";
+    const edit = "ANALYST EDIT: the collision was reported off Yemen.";
     const summaries: Record<string, string> = { [String(target.id)]: edit };
 
     const text = await textAfter(() =>
@@ -366,11 +368,11 @@ describe("Shipping PDF — Related Incidents summary line emitted", () => {
       ),
     );
 
-    expect(text).toContain(edit);
+    expect(text).not.toContain(edit);
     expect(resolveIncidentSummary(target, summaries)).toBe(edit);
   });
 
-  it("falls back to the deterministic line when a row has no summary", async () => {
+  it("keeps deterministic fallback resolution without drawing a duplicate line", async () => {
     const rows = shippingRows();
     const summaries = summariesForAllButLast(
       rows,
@@ -391,7 +393,7 @@ describe("Shipping PDF — Related Incidents summary line emitted", () => {
       ),
     );
 
-    expect(text).toContain(fallback);
+    expect(text).not.toContain(fallback);
     expect(resolveIncidentSummary(fallbackRow, summaries)).toBe(fallback);
   });
 });
@@ -418,15 +420,6 @@ describe("Shipping PDF — Related Incidents summary line emitted", () => {
 // ---------------------------------------------------------------------------
 
 const POOL_SIZE = 75; // > SERVER_GENERATION_CAP (60)
-
-// The server caps the incident set it FINGERPRINTS and generates summaries for
-// at MAX_PROSE_INCIDENTS = 60 (artifacts/api-server/src/lib/countryProse.ts,
-// via canonicalIncidents). Any incident the editor requests BEYOND this cap is
-// dropped from the canonical set, so it receives no AI summary and
-// resolveIncidentSummary silently falls back to its deterministic line. We
-// cannot import that constant here: countryProse.ts pulls in @workspace/ingest,
-// whose dev-env loader uses import.meta and breaks every ts-jest suite that
-// imports it. So we pin the value locally and assert against it.
 const SERVER_GENERATION_CAP = 60;
 
 // Faithful replica of the server's canonicalIncidents: deterministically order
@@ -475,44 +468,38 @@ describe("Long Shipping PDF — editor-requested ids match the drawn rows", () =
   // title-dedupe keeps them separate) and unambiguously shipping-relevant.
   const LONG_SHIP_INCIDENTS: ShippingReportIncident[] = Array.from(
     { length: POOL_SIZE },
-    (_, i) => ({
-      id: `ts${i}`,
-      topic: "shipping",
-      title: `Tanker attacked by armed skiffs in the Gulf of Aden incident ${i}`,
-      severity: i % 2 === 0 ? "high" : "moderate",
-      occurredAt: `2026-06-${windowDay(i)}T08:00:00+00:00`,
-      country: "Yemen",
-      summary: `Armed men in skiffs attacked a tanker underway, case ${i}.`,
-      source: "Test Wire",
-      sourceUrl: `https://example.com/ts${i}`,
-      location: null,
-    }),
+    (_, i) =>
+      semanticIncident(
+        `ts${i}`,
+        `Collision case ${i} near Port ${i}`,
+        {
+          eventClass: "collision_or_grounding",
+          severity: i % 2 === 0 ? "high" : "moderate",
+          eventDate: `2026-06-${windowDay(i)}`,
+          country: "Yemen",
+          physicalLocation: `Port ${i}`,
+          developmentKey: `shipping-pdf-summary-long-${i}`,
+        },
+      ),
   );
 
   // The exact set the editor requests summaries for: ReportEditor's
-  // relatedForSummaries for shipping is buildShippingReportDataset(...)
-  // .relatedIncidents — the SAME builder the exporter draws from.
+  // relatedForSummaries uses the final publication dataset, so incidents
+  // already shown in Maritime Intelligence are intentionally excluded.
   function editorRequestedRows() {
-    return buildShippingReportDataset(
-      LONG_SHIP_INCIDENTS,
-      "shipping",
-      ISSUE_DATE,
-      [],
-    ).relatedIncidents;
+    return finalizeShippingPublication({
+      report: SHIP_DATA,
+      incidents: LONG_SHIP_INCIDENTS,
+      topic: "shipping",
+      issueDate: ISSUE_DATE,
+    }).dataset.relatedIncidents;
   }
 
-  it("pool exceeds the generation cap and the rendered set is parity-locked", async () => {
+  it("does not request or render duplicate summaries for a large canonical pool", async () => {
     expect(LONG_SHIP_INCIDENTS.length).toBeGreaterThanOrEqual(60);
     const requested = editorRequestedRows();
     const requestedIds = new Set(requested.map((r) => String(r.id)));
-    expect(requestedIds.size).toBeGreaterThan(0);
-
-    // PROTECTIVE INVARIANT: even from a >60 input pool the editor never REQUESTS
-    // more summaries than the server will fingerprint/generate for, so the
-    // server's canonical 60-cap can never silently drop a RENDERED row's
-    // summary. If a future cap raise breaks this, the truncation test below
-    // shows what would start failing silently in the PDF.
-    expect(requestedIds.size).toBeLessThanOrEqual(SERVER_GENERATION_CAP);
+    expect(requestedIds.size).toBe(0);
 
     const summaries: Record<string, string> = {};
     for (const inc of LONG_SHIP_INCIDENTS)
@@ -536,11 +523,8 @@ describe("Long Shipping PDF — editor-requested ids match the drawn rows", () =
     // The drawn rows are EXACTLY the rows the editor requested summaries for.
     expectSameIdSet(drawnIds, requestedIds);
 
-    // No rendered row silently fell back to its deterministic line.
-    for (const row of requested) {
-      expect(text).not.toContain(deterministicIncidentSummary(row));
-      expect(text).toContain(aiSentinel(String(row.id)));
-    }
+    // No stale cache entry can leak into a non-rendered section.
+    expect(text.some((line) => line.includes("AISUMMARY-"))).toBe(false);
   });
 });
 

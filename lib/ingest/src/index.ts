@@ -1,5 +1,36 @@
 export { runFlashpointIngest, resolveFlashpointCountry } from "./flashpoint";
 export { validateFlashpointEvent, normalizeFlashpointEventDate, FLASHPOINT_VALIDITY_VERSION } from "./flashpointValidity";
+export {
+  validateMaritimeEvent,
+  isMaritimeSemanticProviderConfigured,
+  MARITIME_SEMANTIC_VERSION,
+} from "./maritimeSemantic";
+export type { MaritimeValidityStatus } from "./maritimeSemantic";
+export {
+  backfillMaritimeSemantic,
+  maritimeContentFingerprint,
+  maritimeEvidenceSnapshotMatches,
+  isTransientMaritimeSemanticReason,
+  persistMaritimeSemanticEvidence,
+  MARITIME_SEMANTIC_RETRY_MS,
+  MARITIME_SEMANTIC_MAX_TRANSIENT_ATTEMPTS,
+} from "./backfillMaritimeSemantic";
+export type {
+  MaritimeIncidentSnapshot,
+  MaritimeSemanticBackfillDependencies,
+} from "./backfillMaritimeSemantic";
+export { validateAndPersistMaritimeWriterRows } from "./maritimeWriterValidation";
+export {
+  compareMaritimeDevelopmentPair,
+  resolveCanonicalMaritimeDevelopmentId,
+  maritimeDevelopmentEventFromSemantic,
+  adjudicateMaritimeDevelopmentPair,
+} from "./maritimeDevelopment";
+export type {
+  MaritimeDevelopmentEvent,
+  MaritimeDevelopmentAdjudicator,
+  DevelopmentPairDecision,
+} from "./maritimeDevelopment";
 export { isTransientFlashpointValidityReason } from "./flashpointValidity";
 export {
   backfillFlashpointValidity,

@@ -8,34 +8,43 @@ import {
 } from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import { resolveReportWindow } from "../../artifacts/workbench/src/lib/reportWindow";
 import { isConfirmedOperationalIncident } from "../../artifacts/workbench/src/lib/shippingAnalysis";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 const issueDate = "2026-06-18";
 const incidents: ShippingReportIncident[] = [
-  {
-    id: 1,
-    topic: "shipping",
-    title: "Missile struck tanker in Strait of Hormuz",
+  semanticIncident(1, "Missile struck tanker in Strait of Hormuz", {
+    eventClass: "commercial_attack",
     severity: "extreme",
-    occurredAt: "2026-06-16T08:00:00.000Z",
-    country: "Iran",
-  },
+    developmentKey: "hormuz-attack-1",
+    routeRelationship: {
+      kind: "physical",
+      routeName: "Strait of Hormuz",
+      evidence: "Missile struck tanker in Strait of Hormuz",
+    },
+  }),
   // Syndicated copy: final report must fold this rather than count it again.
-  {
-    id: 2,
-    topic: "shipping",
-    title: "Missile struck tanker in Strait of Hormuz - Reuters",
+  semanticIncident(2, "Missile struck tanker in Strait of Hormuz - Reuters", {
+    eventClass: "commercial_attack",
     severity: "high",
-    occurredAt: "2026-06-16T09:00:00.000Z",
+    developmentKey: "hormuz-attack-1",
+    eventDate: "2026-06-16",
+    physicalLocation: "Strait of Hormuz",
+    physicalLocationEvidence: "Missile struck tanker in Strait of Hormuz - Reuters",
     country: "Iran",
-  },
-  {
-    id: 3,
-    topic: "shipping",
-    title: "Port closed after collision in Singapore Strait",
+    routeRelationship: {
+      kind: "physical",
+      routeName: "Strait of Hormuz",
+      evidence: "Missile struck tanker in Strait of Hormuz - Reuters",
+    },
+  }),
+  semanticIncident(3, "Port closed after collision in Singapore Strait", {
+    eventClass: "collision_or_grounding",
     severity: "moderate",
-    occurredAt: "2026-06-15T08:00:00.000Z",
+    developmentKey: "singapore-port-1",
     country: "Singapore",
-  },
+    physicalLocation: "Singapore Strait",
+    physicalLocationEvidence: "Port closed after collision in Singapore Strait",
+  }),
 ];
 
 function build() {

@@ -40,9 +40,7 @@ export function maritimeExecCards(
   board: MaritimeIntelligence,
 ): MaritimeExecCard[] {
   const { risk, incidentSnapshot, chokepointsAffected } = board;
-  const namedImpacts = board.businessImpact.filter(
-    (b) => b !== "No material impact",
-  );
+  const namedImpacts = board.businessImpact;
   return [
     {
       label: "Maritime Risk Level",

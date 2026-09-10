@@ -62,53 +62,46 @@ describe("cargo foreign-country attribution", () => {
 const { classify: classifyShipping, classifyFeedItem: classifyShippingFeedItem } = shippingTestHooks;
 
 describe("shipping foreign-country attribution", () => {
-  it("keeps theatre-first ordering: a Red Sea Houthi item is tagged Yemen, not the broader Saudi Arabia", () => {
-    // COUNTRY_ALIASES lists Yemen/Houthi before Saudi Arabia on purpose. A
-    // headline naming both must resolve to the specific actor (Yemen).
+  it("does not infer physical jurisdiction from a named actor before semantic validation", () => {
     const c = classifyShipping(
       "Houthi drone attack on tanker in Red Sea off Saudi Arabia coast",
       "",
     );
     expect(c.kept).toBe(true);
-    expect(c.country).toBe("Yemen");
+    expect(c.country).toBeNull();
   });
 
   it("does NOT relocate an in-region shipping story onto a foreign port named in passing", () => {
-    // The seizure is in the Strait of Hormuz (Iran); Rotterdam is only the
-    // vessel's origin and is not an in-scope alias, so attribution stays Iran.
+    // Neither a route name nor the vessel's origin establishes jurisdiction.
     const c = classifyShipping(
       "Tanker seized in Strait of Hormuz after departing Rotterdam",
       "",
     );
     expect(c.kept).toBe(true);
-    expect(c.country).toBe("Iran");
+    expect(c.country).toBeNull();
   });
 
   it("keeps an in-region boarding story even when a foreign flag state is named", () => {
-    // A Panama-flagged vessel boarded in the Singapore Strait is a Singapore
-    // theatre event; the flag state must not relocate it.
+    // Flag state and route mentions cannot replace validated physical geography.
     const c = classifyShipping(
       "Panama-flagged bulk carrier boarded by robbers in Singapore Strait",
       "",
     );
     expect(c.kept).toBe(true);
-    expect(c.country).toBe("Singapore");
+    expect(c.country).toBeNull();
   });
 
-  it("falls back to the feed's theatre default when the text names no in-scope country", () => {
-    // No in-scope alias in the text and a foreign origin named in passing must
-    // not hijack attribution; it falls back to the feed default (e.g. Hormuz →
-    // Iran) rather than the foreign place.
+  it("does not fall back to a feed theatre when physical country is unknown", () => {
     const c = classifyShipping(
       "Tanker attacked by drone at sea after leaving Rotterdam",
       "",
       "Iran",
     );
     expect(c.kept).toBe(true);
-    expect(c.country).toBe("Iran");
+    expect(c.country).toBeNull();
   });
 
-  it("attributes Singapore Strait theatre after SCMP masthead strip (CG-02)", () => {
+  it("strips the publisher without inventing a physical country", () => {
     const item = classifyShippingFeedItem(
       "Armed robbers board bulk carrier in Singapore Strait - South China Morning Post",
       "",
@@ -116,6 +109,6 @@ describe("shipping foreign-country attribution", () => {
     expect(item.cleanTitle).toBe("Armed robbers board bulk carrier in Singapore Strait");
     expect(item.sourceName).toBe("South China Morning Post");
     expect(item.result.kept).toBe(true);
-    expect(item.result.country).toBe("Singapore");
+    expect(item.result.country).toBeNull();
   });
 });

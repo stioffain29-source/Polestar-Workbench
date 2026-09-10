@@ -3542,7 +3542,7 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const severityOutsideVolumeLead =
     Boolean(lead && sevInc && sevCountry && sevElevated) &&
     !volumeLeadersRows.some((row) => row.label === sevCountry);
-  if (severityOutsideVolumeLead) {
+  if (severityOutsideVolumeLead && sevInc) {
     opener = tieN > 1
       ? `${volumeLeads}, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${tableLeadPhrase(sevInc)} in ${sevCountry}.`
       : `${volumeLeads}, but the sharper operational concern is ${tableLeadPhrase(sevInc)} in ${sevCountry} (${hs.label}).`;

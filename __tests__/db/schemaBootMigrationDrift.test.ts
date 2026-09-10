@@ -27,8 +27,8 @@ import * as schema from "@workspace/db/schema";
  * are therefore not (and need not be) re-created there. They are enumerated
  * below and were verified to exist in the production database. This list is a
  * FROZEN snapshot of the pre-guard schema — it must NOT grow. Any NEW table or
- * column added to a Drizzle schema from now on must ship matching boot-migration
- * DDL in `runDataMigrations`, not a new baseline entry.
+ * column must not be added to that historical baseline. New managed schema
+ * uses the development-to-production Publish diff, not startup DDL.
  */
 
 const MIGRATIONS_PATH = join(
@@ -43,7 +43,7 @@ const MIGRATIONS_PATH = join(
 );
 
 // Pre-existing production schema objects that predate the boot-migration guard.
-// Frozen snapshot — do not add new entries here; add boot DDL instead.
+// Frozen historical snapshot — new tables use managed Publish, not boot DDL.
 const BASELINE: Record<string, readonly string[]> = {
   incidents: [
     "id",
@@ -254,6 +254,12 @@ function parseAlterAddColumns(sqlText: string): Map<string, Set<string>> {
 }
 
 describe("production schema boot-migration drift", () => {
+  // These tables were introduced under the managed-Publish migration policy.
+  // Keep legacy coverage intact without requiring new production startup DDL.
+  const managedPublishTables = new Set([
+    "maritime_semantic_evidence",
+    "maritime_semantic_decisions",
+  ]);
   const migrationsSource = readFileSync(MIGRATIONS_PATH, "utf8");
   const createdColumns = parseCreateTableColumns(migrationsSource);
   const alteredColumns = parseAlterAddColumns(migrationsSource);
@@ -266,11 +272,11 @@ describe("production schema boot-migration drift", () => {
     expect(drizzleTables.length).toBeGreaterThan(0);
   });
 
-  it("provisions every Drizzle table in runDataMigrations or the frozen baseline", () => {
+  it("accounts for every Drizzle table through legacy or managed schema ownership", () => {
     const undeclared = drizzleTables
       .map((t) => t.name)
       .filter(
-        (name) => !createdColumns.has(name) && BASELINE[name] === undefined,
+        (name) => !createdColumns.has(name) && BASELINE[name] === undefined && !managedPublishTables.has(name),
       );
 
     expect(undeclared).toEqual([]);
@@ -280,6 +286,7 @@ describe("production schema boot-migration drift", () => {
     const missing: string[] = [];
 
     for (const table of drizzleTables) {
+      if (managedPublishTables.has(table.name)) continue;
       const created = createdColumns.get(table.name) ?? new Set<string>();
       const altered = alteredColumns.get(table.name) ?? new Set<string>();
       const baseline = new Set(BASELINE[table.name] ?? []);
@@ -292,10 +299,18 @@ describe("production schema boot-migration drift", () => {
       }
     }
 
-    // Each entry below is a Drizzle column with no idempotent boot-migration
-    // DDL in runDataMigrations — it will exist in dev but be MISSING from the
-    // production database. Add a `CREATE TABLE`/`ALTER TABLE ... ADD COLUMN IF
-    // NOT EXISTS` for it in artifacts/api-server/src/lib/migrations.ts.
+    // Preserve the historical coverage contract without extending boot DDL.
     expect(missing).toEqual([]);
+  });
+
+  it("keeps managed maritime tables in the schema and out of startup DDL", () => {
+    for (const name of managedPublishTables) {
+      const table = drizzleTables.find((candidate) => candidate.name === name);
+      expect(table).toBeDefined();
+      expect(table!.columns.some((column) => column.name === "incident_id")).toBe(true);
+      expect(table!.columns.some((column) => column.name === "content_fingerprint")).toBe(true);
+      expect(createdColumns.has(name)).toBe(false);
+      expect(alteredColumns.has(name)).toBe(false);
+    }
   });
 });

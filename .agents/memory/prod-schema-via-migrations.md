@@ -1,27 +1,10 @@
 ---
-name: Prod schema changes via boot migrations
-description: Adding a DB column reaches prod only through an idempotent ALTER in api-server migrations, not drizzle push.
+name: Managed production schema changes
+description: Current publishing guidance supersedes the project's historical boot-DDL convention.
 ---
 
-Adding a column to a `@workspace/db` schema table requires TWO writes, not one:
-1. The Drizzle schema (`lib/db/src/schema/*.ts`) — gives types + dev push.
-2. An idempotent `ALTER TABLE … ADD COLUMN IF NOT EXISTS …` via `db.execute(sql\`…\`)`
-   at the TOP of `runDataMigrations()` in `artifacts/api-server/src/lib/migrations.ts`.
+For new schema work, consult the database skill and its publish-migrations reference. Apply additive schema changes to development and let Publish apply the development-to-production schema diff. Do not add new startup-time DDL or production mutation scripts.
 
-**Why:** `pnpm --filter @workspace/db run push` (drizzle-kit) only reaches the DEV
-database. From the workspace the prod `DATABASE_URL` is a read-only replica, so the
-deployment runtime is the only place that can write prod schema. `runDataMigrations`
-runs on api-server boot (before `listen`), so the ALTER is how a new column actually
-appears in prod after a republish. Without it, prod queries selecting the new column
-throw "column does not exist" while dev works fine.
+**Why:** The current platform guidance checked on 2026-09-10 explicitly prohibits startup DDL to self-heal production. Earlier project notes incorrectly said new columns required boot migrations; that instruction is superseded. Existing historical boot migrations are not permission to extend the pattern.
 
-**How to apply:** any new schema column/table — add the IF NOT EXISTS DDL to the
-migration runner so it self-applies on the next deploy. Idempotent, safe to re-run.
-
-**Enforced by a test:** `__tests__/db/schemaBootMigrationDrift.test.ts` compares
-every Drizzle table/column (via `getTableConfig`) against the `CREATE TABLE` /
-`ALTER ... ADD COLUMN IF NOT EXISTS` DDL parsed from `migrations.ts`, and fails
-the jest run on drift. It carries a FROZEN baseline of pre-guard tables/columns
-(incidents/sources/reports original cols + whole strikes/spot_reports/
-market_prices, all verified present in prod). Do NOT grow that baseline for new
-schema — add boot DDL instead, or the guard is pointless.
+**How to apply:** Keep schema definitions authoritative, inspect development diffs for unrelated destructive changes, and test development first. If an old drift test mandates boot DDL for every new table, revise that expectation for the managed-publish path rather than reintroducing prohibited startup mutations. Do not refactor unrelated historical migrations without a separate reason.

@@ -14,6 +14,12 @@
 //      event prose) from leaking into the incident-country bucket.
 //   3. Otherwise return null — surfaced as "Location not identified".
 
+import {
+  countryFromPhysicalEvidence,
+} from "@workspace/relevance";
+import type { MaritimeSemanticEvidence } from "@workspace/relevance";
+import type { ShippingMaritimeSemanticEvidence } from "./shippingAnalysis";
+
 export const KNOWN_COUNTRIES = [
   // Middle East
   "Saudi Arabia", "United Arab Emirates", "UAE", "Oman", "Qatar", "Bahrain",
@@ -218,6 +224,7 @@ export interface CountrySource {
   location?: string | null;
   title?: string | null;
   summary?: string | null;
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
 }
 
 /**
@@ -225,6 +232,13 @@ export interface CountrySource {
  * country can be identified — callers should surface "Location not identified".
  */
 export function deriveIncidentCountry(i: CountrySource): string | null {
+  // Shipping semantic evidence is authoritative. When the field is present,
+  // never fall back to raw location/title/country keyword inference.
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    return countryFromPhysicalEvidence(
+      i.maritimeSemantic as MaritimeSemanticEvidence | null | undefined,
+    );
+  }
   // 1. Location text is authored from the event itself.
   const fromLocation = findCountryCue(i.location ?? "");
   if (fromLocation) return fromLocation;

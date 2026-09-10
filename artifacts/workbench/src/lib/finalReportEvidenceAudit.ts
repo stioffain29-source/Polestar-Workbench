@@ -119,9 +119,9 @@ const STOP = new Set(
 );
 
 function words(text: string): string[] {
-  return (text.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? []).filter(
-    (w) => !STOP.has(w),
-  );
+  return (text.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [])
+    .flatMap((word) => word.split("-"))
+    .filter((w) => !STOP.has(w));
 }
 
 function corpusOf(records: FinalReportEvidenceRecord[], forward: Array<string | FinalReportTypedReference>): string {
@@ -145,6 +145,13 @@ function referenceGrounds(item: string, reference: FinalReportTypedReference): b
   const itemWords = [...new Set(words(item).filter((w) => w.length >= 4))];
   const refWords = new Set(words(reference.text));
   const overlap = itemWords.filter((word) => refWords.has(word)).length;
+  if (reference.type === "forward-indicator") {
+    // Forward-looking items are not factual retellings. They need a
+    // meaningful pair of terms from one current reference, but should not be
+    // rejected merely because they also contain a future qualifier and an
+    // action verb.
+    return overlap >= 2;
+  }
   // A typed link must retain either the exact reference phrase or a substantial
   // share of one specific reference. Two unrelated words spread across the
   // complete corpus are deliberately insufficient.

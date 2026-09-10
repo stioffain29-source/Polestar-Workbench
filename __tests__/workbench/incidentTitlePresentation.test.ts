@@ -10,6 +10,7 @@ import { buildMaritimeIntelligence } from "../../artifacts/workbench/src/lib/mar
 import { toDraftableIncidents } from "../../artifacts/workbench/src/lib/topicProseResolution";
 import { incidentBlock } from "../../artifacts/api-server/src/lib/countryProse";
 import { validFlashpointSemantic } from "../../test-utils/flashpointTestFixtures";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 describe("translated incident titles at presentation boundaries", () => {
   const rawTitle = "Mahasiswa menggelar demonstrasi di Jayapura";
@@ -31,18 +32,19 @@ describe("translated incident titles at presentation boundaries", () => {
   });
 
   test("Shipping monitor dedupe preserves raw analysis fields and the translation", () => {
-    const rows = dedupeShippingMonitorRows([
+    const row = semanticIncident(
+      1,
+      "Kapal tanker diserang di Selat Malaka",
       {
-        id: 1,
-        title: "Kapal tanker diserang di Selat Malaka",
-        displayTitle: "Tanker attacked in the Strait of Malacca",
-        severity: "high",
-        occurredDate: new Date("2026-08-18T08:00:00Z"),
-        summary: "A tanker was attacked while transiting the shipping lane.",
-        location: "Strait of Malacca",
-        source: "Test Wire",
-        sourceUrl: "https://example.com/shipping",
+        eventClass: "commercial_attack",
+        country: "Malaysia",
+        physicalLocation: "Strait of Malacca",
+        eventDate: "2026-08-18",
       },
+    );
+    row.displayTitle = "Tanker attacked in the Strait of Malacca";
+    const rows = dedupeShippingMonitorRows([
+      { ...row, occurredDate: new Date("2026-08-18T08:00:00Z") },
     ]);
 
     expect(rows).toHaveLength(1);
@@ -54,20 +56,22 @@ describe("translated incident titles at presentation boundaries", () => {
 
   test("Shipping report analysis stays raw while returned rows use displayTitle", () => {
     const translatedTitle = "English presentation title";
+    const semantic = semanticIncident(
+      11,
+      "Tanker attacked by armed skiffs in the Gulf of Aden",
+      {
+        eventClass: "commercial_attack",
+        country: "Yemen",
+        physicalLocation: "Gulf of Aden",
+        eventDate: "2026-08-18",
+      },
+    );
     const dataset = buildShippingReportDataset(
       [
         {
-          id: 11,
-          title: "Tanker attacked by armed skiffs in the Gulf of Aden",
+          ...semantic,
           displayTitle: translatedTitle,
           topic: "shipping",
-          severity: "high",
-          occurredAt: "2026-08-18T08:00:00Z",
-          country: "Yemen",
-          location: "Gulf of Aden",
-          summary: "Armed men in skiffs attacked a tanker underway.",
-          source: "Test Wire",
-          sourceUrl: "https://example.com/shipping-report",
         },
       ],
       "shipping",
@@ -83,20 +87,21 @@ describe("translated incident titles at presentation boundaries", () => {
 
   test("Maritime board classifies raw titles and presents translated titles", () => {
     const translatedTitle = "English maritime presentation title";
+    const semantic = semanticIncident(
+      12,
+      "Tanker attacked by armed skiffs in the Gulf of Aden",
+      {
+        eventClass: "commercial_attack",
+        country: "Yemen",
+        physicalLocation: "Gulf of Aden",
+        eventDate: "2026-08-18",
+      },
+    );
     const board = buildMaritimeIntelligence({
       incidents: [
         {
-          id: 12,
-          title: "Tanker attacked by armed skiffs in the Gulf of Aden",
+          ...semantic,
           displayTitle: translatedTitle,
-          topic: "shipping",
-          severity: "high",
-          occurredAt: "2026-08-18T08:00:00Z",
-          country: "Yemen",
-          location: "Gulf of Aden",
-          summary: "Armed men in skiffs attacked a tanker underway.",
-          source: "Test Wire",
-          sourceUrl: "https://example.com/maritime-board",
         },
       ],
       movement: [],
@@ -148,6 +153,31 @@ describe("translated incident titles at presentation boundaries", () => {
     for (const rawInterpolation of forbiddenDirectInterpolations) {
       expect(source).not.toContain(rawInterpolation);
     }
+  });
+
+  test("Shipping monitor does not expose dataset or AIS methodology copy", () => {
+    const source = readFileSync("artifacts/workbench/src/pages/Shipping.tsx", "utf8");
+    const forbiddenClientCopy = [
+      "One shared dataset, identical to the Shipping Watch report.",
+      "Confidence & sources",
+      "No validated route evidence",
+      "No hostile vessel incidents currently on file in the shipping dataset.",
+      "Source may be pending external network validation",
+      "structured commercial or routing-consequence evidence",
+      "routed to Shipping Watch",
+      "PDF text is merged into the stored body",
+      "Full records remain available in the incident table",
+      "Thresholds are listed in Methodology",
+      "No matching records in current view",
+      "never count as incidents and never raise the risk level on their own",
+      "Vessel movement is CONTEXT only",
+    ];
+
+    for (const phrase of forbiddenClientCopy) {
+      expect(source).not.toContain(phrase);
+    }
+    expect(source).toContain("{t.count} observations");
+    expect(source).not.toContain("Confidence: ${");
   });
 
   test("Flashpoint report datasets expose English titles to previews and PDFs", () => {

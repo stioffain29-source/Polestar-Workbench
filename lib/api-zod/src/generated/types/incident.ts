@@ -7,6 +7,7 @@
  */
 import type { Confidence } from './confidence';
 import type { Corroboration } from './corroboration';
+import type { MaritimeSemanticEvidence } from './maritimeSemanticEvidence';
 import type { Severity } from './severity';
 import type { Topic } from './topic';
 
@@ -61,4 +62,5 @@ export interface Incident {
   gdeltEnrichedAt?: Date | null;
   /** @nullable */
   analystInScope?: boolean | null;
+  maritimeSemantic: MaritimeSemanticEvidence | null;
 }

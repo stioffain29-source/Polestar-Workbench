@@ -112,6 +112,21 @@ describe("decideXIncident", () => {
     expect(d.row.relevanceStatus).toBe("relevant");
     expect(d.row.analystNotes).toContain(`${X_MARKER_PREFIX}1900000000000000001`);
   });
+
+  it("withholds feed-country geography for shipping until semantic validation", () => {
+    const d = decideXIncident(
+      tweet({
+        text: "Pirates boarded a tanker in the Singapore Strait near Indonesia in a sea robbery.",
+      }),
+    );
+    expect(d.insert).toBe(true);
+    if (!d.insert) return;
+    expect(d.topic).toBe("shipping");
+    expect(d.row.country).toBe("Unknown");
+    expect(d.row.location).toBeNull();
+    expect(d.row.latitude).toBeNull();
+    expect(d.row.longitude).toBeNull();
+  });
 });
 
 // Fixture-driven precedence ladder. Each fixture is a representative, realistic

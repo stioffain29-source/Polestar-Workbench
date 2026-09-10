@@ -17,16 +17,17 @@ import {
   classifyPiracy,
   classifyVesselIncident,
   isConfirmedOperationalIncident,
-  isLowCredibilityShippingRecord,
   detectChokepoints,
   detectChokepointsScoped,
   classifyRegion,
+  isSemanticallyValidatedMaritimeIncident,
+  semanticEventClass,
+  semanticPhysicalCountry,
+  type ShippingMaritimeSemanticEvidence,
   type Region,
   type ChokepointKey,
   type MaritimeRecordLike,
 } from "./shippingAnalysis";
-import { dedupeShippingMonitorRows } from "./shippingReportDataset";
-import { deriveIncidentCountry } from "./shippingCountry";
 import { displayIncidentTitle } from "./incidentTitle";
 import type { ShippingReportDataset } from "./shippingReportDataset";
 
@@ -46,6 +47,7 @@ export interface MaritimeIncidentInput {
   source?: string | null;
   sourceUrl?: string | null;
   topic?: string | null;
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
 }
 
 export type MaritimeIncidentCategory =
@@ -109,6 +111,36 @@ export function classifyMaritimeIncident(
   i: MaritimeRecordLike,
   prevalidated = false,
 ): MaritimeIncidentCategory | null {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    if (!isSemanticallyValidatedMaritimeIncident(i)) return null;
+    switch (semanticEventClass(i)) {
+      case "commercial_seizure":
+        return "Hijacking / seizure";
+      case "commercial_attack":
+        return "Attack";
+      case "piracy_or_armed_robbery":
+        return "Piracy / armed robbery";
+      case "port_disruption":
+      case "protest_or_labour":
+      case "collision_or_grounding":
+      case "environmental_maritime_event":
+        return "Port closure / disruption";
+      case "chokepoint_disruption":
+      case "route_disruption":
+      case "routing_consequence":
+        return "Port closure / disruption";
+      case "geopolitical_activity":
+      case "geopolitical_maritime_development":
+      case "naval_activity":
+      case "military_naval_activity":
+      case "military_exercise":
+      case "drone_activity":
+      case "other_maritime_event":
+        return "Other confirmed maritime security event";
+      default:
+        return null;
+    }
+  }
   if (!prevalidated && !isConfirmedOperationalIncident(i)) return null;
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   const piracy = classifyPiracy(i);
@@ -210,12 +242,8 @@ export function computeMaritimeRisk(confirmed: ClassifiedIncident[]): MaritimeRi
   if (confirmed.length === 0) {
     return {
       level: 1,
-      // Zero incidents + low confidence must NOT read as a positive
-      // "Insignificant" risk judgement — a quiet window is at least as likely
-      // to be a reporting gap. Say so explicitly instead of asserting safety.
       label: "Not assessed",
-      rationale:
-        "No confirmed maritime security incidents in the window \u2014 insufficient reporting to assess a risk level, not a judgement that risk is low.",
+      rationale: "No validated maritime incidents in the selected window.",
       confidence: "low",
     };
   }
@@ -226,7 +254,6 @@ export function computeMaritimeRisk(confirmed: ClassifiedIncident[]): MaritimeRi
   );
   const kinetic = confirmed.filter((r) => KINETIC_CATEGORIES.has(r.category));
   const kineticCount = kinetic.length;
-  const chokepointKinetic = kinetic.find((r) => r.chokepoints.length > 0) ?? null;
   const hasPiracyish = confirmed.some((r) =>
     (
       ["Boarding", "Attempted attack", "Suspicious approach", "Piracy / armed robbery"] as MaritimeIncidentCategory[]
@@ -240,19 +267,18 @@ export function computeMaritimeRisk(confirmed: ClassifiedIncident[]): MaritimeRi
 
   let level: MaritimeRiskLevel;
   let rationale: string;
-  if (chokepointKinetic || sevRank >= 5 || kineticCount >= 2) {
+  // Highest individual severity is deliberately not the overall watch risk:
+  // one Extreme incident is a severe event, but it is not by itself evidence
+  // of sustained system-wide maritime risk.
+  if (kineticCount >= 2) {
     level = 5;
-    rationale = chokepointKinetic
-      ? `Confirmed kinetic activity against shipping in the ${chokepointKinetic.chokepoints[0]}.`
-      : kineticCount >= 2
-        ? "Sustained kinetic activity against shipping this week."
-        : "An incident rated Extreme sits in the window.";
+    rationale = "Sustained kinetic activity against commercial shipping this week.";
   } else if (kineticCount >= 1 || sevRank >= 4) {
     level = 4;
     rationale =
       kineticCount >= 1
-        ? "A confirmed kinetic attack on shipping this week."
-        : "A High-severity maritime incident this week.";
+        ? "A confirmed kinetic event against commercial shipping this week."
+        : "A High-severity maritime event this week.";
   } else if (hasDisruption || hasPiracyish || sevRank >= 3) {
     level = 3;
     rationale = hasDisruption
@@ -301,51 +327,32 @@ const BUSINESS_IMPACT_ORDER: BusinessImpact[] = [
 
 /**
  * Map the confirmed-incident picture to a deterministic set of fixed business
- * impacts. Returns ["No material impact"] when nothing is confirmed.
+ * impacts. Returns an empty list when no structured consequence is confirmed.
  */
 export function deriveBusinessImpact(
   confirmed: ClassifiedIncident[],
 ): BusinessImpact[] {
-  if (confirmed.length === 0) return ["No material impact"];
-  const cats = new Set(confirmed.map((r) => r.category));
-  const kineticChokepoint = confirmed.some(
-    (r) => KINETIC_CATEGORIES.has(r.category) && r.chokepoints.length > 0,
-  );
   const out = new Set<BusinessImpact>();
-
-  if (kineticChokepoint) {
-    out.add("Severe route disruption");
-    out.add("War-risk insurance premium pressure");
-    out.add("Rerouting consideration");
+  // Do not manufacture business consequences from an attack category or a
+  // route mention. Only structured, source-grounded consequence assessments
+  // may populate this client-facing list.
+  for (const row of confirmed) {
+    const semantic = row.maritimeSemantic;
+    if (!semantic) continue;
+    const routing = semantic.routingConsequence;
+    if (
+      routing?.status === "confirmed" ||
+      routing?.status === "assessed"
+    ) {
+      if (routing.kind === "observed" || routing.kind === "reported") {
+        out.add("Rerouting consideration");
+        out.add("Transit delay risk");
+      }
+    }
+    // A generic commercial-consequence status does not identify which
+    // business impact occurred. Do not turn it into a canned cargo-delay
+    // label; preserve the source-grounded claim in the incident evidence.
   }
-  if (
-    cats.has("Attack") ||
-    cats.has("Explosion / projectile impact") ||
-    cats.has("Fired upon") ||
-    cats.has("Hijacking / seizure")
-  ) {
-    out.add("War-risk insurance premium pressure");
-    out.add("Crew vigilance advised");
-    out.add("Chartering / fixture caution");
-  }
-  if (
-    cats.has("Boarding") ||
-    cats.has("Attempted attack") ||
-    cats.has("Suspicious approach") ||
-    cats.has("Piracy / armed robbery")
-  ) {
-    out.add("Crew vigilance advised");
-  }
-  if (
-    cats.has("Port closure / disruption") ||
-    cats.has("Maritime protest / labour disruption")
-  ) {
-    out.add("Port / berth disruption");
-    out.add("Cargo delivery delay");
-    out.add("Transit delay risk");
-  }
-  if (out.size === 0) out.add("Transit delay risk");
-
   return BUSINESS_IMPACT_ORDER.filter((b) => out.has(b));
 }
 
@@ -591,13 +598,20 @@ export interface MaritimeIntelligence {
   windowStart: Date;
   windowEnd: Date;
   bluf: string;
+  /** Highest severity of one individual validated incident. */
+  highestIndividualSeverity: string | null;
+  /** Risk from the subset of validated incidents with physical/direct route ties. */
+  chokepointRisk: MaritimeRisk;
+  /** Authoritative overall Shipping Watch risk rollup (also exposed as `risk`
+   * for existing report view consumers). */
+  overallRisk: MaritimeRisk;
   risk: MaritimeRisk;
   movementSnapshot: MovementSnapshot | null;
   incidentSnapshot: IncidentSnapshot;
   /**
    * The seven spec chokepoints, each with its own risk / count / movement.
-   * The report's prevalidated mode keeps off-card incidents in the overall
-   * confirmed total/risk, while these seven cards remain route-specific.
+   * Incidents outside a tracked route remain in the overall canonical total;
+   * these cards are only the physical/direct-passage route subset.
    */
   chokepointCards: ChokepointCard[];
   /** Number of board chokepoints with ≥1 confirmed incident in the window. */
@@ -650,7 +664,7 @@ function toLatestIncident(r: ClassifiedIncident): LatestIncident {
     ),
     category: r.category,
     severity: r.severity,
-    occurredAt: r.occurredAt,
+    occurredAt: r.maritimeSemantic?.eventDate ?? r.occurredAt,
     chokepoint: r.chokepoints[0] ?? null,
     country: r.incidentCountry,
     source: r.source ?? null,
@@ -659,7 +673,7 @@ function toLatestIncident(r: ClassifiedIncident): LatestIncident {
 }
 
 function impactSentence(impacts: BusinessImpact[]): string {
-  const named = impacts.filter((b) => b !== "No material impact").slice(0, 2);
+  const named = impacts.slice(0, 2);
   if (named.length === 0) return "";
   const lower = named.map((b) => b.charAt(0).toLowerCase() + b.slice(1));
   const phrase =
@@ -675,47 +689,42 @@ export function buildMaritimeIntelligence(
 ): MaritimeIntelligence {
   const { movement } = args;
   const prevalidated = args.inputMode === "prevalidated";
-  // Scope to shipping-topic incidents so the report (which is handed ALL topics)
-  // and the live Shipping monitor (server-filtered to topic "shipping") build
-  // from the EXACT same incident set. Without this the two surfaces could
-  // diverge — maritime-looking rows from cargo/flashpoint/fuel/energy would
-  // inflate the report's incident picture but not the monitor's.
-  const incidents = prevalidated
-    ? args.incidents
-    : args.incidents.filter((i) => i.topic === "shipping");
+  // Scope to shipping-topic incidents and require the same current semantic
+  // verdict used by the report dataset. Prevalidated means "already folded",
+  // not "trust arbitrary rows"; missing or stale semantic evidence still
+  // fails closed.
+  const incidents = args.incidents.filter(
+    (i) =>
+      (prevalidated || i.topic === "shipping") &&
+      isSemanticallyValidatedMaritimeIncident(i),
+  );
   const windowDays = args.windowDays ?? 7;
   const windowEnd = args.windowEnd ?? args.asOf ?? new Date();
   const windowStart =
     args.windowStart ??
     new Date(windowEnd.getTime() - windowDays * 24 * 60 * 60 * 1000);
 
-  // 1. Scope (APAC + Middle East) + credibility screen + syndication dedupe —
-  //    the exact same pipeline the Shipping monitor and report already use.
+  // 1. Use physical event geography only. Route names and vessel flags are
+  //    never incident countries. The canonical report path has already folded
+  //    development keys; the board does not run a second dedupe.
   const enriched = incidents.map((i) => {
-    const incidentCountry = deriveIncidentCountry(i);
+    const incidentCountry = semanticPhysicalCountry(i);
     return {
       ...i,
       incidentCountry,
       region: classifyRegion(incidentCountry),
-      occurredDate: safeDate(i.occurredAt),
+      occurredDate: safeDate(i.maritimeSemantic?.eventDate ?? i.occurredAt),
     };
   });
-  const inScopeClean = prevalidated
-    ? enriched
-    : enriched
-      .filter((i) => i.region !== "Out of scope")
-      .filter((i) => !isLowCredibilityShippingRecord(i));
-  const deduped = prevalidated ? inScopeClean : dedupeShippingMonitorRows(inScopeClean);
+  const inScopeClean = enriched.filter((i) => i.region !== "Out of scope");
 
-  // 2. Window the deduped set.
-  const windowRows = prevalidated
-    ? deduped
-    : deduped.filter(
-      (i) =>
-        !isNaN(i.occurredDate.getTime()) &&
-        i.occurredDate >= windowStart &&
-        i.occurredDate <= windowEnd,
-    );
+  // 2. Window the already-canonical set. AIS/movement is not involved.
+  const windowRows = inScopeClean.filter(
+    (i) =>
+      !isNaN(i.occurredDate.getTime()) &&
+      i.occurredDate >= windowStart &&
+      i.occurredDate <= windowEnd,
+  );
 
   // 3. Keep ONLY confirmed operational incidents, each tagged with a category.
   //    classifyMaritimeIncident gates on isConfirmedOperationalIncident, so
@@ -733,14 +742,6 @@ export function buildMaritimeIntelligence(
       } as ClassifiedIncident;
     })
     .filter((x): x is ClassifiedIncident => x !== null)
-    // The report is a CHOKEPOINT report: keep ONLY confirmed incidents that name
-    // at least one tracked board strait. Confirmed maritime activity in wider
-    // waters that names no board chokepoint (e.g. a Mediterranean seizure, or a
-    // Gulf-of-Oman / Persian-Gulf attack) is OUT OF SCOPE — the owner's decision
-    // is to remove it from the report entirely rather than surface it, so it can
-    // never drive the overall risk / BLUF while every named card reads zero (the
-    // "Extreme over a wall of zeros" contradiction).
-    .filter((r) => prevalidated || r.chokepoints.some((cp) => BOARD_CHOKEPOINTS.includes(cp)))
     .sort((a, b) => b.occurredDate.getTime() - a.occurredDate.getTime());
 
   // 4. Incident snapshot.
@@ -780,6 +781,14 @@ export function buildMaritimeIntelligence(
 
   // 5. Risk + business impact (incident-driven only).
   const risk = computeMaritimeRisk(confirmed);
+  const highestIndividualSeverity =
+    confirmed.reduce((highest, row) => {
+      const key = (row.severity ?? "").toLowerCase();
+      return (SEV_RANK[key] ?? 0) > (SEV_RANK[highest] ?? 0) ? key : highest;
+    }, "") || null;
+  const chokepointRisk = computeMaritimeRisk(
+    confirmed.filter((row) => row.chokepoints.length > 0),
+  );
   const businessImpact = deriveBusinessImpact(confirmed);
 
   // 6. Movement snapshot (context).
@@ -803,8 +812,30 @@ export function buildMaritimeIntelligence(
       }) ?? null
     );
   };
+  const routeCardFor = (routeName: string | null | undefined): ChokepointKey | null => {
+    const normalized = (routeName ?? "").trim().toLowerCase();
+    if (!normalized) return null;
+    return (
+      BOARD_CHOKEPOINTS.find((key) => {
+        const candidate = key.toLowerCase();
+        return candidate === normalized || candidate.includes(normalized) || normalized.includes(candidate);
+      }) ?? null
+    );
+  };
   const chokepointCards: ChokepointCard[] = BOARD_CHOKEPOINTS.map((key) => {
-    const subset = confirmed.filter((r) => r.chokepoints.includes(key));
+    const subset = confirmed.filter((r) => {
+      if (r.chokepoints.includes(key)) return true;
+      const relationship = r.maritimeSemantic?.routeRelationship;
+      const indirectConsequence =
+        relationship?.kind === "indirect" &&
+        (r.maritimeSemantic?.routingConsequence?.status === "confirmed" ||
+          r.maritimeSemantic?.routingConsequence?.status === "assessed");
+      const routeRelevant =
+        relationship?.kind === "physical" ||
+        relationship?.kind === "direct_passage" ||
+        indirectConsequence;
+      return routeRelevant && routeCardFor(relationship?.routeName) === key;
+    });
     const cpRisk = computeMaritimeRisk(subset);
     return {
       key,
@@ -891,22 +922,22 @@ export function buildMaritimeIntelligence(
     confirmed.some((r) => KINETIC_CATEGORIES.has(r.category) && r.chokepoints.length > 0)
   ) {
     watchNext.push(
-      `Watch the ${topChokepoint ?? "affected chokepoint"} for follow-on attacks and insurer war-risk repricing.`,
+      `Monitor ${topChokepoint ?? "the affected chokepoint"} for additional validated kinetic or route-linked evidence.`,
     );
   } else if ([...cats].some((c) => KINETIC_CATEGORIES.has(c))) {
-    watchNext.push("Watch for follow-on attacks and a possible advisory or escort response.");
+    watchNext.push("Monitor for additional validated kinetic evidence or a changed semantic route relationship.");
   }
   if (cats.has("Port closure / disruption") || cats.has("Maritime protest / labour disruption")) {
-    watchNext.push("Watch for port-closure escalation and cargo backlog.");
+    watchNext.push("Monitor for additional validated port-disruption or structured consequence evidence.");
   }
   if (cats.has("Piracy / armed robbery") || cats.has("Boarding") || cats.has("Suspicious approach")) {
-    watchNext.push("Watch high-risk anchorages for further boardings.");
+    watchNext.push("Monitor for additional validated piracy, boarding or suspicious-approach evidence.");
   }
   if (!movementSnapshot) {
-    watchNext.push("Confirm vessel movement with a licensed AIS provider — movement data unavailable.");
+    watchNext.push("Movement context is unavailable for this window.");
   }
   if (watchNext.length === 0) {
-    watchNext.push("No active maritime security driver; monitor for new reporting.");
+    watchNext.push("No validated maritime driver is available for a watch-next assessment.");
   }
 
   // 9. BLUF — bottom line up front.
@@ -916,12 +947,12 @@ export function buildMaritimeIntelligence(
   // incidents" negative would be falsifiable within the same PDF.
   const bluf =
     risk.level === 1
-      ? "Maritime risk is Insignificant. No confirmed incidents at tracked chokepoints this week; routine vigilance only."
+      ? "No validated maritime incidents were recorded in the selected window."
       : `Maritime risk is ${risk.label}. ${risk.rationale}${impactSentence(businessImpact)}`;
 
   // 10. Source health.
   const sourceHealth: MaritimeSourceHealth = {
-    incidentsAvailable: deduped.length > 0,
+      incidentsAvailable: inScopeClean.length > 0,
     movementAvailable: movementSnapshot !== null,
     movementAsOf: movementSnapshot?.asOf ?? null,
     movementSource: movementSnapshot?.sourceName ?? null,
@@ -935,6 +966,9 @@ export function buildMaritimeIntelligence(
     windowStart,
     windowEnd,
     bluf,
+    highestIndividualSeverity,
+    chokepointRisk,
+    overallRisk: risk,
     risk,
     movementSnapshot,
     incidentSnapshot,
@@ -1039,9 +1073,13 @@ export function assertShippingReportConsistency(
     null;
   if (
     latestSignificant &&
-    !ds.relatedIncidents.some((row) => String(row.id) === String(latestSignificant.id))
+    !ds.relatedIncidents.some((row) => String(row.id) === String(latestSignificant.id)) &&
+    !board.confirmedIncidents.some((row) => String(row.id) === String(latestSignificant.id)) &&
+    !ds.vesselRows.some((row) => String(row.id) === String(latestSignificant.id)) &&
+    !ds.piracyRows.some((row) => String(row.id) === String(latestSignificant.id)) &&
+    !ds.commercialRows.some((row) => String(row.id) === String(latestSignificant.id))
   ) {
-    fail("Latest Significant Incident is missing from Related Incidents");
+    fail("Latest Significant Incident is missing from the published incident surfaces");
   }
   const expectedBoard = buildMaritimeIntelligence({
     incidents: canonical,

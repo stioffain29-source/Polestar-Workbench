@@ -8,6 +8,7 @@ import {
   type InsertDataCentreFacility,
 } from "@workspace/db";
 import { requireAdminToken } from "../lib/adminAuth";
+import { validateAndPersistMaritimeWriterRows } from "@workspace/ingest";
 
 // One-time, token-gated incident backfill.
 //
@@ -119,12 +120,17 @@ router.post(
         ? or(eq(incidentsTable.sourceUrl, rec.sourceUrl), naturalKey)
         : naturalKey;
       const existing = await db
-        .select({ id: incidentsTable.id })
+        .select()
         .from(incidentsTable)
         .where(matchCondition)
         .limit(1);
 
       if (existing.length > 0) {
+        // A skipped duplicate is still a writer reconciliation opportunity:
+        // old maritime rows may predate semantic validation. Re-evaluate the
+        // existing snapshot rather than letting "already present" bypass the
+        // current hash/version admission gate.
+        await validateAndPersistMaritimeWriterRows(existing);
         skipped.push({ title: rec.title, reason: "already_present" });
         continue;
       }
@@ -133,10 +139,25 @@ router.post(
         topic: rec.topic,
         title: rec.title,
         summary: rec.summary,
-        country: rec.country,
-        location: rec.location ?? null,
-        latitude: rec.latitude ?? null,
-        longitude: rec.longitude ?? null,
+        // Legacy geography is not accepted from a backfill payload for
+        // maritime rows. The semantic writer validator is the only authority
+        // allowed to restore a verified physical country/location.
+        country:
+          rec.topic === "shipping" || rec.topic === "maritime"
+            ? "Unknown"
+            : rec.country,
+        location:
+          rec.topic === "shipping" || rec.topic === "maritime"
+            ? null
+            : rec.location ?? null,
+        latitude:
+          rec.topic === "shipping" || rec.topic === "maritime"
+            ? null
+            : rec.latitude ?? null,
+        longitude:
+          rec.topic === "shipping" || rec.topic === "maritime"
+            ? null
+            : rec.longitude ?? null,
         occurredAt,
         severity: rec.severity,
         confidence: rec.confidence,
@@ -148,7 +169,8 @@ router.post(
       const [row] = await db
         .insert(incidentsTable)
         .values(values)
-        .returning({ id: incidentsTable.id });
+        .returning();
+      await validateAndPersistMaritimeWriterRows([row!]);
       inserted.push({ id: row!.id, title: rec.title });
     }
 

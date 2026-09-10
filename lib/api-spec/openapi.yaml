@@ -2105,9 +2105,128 @@ components:
         url: { type: string }
         matchScore: { type: number }
 
+    MaritimeSemanticEvidence:
+      description: >
+        Source-grounded maritime semantic decision. A null value means the row
+        has not yet converged; needs_review is never keyword-fallbacked into a
+        commercial incident. AIS/movement is not included in this contract.
+      type: object
+      required:
+        - version
+        - verdict
+        - reason
+        - eventOccurred
+        - eventClass
+        - commercialTargetValidated
+        - commercialTarget
+        - commercialTargetName
+        - commercialTargetEvidence
+        - physicalLocation
+        - physicalLocationEvidence
+        - country
+        - coastalState
+        - routeRelationship
+        - routingConsequence
+        - commercialConsequence
+        - geopolitical
+        - eventDate
+        - developmentKey
+        - severity
+        - severityJustification
+        - severityEvidenceQuote
+        - confidence
+        - contradictions
+        - sourceQuotes
+        - evidence
+        - evaluatedAt
+      properties:
+        version: { type: string }
+        verdict: { type: string, enum: [valid, invalid, needs_review] }
+        reason: { type: string }
+        eventOccurred: { type: ["boolean", "null"] }
+        eventClass:
+          type: ["string", "null"]
+          enum:
+            [commercial_attack, commercial_seizure, piracy_or_armed_robbery,
+             collision_or_grounding, port_disruption, chokepoint_disruption,
+             route_disruption, environmental_maritime_event, naval_activity,
+             military_naval_activity, drone_activity, military_exercise,
+             geopolitical_maritime_development, protest_or_labour,
+             other_maritime_event, non_event]
+        commercialTargetValidated: { type: boolean }
+        commercialTarget:
+          type: string
+          enum: [vessel, cargo, port_facility, shipping_operations, none, unknown]
+        commercialTargetName: { type: ["string", "null"] }
+        commercialTargetEvidence: { type: ["string", "null"] }
+        physicalLocation: { type: ["string", "null"] }
+        physicalLocationEvidence: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        coastalState: { type: ["string", "null"] }
+        routeRelationship:
+          type: object
+          required: [kind, routeName, evidence]
+          properties:
+            kind: { type: string, enum: [physical, direct_passage, indirect, none] }
+            routeName: { type: ["string", "null"] }
+            evidence: { type: ["string", "null"] }
+        routingConsequence:
+          $ref: "#/components/schemas/MaritimeConsequence"
+        commercialConsequence:
+          $ref: "#/components/schemas/MaritimeConsequence"
+        geopolitical:
+          type: object
+          required: [relevant, claim, evidenceQuote]
+          properties:
+            relevant: { type: boolean }
+            claim: { type: ["string", "null"] }
+            evidenceQuote: { type: ["string", "null"] }
+        eventDate: { type: ["string", "null"], format: date }
+        developmentKey: { type: ["string", "null"] }
+        severity:
+          type: ["string", "null"]
+          enum: [insignificant, low, moderate, high, extreme, null]
+        severityJustification: { type: ["string", "null"] }
+        severityEvidenceQuote: { type: ["string", "null"] }
+        confidence:
+          type: object
+          required: [event, classification, commercialTarget, geography, routeRelationship, consequence, date]
+          properties:
+            event: { type: number, minimum: 0, maximum: 1 }
+            classification: { type: number, minimum: 0, maximum: 1 }
+            commercialTarget: { type: number, minimum: 0, maximum: 1 }
+            geography: { type: number, minimum: 0, maximum: 1 }
+            routeRelationship: { type: number, minimum: 0, maximum: 1 }
+            consequence: { type: number, minimum: 0, maximum: 1 }
+            date: { type: number, minimum: 0, maximum: 1 }
+        contradictions: { type: array, items: { type: string } }
+        sourceQuotes:
+          type: array
+          items:
+            type: object
+            required: [quote, claim]
+            properties:
+              quote: { type: string }
+              claim: { type: string }
+        evidence: { type: array, items: { type: string } }
+        evaluatedAt: { type: string, format: date-time }
+
+    MaritimeConsequence:
+      type: object
+      required: [status, claim, evidenceQuote, confidence]
+      properties:
+        status: { type: string, enum: [none, confirmed, assessed] }
+        claim: { type: ["string", "null"] }
+        evidenceQuote: { type: ["string", "null"] }
+        confidence: { type: ["number", "null"], minimum: 0, maximum: 1 }
+        # Legacy adapter fields retained until all consumers converge.
+        kind: { type: string, enum: [none, observed, reported, potential, unknown] }
+        description: { type: ["string", "null"] }
+        evidence: { type: ["string", "null"] }
+
     Incident:
       type: object
-      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt, corroborations]
+      required: [id, topic, title, summary, country, occurredAt, severity, confidence, createdAt, corroborations, maritimeSemantic]
       properties:
         id: { type: integer }
         topic: { $ref: "#/components/schemas/Topic" }
@@ -2155,6 +2274,10 @@ components:
         # Cargo Watch "needs review" incident by assigning its country — the row
         # is then authoritative for the in-scope main lane. Null for scraper rows.
         analystInScope: { type: ["boolean", "null"] }
+        maritimeSemantic:
+          allOf:
+            - $ref: "#/components/schemas/MaritimeSemanticEvidence"
+          nullable: true
 
     IncidentInput:
       type: object

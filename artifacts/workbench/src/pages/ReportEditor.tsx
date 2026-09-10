@@ -85,6 +85,7 @@ import {
 } from "@/components/OrphanedFuelOverridesPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
+import { finalizeShippingPublication } from "@/lib/shippingPublication";
 import {
   buildFlashpointReportDataset,
   resolveFlashpointRenderedModel,
@@ -641,7 +642,21 @@ export default function ReportEditor() {
     if (!summariesEnabled) return [];
     let rows: Array<Record<string, unknown>> = [];
     if (form.topic === "shipping") {
-      rows = (shippingDataset?.relatedIncidents ?? []) as unknown as Array<Record<string, unknown>>;
+      // Use the same final publication boundary as preview/PDF. In
+      // particular, incidents already shown in Maritime Intelligence or a
+      // specialised table are not Related Incidents and must not be sent to
+      // the summary cache/generator.
+      rows = (
+        shippingDataset
+          ? finalizeShippingPublication({
+              report: { topic: "shipping", issueDate: form.issueDate },
+              topic: "shipping",
+              issueDate: form.issueDate,
+              incidents: incidentsForExport as never,
+              dataset: shippingDataset,
+            }).dataset.relatedIncidents
+          : []
+      ) as unknown as Array<Record<string, unknown>>;
     } else if (form.topic === "conflict") {
       rows = buildConflictReportDataset(
         incidentsForExport,

@@ -2,6 +2,163 @@
 // Shipping report PDF exporter. Single source of truth so the dashboard
 // and the report never disagree.
 
+import {
+  MARITIME_SEMANTIC_VERSION,
+  isValidatedMaritimeIncident,
+  validateMaritimeSemanticContract,
+  type MaritimeSemanticEvidence,
+} from "@workspace/relevance";
+import type {
+  MaritimeSemanticEvidence as ApiMaritimeSemanticEvidence,
+} from "@workspace/api-client-react";
+
+/**
+ * Semantic evidence is supplied by the API on shipping incidents. Keep the
+ * frontend helpers structural at this boundary: the ingest contract is
+ * versioned and the API can add provider-only evidence fields without forcing
+ * every report consumer to know about them.
+ */
+/** Semantic evidence as delivered by the generated API client or the
+ * provider-contract package. The generated API carries a few nullable legacy
+ * adapter fields, so admission validates and projects both shapes through the
+ * canonical provider contract below. */
+export type ShippingMaritimeSemanticEvidence =
+  | MaritimeSemanticEvidence
+  | ApiMaritimeSemanticEvidence;
+
+type SemanticRecord = {
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
+};
+
+function semanticOf(
+  record: SemanticRecord | null | undefined,
+): MaritimeSemanticEvidence | null {
+  const evidence = record?.maritimeSemantic;
+  if (!evidence || typeof evidence !== "object") return null;
+  if (evidence.version !== MARITIME_SEMANTIC_VERSION) return null;
+  const contract = validateMaritimeSemanticContract(
+    evidence as Partial<MaritimeSemanticEvidence>,
+  );
+  if (!contract.valid) return null;
+  return evidence as MaritimeSemanticEvidence;
+}
+
+/**
+ * A shipping row is admitted only from a current, fully valid semantic
+ * result. There is intentionally no title/summary fallback here. Missing,
+ * stale or malformed semantic evidence is an unavailable assessment, not a
+ * keyword-classified incident.
+ */
+export function hasValidMaritimeSemantic(
+  record: SemanticRecord | null | undefined,
+): record is SemanticRecord & { maritimeSemantic: MaritimeSemanticEvidence } {
+  return semanticOf(record) !== null;
+}
+
+export function isSemanticallyValidatedMaritimeIncident(
+  record: SemanticRecord | null | undefined,
+): boolean {
+  const evidence = semanticOf(record);
+  return evidence !== null && isValidatedMaritimeIncident(evidence);
+}
+
+export type MaritimeRouteRelationshipKind =
+  | "physical"
+  | "direct_passage"
+  | "indirect"
+  | "none";
+
+export function semanticRouteRelationship(
+  record: SemanticRecord | null | undefined,
+): {
+  kind: MaritimeRouteRelationshipKind;
+  routeName: string | null;
+  evidence: string | null;
+} {
+  const evidence = semanticOf(record);
+  const route = evidence?.routeRelationship as
+    | {
+        kind?: MaritimeRouteRelationshipKind;
+        relevant?: boolean;
+        routeName?: string | null;
+        evidence?: string | null;
+      }
+    | undefined;
+  if (!route) return { kind: "none", routeName: null, evidence: null };
+  // `relevant` was part of the initial contract. Keep this compatibility
+  // projection while the versioned provider contract migrates to the explicit
+  // physical/direct/indirect relationship enum. It is still semantic data,
+  // never a raw-text inference.
+  const kind =
+    route.kind ??
+    (route.relevant ? "direct_passage" : "none");
+  return {
+    kind,
+    routeName: typeof route.routeName === "string" ? route.routeName : null,
+    evidence: typeof route.evidence === "string" ? route.evidence : null,
+  };
+}
+
+export function semanticPhysicalCountry(
+  record: SemanticRecord | null | undefined,
+): string | null {
+  const evidence = semanticOf(record);
+  if (
+    !evidence ||
+    typeof evidence.physicalLocation !== "string" ||
+    !evidence.physicalLocation.trim() ||
+    typeof evidence.physicalLocationEvidence !== "string" ||
+    !evidence.physicalLocationEvidence.trim()
+  ) {
+    return null;
+  }
+  return typeof evidence.country === "string" && evidence.country.trim()
+    ? evidence.country.trim()
+    : null;
+}
+
+export function semanticPhysicalLocation(
+  record: SemanticRecord | null | undefined,
+): string | null {
+  const evidence = semanticOf(record);
+  return evidence &&
+    typeof evidence.physicalLocation === "string" &&
+    evidence.physicalLocation.trim()
+    ? evidence.physicalLocation.trim()
+    : null;
+}
+
+export function semanticEventClass(
+  record: SemanticRecord | null | undefined,
+): string | null {
+  const evidence = semanticOf(record);
+  return evidence?.eventClass ?? null;
+}
+
+export function semanticSeverity(
+  record: SemanticRecord | null | undefined,
+): string | null {
+  const evidence = semanticOf(record);
+  return evidence?.severity ?? null;
+}
+
+export function semanticCommercialTargetValidated(
+  record: SemanticRecord | null | undefined,
+): boolean {
+  const evidence = semanticOf(record);
+  return (
+    evidence?.commercialTargetValidated === true &&
+    typeof evidence.commercialTarget === "string" &&
+    !["none", "unknown"].includes(evidence.commercialTarget)
+  );
+}
+
+export function semanticRouteEvidence(
+  record: SemanticRecord | null | undefined,
+): string | null {
+  return semanticRouteRelationship(record).evidence;
+}
+
 export type ChokepointKey =
   | "Strait of Hormuz"
   | "Gulf of Oman"
@@ -66,6 +223,7 @@ export interface MaritimeRecordLike {
   location?: string | null;
   source?: string | null;
   sourceUrl?: string | null;
+  maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +363,23 @@ function blob(i: MaritimeRecordLike): string {
  * Persian/Arabian Gulf row, so we do not stop at the first hit.
  */
 export function detectChokepoints(i: MaritimeRecordLike): ChokepointKey[] {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    const route = semanticRouteRelationship(i);
+    if (route.kind !== "physical" && route.kind !== "direct_passage") return [];
+    const routeText = (route.routeName ?? "").toLowerCase();
+    const aliases: Array<[ChokepointKey, RegExp]> = [
+      ["Strait of Hormuz", /\b(hormuz|strait of hormuz)\b/],
+      ["Gulf of Oman", /\bgulf of oman\b/],
+      ["Arabian / Persian Gulf", /\b(arabian|persian) gulf\b/],
+      ["Red Sea", /\bred sea\b/],
+      ["Bab el-Mandeb", /\bbab[- ]?(el|al)[- ]?mande[bn]\b/],
+      ["Suez Canal", /\bsuez\b/],
+      ["Gulf of Aden", /\bgulf of aden\b/],
+      ["Singapore Strait", /\b(singapore strait|strait of singapore)\b/],
+      ["Malacca Strait", /\b(malacca strait|strait of malacca|malacca)\b/],
+    ];
+    return aliases.filter(([, pattern]) => pattern.test(routeText)).map(([key]) => key);
+  }
   const text = blob(i);
   const hits: ChokepointKey[] = [];
   for (const r of CHOKEPOINT_RULES) {
@@ -243,6 +418,11 @@ export function detectChokepointsScoped(
   i: MaritimeRecordLike,
   incidentCountry: string | null | undefined,
 ): ChokepointKey[] {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    // A validated provider relationship is already the geography/route
+    // assessment. Never re-introduce a text mention or a feed-country veto.
+    return detectChokepoints(i);
+  }
   const hits = detectChokepoints(i);
   const country = (incidentCountry ?? "").trim();
   if (!country) return hits;
@@ -309,6 +489,12 @@ const PIRACY_RULES: Array<{ type: PiracyAct; pattern: RegExp }> = [
  * not a piracy event. Land cargo theft is always rejected.
  */
 export function classifyPiracy(i: MaritimeRecordLike): PiracyAct | null {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    if (!isSemanticallyValidatedMaritimeIncident(i)) return null;
+    return semanticEventClass(i) === "piracy_or_armed_robbery"
+      ? "Piracy"
+      : null;
+  }
   const text = blob(i);
   if (LAND_CARGO_RE.test(text) && !/\b(at sea|at anchorage|on board|vessel|ship|tanker|dhow|crew)\b/i.test(text)) {
     return null;
@@ -469,6 +655,35 @@ const VESSEL_RULES: Array<{ type: VesselIncidentType; pattern: RegExp }> = [
 ];
 
 export function classifyVesselIncident(i: MaritimeRecordLike): VesselIncidentType | null {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    if (!isSemanticallyValidatedMaritimeIncident(i)) return null;
+    const eventClass = semanticEventClass(i);
+    const targetValidated = semanticCommercialTargetValidated(i);
+    // Naval, military and drone activity is context only unless the provider
+    // positively identified a commercial target. It must never seed attack or
+    // seizure totals on wording alone.
+    if (
+      (eventClass === "naval_activity" ||
+        eventClass === "military_naval_activity" ||
+        eventClass === "military_exercise" ||
+        eventClass === "drone_activity") &&
+      !targetValidated
+    ) {
+      return null;
+    }
+    if (!targetValidated) return null;
+    if (eventClass === "commercial_seizure") return "Seized";
+    if (
+      eventClass === "commercial_attack" ||
+      eventClass === "drone_activity"
+    ) {
+      return "Attack";
+    }
+    // Piracy / armed robbery is a separate metric. It must never be folded
+    // into commercial attack totals merely because the target was a vessel.
+    if (eventClass === "piracy_or_armed_robbery") return null;
+    return null;
+  }
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   if (COMMERCIAL_RE.test(text)) return null;
   if (DIPLOMATIC_FOLLOWUP_RE.test(text)) return null;
@@ -500,6 +715,36 @@ export const VESSEL_ACCENT: Record<VesselIncidentType, string> = {
 // ---------------------------------------------------------------------------
 
 export function classifyIssue(i: MaritimeRecordLike): string {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    if (!isSemanticallyValidatedMaritimeIncident(i)) {
+      return "Unclassified maritime record";
+    }
+    switch (semanticEventClass(i)) {
+      case "commercial_attack":
+      case "commercial_seizure":
+      case "piracy_or_armed_robbery":
+        return semanticEventClass(i) === "piracy_or_armed_robbery"
+          ? "Piracy / armed robbery"
+          : semanticEventClass(i) === "commercial_seizure"
+            ? "Vessel seizure"
+            : "Vessel attack";
+      case "collision_or_grounding":
+        return "Route diversion";
+      case "port_disruption":
+        return "Port disruption";
+      case "chokepoint_disruption":
+      case "route_disruption":
+      case "routing_consequence":
+        return "Route diversion";
+      case "environmental_maritime_event":
+        return "Commercial shipping disruption";
+      case "geopolitical_activity":
+      case "geopolitical_maritime_development":
+        return "Chokepoint risk";
+      default:
+        return "Maritime advisory";
+    }
+  }
   const text = `${i.title ?? ""} ${i.summary ?? ""}`;
   if (ISSUE_RULES[0].pattern.test(text)) return ISSUE_RULES[0].label;
   const v = classifyVesselIncident(i);
@@ -560,6 +805,9 @@ const CONFIRMED_INCIDENT_CAUSE_RE = /\b(ran aground|aground|grounding|grounded|r
  * commentary all return false, so they cannot be presented as incidents.
  */
 export function isConfirmedOperationalIncident(i: MaritimeRecordLike): boolean {
+  if (Object.prototype.hasOwnProperty.call(i, "maritimeSemantic")) {
+    return isSemanticallyValidatedMaritimeIncident(i);
+  }
   // Never confirmed if it is noise, human-interest, speculative claim,
   // rhetoric, media packaging, or capability/procurement context.
   if (isLowCredibilityShippingRecord(i)) return false;

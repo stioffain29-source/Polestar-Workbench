@@ -1,21 +1,55 @@
-import { incidentsTable } from "@workspace/db";
+import { incidentsTable, maritimeSemanticEvidenceTable } from "@workspace/db";
 import { displayableIncidentTitleCondition } from "@workspace/ingest/titleTranslate";
 import {
   FLASHPOINT_ACCEPTED_EVENT_TYPES,
   FLASHPOINT_CONFIDENCE_THRESHOLDS,
   FLASHPOINT_VALIDITY_VERSION,
+  MARITIME_SEMANTIC_VERSION,
   validateFlashpointSemanticContract,
   type FlashpointSemanticGates,
 } from "@workspace/relevance";
 import { and, eq, notInArray, or, sql, type SQL } from "drizzle-orm";
 
+function currentMaritimeContentFingerprintSql(): SQL {
+  const canonicalDate = (column: unknown) => sql`
+    coalesce(
+      to_char(
+        date_trunc('milliseconds', ${column} AT TIME ZONE 'UTC'),
+        'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      ),
+      ''
+    )`;
+  return sql`md5(concat_ws(
+    ${"\u001f"},
+    coalesce(${incidentsTable.topic}, ''),
+    coalesce(${incidentsTable.title}, ''),
+    coalesce(${incidentsTable.summary}, ''),
+    coalesce(${incidentsTable.source}, ''),
+    coalesce(${incidentsTable.sourceUrl}, ''),
+    coalesce(${incidentsTable.country}, ''),
+    coalesce(${incidentsTable.location}, ''),
+    ${canonicalDate(incidentsTable.occurredAt)},
+    ${canonicalDate(incidentsTable.incidentDate)}
+  ))`;
+}
+
+/** Requires a projection for the current source snapshot, not merely any v2 row. */
+export function currentMaritimeSemanticProjectionCondition(): SQL {
+  return and(
+    eq(maritimeSemanticEvidenceTable.version, MARITIME_SEMANTIC_VERSION),
+    sql`${maritimeSemanticEvidenceTable.contentFingerprint} =
+      ${currentMaritimeContentFingerprintSql()}`,
+  )!;
+}
+
 /**
  * Default server-side relevance gate for incident reads. Fail closed: only rows
  * the shared @workspace/relevance engine explicitly marked 'relevant' appear.
  * NULL/unevaluated records are not incidents until classification proves they
- * are, so geography, source membership or ingestion alone can never surface one.
- * This is the single choke point that keeps every read surface (topic pages,
- * incidents list, map, timeline, dashboard counts) clean.
+ * are, so geography, source membership or ingestion alone can never surface
+ * one. Maritime review rows remain readable for analyst resolution; callers
+ * that calculate validated maritime totals additionally apply
+ * validatedMaritimeIncidentCondition().
  */
 export function defaultRelevanceCondition(): SQL {
   const gates = incidentsTable.validityGates;
@@ -83,6 +117,34 @@ export function defaultRelevanceCondition(): SQL {
       ),
     ),
     displayableIncidentTitleCondition(),
+  )!;
+}
+
+/**
+ * Count/report boundary for maritime rows.  Review rows remain retrievable
+ * through the incident API (with maritimeSemantic.verdict=needs_review), but
+ * cannot inflate validated incident totals until the relational projection
+ * proves a discrete event.  Military/naval/drone context requires a validated
+ * commercial target before it enters those totals.
+ */
+export function validatedMaritimeIncidentCondition(): SQL {
+  return or(
+    notInArray(incidentsTable.topic, ["shipping", "maritime"]),
+    sql`EXISTS (
+      SELECT 1
+        FROM ${maritimeSemanticEvidenceTable}
+       WHERE ${maritimeSemanticEvidenceTable.incidentId} = ${incidentsTable.id}
+          AND ${currentMaritimeSemanticProjectionCondition()}
+         AND ${maritimeSemanticEvidenceTable.verdict} = 'valid'
+         AND ${maritimeSemanticEvidenceTable.eventOccurred} = true
+         AND ${maritimeSemanticEvidenceTable.eventClass} IS NOT NULL
+         AND ${maritimeSemanticEvidenceTable.eventClass} <> 'non_event'
+         AND (
+           ${maritimeSemanticEvidenceTable.eventClass} NOT IN
+             ('naval_activity', 'military_naval_activity', 'military_exercise', 'drone_activity')
+           OR ${maritimeSemanticEvidenceTable.commercialTargetValidated} = true
+         )
+    )`,
   )!;
 }
 

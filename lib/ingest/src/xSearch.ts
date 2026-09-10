@@ -1,5 +1,5 @@
 import { db, incidentsTable } from "@workspace/db";
-import type { InsertIncident } from "@workspace/db";
+import type { Incident, InsertIncident } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { cleanText } from "./text";
 import { classifySeverity, type SeverityTopic } from "./severity";
@@ -12,6 +12,7 @@ import {
   type RelevanceInput,
 } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
+import { validateAndPersistMaritimeWriterRows } from "./maritimeWriterValidation";
 
 // X (Twitter) Recent Search — SOURCE PROVIDER ONLY.
 //
@@ -155,7 +156,11 @@ export function decideXIncident(post: NormalisedTweet): XDecision {
   const title = text.slice(0, 500);
   const summary = text.slice(0, 2000);
 
-  const geo = geocode(country, `${title} ${summary}`);
+  // Maritime geography is source-backed semantic evidence, not a feed-country
+  // centroid. Keep legacy country/coordinates unassigned until that evidence
+  // has been evaluated.
+  const legacyCountry = topic === "shipping" ? "Unknown" : country;
+  const geo = topic === "shipping" ? null : geocode(country, `${title} ${summary}`);
   const severity = classifySeverity(title, summary, topic);
 
   const rel = evaluateIncidentRelevance(topic, {
@@ -171,7 +176,7 @@ export function decideXIncident(post: NormalisedTweet): XDecision {
     topic,
     title,
     summary,
-    country,
+    country: legacyCountry,
     location: geo?.location ?? null,
     latitude: geo?.latitude ?? null,
     longitude: geo?.longitude ?? null,
@@ -459,8 +464,12 @@ export async function runXSearchIngest(opts: XSearchOptions = {}): Promise<XSear
 
   if (commit && toInsert.length > 0) {
     try {
-      await db.insert(incidentsTable).values(toInsert);
-      summary.inserted = toInsert.length;
+      const insertedRows = await db
+        .insert(incidentsTable)
+        .values(toInsert)
+        .returning();
+      await validateAndPersistMaritimeWriterRows(insertedRows as Incident[]);
+      summary.inserted = insertedRows.length;
       log(`  inserted           : ${summary.inserted}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

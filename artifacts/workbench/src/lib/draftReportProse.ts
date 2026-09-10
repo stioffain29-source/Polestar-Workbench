@@ -532,39 +532,42 @@ const CARGO: ReportPack = {
 // Shipping Watch
 // ---------------------------------------------------------------------------
 const SHIPPING: ReportPack = {
-  exec: ({ types, lead, countries, sev, thin, total, cadence, leadDevelopment }) => {
-    const driver = types || "chokepoint exposure, vessel risk and freight-side pressure";
-    const geo = lead
-      ? ` ${lead} saw the most activity${countries && countries !== lead ? `, with less from ${countries.replace(`${lead}, `, "").replace(`${lead} and `, "")}` : ""}.`
-      : " No single country stands out, and several reports do not pin down a precise location.";
-    const headline = leadDevelopment
-      ? `The week centred on ${leadDevelopment}. `
-      : "";
-    return `${headline}Maritime reporting was centred on ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)}`;
+  exec: ({ types, countries, sev, thin, total, cadence }) => {
+    const driver = types || "no single maritime event class";
+    const geo = countries
+      ? ` The reported geography included ${countries}.`
+      : " The reported geography was not consistently identified.";
+    return `Maritime reporting identified ${driver}.${geo}${sevTail(sev)}${thinTail(thin, total, cadence)} Treat this as a reported signal, not an overall risk judgement.`;
   },
   situation: ({ types }) => {
-    const focus = types ? `Chokepoints and major ports remain the standing pressure points, currently showing up as ${types}.` : "Chokepoints and major ports remain the standing pressure points, with vessel and freight-side risk close behind.";
+    const focus = types
+      ? `The reporting window contains ${types}; the named incidents provide the basis for the operational assessment.`
+      : "The reporting window contains no specific maritime event class to lead the operational assessment.";
     return `${focus}`;
   },
   whatHappened: ({ types, countries, sev }) => {
-    const lead = types ? `Maritime activity was shaped by ${types}.` : `Maritime activity was light this week.`;
-    const geo = countries ? ` Reporting traced back to ${countries}.` : "";
+    const lead = types ? `Reported maritime developments included ${types}.` : `No specific maritime development was identified in the reporting window.`;
+    const geo = countries ? ` The reported geography included ${countries}.` : "";
     return `${lead}${geo}${sevTail(sev)}`;
   },
-  whatMatters: () =>
-    "Pressure here feeds straight into transit time, freight cost and war-risk premium exposure across the wider region. A small shift on any one chokepoint usually shows up in the freight and insurance picture soon after.",
+  // These seeds are deliberately conservative. Publication-time prose adds
+  // the detailed route, target and consequence checks.
+  whatMatters: ({ lead }) =>
+    lead
+      ? `Assessment: maritime risk remains concentrated around ${lead}; the operational question is whether a further route disruption is reported.`
+      : "Assessment: the available reports do not identify a single operational pressure point; treat the current risk view as provisional.",
   implications: () =>
-    "Re-walk routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure. Confirm crew-change and advisory triggers with operators.",
+    "Review operator escalation triggers for further maritime incidents, and keep any route response conditional.",
   watchNext: () =>
-    "Next week hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices.",
+    "Monitor for a further reported maritime event, a physical route relationship, or a commercial consequence; these are forward indicators, not current events.",
   polestarView: ({ lead }) =>
-    `Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption.${lead ? ` ${lead} saw the most activity this week.` : ""}`,
-  zeroExec: "Maritime reporting was quiet this week. Read that as a gap in reporting rather than proof of calm at sea.",
-  zeroSituation: "Chokepoint, vessel and freight-side exposure persists even when little is reported.",
-  zeroWhatHappened: "No notable maritime activity came through, so the picture is a rough guide rather than firm.",
-  zeroWhatMatters: "Underlying pressure on transit time, freight cost and war-risk premium remains, whatever is reported.",
-  zeroPolestar: "Nothing useful came through on shipping this week. Standing exposure to chokepoint, vessel and freight risk remains.",
-  thinNote: "Shipping reporting was light this week. Treat that as a gap in reporting, not proof that disruption has eased.",
+    `Polestar assesses maritime risk from reported incidents rather than movement indicators.${lead ? ` The leading reported geography is ${lead}.` : ""}`,
+  zeroExec: "No maritime incident was identified in the reporting window. Treat that as limited evidence, not proof of calm at sea.",
+  zeroSituation: "No maritime incident provides a lead for the operational assessment in this window.",
+  zeroWhatHappened: "No maritime development was identified in the reporting window.",
+  zeroWhatMatters: "Assessment: the reporting window does not establish a specific maritime operational pressure point.",
+  zeroPolestar: "Polestar assesses the current maritime risk view as provisional because no incident was identified.",
+  thinNote: "Shipping reporting was light this week. Treat that as limited evidence, not proof that disruption has eased.",
 };
 
 // ---------------------------------------------------------------------------

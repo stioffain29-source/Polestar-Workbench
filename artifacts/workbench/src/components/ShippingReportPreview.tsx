@@ -1,22 +1,14 @@
 import {
   makeSectionGate,
-  applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "@/lib/topicSectionOverrides";
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
-import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
-import { pickRead } from "@/lib/pickRead";
+import { resolveReportTitle } from "@/lib/reportNaming";
+import type { TopicAiProse } from "@/lib/topicProseResolution";
 import {
-  resolveSimpleProse,
-  stableDraftTopicReportProse,
-  toDraftableIncidents,
-  type TopicAiProse,
-} from "@/lib/topicProseResolution";
-import {
-  buildShippingReportDataset,
   type ShippingReportIncident,
   type ShippingReportDataset,
   type KpiCard,
@@ -28,11 +20,8 @@ import {
   shippingSevKey,
 } from "@/lib/shippingReportDataset";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
-import { resolveReportWindow } from "@/lib/reportWindow";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
-  buildMaritimeIntelligence,
-  assertShippingReportConsistency,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
@@ -40,7 +29,9 @@ import {
   type LatestIncident,
 } from "@/lib/maritimeIntelligence";
 import {
-  MARITIME_CONF_LABEL,
+  finalizeShippingPublication,
+} from "@/lib/shippingPublication";
+import {
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
 } from "@/lib/maritimeReportView";
@@ -500,7 +491,7 @@ function MaritimeSubLabel({ children }: { children: React.ReactNode }) {
 // exportShippingReportPdf draws it. Movement (AIS) is CONTEXT only and
 // degrades to "movement data unavailable". #A33232 is reserved for level 5.
 function ChokepointReportCard({ card }: { card: ChokepointCard }) {
-  const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
+  const { key, risk, incidentCount, lastConfirmed, movement } = card;
   return (
     <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, padding: 10, breakInside: "avoid" }}>
       <div className="flex items-start justify-between gap-2" style={{ marginBottom: 4 }}>
@@ -523,13 +514,6 @@ function ChokepointReportCard({ card }: { card: ChokepointCard }) {
       <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
         <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Movement</span>
         {movement ? formatMovementSummary(movement) : "Movement data unavailable"}
-      </p>
-      <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
-        <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Business impact</span>
-        {businessImpact.join(", ")}
-      </p>
-      <p className="text-[10px] uppercase" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", letterSpacing: "0.08em", margin: 0 }}>
-        Confidence: {MARITIME_CONF_LABEL[confidence] ?? confidence}
       </p>
     </div>
   );
@@ -572,7 +556,6 @@ function ConfirmedIncidentsReportTable({ rows }: { rows: LatestIncident[] }) {
 function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntelligence }) {
   const {
     bluf,
-    risk,
     movementSnapshot,
     chokepointCards,
     confirmedIncidents,
@@ -615,23 +598,16 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
               </li>
             ))}
           </ul>
-          <p className="text-[12px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontStyle: "italic", marginTop: 6 }}>
-            Vessel movement is context only &mdash; it never counts as an incident and never raises the risk level on its own.
-          </p>
         </>
       ) : (
         <p className="text-[13px] leading-[1.6]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-          Movement data unavailable. Risk is assessed from confirmed incidents alone.
+          No vessel movement observation is available for this window.
         </p>
       )}
 
       {/* The board's internal Polestar View / Watch Next block is NOT rendered
-          in the report — the report has exactly one Polestar View and one
-          Watch Next (the standalone sections). Assessment + confidence live on
-          the chokepoint cards; business impact is in the KPI strip. */}
-      <p className="text-[12px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontStyle: "italic", marginTop: 10 }}>
-        Assessment confidence: {MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}. {risk.rationale}
-      </p>
+          in the report — the report has exactly one of each in the standalone
+          sections. */}
     </Section>
   );
 }
@@ -658,63 +634,54 @@ export default function ShippingReportPreview({
   hiddenSections?: string[];
   sectionOverrides?: TopicSectionOverrides | null;
 }) {
-  const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "shipping";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
   const resolvedTitle = resolveReportTitle(topic, report.title);
-  void canonicalTopic; void format;
-
-  const ds = useMemo(
+  const publication = useMemo(
     () =>
-      dataset ??
-        buildShippingReportDataset(
-          incidents,
-          topic,
-          issueDate,
-          maritimeSecurityEvents,
-        ),
-    [dataset, incidents, topic, issueDate, maritimeSecurityEvents],
-  );
-
-  // The one shared deterministic Maritime Intelligence board, aligned to THIS
-  // report's window so the report agrees with the live Shipping monitor.
-  const maritimeBoard = useMemo(() => {
-    const win = resolveReportWindow(topic, issueDate);
-    return buildMaritimeIntelligence({
-      incidents: ds.canonicalIncidents,
-      movement,
-      windowStart: win.start,
-      windowEnd: win.end,
-      inputMode: "prevalidated",
-    });
-  }, [ds, movement, topic, issueDate]);
-
-  const renderedFastFacts = useMemo(
-    () => applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
-    [ds.fastFacts, sectionOverrides?.fastFactOverrides],
-  );
-
-  // Rendering is a hard boundary: never show a report where a mutated derived
-  // field disagrees with the final canonical incident set.
-  assertShippingReportConsistency(ds, maritimeBoard, renderedFastFacts);
-
-  // Deterministic shipping draft for the Executive Summary (which has no
-  // dataset auto-prose). Stable incident order so the preview and the PDF
-  // build identical fallback text; the AI narrative sits in the layer above.
-  const proseDraft = useMemo(
-    () =>
-      stableDraftTopicReportProse({
-        topic,
-        issueDate,
-        incidents: toDraftableIncidents(ds.canonicalIncidents),
+      finalizeShippingPublication({
+        report,
+        incidents,
+        movement,
+        maritimeSecurityEvents,
+        dataset,
+        incidentSummaries,
+        aiProse,
+        hiddenSections,
+        sectionOverrides,
       }),
-    [topic, issueDate, ds],
+    [
+      report,
+      incidents,
+      movement,
+      maritimeSecurityEvents,
+      dataset,
+      incidentSummaries,
+      aiProse,
+      hiddenSections,
+      sectionOverrides,
+    ],
   );
-  const execText = resolveSimpleProse(
-    report.executiveSummary,
-    aiProse?.executiveSummary,
-    proseDraft.executiveSummary,
-  );
+  const ds = publication.dataset;
+  const maritimeBoard = publication.maritimeBoard;
+  const renderedFastFacts = publication.fastFacts;
+  const prose = publication.prose;
+  const show = makeSectionGate([...publication.hiddenSections]);
+
+  // The finalizer runs before any report page (including the cover) is
+  // rendered.  A validation card is an editor state, not a published report.
+  if (publication.auditIssues.length > 0) {
+    return (
+      <div className="rounded border border-red-300 bg-red-50 p-5 text-sm text-red-900">
+        <strong>Shipping Watch cannot be rendered.</strong>
+        <ul className="mt-2 list-disc pl-5">
+          {publication.auditIssues.map((item, index) => (
+            <li key={`${item.code}-${index}`}>{item.message}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
@@ -800,9 +767,9 @@ export default function ShippingReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        {execText.trim() && (
+        {prose.executiveSummary.trim() && (
           <Section hidden={!show("executive-summary")} title="Executive Summary">
-            <Paragraphs text={execText} />
+            <Paragraphs text={prose.executiveSummary} />
           </Section>
         )}
 
@@ -815,14 +782,14 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">
-          <Paragraphs text={pickRead(report.chokepointRouteRead, ds.chokepointRouteRead)} />
+          <Paragraphs text={prose.chokepointRouteRead} />
           <div className="mt-4">
             <ChokepointTable rows={ds.chokepointRows} />
           </div>
         </Section>
 
         <Section hidden={!show("vessel-piracy")} title="Vessel Threat and Piracy Read">
-          <Paragraphs text={pickRead(report.vesselPiracyRead, ds.vesselPiracyRead)} />
+          <Paragraphs text={prose.vesselPiracyRead} />
           <div
             className="uppercase mb-2 mt-4"
             style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
@@ -850,7 +817,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section hidden={!show("maritime-security")} title="Maritime Security (ICC CCS / IMB)">
-          <Paragraphs text={pickRead(report.maritimeSecurityRead, ds.maritimeSecurity.read)} />
+          <Paragraphs text={prose.maritimeSecurityRead} />
           {ds.maritimeSecurity.byType.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4 mb-3">
               {ds.maritimeSecurity.byType.map((b) => (
@@ -923,7 +890,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section hidden={!show("commercial-impact")} title="Commercial Impact on Shipping">
-          <Paragraphs text={pickRead(report.commercialImpactRead, ds.commercialImpactRead)} />
+          <Paragraphs text={prose.commercialImpactRead} />
           <div className="mt-4">
             <IncidentTable
               rows={ds.commercialRows}
@@ -935,7 +902,7 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section hidden={!show("regional")} title="Regional and Country View">
-          <Paragraphs text={pickRead(report.regionalCountryRead, ds.regionalCountryRead)} />
+          <Paragraphs text={prose.regionalCountryRead} />
           <div className="mt-4 mb-5">
             <div
               className="uppercase mb-2"
@@ -955,21 +922,21 @@ export default function ShippingReportPreview({
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">
-          <Paragraphs text={resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters)} />
+          <Paragraphs text={prose.whatMatters} />
         </Section>
         <Section hidden={!show("implications")} title="Implications for Business">
-          <Bullets text={resolveSimpleProse(report.implications, aiProse?.implications, ds.autoImplications)} />
+          <Bullets text={prose.implications} />
         </Section>
         <Section hidden={!show("watch-next")} title="Watch Next">
-          <Bullets text={resolveSimpleProse(report.watchNext, aiProse?.watchNext, ds.autoWatchNext)} max={8} />
+          <Bullets text={prose.watchNext} max={8} />
         </Section>
         <Section hidden={!show("polestar-view")} title="Polestar View">
-          <Paragraphs text={resolveSimpleProse(report.polestarView, aiProse?.polestarView, ds.autoPolestarView)} />
+          <Paragraphs text={prose.polestarView} />
         </Section>
 
         {ds.relatedIncidents.length > 0 && (
           <Section hidden={!show("related-incidents")} title="Related Incidents">
-            <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
+            <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={publication.incidentSummaries} />
           </Section>
         )}
 

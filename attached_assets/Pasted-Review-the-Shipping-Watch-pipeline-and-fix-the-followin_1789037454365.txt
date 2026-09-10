@@ -1,0 +1,359 @@
+Review the Shipping Watch pipeline and fix the following as general system rules. Do not patch individual incidents, headlines, countries, vessels or chokepoints. The objective is to prevent these classes of failure recurring in future reports.
+
+1. Separate maritime event classes properly
+
+The system currently risks conflating several different things:
+
+commercial vessel attack
+commercial vessel seizure
+piracy or armed robbery
+military or naval incident
+port disruption
+chokepoint disruption
+routing consequence
+general geopolitical maritime activity
+
+These must be separate event classes.
+
+A military or naval incident occurring at sea must not automatically become a commercial shipping incident.
+
+A story affecting shipping indirectly must not automatically become a vessel attack, seizure or chokepoint incident.
+
+2. Separate event location from route relevance
+
+For every event, store separately:
+
+physical event location
+coastal state or country
+affected route or chokepoint
+commercial routing consequence
+
+Do not assign an incident to a chokepoint merely because that chokepoint is mentioned or affected downstream.
+
+The physical location determines where the incident occurred.
+
+Route relevance determines which shipping corridors may be affected.
+
+These are different fields and must never substitute for one another.
+
+3. Separate disruption origin from routing consequence
+
+If congestion, closure or disruption occurs in one location and causes carriers to use another route, the destination route must not be classified as the location of the original disruption.
+
+The report should be able to say:
+
+disruption occurred here
+routing consequence affected here
+
+without converting the consequence into another incident.
+
+4. Require evidence before classifying something as an attack on shipping
+
+Before an event can enter vessel attack or seizure counts, confirm that the target was actually:
+
+a commercial vessel
+merchant shipping
+cargo or tanker traffic
+crew
+commercial maritime infrastructure
+
+Military drones, naval systems, military vessels or general military activity must remain separate unless there is a demonstrable commercial shipping consequence.
+
+5. Require evidence before assigning chokepoint incidents
+
+An incident should count against a chokepoint only when it physically occurred within or directly affected passage through that chokepoint.
+
+Nearby events, coastal attacks, wider regional conflict and downstream routing effects may be relevant context but should not inflate the chokepoint incident count.
+
+6. Create one canonical maritime incident set
+
+All headline metrics must derive from one final validated maritime dataset after:
+
+relevance validation
+event type validation
+physical geography
+commercial shipping relevance
+chokepoint attribution
+deduplication
+severity assessment
+
+The following must all use that same final set:
+
+confirmed incident count
+chokepoint counts
+country counts
+regional counts
+vessel attack totals
+piracy totals
+highest severity
+main affected chokepoint
+charts
+tables
+prose
+Polestar View
+
+No section should run an independent selector.
+
+7. Separate AIS context from incident evidence
+
+AIS activity is contextual information.
+
+It may support analysis of traffic concentration, anchorage, routing or unusual movement, but it must not:
+
+create an incident
+raise severity by itself
+change country incident totals
+change chokepoint incident totals
+
+unless there is a separately validated event.
+
+Keep that logic internal. Do not repeatedly explain it to the client.
+
+8. Fix overall risk rollup consistency
+
+There must be one authoritative overall Shipping Watch risk level.
+
+Executive Summary
+Maritime Intelligence
+BLUF
+What Matters
+Polestar View
+
+must all use the same final risk assessment.
+
+A report must never start with one overall risk level and finish with another unless the report explicitly explains why the assessment changed.
+
+9. Separate highest incident severity from overall report risk
+
+The presence of one Extreme incident does not automatically make the entire reporting period Extreme.
+
+Likewise, the report must not describe a High event as the most serious if an Extreme event exists elsewhere in the canonical data.
+
+Calculate and label separately:
+
+highest individual incident severity
+chokepoint risk
+overall Shipping Watch risk
+
+10. Strengthen deduplication around underlying developments
+
+Multiple articles about the same underlying development must not become separate incidents simply because:
+
+publication dates differ
+headlines differ
+different publishers reported it
+one story emphasises congestion while another emphasises rerouting
+
+Deduplication should identify the underlying event or development, not just matching text.
+
+Follow-on developments may remain separate only when something materially changed.
+
+11. Fix country attribution
+
+Country counts must represent the physical location or directly affected jurisdiction of validated incidents.
+
+Do not derive country from:
+
+publisher location
+company headquarters
+route destination
+named nationality
+affected trade relationship
+article subject
+
+If an event cannot be confidently assigned to a country, keep it unassigned rather than forcing geography.
+
+12. Separate country analysis from chokepoint analysis
+
+A country may contain an incident without being the main affected chokepoint.
+
+A chokepoint may be commercially affected without creating another country incident.
+
+Do not allow route and country classifications to contaminate one another.
+
+13. Remove backend commentary from client output
+
+Do not expose phrases explaining system behaviour such as:
+
+context only
+never counted as incidents
+left off the chart
+standalone reference layer
+deduplicated from X reports
+records could not be tied
+assessment confidence generated from backend state
+
+These can remain in internal audit output but should not appear in the client report unless deliberately written as methodology.
+
+14. Stop template repetition
+
+The same incident should not be retold repeatedly across:
+
+Chokepoint Cards
+Confirmed Incidents
+Route Read
+Vessel Threat
+Commercial Impact
+Regional View
+Related Incidents
+
+Each section must have a distinct purpose.
+
+Incident detail should appear once.
+
+Later sections should interpret it rather than repeat the headline.
+
+15. Give every section a distinct analytical role
+
+Executive Summary:
+What changed and why it matters.
+
+Chokepoint Cards:
+Current status of each route.
+
+Confirmed Maritime Incidents:
+Validated events only.
+
+Route Read:
+How those events affect passage and routing.
+
+Vessel Threat:
+Direct threat to commercial vessels.
+
+Commercial Impact:
+Cost, schedule, insurance and supply consequences.
+
+Regional View:
+Geographic concentration.
+
+What Matters:
+Main analytical judgement.
+
+Watch Next:
+Specific escalation or easing indicators.
+
+Polestar View:
+Overall direction and priority risk.
+
+Prevent cross-section duplication.
+
+16. Require evidence for commercial consequences
+
+Do not automatically state that incidents cause:
+
+war-risk premium increases
+freight-rate increases
+rerouting
+charter changes
+schedule delay
+insurance changes
+
+unless evidence supports the relationship.
+
+Generic statements such as costs appearing after a fixed number of days should not be generated without evidence.
+
+Where the consequence is plausible but unconfirmed, identify it as an assessed risk rather than a fact.
+
+17. Distinguish reported fact from Polestar assessment
+
+The report must clearly separate:
+
+what happened
+what shipping operators are doing
+what commercial effects are confirmed
+what Polestar assesses may happen next
+
+Do not turn an analytical inference into a reported fact.
+
+18. Improve severity logic
+
+Severity should consider the actual event and commercial shipping consequence.
+
+Do not assign Extreme or High simply because the source headline contains:
+
+large casualty figures
+military action
+missile
+seizure
+Houthi
+Iran
+war
+
+Severity must be tied to the validated maritime event and its operational consequence.
+
+19. Make zero-incident route cards useful or remove them
+
+Do not fill the report with repeated:
+
+Quiet this week
+No material impact
+Low confidence
+None in window
+
+If a chokepoint has no meaningful current development, either compress it substantially or omit it from narrative treatment.
+
+Do not use empty routes merely to fill the template.
+
+20. Strengthen What Matters and Polestar View
+
+These should be the strongest analytical sections.
+
+They should synthesise:
+
+where direct threat is concentrated
+where commercial routing exposure exists
+whether risk is escalating or easing
+whether effects are security, schedule, insurance or capacity related
+what would materially change the assessment next
+
+Avoid generic maritime security advice.
+
+21. Add final cross-report contradiction checks
+
+Before rendering, automatically verify:
+
+overall risk level is consistent
+highest severity is correct
+main affected chokepoint matches canonical data
+country totals match validated geography
+regional totals reconcile
+vessel attack totals contain only valid commercial vessel events
+piracy totals contain only valid piracy events
+chokepoint totals reflect physical or direct passage impact
+no duplicate underlying developments are counted twice
+AIS context has not affected incident counts
+prose does not contradict tables or charts
+
+Fail closed if these checks do not pass.
+
+22. Add an evidence-to-prose validation step
+
+For every material sentence in the final report ask:
+
+What evidence supports this?
+Is this fact or assessment?
+Is the geography correct?
+Is the event class correct?
+Is the route relationship direct or indirect?
+Is the commercial consequence confirmed or inferred?
+Has this event already been described elsewhere?
+Does this sentence add analytical value?
+
+If not, rewrite or remove it.
+
+23. Apply this as shared maritime architecture
+
+Do not solve these issues with headline blacklists, country exceptions or chokepoint-specific patches.
+
+The fix needs to be semantic and relational:
+
+event
+location
+target
+route
+commercial relevance
+consequence
+severity
+confidence
+
+Inspect the current Shipping Watch architecture and implement these rules at ingestion, classification, canonical dataset construction, risk rollup and final prose validation.

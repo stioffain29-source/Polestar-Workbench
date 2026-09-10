@@ -7,6 +7,7 @@ import { deterministicIncidentSummary } from "../../artifacts/workbench/src/lib/
 import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
 import type { ShippingReportIncident } from "../../artifacts/workbench/src/lib/shippingReportDataset";
 import type { ConflictReportIncident } from "../../artifacts/workbench/src/lib/conflictReportDataset";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 // Task #146 unit-tested resolveIncidentSummary / deterministicIncidentSummary as
 // PURE functions. This sibling guards the WIRING: each report family
@@ -299,32 +300,32 @@ describe("ConflictReportPreview Related Incidents summary wiring", () => {
 
 describe("ShippingReportPreview Related Incidents summary wiring", () => {
   const incidents: ShippingReportIncident[] = [
-    {
-      id: "sh1",
-      topic: "shipping",
-      title: "Tanker attacked by armed skiffs in the Gulf of Aden",
-      severity: "high",
-      occurredAt: "2026-06-14T08:00:00+00:00",
-      country: "Yemen",
-      location: "Gulf of Aden",
-      summary: "Armed men in skiffs attacked a tanker underway.",
-      source: "Test Wire",
-      sourceUrl: "https://example.com/sh1",
-    },
-    {
-      id: "sh2",
-      topic: "shipping",
-      title: "Cargo vessel boarded and crew robbed in the Singapore Strait",
-      severity: "moderate",
-      occurredAt: "2026-06-12T08:00:00+00:00",
-      country: "Singapore",
-      location: "Singapore Strait",
-      summary: "Robbers boarded a bulk carrier and stole stores.",
-      source: "Test Wire",
-      sourceUrl: "https://example.com/sh2",
-    },
+    semanticIncident(
+      "sh1",
+      "Tanker collided with another vessel in the Gulf of Aden",
+      {
+        eventClass: "collision_or_grounding",
+        severity: "high",
+        eventDate: "2026-06-14",
+        country: "Yemen",
+        physicalLocation: "Gulf of Aden",
+        developmentKey: "shipping-wiring-collision-1",
+      },
+    ),
+    semanticIncident(
+      "sh2",
+      "Cargo vessel grounded in the Singapore Strait",
+      {
+        eventClass: "collision_or_grounding",
+        severity: "moderate",
+        eventDate: "2026-06-12",
+        country: "Singapore",
+        physicalLocation: "Singapore Strait",
+        developmentKey: "shipping-wiring-collision-2",
+      },
+    ),
   ];
-  const aiSummary = "Vetted AI summary for the tanker-attack lead.";
+  const aiSummary = "Vetted AI summary for the Gulf of Aden collision.";
   const summaries: Record<string, string> = {
     sh1: aiSummary,
     [PHANTOM_ID]: PHANTOM_SUMMARY,
@@ -338,19 +339,21 @@ describe("ShippingReportPreview Related Incidents summary wiring", () => {
   );
 
   it("renders the Related Incidents table body with the real titles", () => {
-    expect(html).toContain("Tanker attacked by armed skiffs in the Gulf of Aden");
+    expect(html).toContain("Tanker collided with another vessel in the Gulf of Aden");
     expect(html).toContain(
-      "Cargo vessel boarded and crew robbed in the Singapore Strait",
+      "Cargo vessel grounded in the Singapore Strait",
     );
+    expect((html.match(/Tanker collided with another vessel in the Gulf of Aden/g) ?? []).length).toBe(1);
+    expect((html.match(/Cargo vessel grounded in the Singapore Strait/g) ?? []).length).toBe(1);
   });
 
-  it("shows the AI summary for the enriched row whose id is in the map", () => {
-    expect(html).toContain(aiSummary);
+  it("does not add a second AI summary for incidents already shown in Maritime Intelligence", () => {
+    expect(html).not.toContain(aiSummary);
   });
 
-  it("shows the deterministic fallback for the row absent from the map", () => {
+  it("keeps the deterministic resolver available without rendering a duplicate line", () => {
     const expected = deterministicIncidentSummary(incidents[1]);
-    expect(html).toContain(expected);
+    expect(html).not.toContain(expected);
     expect(expected).not.toBe(aiSummary);
   });
 

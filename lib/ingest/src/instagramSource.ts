@@ -1,5 +1,5 @@
 import { db, incidentsTable } from "@workspace/db";
-import type { InsertIncident } from "@workspace/db";
+import type { Incident, InsertIncident } from "@workspace/db";
 import { cleanText, sanitiseCaption } from "./text";
 import { classifySeverity, type SeverityTopic } from "./severity";
 import { geocode } from "./geocode";
@@ -7,6 +7,7 @@ import { detectCountry } from "./newsTopic";
 import { COUNTRY_ALIASES } from "./topicConfigs";
 import { evaluateIncidentRelevance } from "@workspace/relevance";
 import { recordSourceHealth } from "./sourceHealth";
+import { validateAndPersistMaritimeWriterRows } from "./maritimeWriterValidation";
 import { routeTopic, xDedupeKey } from "./xSearch";
 import { fetchApifyDatasetItems } from "./facebookOsint";
 import {
@@ -124,7 +125,11 @@ export function decideInstagramIncident(post: NormalisedIgPost): IgDecision {
   const title = text.slice(0, 500);
   const summary = text.slice(0, 2000);
 
-  const geo = geocode(country, `${title} ${summary}`);
+  // Maritime geography is source-backed semantic evidence, not a feed-country
+  // centroid. Keep legacy country/coordinates unassigned until that evidence
+  // has been evaluated.
+  const legacyCountry = topic === "shipping" ? "Unknown" : country;
+  const geo = topic === "shipping" ? null : geocode(country, `${title} ${summary}`);
   const severity = classifySeverity(title, summary, topic);
 
   const rel = evaluateIncidentRelevance(topic, {
@@ -140,7 +145,7 @@ export function decideInstagramIncident(post: NormalisedIgPost): IgDecision {
     topic,
     title,
     summary,
-    country,
+    country: legacyCountry,
     location: geo?.location ?? null,
     latitude: geo?.latitude ?? null,
     longitude: geo?.longitude ?? null,
@@ -313,8 +318,12 @@ export async function dedupeAndInsertIgIncidents(
 
   if (commit && toInsert.length > 0) {
     try {
-      await db.insert(incidentsTable).values(toInsert);
-      result.inserted = toInsert.length;
+      const insertedRows = await db
+        .insert(incidentsTable)
+        .values(toInsert)
+        .returning();
+      await validateAndPersistMaritimeWriterRows(insertedRows as Incident[]);
+      result.inserted = insertedRows.length;
       log(`  inserted           : ${result.inserted}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

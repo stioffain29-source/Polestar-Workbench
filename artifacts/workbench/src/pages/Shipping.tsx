@@ -8,7 +8,7 @@ import {
   getListLatestMaritimeMovementQueryKey,
   getListMaritimeMovementQueryKey,
 } from "@workspace/api-client-react";
-import type { Incident, MaritimeMovementInput } from "@workspace/api-client-react";
+import type { MaritimeMovementInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -24,18 +24,21 @@ import {
 } from "recharts";
 import { severityBadgeStyle, ratingColor, SEVERITY_LEVELS, SEVERITY_LABELS } from "@/lib/topics";
 import { TopicReportPanel } from "@/components/TopicReportPanel";
-import { deriveIncidentCountry, deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
+import { deriveFlagState, LOCATION_NOT_IDENTIFIED } from "@/lib/shippingCountry";
 import {
   CHOKEPOINTS, detectChokepoints, classifyPiracy,
   type PiracyAct,
   classifyRegion, REGION_COLOR, type Region,
-  classifyIssue, ISSUE_PALETTE,
+  ISSUE_PALETTE,
   classifyVesselIncident, type VesselIncidentType, VESSEL_ACCENT,
-  TRANSIT_ISSUES, COMMERCIAL_ISSUES,
-  isLowCredibilityShippingRecord, isCapabilityContext,
+  isCapabilityContext,
 } from "@/lib/shippingAnalysis";
 import { computeHormuzStatus, HORMUZ_TONE_COLOR, type HormuzCategoryResult, type HormuzStatusTone } from "@/lib/hormuzStatus";
-import { dedupeShippingMonitorRows } from "@/lib/shippingReportDataset";
+import {
+  buildShippingCanonicalIncidents,
+  hasEvidenceBackedCommercialConsequence,
+  type ShippingReportIncident,
+} from "@/lib/shippingReportDataset";
 import { RangeToggle } from "@/components/RangeToggle";
 import { RANGE_DAYS, RANGE_LABEL, type RangeKey } from "@/lib/dateRange";
 import { ExternalLink } from "lucide-react";
@@ -79,37 +82,6 @@ const SEV_RANK: Record<string, number> = {
 
 const FILL_OPACITY = 0.78;
 const STROKE_WIDTH = 1.5;
-
-// --- Methodology --------------------------------------------------------------
-// Plain-language definitions for every term the dashboard asserts, derived
-// directly from the shared classifiers in shippingAnalysis.ts / hormuzStatus.ts
-// so the stated methodology and the computed numbers can never drift.
-const SHIPPING_DEFINITIONS: { term: string; def: string }[] = [
-  {
-    term: "Shipping record",
-    def: "One de-duplicated maritime news item scoped to APAC or the Middle East that passes the credibility screen. Social-media handles, repatriation / crew-welfare follow-ups, speculative or unverified claims, pure commentary, rhetorical closure threats and media-packaging headlines are excluded. Syndicated copies are collapsed: identical headlines merge regardless of date, reworded copies of one event merge within a date-and-keyword signature, and re-reports of a single vessel event cluster across a few days — keeping the most severe / most recent version.",
-  },
-  {
-    term: "Significant incident",
-    def: "The most recent record rated High or Extreme; if none is on file, the most recent credible record. Repatriation, social-handle, speculative-claim and capability / procurement / exercise items are filtered out before the pick, so none can become the significant incident.",
-  },
-  {
-    term: "Chokepoint risk",
-    def: "A record naming one of seven tracked chokepoints (Strait of Hormuz, Bab el-Mandeb, Red Sea, Suez Canal, Gulf of Aden, Singapore Strait, Malacca Strait). The Strait of Hormuz additionally requires an operational maritime term, so a bare 'Hormuz' mention in a price or policy headline does not qualify; the other six match on a named mention.",
-  },
-  {
-    term: "Vessel attack / seizure",
-    def: "A confirmed hostile act against a specific vessel — attack, near miss, or seizure / hijack — per the strict vessel classifier. Commercial, finance, regulatory and diplomatic-follow-up items are excluded. This counts a confirmed event, not a claim of one.",
-  },
-  {
-    term: "Piracy / armed robbery",
-    def: "Hostile activity against vessels or crew at sea or at anchorage: piracy, armed robbery, boarding or attempted boarding, suspicious or small-craft approach, hijacking, crew threat, and theft from a vessel. Land and warehouse cargo theft is tracked under Cargo Watch, not here.",
-  },
-  {
-    term: "Active kinetic environment",
-    def: "A status reserved for one or more confirmed kinetic incidents (attack, near miss, seizure or boarding — by the strict vessel classifier or explicit UKMTO / JMIC confirmation) in the Strait of Hormuz theatre within the last 7 days. Routine advisories, naval posture, market, insurance and diplomatic reporting never trigger it.",
-  },
-];
 
 // Status thresholds for the Strait of Hormuz banner. The banner tone is chosen
 // strictly by these rules — no strong language is shown unless its threshold is
@@ -170,68 +142,54 @@ export default function Shipping() {
   const windowDays = RANGE_DAYS[range];
   const now = useMemo(() => new Date(), []);
 
-  // Maritime Intelligence board — ONE shared deterministic dataset (also used by
-  // the Shipping Watch report). Always a 7-day weekly assessment regardless of
-  // the range toggle above, so the BLUF/risk read as a current weekly picture.
-  // Movement is CONTEXT only; it never becomes or inflates an incident here.
-  const maritimeBoard = useMemo(
-    () => buildMaritimeIntelligence({ incidents, movement, windowDays: 7, asOf: now }),
-    [incidents, movement, now],
-  );
-
-  // Scope: APAC + Middle East only. Records that classify to a country outside
-  // those regions are dropped from this view. Records with no identifiable
-  // country are kept and surfaced as "Country not identified".
-  const allEnriched = useMemo(
-    () => incidents.map((i) => {
-      const incidentCountry = deriveIncidentCountry(i);
-      const flagState = deriveFlagState(i);
-      return {
-        ...i,
-        incidentCountry,
-        flagState,
-        // Region is classified from the *incident* country, not from the raw
-        // `country` field, so flag-state-only records do not get bucketed into
-        // the wrong region.
-        region: classifyRegion(incidentCountry),
-        issue: classifyIssue(i),
-        occurredDate: (() => { try { return parseISO(i.occurredAt); } catch { return new Date(NaN); } })(),
-      };
-    }),
+  // The monitor, report and Maritime Intelligence board all consume this
+  // canonical semantic/development-key set. It is folded before the range
+  // toggle is applied, so publication-date syndication cannot become multiple
+  // incidents or make the selected range disagree with the report.
+  const canonicalBuild = useMemo(
+    () =>
+      buildShippingCanonicalIncidents(
+        incidents as unknown as ShippingReportIncident[],
+        "shipping",
+      ),
     [incidents],
   );
-  const outOfScopeCount = allEnriched.filter((i) => i.region === "Out of scope").length;
-
-  // The monitor renders the SAME cleaned + deduplicated dataset the Shipping
-  // report produces, so the two surfaces can never disagree. Pipeline:
-  //   1. scope to APAC + Middle East (drop Out of scope);
-  //   2. drop noise via `isLowCredibilityShippingRecord` (social handles,
-  //      repatriation / crew-return, speculative claims, generic commentary);
-  //   3. collapse syndication via `dedupeShippingMonitorRows` — the same wire
-  //      story republished under five or six headlines on the same day becomes
-  //      a single row, keeping the most severe / most recent version.
-  // Every count and card on this page is therefore one-event-one-row, not raw
-  // wire volume, and a single event can never show as both Extreme and Low.
-  const inScopeClean = useMemo(
-    () =>
-      allEnriched
-        .filter((i) => i.region !== "Out of scope")
-        .filter((i) => !isLowCredibilityShippingRecord(i)),
-    [allEnriched],
-  );
-  // All-time cleaned + deduped in-scope set (pre-window). Windowing is applied
-  // on top of this so the dedupe always runs over the full record set first.
+  const toMonitorRow = (row: (typeof canonicalBuild.canonicalIncidents)[number]) => ({
+    ...row,
+    // The maritime semantic-v3 contract currently carries a source-grounded
+    // physical place, not coordinates. Never reuse legacy feed centroids for
+    // the monitor map: an unverified point is worse than an unplotted event.
+    latitude: null,
+    longitude: null,
+    flagState: deriveFlagState(row),
+    occurredDate: row.date,
+  });
   const enrichedAll = useMemo(
-    () => dedupeShippingMonitorRows(inScopeClean),
-    [inScopeClean],
+    () => canonicalBuild.canonicalIncidents.map(toMonitorRow),
+    [canonicalBuild.canonicalIncidents],
   );
+  // Maritime Intelligence board — the same canonical set, with AIS retained
+  // strictly as context. Always a seven-day weekly assessment regardless of
+  // the range toggle above.
+  const maritimeBoard = useMemo(
+    () =>
+      buildMaritimeIntelligence({
+        incidents: canonicalBuild.canonicalIncidents,
+        movement,
+        windowDays: 7,
+        asOf: now,
+        inputMode: "prevalidated",
+      }),
+    [canonicalBuild.canonicalIncidents, movement, now],
+  );
+
   // `enriched` is the windowed working set that drives every range-scoped
   // surface (KPIs, charts, region/issue/country mixes, chokepoint, vessel,
   // piracy, map, table). No lower bound so the widest default never hides a
   // record the all-time view used to show.
   const enriched = useMemo(
-    () =>
-      enrichedAll.filter(
+      () =>
+        enrichedAll.filter(
         (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
       ),
     [enrichedAll, windowDays, now],
@@ -240,19 +198,9 @@ export default function Shipping() {
   // (Latest Significant Incident, Chokepoint Watch, Vessel / Piracy tables)
   // keep their names; cleaned + deduped + windowed is the single base.
   const cleanEnriched = enriched;
-  // Pre-region-filter clean + deduped set — feeds the Strait of Hormuz status
-  // indicators, which intentionally read across regions (FT / Reuters US
-  // bylines etc.) rather than the APAC + ME scope. Also windowed so the banner
-  // reflects the selected range.
-  const cleanAllEnriched = useMemo(
-    () =>
-      dedupeShippingMonitorRows(
-        allEnriched.filter((i) => !isLowCredibilityShippingRecord(i)),
-      ).filter(
-        (i) => !isNaN(i.occurredDate.getTime()) && differenceInDays(now, i.occurredDate) <= windowDays,
-      ),
-    [allEnriched, windowDays, now],
-  );
+  // Hormuz status also reads from this same semantic canonical window. It may
+  // not re-admit out-of-scope or raw-text rows through a parallel selector.
+  const cleanAllEnriched = enriched;
 
   const total = enriched.length;
 
@@ -317,7 +265,12 @@ export default function Shipping() {
     count: enriched.filter((i) => i.severity === s).length,
   })), [enriched]);
 
-  const withCoords = enriched.filter((i) => i.latitude != null && i.longitude != null);
+  const withCoords = enriched.filter(
+    (i) =>
+      i.incidentCountry !== null &&
+      i.latitude != null &&
+      i.longitude != null,
+  );
 
   // Timeline — bucket by day for the last 30 days that have records, fall back
   // to grouping the whole dataset by day if there aren't enough recent rows.
@@ -424,17 +377,15 @@ export default function Shipping() {
     [cleanEnriched],
   );
 
-  // TRANSIT_ISSUES / COMMERCIAL_ISSUES come from shippingAnalysis.ts so the
-  // Shipping page and the Shipping report PDF share one vocabulary.
+  // Route and commercial-impact panels read the canonical rows.
   const transitRecords = sortedEnriched.filter(
-    (i) => TRANSIT_ISSUES.has(i.issue) || detectChokepoints(i).length > 0,
+    (i) => i.issue === "Route diversion" || detectChokepoints(i).length > 0,
   );
-  const commercialRecords = sortedEnriched.filter((i) => COMMERCIAL_ISSUES.has(i.issue));
+  const commercialRecords = sortedEnriched.filter(hasEvidenceBackedCommercialConsequence);
 
   // --- Chokepoint Watch ---------------------------------------------------
   // For each chokepoint: count, highest severity, latest incident, short
-  // operational read. We do NOT invent rows — if a chokepoint has nothing on
-  // file in the window the row reads "No current records in selected window".
+  // operational read.
   const chokepointRows = useMemo(() => {
     return CHOKEPOINTS.map((cp) => {
       const records = sortedCleanEnriched.filter((i) => detectChokepoints(i).includes(cp));
@@ -457,12 +408,9 @@ export default function Shipping() {
   }, [chokepointRows]);
 
   // --- Strait of Hormuz Chokepoint Status ---------------------------------
-  // Reads from `allEnriched` (pre-region-filter) so generic market or
-  // diplomatic commentary tagged with a non-APAC/Middle-East country (FT,
-  // Reuters US byline, etc.) still feeds the market / diplomatic indicators.
-  // The kinetic headline uses a 7-day window so "no new kinetic incident in
-  // the latest reporting window" reflects the active week, while category
-  // counts cover the entire loaded window.
+  // Reads from the same semantic canonical window as the rest of the monitor.
+  // The kinetic headline uses a 7-day window while category counts cover the
+  // full selected window.
   const hormuzStatus = useMemo(
     () => computeHormuzStatus(cleanAllEnriched, { kineticWindowDays: Math.min(7, windowDays) }),
     [cleanAllEnriched, windowDays],
@@ -507,7 +455,7 @@ export default function Shipping() {
           <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Shipping</h1>
           <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
-            Port disruption, chokepoint risk, vessel attacks, route diversion, shipping delays, insurance pressure, naval advisories, port strikes and cargo movement disruption. APAC and the Middle East only — records from other regions are excluded. Cargo theft and pilferage are tracked under Cargo Watch.
+            Shipping operations across APAC and the Middle East: chokepoints, vessel security, route and port disruption.
           </p>
         </div>
         <RangeToggle range={range} onChange={setRange} />
@@ -523,94 +471,12 @@ export default function Shipping() {
 
       {/* 1a-ii. Red Sea directional flow — MONITOR-ONLY (removed from the
           Shipping Watch report at the owner's request; the panel stays here). */}
-      <Section title="Red Sea Directional Flow — Gateway Movement (AIS)">
+      <Section title="Red Sea Directional Flow — Gateway Movement">
         <RedSeaDirectionalFlowPanel gateways={redSeaFlow} />
       </Section>
 
       {/* 1a-i. Admin-gated manual upload for movement (AIS) context. */}
       <MaritimeMovementUploadForm hasMovement={movement.length > 0} />
-
-      {outOfScopeCount > 0 && (
-        <div className="text-[11px] text-muted-foreground bg-muted/30 border border-border rounded-sm px-3 py-2">
-          {outOfScopeCount} shipping record{outOfScopeCount === 1 ? "" : "s"} from outside APAC and the Middle East (e.g. North America, Europe, Africa, South America) are excluded from this view.
-        </div>
-      )}
-
-      {/* 1b. Methodology & Definitions */}
-      <Section title="Methodology & Definitions">
-        <details className="bg-white border border-border rounded-sm">
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-sans text-primary">
-            How this monitor defines its terms, windows, categories and status thresholds.
-          </summary>
-          <div className="px-4 pb-4 pt-1 space-y-4">
-            {/* Definitions */}
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Definitions</div>
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                {SHIPPING_DEFINITIONS.map((d) => (
-                  <div key={d.term}>
-                    <dt className="font-serif font-bold text-sm text-primary">{d.term}</dt>
-                    <dd className="text-[12px] text-foreground/80 font-sans leading-snug mt-0.5">{d.def}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            {/* Category model: exclusive vs overlapping */}
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Category model</div>
-              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
-                <span className="font-semibold text-primary">Mutually exclusive</span> — each record carries exactly one
-                Issue Type, one Region and one Severity tier. These totals are additive and sum to the record count.
-              </p>
-              <p className="text-[12px] text-foreground/80 font-sans leading-snug mt-1.5">
-                <span className="font-semibold text-primary">Overlapping by design</span> — Vessel Attacks, Piracy / Armed
-                Robbery, the per-chokepoint counts and the six Strait of Hormuz indicators are lenses over the same records,
-                so one incident can appear in more than one (a tanker attack in Hormuz shows under Vessel Attacks, the
-                Hormuz confirmed-kinetic indicator and the Hormuz chokepoint row). Counts across these lenses are
-                therefore not additive with the Issue Type totals.
-              </p>
-            </div>
-
-            {/* Confirmed vs contextual */}
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Confirmed incidents vs contextual indicators</div>
-              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
-                <span className="font-semibold text-primary">Confirmed incidents</span> — vessel attacks / seizures,
-                piracy / armed robbery, and confirmed kinetic events. <span className="font-semibold text-primary">Contextual
-                indicators (not incidents)</span> — traffic disruption, navigation interference, naval / security posture,
-                market moves, insurance pressure, and diplomatic / advisory reporting. Strong status language is driven
-                only by confirmed incidents crossing a stated threshold below; context can raise the posture but never, on
-                its own, declares an active kinetic environment.
-              </p>
-            </div>
-
-            {/* Status thresholds */}
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Strait of Hormuz status thresholds</div>
-              <ul className="space-y-1">
-                {HORMUZ_STATUS_THRESHOLDS.map((t) => (
-                  <li key={t.label} className="text-[12px] font-sans leading-snug">
-                    <span className="font-semibold text-primary">{t.label}</span>
-                    <span className="text-foreground/80"> — {t.rule}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Confidence & sources */}
-            <div className="border-t border-border pt-3">
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">Confidence & sources</div>
-              <p className="text-[12px] text-foreground/80 font-sans leading-snug">
-                Every displayed record passes the credibility screen and links to its source where one is available;
-                items without a source link are marked. Severity tiers are assigned automatically from the report text,
-                with Extreme reserved for confirmed mass-casualty or major physical-disruption events. Where no value can
-                be derived (location, flag state, severity), the monitor states it plainly rather than inventing one.
-              </p>
-            </div>
-          </div>
-        </details>
-      </Section>
 
       {/* 2. Fast Facts */}
       <Section title="Fast Facts">
@@ -702,7 +568,7 @@ export default function Shipping() {
       {/* 3a-pre. Strait of Hormuz — Chokepoint Status (six-indicator layer) */}
       <Section title="Strait of Hormuz — Chokepoint Status">
         <p className="text-xs text-muted-foreground font-sans -mt-1 mb-3">
-          Layered read across six indicator categories. The chokepoint can read elevated even when no new attacks land in the latest week — traffic disruption, navigation interference, naval posture, market reaction and diplomatic signal all count.
+          Current operational signal for the Strait of Hormuz.
         </p>
         <div
           className="rounded-sm border p-4 mb-3"
@@ -732,8 +598,7 @@ export default function Shipping() {
           <div className="text-[11px] font-sans mt-2 pt-2 border-t" style={{ color: "#363636", borderColor: "#e2e2e2" }}>
             <span className="uppercase tracking-wider font-semibold">Trigger</span>{" "}
             {HORMUZ_STATUS_THRESHOLDS.find((t) => t.tone === hormuzStatus.tone)?.rule
-              ?? "Status derived from the loaded indicator window."}{" "}
-            Thresholds are listed in Methodology &amp; Definitions above.
+              ?? "Status derived from the loaded indicator window."}
           </div>
         </div>
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mb-2">
@@ -761,7 +626,7 @@ export default function Shipping() {
       {/* 3a. Chokepoint Watch */}
       <Section title="Chokepoint Watch">
         <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
-          Operational read by chokepoint. Counts, highest severity and latest record are derived directly from the loaded shipping window. Rows with nothing on file are marked plainly and not invented.
+          Current operational activity by chokepoint.
         </p>
         <div className="bg-white border border-border rounded-sm overflow-hidden">
           <table className="w-full text-sm">
@@ -795,7 +660,7 @@ export default function Shipping() {
                   </td>
                   <td className="p-2 text-xs text-foreground/80">
                     {row.count === 0
-                      ? <span className="italic text-muted-foreground">No current records in selected window.</span>
+                      ? <span className="italic text-muted-foreground">No chokepoint activity observed in the selected window.</span>
                       : `Latest item: ${displayIncidentTitle(row.latest!.title, row.latest!.displayTitle)}. (${row.count} record${row.count === 1 ? "" : "s"} in window.)`}
                   </td>
                 </tr>
@@ -807,12 +672,9 @@ export default function Shipping() {
 
       {/* 3b. Vessel Attacks — strict hostile-only subset */}
       <Section title="Vessel Attacks">
-        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
-          Hostile maritime incidents affecting vessels in the Strait of Hormuz, Arabian Gulf and Gulf of Oman. Limited to attacks, near misses, seizures and credible threats — general freight, port congestion, finance, partnerships and cargo theft are excluded. Cargo theft and pilferage remain in Cargo Watch.
-        </p>
         {vesselIncidents.length === 0 ? (
           <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
-            No hostile vessel incidents currently on file in the shipping dataset.
+            No confirmed vessel attack or seizure observed in the selected window.
           </div>
         ) : (
           <>
@@ -847,21 +709,15 @@ export default function Shipping() {
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground italic mt-2">
-              Showing latest vessel attack/threat incidents. Full records remain available in the incident table.
-            </p>
           </>
         )}
       </Section>
 
       {/* 3c. Piracy and Armed Robbery */}
       <Section title="Piracy and Armed Robbery">
-        <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
-          Hostile activity directed at vessels and crew: piracy, armed robbery at sea, boarding, attempted boarding, suspicious approach, small craft approach, hijacking, crew threat and theft from a vessel at anchorage. Land cargo theft remains under Cargo Watch.
-        </p>
         {piracyIncidents.length === 0 ? (
           <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
-            No current piracy or armed-robbery records in the selected window.
+            No piracy or armed-robbery activity observed in the selected window.
           </div>
         ) : (
           <div className="bg-white border border-border rounded-sm overflow-hidden">
@@ -910,13 +766,11 @@ export default function Shipping() {
       {/* 3d. Maritime Security — ICC CCS / IMB Piracy Reporting Centre */}
       <Section title="Maritime Security — ICC CCS / IMB Piracy Reporting Centre">
         <p className="text-xs text-muted-foreground font-sans -mt-1 mb-2">
-          Reported piracy and armed-robbery-at-sea events from the{" "}
+          Maritime-security observations from the{" "}
           <a href={MARITIME_SECURITY_SOURCE_PAGE} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
             {MARITIME_SECURITY_SOURCE_LABEL}
           </a>{" "}
-          live piracy map (current calendar year). This is a standalone reference
-          source: it is shown alongside the monitor but is never added to the
-          shipping incident counts above.
+          live map for the current calendar year.
         </p>
         {maritimeSecurity.byType.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -927,15 +781,14 @@ export default function Shipping() {
               >
                 <span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: t.color }} />
                 <span className="text-primary font-medium">{t.type}</span>
-                <span className="text-muted-foreground font-mono">{t.count}</span>
+                <span className="text-muted-foreground font-mono">{t.count} observations</span>
               </span>
             ))}
           </div>
         )}
         {maritimeSecurity.rows.length === 0 ? (
           <div className="bg-white border border-border rounded-sm p-6 text-sm text-muted-foreground italic">
-            No ICC/IMB maritime-security events in the selected window. (Source
-            may be pending external network validation — see Source Health.)
+            No maritime-security observations in the selected window.
           </div>
         ) : (
           <div className="bg-white border border-border rounded-sm overflow-hidden">
@@ -988,9 +841,6 @@ export default function Shipping() {
             <RegionRow label="APAC" count={apCount} total={total} accent={REGION_COLOR["APAC"]} />
             <RegionRow label={NOT_IDENTIFIED} count={notIdentifiedCount} total={total} accent={REGION_COLOR["Country not identified"]} />
           </div>
-          <p className="text-[11px] text-muted-foreground mt-3">
-            Country reflects where the incident occurred, derived from the event location text. Vessel flag state is shown separately on vessel cards and is never counted in the country charts. Records with no identifiable incident location are kept in totals but separated from the country charts. Records outside APAC and the Middle East are excluded entirely.
-          </p>
         </div>
       </Section>
 
@@ -1021,7 +871,7 @@ export default function Shipping() {
             label="Chokepoint / Route Activity"
             body={
               transitRecords.length > 0
-                ? `Chokepoint reporting was led by ${displayIncidentTitle(transitRecords[0].title, transitRecords[0].displayTitle)}, with the wider set covering chokepoint risk, route diversion and maritime advisories (${transitRecords.length} record${transitRecords.length === 1 ? "" : "s"} in window).`
+                ? `Chokepoint activity was led by ${displayIncidentTitle(transitRecords[0].title, transitRecords[0].displayTitle)} (${transitRecords.length} observation${transitRecords.length === 1 ? "" : "s"} in window).`
                 : null
             }
           />
@@ -1041,7 +891,7 @@ export default function Shipping() {
                             piracyIncidents[0].displayTitle,
                           )
                         : "—"
-                  }, split across ${vesselAttackOrSeizureCount} vessel attack or seizure record${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy or armed-robbery record${piracyIncidents.length === 1 ? "" : "s"}.`
+                  }, split across ${vesselAttackOrSeizureCount} attack or seizure observation${vesselAttackOrSeizureCount === 1 ? "" : "s"} and ${piracyIncidents.length} piracy or armed-robbery observation${piracyIncidents.length === 1 ? "" : "s"}.`
                 : null
             }
           />
@@ -1049,7 +899,7 @@ export default function Shipping() {
             label="Commercial Impact"
             body={
               commercialRecords.length > 0
-                ? `Commercial pressure was led by ${displayIncidentTitle(commercialRecords[0].title, commercialRecords[0].displayTitle)}, covering port disruption, freight and insurance pressure and wider commercial shipping disruption (${commercialRecords.length} record${commercialRecords.length === 1 ? "" : "s"} in window).`
+                ? `${commercialRecords.length} commercial-impact signal${commercialRecords.length === 1 ? "" : "s"} observed; the latest is ${displayIncidentTitle(commercialRecords[0].title, commercialRecords[0].displayTitle)}.`
                 : null
             }
           />
@@ -1061,7 +911,7 @@ export default function Shipping() {
         <div className="bg-white border border-border rounded-sm overflow-hidden">
           {withCoords.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
-              No geocoded shipping records available for this view.
+              No physical-location map observations available for this window.
             </div>
           ) : (
             <div className="h-[420px]">
@@ -1136,13 +986,6 @@ export default function Shipping() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              {notIdentifiedCount > 0 && (
-                <p className="text-[11px] text-muted-foreground font-sans mt-2 shrink-0 leading-snug">
-                  Based on {meCount + apCount} record{meCount + apCount === 1 ? "" : "s"} with an identified incident location.
-                  A further {notIdentifiedCount} credible record{notIdentifiedCount === 1 ? "" : "s"} could not be tied to a
-                  specific country and {notIdentifiedCount === 1 ? "is" : "are"} omitted from this chart.
-                </p>
-              )}
             </div>
           </ChartCard>
 
@@ -1186,25 +1029,25 @@ export default function Shipping() {
 
       <OfficialMilitaryMaritimeWatchPanel
         title="Official UKMTO Products"
-        subtitle="UK Maritime Trade Operations warnings and advisories ingested as standalone official sources — routed to Shipping Watch (and Conflict when escalation terms match). PDF text is merged into the stored body when available."
+        subtitle="UK Maritime Trade Operations warnings and advisories relevant to shipping operations."
         query={{ watch: "shipping", source: "ukmto", limit: 25 }}
       />
 
       <OfficialMilitaryMaritimeWatchPanel
         title="Partner Maritime Context (JMIC / CMF)"
-        subtitle="Threat-level updates and routine partner guidance routed to Shipping Watch. Escalation advisories with conflict terms also surface on Conflict Watch."
+        subtitle="JMIC and CMF threat-level updates relevant to shipping operations."
         query={{ watch: "shipping", source: "partner", limit: 15 }}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <OfficialMilitaryMaritimeWatchPanel
           title="JMIC Products"
-          subtitle="Joint Maritime Information Center advisories and threat-level guidance."
+          subtitle="Joint Maritime Information Center advisories and threat-level guidance for shipping operations."
           query={{ watch: "shipping", source: "jmic", limit: 10 }}
         />
         <OfficialMilitaryMaritimeWatchPanel
           title="CMF Products"
-          subtitle="Combined Maritime Forces regional threat assessments and maritime guidance."
+          subtitle="Combined Maritime Forces regional threat assessments and maritime guidance for shipping operations."
           query={{ watch: "shipping", source: "cmf", limit: 10 }}
         />
       </div>
@@ -1271,18 +1114,6 @@ export default function Shipping() {
         </div>
       </Section>
 
-      {/* 10. Data quality note */}
-      <div className="bg-white border border-border rounded-sm p-4 flex items-center justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans">Data Quality</div>
-          <div className="text-sm text-primary font-sans mt-1">
-            Records with incident location not identified: <span className="font-bold">{notIdentifiedCount}</span>
-          </div>
-        </div>
-        <div className="text-[11px] text-muted-foreground max-w-md text-right">
-          Kept in totals; excluded from country-level charts. Source records show <span className="font-semibold">{LOCATION_NOT_IDENTIFIED}</span> when no event-country can be derived. Vessel flag state, when present, is surfaced on vessel cards only.
-        </div>
-      </div>
     </div>
   );
 }
@@ -1399,7 +1230,7 @@ function IntelCard({ label, body }: { label: string; body: string | null }) {
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent" />
       <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-1">{label}</div>
       <p className="text-sm text-primary font-sans leading-relaxed mt-2">
-        {body ?? <span className="italic text-muted-foreground">No matching records in current view.</span>}
+        {body ?? <span className="italic text-muted-foreground">No current activity observed.</span>}
       </p>
     </div>
   );
@@ -1484,12 +1315,6 @@ function EmptyChart({ message }: { message: string }) {
 // the live board and the report can never disagree. Brand: #0b0a3d / #465bff /
 // #A33232 reserved for level-5 / Extreme only. Terse; no parenthetical counts
 // in prose (counts appear only on stat tiles / captions).
-
-const MARITIME_CONFIDENCE_LABEL: Record<string, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
 
 function MaritimeRiskChip({ level, label }: { level: MaritimeRiskLevel; label: string }) {
   return (
@@ -1605,7 +1430,7 @@ function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
       ]);
       setResult({
         kind: "ok",
-        msg: "Movement snapshot uploaded. The board and the Shipping Watch report now carry this context.",
+        msg: "Movement snapshot uploaded.",
       });
       setCounts({});
       setNotes("");
@@ -1632,12 +1457,10 @@ function MaritimeMovementUploadForm({ hasMovement }: { hasMovement: boolean }) {
     <Section title="Movement Data Upload — Admin">
       <div className="flex items-center justify-between gap-4 flex-wrap -mt-1">
         <p className="text-xs text-muted-foreground font-sans max-w-3xl">
-          Movement (AIS) figures are CONTEXT, never incidents. A live AIS feed populates these
-          automatically when configured; this form adds a licensed provider's snapshot manually.
-          Admin token required.{" "}
+          Licensed movement snapshot upload. Admin token required.{" "}
           {hasMovement
-            ? "A snapshot is on file; uploading adds a newer one."
-            : "No snapshot on file — both surfaces read movement data unavailable until one is added."}
+            ? "A current snapshot is on file."
+            : "No current snapshot is on file."}
         </p>
         <button
           type="button"
@@ -1840,7 +1663,16 @@ function MovementBlock({ movement }: { movement: MovementTheatre | null }) {
 
 // One of the seven spec chokepoint cards.
 function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
-  const { key, risk, incidentCount, lastConfirmed, movement, businessImpact, confidence } = card;
+  const { key, risk, incidentCount, lastConfirmed, movement, businessImpact } = card;
+  // Keep empty route cards compact. A movement-only snapshot is context, not
+  // route evidence, so it does not become a narrative finding.
+  if (incidentCount === 0) {
+    return (
+      <div className="bg-white border border-border rounded-sm p-3">
+        <span className="font-serif font-bold text-primary text-sm leading-tight">{key}</span>
+      </div>
+    );
+  }
   return (
     <div className="bg-white border border-border rounded-sm p-3 flex flex-col gap-2">
       <div className="flex items-start justify-between gap-2">
@@ -1857,25 +1689,24 @@ function ChokepointBoardCard({ card }: { card: ChokepointCard }) {
 
       <div className="text-[11px] font-sans leading-snug">
         <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Last incident</span>
-        {lastConfirmed ? (
+        {lastConfirmed && (
           <span className="text-foreground/85">
             {format(parseISO(lastConfirmed.occurredAt), "dd MMM")} — {lastConfirmed.title}
           </span>
-        ) : (
-          <span className="italic text-muted-foreground">None in window</span>
         )}
       </div>
 
       <MovementBlock movement={movement} />
 
       <div className="text-[11px] font-sans leading-snug">
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Business impact</span>
-        <span className="text-foreground/85">{businessImpact.join(", ")}</span>
+        {businessImpact.length > 0 && (
+          <>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground mr-1">Business impact</span>
+            <span className="text-foreground/85">{businessImpact.join(", ")}</span>
+          </>
+        )}
       </div>
 
-      <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-sans mt-auto pt-1">
-        Confidence: {MARITIME_CONFIDENCE_LABEL[confidence] ?? confidence}
-      </div>
     </div>
   );
 }
@@ -1970,12 +1801,12 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
     watchNext,
   } = board;
 
-  const namedImpacts = businessImpact.filter((b) => b !== "No material impact");
+  const namedImpacts = businessImpact;
 
   return (
     <Section title="Maritime Intelligence">
       <p className="text-xs text-muted-foreground font-sans -mt-1">
-        Weekly assessment · last 7 days. One shared dataset, identical to the Shipping Watch report.
+        Weekly maritime operations view · last 7 days.
       </p>
 
       {/* Executive summary row — 4 cards */}
@@ -1984,7 +1815,6 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
           label="Maritime Risk Level"
           value={`L${risk.level} · ${risk.label}`}
           valueColor={MARITIME_RISK_COLOR[risk.level]}
-          sub={`Confidence: ${MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}`}
         />
         <ExecSummaryCard
           label="Confirmed Incidents · 7d"
@@ -1994,12 +1824,12 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
         <ExecSummaryCard
           label="Chokepoints Affected"
           value={`${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`}
-          sub="With ≥1 confirmed incident"
+          sub="With observed maritime activity"
         />
         <ExecSummaryCard
           label="Business Impact"
           value={namedImpacts.length > 0 ? namedImpacts.length : "—"}
-          sub={namedImpacts.length > 0 ? namedImpacts.slice(0, 2).join(", ") : "No material impact"}
+          sub={namedImpacts.length > 0 ? namedImpacts.slice(0, 2).join(", ") : "No current impact signal"}
         />
       </div>
 
@@ -2031,30 +1861,23 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
       {/* Confirmed incidents table */}
       <ConfirmedIncidentsTable rows={confirmedIncidents} />
 
-      {/* Live vessel map — individual AIS positions in the tracked chokepoints */}
-      <MaritimeBoardCard label="Live Vessel Map — AIS Positions (Middle East & Asia-Pacific)">
-        <p className="text-[11px] text-muted-foreground font-sans leading-snug mb-3">
-          Individual vessels at their most recent transmitted position inside the tracked chokepoints. Positions are live AIS CONTEXT — they never count as incidents and never raise the risk level on their own.
-        </p>
+      {/* Live vessel map — individual positions in the tracked chokepoints */}
+      <MaritimeBoardCard label="Live Vessel Map">
         <VesselMap />
       </MaritimeBoardCard>
 
-      {/* Live fleet intelligence — flags of registry & composition from the same AIS sightings */}
-      <MaritimeBoardCard label="Live Fleet Intelligence — Flags of Registry & Composition (AIS)">
-        <p className="text-[11px] text-muted-foreground font-sans leading-snug mb-3">
-          The live fleet in the tracked chokepoints, broken down by flag of registry and vessel class. Derived from the same AIS positions plotted above — flag from each vessel's MMSI country code, class from its broadcast AIS ship-type. Live context, never incidents.
-        </p>
+      {/* Live fleet intelligence — flags of registry and composition */}
+      <MaritimeBoardCard label="Live Fleet Intelligence — Flags of Registry & Composition">
         <FleetIntelligence />
       </MaritimeBoardCard>
 
       {/* Maritime context panel — movement / AIS only */}
-      <MaritimeBoardCard label="Maritime Context — Vessel Movement (AIS)">
+      <MaritimeBoardCard label="Maritime Context — Vessel Movement">
         {movementSnapshot ? (
           <div className="space-y-2">
             <div className="text-[11px] text-muted-foreground font-sans">
               As of {format(parseISO(movementSnapshot.asOf ?? new Date().toISOString()), "dd MMM yyyy")} ·{" "}
-              {movementSnapshot.sourceName ?? "Licensed provider"} · Confidence{" "}
-              {MARITIME_CONFIDENCE_LABEL[movementSnapshot.confidence ?? "low"] ?? movementSnapshot.confidence}
+              {movementSnapshot.sourceName ?? "Licensed provider"}
             </div>
             <ul className="space-y-1.5">
               {movementSnapshot.theatres.map((t) => (
@@ -2064,13 +1887,10 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
                 </li>
               ))}
             </ul>
-            <p className="text-[11px] text-muted-foreground font-sans leading-snug">
-              Vessel movement is CONTEXT only — it never counts as an incident and never raises the risk level on its own.
-            </p>
           </div>
         ) : (
           <div className="text-[12px] font-sans italic text-muted-foreground">
-            Movement data unavailable. Upload a licensed-provider snapshot to populate this panel. Risk is assessed from confirmed incidents alone.
+            No vessel-movement observation is available for this window.
           </div>
         )}
       </MaritimeBoardCard>
@@ -2112,12 +1932,6 @@ function MaritimeIntelligenceBoard({ board }: { board: MaritimeIntelligence }) {
                 </span>
               ))}
             </div>
-            <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
-              Confidence
-            </div>
-            <p className="text-[12px] font-sans mb-3" style={{ color: "#FFFFFF" }}>
-              {MARITIME_CONFIDENCE_LABEL[risk.confidence] ?? risk.confidence}
-            </p>
             <div className="text-[10px] uppercase tracking-widest font-sans mb-1" style={{ color: "#9aa0c8" }}>
               Watch next
             </div>

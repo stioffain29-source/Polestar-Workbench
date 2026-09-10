@@ -39,19 +39,11 @@ import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import {
   makeSectionGate,
-  applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
-import {
-  resolveSimpleProse,
-  stableDraftTopicReportProse,
-  toDraftableIncidents,
-  type TopicAiProse,
-} from "./topicProseResolution";
+import type { TopicAiProse } from "./topicProseResolution";
 import { LOCATION_NOT_IDENTIFIED as _LOCATION_NOT_IDENTIFIED } from "./shippingCountry";
-import { pickRead } from "./pickRead";
 import {
-  buildShippingReportDataset,
   type ShippingReportIncident,
   type BarRow,
   type ChokepointRow,
@@ -61,19 +53,20 @@ import {
 } from "./shippingReportDataset";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
-  buildMaritimeIntelligence,
-  assertShippingReportConsistency,
   formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
 } from "./maritimeIntelligence";
+import {
+  assertShippingPublication,
+  finalizeShippingPublication,
+} from "./shippingPublication";
 import {
   MARITIME_SECURITY_SOURCE_LABEL,
   maritimeTypeColor,
   type MaritimeSecuritySummary,
 } from "./maritimeSecurity";
 import {
-  MARITIME_CONF_LABEL,
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
 } from "./maritimeReportView";
@@ -803,7 +796,6 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
   const { pdf, MX } = ctx;
   const {
     bluf,
-    risk,
     movementSnapshot,
     chokepointCards,
     confirmedIncidents,
@@ -852,10 +844,6 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
     } else {
       lines.push("Movement: Movement data unavailable");
     }
-    lines.push(`Business impact: ${card.businessImpact.join(", ")}`);
-    lines.push(
-      `Confidence: ${MARITIME_CONF_LABEL[card.confidence] ?? card.confidence}`,
-    );
     drawMiniBullets(ctx, lines, lines.length);
   }
 
@@ -889,24 +877,13 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
       (t) => `${t.theatre} \u2014 ${formatMovementSummary(t)}`,
     );
     drawMiniBullets(ctx, items);
-    renderProse(
-      ctx,
-      "Vessel movement is context only \u2014 it never counts as an incident and never raises the risk level on its own.",
-    );
   } else {
-    renderProse(
-      ctx,
-      "Movement data unavailable. Risk is assessed from confirmed incidents alone.",
-    );
+    renderProse(ctx, "No vessel movement observation is available for this window.");
   }
 
   // The board's internal Polestar View / Watch Next block is NOT rendered in
   // the report — the report carries exactly one Polestar View and one Watch
-  // Next (the standalone sections). Mirrors the preview byte-for-byte.
-  renderProse(
-    ctx,
-    `Assessment confidence: ${MARITIME_CONF_LABEL[risk.confidence] ?? risk.confidence}. ${risk.rationale}`,
-  );
+  // Next in the standalone sections. Mirrors the preview byte-for-byte.
 }
 
 // Exporter ------------------------------------------------------------------
@@ -922,7 +899,6 @@ export async function exportShippingReportPdf(
   hiddenSections?: string[],
   sectionOverrides?: TopicSectionOverrides | null,
 ): Promise<void> {
-  const show = makeSectionGate(hiddenSections);
   const canon = canonicalTopic(data.topic);
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const cadence = `${canon.cadence} Briefing`;
@@ -933,33 +909,31 @@ export async function exportShippingReportPdf(
     /* keep */
   }
 
+  // Resolve and validate the complete publication bundle before the cover or
+  // any other PDF surface is painted.  Preview uses this exact finalizer.
+  const publication = assertShippingPublication(
+    finalizeShippingPublication({
+      report: data,
+      incidents,
+      movement,
+      maritimeSecurityEvents,
+      incidentSummaries,
+      aiProse,
+      hiddenSections,
+      sectionOverrides,
+    }),
+  );
+  const show = makeSectionGate([...publication.hiddenSections]);
+  const ds = publication.dataset;
+  const maritimeBoard = publication.maritimeBoard;
+  const renderedFastFacts = publication.fastFacts;
+  const prose = publication.prose;
+  const win = resolveReportWindow(data.topic, data.issueDate);
+
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
   // Embed Roboto on this pdf instance before drawing any text. Without this,
   // jsPDF silently falls back to Helvetica, which the brand spec forbids.
   await ensureRobotoLoaded(ctx.pdf);
-  const win = resolveReportWindow(data.topic, data.issueDate);
-  // Build the final, event-folded set before any prose or board derivation.
-  // Every rendered report surface below is driven from this one dataset.
-  const ds = buildShippingReportDataset(
-    incidents,
-    data.topic,
-    data.issueDate,
-    maritimeSecurityEvents,
-  );
-  const maritimeBoard = buildMaritimeIntelligence({
-    incidents: ds.canonicalIncidents,
-    movement,
-    windowStart: win.start,
-    windowEnd: win.end,
-    inputMode: "prevalidated",
-  });
-  const renderedFastFacts = applyFastFactOverrides(
-    ds.fastFacts,
-    sectionOverrides?.fastFactOverrides,
-  );
-  // Validate before even the cover is painted: a contradictory report must
-  // fail rather than yield a partially rendered PDF.
-  assertShippingReportConsistency(ds, maritimeBoard, renderedFastFacts);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
   try {
     const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
@@ -982,21 +956,9 @@ export async function exportShippingReportPdf(
   void cadence;
   beginBodyPages(ctx);
 
-  // Executive Summary resolves through the SHARED chain (analyst edit -> AI ->
-  // deterministic draft) so the PDF matches the on-screen preview exactly.
-  const proseDraft = stableDraftTopicReportProse({
-    topic: data.topic,
-    issueDate: data.issueDate,
-    incidents: toDraftableIncidents(ds.canonicalIncidents),
-  });
-  const execText = resolveSimpleProse(
-    data.executiveSummary,
-    aiProse?.executiveSummary,
-    proseDraft.executiveSummary,
-  );
-  if (show("executive-summary") && execText.trim()) {
+  if (show("executive-summary") && prose.executiveSummary.trim()) {
     drawSectionHeading(ctx, "Executive Summary");
-    renderProse(ctx, execText);
+    renderProse(ctx, prose.executiveSummary);
   }
 
   // Maritime Intelligence — the one shared deterministic board, aligned to this
@@ -1019,7 +981,7 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "Chokepoint / Route Read",
-      pickRead(data.chokepointRouteRead, ds.chokepointRouteRead),
+      prose.chokepointRouteRead,
     );
     drawChokepointWatch(ctx, ds.chokepointRows, ds.thirtyDayShortLabel);
   }
@@ -1029,7 +991,7 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "Vessel Threat and Piracy Read",
-      pickRead(data.vesselPiracyRead, ds.vesselPiracyRead),
+      prose.vesselPiracyRead,
     );
     drawIncidentTable<VesselRow>(
       ctx,
@@ -1060,7 +1022,7 @@ export async function exportShippingReportPdf(
     drawMaritimeSecurity(
       ctx,
       ds.maritimeSecurity,
-      pickRead(data.maritimeSecurityRead, ds.maritimeSecurity.read),
+      prose.maritimeSecurityRead,
     );
   }
 
@@ -1071,7 +1033,7 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "Commercial Impact on Shipping",
-      pickRead(data.commercialImpactRead, ds.commercialImpactRead),
+      prose.commercialImpactRead,
     );
     drawIncidentTable<EnrichedIncident>(ctx, null, ds.commercialRows, {
       showActColumn: true,
@@ -1086,7 +1048,7 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "Regional and Country View",
-      pickRead(data.regionalCountryRead, ds.regionalCountryRead),
+      prose.regionalCountryRead,
     );
     drawHorizontalBarChart(ctx, "Incidents by Region", ds.regionRows, {
       labelW: 160,
@@ -1112,25 +1074,21 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "What Matters",
-      resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, ds.autoWhatMatters),
+      prose.whatMatters,
     );
   }
   if (show("implications")) {
     drawBulletSection(
       ctx,
       "Implications for Business",
-      resolveSimpleProse(
-        data.implications,
-        aiProse?.implications,
-        ds.autoImplications,
-      ),
+      prose.implications,
     );
   }
   if (show("watch-next")) {
     drawBulletSection(
       ctx,
       "Watch Next",
-      resolveSimpleProse(data.watchNext, aiProse?.watchNext, ds.autoWatchNext),
+      prose.watchNext,
       8,
     );
   }
@@ -1138,16 +1096,12 @@ export async function exportShippingReportPdf(
     drawSectionWithProse(
       ctx,
       "Polestar View",
-      resolveSimpleProse(
-        data.polestarView,
-        aiProse?.polestarView,
-        ds.autoPolestarView,
-      ),
+      prose.polestarView,
     );
   }
 
   if (show("related-incidents")) {
-    drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
+    drawRelatedIncidents(ctx, ds.relatedIncidents, publication.incidentSummaries);
   }
 
   drawDisclaimer(ctx);

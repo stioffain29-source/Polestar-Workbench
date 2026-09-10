@@ -13,6 +13,7 @@ import {
   maritimeChokepointTitles,
   maritimeExecCards,
 } from "../../artifacts/workbench/src/lib/maritimeReportView";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 // ---------------------------------------------------------------------------
 // Screen == PDF parity guard for the Shipping Watch "Maritime Intelligence"
@@ -42,26 +43,34 @@ const WINDOW_END = new Date("2026-06-18T00:00:00.000Z");
 const WINDOW_START = new Date("2026-06-11T00:00:00.000Z");
 
 const FIXTURE: MaritimeIncidentInput[] = [
-  {
-    id: 1,
-    title: "Missile struck a tanker in the Strait of Hormuz, two crew killed",
+  semanticIncident(1, "Missile struck a tanker in the Strait of Hormuz, two crew killed", {
+    eventClass: "commercial_attack",
     severity: "extreme",
-    occurredAt: "2026-06-16T08:00:00.000Z",
     country: "Iran",
-    source: "Reuters",
-    sourceUrl: "https://example.com/hormuz",
-    topic: "shipping",
-  },
-  {
-    id: 2,
-    title: "Drone struck a vessel in the Red Sea",
+    physicalLocation: "Strait of Hormuz",
+    physicalLocationEvidence: "Missile struck a tanker in the Strait of Hormuz, two crew killed",
+    routeRelationship: {
+      kind: "physical",
+      routeName: "Strait of Hormuz",
+      evidence: "Missile struck a tanker in the Strait of Hormuz, two crew killed",
+    },
+  }),
+  semanticIncident(2, "Drone struck a vessel in the Red Sea", {
+    eventClass: "drone_activity",
+    commercialTargetValidated: true,
+    commercialTarget: "vessel",
+    commercialTargetName: "Test vessel",
+    commercialTargetEvidence: "Drone struck a vessel in the Red Sea",
     severity: "high",
-    occurredAt: "2026-06-14T08:00:00.000Z",
     country: "Yemen",
-    source: "gCaptain",
-    sourceUrl: "https://example.com/redsea",
-    topic: "shipping",
-  },
+    physicalLocation: "Red Sea",
+    physicalLocationEvidence: "Drone struck a vessel in the Red Sea",
+    routeRelationship: {
+      kind: "physical",
+      routeName: "Red Sea",
+      evidence: "Drone struck a vessel in the Red Sea",
+    },
+  }),
   // A non-shipping row that must be ignored by the builder (topic scope).
   {
     id: 3,
@@ -161,27 +170,24 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
   });
 });
 
-describe("Off-board confirmed incidents are excluded (no 'Extreme over zeros')", () => {
+describe("Off-board validated route evidence remains separate from board cards", () => {
   // A single confirmed kinetic incident whose ONLY chokepoint is a NON-board
   // strait ("Arabian / Persian Gulf" is in the detection vocabulary but is not
-  // its own card; the country stays Iran so it passes the Middle-East scope
-  // gate). Its extreme severity WOULD drive the overall risk to L5 if it counted
-  // — the exact "Extreme over a wall of zeros" defect the owner reported. The
-  // owner's fix is to remove such wider-waters activity from the report
-  // entirely, so it must not appear as a card and must not drive the risk /
-  // BLUF. Because it names a chokepoint (just not a board one), it also proves
-  // the scope predicate is "names a BOARD chokepoint", not "names any".
+  // its own card). It remains part of the canonical incident/risk picture,
+  // while the seven fixed board cards remain zero.
   const OFF_BOARD_FIXTURE: MaritimeIncidentInput[] = [
-    {
-      id: 10,
-      title: "Missile struck a tanker in the Persian Gulf, two crew killed",
+    semanticIncident(10, "Missile struck a tanker in the Persian Gulf, two crew killed", {
+      eventClass: "commercial_attack",
       severity: "extreme",
-      occurredAt: "2026-06-16T08:00:00.000Z",
       country: "Iran",
-      source: "Reuters",
-      sourceUrl: "https://example.com/persian-gulf",
-      topic: "shipping",
-    },
+      physicalLocation: "Persian Gulf",
+      physicalLocationEvidence: "Missile struck a tanker in the Persian Gulf, two crew killed",
+      routeRelationship: {
+        kind: "physical",
+        routeName: "Arabian / Persian Gulf",
+        evidence: "Missile struck a tanker in the Persian Gulf, two crew killed",
+      },
+    }),
   ];
   const board = buildMaritimeIntelligence({
     incidents: OFF_BOARD_FIXTURE,
@@ -195,31 +201,25 @@ describe("Off-board confirmed incidents are excluded (no 'Extreme over zeros')",
     expect(board.chokepointCards).toHaveLength(BOARD_CHOKEPOINTS.length);
   });
 
-  it("excludes the off-board incident from the confirmed set entirely", () => {
-    expect(board.incidentSnapshot.total).toBe(0);
-    expect(board.confirmedIncidents).toHaveLength(0);
+  it("keeps the off-board incident in the validated confirmed set", () => {
+    expect(board.incidentSnapshot.total).toBe(1);
+    expect(board.confirmedIncidents).toHaveLength(1);
   });
 
-  it("never shows an elevated overall risk over an all-zero chokepoint grid", () => {
-    // With no in-scope confirmed incident the risk stays L1 (Insignificant), so
-    // the BLUF can never read Extreme over seven zero cards.
-    expect(board.risk.level).toBe(1);
+  it("does not assign the off-board incident to a tracked route card", () => {
+    expect(board.risk.level).toBe(4);
     expect(board.chokepointCards.every((c) => c.incidentCount === 0)).toBe(true);
   });
 
-  it("keeps 'Chokepoints Affected' at 0 / 7", () => {
+  it("keeps tracked 'Chokepoints Affected' at 0 / 7", () => {
     expect(board.chokepointsAffected).toBe(0);
     const affectedCard = maritimeExecCards(board)[2];
     expect(affectedCard.value).toBe(`0 / ${BOARD_CHOKEPOINTS.length}`);
   });
 
   it("scopes the empty-week BLUF to tracked chokepoints, not an absolute negative", () => {
-    // The off-board incident may still surface in the report's other sections,
-    // so the BLUF must NOT claim a blanket "no confirmed maritime security
-    // incidents" — that would be falsifiable within the same PDF.
-    expect(board.risk.level).toBe(1);
-    expect(board.bluf).toContain("No confirmed incidents at tracked chokepoints");
-    expect(board.bluf).not.toContain("No confirmed maritime security incidents");
+    expect(board.risk.level).toBe(4);
+    expect(board.bluf).not.toContain("No validated maritime incidents");
   });
 });
 

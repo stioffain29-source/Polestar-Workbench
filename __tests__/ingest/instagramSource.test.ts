@@ -48,6 +48,21 @@ describe("decideInstagramIncident", () => {
     expect(d.row.analystNotes).toContain(`${INSTAGRAM_MARKER_PREFIX}ig_ABC123`);
   });
 
+  it("withholds feed-country geography for shipping until semantic validation", () => {
+    const d = decideInstagramIncident(
+      post({
+        text: "Pirates boarded a tanker in the Singapore Strait near Indonesia in a sea robbery.",
+      }),
+    );
+    expect(d.insert).toBe(true);
+    if (!d.insert) return;
+    expect(d.topic).toBe("shipping");
+    expect(d.row.country).toBe("Unknown");
+    expect(d.row.location).toBeNull();
+    expect(d.row.latitude).toBeNull();
+    expect(d.row.longitude).toBeNull();
+  });
+
   it("routes separatist-armed content to conflict", () => {
     const d = decideInstagramIncident(
       post({

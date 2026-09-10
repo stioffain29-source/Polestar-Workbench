@@ -19,6 +19,33 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Operational overview across all topic areas
  */
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneRoutingConsequenceConfidenceMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneRoutingConsequenceConfidenceMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneCommercialConsequenceConfidenceMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneCommercialConsequenceConfidenceMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceEventMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceEventMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceClassificationMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceClassificationMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceCommercialTargetMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceCommercialTargetMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceGeographyMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceGeographyMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceRouteRelationshipMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceRouteRelationshipMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceConsequenceMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceConsequenceMax = 1;
+
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceDateMin = 0;
+export const getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceDateMax = 1;
+
 export const getDashboardOverviewResponseSourceAlertsItemConsecutiveFailuresMin = 0;
 
 export const getDashboardOverviewResponseSourceAlertsItemReliabilityMin = 0;
@@ -79,7 +106,71 @@ export const GetDashboardOverviewResponse = zod.object({
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
   "gdeltEnrichedAt": zod.coerce.date().nullish(),
-  "analystInScope": zod.boolean().nullish()
+  "analystInScope": zod.boolean().nullish(),
+  "maritimeSemantic": zod.object({
+  "version": zod.string(),
+  "verdict": zod.enum(['valid', 'invalid', 'needs_review']),
+  "reason": zod.string(),
+  "eventOccurred": zod.boolean().nullable(),
+  "eventClass": zod.enum(['commercial_attack', 'commercial_seizure', 'piracy_or_armed_robbery', 'collision_or_grounding', 'port_disruption', 'chokepoint_disruption', 'route_disruption', 'environmental_maritime_event', 'naval_activity', 'military_naval_activity', 'drone_activity', 'military_exercise', 'geopolitical_maritime_development', 'protest_or_labour', 'other_maritime_event', 'non_event']).nullable(),
+  "commercialTargetValidated": zod.boolean(),
+  "commercialTarget": zod.enum(['vessel', 'cargo', 'port_facility', 'shipping_operations', 'none', 'unknown']),
+  "commercialTargetName": zod.string().nullable(),
+  "commercialTargetEvidence": zod.string().nullable(),
+  "physicalLocation": zod.string().nullable(),
+  "physicalLocationEvidence": zod.string().nullable(),
+  "country": zod.string().nullable(),
+  "coastalState": zod.string().nullable(),
+  "routeRelationship": zod.object({
+  "kind": zod.enum(['physical', 'direct_passage', 'indirect', 'none']),
+  "routeName": zod.string().nullable(),
+  "evidence": zod.string().nullable()
+}),
+  "routingConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneRoutingConsequenceConfidenceMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneRoutingConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "commercialConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneCommercialConsequenceConfidenceMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneCommercialConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "geopolitical": zod.object({
+  "relevant": zod.boolean(),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable()
+}),
+  "eventDate": zod.coerce.date().nullable(),
+  "developmentKey": zod.string().nullable(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullable(),
+  "severityJustification": zod.string().nullable(),
+  "severityEvidenceQuote": zod.string().nullable(),
+  "confidence": zod.object({
+  "event": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceEventMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceEventMax),
+  "classification": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceClassificationMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceClassificationMax),
+  "commercialTarget": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceCommercialTargetMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceCommercialTargetMax),
+  "geography": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceGeographyMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceGeographyMax),
+  "routeRelationship": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceRouteRelationshipMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceRouteRelationshipMax),
+  "consequence": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceConsequenceMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceConsequenceMax),
+  "date": zod.number().min(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceDateMin).max(getDashboardOverviewResponseRecentIncidentsItemMaritimeSemanticOneConfidenceDateMax)
+}),
+  "contradictions": zod.array(zod.string()),
+  "sourceQuotes": zod.array(zod.object({
+  "quote": zod.string(),
+  "claim": zod.string()
+})),
+  "evidence": zod.array(zod.string()),
+  "evaluatedAt": zod.coerce.date()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
 })),
   "sourceAlerts": zod.array(zod.object({
   "id": zod.number(),
@@ -834,6 +925,35 @@ export const ListIncidentsQueryParams = zod.object({
   "countryLike": zod.coerce.string().optional().describe('Superset country pre-filter: comma-separated tokens. Returns rows whose country field contains ANY token (case-insensitive substring). Distinct from the exact `country` match — this is a loose OR filter used by the country report to scope the fetch (cutting payload and the corroboration join) without changing the client-side country match, which stays the authoritative gate.')
 })
 
+export const listIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceEventMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceEventMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceClassificationMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceClassificationMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceGeographyMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceGeographyMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMax = 1;
+
+export const listIncidentsResponseMaritimeSemanticOneConfidenceDateMin = 0;
+export const listIncidentsResponseMaritimeSemanticOneConfidenceDateMax = 1;
+
+
+
 export const ListIncidentsResponseItem = zod.object({
   "id": zod.number(),
   "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres']),
@@ -872,7 +992,71 @@ export const ListIncidentsResponseItem = zod.object({
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
   "gdeltEnrichedAt": zod.coerce.date().nullish(),
-  "analystInScope": zod.boolean().nullish()
+  "analystInScope": zod.boolean().nullish(),
+  "maritimeSemantic": zod.object({
+  "version": zod.string(),
+  "verdict": zod.enum(['valid', 'invalid', 'needs_review']),
+  "reason": zod.string(),
+  "eventOccurred": zod.boolean().nullable(),
+  "eventClass": zod.enum(['commercial_attack', 'commercial_seizure', 'piracy_or_armed_robbery', 'collision_or_grounding', 'port_disruption', 'chokepoint_disruption', 'route_disruption', 'environmental_maritime_event', 'naval_activity', 'military_naval_activity', 'drone_activity', 'military_exercise', 'geopolitical_maritime_development', 'protest_or_labour', 'other_maritime_event', 'non_event']).nullable(),
+  "commercialTargetValidated": zod.boolean(),
+  "commercialTarget": zod.enum(['vessel', 'cargo', 'port_facility', 'shipping_operations', 'none', 'unknown']),
+  "commercialTargetName": zod.string().nullable(),
+  "commercialTargetEvidence": zod.string().nullable(),
+  "physicalLocation": zod.string().nullable(),
+  "physicalLocationEvidence": zod.string().nullable(),
+  "country": zod.string().nullable(),
+  "coastalState": zod.string().nullable(),
+  "routeRelationship": zod.object({
+  "kind": zod.enum(['physical', 'direct_passage', 'indirect', 'none']),
+  "routeName": zod.string().nullable(),
+  "evidence": zod.string().nullable()
+}),
+  "routingConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(listIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin).max(listIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "commercialConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(listIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin).max(listIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "geopolitical": zod.object({
+  "relevant": zod.boolean(),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable()
+}),
+  "eventDate": zod.coerce.date().nullable(),
+  "developmentKey": zod.string().nullable(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullable(),
+  "severityJustification": zod.string().nullable(),
+  "severityEvidenceQuote": zod.string().nullable(),
+  "confidence": zod.object({
+  "event": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceEventMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceEventMax),
+  "classification": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceClassificationMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceClassificationMax),
+  "commercialTarget": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMax),
+  "geography": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceGeographyMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceGeographyMax),
+  "routeRelationship": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMax),
+  "consequence": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMax),
+  "date": zod.number().min(listIncidentsResponseMaritimeSemanticOneConfidenceDateMin).max(listIncidentsResponseMaritimeSemanticOneConfidenceDateMax)
+}),
+  "contradictions": zod.array(zod.string()),
+  "sourceQuotes": zod.array(zod.object({
+  "quote": zod.string(),
+  "claim": zod.string()
+})),
+  "evidence": zod.array(zod.string()),
+  "evaluatedAt": zod.coerce.date()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
 })
 export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
@@ -900,6 +1084,35 @@ export const CreateIncidentBody = zod.object({
 export const GetIncidentParams = zod.object({
   "id": zod.coerce.number()
 })
+
+export const getIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin = 0;
+export const getIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin = 0;
+export const getIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceEventMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceEventMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceClassificationMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceClassificationMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceGeographyMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceGeographyMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceConsequenceMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceConsequenceMax = 1;
+
+export const getIncidentResponseMaritimeSemanticOneConfidenceDateMin = 0;
+export const getIncidentResponseMaritimeSemanticOneConfidenceDateMax = 1;
+
+
 
 export const GetIncidentResponse = zod.object({
   "id": zod.number(),
@@ -939,7 +1152,71 @@ export const GetIncidentResponse = zod.object({
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
   "gdeltEnrichedAt": zod.coerce.date().nullish(),
-  "analystInScope": zod.boolean().nullish()
+  "analystInScope": zod.boolean().nullish(),
+  "maritimeSemantic": zod.object({
+  "version": zod.string(),
+  "verdict": zod.enum(['valid', 'invalid', 'needs_review']),
+  "reason": zod.string(),
+  "eventOccurred": zod.boolean().nullable(),
+  "eventClass": zod.enum(['commercial_attack', 'commercial_seizure', 'piracy_or_armed_robbery', 'collision_or_grounding', 'port_disruption', 'chokepoint_disruption', 'route_disruption', 'environmental_maritime_event', 'naval_activity', 'military_naval_activity', 'drone_activity', 'military_exercise', 'geopolitical_maritime_development', 'protest_or_labour', 'other_maritime_event', 'non_event']).nullable(),
+  "commercialTargetValidated": zod.boolean(),
+  "commercialTarget": zod.enum(['vessel', 'cargo', 'port_facility', 'shipping_operations', 'none', 'unknown']),
+  "commercialTargetName": zod.string().nullable(),
+  "commercialTargetEvidence": zod.string().nullable(),
+  "physicalLocation": zod.string().nullable(),
+  "physicalLocationEvidence": zod.string().nullable(),
+  "country": zod.string().nullable(),
+  "coastalState": zod.string().nullable(),
+  "routeRelationship": zod.object({
+  "kind": zod.enum(['physical', 'direct_passage', 'indirect', 'none']),
+  "routeName": zod.string().nullable(),
+  "evidence": zod.string().nullable()
+}),
+  "routingConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin).max(getIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "commercialConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin).max(getIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "geopolitical": zod.object({
+  "relevant": zod.boolean(),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable()
+}),
+  "eventDate": zod.coerce.date().nullable(),
+  "developmentKey": zod.string().nullable(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullable(),
+  "severityJustification": zod.string().nullable(),
+  "severityEvidenceQuote": zod.string().nullable(),
+  "confidence": zod.object({
+  "event": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceEventMin).max(getIncidentResponseMaritimeSemanticOneConfidenceEventMax),
+  "classification": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceClassificationMin).max(getIncidentResponseMaritimeSemanticOneConfidenceClassificationMax),
+  "commercialTarget": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMin).max(getIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMax),
+  "geography": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceGeographyMin).max(getIncidentResponseMaritimeSemanticOneConfidenceGeographyMax),
+  "routeRelationship": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMin).max(getIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMax),
+  "consequence": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceConsequenceMin).max(getIncidentResponseMaritimeSemanticOneConfidenceConsequenceMax),
+  "date": zod.number().min(getIncidentResponseMaritimeSemanticOneConfidenceDateMin).max(getIncidentResponseMaritimeSemanticOneConfidenceDateMax)
+}),
+  "contradictions": zod.array(zod.string()),
+  "sourceQuotes": zod.array(zod.object({
+  "quote": zod.string(),
+  "claim": zod.string()
+})),
+  "evidence": zod.array(zod.string()),
+  "evaluatedAt": zod.coerce.date()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
 })
 
 
@@ -963,6 +1240,35 @@ export const UpdateIncidentBody = zod.object({
   "analystNotes": zod.string().optional(),
   "analystInScope": zod.boolean().optional()
 })
+
+export const updateIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceEventMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceEventMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceClassificationMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceClassificationMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceGeographyMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceGeographyMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceConsequenceMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceConsequenceMax = 1;
+
+export const updateIncidentResponseMaritimeSemanticOneConfidenceDateMin = 0;
+export const updateIncidentResponseMaritimeSemanticOneConfidenceDateMax = 1;
+
+
 
 export const UpdateIncidentResponse = zod.object({
   "id": zod.number(),
@@ -1002,7 +1308,71 @@ export const UpdateIncidentResponse = zod.object({
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
   "gdeltEnrichedAt": zod.coerce.date().nullish(),
-  "analystInScope": zod.boolean().nullish()
+  "analystInScope": zod.boolean().nullish(),
+  "maritimeSemantic": zod.object({
+  "version": zod.string(),
+  "verdict": zod.enum(['valid', 'invalid', 'needs_review']),
+  "reason": zod.string(),
+  "eventOccurred": zod.boolean().nullable(),
+  "eventClass": zod.enum(['commercial_attack', 'commercial_seizure', 'piracy_or_armed_robbery', 'collision_or_grounding', 'port_disruption', 'chokepoint_disruption', 'route_disruption', 'environmental_maritime_event', 'naval_activity', 'military_naval_activity', 'drone_activity', 'military_exercise', 'geopolitical_maritime_development', 'protest_or_labour', 'other_maritime_event', 'non_event']).nullable(),
+  "commercialTargetValidated": zod.boolean(),
+  "commercialTarget": zod.enum(['vessel', 'cargo', 'port_facility', 'shipping_operations', 'none', 'unknown']),
+  "commercialTargetName": zod.string().nullable(),
+  "commercialTargetEvidence": zod.string().nullable(),
+  "physicalLocation": zod.string().nullable(),
+  "physicalLocationEvidence": zod.string().nullable(),
+  "country": zod.string().nullable(),
+  "coastalState": zod.string().nullable(),
+  "routeRelationship": zod.object({
+  "kind": zod.enum(['physical', 'direct_passage', 'indirect', 'none']),
+  "routeName": zod.string().nullable(),
+  "evidence": zod.string().nullable()
+}),
+  "routingConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(updateIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin).max(updateIncidentResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "commercialConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(updateIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin).max(updateIncidentResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "geopolitical": zod.object({
+  "relevant": zod.boolean(),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable()
+}),
+  "eventDate": zod.coerce.date().nullable(),
+  "developmentKey": zod.string().nullable(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullable(),
+  "severityJustification": zod.string().nullable(),
+  "severityEvidenceQuote": zod.string().nullable(),
+  "confidence": zod.object({
+  "event": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceEventMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceEventMax),
+  "classification": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceClassificationMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceClassificationMax),
+  "commercialTarget": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceCommercialTargetMax),
+  "geography": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceGeographyMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceGeographyMax),
+  "routeRelationship": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceRouteRelationshipMax),
+  "consequence": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceConsequenceMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceConsequenceMax),
+  "date": zod.number().min(updateIncidentResponseMaritimeSemanticOneConfidenceDateMin).max(updateIncidentResponseMaritimeSemanticOneConfidenceDateMax)
+}),
+  "contradictions": zod.array(zod.string()),
+  "sourceQuotes": zod.array(zod.object({
+  "quote": zod.string(),
+  "claim": zod.string()
+})),
+  "evidence": zod.array(zod.string()),
+  "evaluatedAt": zod.coerce.date()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
 })
 
 
@@ -1021,6 +1391,35 @@ export const getRecentIncidentsQueryLimitMax = 50;
 export const GetRecentIncidentsQueryParams = zod.object({
   "limit": zod.coerce.number().min(1).max(getRecentIncidentsQueryLimitMax).optional()
 })
+
+export const getRecentIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceEventMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceEventMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceClassificationMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceClassificationMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceGeographyMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceGeographyMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMax = 1;
+
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceDateMin = 0;
+export const getRecentIncidentsResponseMaritimeSemanticOneConfidenceDateMax = 1;
+
+
 
 export const GetRecentIncidentsResponseItem = zod.object({
   "id": zod.number(),
@@ -1060,7 +1459,71 @@ export const GetRecentIncidentsResponseItem = zod.object({
   "gdeltSubEventType": zod.string().nullish(),
   "gdeltConfidence": zod.number().nullish(),
   "gdeltEnrichedAt": zod.coerce.date().nullish(),
-  "analystInScope": zod.boolean().nullish()
+  "analystInScope": zod.boolean().nullish(),
+  "maritimeSemantic": zod.object({
+  "version": zod.string(),
+  "verdict": zod.enum(['valid', 'invalid', 'needs_review']),
+  "reason": zod.string(),
+  "eventOccurred": zod.boolean().nullable(),
+  "eventClass": zod.enum(['commercial_attack', 'commercial_seizure', 'piracy_or_armed_robbery', 'collision_or_grounding', 'port_disruption', 'chokepoint_disruption', 'route_disruption', 'environmental_maritime_event', 'naval_activity', 'military_naval_activity', 'drone_activity', 'military_exercise', 'geopolitical_maritime_development', 'protest_or_labour', 'other_maritime_event', 'non_event']).nullable(),
+  "commercialTargetValidated": zod.boolean(),
+  "commercialTarget": zod.enum(['vessel', 'cargo', 'port_facility', 'shipping_operations', 'none', 'unknown']),
+  "commercialTargetName": zod.string().nullable(),
+  "commercialTargetEvidence": zod.string().nullable(),
+  "physicalLocation": zod.string().nullable(),
+  "physicalLocationEvidence": zod.string().nullable(),
+  "country": zod.string().nullable(),
+  "coastalState": zod.string().nullable(),
+  "routeRelationship": zod.object({
+  "kind": zod.enum(['physical', 'direct_passage', 'indirect', 'none']),
+  "routeName": zod.string().nullable(),
+  "evidence": zod.string().nullable()
+}),
+  "routingConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMin).max(getRecentIncidentsResponseMaritimeSemanticOneRoutingConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "commercialConsequence": zod.object({
+  "status": zod.enum(['none', 'confirmed', 'assessed']),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable(),
+  "confidence": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMin).max(getRecentIncidentsResponseMaritimeSemanticOneCommercialConsequenceConfidenceMax).nullable(),
+  "kind": zod.enum(['none', 'observed', 'reported', 'potential', 'unknown']).optional(),
+  "description": zod.string().nullish(),
+  "evidence": zod.string().nullish()
+}),
+  "geopolitical": zod.object({
+  "relevant": zod.boolean(),
+  "claim": zod.string().nullable(),
+  "evidenceQuote": zod.string().nullable()
+}),
+  "eventDate": zod.coerce.date().nullable(),
+  "developmentKey": zod.string().nullable(),
+  "severity": zod.union([zod.literal('insignificant'),zod.literal('low'),zod.literal('moderate'),zod.literal('high'),zod.literal('extreme'),zod.literal(null)]).nullable(),
+  "severityJustification": zod.string().nullable(),
+  "severityEvidenceQuote": zod.string().nullable(),
+  "confidence": zod.object({
+  "event": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceEventMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceEventMax),
+  "classification": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceClassificationMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceClassificationMax),
+  "commercialTarget": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceCommercialTargetMax),
+  "geography": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceGeographyMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceGeographyMax),
+  "routeRelationship": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceRouteRelationshipMax),
+  "consequence": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceConsequenceMax),
+  "date": zod.number().min(getRecentIncidentsResponseMaritimeSemanticOneConfidenceDateMin).max(getRecentIncidentsResponseMaritimeSemanticOneConfidenceDateMax)
+}),
+  "contradictions": zod.array(zod.string()),
+  "sourceQuotes": zod.array(zod.object({
+  "quote": zod.string(),
+  "claim": zod.string()
+})),
+  "evidence": zod.array(zod.string()),
+  "evaluatedAt": zod.coerce.date()
+}).describe('Source-grounded maritime semantic decision. A null value means the row has not yet converged; needs_review is never keyword-fallbacked into a commercial incident. AIS\/movement is not included in this contract.\n').nullable()
 })
 export const GetRecentIncidentsResponse = zod.array(GetRecentIncidentsResponseItem)
 

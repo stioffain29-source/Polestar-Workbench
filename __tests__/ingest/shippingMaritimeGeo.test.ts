@@ -1,13 +1,11 @@
 import { shippingTestHooks } from "../../lib/ingest/src/shipping";
 
-// Locks the bug report: a vessel/chokepoint item that resolves to a bare
-// country centroid (or a non-coastal city) must never be plotted there — a
-// tanker cannot be sailing through the middle of the Arabian desert. It must
-// fall through to a real chokepoint centroid instead.
+// A vessel/chokepoint item that resolves only to a bare country centroid must
+// remain unplotted until semantic physical geography is verified.
 const { sanitizeMaritimeGeo } = shippingTestHooks;
 
 describe("shipping maritime geo sanitization", () => {
-  it("clamps a Saudi Arabia country-centroid vessel item onto the Red Sea, not the desert", () => {
+  it("drops a Saudi Arabia country-centroid vessel item instead of plotting the desert", () => {
     // Bare country centroid: geocode() found no in-text city, so location is
     // null. This is exactly the "vessel in the centre of Saudi Arabia" bug.
     const bareCentroid = { latitude: 23.89, longitude: 45.08, location: null };
@@ -18,25 +16,17 @@ describe("shipping maritime geo sanitization", () => {
       "Unknown",
       "Houthi drone strikes tanker in the Red Sea off the coast near Saudi Arabia",
     );
-    expect(result.location).toBe("Red Sea");
-    expect(result.latitude).not.toBe(23.89);
-    expect(result.longitude).not.toBe(45.08);
+    expect(result).toBeNull();
   });
 
-  it("keeps a genuine coastal-city match (Jeddah) for a vessel item", () => {
+  it("keeps a genuine physical city match", () => {
     const cityMatch = { latitude: 21.49, longitude: 39.19, location: "Jeddah" };
-    const result = sanitizeMaritimeGeo(
-      cityMatch,
-      "Vessel · Vessel attacks",
-      "Saudi Arabia",
-      "Unknown",
-      "Tanker attacked near Jeddah port",
-    );
+    const result = sanitizeMaritimeGeo(cityMatch);
     expect(result.location).toBe("Jeddah");
     expect(result.latitude).toBe(21.49);
   });
 
-  it("resolves a Chokepoint feed to its own strait centroid even with no city match", () => {
+  it("does not synthesize a chokepoint centroid from a feed label", () => {
     const bareCentroid = { latitude: 15.55, longitude: 48.52, location: null };
     const result = sanitizeMaritimeGeo(
       bareCentroid,
@@ -45,10 +35,10 @@ describe("shipping maritime geo sanitization", () => {
       "Yemen",
       "Houthi forces threaten shipping lanes",
     );
-    expect(result.location).toBe("Bab el-Mandeb");
+    expect(result).toBeNull();
   });
 
-  it("leaves the Singapore country centroid alone (island state, already coastal)", () => {
+  it("does not accept a Singapore country centroid", () => {
     const singaporeCentroid = { latitude: 1.35, longitude: 103.82, location: null };
     const result = sanitizeMaritimeGeo(
       singaporeCentroid,
@@ -57,11 +47,10 @@ describe("shipping maritime geo sanitization", () => {
       "Singapore",
       "ReCAAP reports armed robbery incident aboard a bulk carrier",
     );
-    expect(result.latitude).toBe(1.35);
-    expect(result.longitude).toBe(103.82);
+    expect(result).toBeNull();
   });
 
-  it("falls back to the Singapore Strait for a Malaysia-defaulted vessel item with no city match", () => {
+  it("does not synthesize Singapore Strait from a Malaysia feed default", () => {
     const bareCentroid = { latitude: 4.21, longitude: 101.98, location: null };
     const result = sanitizeMaritimeGeo(
       bareCentroid,
@@ -70,6 +59,6 @@ describe("shipping maritime geo sanitization", () => {
       "Malaysia",
       "Pirates board bulk carrier in regional waters",
     );
-    expect(result.location).toBe("Singapore Strait");
+    expect(result).toBeNull();
   });
 });
