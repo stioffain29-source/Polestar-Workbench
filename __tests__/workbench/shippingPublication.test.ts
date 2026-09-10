@@ -5,6 +5,7 @@ import {
 } from "../../artifacts/workbench/src/lib/shippingPublication";
 import type { ShippingReportIncident } from "../../artifacts/workbench/src/lib/shippingReportDataset";
 import { buildShippingReportDataset } from "../../artifacts/workbench/src/lib/shippingReportDataset";
+import { buildShippingCoverage } from "../../artifacts/workbench/src/lib/shippingCoverage";
 import { draftTopicReportProse } from "../../artifacts/workbench/src/lib/draftReportProse";
 import { MARITIME_SEMANTIC_VERSION } from "@workspace/relevance";
 import { semanticIncident } from "./maritimeSemanticTestHelpers";
@@ -116,6 +117,210 @@ describe("Shipping publication final boundary", () => {
     expect(() => assertShippingPublication(publication)).not.toThrow();
   });
 
+  it("counts raw in-window validation coverage before canonical filtering", () => {
+    const validated = incident(1, {
+      severity: "high",
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+    });
+    const pending = incident(2, {
+      severity: "extreme",
+      maritimeValidation: { status: "pending", version: MARITIME_SEMANTIC_VERSION },
+    });
+    const rejected = incident(3, {
+      maritimeSemantic: semantic({ verdict: "invalid" }),
+      maritimeValidation: {
+        status: "rejected",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+    });
+    const missing = incident(4, {
+      maritimeSemantic: semantic({ eventDate: "2026-06-15" }),
+    });
+    const outside = incident(5, {
+      occurredAt: "2026-05-01T08:00:00.000Z",
+      maritimeSemantic: semantic({ eventDate: "2026-05-01" }),
+      maritimeValidation: { status: "pending" },
+    });
+
+    const coverage = buildShippingCoverage(
+      [validated, pending, rejected, missing, outside],
+      "shipping",
+      ISSUE_DATE,
+    );
+    expect(coverage).toMatchObject({
+      status: "incomplete",
+      complete: false,
+      sourceRows: 4,
+      validated: 1,
+      rejected: 1,
+      pending: 2,
+      assessmentLabel: "Assessment pending",
+    });
+    expect(coverage.disclosure).toBe(
+      "Coverage is incomplete: 2 of 4 source reports are still under review. Overall maritime risk assessment is pending.",
+    );
+  });
+
+  it("holds overall risk at Assessment pending while retaining confirmed severity", () => {
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [
+        incident(1, {
+          severity: "high",
+          maritimeValidation: {
+            status: "validated",
+            version: MARITIME_SEMANTIC_VERSION,
+          },
+        }),
+        incident(2, {
+          severity: "extreme",
+          maritimeValidation: {
+            status: "pending",
+            version: MARITIME_SEMANTIC_VERSION,
+          },
+        }),
+      ],
+    }));
+
+    expect(publication.completeness).toMatchObject({
+      status: "incomplete",
+      validated: 1,
+      pending: 1,
+      rejected: 0,
+    });
+    expect(publication.maritimeBoard.risk.label).toBe("Assessment pending");
+    expect(publication.maritimeBoard.overallRisk.label).toBe("Assessment pending");
+    expect(publication.maritimeBoard.highestIndividualSeverity).toBe("high");
+    expect(publication.prose.executiveSummary).toContain("coverage is incomplete");
+    expect(publication.prose.executiveSummary).toContain("highest individual incident severity is High");
+    expect(publication.prose.executiveSummary).not.toMatch(/overall maritime risk as High/i);
+  });
+
+  it("preserves an analyst risk edit and flags its contradiction with pending coverage", () => {
+    const saved = "Overall maritime risk is High. Review the reported route.";
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [incident(1, {
+        maritimeValidation: { status: "pending", version: MARITIME_SEMANTIC_VERSION },
+      })],
+      report: { executiveSummary: saved },
+    }));
+
+    expect(publication.prose.executiveSummary).toBe(saved);
+    expect(publication.auditIssues.map((item) => item.code)).toContain(
+      "RISK_CONTRADICTION",
+    );
+  });
+
+  it("does not let generated AI prose restore a definitive risk during incomplete coverage", () => {
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [incident(1, {
+        maritimeValidation: { status: "pending", version: MARITIME_SEMANTIC_VERSION },
+      })],
+      aiProse: {
+        executiveSummary: "Overall maritime risk is High.",
+        whatMatters: "High risk requires immediate action.",
+        implications: "High risk will increase insurance costs.",
+        watchNext: "Monitor High risk.",
+        polestarView: "Overall maritime risk is High.",
+      },
+    }));
+
+    expect(publication.prose.executiveSummary).toContain("assessment is pending");
+    expect(publication.prose.executiveSummary).not.toContain("risk is High");
+    expect(publication.prose.polestarView).not.toContain("risk is High");
+  });
+
+  it("holds an inconsistent semantic chokepoint event out of every published surface", () => {
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [incident(79181, {
+        maritimeSemantic: semantic({
+          eventClass: "chokepoint_disruption",
+          routeRelationship: { kind: "none", routeName: null, evidence: null },
+          physicalLocation: "Strait of Hormuz",
+          physicalLocationEvidence: "at Strait of Hormuz",
+        }),
+        maritimeValidation: {
+          status: "validated",
+          version: MARITIME_SEMANTIC_VERSION,
+        },
+      })],
+    }));
+
+    expect(publication.dataset.canonicalIncidents).toHaveLength(0);
+    expect(publication.maritimeBoard.confirmedIncidents).toHaveLength(0);
+    expect(publication.maritimeBoard.risk.label).toBe("Assessment pending");
+    expect(publication.auditIssues.map((item) => item.code)).not.toContain(
+      "ROUTE_RELATIONSHIP_CONTRADICTION",
+    );
+  });
+
+  it("keeps generated commercial-impact prose reader-facing and auditable", () => {
+    const row = incident(8, {
+      maritimeSemantic: semantic({
+        commercialConsequence: {
+          status: "confirmed",
+          claim: "Insurance premiums rose",
+          evidenceQuote: "Insurance premiums rose",
+          confidence: 0.9,
+        },
+      }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+    });
+    const generated = buildShippingReportDataset([row], "shipping", ISSUE_DATE)
+      .commercialImpactRead;
+    expect(generated).not.toMatch(/canonical|structured|evidence/i);
+    expect(generated).toContain("commercial consequence");
+
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [row],
+      report: { commercialImpactRead: generated },
+    }));
+    expect(publication.auditIssues.map((item) => item.code)).not.toContain(
+      "UNSUPPORTED_PROSE_ASSERTION",
+    );
+  });
+
+  it("does not assign a chokepoint from a title mention when another row owns the route", () => {
+    const titleOnly = incident(9, {
+      title: "Attack report mentions Strait of Hormuz",
+      maritimeSemantic: semantic({
+        developmentKey: "title-only-route",
+        physicalLocation: "Yemen",
+        physicalLocationEvidence: "off Yemen",
+        routeRelationship: { kind: "none", routeName: null, evidence: null },
+      }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+    });
+    const routeOwner = incident(10, {
+      maritimeSemantic: semantic({
+        developmentKey: "route-owner",
+      }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+    });
+    const publication = finalizeShippingPublication(validOptions({
+      incidents: [titleOnly, routeOwner],
+    }));
+
+    expect(publication.dataset.canonicalIncidents).toHaveLength(2);
+    expect(publication.auditIssues.map((item) => item.code)).not.toContain(
+      "ROUTE_RELATIONSHIP_CONTRADICTION",
+    );
+    expect(publication.dataset.chokepointRows.some((row) => row.count > 0)).toBe(
+      true,
+    );
+  });
+
   it("keeps a same-day event with unknown physical geography aligned across board and prose", () => {
     const unknownGeography = incident(3, {
       occurredAt: "2026-06-15T08:00:00.000Z",
@@ -128,6 +333,10 @@ describe("Shipping publication final boundary", () => {
         coastalState: null,
         routeRelationship: { kind: "none", routeName: null, evidence: null },
       }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
     });
     const publication = finalizeShippingPublication(
       validOptions({
@@ -153,7 +362,7 @@ describe("Shipping publication final boundary", () => {
     expect(publication.auditIssues).toEqual([]);
     expect(publication.dataset.canonicalIncidents).toHaveLength(0);
     expect(publication.tables.vessel).toHaveLength(0);
-    expect(publication.maritimeBoard.risk.label).toBe("Not assessed");
+    expect(publication.maritimeBoard.risk.label).toBe("Assessment pending");
   });
 
   it("rejects analyst edits that contradict overall risk, severity, counts, country, or route", () => {

@@ -12,6 +12,8 @@ import type {
   PngReportDataset,
   PngReportItem,
 } from "../../artifacts/workbench/src/lib/pngReportDataset";
+import { semanticIncident } from "./maritimeSemanticTestHelpers";
+import { MARITIME_SEMANTIC_VERSION } from "@workspace/relevance";
 
 // Sibling to `reportFastFactsTiles.test.tsx` (which guards the SHARED
 // `ReportPreview` topic/cargo/fuel tiles) and to `pdfPageBreakMarkers.test.tsx`
@@ -139,26 +141,28 @@ describe("FlashpointReportPreview Fast Facts tiles", () => {
 describe("ShippingReportPreview summary tiles", () => {
   const incidents: ShippingReportIncident[] = [
     {
-      id: "s1",
-      topic: "shipping",
-      title: "Tanker attacked by armed skiffs in the Gulf of Aden",
-      severity: "high",
-      occurredAt: "2026-06-14T08:00:00+00:00",
-      country: "Yemen",
-      summary: "Armed men in skiffs attacked a tanker underway.",
-      source: "Test Wire",
-      sourceUrl: "https://example.com/s1",
+      ...semanticIncident("s1", "Tanker attacked by armed skiffs in the Gulf of Aden", {
+        eventDate: "2026-06-14",
+        severity: "high",
+        country: "Yemen",
+        physicalLocation: "Gulf of Aden",
+      }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
     },
     {
-      id: "s2",
-      topic: "shipping",
-      title: "Cargo vessel boarded and crew robbed in the Singapore Strait",
-      severity: "moderate",
-      occurredAt: "2026-06-12T08:00:00+00:00",
-      country: "Singapore",
-      summary: "Robbers boarded a bulk carrier and stole stores.",
-      source: "Test Wire",
-      sourceUrl: "https://example.com/s2",
+      ...semanticIncident("s2", "Cargo vessel boarded and crew robbed in the Singapore Strait", {
+        eventDate: "2026-06-12",
+        severity: "moderate",
+        country: "Singapore",
+        physicalLocation: "Singapore Strait",
+      }),
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
     },
   ];
 
@@ -172,17 +176,16 @@ describe("ShippingReportPreview summary tiles", () => {
   it("emits the Maritime Intelligence executive KPI tiles", () => {
     for (const label of [
       "Maritime Risk Level",
-      "Chokepoint Incidents \u00b7 7d",
+      "Confirmed Maritime Incidents \u00b7 7d",
       "Chokepoints Affected",
-      "Business Impact Areas",
     ]) {
       expect(hasTile(html, label)).toBe(true);
     }
   });
 
-  it("fills the Maritime Risk Level tile with a real level, not a placeholder", () => {
+  it("fills the Maritime Risk Level tile with the assessed level", () => {
     const v = tileValue(html, "Maritime Risk Level");
-    expect(v).toMatch(/^L[1-5] \u00b7 /);
+    expect(v).toBe("L5 · Extreme");
   });
 
   it("emits the shipping Fast Facts tile labels", () => {

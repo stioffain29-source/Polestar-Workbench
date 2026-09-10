@@ -22,7 +22,6 @@ import {
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
-  formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
   type ChokepointCard,
@@ -34,8 +33,15 @@ import {
   shippingPublicationIssueSection,
 } from "@/lib/shippingPublication";
 import {
+  MARITIME_CHOKEPOINT_CARDS_TITLE,
+  MARITIME_COVERAGE_STATUS_LABEL,
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
+  maritimeReportChokepointCards,
+  maritimeReportMovementTheatres,
+  formatMaritimeMovementDate,
+  formatMaritimeMovementSample,
+  type MaritimeReportCompleteness,
 } from "@/lib/maritimeReportView";
 import {
   MARITIME_SECURITY_SOURCE_LABEL,
@@ -274,6 +280,8 @@ function SeverityChip({ sevKey: k, label }: { sevKey: string; label: string }) {
 }
 
 function ChokepointTable({ rows }: { rows: ChokepointRow[] }) {
+  const populated = rows.filter((row) => row.count > 0);
+  if (populated.length === 0) return null;
   return (
     <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
       <div
@@ -295,7 +303,7 @@ function ChokepointTable({ rows }: { rows: ChokepointRow[] }) {
         <div>Latest</div>
         <div>Operational Read</div>
       </div>
-      {rows.map((r, i) => (
+       {populated.map((r, i) => (
         <div
           key={r.name}
           className="grid"
@@ -329,13 +337,9 @@ interface IncidentTableProps<T extends EnrichedIncident> {
   rowLimit?: number;
 }
 
-function IncidentTable<T extends EnrichedIncident>({ rows, emptyMessage, actLabel, actFor, rowLimit = 15 }: IncidentTableProps<T>) {
+function IncidentTable<T extends EnrichedIncident>({ rows, actLabel, actFor, rowLimit = 15 }: IncidentTableProps<T>) {
   if (rows.length === 0) {
-    return (
-      <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        {emptyMessage}
-      </p>
-    );
+    return null;
   }
   const limited = rows.slice(0, rowLimit);
   const showAct = !!actLabel && !!actFor;
@@ -404,13 +408,9 @@ function niceScale(rawMax: number): { max: number; step: number } {
   return { max, step: Math.max(step, 1) };
 }
 
-function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow[]; labelW?: number; emptyMessage?: string }) {
+function HorizontalBarChart({ rows, labelW = 160 }: { rows: BarRow[]; labelW?: number }) {
   if (rows.length === 0) {
-    return (
-      <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        {emptyMessage ?? "No data reported this week."}
-      </p>
-    );
+    return null;
   }
   const rawMax = rows.reduce((m, r) => Math.max(m, r.value), 0) || 1;
   const { max, step } = niceScale(rawMax);
@@ -546,18 +546,20 @@ function MaritimeSubLabel({ children }: { children: React.ReactNode }) {
 // Maritime Intelligence — the shared deterministic board, rendered in the
 // report in the SAME order as the live Shipping monitor and the SAME order
 // exportShippingReportPdf draws it. Movement (AIS) is CONTEXT only and
-// degrades to "movement data unavailable". #A33232 is reserved for level 5.
+// is shown only as a dated latest-per-theatre sample. #A33232 is reserved for
+// level 5.
 function ChokepointReportCard({ card }: { card: ChokepointCard }) {
   const { key, risk, incidentCount, lastConfirmed, movement } = card;
+  const pending = risk.label === "Assessment pending";
   return (
     <div style={{ border: `1px solid ${POLAR}`, borderRadius: 2, padding: 10, breakInside: "avoid" }}>
       <div className="flex items-start justify-between gap-2" style={{ marginBottom: 4 }}>
         <span style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 13, lineHeight: 1.15 }}>{key}</span>
         <span
           className="uppercase"
-          style={{ background: MARITIME_RISK_COLOR[risk.level], color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap" }}
+          style={{ background: pending ? "#626773" : MARITIME_RISK_COLOR[risk.level], color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", padding: "2px 6px", borderRadius: 2, whiteSpace: "nowrap" }}
         >
-          L{risk.level} &middot; {risk.label}
+          {pending ? risk.label : `L${risk.level} · ${risk.label}`}
         </span>
       </div>
       <div style={{ marginBottom: 4 }}>
@@ -568,22 +570,18 @@ function ChokepointReportCard({ card }: { card: ChokepointCard }) {
         <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Last incident</span>
         {lastConfirmed ? `${format(parseISO(lastConfirmed.occurredAt), "d MMM")} — ${lastConfirmed.title}` : "None in window"}
       </p>
-      <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
-        <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Movement</span>
-        {movement ? formatMovementSummary(movement) : "Movement data unavailable"}
-      </p>
+      {movement && (
+        <p className="text-[11px]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif", lineHeight: 1.5, margin: "0 0 3px 0" }}>
+          <span className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.08em", marginRight: 4 }}>Movement:</span>
+          {formatMaritimeMovementDate(movement.dataAsOf)} — {formatMaritimeMovementSample(movement)}
+        </p>
+      )}
     </div>
   );
 }
 
 function ConfirmedIncidentsReportTable({ rows }: { rows: LatestIncident[] }) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-[13px]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-        No confirmed maritime security incidents in the window.
-      </p>
-    );
-  }
+  if (rows.length === 0) return null;
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Roboto, sans-serif" }}>
       <thead>
@@ -610,17 +608,51 @@ function ConfirmedIncidentsReportTable({ rows }: { rows: LatestIncident[] }) {
   );
 }
 
-function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntelligence }) {
-  const {
-    bluf,
-    movementSnapshot,
-    chokepointCards,
-    confirmedIncidents,
-  } = board;
-  const execCards: KpiCard[] = maritimeExecCards(board);
+function MaritimeCoverageDisclosure({
+  completeness,
+}: {
+  completeness: MaritimeReportCompleteness;
+}) {
+  const disclosure =
+    completeness.complete ? "" : (completeness.disclosure ?? "").trim();
+  if (!disclosure) return null;
+  return (
+    <div
+      className="rounded-sm px-3 py-2"
+      role="status"
+      style={{
+        marginTop: 10,
+        background: "#f2f3f7",
+        border: `1px solid ${POLAR}`,
+        color: DUSK,
+        fontFamily: "Roboto, sans-serif",
+        fontSize: 11,
+        lineHeight: 1.5,
+      }}
+    >
+      <div className="uppercase" style={{ fontWeight: 700, fontSize: 9, letterSpacing: "0.1em", color: NAVY }}>
+        {MARITIME_COVERAGE_STATUS_LABEL}
+      </div>
+      <div>{disclosure}</div>
+    </div>
+  );
+}
+
+function MaritimeIntelligenceReportSection({
+  board,
+  completeness,
+}: {
+  board: MaritimeIntelligence;
+  completeness: MaritimeReportCompleteness;
+}) {
+  const { bluf, confirmedIncidents } = board;
+  const movementTheatres = maritimeReportMovementTheatres(board);
+  const chokepointCards = maritimeReportChokepointCards(board);
+  const execCards: KpiCard[] = maritimeExecCards(board, completeness);
   return (
     <Section title="Maritime Intelligence">
       <KpiGrid cards={execCards} />
+      <MaritimeCoverageDisclosure completeness={completeness} />
 
       <div className="rounded-sm p-4" style={{ background: NAVY, marginTop: 12 }}>
         <div
@@ -634,32 +666,36 @@ function MaritimeIntelligenceReportSection({ board }: { board: MaritimeIntellige
         </p>
       </div>
 
-      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[0]}</MaritimeSubLabel>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-        {chokepointCards.map((card) => (
-          <ChokepointReportCard key={card.key} card={card} />
-        ))}
-      </div>
-
-      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[1]}</MaritimeSubLabel>
-      <ConfirmedIncidentsReportTable rows={confirmedIncidents} />
-
-      <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[2]}</MaritimeSubLabel>
-      {movementSnapshot ? (
+      {chokepointCards.length > 0 && (
         <>
+          <MaritimeSubLabel>{MARITIME_CHOKEPOINT_CARDS_TITLE}</MaritimeSubLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            {chokepointCards.map((card) => (
+              <ChokepointReportCard key={card.key} card={card} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {confirmedIncidents.length > 0 && (
+        <>
+          <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[0]}</MaritimeSubLabel>
+          <ConfirmedIncidentsReportTable rows={confirmedIncidents} />
+        </>
+      )}
+
+      {movementTheatres.length > 0 && (
+        <>
+          <MaritimeSubLabel>{MARITIME_SUBSECTION_ORDER[1]}</MaritimeSubLabel>
           <ul className="space-y-1.5" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            {movementSnapshot.theatres.map((t) => (
+            {movementTheatres.map((t) => (
               <li key={t.theatre} className="text-[13px] leading-[1.6]">
                 <span style={{ color: NAVY, fontWeight: 700 }}>{t.theatre}</span>
-                <span> &mdash; {formatMovementSummary(t)}</span>
+                <span> &mdash; {formatMaritimeMovementDate(t.dataAsOf)} — {formatMaritimeMovementSample(t)}</span>
               </li>
             ))}
           </ul>
         </>
-      ) : (
-        <p className="text-[13px] leading-[1.6]" style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-          No vessel movement observation is available for this window.
-        </p>
       )}
 
       {/* The board's internal Polestar View / Watch Next block is NOT rendered
@@ -822,7 +858,10 @@ export default function ShippingReportPreview({
         )}
 
         {show("maritime-intelligence") && (
-          <MaritimeIntelligenceReportSection board={maritimeBoard} />
+          <MaritimeIntelligenceReportSection
+            board={maritimeBoard}
+            completeness={publication.completeness}
+          />
         )}
 
         <Section hidden={!show("fast-facts")} title="Fast Facts">
@@ -831,37 +870,47 @@ export default function ShippingReportPreview({
 
         <Section hidden={!show("chokepoint-route")} title="Chokepoint / Route Read">
           <Paragraphs text={prose.chokepointRouteRead} />
-          <div className="mt-4">
-            <ChokepointTable rows={ds.chokepointRows} />
-          </div>
+          {ds.chokepointRows.some((row) => row.count > 0) && (
+            <div className="mt-4">
+              <ChokepointTable rows={ds.chokepointRows} />
+            </div>
+          )}
         </Section>
 
         <Section hidden={!show("vessel-piracy")} title="Vessel Threat and Piracy Read">
           <Paragraphs text={prose.vesselPiracyRead} />
-          <div
-            className="uppercase mb-2 mt-4"
-            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-          >
-            Vessel Attacks ({ds.thirtyDayShortLabel})
-          </div>
-          <IncidentTable
-            rows={ds.vesselRows}
-            actLabel="Act"
-            actFor={(r) => r.vesselType}
-            emptyMessage="No hostile vessel incidents reported this week."
-          />
-          <div
-            className="uppercase mb-2 mt-4"
-            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-          >
-            Piracy and Armed Robbery ({ds.thirtyDayShortLabel})
-          </div>
-          <IncidentTable
-            rows={ds.piracyRows}
-            actLabel="Act"
-            actFor={(r) => r.act}
-            emptyMessage="No piracy or armed-robbery reports this week."
-          />
+          {ds.vesselRows.length > 0 && (
+            <>
+              <div
+                className="uppercase mb-2 mt-4"
+                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+              >
+                Vessel Attacks ({ds.thirtyDayShortLabel})
+              </div>
+              <IncidentTable
+                rows={ds.vesselRows}
+                actLabel="Act"
+                actFor={(r) => r.vesselType}
+                emptyMessage="No hostile vessel incidents reported this week."
+              />
+            </>
+          )}
+          {ds.piracyRows.length > 0 && (
+            <>
+              <div
+                className="uppercase mb-2 mt-4"
+                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+              >
+                Piracy and Armed Robbery ({ds.thirtyDayShortLabel})
+              </div>
+              <IncidentTable
+                rows={ds.piracyRows}
+                actLabel="Act"
+                actFor={(r) => r.act}
+                emptyMessage="No piracy or armed-robbery reports this week."
+              />
+            </>
+          )}
         </Section>
 
         <Section hidden={!show("maritime-security")} title="Maritime Security (ICC CCS / IMB)">
@@ -939,34 +988,42 @@ export default function ShippingReportPreview({
 
         <Section hidden={!show("commercial-impact")} title="Commercial Impact on Shipping">
           <Paragraphs text={prose.commercialImpactRead} />
-          <div className="mt-4">
-            <IncidentTable
-              rows={ds.commercialRows}
-              actLabel="Issue"
-              actFor={(r) => r.issue}
-              emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
-            />
-          </div>
+          {ds.commercialRows.length > 0 && (
+            <div className="mt-4">
+              <IncidentTable
+                rows={ds.commercialRows}
+                actLabel="Issue"
+                actFor={(r) => r.issue}
+                emptyMessage="No port, freight, insurance or commercial-shipping disruption records in the weekly window."
+              />
+            </div>
+          )}
         </Section>
 
         <Section hidden={!show("regional")} title="Regional and Country View">
           <Paragraphs text={prose.regionalCountryRead} />
-          <div className="mt-4 mb-5">
-            <div
-              className="uppercase mb-2"
-              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-            >
-              Incidents by Region
+          {ds.regionRows.some((row) => row.value > 0) && (
+            <div className="mt-4 mb-5">
+              <div
+                className="uppercase mb-2"
+                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+              >
+                Incidents by Region
+              </div>
+              <HorizontalBarChart rows={ds.regionRows.filter((row) => row.value > 0)} labelW={180} />
             </div>
-            <HorizontalBarChart rows={ds.regionRows} labelW={180} emptyMessage="No regional classifications reported this week." />
-          </div>
-          <div
-            className="uppercase mb-2"
-            style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
-          >
-            {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
-          </div>
-          <HorizontalBarChart rows={ds.countryRows} labelW={180} emptyMessage="No identified incident countries reported this week." />
+          )}
+          {ds.countryRows.length > 0 && (
+            <>
+              <div
+                className="uppercase mb-2"
+                style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 11, letterSpacing: "0.12em", color: DUSK }}
+              >
+                {ds.countryRows.length >= 12 ? "Incidents by Country (Top 12)" : "Incidents by Country"}
+              </div>
+              <HorizontalBarChart rows={ds.countryRows} labelW={180} />
+            </>
+          )}
         </Section>
 
         <Section hidden={!show("what-matters")} title="What Matters">

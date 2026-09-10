@@ -8,11 +8,20 @@ import {
 } from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import {
   MARITIME_CONF_LABEL,
+  MARITIME_CHOKEPOINT_CARDS_TITLE,
   MARITIME_POLESTAR_SUBSECTIONS,
   MARITIME_SUBSECTION_ORDER,
   maritimeChokepointTitles,
   maritimeExecCards,
+  maritimeReportChokepointCards,
+  maritimeReportMovementTheatres,
+  formatMaritimeMovementDate,
+  formatMaritimeMovementSample,
 } from "../../artifacts/workbench/src/lib/maritimeReportView";
+import type {
+  BusinessImpact,
+  MovementTheatre,
+} from "../../artifacts/workbench/src/lib/maritimeIntelligence";
 import { semanticIncident } from "./maritimeSemanticTestHelpers";
 
 // ---------------------------------------------------------------------------
@@ -94,13 +103,12 @@ function buildFixtureBoard() {
 describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
   const board = buildFixtureBoard();
 
-  it("builds the four exec KPI cards in the correct order with the right labels", () => {
+  it("builds the populated exec KPI cards in the correct order with the right labels", () => {
     const cards = maritimeExecCards(board);
     expect(cards.map((c) => c.label)).toEqual([
       "Maritime Risk Level",
-      `Chokepoint Incidents ${MIDDOT} 7d`,
+      `Confirmed Maritime Incidents ${MIDDOT} 7d`,
       "Chokepoints Affected",
-      "Business Impact Areas",
     ]);
   });
 
@@ -112,7 +120,21 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     expect(riskCard.value).not.toContain(EMDASH);
   });
 
-  it("keeps the middot in the 'Chokepoint Incidents · 7d' label", () => {
+  it("uses a neutral pending card without leaking placeholder L1 or severity colour", () => {
+    const pending = maritimeExecCards(
+      {
+        ...board,
+        risk: { ...board.risk, level: 1, label: "Assessment pending" },
+        overallRisk: { ...board.overallRisk, level: 1, label: "Assessment pending" },
+      },
+      { complete: false, assessmentLabel: "Assessment pending" },
+    )[0];
+    expect(pending.value).toBe("Assessment pending");
+    expect(pending.value).not.toContain("L1");
+    expect(pending.accent).toBeUndefined();
+  });
+
+  it("keeps the middot in the 'Confirmed Maritime Incidents · 7d' label", () => {
     const confirmedCard = maritimeExecCards(board)[1];
     expect(confirmedCard.label).toContain(MIDDOT);
     expect(confirmedCard.value).toBe(String(board.incidentSnapshot.total));
@@ -127,12 +149,13 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     );
   });
 
-  it("reports Business Impact Areas as a count with unit, or an em-dash when none", () => {
-    const named = board.businessImpact.filter((b) => b !== "No material impact");
-    const card = maritimeExecCards(board)[3];
-    expect(card.value).toBe(
-      named.length > 0 ? `${named.length} affected` : EMDASH,
-    );
+  it("omits an empty Business Impact card and labels populated impact areas", () => {
+    expect(maritimeExecCards(board).some((card) => card.label === "Business Impact Areas")).toBe(false);
+    const populated = maritimeExecCards({
+      ...board,
+      businessImpact: ["Transit delay risk"] as BusinessImpact[],
+    });
+    expect(populated.find((card) => card.label === "Business Impact Areas")?.value).toBe("1 affected");
   });
 
   it("produces a non-empty BLUF", () => {
@@ -144,12 +167,12 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
     expect(maritimeChokepointTitles(board)).toHaveLength(7);
   });
 
-  it("locks the three mid sub-sections, in order", () => {
+  it("locks the populated mid sub-sections, in order", () => {
     expect([...MARITIME_SUBSECTION_ORDER]).toEqual([
-      "Chokepoint Cards",
       "Confirmed Maritime Incidents",
       `Maritime Context ${EMDASH} Vessel Movement (AIS)`,
     ]);
+    expect(MARITIME_CHOKEPOINT_CARDS_TITLE).toBe("Chokepoint Cards");
   });
 
   it("locks the four Polestar View sub-sections, in order", () => {
@@ -167,6 +190,69 @@ describe("Maritime Intelligence shared view contract (screen == PDF)", () => {
       medium: "Medium",
       high: "High",
     });
+  });
+});
+
+describe("Maritime report surfaces remove empty cards and bound AIS movement", () => {
+  const movement = (theatre: string, dataAsOf: string, totalVessels: number): MovementTheatre => ({
+    theatre,
+    chokepoint: theatre,
+    dataAsOf,
+    totalVessels,
+    inboundCount: 10,
+    outboundCount: 8,
+    tankersCount: null,
+    bulkCarriersCount: null,
+    containerCount: null,
+    lngLpgCount: null,
+    anchoredOrWaitingCount: 2,
+    aisVisibleCount: null,
+    aisDarkOrGapCount: null,
+    changeVs7DayBaseline: null,
+    confidence: "high",
+    sourceName: "Test AIS",
+    sourceUrl: null,
+    notes: null,
+  });
+
+  it("keeps one latest dated movement sample per theatre before report end", () => {
+    const board = {
+      ...buildFixtureBoard(),
+      movementSnapshot: {
+        theatres: [
+          movement("Red Sea", "2026-06-12T00:00:00.000Z", 40),
+          movement("Red Sea", "2026-06-17T00:00:00.000Z", 42),
+          movement("Red Sea", "2026-06-19T00:00:00.000Z", 99),
+          movement("Hormuz", "2026-06-16T00:00:00.000Z", 20),
+        ],
+        asOf: "2026-06-19T00:00:00.000Z",
+        sourceName: "Test AIS",
+        confidence: "high" as const,
+      },
+    };
+    const theatres = maritimeReportMovementTheatres(board);
+    expect(theatres.map((row) => [row.theatre, row.dataAsOf, row.totalVessels])).toEqual([
+      ["Hormuz", "2026-06-16T00:00:00.000Z", 20],
+      ["Red Sea", "2026-06-17T00:00:00.000Z", 42],
+    ]);
+    expect(formatMaritimeMovementDate(theatres[1].dataAsOf)).toBe("17 Jun 2026");
+    expect(formatMaritimeMovementSample(theatres[1])).toContain("AIS sample: 42 vessels");
+    expect(formatMaritimeMovementSample(theatres[1])).not.toContain("vessels tracked");
+  });
+
+  it("returns only incident-bearing chokepoint cards", () => {
+    const cards = maritimeReportChokepointCards(buildFixtureBoard());
+    expect(cards.map((card) => card.key)).toEqual([
+      "Strait of Hormuz",
+      "Red Sea",
+    ]);
+    expect(maritimeReportChokepointCards({
+      ...buildFixtureBoard(),
+      chokepointCards: buildFixtureBoard().chokepointCards.map((card) => ({
+        ...card,
+        incidentCount: 0,
+      })),
+    })).toEqual([]);
   });
 });
 
@@ -236,12 +322,20 @@ describe("Both surfaces consume the shared contract (no re-inlined literals)", (
 
   it("the PDF exporter imports and uses the shared exec-card builder", () => {
     expect(pdfSrc).toContain("maritimeReportView");
-    expect(pdfSrc).toContain("maritimeExecCards(board)");
+    expect(pdfSrc).toContain("maritimeExecCards(board, completeness)");
   });
 
   it("the preview imports and uses the shared exec-card builder", () => {
     expect(previewSrc).toContain("maritimeReportView");
-    expect(previewSrc).toContain("maritimeExecCards(board)");
+    expect(previewSrc).toContain("maritimeExecCards(board, completeness)");
+  });
+
+  it("both surfaces use the shared populated-card and movement projection", () => {
+    for (const source of [pdfSrc, previewSrc]) {
+      expect(source).toContain("maritimeReportChokepointCards(board)");
+      expect(source).toContain("maritimeReportMovementTheatres(board)");
+      expect(source).toContain("formatMaritimeMovementSample");
+    }
   });
 
   it("neither surface re-declares its own MARITIME_CONF_LABEL", () => {

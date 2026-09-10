@@ -55,11 +55,65 @@ export function hasValidMaritimeSemantic(
   return semanticOf(record) !== null;
 }
 
+const TRACKED_CHOKEPOINT_NAMES = [
+  "strait of hormuz",
+  "bab el-mandeb",
+  "red sea",
+  "suez canal",
+  "gulf of aden",
+  "singapore strait",
+  "malacca strait",
+];
+
+/**
+ * A chokepoint disruption is not a valid confirmed incident unless the
+ * semantic result carries a source-backed physical/direct route relationship.
+ * The publication validator used to discover this only after admission (from
+ * the rendered title), which let the same row inflate counts and then block
+ * publication.  Keep this gate semantic and generic: no title/raw-text
+ * inference, and no weakening of the route evidence contract.
+ */
+export function hasInconsistentMaritimeChokepointRoute(
+  record: SemanticRecord | null | undefined,
+): boolean {
+  const evidence = semanticOf(record);
+  if (!evidence) return false;
+  const route = evidence.routeRelationship;
+  const routeKind = route?.kind;
+  const routeName = typeof route?.routeName === "string"
+    ? route.routeName.trim().toLowerCase()
+    : "";
+  const physicalLocation = typeof evidence.physicalLocation === "string"
+    ? evidence.physicalLocation.trim().toLowerCase()
+    : "";
+  const namesTrackedChokepoint = (value: string): boolean =>
+    Boolean(
+      value &&
+        TRACKED_CHOKEPOINT_NAMES.some(
+          (name) => value === name || value.includes(name) || name.includes(value),
+        ),
+    );
+  const isChokepointEvent =
+    evidence.eventClass === "chokepoint_disruption" ||
+    (evidence.eventClass === "route_disruption" &&
+      (namesTrackedChokepoint(routeName) ||
+        namesTrackedChokepoint(physicalLocation)));
+  if (!isChokepointEvent) return false;
+  // `indirect` is deliberately not accepted here.  The report's route
+  // contradiction rule treats it as insufficient for a chokepoint incident,
+  // and changing that would weaken the existing evidence gate.
+  return routeKind !== "physical" && routeKind !== "direct_passage";
+}
+
 export function isSemanticallyValidatedMaritimeIncident(
   record: SemanticRecord | null | undefined,
 ): boolean {
   const evidence = semanticOf(record);
-  return evidence !== null && isValidatedMaritimeIncident(evidence);
+  return (
+    evidence !== null &&
+    isValidatedMaritimeIncident(evidence) &&
+    !hasInconsistentMaritimeChokepointRoute(record)
+  );
 }
 
 export type MaritimeRouteRelationshipKind =

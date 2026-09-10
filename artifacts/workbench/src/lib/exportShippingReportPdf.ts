@@ -53,7 +53,6 @@ import {
 } from "./shippingReportDataset";
 import type { MaritimeMovement, MaritimeSecurityEvent } from "@workspace/api-client-react";
 import {
-  formatMovementSummary,
   MARITIME_RISK_COLOR,
   type MaritimeIntelligence,
 } from "./maritimeIntelligence";
@@ -67,8 +66,15 @@ import {
   type MaritimeSecuritySummary,
 } from "./maritimeSecurity";
 import {
+  MARITIME_CHOKEPOINT_CARDS_TITLE,
+  MARITIME_COVERAGE_STATUS_LABEL,
   MARITIME_SUBSECTION_ORDER,
   maritimeExecCards,
+  maritimeReportChokepointCards,
+  maritimeReportMovementTheatres,
+  formatMaritimeMovementDate,
+  formatMaritimeMovementSample,
+  type MaritimeReportCompleteness,
 } from "./maritimeReportView";
 
 void _LOCATION_NOT_IDENTIFIED;
@@ -157,6 +163,8 @@ function drawChokepointWatch(
   rows: ChokepointRow[],
   windowLabel: string,
 ) {
+  const populated = rows.filter((row) => row.count > 0);
+  if (populated.length === 0) return;
   const { pdf, MX, CW } = ctx;
   const colNameW = 130;
   const colCountW = 50;
@@ -191,7 +199,7 @@ function drawChokepointWatch(
   ensureSpace(ctx, rowH * 2);
   drawHeader();
 
-  for (const row of rows) {
+  for (const row of populated) {
     setRoboto(pdf, "regular");
     pdf.setFontSize(8.5);
 
@@ -277,17 +285,12 @@ function drawIncidentTable<T extends EnrichedIncident>(
   rows: T[],
   opts: IncidentRowOpts<T>,
 ) {
-  if (heading) drawSubtitle(ctx, heading);
   if (rows.length === 0) {
-    const { pdf, MX } = ctx;
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    pdf.text(sanitize(opts.emptyMessage), MX, ctx.y + 10);
-    setRoboto(pdf, "regular");
-    ctx.y += 22;
+    // Empty operational tables do not get a stranded subtitle or a panel
+    // containing only an apologetic sentence.
     return;
   }
+  if (heading) drawSubtitle(ctx, heading);
   const { pdf, MX, CW } = ctx;
   const colDateW = 80;
   const colActW = opts.showActColumn ? 110 : 0;
@@ -402,21 +405,13 @@ function drawHorizontalBarChart(
   rows: BarRow[],
   opts: { labelW?: number; barColor?: string; emptyMessage?: string } = {},
 ) {
-  if (heading) drawSubtitle(ctx, heading);
   const { pdf, MX, CW } = ctx;
   if (rows.length === 0) {
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    pdf.text(
-      sanitize(opts.emptyMessage ?? "No data reported this week."),
-      MX,
-      ctx.y + 10,
-    );
-    setRoboto(pdf, "regular");
-    ctx.y += 22;
+    // Do not leave an empty chart title or a panel whose only content is an
+    // empty-state sentence in a client-facing report.
     return;
   }
+  if (heading) drawSubtitle(ctx, heading);
   const labelW = opts.labelW ?? 160;
   const valueW = 34;
   const trackX = MX + labelW + 6;
@@ -792,65 +787,79 @@ function drawBlufBox(ctx: Ctx, text: string) {
   ctx.y += boxH + 14;
 }
 
-function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
+function drawMaritimeCoverageDisclosure(
+  ctx: Ctx,
+  completeness: MaritimeReportCompleteness,
+) {
+  const disclosure =
+    completeness.complete ? "" : (completeness.disclosure ?? "").trim();
+  if (!disclosure) return;
+  drawSubtitle(ctx, MARITIME_COVERAGE_STATUS_LABEL);
+  renderProse(ctx, disclosure);
+}
+
+function drawMaritimeIntelligence(
+  ctx: Ctx,
+  board: MaritimeIntelligence,
+  completeness: MaritimeReportCompleteness,
+) {
   const { pdf, MX } = ctx;
-  const {
-    bluf,
-    movementSnapshot,
-    chokepointCards,
-    confirmedIncidents,
-  } = board;
+  const { bluf, confirmedIncidents } = board;
+  const movementTheatres = maritimeReportMovementTheatres(board);
+  const chokepointCards = maritimeReportChokepointCards(board);
 
   drawSectionHeading(ctx, "Maritime Intelligence");
 
-  // Executive summary — four KPI cards (Risk Level, Confirmed Incidents 7d,
-  // Chokepoints Affected, Business Impact). Built from the SHARED view contract
-  // (maritimeReportView) so they are byte-identical to the on-screen board.
-  const execCards: KpiCardData[] = maritimeExecCards(board);
+  // Executive summary KPI cards (risk, confirmed incidents, affected
+  // chokepoints and, when populated, business impact). Built from the SHARED
+  // view contract (maritimeReportView) so they are byte-identical to the
+  // on-screen board.
+  const execCards: KpiCardData[] = maritimeExecCards(board, completeness);
   drawFastFactsKpiCards(ctx, execCards);
+  drawMaritimeCoverageDisclosure(ctx, completeness);
 
   drawBlufBox(ctx, bluf);
 
-  // Chokepoint cards — rendered as compact stacked blocks (one per chokepoint)
-  // so the PDF carries the SAME cards, in the same order, as the on-screen
-  // board: the seven tracked chokepoints.
-  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[0]);
-  for (const card of chokepointCards) {
-    ensureSpace(ctx, 20);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(10);
-    setText(pdf, MARITIME_RISK_COLOR[card.risk.level]);
-    pdf.text(
-      sanitize(`${card.key} \u2014 L${card.risk.level} ${card.risk.label}`),
-      MX,
-      ctx.y + 9,
-    );
-    ctx.y += 13;
-    const lines: string[] = [];
-    lines.push(`Confirmed (7d): ${card.incidentCount}`);
-    if (card.lastConfirmed) {
-      let when = card.lastConfirmed.occurredAt;
-      try {
-        when = format(parseISO(card.lastConfirmed.occurredAt), "d MMM");
-      } catch {
-        /* keep raw */
+  // Chokepoint cards are a populated-only report surface. The live board keeps
+  // zero-count cards for monitoring, but empty client-facing cards add noise.
+  if (chokepointCards.length > 0) {
+    drawSubtitle(ctx, MARITIME_CHOKEPOINT_CARDS_TITLE);
+    for (const card of chokepointCards) {
+      ensureSpace(ctx, 20);
+      setRoboto(pdf, "bold");
+      pdf.setFontSize(10);
+      const pendingRisk = card.risk.label === "Assessment pending";
+      setText(pdf, pendingRisk ? "#626773" : MARITIME_RISK_COLOR[card.risk.level]);
+      pdf.text(
+        sanitize(`${card.key} \u2014 ${pendingRisk ? card.risk.label : `L${card.risk.level} \u00b7 ${card.risk.label}`}`),
+        MX,
+        ctx.y + 9,
+      );
+      ctx.y += 13;
+      const lines: string[] = [];
+      lines.push(`${card.incidentCount} confirmed \u00b7 7 days`);
+      if (card.lastConfirmed) {
+        let when = card.lastConfirmed.occurredAt;
+        try {
+          when = format(parseISO(card.lastConfirmed.occurredAt), "d MMM");
+        } catch {
+          /* keep raw */
+        }
+        lines.push(`Last incident: ${when} \u2014 ${card.lastConfirmed.title}`);
       }
-      lines.push(`Last incident: ${when} \u2014 ${card.lastConfirmed.title}`);
-    } else {
-      lines.push("Last incident: None in window");
+      if (card.movement) {
+        lines.push(
+          `Movement: ${formatMaritimeMovementDate(card.movement.dataAsOf)} \u2014 ${formatMaritimeMovementSample(card.movement)}`,
+        );
+      }
+      drawMiniBullets(ctx, lines, lines.length);
     }
-    if (card.movement) {
-      lines.push(`Movement: ${formatMovementSummary(card.movement)}`);
-    } else {
-      lines.push("Movement: Movement data unavailable");
-    }
-    drawMiniBullets(ctx, lines, lines.length);
   }
 
   // Confirmed maritime incidents — allowed categories only; movement/AIS never
   // appears here.
-  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[1]);
   if (confirmedIncidents.length > 0) {
+    drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[0]);
     const rows = confirmedIncidents.map((r) => {
       let when = r.occurredAt;
       try {
@@ -863,22 +872,16 @@ function drawMaritimeIntelligence(ctx: Ctx, board: MaritimeIntelligence) {
       return `${when} \u2014 ${r.category} \u00b7 ${sev}${cp}: ${r.title}`;
     });
     drawMiniBullets(ctx, rows, rows.length);
-  } else {
-    renderProse(
-      ctx,
-      "No confirmed maritime security incidents in the window.",
-    );
   }
 
   // Maritime context — vessel movement (AIS). CONTEXT only.
-  drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[2]);
-  if (movementSnapshot) {
-    const items = movementSnapshot.theatres.map(
-      (t) => `${t.theatre} \u2014 ${formatMovementSummary(t)}`,
+  if (movementTheatres.length > 0) {
+    drawSubtitle(ctx, MARITIME_SUBSECTION_ORDER[1]);
+    const items = movementTheatres.map(
+      (t) =>
+        `${t.theatre} \u2014 ${formatMaritimeMovementDate(t.dataAsOf)} \u2014 ${formatMaritimeMovementSample(t)}`,
     );
-    drawMiniBullets(ctx, items);
-  } else {
-    renderProse(ctx, "No vessel movement observation is available for this window.");
+    drawMiniBullets(ctx, items, items.length);
   }
 
   // The board's internal Polestar View / Watch Next block is NOT rendered in
@@ -965,7 +968,7 @@ export async function exportShippingReportPdf(
   // report's window so the PDF agrees with the live Shipping monitor. Drawn in
   // the SAME order ShippingReportPreview renders it (preview == PDF).
   if (show("maritime-intelligence")) {
-    drawMaritimeIntelligence(ctx, maritimeBoard);
+    drawMaritimeIntelligence(ctx, maritimeBoard, publication.completeness);
   }
 
   if (show("fast-facts")) {
@@ -1050,10 +1053,15 @@ export async function exportShippingReportPdf(
       "Regional and Country View",
       prose.regionalCountryRead,
     );
-    drawHorizontalBarChart(ctx, "Incidents by Region", ds.regionRows, {
-      labelW: 160,
-      emptyMessage: "No regional classifications reported this week.",
-    });
+    drawHorizontalBarChart(
+      ctx,
+      "Incidents by Region",
+      ds.regionRows.filter((row) => row.value > 0),
+      {
+        labelW: 160,
+        emptyMessage: "No regional classifications reported this week.",
+      },
+    );
     drawHorizontalBarChart(
       ctx,
       ds.countryRows.length >= 12

@@ -21,6 +21,7 @@ jest.mock("../../artifacts/workbench/src/lib/pdfChrome", () => {
     __reset: () => textCalls.splice(0),
     createCtx: () => ({ pdf, MX: 40, CW: 515, W: 595, H: 100000, TOP: 40, BOTTOM: 40, y: 40 }),
     drawSectionHeading: () => undefined,
+    drawSubtitle: (_ctx: unknown, title: unknown) => record(title),
     renderProse: (_ctx: unknown, body: unknown) => record(body),
     drawSectionWithProse: (_ctx: unknown, _title: unknown, body: unknown) => record(body),
     drawSectionKeepTogether: (_ctx: unknown, _title: unknown, body: unknown) => record(body),
@@ -116,6 +117,8 @@ describe("Shipping publication surface integration", () => {
 
     expect(html).toContain("Maritime Intelligence");
     expect(html).toContain("Shipping Watch");
+    expect(html).toContain("Assessment pending");
+    expect(html).toContain("Coverage is incomplete");
     expect(html).not.toContain("cannot be rendered");
     expect((html.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(1);
     expect(html).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
@@ -162,7 +165,72 @@ describe("Shipping publication surface integration", () => {
 
     expect(text).toContain("BOTTOM LINE UP FRONT");
     expect(text).toContain("overall maritime risk");
+    expect(text).toContain("Assessment pending");
+    expect(text).toContain("Coverage is incomplete");
     expect((text.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(1);
     expect(text).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
+  });
+
+  it("keeps the coverage disclosure when Executive Summary is hidden", async () => {
+    const hidden = renderToStaticMarkup(
+      createElement(ShippingReportPreview, {
+        report,
+        incidents,
+        movement: [],
+        maritimeSecurityEvents: [],
+        hiddenSections: ["executive-summary"],
+      } as never),
+    );
+    expect(hidden).not.toContain(">Executive Summary</h2>");
+    expect(hidden).toContain("Assessment pending");
+    expect(hidden).toContain("Coverage is incomplete");
+
+    const chrome = jest.requireMock("../../artifacts/workbench/src/lib/pdfChrome") as { __textCalls: string[]; __reset: () => void };
+    chrome.__reset();
+    await exportShippingReportPdf(
+      report as never,
+      incidents as never,
+      "shipping-hidden-summary.pdf",
+      [],
+      [],
+      {},
+      undefined,
+      ["executive-summary"],
+    );
+    const text = chrome.__textCalls.join("\n");
+    expect(text).not.toContain("EXECUTIVE SUMMARY");
+    expect(text).toContain("Assessment pending");
+    expect(text).toContain("Coverage is incomplete");
+  });
+
+  it("omits empty maritime cards and subheadings on both surfaces", async () => {
+    const emptyHtml = renderToStaticMarkup(
+      createElement(ShippingReportPreview, {
+        report,
+        incidents: [],
+        movement: [],
+        maritimeSecurityEvents: [],
+      } as never),
+    );
+    expect(emptyHtml).toContain("Confirmed Maritime Incidents · 7d");
+    expect(emptyHtml).toContain("L1 · Not assessed");
+    expect(emptyHtml).not.toContain("Chokepoint Cards");
+    expect(emptyHtml).not.toContain("Business Impact Areas");
+    expect(emptyHtml).not.toContain("Maritime Context");
+
+    const chrome = jest.requireMock("../../artifacts/workbench/src/lib/pdfChrome") as { __textCalls: string[]; __reset: () => void };
+    chrome.__reset();
+    await exportShippingReportPdf(
+      report as never,
+      [],
+      "shipping-empty.pdf",
+      [],
+      [],
+      {},
+    );
+    const text = chrome.__textCalls.join("\n");
+    expect(text).not.toContain("Chokepoint Cards");
+    expect(text).not.toContain("Business Impact Areas");
+    expect(text).not.toContain("Maritime Context");
   });
 });

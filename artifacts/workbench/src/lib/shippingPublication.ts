@@ -29,6 +29,14 @@ import {
   type VesselRow,
 } from "./shippingReportDataset";
 import {
+  buildShippingCoverage,
+  type ShippingCoverage,
+} from "./shippingCoverage";
+import {
+  detectChokepointsScoped,
+  type ChokepointKey,
+} from "./shippingAnalysis";
+import {
   applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
@@ -293,6 +301,8 @@ export function shippingPublicationIssueAction(
 
 export interface ShippingPublicationBundle {
   dataset: ShippingReportDataset;
+  /** Raw in-window validation coverage used to qualify overall risk. */
+  completeness: ShippingCoverage;
   maritimeBoard: MaritimeIntelligence;
   fastFacts: KpiCard[];
   prose: ShippingPublicationProse;
@@ -414,9 +424,13 @@ function safeDeterministicProse(
   dataset: ShippingReportDataset,
   board: MaritimeIntelligence,
   incidents: ShippingReportIncident[],
+  completeness: ShippingCoverage,
 ): ShippingPublicationProse {
   const risk = board.risk.label;
   const highest = highestSeverity(dataset.canonicalIncidents);
+  const overallAssessment = completeness.complete
+    ? `Overall maritime risk is ${risk}.`
+    : "Overall maritime risk assessment is pending until coverage is complete.";
   const route = firstRoute(dataset);
   const geography = firstGeography(dataset);
   const event = firstEventLabel(dataset, incidents);
@@ -430,16 +444,9 @@ function safeDeterministicProse(
 
   const direct = dataset.vesselRows.length;
   const piracy = dataset.piracyRows.length;
-  const commercialConsequences = dataset.canonicalIncidents
-    .map(semanticFor)
-    .filter(
-      (semantic): semantic is SemanticEvidence =>
-        Boolean(semantic?.commercialConsequence?.status === "confirmed"),
-    );
-
   return {
     executiveSummary:
-      `Shipping Watch assesses overall maritime risk as ${risk}. ` +
+      `${completeness.complete ? `Shipping Watch assesses overall maritime risk as ${risk}.` : "The overall maritime risk assessment is pending because coverage is incomplete."} ` +
       `The assessment treats a ${event} as the clearest reported signal in ${place}; ` +
       `the highest individual incident severity is ${highest}. ` +
       `Overall risk and individual incident severity are separate judgements.`,
@@ -456,14 +463,15 @@ function safeDeterministicProse(
       dataset.maritimeSecurity.rows.length > 0
         ? "Separate maritime-security reporting provides additional context for this window."
         : "No separate maritime-security reporting is available in this window.",
-    commercialImpactRead:
-      commercialConsequences.length > 0
-        ? "A commercial consequence is reported alongside the relevant maritime developments."
-        : "No confirmed commercial cost, insurance, rerouting or transit-time consequence is reported in this window.",
+    // The dataset builder owns the reader-facing consequence gate and emits
+    // wording that can be tied back to the same semantic reference. Reusing
+    // it here avoids a generic fallback sentence that the prose audit cannot
+    // link to an actual incident.
+    commercialImpactRead: dataset.commercialImpactRead,
     regionalCountryRead:
       `${geographySentence} The regional view follows that physical geography.`,
     whatMatters:
-      `Assessment: ${risk} overall maritime risk is concentrated on ${place}. ` +
+      `${overallAssessment} The assessment is concentrated on ${place}. ` +
       `What matters operationally is whether another ${event} occurs or a route disruption is reported; ` +
       `that assessment is distinct from the highest individual incident severity of ${highest}.`,
     implications:
@@ -475,7 +483,8 @@ function safeDeterministicProse(
         ? `Monitor ${route} for a further ${event}, a route disruption, or a commercial consequence.`
         : `Monitor for a further ${event}, a physical route relationship, or a commercial consequence.`,
     polestarView:
-      `Polestar assesses overall maritime risk as ${risk}, while the highest individual incident severity is ${highest}. ` +
+      `${completeness.complete ? `Polestar assesses overall maritime risk as ${risk}.` : "Polestar's overall maritime risk assessment is pending because coverage is incomplete."} ` +
+      `The highest individual incident severity is ${highest}, a separate assessment from overall risk. ` +
       `Priority remains ${place}; the assessment would change if a new ${event} or route disruption were reported.`,
   };
 }
@@ -483,19 +492,33 @@ function safeDeterministicProse(
 function clientMaritimeBoard(
   board: MaritimeIntelligence,
   dataset: ShippingReportDataset,
+  completeness: ShippingCoverage,
 ): MaritimeIntelligence {
-  const riskRationale =
-    board.risk.label === "Not assessed"
+  const incomplete = !completeness.complete;
+  const risk = incomplete
+    ? {
+        ...board.risk,
+        level: 1 as const,
+        label: completeness.assessmentLabel,
+        confidence: "low" as const,
+      }
+    : { ...board.risk };
+  const riskRationale = incomplete
+    ? "The overall maritime risk assessment is pending because coverage is incomplete."
+    : risk.label === "Not assessed"
       ? "No maritime incident was reported in this window."
       : `Overall risk is assessed from maritime incidents; the highest individual severity is ${highestSeverity(dataset.canonicalIncidents)}.`;
-  const risk = { ...board.risk, rationale: riskRationale };
+  const authoritativeRisk = { ...risk, rationale: riskRationale };
   return {
     ...board,
-    risk,
+    risk: authoritativeRisk,
+    overallRisk: authoritativeRisk,
     bluf:
-      board.risk.label === "Not assessed"
+      incomplete
+        ? "The overall maritime risk assessment is pending because coverage is incomplete."
+        : risk.label === "Not assessed"
         ? "Maritime risk is not assessed because no maritime incident was reported in this window."
-        : `Maritime risk is ${board.risk.label}. ${riskRationale}`,
+        : `Maritime risk is ${risk.label}. ${riskRationale}`,
     // Empty route cards are not a client-facing finding.  Movement-only
     // theatres and the fixed board vocabulary must not become seven rows
     // saying "None in window"; retain only routes with a current confirmed
@@ -806,14 +829,28 @@ function validateSemanticRows(
     if (route && route.kind && route.kind !== "none" && (!trim(route.routeName) || !trim(route.evidence))) {
       issue(issues, "UNSUPPORTED_ROUTE_RELATIONSHIP", "A physical or direct/indirect route relationship lacks source evidence.", section, [id]);
     }
+    // A table row elsewhere in the report is not evidence that this incident
+    // belongs to that chokepoint.  Membership must come from the canonical
+    // semantic route projection itself; never infer it from a title mention.
+    const semanticChokepoints = canonical
+      ? new Set<ChokepointKey>(
+          detectChokepointsScoped(
+            canonical,
+            canonical.incidentCountry,
+          ),
+        )
+      : new Set<ChokepointKey>();
+    const populatedTableChokepoints = new Set<ChokepointKey>(
+      dataset.chokepointRows
+        .filter((chokepoint) => chokepoint.count > 0)
+        .map((chokepoint) => chokepoint.name),
+    );
     if (
       route &&
       (route.kind === "indirect" || route.kind === "none") &&
       canonical &&
-      dataset.chokepointRows.some(
-        (chokepoint) =>
-          chokepoint.count > 0 &&
-          normalizeText(canonical.title).includes(normalizeText(chokepoint.name)),
+      [...semanticChokepoints].some((chokepoint) =>
+        populatedTableChokepoints.has(chokepoint),
       )
     ) {
       issue(
@@ -1471,6 +1508,14 @@ export function finalizeShippingPublication(
       issueDate,
       options.maritimeSecurityEvents ?? [],
     );
+  // Coverage must be calculated before canonical semantic admission: pending
+  // and rejected rows are intentionally absent from the dataset, but they are
+  // still part of the report's raw in-window evidence universe.
+  const completeness = buildShippingCoverage(
+    options.incidents,
+    topic,
+    issueDate,
+  );
   const detailedIncidentIds = new Set(
     [
       ...baseDataset.vesselRows,
@@ -1536,7 +1581,11 @@ export function finalizeShippingPublication(
         })
       : baseDataset.relatedIncidents,
   };
-  const maritimeBoard = clientMaritimeBoard(builtMaritimeBoard, dataset);
+  const maritimeBoard = clientMaritimeBoard(
+    builtMaritimeBoard,
+    dataset,
+    completeness,
+  );
   const fastFacts = applyFastFactOverrides(
     dataset.fastFacts,
     options.sectionOverrides?.fastFactOverrides,
@@ -1549,7 +1598,12 @@ export function finalizeShippingPublication(
     }
     return fact;
   });
-  const deterministic = safeDeterministicProse(dataset, maritimeBoard, options.incidents);
+  const deterministic = safeDeterministicProse(
+    dataset,
+    maritimeBoard,
+    options.incidents,
+    completeness,
+  );
   const draft = stableDraftTopicReportProse({
     topic,
     issueDate,
@@ -1634,6 +1688,18 @@ export function finalizeShippingPublication(
       baseDataset[legacyAutoFields[field]],
     );
   }
+  // Compatibility for the previous auto-generated Commercial Impact wording.
+  // It described canonical/evidence internals and could survive in a saved
+  // report after the reader-facing generator changed, where it was then
+  // audited as though it were an analyst edit.  These exact historical
+  // strings are automatic seeds, not a broad rewrite of saved prose.
+  for (const value of [
+    "No canonical incident in this window carries structured commercial-consequence evidence.",
+    "No canonical incident in this window carries structured commercial-consequence evidence; the security and route-linked counts are reported separately.",
+    "A commercial consequence is reported alongside the relevant maritime developments.",
+  ]) {
+    addGeneratedCandidate(generatedCandidates, "commercialImpactRead", value);
+  }
   const isGeneratedCandidate = (field: string, value: unknown): boolean => {
     const key = generatedTextKey(value);
     return Boolean(key && generatedCandidates.get(field)?.has(key));
@@ -1647,7 +1713,11 @@ export function finalizeShippingPublication(
     // cannot veto the live finalizer.  Any other non-empty value remains a
     // genuine analyst edit and is still subject to the strict audit below.
     const analyst = saved && !isGeneratedCandidate(field, saved) ? saved : "";
-    const aiText = trim(ai?.[field]);
+    // AI prose is a generated fallback, not an analyst edit.  It may have
+    // been drafted against the incomplete/filtered incident set and therefore
+    // must not reintroduce a definitive overall risk after the board has been
+    // qualified as Assessment pending.
+    const aiText = completeness.complete ? trim(ai?.[field]) : "";
     return analyst || aiText || fallback;
   };
   const resolveRead = (
@@ -1712,7 +1782,11 @@ export function finalizeShippingPublication(
   // in the dataset's prioritised Related Incidents source list.  Publication
   // removes rows already shown in a detailed board/table surface below, so run
   // that source-level check before the no-retelling projection is applied.
-  addConsistencyIssues(baseDataset, maritimeBoard, fastFacts, issues);
+  // The client-facing board qualifies overall risk as Assessment pending when
+  // raw coverage is incomplete.  Run canonical set consistency against the
+  // unqualified board so that this intentional disclosure is not mistaken for
+  // a mutated risk rollup.
+  addConsistencyIssues(baseDataset, builtMaritimeBoard, fastFacts, issues);
   validateClientFacingBoard(maritimeBoard, issues);
   validateSemanticRows(options.incidents, dataset, issues);
   validateProse(prose, dataset, maritimeBoard, issues);
@@ -1727,6 +1801,7 @@ export function finalizeShippingPublication(
 
   return {
     dataset,
+    completeness,
     maritimeBoard,
     fastFacts,
     prose,

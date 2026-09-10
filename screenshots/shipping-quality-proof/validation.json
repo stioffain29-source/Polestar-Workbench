@@ -1,0 +1,104 @@
+{
+  "reportId": 12,
+  "issueDate": "2026-09-09",
+  "draftRenders": true,
+  "pdfAllowed": true,
+  "auditIssues": [],
+  "fastFacts": [
+    {
+      "label": "Reporting Period",
+      "value": "3 Sep - 9 Sep 2026"
+    },
+    {
+      "label": "Confirmed Incidents",
+      "value": "11"
+    },
+    {
+      "label": "Highest Severity",
+      "value": "High",
+      "severity": "high"
+    },
+    {
+      "label": "Main Affected Chokepoint",
+      "value": "Strait of Hormuz",
+      "note": "6 records"
+    },
+    {
+      "label": "Vessel Attacks / Seizures",
+      "value": "5"
+    },
+    {
+      "label": "Piracy / Armed Robbery",
+      "value": "1",
+      "note": "Latest: 09 Sep 2026"
+    },
+    {
+      "label": "Latest Significant Incident",
+      "value": "09 Sep 2026",
+      "severity": "high",
+      "note": "Incident reported"
+    }
+  ],
+  "completeness": {
+    "status": "incomplete",
+    "complete": false,
+    "sourceRows": 393,
+    "validated": 12,
+    "rejected": 15,
+    "pending": 366,
+    "windowStart": "2026-09-03T00:00:00.000Z",
+    "windowEnd": "2026-09-09T23:59:59.999Z",
+    "disclosure": "Coverage is incomplete: 366 of 393 source reports are still under review. Overall maritime risk assessment is pending.",
+    "assessmentLabel": "Assessment pending"
+  },
+  "cards": [
+    {
+      "label": "Maritime Risk Level",
+      "value": "Assessment pending"
+    },
+    {
+      "label": "Confirmed Maritime Incidents · 7d",
+      "value": "11"
+    },
+    {
+      "label": "Chokepoints Affected",
+      "value": "2 / 7"
+    },
+    {
+      "label": "Business Impact Areas",
+      "value": "2 affected"
+    }
+  ],
+  "movementSamples": [
+    {
+      "theatre": "Malacca Strait",
+      "dataAsOf": "2026-09-09T19:22:03.126Z",
+      "vessels": 11
+    },
+    {
+      "theatre": "Red Sea",
+      "dataAsOf": "2026-09-08T00:32:16.388Z",
+      "vessels": null
+    },
+    {
+      "theatre": "Singapore Strait",
+      "dataAsOf": "2026-09-09T19:22:03.126Z",
+      "vessels": 78
+    },
+    {
+      "theatre": "Suez Canal",
+      "dataAsOf": "2026-09-09T19:22:03.126Z",
+      "vessels": 2
+    }
+  ],
+  "qualityChecks": {
+    "maritimeCountLabelAccurate": true,
+    "oneAisSamplePerTheatre": true,
+    "aisSamplesNotAfterReportEnd": true,
+    "noEmptyChokepointHeading": true,
+    "noEmptyBusinessImpactCard": true,
+    "incompleteRiskExplicit": true,
+    "noUnsupportedAisRatios": true,
+    "incompleteRouteRisksExplicit": true
+  }
+}

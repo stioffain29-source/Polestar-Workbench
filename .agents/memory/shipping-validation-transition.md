@@ -14,3 +14,9 @@ Missing/stale/failed maritime validation is pending coverage, not proof of zero 
 **Why:** the semantic rollout withheld most historical rows while the editor still showed Extreme from raw incidents; a midnight-only board cutoff also excluded same-day events counted by Fast Facts.
 
 **How to apply:** scope pending counts and risk to the same window, expose status with refresh, and check automatic prose against real unknown-geography records instead of inferring location from feed fields.
+
+Rendering successfully and passing the publication gate are not sufficient evidence of report quality. Prove the specific requested output properties visually and from the saved-report model, at the exact effective issue date.
+
+**Why:** the owner rejected a passing preview that still displayed contradictory labels, repeated AIS snapshots, empty headings and a definitive risk tier despite incomplete coverage.
+
+**How to apply:** include incomplete-coverage risk qualification, accurate count labels, dated latest-per-theatre AIS sampling and omission of empty panels in saved-report acceptance. Label proof as development output, never as an authenticated published-site capture.

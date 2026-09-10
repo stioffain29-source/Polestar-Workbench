@@ -933,3 +933,31 @@ mtime_ms = 1789045816573
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/c58ab31b-ff73-4654-89ff-ebb8344075ee/6696b905-7e6d-4b2a-96a1-625fd778df3c"
 storage_version_token = "1789045845088341"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Qi0kPS7qR0VwHwHOdzDBe"
+uri = "file://screenshots/shipping-quality-proof/report-body.png"
+type = "image"
+title = "Shipping Watch — corrected saved-report preview"
+description = "Actual development report, 3–9 September. Shows pending risk, separate maritime/chokepoint counts, populated panels and four dated AIS summaries. Not a published-site capture."
+logical_id = "eb5d137a-0932-4cd0-8ac9-0b55cf5001fb"
+content_hash = "sha256:1ac774f81aff75469910345ef249388dd0e1ef4edfa0a7ced41a7778803dc41d"
+size = 207786
+mtime_ms = 1789047492064
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/eb5d137a-0932-4cd0-8ac9-0b55cf5001fb/de5f477b-210f-4c6a-9166-49d110ed870e"
+storage_version_token = "1789047521338701"
+content_type = "image/png"
+
+[[outputs]]
+id = "-nYocqifWVs8Doqcn_EsA"
+uri = "file://screenshots/shipping-quality-proof/saved-report.pdf"
+type = "pdf"
+title = "Shipping Watch — corrected preview PDF"
+description = "Browser-printed inspection copy of the same saved-report rendering. The application PDF exporter was also run successfully against this reporting window."
+logical_id = "04426d93-9776-4b6d-af52-633b078f76a8"
+content_hash = "sha256:6001bed67bd4191b665455d9f8d6a43233bd75dc58c46943b6fafc69730e5221"
+size = 7448979
+mtime_ms = 1789047494200
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/04426d93-9776-4b6d-af52-633b078f76a8/34161fa9-f179-4787-9420-397a225cb35a"
+storage_version_token = "1789047522808558"
+content_type = "application/pdf"

@@ -50,6 +50,13 @@ export interface ShippingReportIncident {
   sourceUrl?: string | null;
   location?: string | null;
   maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;
+  /** Current API validation projection used for report coverage accounting. */
+  maritimeValidation?: {
+    status?: string | null;
+    version?: string | null;
+    reason?: string | null;
+    evaluatedAt?: string | null;
+  } | null;
 }
 
 export interface EnrichedIncident extends ShippingReportIncident {
@@ -960,10 +967,6 @@ export function buildShippingReportDataset(
   // commercial pressure shows up, before the table of records.
   const commercialImpactRead = buildCommercialImpactRead(
     commercialRecords.map(toShippingPresentationIncident),
-    // Cross-signal so an empty commercial table can never claim "no
-    // disruption" while the vessel/chokepoint sections above report attacks
-    // and rerouting pressure in the same window.
-    vesselHostile.length > 0 || cpRanked.length > 0,
   );
 
   // Region rows in fixed order — "Country not identified" is intentionally
@@ -1370,20 +1373,29 @@ function buildVesselPiracyRead(opts: {
 
 function buildCommercialImpactRead(
   commercialRecords: EnrichedIncident[],
-  hasUpstreamDisruption: boolean,
 ): string {
   if (commercialRecords.length === 0) {
-    return hasUpstreamDisruption
-      ? "No canonical incident in this window carries structured commercial-consequence evidence; the security and route-linked counts are reported separately."
-      : "No canonical incident in this window carries structured commercial-consequence evidence.";
+    // Keep the empty branch reader-facing.  The old "canonical incident /
+    // structured evidence" wording described implementation state and then
+    // failed the prose evidence audit as an unsupported incident assertion.
+    return "No confirmed commercial cost, insurance, rerouting or transit-time consequence is reported in this window.";
   }
   const n = commercialRecords.length;
   const lead = commercialRecords[0];
-  const second = commercialRecords[1];
-  const examples = second
-    ? `Examples include "${lead.title}" (${lead.issue.toLowerCase()}) and "${second.title}" (${second.issue.toLowerCase()}).`
-    : `The listed example is "${lead.title}" (${lead.issue.toLowerCase()}).`;
-  return `${n} canonical incident${n === 1 ? "" : "s"} carries structured commercial-consequence evidence. ${examples}`;
+  const eventClass = semanticEventClass(lead) ?? "";
+  const eventLabel: Record<string, string> = {
+    commercial_attack: "commercial-vessel attack",
+    commercial_seizure: "commercial-vessel seizure",
+    piracy_or_armed_robbery: "piracy or armed-robbery event",
+    port_disruption: "port disruption",
+    chokepoint_disruption: "chokepoint disruption",
+    route_disruption: "route disruption",
+  };
+  const label = eventLabel[eventClass] ?? "maritime event";
+  const routeName = lead.maritimeSemantic?.routeRelationship?.routeName?.trim();
+  const place = lead.physicalLocation?.trim() || routeName;
+  const anchor = place ? ` at ${place}` : "";
+  return `${n} reported ${label} incident${n === 1 ? "" : "s"} carr${n === 1 ? "ies" : "y"} a documented commercial consequence${anchor}.`;
 }
 
 function buildRegionalCountryRead(opts: {

@@ -7,12 +7,20 @@
 // re-declared the executive KPI cards and section labels with their own string
 // literals, and they silently drifted (the PDF once read "5 — Extreme" while the
 // screen read "L5 · Extreme", and a middot went missing from "Confirmed
-// Incidents · 7d"). Defining the labels/values/order ONCE here and having both
+// Maritime Incidents · 7d"). Defining the labels/values/order ONCE here and having both
 // surfaces consume them makes that class of drift impossible, and the parity
 // test (maritimeReportParity.test.ts) locks these definitions against a fixture.
 
-import { BOARD_CHOKEPOINTS, MARITIME_RISK_COLOR } from "./maritimeIntelligence";
-import type { MaritimeIntelligence } from "./maritimeIntelligence";
+import { format, parseISO } from "date-fns";
+import {
+  BOARD_CHOKEPOINTS,
+  MARITIME_RISK_COLOR,
+} from "./maritimeIntelligence";
+import type {
+  ChokepointCard,
+  MaritimeIntelligence,
+  MovementTheatre,
+} from "./maritimeIntelligence";
 
 /** Human label for the board confidence enum. Shared by preview + PDF. */
 export const MARITIME_CONF_LABEL: Record<string, string> = {
@@ -36,51 +44,187 @@ export interface MaritimeExecCard {
   accent?: string;
 }
 
+export interface MaritimeReportCompleteness {
+  complete: boolean;
+  assessmentLabel?: string | null;
+  disclosure?: string | null;
+}
+
+export const MARITIME_COVERAGE_STATUS_LABEL = "Assessment pending";
+
 export function maritimeExecCards(
   board: MaritimeIntelligence,
+  completeness?: MaritimeReportCompleteness | null,
 ): MaritimeExecCard[] {
   const { risk, incidentSnapshot, chokepointsAffected } = board;
-  const namedImpacts = board.businessImpact;
-  return [
+  // Incomplete coverage deliberately uses level 1 internally as a neutral
+  // placeholder. Never leak that implementation value or its Insignificant
+  // colour into a client-facing report.
+  const assessmentPending =
+    completeness?.complete === false ||
+    completeness?.assessmentLabel === MARITIME_COVERAGE_STATUS_LABEL ||
+    risk.label === MARITIME_COVERAGE_STATUS_LABEL ||
+    board.overallRisk.label === MARITIME_COVERAGE_STATUS_LABEL;
+  const namedImpacts = board.businessImpact.filter(
+    (impact) => impact !== "No material impact",
+  );
+  const cards: MaritimeExecCard[] = [
     {
       label: "Maritime Risk Level",
-      value: `L${risk.level} \u00b7 ${risk.label}`,
-      // Accent strip corresponds to the displayed risk level (e.g. Extreme →
-      // subdued red #A33232), matching the L-level chip/value colour.
-      accent: MARITIME_RISK_COLOR[risk.level],
+      value: assessmentPending
+        ? MARITIME_COVERAGE_STATUS_LABEL
+        : `L${risk.level} \u00b7 ${risk.label}`,
+      // A pending assessment intentionally has no severity accent. Both
+      // renderers fall back to the neutral brand accent instead.
+      ...(assessmentPending
+        ? {}
+        : {
+            // Accent strip corresponds to the displayed risk level (e.g.
+            // Extreme → subdued red #A33232), matching the L-level value.
+            accent: MARITIME_RISK_COLOR[risk.level],
+          }),
     },
-    // "Chokepoint Incidents" — this board counts confirmed incidents AT THE
-    // TRACKED STRAITS only, a subset of the report's canonical incident pool.
-    // The label says so, so this card can never read as a rival total to the
-    // Fast Facts "Confirmed Incidents" count.
-    { label: "Chokepoint Incidents \u00b7 7d", value: String(incidentSnapshot.total) },
+    // This is the global maritime count, not a chokepoint-only subset. Naming
+    // it explicitly prevents the KPI from being mistaken for a second route
+    // count beside the Fast Facts "Confirmed Incidents" figure.
+    {
+      label: "Confirmed Maritime Incidents \u00b7 7d",
+      value: String(incidentSnapshot.total),
+    },
     {
       label: "Chokepoints Affected",
       // Denominator is the fixed number of tracked board chokepoints. Keeps the
       // KPI reading "X / 7".
       value: `${chokepointsAffected} / ${BOARD_CHOKEPOINTS.length}`,
     },
-    {
-      // A bare number ("Business Impact 8") explains nothing — say what is
-      // being counted, and spell the unit in the value.
-      label: "Business Impact Areas",
-      value:
-        namedImpacts.length > 0
-          ? `${namedImpacts.length} affected`
-          : "\u2014",
-    },
   ];
+  // Do not ship an empty KPI card. A dash-labelled Business Impact card made
+  // the report look as though an impact assessment had been omitted.
+  if (namedImpacts.length > 0) {
+    cards.push({
+      label: "Business Impact Areas",
+      value: `${namedImpacts.length} affected`,
+    });
+  }
+  return cards;
 }
 
 /**
- * The three mid sub-sections rendered between the BLUF box and the Polestar
- * View, in order. Both surfaces draw these exact subtitles.
+ * The populated mid sub-sections rendered between the BLUF box and the
+ * Polestar View, in order. Empty sections are omitted by both surfaces.
  */
 export const MARITIME_SUBSECTION_ORDER = [
-  "Chokepoint Cards",
   "Confirmed Maritime Incidents",
   "Maritime Context \u2014 Vessel Movement (AIS)",
 ] as const;
+
+export const MARITIME_CHOKEPOINT_CARDS_TITLE = "Chokepoint Cards";
+
+/**
+ * Return only populated chokepoint cards for the report. The live board keeps
+ * all seven tracked routes so analysts can see zeros, but a client report
+ * should not spend a heading and seven empty cards on that internal shape.
+ *
+ * Movement is replaced with the same latest-per-theatre, report-window-bounded
+ * snapshot used by the movement subsection. This prevents an old or future
+ * AIS row from leaking into a current report card.
+ */
+export function maritimeReportChokepointCards(
+  board: MaritimeIntelligence,
+): ChokepointCard[] {
+  const theatres = maritimeReportMovementTheatres(board);
+  const findMovement = (key: string): MovementTheatre | null => {
+    const normalized = key.toLowerCase();
+    return (
+      theatres.find((theatre) => {
+        const name = theatre.theatre.toLowerCase();
+        const chokepoint = (theatre.chokepoint ?? "").toLowerCase();
+        return (
+          name.includes(normalized) ||
+          normalized.includes(name) ||
+          (chokepoint &&
+            (chokepoint.includes(normalized) ||
+              normalized.includes(chokepoint)))
+        );
+      }) ?? null
+    );
+  };
+
+  return board.chokepointCards
+    .filter((card) => card.incidentCount > 0)
+    .map((card) => ({
+      ...card,
+      risk: board.risk.label === "Assessment pending"
+        ? { ...card.risk, label: "Assessment pending" }
+        : card.risk,
+      movement: findMovement(card.key),
+    }));
+}
+
+/**
+ * Collapse the movement rows already attached to the board into one latest
+ * dated observation per theatre. The publication finalizer supplies the
+ * report window end, so rows collected after the issue date are excluded even
+ * when the API returned them in the same response.
+ */
+export function maritimeReportMovementTheatres(
+  board: MaritimeIntelligence,
+): MovementTheatre[] {
+  const source = board.movementSnapshot?.theatres ?? [];
+  const cutoff = board.windowEnd.getTime();
+  const latest = new Map<string, { theatre: MovementTheatre; time: number }>();
+
+  for (const theatre of source) {
+    const time = Date.parse(theatre.dataAsOf);
+    if (!Number.isFinite(time) || (Number.isFinite(cutoff) && time > cutoff)) {
+      continue;
+    }
+    const key = theatre.theatre.trim().toLowerCase();
+    if (!key) continue;
+    const previous = latest.get(key);
+    if (!previous || time > previous.time) {
+      latest.set(key, { theatre, time });
+    }
+  }
+
+  return [...latest.values()]
+    .sort((a, b) => a.theatre.theatre.localeCompare(b.theatre.theatre))
+    .map(({ theatre }) => theatre);
+}
+
+/** Human-readable date shared by the report preview and PDF. */
+export function formatMaritimeMovementDate(dataAsOf: string): string {
+  try {
+    const date = parseISO(dataAsOf);
+    return Number.isNaN(date.getTime())
+      ? dataAsOf
+      : format(date, "dd MMM yyyy");
+  } catch {
+    return dataAsOf;
+  }
+}
+
+/**
+ * Compact, explicitly scoped movement wording for client reports. These are
+ * AIS sample observations, not a traffic total or an incident count.
+ */
+export function formatMaritimeMovementSample(t: MovementTheatre): string {
+  const parts: string[] = [];
+  parts.push(
+    t.totalVessels != null
+      ? `AIS sample: ${t.totalVessels} vessels`
+      : "AIS sample size unavailable",
+  );
+  if (t.inboundCount != null && t.outboundCount != null) {
+    parts.push(`${t.inboundCount} inbound / ${t.outboundCount} outbound`);
+  }
+  if (t.anchoredOrWaitingCount != null) {
+    parts.push(`${t.anchoredOrWaitingCount} anchored or waiting`);
+  }
+  // Historical gap/baseline counters are not denominators of this snapshot.
+  // Comparing them to the current sample produces impossible ratios.
+  return parts.join(" \u00b7 ");
+}
 
 /** The four Polestar View sub-sections rendered on screen, in order. */
 export const MARITIME_POLESTAR_SUBSECTIONS = [
