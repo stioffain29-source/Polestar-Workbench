@@ -2390,6 +2390,23 @@ function titleHaystack(i: RelevanceInput): string {
   return t.toLowerCase();
 }
 
+// C1/C2/C9: investigation / inquiry / commission / "arrested over" a past
+// protest is process, not a live public-order event. Keyword "protest" must
+// not keep these. A street-event companion (clash, tear gas, sit-in, march)
+// still keeps a genuine gathering that happens to name a commission.
+const FP_PROCESS_NOT_EVENT_RE =
+  /\b(?:(?:human\s+rights\s+commission|\bnhrc\b|rights\s+(?:body|commission)|commission\s+of\s+inquiry).{0,80}\b(?:investigation|probe|inquir(?:y|ies)|recommend|findings?|directs?)|(?:investigation|probe|inquir(?:y|ies))\s+(?:into|over|on|against|ordered|opened|launched|opens|orders).{0,80}\b(?:protest|unrest|crackdown|demonstration|gen\s*[- ]?z)|recommends?\s+(?:action|charges?|prosecution|a\s+probe).{0,80}\b(?:protest|crackdown|unrest|gen\s*[- ]?z)|(?:arrested|detained|held|summoned|indicted|booked|charged)\s+over\s+.{0,50}\b(?:protest|crackdown|unrest|gen\s*[- ]?z)|(?:opens?|opened|launches?|launched|orders?|ordered)\s+(?:an?\s+)?(?:investigation|probe|inquiry)\s+(?:into|over|on))\b/i;
+const FP_LIVE_STREET_EVENT_RE =
+  /\b(tear[- ]?gas|water cannon|baton charge|demonstrators|took to the streets|sit[- ]?in|roadblock|blockad|clash(?:es|ed)?|ongoing protest|violence erupts?|riot police|marched through|marching on|crowd(?:s)? gathered|thousands (?:of )?(?:people )?(?:join|rally|protest|march)|workers (?:march|rally|stage)|students (?:rally|march|clash))\b/i;
+
+/** True when the record is legal/accountability process without a live gathering. */
+export function isFlashpointProcessNotEvent(title: string, summary?: string | null): boolean {
+  const text = `${title} ${summary ?? ""}`;
+  if (!FP_PROCESS_NOT_EVENT_RE.test(text)) return false;
+  if (FP_LIVE_STREET_EVENT_RE.test(text)) return false;
+  return true;
+}
+
 export interface RelevanceResult {
   relevant: boolean;
   reason: string;
@@ -2419,6 +2436,9 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
   if (topic === "flashpoint") {
     const t = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
     if (t) return { relevant: false, reason: `slop: flashpoint title noise (/${t.source}/)` };
+    if (isFlashpointProcessNotEvent(i.title ?? "", i.summary)) {
+      return { relevant: false, reason: "slop: investigation/process (not a live public-order event)" };
+    }
     // A headline that is itself an unmistakable public-order event is a genuine
     // flashpoint story even when its BODY shares an ambiguous FLASHPOINT_EXCLUDE
     // token (an anti-"air strike" protest, a disaster-response demonstration).
@@ -2700,6 +2720,11 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     //     FLASHPOINT_EXCLUDE which runs only AFTER the rescue.
     const titleHom = firstMatch(titleHaystack(i), FLASHPOINT_TITLE_HARD_EXCLUDE);
     if (titleHom) return { relevant: false, reason: `excluded: flashpoint homonym in headline (/${titleHom.source}/)` };
+    // Process / investigation / commission aftermath is not an event. Must
+    // run before title-rescue and the protest-keyword keep path (C1/C2/C9).
+    if (isFlashpointProcessNotEvent(i.title ?? "", i.summary)) {
+      return { relevant: false, reason: "excluded: investigation/process (not a live public-order event)" };
+    }
     // Animal-welfare / wildlife-enforcement (rescue, seizure, "<animal> meat"
     // trade crackdown) is a law-enforcement story, not civil unrest — unless a
     // public-gathering signal shows it is a genuine animal-rights protest. Runs

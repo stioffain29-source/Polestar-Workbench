@@ -39,6 +39,7 @@ EDITORIAL_FAIL = [
     (r"\bconfirmed dates in Watch Next\b", "Watch Next treated as a calendar"),
     (r"\bupcoming,\s*date confirmed\b", "Watch Next date-calendar status"),
     (r"\b(?:the )?(?:table|chart) (?:above|below)\b", "file/table narration"),
+    (r"\bincidents listed in the tables above\b", "file/table narration"),
     (r"\bdriven by protest activity\b", "dataset narration"),
     (r"\bsections follow\b", "meta section preview"),
     (r"\bOverall protest posture this week\b", "posture-score explanation"),

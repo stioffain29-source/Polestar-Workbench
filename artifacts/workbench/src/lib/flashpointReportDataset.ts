@@ -22,6 +22,7 @@ import {
 import { isReactionLed } from "@workspace/ingest/severity";
 import {
   FLASHPOINT_VALIDITY_VERSION,
+  isFlashpointProcessNotEvent,
   validateFlashpointSemanticContract,
   type FlashpointSemanticGates,
 } from "@workspace/relevance";
@@ -781,6 +782,7 @@ const SELECTOR_LEGAL_COMMENTARY_ONLY_RE =
 
 /** Rescue weak-operational drops when the row carries a genuine public-order signal. */
 export function hasStrongPublicOrderCue(text: string): boolean {
+  if (isFlashpointProcessNotEvent(text, "")) return false;
   if (LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (
     /\bgen\s*[- ]?z\b/i.test(text) &&
@@ -3261,7 +3263,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
   if (lines.length === 0) {
     const focus = ctx.countryRows.slice(0, 3).map((r) => r.label);
     lines.push(
-      `Review staff routes and site access in ${joinList(focus)} against the incidents listed in the tables above.`,
+      `Review staff routes and site access in ${joinList(focus)} against confirmed reporting this week.`,
     );
   }
   return lines.join("\n\n");

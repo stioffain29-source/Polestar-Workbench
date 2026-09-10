@@ -180,7 +180,7 @@ describe("Fuel Watch consequence and physical-geography gate", () => {
   });
 
   it("bumps the persisted fuel relevance rules for backfill", () => {
-    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-10.1");
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-10.2");
   });
 });
 

@@ -26,15 +26,23 @@ function fp(over: Partial<FlashpointReportIncident>): FlashpointReportIncident {
 }
 
 describe("Flashpoint selector FN recovery (FP-02)", () => {
-  it("hasStrongPublicOrderCue recognises Gen Z protest crackdown rows", () => {
+  it("does not treat rights-body process as a live public-order cue", () => {
     expect(
       hasStrongPublicOrderCue(
-        "Former Nepal PM K P Sharma Oli arrested over Gen Z protest crackdown",
+        "Former cabinet minister arrested over last year's protest crackdown",
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       hasStrongPublicOrderCue(
-        "NHRC recommends action against Oli, Lekhak, Gurung over Gen Z protest deaths",
+        "Rights commission recommends action against officials over protest deaths",
+      ),
+    ).toBe(false);
+  });
+
+  it("recognises a live Gen Z protest crackdown gathering", () => {
+    expect(
+      hasStrongPublicOrderCue(
+        "Police clash with Gen Z protesters after tear gas is fired in the square",
       ),
     ).toBe(true);
   });

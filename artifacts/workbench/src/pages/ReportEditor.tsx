@@ -1435,6 +1435,7 @@ export default function ReportEditor() {
   useEffect(() => {
     if (seededForId.current !== null && seededForId.current !== id) {
       seededForId.current = null;
+      setSeededId(null);
     }
     if (fuelPrefillForId.current !== null && fuelPrefillForId.current !== id) {
       fuelPrefillForId.current = null;
@@ -1875,17 +1876,15 @@ export default function ReportEditor() {
         )
       : null;
 
-  if (isLoading) {
+  const reportDetailsLoading =
+    pendingTopic !== null || !incidentWindowReady || seededId !== report?.id;
+  const loadingTopicLabel =
+    TOPIC_LABELS[pendingTopic ?? report?.topic ?? form.topic] ?? "report";
+
+  if (isLoading || (report && seededId !== report.id)) {
     return (
-      <div
-        className="flex flex-col items-center justify-center gap-3 py-24"
-        role="status"
-        aria-live="polite"
-      >
-        <Loader2 className="w-8 h-8 animate-spin text-accent" />
-        <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground">
-          Loading report
-        </div>
+      <div className="max-w-[1900px] mx-auto">
+        <ReportDetailsLoading topicLabel={loadingTopicLabel} />
       </div>
     );
   }
@@ -1893,10 +1892,6 @@ export default function ReportEditor() {
     return (
       <div className="text-sm text-muted-foreground">Report not found.</div>
     );
-
-  const reportDetailsLoading = pendingTopic !== null || !incidentWindowReady;
-  const loadingTopicLabel =
-    TOPIC_LABELS[pendingTopic ?? form.topic] ?? "report";
 
   const scope = scopeFor(form.topic);
   // The rating a card pull would derive if the analyst leaves the override
@@ -1957,7 +1952,14 @@ export default function ReportEditor() {
             Polestar Insights
           </div>
           <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-0.5">
-            {form.title || "Untitled report"}
+            {reportDetailsLoading && !(form.title || "").trim() ? (
+              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Loading {loadingTopicLabel}
+              </span>
+            ) : (
+              form.title || resolveReportTitle(form.topic, report.title)
+            )}
           </h1>
         </div>
         <div className="flex items-center gap-2">
