@@ -13,6 +13,8 @@ export interface FinalReportEvidenceRecord {
   occurredAt?: string | null;
   themes?: string[];
   supportedClaims?: string[];
+  /** Optional; used for class C5 severity-vs-narrative parity when present. */
+  severity?: string | null;
   marketComparison?: {
     indicator: string;
     currentDate?: string | null;
@@ -50,7 +52,9 @@ export type FinalReportEvidenceAuditCode =
   | "WATCH_NEXT_UNGROUNDED"
   | "BACKEND_CONFIDENCE_LEAK"
   | "RAW_EVIDENCE_TITLE"
-  | "PRIORITY_GEOGRAPHY_CONTRADICTION";
+  | "PRIORITY_GEOGRAPHY_CONTRADICTION"
+  | "RANKING_TIE"
+  | "SEVERITY_PARITY";
 
 export interface FinalReportEvidenceAuditIssue {
   code: FinalReportEvidenceAuditCode;
@@ -84,6 +88,22 @@ const SPECULATIVE_RE =
   /\b(could|may|might|potential|risk of|watch for|if\b|scenario|would)\b/i;
 const BACKEND_RE =
   /\b(model confidence|backend confidence|evidence confidence|confidence score|validation status|unresolved fields?|classifier confidence|model uncertainty|low-confidence evidence|fixed risk picture|current condition set|condition set|records indicate|on file|(?:the )?dataset shows)\b|\bconfidence (?:is|stays|remains) (?:low|moderate|high)\b[^.!?]{0,90}\b(?:unresolved|validation|location|event status|routing outcome)\b/i;
+/** Client-facing engine/file/table talk as a class — not a per-phrase product list. */
+const DATASET_NARRATION_RE =
+  /\b(?:also )?on file\b|\bin the file\b|\b(?:the )?(?:file|dataset) does not show\b|\bthe file does not\b|\b(?:the )?(?:table|chart) (?:above|below)\b|\bnamed locations\s*:|\blocations named in the records\b|\bthin in the records\b/i;
+const EXCLUSIVE_VOLUME_RE =
+  /\b(most affected|heaviest volume|leads on volume|volume leader)\b/i;
+const VOLUME_TIE_LANGUAGE_RE =
+  /\b(tied|tie|share[s]? the (?:heaviest volume|lead)|joint(?:ly)?|equally|no (?:single |clear )?volume leader)\b/i;
+const MOST_SERIOUS_RE = /\bmost serious\b/i;
+const SEV_RANK: Record<string, number> = {
+  insignificant: 0,
+  low: 1,
+  moderate: 2,
+  medium: 2,
+  high: 3,
+  extreme: 4,
+};
 const PERIOD_DISCLAIMER_RE =
   /\b(?:not|rather than|cannot|does not|isn't|is not)\b[^.!?]{0,100}\b(?:evidence|indicat(?:e|ion)|direction|movement|move)\b[^.!?]{0,50}\b(?:within|for|in) (?:this|the) reporting period\b|\bcontext rather than (?:a )?reporting-period direction\b/i;
 const PRIORITY_RE =
@@ -198,8 +218,8 @@ export function auditFinalReportEvidence(
     if (/\bthe confirmed change\b/i.test(text)) {
       issues.push({ code: "VAGUE_CHANGE", section, message: 'Name the development instead of saying "the confirmed change".' });
     }
-    if (BACKEND_RE.test(text)) {
-      issues.push({ code: "BACKEND_CONFIDENCE_LEAK", section, message: "Internal model, validation or evidence-confidence state reached client prose." });
+    if (BACKEND_RE.test(text) || DATASET_NARRATION_RE.test(text)) {
+      issues.push({ code: "BACKEND_CONFIDENCE_LEAK", section, message: "Internal model, file, table or evidence-confidence state reached client prose." });
     }
     for (const record of input.evidence) {
       if (BAD_TITLE_RE.test(record.title) && titleFragmentAppears(text, record.title)) {
@@ -255,6 +275,72 @@ export function auditFinalReportEvidence(
         const explicitlyValidated = typedReferences.some((reference) => referenceGrounds(item, reference));
         if (!explicitlyValidated) {
           issues.push({ code: "WATCH_NEXT_UNGROUNDED", section, message: `Watch item introduces a country or theme absent from evidence and validated indicators: "${item.trim().slice(0, 150)}"` });
+        }
+      }
+    }
+  }
+
+  const countryCounts = new Map<string, number>();
+  for (const record of currentEvidence) {
+    if (record.marketComparison) continue;
+    const country = record.country?.trim();
+    if (!country) continue;
+    countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
+  }
+  const maxCountryCount = Math.max(0, ...countryCounts.values());
+  const tiedCountries = [...countryCounts.entries()]
+    .filter(([, count]) => count === maxCountryCount && maxCountryCount > 0)
+    .map(([country]) => country);
+  if (tiedCountries.length > 1) {
+    for (const [section, raw] of Object.entries(input.sections)) {
+      const text = (raw ?? "").trim();
+      if (!text) continue;
+      for (const sentence of text.split(SENTENCE_RE).filter(Boolean)) {
+        if (!EXCLUSIVE_VOLUME_RE.test(sentence) || VOLUME_TIE_LANGUAGE_RE.test(sentence)) continue;
+        const named = tiedCountries.filter((country) =>
+          new RegExp(`\\b${country.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence),
+        );
+        if (named.length === 1) {
+          issues.push({
+            code: "RANKING_TIE",
+            section,
+            message: `Exclusive volume ranking names ${named[0]} while ${tiedCountries.join(" and ")} share the top count.`,
+          });
+        }
+      }
+    }
+  }
+
+  const rankedEvidence = currentEvidence.filter((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] != null);
+  if (rankedEvidence.length > 0) {
+    const maxSev = Math.max(
+      ...rankedEvidence.map((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] ?? 0),
+    );
+    for (const [section, raw] of Object.entries(input.sections)) {
+      const text = (raw ?? "").trim();
+      if (!text) continue;
+      for (const sentence of text.split(SENTENCE_RE).filter(Boolean)) {
+        if (!MOST_SERIOUS_RE.test(sentence)) continue;
+        const geography = geographyIn(sentence, rankedEvidence);
+        if (!geography) continue;
+        const localMax = Math.max(
+          0,
+          ...rankedEvidence
+            .filter((record) =>
+              [record.country, record.location].some(
+                (value) =>
+                  value &&
+                  new RegExp(`\\b${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(geography),
+              ),
+            )
+            .map((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] ?? 0),
+        );
+        if (localMax > 0 && localMax < maxSev) {
+          issues.push({
+            code: "SEVERITY_PARITY",
+            section,
+            message: `"Most serious" names ${geography} below the canonical maximum severity.`,
+          });
         }
       }
     }

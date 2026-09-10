@@ -9,9 +9,6 @@ import {
 import { type TopicAiProse } from "@/lib/topicProseResolution";
 import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
-  buildFlashpointReportDataset,
-  resolveFlashpointRenderedModel,
-  assertFlashpointRenderedModelValid,
   type FlashpointReportIncident,
   type KpiCard,
   type BarRow,
@@ -19,6 +16,9 @@ import {
   type FlashpointRenderedModel,
   FLASHPOINT_SEV_LABEL,
 } from "@/lib/flashpointReportDataset";
+import {
+  finalizeFlashpointPublication,
+} from "@/lib/flashpointPublication";
 import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
@@ -376,20 +376,65 @@ export default function FlashpointReportPreview({
   const resolvedTitle = resolveReportTitle(topic, report.title);
   const coverUrl = TOPIC_COVER_URLS[topic];
 
-  const model = useMemo(
+  const bundle = useMemo(
     () => {
-      if (renderedModel) return renderedModel;
-      const built = buildFlashpointReportDataset(incidents, topic, issueDate);
-      return resolveFlashpointRenderedModel({
-        dataset: built,
+      if (renderedModel) {
+        return finalizeFlashpointPublication({
+          incidents,
+          topic,
+          issueDate,
+          report,
+          ai: aiProse,
+          renderedModel,
+        });
+      }
+      return finalizeFlashpointPublication({
+        incidents,
+        topic,
+        issueDate,
         report,
         ai: aiProse,
       });
     },
     [incidents, topic, issueDate, report, aiProse, renderedModel],
   );
+  const model = bundle.model;
   const ds = model.dataset;
-  assertFlashpointRenderedModelValid(model);
+  if (bundle.auditIssues.length > 0) {
+    return (
+      <div
+        className="print-report bg-white"
+        style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
+        data-flashpoint-validation-blocked="true"
+      >
+        <div style={{ border: "2px solid #A33232", padding: 24 }}>
+          <div
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 700,
+              fontSize: 20,
+              color: "#A33232",
+              marginBottom: 12,
+            }}
+          >
+            Flashpoint evidence audit failed — export blocked
+          </div>
+          <p style={{ fontSize: 13, marginBottom: 16 }}>
+            Final client prose failed the shared report architecture gate.
+            Named cities are not the work — the same class must fail closed on the next cycle.
+          </p>
+          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
+            {bundle.auditIssues.map((issue, i) => (
+              <li key={i}>
+                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
+                [{issue.code}] {issue.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   // Mirror the PDF: the Executive Summary renders the data-driven
   // ds.autoExecutiveSummary unless the analyst has written a genuine

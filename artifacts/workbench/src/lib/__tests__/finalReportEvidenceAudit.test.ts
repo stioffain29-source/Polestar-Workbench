@@ -136,4 +136,45 @@ describe("shared final report evidence audit", () => {
     ).map((x) => x.code);
     expect(codes).toContain("PRIORITY_GEOGRAPHY_CONTRADICTION");
   });
+
+  it("blocks file/table narration as a language class, not a named-story list", () => {
+    const codes = auditFinalReportEvidence(
+      input({
+        forecastRead: "Upcoming signals are listed in the table above. Named locations: Port Alpha. The file does not show a second corridor.",
+      }),
+    ).map((x) => x.code);
+    expect(codes).toContain("BACKEND_CONFIDENCE_LEAK");
+  });
+
+  it("blocks exclusive volume ranking when country counts tie", () => {
+    const codes = auditFinalReportEvidence(
+      input(
+        { regionalCountryRead: "Freedonia has the heaviest volume this week." },
+        {
+          evidence: [
+            { id: 1, title: "Depot outage in Port Alpha", country: "Freedonia", location: "Port Alpha", occurredAt: "2026-08-03" },
+            { id: 2, title: "Second depot outage in Port Alpha", country: "Freedonia", location: "Port Alpha", occurredAt: "2026-08-03" },
+            { id: 3, title: "Depot outage in Harbourtown", country: "Erewhon", location: "Harbourtown", occurredAt: "2026-08-04" },
+            { id: 4, title: "Second depot outage in Harbourtown", country: "Erewhon", location: "Harbourtown", occurredAt: "2026-08-04" },
+          ],
+        },
+      ),
+    ).map((x) => x.code);
+    expect(codes).toContain("RANKING_TIE");
+  });
+
+  it("blocks a most-serious claim that names a lower-severity geography", () => {
+    const codes = auditFinalReportEvidence(
+      input(
+        { civilUnrestRead: "The most serious civil-unrest event was a march in Port Alpha." },
+        {
+          evidence: [
+            { id: 1, title: "March in Port Alpha", country: "Freedonia", location: "Port Alpha", severity: "moderate", occurredAt: "2026-08-03" },
+            { id: 2, title: "Disorder in Harbourtown", country: "Erewhon", location: "Harbourtown", severity: "high", occurredAt: "2026-08-04" },
+          ],
+        },
+      ),
+    ).map((x) => x.code);
+    expect(codes).toContain("SEVERITY_PARITY");
+  });
 });

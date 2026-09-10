@@ -277,6 +277,21 @@ describe("flashpoint report consistency", () => {
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 
+  test("tied country counts do not pick a single most-affected winner", () => {
+    const rows = [
+      inc({ title: "Workers march in Seoul over wages", country: "South Korea", location: "Seoul" }),
+      inc({ title: "Students rally in Busan over fees", country: "South Korea", location: "Busan" }),
+      inc({ title: "Traders protest in Dhaka over tax rules", country: "Bangladesh", location: "Dhaka" }),
+      inc({ title: "Garment workers march in Chittagong over arrears", country: "Bangladesh", location: "Chittagong" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    const card = ds.fastFacts.find((k) => k.label === "Most Affected Country")?.value ?? "";
+    expect(card).toMatch(/South Korea/);
+    expect(card).toMatch(/Bangladesh/);
+    expect(ds.autoExecutiveSummary + ds.regionalCountryRead).toMatch(/share the heaviest volume|share the lead on volume|clustered in/);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
   test("Polestar View gives actionable movement guidance without posture-score label", () => {
     const rows = [
       inc({ title: "PTI supporters clash with police outside Adiala jail", severity: "high", country: "Pakistan", location: "Rawalpindi" }),
@@ -708,7 +723,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     expect(ds.forecastFuture).toHaveLength(0);
-    expect(ds.forecastRead).toMatch(/Unconfirmed mobilisation signals are listed in Watch Next/i);
+    expect(ds.forecastRead).toMatch(/Unconfirmed mobilisation signals appear in Watch Next/i);
     expect(ds.forecastRead).not.toMatch(/track scheduled events/i);
     expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
   });

@@ -1731,6 +1731,27 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
+/** Countries sharing the top incident count. Chart order stays count/significance; prose must not crown one. */
+function volumeLeaders(countryRows: BarRow[]): BarRow[] {
+  if (countryRows.length === 0) return [];
+  const max = countryRows[0].value;
+  return countryRows.filter((r) => r.value === max);
+}
+
+function volumeLeadPhrase(countryRows: BarRow[], exclusiveVerb: "has" | "leads"): string {
+  const leaders = volumeLeaders(countryRows);
+  if (leaders.length === 0) return "";
+  const names = joinList(leaders.map((r) => r.label));
+  if (leaders.length > 1) {
+    return exclusiveVerb === "leads"
+      ? `${names} share the lead on volume`
+      : `${names} share the heaviest volume`;
+  }
+  return exclusiveVerb === "leads"
+    ? `${names} leads on volume`
+    : `${names} has the heaviest volume`;
+}
+
 // --- Dataset builder -------------------------------------------------------
 export type FlashpointRejectStage =
   | "semantic-validity"
@@ -2088,8 +2109,11 @@ export function buildFlashpointReportDataset(
       (countrySignificance.get(b) ?? 0) - (countrySignificance.get(a) ?? 0) ||
       a.localeCompare(b),
   );
-  const topCountry = rankedCountries[0] ?? "—";
-  const topCountryN = countryCount.get(topCountry) ?? 0;
+  const topCountryLeaders = rankedCountries.filter(
+    (country) => (countryCount.get(country) ?? 0) === (countryCount.get(rankedCountries[0] ?? "") ?? 0),
+  );
+  const topCountry = topCountryLeaders.length > 0 ? joinList(topCountryLeaders) : "—";
+  const topCountryN = countryCount.get(rankedCountries[0] ?? "") ?? 0;
   const issueCount = new Map<string, number>();
   for (const r of enriched) issueCount.set(r.issue, (issueCount.get(r.issue) ?? 0) + 1);
   let topIssue = "—", topIssueN = 0;
@@ -2131,7 +2155,12 @@ export function buildFlashpointReportDataset(
     {
       label: "Most Affected Country",
       value: topCountry,
-      note: topCountryN > 0 ? `${topCountryN} incident${topCountryN === 1 ? "" : "s"}` : undefined,
+      note:
+        topCountryN > 0
+          ? topCountryLeaders.length > 1
+            ? `${topCountryN} incidents each (tied)`
+            : `${topCountryN} incident${topCountryN === 1 ? "" : "s"}`
+          : undefined,
     },
     { label: "Latest Incident", value: latest },
   ];
@@ -2560,7 +2589,7 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (rows.length === 0) {
     return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. A quiet stretch for civil unrest alongside continuing protest activity usually means the authorities have held back from mass arrests or curfew orders — useful, but it can reverse within days if a protest crosses a policy line.\n\nKeep tracking police statements, local government orders, internet-shutdown notices and any move to call in the military. These tend to come ahead of curfews and visible street-level enforcement.`;
   }
-  const lead = pickLead(rows, windowEnd);
+  const lead = topSeverityIncident(rows);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   // Posture claims scan the WHOLE usable file, not just the unrest bucket —
   // an arrest reported on an activism-bucketed row still falsifies "no
@@ -2574,8 +2603,12 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (hasCrackdown) postureBits.push("police have already used force or made arrests at demonstrations");
   if (hasRiotClash) postureBits.push("street-level disorder is on the record");
   const containedNote = lead ? containedVenueNote(lead) : null;
+  const unrestTie = topSeverityTieCount(rows, lead);
+  const sevLabel = lead ? (SEV_LABEL[sevKey(lead.severity)] ?? lead.severity) : "";
   const headline = lead
-    ? `The most serious civil-unrest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+    ? unrestTie > 1
+      ? `The most serious civil-unrest events across ${windowLabel} were ${unrestTie} incidents rated ${sevLabel}, including ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+      : `The most serious civil-unrest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
     : `Civil unrest across ${windowLabel} was limited, with no single standout event.`;
   const postureLine = postureBits.length > 0
     ? `The police response is the main thing to watch: ${joinList(postureBits)}.`
@@ -2606,6 +2639,8 @@ function buildForecastRead(opts: {
   const forecastLeadCountry = (opts.forecastLeadCountry ?? "").trim();
   const forecastLeadSignal = (opts.forecastLeadSignal ?? "").trim();
   const lead = countryRows[0];
+  const volumeLeaderRows = volumeLeaders(countryRows);
+  const volumeHas = volumeLeadPhrase(countryRows, "has");
   const total = activismRows.length + unrestRows.length;
   // The structured forward-looking table is rendered above this prose
   // by the exporter when at least one credible future-dated record is
@@ -2615,15 +2650,15 @@ function buildForecastRead(opts: {
         const rows = opts.forecastRows ?? [];
         const datedN = rows.filter((r) => !!r.date).length;
         if (datedN > 0 && datedN === rows.length) {
-          return `Confirmed upcoming events with stated dates are listed in the table above and are the first dates to plan around. The outlook below builds on that schedule.`;
+          return `Confirmed upcoming events with stated dates are the first dates to plan around. The outlook below builds on that schedule.`;
         }
         if (datedN > 0) {
-          return `Upcoming signals are listed in the table above. Rows with a date are confirmed schedule items; rows marked "—" have no stated date yet. The outlook below builds on that mix.`;
+          return `Upcoming signals mix confirmed schedule items and undated monitor items. The outlook below builds on that mix.`;
         }
-        return `Upcoming signals without confirmed dates are listed in the table above. Treat them as items to monitor rather than fixed calendar dates. The outlook below builds on those signals.`;
+        return `Upcoming signals without confirmed dates should be treated as items to monitor rather than fixed calendar dates. The outlook below builds on those signals.`;
       })()
     : hasUnconfirmedSignals
-      ? `No confirmed upcoming dates appear in the forward-looking table. Unconfirmed mobilisation signals are listed in Watch Next below — treat those as monitor items, not fixed calendar dates. The outlook below builds on current activity only.`
+      ? `No confirmed upcoming dates have been reported. Unconfirmed mobilisation signals appear in Watch Next — treat those as monitor items, not fixed calendar dates. The outlook below builds on current activity only.`
       : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of likely direction from current activity, not a list of scheduled events.`;
   const activismShare = total > 0 ? activismRows.length / total : 0;
   const unrestShare = total > 0 ? unrestRows.length / total : 0;
@@ -2655,7 +2690,10 @@ function buildForecastRead(opts: {
   // elevated (Moderate or higher). A "highest" that is still Low is not
   // an escalation and must not be dressed up as one.
   const sevOutranksLead =
-    !!lead && !!sevInc && !!sevCountry && sevCountry !== lead.label &&
+    volumeLeaderRows.length > 0 &&
+    !!sevInc &&
+    !!sevCountry &&
+    !volumeLeaderRows.some((row) => row.label === sevCountry) &&
     (SEV_RANK[sevKey(sevInc.severity)] ?? 0) >= 3;
   // The forward-looking TABLE is ranked by confirmed future-dated
   // signals, so its lead country can differ from the volume chart's
@@ -2663,7 +2701,9 @@ function buildForecastRead(opts: {
   // a client ("why does the forecast highlight X when the chart leads
   // with Y?"), so reconcile it explicitly whenever it occurs.
   const tableLeadDiffers =
-    !!lead && !!forecastLeadCountry && forecastLeadCountry !== lead.label;
+    volumeLeaderRows.length > 0 &&
+    !!forecastLeadCountry &&
+    !volumeLeaderRows.some((row) => row.label === forecastLeadCountry);
   if (lead && sevOutranksLead) {
     // Volume lead and an elevated severity lead are different countries.
     // Only tie the severity lead to the forward-looking table when the
@@ -2678,24 +2718,24 @@ function buildForecastRead(opts: {
     // be called "the most serious" (owner-flagged defect).
     const tieN = opts.topSeverityTie ?? topSeverityTieCount(allRows, sevInc);
     const seriousClause = tieN > 1
-      ? `but the most serious incidents — ${tieN} rated ${sevHs.label} — include ${shortSignalLabel(sevInc)} in ${sevCountry}${tableClause}`
+      ? `but several incidents share the top ${sevHs.label} rating, including ${shortSignalLabel(sevInc)} in ${sevCountry}${tableClause}`
       : `but the most serious single incident was in ${sevCountry}: ${shortSignalLabel(sevInc)}, rated ${sevHs.label}${tableClause}`;
     const watchClause = tieN > 1
       ? `watch the ${sevHs.label}-rated incidents, starting with ${sevCountry}, for how they develop`
       : `watch ${sevCountry} for how that incident develops`;
     lines.push(
-      `${lead.label} had the most events this week, ${seriousClause}. Expect frequent, mostly lower-level disruption in ${lead.label}, and ${watchClause}.`,
+      `${volumeHas} this week, ${seriousClause}. Expect frequent, mostly lower-level disruption in those markets, and ${watchClause}.`,
     );
   } else if (lead && tableLeadDiffers) {
-    // Volume leader and forecast-table leader differ, but on count not
-    // severity. Explain the table is a scheduling signal, not a ranking.
     const sig = forecastLeadSignal ? ` (${forecastLeadSignal})` : "";
     lines.push(
-      `The upcoming-events table and the country breakdown point in slightly different directions. ${lead.label} shows the most activity in the window. The table highlights ${forecastLeadCountry}${sig} only because it has the clearest confirmed upcoming event — a fixed calendar date to plan around, not a sign that ${forecastLeadCountry} outweighs ${lead.label} on volume or severity.`,
+      `${volumeHas} in the window. ${forecastLeadCountry}${sig} is highlighted only because it has the clearest confirmed upcoming event — a fixed calendar date to plan around, not a sign that ${forecastLeadCountry} outweighs ${volumeLeaderRows.map((row) => row.label).join(" / ")} on volume or severity.`,
     );
   } else if (lead) {
     lines.push(
-      `On the current record, ${lead.label} carries the most protest and civil-unrest activity and is the country most likely to see it continue.`,
+      volumeLeaderRows.length > 1
+        ? `On the current record, ${joinList(volumeLeaderRows.map((row) => row.label))} share the heaviest volume and are the markets most likely to see activity continue.`
+        : `On the current record, ${lead.label} carries the most protest and civil-unrest activity and is the country most likely to see it continue.`,
     );
   } else {
     lines.push(
@@ -2788,11 +2828,7 @@ function buildRegionalCountryRead(opts: {
     return `Few events could be tied to a specific country this week, even where there is clearly activity happening. That usually reflects gaps in reporting rather than a real absence of street-level activity.`;
   }
   const lead = countryRows[0];
-  // APAC sub-region spread leads. The reader sees the regional
-  // footprint first, then the country-level concentration. This is
-  // deliberately different from a "Pakistan dominates" lede, which
-  // under-reads the cycle even when Pakistan is the largest single
-  // bucket.
+  const volumePhrase = volumeLeadPhrase(countryRows, "has");
   const spread = subregionSpread(countryRows);
   // Name each region once and each leading country once. The old form
   // repeated "(led by X)" after every region, which read as boilerplate
@@ -2801,9 +2837,12 @@ function buildRegionalCountryRead(opts: {
   // not one leader per sub-region — an owner-flagged defect had Nepal and
   // South Korea ranked above the Philippines in the chart while the headline
   // named Bangladesh, Japan and the Philippines as "busiest elsewhere".
-  const otherBusy = countryRows.slice(1, 4).map((r) => r.label);
+  const otherBusy = countryRows
+    .filter((r) => r.value < (countryRows[0]?.value ?? 0))
+    .slice(0, 3)
+    .map((r) => r.label);
   const headline = spread.regions.length >= 2
-    ? `Protest pressure runs across ${joinList(spread.regions)}. ${lead.label} has the heaviest volume${otherBusy.length > 0 ? `, with ${joinList(otherBusy)} also reporting multiple events` : ""}. Plan market-by-market — the file does not show one coordinated regional campaign.`
+    ? `Protest pressure runs across ${joinList(spread.regions)}. ${volumePhrase}${otherBusy.length > 0 ? `, with ${joinList(otherBusy)} also reporting multiple events` : ""}. Plan market-by-market — there is no evidence of one coordinated regional campaign.`
     : `Activity clusters in ${lead.label}; other APAC markets were quieter in this reporting window.`;
   const byCountry = new Map<string, EnrichedIncident[]>();
   for (const r of enriched) {
@@ -2832,7 +2871,7 @@ function buildRegionalCountryRead(opts: {
   const operationalCountryRead = (rows: EnrichedIncident[], country: string): string => {
     const ranked = sortBySignificance(rows);
     const leadRow = ranked[0];
-    if (!leadRow) return "Street-level detail is thin in the records.";
+    if (!leadRow) return "Street-level detail is thin.";
     const label = shortSignalLabel(leadRow);
     const city = extractCityLabel(leadRow) || (leadRow.location ?? "").trim();
     const where = city ? ` in ${city}` : "";
@@ -2842,12 +2881,12 @@ function buildRegionalCountryRead(opts: {
         ? "Allow for same-day transport and site-access disruption."
         : sev >= 3
           ? "Expect local traffic and venue friction around confirmed gatherings."
-          : "Monitor for escalation; no major disruption signal in the records yet.";
+          : "Monitor for escalation; no major disruption signal yet.";
     if (ranked.length === 1) {
       return `Lead item: ${label}${where}. ${impact}`;
     }
     const second = shortSignalLabel(ranked[1]);
-    return `Lead item: ${label}${where}; ${second} also on file. ${impact}`;
+    return `Lead item: ${label}${where}; ${second} also reported. ${impact}`;
   };
   const topThree = countryRows.slice(0, 3);
   const countryParas: string[] = [];
@@ -2857,14 +2896,14 @@ function buildRegionalCountryRead(opts: {
     const n = rows.length;
     const countLabel = `${n} incident${n === 1 ? "" : "s"}`;
     const loci = lociFor(rows, cr.label);
-    const lociClause = loci ? ` Named locations: ${loci}.` : "";
+    const lociClause = loci ? ` Locations include ${loci}.` : "";
     countryParas.push(
       `${cr.label} (${countLabel}): ${operationalCountryRead(rows, cr.label)}${lociClause}`,
     );
   });
   const reach = countryRows.length > 3
-    ? `Other APAC countries saw less activity this week and appear in the country chart above.`
-    : `Full breakdown in the chart above.`;
+    ? `Other APAC countries saw less activity this week.`
+    : ``;
   // Coverage callouts. The product needs to be visibly checking the
   // recurring Asia-Pacific protest environments — Australia, Papua /
   // PNG / Indonesian Papua, Philippines / Manila, Japan / Tokyo,
@@ -2900,7 +2939,7 @@ function buildRegionalCountryRead(opts: {
   // logic stays in place for any future internal use.
   void present;
   void absent;
-  const blocks = [headline, ...countryParas, reach];
+  const blocks = [headline, ...countryParas, reach].filter((block) => block.trim().length > 0);
   return blocks.join("\n\n");
 }
 
@@ -3464,6 +3503,9 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
     return `This briefing covers activism, protest and civil unrest across APAC for ${windowLabel}. Little was reported this week — maintain standing monitoring rather than assuming risk has eased.`;
   }
   const lead = ctx.countryRows[0];
+  const volumeLeadersRows = volumeLeaders(ctx.countryRows);
+  const volumeHas = volumeLeadPhrase(ctx.countryRows, "has");
+  const volumeLeads = volumeLeadPhrase(ctx.countryRows, "leads");
   const spread = subregionSpread(ctx.countryRows);
   const allRows = [...ctx.activismRows, ...ctx.unrestRows];
   const hasEnforcement = hasEnforcementSignal(allRows);
@@ -3474,21 +3516,26 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const tieN = topSeverityTieCount(ctx.enriched, sevInc);
 
   let opener: string;
-  if (lead && sevInc && sevCountry && sevElevated && sevCountry !== lead.label) {
+  const severityOutsideVolumeLead =
+    Boolean(lead && sevInc && sevCountry && sevElevated) &&
+    !volumeLeadersRows.some((row) => row.label === sevCountry);
+  if (severityOutsideVolumeLead) {
     opener = tieN > 1
-      ? `${lead.label} leads on volume, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${shortSignalLabel(sevInc)} in ${sevCountry}.`
-      : `${lead.label} leads on volume, but the sharper operational concern is ${shortSignalLabel(sevInc)} in ${sevCountry} (${hs.label}).`;
+      ? `${volumeLeads}, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${shortSignalLabel(sevInc)} in ${sevCountry}.`
+      : `${volumeLeads}, but the sharper operational concern is ${shortSignalLabel(sevInc)} in ${sevCountry} (${hs.label}).`;
   } else if (lead && spread.regions.length >= 2) {
-    opener = `Protest pressure spans ${joinList(spread.regions)}; ${lead.label} has the heaviest volume.`;
+    opener = `Protest pressure spans ${joinList(spread.regions)}; ${volumeHas}.`;
   } else if (lead) {
-    opener = `Activity clusters in ${lead.label} this week.`;
+    opener = volumeLeadersRows.length > 1
+      ? `Activity this week is clustered in ${joinList(volumeLeadersRows.map((row) => row.label))}.`
+      : `Activity clusters in ${lead.label} this week.`;
   } else {
     opener = `Protest activity is scattered across APAC with no clear volume leader.`;
   }
 
   const bottom = hasEnforcement
     ? `Police action is already affecting some gatherings — plan for same-day movement disruption rather than a quiet week.`
-    : `No broad crackdown pattern shows in the file; disruption risk is mainly from localised or scheduled gatherings.`;
+    : `No broad crackdown pattern is evident; disruption risk is mainly from localised or scheduled gatherings.`;
 
   return `${opener}\n\n${bottom}`;
 }
@@ -3547,6 +3594,11 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
   /\bpeak single-incident rating\b/i,
   /\bTreat that as a single reporting period\b/i,
   /\bTreat that as a feature of a quiet week\b/i,
+  /\b(?:the )?(?:table|chart) (?:above|below)\b/i,
+  /\bnamed locations\s*:/i,
+  /\b(?:the )?file does not show\b/i,
+  /\balso on file\b/i,
+  /\bin the file\b/i,
 ];
 
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
@@ -3707,9 +3759,10 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
     );
   }
 
-  // 1b. Most Affected Country must match the volume leader on the chart.
+  // 1b. Most Affected Country must match the volume leader(s) on the chart.
   const countryCard = ds.fastFacts.find((k) => k.label === "Most Affected Country");
-  const chartLead = ds.countryRows[0]?.label ?? "—";
+  const chartLeaders = volumeLeaders(ds.countryRows);
+  const chartLead = chartLeaders.length > 0 ? joinList(chartLeaders.map((r) => r.label)) : "—";
   if (!countryCard || countryCard.value !== chartLead) {
     errors.push(
       `Fast Facts country "${countryCard?.value ?? "missing"}" != chart leader "${chartLead}"`,
@@ -3727,7 +3780,7 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
       .split("\n\n")
       .find((p) => p.startsWith(`${country} —`));
     if (!para) continue;
-    const m = para.match(/(?:Locations named in the records|Named locations): (.+?)\.$/);
+    const m = para.match(/(?:Locations named in the records|Named locations|Locations include): (.+?)\.$/);
     if (!m) continue;
     const listed = m[1].split(/,\s*|\s+and\s+/).map((s) => s.trim()).filter(Boolean);
     const bad = listed.filter((loc) => locationForeignToCountry(loc, country));

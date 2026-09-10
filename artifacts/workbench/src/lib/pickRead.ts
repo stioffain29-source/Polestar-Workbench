@@ -23,8 +23,11 @@ export function looksLikeAutoFlashpointRead(text: string): boolean {
     /^Little riot, clash, crackdown, curfew or security-force activity was reported across/m.test(t) ||
     /^Civil unrest across .+ was limited/m.test(t) ||
     /^Confirmed upcoming events with stated dates are listed in the table above/m.test(t) ||
+    /^Confirmed upcoming events with stated dates are the first dates to plan around/m.test(t) ||
     /^Upcoming signals are listed in the table above/m.test(t) ||
+    /^Upcoming signals mix confirmed schedule items/m.test(t) ||
     /^Upcoming signals without confirmed dates are listed in the table above/m.test(t) ||
+    /^Upcoming signals without confirmed dates should be treated/m.test(t) ||
     /^No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported/m.test(t) ||
     /^The near-term outlook is for continued quiet/m.test(t) ||
     /This outlook is based on one reporting period and on confirmed announcements only/m.test(t) ||

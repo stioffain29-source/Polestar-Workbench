@@ -42,15 +42,16 @@ import {
 } from "./topicSectionOverrides";
 import { type TopicAiProse } from "./topicProseResolution";
 import {
-  buildFlashpointReportDataset,
-  resolveFlashpointRenderedModel,
-  assertFlashpointRenderedModelValid,
   type FlashpointReportIncident,
   type EnrichedIncident,
   type BarRow,
   type ForecastFutureRow,
   type FlashpointRenderedModel,
 } from "./flashpointReportDataset";
+import {
+  finalizeFlashpointPublication,
+  assertFlashpointPublication,
+} from "./flashpointPublication";
 
 // Flashpoint PDF. Section order (per final spec):
 //   Cover -> Executive Summary -> Fast Facts ->
@@ -578,13 +579,17 @@ export async function exportFlashpointReportPdf(
     /* keep */
   }
 
-  const model = renderedModel ?? resolveFlashpointRenderedModel({
-    dataset: buildFlashpointReportDataset(incidents, data.topic, data.issueDate),
+  const bundle = finalizeFlashpointPublication({
+    incidents,
+    topic: data.topic,
+    issueDate: data.issueDate,
     report: data,
     ai: aiProse,
+    renderedModel,
   });
+  assertFlashpointPublication(bundle);
+  const model = bundle.model;
   const ds = model.dataset;
-  assertFlashpointRenderedModelValid(model);
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
   await ensureRobotoLoaded(ctx.pdf);
