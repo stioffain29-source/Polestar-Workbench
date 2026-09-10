@@ -194,7 +194,9 @@ export function shortSignalLabel(r: UpcomingSignalInput): string {
   if (/\b(metro bus|salaries|salary|pay|wages?|unpaid)\b/.test(text)) return withCity("Sectoral pay protest by transport / public-sector staff");
   if (/\b(student union|student body|students?)\b.{0,40}\b(protest|march|rally|walkout|strike)\b/.test(text)) return withCity("Student-body mobilisation");
   if (/\b(teacher|faculty|vc|university|campus)\b/.test(text)) return withCity("Faculty / campus protest");
-  if (/\b(dowry|kin|family|relatives).*(protest|sit|demand)|protest.*(family|kin)/.test(text)) return withCity("Family-led sit-in at official premises");
+  if (/\b(dowry|kin|famil(?:y|ies)|relatives).{0,50}\b(sit[- ]?in|sit in)\b/.test(text)) {
+    return withCity("Family-led sit-in at official premises");
+  }
   if (/\b(petroleum|fuel|levy|tariff|tax|price)\b/.test(text)) return withCity("Fuel / levy political challenge");
   if (/\bblockade|roadblock|highway|motorway|sit[- ]?in\b/.test(text)) return withCity("Road blockade / sit-in");
   if (

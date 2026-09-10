@@ -1069,15 +1069,11 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   if (TOURISM_DEMO_RE.test(text)) return true;
   if (TOURISM_POLICY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (ADMIN_DISCIPLINE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
-  if (
-    COMMEMORATION_ANNOUNCE_RE.test(text) &&
-    !LIVE_PUBLIC_ORDER_RE.test(text) &&
-    !hasStrongPublicOrderCue(text)
-  ) {
-    return true;
-  }
+  // Cycle keywords (protest, Gen Z, rally) must not rescue a calendar,
+  // inquiry or legal-aftermath row. Only an evidenced live gathering does.
+  if (COMMEMORATION_ANNOUNCE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   if (RETROSPECTIVE_UNREST_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
-  if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   const editorialTitle = titleWithoutSource(r.title ?? "");
   if (
     (MULTI_STORY_BRIEF_RE.test(editorialTitle) || /\bprotest in ceuta\b/i.test(editorialTitle)) &&
@@ -1124,12 +1120,12 @@ function isWeakOperational(r: FlashpointReportIncident): boolean {
   // indictments) the classifier still keeps in civil-unrest because
   // of "rioters" / "courthouse" vocabulary — drop unless live public
   // order is present.
-  if (COURT_VERDICT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (COURT_VERDICT_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Retrospective accountability / legal-aftermath about a PAST event
   // (rights-body charge recommendations, ex-officials arrested over an
   // old crackdown, probes, death-toll-report disputes). Drop unless the
   // same record describes a current live public-order event.
-  if (RETRO_ACCOUNTABILITY_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
+  if (RETRO_ACCOUNTABILITY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
   // Anticipatory / negated non-events ("government requests opposition not
   // to stage protests") — a request, not a street event. Drop unless the
   // protest actually went ahead (live public-order hook present).
@@ -1785,6 +1781,16 @@ function uniquePlaces(
     if (seen.length >= cap) break;
   }
   return seen;
+}
+
+/** Client name for a table lead: the same headline the table shows. */
+function tableLeadPhrase(r: { title?: string | null; summary?: string | null; location?: string | null; country?: string | null }): string {
+  const title = (r.title ?? "").replace(/\s+/g, " ").trim();
+  return title || shortSignalLabel(r);
+}
+
+function signalKey(label: string): string {
+  return label.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 /** Countries sharing the top incident count. Chart order stays count/significance; prose must not crown one. */
@@ -2605,7 +2611,7 @@ function buildActivismRead(
   if (rows.length === 0) {
     return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
   }
-  const lead = pickLead(rows, windowEnd, { activism: true }) ?? topSeverityIncident(rows);
+  const lead = rows[0];
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const political = rows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
   const sectoral = rows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|wage|salary|pay|metro bus|pension)\b/i.test(text(r)));
@@ -2632,7 +2638,7 @@ function buildActivismRead(
         const reaction = lead && isReactionLed(lead.title ?? "")
           ? " That rating reflects the underlying incident being protested rather than disruption from the protest itself."
           : "";
-        return `The main protest event across ${windowLabel} was ${shortSignalLabel(lead)}${where ? ` in ${where}` : ""}, rated ${label} severity.${reaction}${detail}`;
+        return `The main protest event across ${windowLabel} was ${tableLeadPhrase(lead)}${where ? ` in ${where}` : ""}, rated ${label} severity.${reaction}${detail}`;
       })()
     : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
   const driverLine = drivers.length > 0
@@ -2651,7 +2657,7 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (rows.length === 0) {
     return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. A quiet stretch for civil unrest alongside continuing protest activity usually means the authorities have held back from mass arrests or curfew orders — useful, but it can reverse within days if a protest crosses a policy line.\n\nKeep tracking police statements, local government orders, internet-shutdown notices and any move to call in the military. These tend to come ahead of curfews and visible street-level enforcement.`;
   }
-  const lead = topSeverityIncident(rows);
+  const lead = rows[0];
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   // Posture claims scan the WHOLE usable file, not just the unrest bucket —
   // an arrest reported on an activism-bucketed row still falsifies "no
@@ -2669,8 +2675,8 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   const sevLabel = lead ? (SEV_LABEL[sevKey(lead.severity)] ?? lead.severity) : "";
   const headline = lead
     ? unrestTie > 1
-      ? `The most serious civil-unrest events across ${windowLabel} were ${unrestTie} incidents rated ${sevLabel}, including ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
-      : `The most serious civil-unrest event across ${windowLabel} was ${shortSignalLabel(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+      ? `The most serious civil-unrest events across ${windowLabel} were ${unrestTie} incidents rated ${sevLabel}, including ${tableLeadPhrase(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+      : `The most serious civil-unrest event across ${windowLabel} was ${tableLeadPhrase(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
     : `Civil unrest across ${windowLabel} was limited, with no single standout event.`;
   const postureLine = postureBits.length > 0
     ? `The police response is the main thing to watch: ${joinList(postureBits)}.`
@@ -2769,8 +2775,8 @@ function buildForecastRead(opts: {
     // be called "the most serious" (owner-flagged defect).
     const tieN = opts.topSeverityTie ?? topSeverityTieCount(allRows, sevInc);
     const seriousClause = tieN > 1
-      ? `but several incidents share the top ${sevHs.label} rating, including ${shortSignalLabel(sevInc)} in ${sevCountry}${tableClause}`
-      : `but the most serious single incident was in ${sevCountry}: ${shortSignalLabel(sevInc)}, rated ${sevHs.label}${tableClause}`;
+      ? `but several incidents share the top ${sevHs.label} rating, including ${tableLeadPhrase(sevInc)} in ${sevCountry}${tableClause}`
+      : `but the most serious single incident was in ${sevCountry}: ${tableLeadPhrase(sevInc)}, rated ${sevHs.label}${tableClause}`;
     const watchClause = tieN > 1
       ? `watch the ${sevHs.label}-rated incidents, starting with ${sevCountry}, for how they develop`
       : `watch ${sevCountry} for how that incident develops`;
@@ -2885,12 +2891,12 @@ function buildRegionalCountryRead(opts: {
     return joinList(places);
   };
   const operationalCountryRead = (rows: EnrichedIncident[], country: string): string => {
-    const ranked = sortBySignificance(rows);
+    const ranked = sortRowsForTable(rows);
     const leadRow = ranked[0];
     if (!leadRow) return "Street-level detail is thin.";
-    const label = shortSignalLabel(leadRow);
-    const city = extractCityLabel(leadRow) || (leadRow.location ?? "").trim();
-    const where = city ? ` in ${city}` : "";
+    const label = tableLeadPhrase(leadRow);
+    const city = extractCityLabel(leadRow);
+    const where = city && city.toLowerCase() !== country.toLowerCase() ? ` in ${city}` : "";
     const sev = SEV_RANK[sevKey(leadRow.severity)] ?? 0;
     const impact =
       sev >= 4
@@ -2898,11 +2904,11 @@ function buildRegionalCountryRead(opts: {
         : sev >= 3
           ? "Expect local traffic and venue friction around confirmed gatherings."
           : "Monitor for escalation; no major disruption signal yet.";
-    if (ranked.length === 1) {
+    const second = ranked.slice(1).find((r) => signalKey(tableLeadPhrase(r)) !== signalKey(label));
+    if (!second) {
       return `Lead item: ${label}${where}. ${impact}`;
     }
-    const second = shortSignalLabel(ranked[1]);
-    return `Lead item: ${label}${where}; ${second} also reported. ${impact}`;
+    return `Lead item: ${label}${where}; ${tableLeadPhrase(second)} also reported. ${impact}`;
   };
   const topThree = countryRows.slice(0, 3);
   const countryParas: string[] = [];
@@ -3184,7 +3190,7 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
   const city = extractCityLabel(r);
   if ((SEV_RANK[sevKey(r.severity)] ?? 0) >= 3 && (country || city)) {
     const where = city && country ? `${city}, ${country}` : country || city;
-    return `${shortSignalLabel(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is the week's sharpest access-and-movement concern in that market.`;
+    return `${tableLeadPhrase(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is the week's sharpest access-and-movement concern in that market.`;
   }
   return null;
 }
@@ -3407,11 +3413,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const bullets: string[] = [];
   for (const r of future) {
     const where = r.country ? `${r.country} — ` : "";
-    const stated = explicitForecastDate(r);
-    // Align with the forecast table: dated announcements are schedule items;
-    // dateless ones stay monitor-only.
-    const status = stated ? "upcoming, date confirmed" : "upcoming, unconfirmed";
-    bullets.push(`${where}${shortSignalLabel(r)}: ${status} — ${operationalMeaningFor(r)}`);
+    bullets.push(`${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`);
   }
   // Never describe a forecast/announcement item as "the most serious
   // incident reported this week" — the follow-through line only fires when
@@ -3422,7 +3424,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   const futureSignalIds = new Set(extractFutureSignals(ctx.enriched).map((r) => r.id));
   if (sevInc && sevCountry && sevElevated && !futureSignalIds.has(sevInc.id)) {
     bullets.push(
-      `${sevCountry} — follow-through after ${shortSignalLabel(sevInc)}, the most serious incident reported this week: watch for further developments in the days that follow.`,
+      `${sevCountry} — follow-through after ${tableLeadPhrase(sevInc)}, the most serious incident reported this week: watch for further developments in the days that follow.`,
     );
   }
   // De-dupe on the leading clause so a future signal and the severity
@@ -3437,7 +3439,7 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
     if (out.length >= 6) break;
   }
   if (out.length === 0) {
-    return `No confirmed upcoming protest calls, strike notices or scheduled hearings were reported this week. There are no dated items to plan around; keep monitoring for fresh announcements.`;
+    return `No forward indicators with a firm operational trigger were reported this week. Keep monitoring for court outcomes, strike notices and fresh mobilisation.`;
   }
   return out.map((b) => `- ${b}`).join("\n");
 }
@@ -3533,8 +3535,8 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
     !volumeLeadersRows.some((row) => row.label === sevCountry);
   if (severityOutsideVolumeLead) {
     opener = tieN > 1
-      ? `${volumeLeads}, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${shortSignalLabel(sevInc)} in ${sevCountry}.`
-      : `${volumeLeads}, but the sharper operational concern is ${shortSignalLabel(sevInc)} in ${sevCountry} (${hs.label}).`;
+      ? `${volumeLeads}, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${tableLeadPhrase(sevInc)} in ${sevCountry}.`
+      : `${volumeLeads}, but the sharper operational concern is ${tableLeadPhrase(sevInc)} in ${sevCountry} (${hs.label}).`;
   } else if (lead && spread.regions.length >= 2) {
     opener = `Protest pressure spans ${joinList(spread.regions)}; ${volumeHas}.`;
   } else if (lead) {
@@ -3614,6 +3616,7 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
   /\bcity-centre commercial districts\b/i,
   /\bone reporting period\b/i,
   /\bconfirmed dates in Watch Next\b/i,
+  /\bupcoming,\s*date confirmed\b/i,
   /\bprotests and organised action\b/i,
 ];
 
@@ -3823,16 +3826,14 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
 
   // Subsection leads must come from that subsection's canonical table (C4).
   if (ds.activismRows.length > 0 && /The main protest event across/i.test(ds.activismRead)) {
-    const namedInTable = ds.activismRows.some((r) =>
-      ds.activismRead.includes(shortSignalLabel(r)),
-    );
-    if (!namedInTable) {
-      errors.push("activism read names a lead that is not in the activism table");
+    const actLead = ds.activismRows[0];
+    if (actLead && !ds.activismRead.includes(tableLeadPhrase(actLead))) {
+      errors.push("activism read does not name the activism table lead");
     }
   }
   const unrestLead = ds.unrestRows[0];
   if (unrestLead && /most serious civil-unrest/i.test(ds.civilUnrestRead)) {
-    if (!ds.civilUnrestRead.includes(shortSignalLabel(unrestLead))) {
+    if (!ds.civilUnrestRead.includes(tableLeadPhrase(unrestLead))) {
       errors.push("civil-unrest read does not name the unrest table lead");
     }
   }

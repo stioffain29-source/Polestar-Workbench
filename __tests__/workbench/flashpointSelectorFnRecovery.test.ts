@@ -80,7 +80,7 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
     expect(sel.enriched).toHaveLength(1);
   });
 
-  it("keeps Manila labour May Day rally legal follow-up", () => {
+  it("drops May Day legal follow-up unless a live gathering is evidenced", () => {
     const sel = selectFlashpointUsable(
       [
         fp({
@@ -92,10 +92,10 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
       "flashpoint",
       ISSUE,
     );
-    expect(sel.enriched).toHaveLength(1);
+    expect(sel.enriched).toHaveLength(0);
   });
 
-  it("keeps Nepal Gen Z crackdown accountability rows", () => {
+  it("drops Gen Z accountability process and keeps a live protest in the same set", () => {
     const sel = selectFlashpointUsable(
       [
         fp({
@@ -116,7 +116,9 @@ describe("Flashpoint selector FN recovery (FP-02)", () => {
       "flashpoint",
       ISSUE,
     );
-    expect(sel.enriched.length).toBeGreaterThanOrEqual(2);
+    expect(sel.enriched.some((r) => /Dhaka Protests/i.test(r.title))).toBe(true);
+    expect(sel.enriched.some((r) => /Oli arrested/i.test(r.title))).toBe(false);
+    expect(sel.enriched.some((r) => /NHRC/i.test(r.title))).toBe(false);
   });
 
   it("still drops motorsport rally homonyms", () => {

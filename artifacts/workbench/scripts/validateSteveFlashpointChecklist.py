@@ -37,6 +37,7 @@ EDITORIAL_FAIL = [
     (r"\bcity-centre commercial districts\b", "generic activism location template"),
     (r"\bone reporting period\b", "period-machinery forecast"),
     (r"\bconfirmed dates in Watch Next\b", "Watch Next treated as a calendar"),
+    (r"\bupcoming,\s*date confirmed\b", "Watch Next date-calendar status"),
     (r"\b(?:the )?(?:table|chart) (?:above|below)\b", "file/table narration"),
     (r"\bdriven by protest activity\b", "dataset narration"),
     (r"\bsections follow\b", "meta section preview"),
