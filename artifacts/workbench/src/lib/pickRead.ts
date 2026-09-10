@@ -29,8 +29,9 @@ export function looksLikeAutoFlashpointRead(text: string): boolean {
     /^Upcoming signals without confirmed dates are listed in the table above/m.test(t) ||
     /^Upcoming signals without confirmed dates should be treated/m.test(t) ||
     /^No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported/m.test(t) ||
+    /^No confirmed forward dates yet/m.test(t) ||
     /^The near-term outlook is for continued quiet/m.test(t) ||
-    /This outlook is based on one reporting period and on confirmed announcements only/m.test(t) ||
+    /This outlook is based on one reporting period/m.test(t) ||
     /^Activity this week is spread across/m.test(t) ||
     /^This week activity centres on/m.test(t) ||
     /^No activity could be tied to a specific country this week/m.test(t) ||

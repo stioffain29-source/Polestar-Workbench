@@ -547,13 +547,19 @@ function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label
 // seen). Used to separate the SEVERITY lead (escalation ceiling) from
 // the VOLUME lead (record count) so the prose can reconcile the two
 // instead of letting the country chart and forecast table contradict.
-function topSeverityIncident(rows: EnrichedIncident[]): EnrichedIncident | null {
-  return [...rows].sort((a, b) =>
+function rankIncidentsForTable(a: EnrichedIncident, b: EnrichedIncident): number {
+  return (
     compareIncidentSignificance(
       { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
       { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
-    ),
-  )[0] ?? null;
+    ) ||
+    b.date.getTime() - a.date.getTime() ||
+    String(a.id).localeCompare(String(b.id))
+  );
+}
+
+function topSeverityIncident(rows: EnrichedIncident[]): EnrichedIncident | null {
+  return [...rows].sort(rankIncidentsForTable)[0] ?? null;
 }
 
 // Signature phrases lifted from the legacy generic prose templates
@@ -909,6 +915,15 @@ function titleWithoutSource(title: string): string {
 // survives even when it names a non-APAC country as the cause.
 // Tourism / travel-industry "demonstration" homonyms — not public-order events.
 const TOURISM_DEMO_RE = /\b(sleep tourism|tourism demonstration|travel tourism|hotel tourism)\b/i;
+// Short-stay / lodging regulation is tourism policy, not a street event.
+const TOURISM_POLICY_RE =
+  /\b(minpaku|short[- ]stay(?:\s+rental)?|vacation rental|airbnb|private lodging (?:ban|law|cap)|tourist accommodation (?:ban|law|rule))\b/i;
+// Administrative discipline of officials, not a public-order incident.
+const ADMIN_DISCIPLINE_RE =
+  /\b(?:admin(?:istrative)?\s+raps|faces?\s+admin(?:istrative)?\s+raps|disciplinary\s+(?:raps|action|charges)|internal\s+(?:affairs|probe|investigation)\b.{0,50}\b(?:officer|cop|police))\b/i;
+// Commemorative calendar announcements without a live gathering underway.
+const COMMEMORATION_ANNOUNCE_RE =
+  /\b(remembrance day|martyrs?'?\s+(?:day|families)|families announce|commemoration day|memorial day)\b/i;
 // Retrospective reporting about earlier unrest (funeral coverage, anniversary).
 const RETROSPECTIVE_UNREST_RE =
   /\b(earlier riots?|previous riots?|last year'?s? (?:riot|protest|unrest)|(?:funeral|memorial|burial).{0,100}(?:riot|unrest|protest|clash)|(?:riot|unrest|protest|clash).{0,100}(?:funeral|memorial|burial))\b/i;
@@ -1052,6 +1067,15 @@ const MILITARY_OFFICIAL_VISIT_RE =
 function isWeakOperational(r: FlashpointReportIncident): boolean {
   const text = `${r.title ?? ""} ${r.summary ?? ""}`;
   if (TOURISM_DEMO_RE.test(text)) return true;
+  if (TOURISM_POLICY_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (ADMIN_DISCIPLINE_RE.test(text) && !LIVE_PUBLIC_ORDER_RE.test(text)) return true;
+  if (
+    COMMEMORATION_ANNOUNCE_RE.test(text) &&
+    !LIVE_PUBLIC_ORDER_RE.test(text) &&
+    !hasStrongPublicOrderCue(text)
+  ) {
+    return true;
+  }
   if (RETROSPECTIVE_UNREST_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   if (PROTEST_FOLLOWUP_COURT_RE.test(text) && !hasStrongPublicOrderCue(text)) return true;
   const editorialTitle = titleWithoutSource(r.title ?? "");
@@ -1703,12 +1727,7 @@ function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
 // not merely the most recent — so a Philippines transport strike mentioned
 // in Watch Next cannot sit below the cap while weaker items fill the table.
 function sortRowsForTable(rows: EnrichedIncident[]): EnrichedIncident[] {
-  return [...rows].sort((a, b) =>
-    compareIncidentSignificance(
-      { severity: a.severity, title: a.title, summary: a.summary, occurredAt: a.occurredAt },
-      { severity: b.severity, title: b.title, summary: b.summary, occurredAt: b.occurredAt },
-    ) || b.date.getTime() - a.date.getTime(),
-  );
+  return [...rows].sort(rankIncidentsForTable);
 }
 
 function countriesOf(rows: EnrichedIncident[]): Map<string, number> {
@@ -1729,6 +1748,43 @@ function joinList(items: string[]): string {
   if (items.length === 1) return items[0];
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+/** City/site from location text, never repeating the country name as a "city". */
+function displayPlace(r: {
+  location?: string | null;
+  country?: string | null;
+  title?: string | null;
+}): string {
+  const country = (r.country ?? "").trim();
+  const loc = (r.location ?? "").trim();
+  if (loc) {
+    const parts = loc.split(/[,;]/).map((p) => p.trim()).filter(Boolean);
+    return parts.find((p) => p.toLowerCase() !== country.toLowerCase()) ?? "";
+  }
+  const t = r.title ?? "";
+  const m = t.match(/\b(?:in|at|near)\s+([A-Z][A-Za-z'(). -]{2,40})\b/);
+  const guessed = m?.[1]?.trim() ?? "";
+  if (guessed && guessed.toLowerCase() !== country.toLowerCase()) return guessed;
+  return "";
+}
+
+function uniquePlaces(
+  rows: { location?: string | null; country?: string | null; title?: string | null }[],
+  cap = 4,
+): string[] {
+  const seen: string[] = [];
+  const lower = new Set<string>();
+  for (const r of rows) {
+    const p = displayPlace(r);
+    if (!p) continue;
+    const key = p.toLowerCase();
+    if (lower.has(key)) continue;
+    lower.add(key);
+    seen.push(p);
+    if (seen.length >= cap) break;
+  }
+  return seen;
 }
 
 /** Countries sharing the top incident count. Chart order stays count/significance; prose must not crown one. */
@@ -2015,17 +2071,36 @@ export function selectFlashpointUsable(
   const keptIds = new Set(enriched.map((r) => r.id));
   for (const r of validated) if (!keptIds.has(r.id)) reject("duplicate", r);
 
+  // Process / commentary / non-events stay out of the canonical set unless the
+  // same record evidences an in-window public-order event (C1/C9).
+  const operationalRows: EnrichedIncident[] = [];
+  let weakNoveltyDropped = 0;
+  let weakOperationalDropped = 0;
+  for (const r of enriched) {
+    if (isWeakNovelty(r)) {
+      weakNoveltyDropped++;
+      reject("weak-novelty", r);
+      continue;
+    }
+    if (isWeakOperational(r)) {
+      weakOperationalDropped++;
+      reject("weak-operational", r);
+      continue;
+    }
+    operationalRows.push(r);
+  }
+
   return {
-    enriched,
+    enriched: operationalRows,
     offTopicDropped: 0,
     kineticDropped: 0,
     courtDropped: 0,
     outOfScopeCrimeDropped: 0,
     dedupedDropped: validated.length - enriched.length,
-    weakNoveltyDropped: 0,
-    weakOperationalDropped: 0,
+    weakNoveltyDropped,
+    weakOperationalDropped,
     semanticValidityDropped,
-    weakDropped: 0,
+    weakDropped: weakNoveltyDropped + weakOperationalDropped,
     rawWindowCount: rawWindow.length,
     rejected,
   };
@@ -2067,18 +2142,6 @@ export function buildFlashpointReportDataset(
   // already clean, so these are simple bucket splits ranked for table display.
   const activismRows = sortRowsForTable(enriched.filter((r) => r.bucket === "activism"));
   const unrestRows = sortRowsForTable(enriched.filter((r) => r.bucket === "unrest"));
-  const activismLeadPool = sortRowsForTable([
-    ...activismRows,
-    ...unrestRows.filter(
-      (r) => hasConfirmedOperationalImpact(r) && !containedVenueNote(r),
-    ),
-    ...enriched.filter(
-      (r) =>
-        r.bucket === "other" &&
-        hasConfirmedOperationalImpact(r) &&
-        !containedVenueNote(r),
-    ),
-  ]);
 
   // Fast Facts. The single top-severity incident is computed ONCE over the
   // full usable set and shared with every prose builder (Exec Summary,
@@ -2203,7 +2266,7 @@ export function buildFlashpointReportDataset(
   // --- Reads ---------------------------------------------------------------
   // Activism lead draws from activism rows plus confirmed street-level unrest,
   // but never prison / contained-facility events (those stay in civil-unrest read).
-  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end, activismLeadPool);
+  const activismRead = buildActivismRead(activismRows, win.shortLabel, win.end);
   const civilUnrestRead = buildCivilUnrestRead(unrestRows, win.shortLabel, win.end, [...activismRows, ...unrestRows]);
   // Forward-looking items rendered as a structured Country / Signal /
   // Operational meaning table rather than a quoted paragraph dump.
@@ -2538,15 +2601,11 @@ function buildActivismRead(
   rows: EnrichedIncident[],
   windowLabel: string,
   windowEnd: Date,
-  leadPool?: EnrichedIncident[],
 ): string {
   if (rows.length === 0) {
     return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
   }
-  const lead = pickLead(leadPool ?? rows, windowEnd, { activism: true });
-  // Driver fingerprinting drives prose shape rather than a generic
-  // "mix breaks down as protest (N)" line. Reads as judgement, not
-  // counting.
+  const lead = pickLead(rows, windowEnd, { activism: true }) ?? topSeverityIncident(rows);
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const political = rows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
   const sectoral = rows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|wage|salary|pay|metro bus|pension)\b/i.test(text(r)));
@@ -2579,7 +2638,10 @@ function buildActivismRead(
   const driverLine = drivers.length > 0
     ? `Most of the reported events came from ${joinList(drivers)}.`
     : `The reported events are routine local organising rather than any single campaign.`;
-  const operational = `The locations named in the incidents are mainly city-centre commercial districts, court complexes, party and ministry offices and the main roads nearby. Where protests fall on staff routes or near sites, movement and access are the first things affected.`;
+  const places = uniquePlaces(rows);
+  const operational = places.length > 0
+    ? `Named sites include ${joinList(places)}. Where these sit on staff routes or near offices, movement and access are the first things affected.`
+    : `Where gatherings sit on staff routes or near offices, movement and access are the first things affected.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${driverLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -2601,7 +2663,7 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   const postureBits: string[] = [];
   if (hasCurfew) postureBits.push("statutory restrictions are already in play");
   if (hasCrackdown) postureBits.push("police have already used force or made arrests at demonstrations");
-  if (hasRiotClash) postureBits.push("street-level disorder is on the record");
+  if (hasRiotClash) postureBits.push("street-level disorder is already visible");
   const containedNote = lead ? containedVenueNote(lead) : null;
   const unrestTie = topSeverityTieCount(rows, lead);
   const sevLabel = lead ? (SEV_LABEL[sevKey(lead.severity)] ?? lead.severity) : "";
@@ -2613,7 +2675,10 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   const postureLine = postureBits.length > 0
     ? `The police response is the main thing to watch: ${joinList(postureBits)}.`
     : `Reports this week do not mention curfews, mass arrests or crackdowns. The police response so far looks measured rather than escalating.`;
-  const operational = `For businesses, what the police do — arrests, crackdowns, curfews — matters more than how many protests there are, because that is where roads close and buildings become hard to reach. If enforcement is concentrated in one city or district, plan for road closures and blocked access on the day.`;
+  const places = uniquePlaces(rows);
+  const operational = places.length > 0
+    ? `The highest-severity unrest sits around ${joinList(places)}. Arrests, crackdowns and curfews there matter more than protest counts, because that is where roads close and buildings become hard to reach.`
+    : `For businesses, what the police do — arrests, crackdowns, curfews — matters more than how many protests there are, because that is where roads close and buildings become hard to reach. If enforcement is concentrated in one city or district, plan for road closures and blocked access on the day.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -2645,23 +2710,12 @@ function buildForecastRead(opts: {
   // The structured forward-looking table is rendered above this prose
   // by the exporter when at least one credible future-dated record is
   // present. Prose then carries trajectory commentary only.
-  const futureBlock = hasFutureTable
-    ? (() => {
-        const rows = opts.forecastRows ?? [];
-        const datedN = rows.filter((r) => !!r.date).length;
-        if (datedN > 0 && datedN === rows.length) {
-          return `Confirmed upcoming events with stated dates are the first dates to plan around. The outlook below builds on that schedule.`;
-        }
-        if (datedN > 0) {
-          return `Upcoming signals mix confirmed schedule items and undated monitor items. The outlook below builds on that mix.`;
-        }
-        return `Upcoming signals without confirmed dates should be treated as items to monitor rather than fixed calendar dates. The outlook below builds on those signals.`;
-      })()
+  const firstForecast = (opts.forecastRows ?? [])[0];
+  const futureBlock = firstForecast
+    ? `${firstForecast.country}: ${firstForecast.signal}${firstForecast.date ? ` (${firstForecast.date})` : ""}. ${firstForecast.meaning}`
     : hasUnconfirmedSignals
-      ? `No confirmed upcoming dates have been reported. Unconfirmed mobilisation signals appear in Watch Next — treat those as monitor items, not fixed calendar dates. The outlook below builds on current activity only.`
-      : `No confirmed upcoming protest calls, strike notices or scheduled hearings have been reported. The outlook below is therefore an assessment of likely direction from current activity, not a list of scheduled events.`;
-  const activismShare = total > 0 ? activismRows.length / total : 0;
-  const unrestShare = total > 0 ? unrestRows.length / total : 0;
+      ? `No confirmed forward dates yet. Treat Watch Next as operational indicators to monitor, not a calendar.`
+      : `No confirmed forward dates yet. Plan from current activity and refresh if a named movement posts a schedule.`;
   const lines: string[] = [futureBlock];
   const datedMarches = (opts.forecastRows ?? []).filter(
     (r) => /civic protest march/i.test(r.signal) && !!r.date,
@@ -2672,10 +2726,7 @@ function buildForecastRead(opts: {
         `Civic protest marches with confirmed dates are set in ${joinList(datedMarches.map((m) => m.country))} — confirm turnout and access impact in each host city before the date.`,
       );
     }
-    lines.push(`The near-term outlook is for continued quiet, with little fresh protest or civil-unrest activity on the current record. That could change if a named movement announces a fresh protest schedule.`);
-    lines.push(
-      `This outlook is based on one reporting period and on confirmed announcements only, so treat it as a starting point rather than a firm prediction.`,
-    );
+    lines.push(`The near-term outlook is for continued quiet, with little fresh protest or civil-unrest activity. That could change if a named movement announces a fresh protest schedule.`);
     return lines.join("\n\n");
   }
   const allRows = [...activismRows, ...unrestRows];
@@ -2712,7 +2763,7 @@ function buildForecastRead(opts: {
     const sevLeadsTable =
       hasFutureTable && !!forecastLeadCountry && forecastLeadCountry === sevCountry;
     const tableClause = sevLeadsTable
-      ? `, which is why it leads the forward-looking table even though it is not the busiest country`
+      ? `, which is why the next confirmed date sits there even though it is not the busiest country`
       : ``;
     // Tie-aware: with several incidents at the top tier, no single event may
     // be called "the most serious" (owner-flagged defect).
@@ -2734,47 +2785,20 @@ function buildForecastRead(opts: {
   } else if (lead) {
     lines.push(
       volumeLeaderRows.length > 1
-        ? `On the current record, ${joinList(volumeLeaderRows.map((row) => row.label))} share the heaviest volume and are the markets most likely to see activity continue.`
-        : `On the current record, ${lead.label} carries the most protest and civil-unrest activity and is the country most likely to see it continue.`,
+        ? `${joinList(volumeLeaderRows.map((row) => row.label))} share the heaviest volume and are the markets most likely to see activity continue.`
+        : `${lead.label} currently has the most reported activity; plan movement and site access there first.`,
     );
   } else {
     lines.push(
-      `Activity is spread across the region on the current record, with no single country standing out.`,
+      `Activity is spread across the region, with no single country standing out.`,
     );
   }
-  if (activismShare >= 0.6) {
-    lines.push(
-      `Most of this week's events were protests and organised action rather than open disorder. Where gatherings take place in commercial districts or on main roads, expect localised road closures and slower staff travel rather than wider disruption.`,
-    );
-  } else if (unrestShare >= 0.6) {
-    lines.push(
-      `Most of this week's events involved civil unrest and police enforcement rather than fresh organising. That kind of activity is more disruptive where it happens near staff routes and business sites.`,
-    );
-  } else {
-    lines.push(
-      `Protest activity and civil unrest are roughly balanced across the window.`,
-    );
-  }
-  // When several confirmed civic protest marches sit in the forward table,
-  // summarise them as one cross-country line instead of leaving the reader
-  // to stitch the per-row detail together.
-  // "Confirmed" is reserved for rows with an explicitly STATED future date.
-  // A dateless announcement is unconfirmed and must not be called confirmed
-  // here while Watch Next calls the same item unconfirmed (owner-flagged
-  // contradiction).
   const marches = datedMarches;
   if (marches.length > 1) {
     lines.push(
       `Civic protest marches with confirmed dates are set in ${joinList(marches.map((m) => m.country))} — confirm turnout and access impact in each host city before the date.`,
     );
   }
-  lines.push(
-    hasFutureTable
-      ? `This outlook is based on one reporting period and on confirmed announcements only, so treat it as a starting point rather than a firm prediction.`
-      : hasUnconfirmedSignals
-        ? `This outlook is based on one reporting period only. Watch Next carries any unconfirmed signals — there are no confirmed dates to plan around yet.`
-        : `This outlook is based on one reporting period only. There are no confirmed dates to plan around; monitor for fresh announcements rather than assuming a quiet stretch will hold.`,
-  );
   return lines.join("\n\n");
 }
 
@@ -2838,7 +2862,7 @@ function buildRegionalCountryRead(opts: {
   // South Korea ranked above the Philippines in the chart while the headline
   // named Bangladesh, Japan and the Philippines as "busiest elsewhere".
   const otherBusy = countryRows
-    .filter((r) => r.value < (countryRows[0]?.value ?? 0))
+    .filter((r) => r.value < (countryRows[0]?.value ?? 0) && r.value > 1)
     .slice(0, 3)
     .map((r) => r.label);
   const headline = spread.regions.length >= 2
@@ -2853,20 +2877,12 @@ function buildRegionalCountryRead(opts: {
     byCountry.set(c, arr);
   }
   const lociFor = (rows: EnrichedIncident[], country: string): string => {
-    const seen: string[] = [];
-    const seenLower = new Set<string>();
-    for (const r of rows) {
-      const loc = (r.location ?? "").trim();
-      if (!loc) continue;
-      if (locationForeignToCountry(loc, country)) continue;
-      const key = loc.toLowerCase();
-      if (seenLower.has(key)) continue;
-      seenLower.add(key);
-      seen.push(loc);
-      if (seen.length >= 3) break;
-    }
-    if (seen.length === 0) return "";
-    return joinList(seen);
+    const places = uniquePlaces(
+      rows.filter((r) => !locationForeignToCountry((r.location ?? "").trim(), country)),
+      3,
+    );
+    if (places.length === 0) return "";
+    return joinList(places);
   };
   const operationalCountryRead = (rows: EnrichedIncident[], country: string): string => {
     const ranked = sortBySignificance(rows);
@@ -3121,11 +3137,7 @@ function sortBySignificance(rows: EnrichedIncident[]): EnrichedIncident[] {
 }
 
 function extractCityLabel(r: EnrichedIncident): string {
-  const loc = (r.location ?? "").trim();
-  if (loc) return loc.split(/[,;]/)[0].trim();
-  const t = r.title ?? "";
-  const m = t.match(/\b(?:in|at|near)\s+([A-Z][A-Za-z'(). -]{2,40})\b/);
-  return m?.[1]?.trim() ?? "";
+  return displayPlace(r);
 }
 
 /** One operational What Matters paragraph keyed off a specific incident. */
@@ -3477,9 +3489,9 @@ function buildPolestarView(ctx: AutoCtx): string {
     .filter((r) => !isWeakOperational(r) && !isWeakNovelty(r) && !forecastDateHasPassed(r, ctx.forecastAsOf));
   const hasDatedFuture = futureMobilisation.some((r) => !!explicitForecastDate(r));
   const watchClause = hasDatedFuture
-    ? `Align site-access rules to the confirmed dates in Watch Next rather than treating the whole week as elevated.`
+    ? `Treat Watch Next as operational indicators for site access, not as a week-long elevation or a calendar of dates.`
     : futureMobilisation.length > 0
-      ? `Treat unconfirmed mobilisation in Watch Next as monitor-only until dates firm up.`
+      ? `Treat Watch Next as monitor-only indicators until a date or court outcome firms up.`
       : `Refresh movement plans if new protest announcements land mid-week.`;
 
   return `${movementLead} ${watchClause}`;
@@ -3599,6 +3611,10 @@ export const FLASHPOINT_BANNED_PROSE_RE: RegExp[] = [
   /\b(?:the )?file does not show\b/i,
   /\balso on file\b/i,
   /\bin the file\b/i,
+  /\bcity-centre commercial districts\b/i,
+  /\bone reporting period\b/i,
+  /\bconfirmed dates in Watch Next\b/i,
+  /\bprotests and organised action\b/i,
 ];
 
 export function validateFlashpointReportDataset(ds: FlashpointReportDataset): string[] {
@@ -3803,6 +3819,22 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
     errors.push(
       `Related Incidents repeats already-shown incidents: ${dupes.map((r) => r.id).join(", ")}`,
     );
+  }
+
+  // Subsection leads must come from that subsection's canonical table (C4).
+  if (ds.activismRows.length > 0 && /The main protest event across/i.test(ds.activismRead)) {
+    const namedInTable = ds.activismRows.some((r) =>
+      ds.activismRead.includes(shortSignalLabel(r)),
+    );
+    if (!namedInTable) {
+      errors.push("activism read names a lead that is not in the activism table");
+    }
+  }
+  const unrestLead = ds.unrestRows[0];
+  if (unrestLead && /most serious civil-unrest/i.test(ds.civilUnrestRead)) {
+    if (!ds.civilUnrestRead.includes(shortSignalLabel(unrestLead))) {
+      errors.push("civil-unrest read does not name the unrest table lead");
+    }
   }
 
   // 4. Prose quality gate. Client-mandated (Aug 2026): no abstract

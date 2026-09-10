@@ -33,6 +33,11 @@ HYGIENE_FAIL = [
 EDITORIAL_FAIL = [
     (r"\bdriven by\b.{0,60}\bmostly\b", "dataset narration (driven by … mostly)"),
     (r"\bmostly protests and organised action\b", "Steve-flagged template phrase"),
+    (r"\bprotests and organised action\b", "forecast mix template"),
+    (r"\bcity-centre commercial districts\b", "generic activism location template"),
+    (r"\bone reporting period\b", "period-machinery forecast"),
+    (r"\bconfirmed dates in Watch Next\b", "Watch Next treated as a calendar"),
+    (r"\b(?:the )?(?:table|chart) (?:above|below)\b", "file/table narration"),
     (r"\bdriven by protest activity\b", "dataset narration"),
     (r"\bsections follow\b", "meta section preview"),
     (r"\bOverall protest posture this week\b", "posture-score explanation"),

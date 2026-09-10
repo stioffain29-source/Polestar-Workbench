@@ -232,7 +232,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
     expect(ds.forecastFuture).toHaveLength(0);
-    expect(ds.forecastRead).toMatch(/No confirmed upcoming/i);
+    expect(ds.forecastRead).toMatch(/No confirmed forward dates/i);
     expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
   });
 
@@ -530,7 +530,7 @@ describe("flashpoint report consistency", () => {
     });
     expect(ds.forecastFuture.some((r) => /13 August/.test(r.date ?? ""))).toBe(true);
     expect(ds.forecastFuture.some((r) => r.country === "South Korea" && /16 August/.test(r.date ?? ""))).toBe(true);
-    expect(ds.forecastRead).toMatch(/Confirmed upcoming events/i);
+    expect(ds.forecastRead).toMatch(/13 August|16 August/i);
     const sameIssueDifferentClock = buildFlashpointReportDataset(
       rows,
       "flashpoint",
@@ -559,8 +559,11 @@ describe("flashpoint report consistency", () => {
       }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
-    expect(ds.activismRead).toMatch(/rated Moderate severity/i);
+    expect(ds.activismRead).toMatch(/Philippines/i);
     expect(ds.activismRead).not.toMatch(/push for tougher labour rules/i);
+    expect(ds.civilUnrestRead).toMatch(/Philippines|Manila/i);
+    expect(ds.activismRead).not.toMatch(/city-centre commercial districts/i);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 
   test("activism read never leads with a prison riot from the unrest bucket", () => {
@@ -723,7 +726,7 @@ describe("flashpoint report consistency", () => {
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
     expect(ds.forecastFuture).toHaveLength(0);
-    expect(ds.forecastRead).toMatch(/Unconfirmed mobilisation signals appear in Watch Next/i);
+    expect(ds.forecastRead).toMatch(/Treat Watch Next as operational indicators/i);
     expect(ds.forecastRead).not.toMatch(/track scheduled events/i);
     expect(ds.autoWatchNext).toMatch(/upcoming, unconfirmed/);
   });
@@ -789,5 +792,87 @@ describe("flashpoint report consistency", () => {
     expect(ds.fastFacts.some((k) => k.label === "Weekly Posture")).toBe(true);
     expect(ds.autoExecutiveSummary).not.toMatch(/in line with the peak incident rating/i);
     expect(ds.enriched.some((r) => /business leaders/i.test(r.title))).toBe(false);
+  });
+
+  test("process and commentary rows stay out unless a live public-order event is evidenced", () => {
+    const rows = [
+      inc({
+        title: "Tokyo minpaku short-stay cap takes effect for tourist lodging",
+        summary: "The new minpaku law tightens private lodging rules for visitors.",
+        country: "Japan",
+        location: "Tokyo",
+        severity: "moderate",
+      }),
+      inc({
+        title: "City police officer faces admin raps over indiscriminate firing",
+        summary: "Internal affairs opened disciplinary raps against the officer.",
+        country: "Philippines",
+        location: "Valenzuela",
+        severity: "high",
+      }),
+      inc({
+        title: "Martyrs' families announce Remembrance Day for next month",
+        summary: "Relatives said they will mark a commemoration day on the calendar.",
+        country: "Nepal",
+        location: "Kathmandu",
+        severity: "extreme",
+      }),
+      inc({
+        title: "Workers stage sit-in at city hall over unpaid wages",
+        summary: "Demonstrators remained in a sit-in outside the municipal offices.",
+        country: "India",
+        location: "Delhi",
+        severity: "high",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    const titles = ds.enriched.map((r) => r.title);
+    expect(titles.some((t) => /minpaku/i.test(t))).toBe(false);
+    expect(titles.some((t) => /admin raps/i.test(t))).toBe(false);
+    expect(titles.some((t) => /Remembrance Day/i.test(t))).toBe(false);
+    expect(titles.some((t) => /sit-in/i.test(t))).toBe(true);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("activism read lead is taken from the activism table only", () => {
+    const rows = [
+      inc({
+        title: "Family-led sit-in continues after public disorder at the square",
+        summary: "Riot police used tear gas after clashes erupted around the sit-in.",
+        country: "Nepal",
+        location: "Kathmandu",
+        severity: "extreme",
+      }),
+      inc({
+        title: "Union march through the commercial district over wages",
+        summary: "Workers marched through the city centre and blocked one junction.",
+        country: "South Korea",
+        location: "Seoul",
+        severity: "moderate",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.activismRead).toMatch(/South Korea|Union march/i);
+    expect(ds.activismRead).not.toMatch(/Kathmandu sit-in|Family-led sit-in/i);
+    expect(ds.activismRead).not.toMatch(/city-centre commercial districts/i);
+    expect(ds.civilUnrestRead).toMatch(/Nepal|sit-in|public disorder/i);
+    expect(ds.unrestRows.length).toBeGreaterThan(0);
+    expect(ds.civilUnrestRead).toMatch(/Nepal/);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("single-count countries are not described as reporting multiple events", () => {
+    const rows = [
+      ...Array.from({ length: 4 }, (_, i) =>
+        inc({ title: `Seoul union rally round ${i}`, country: "South Korea", location: "Seoul" }),
+      ),
+      inc({ title: "Port Moresby teachers march on parliament", country: "Papua New Guinea", location: "Port Moresby" }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.regionalCountryRead).not.toMatch(/Papua New Guinea also reporting multiple events/i);
+    expect(ds.regionalCountryRead).not.toMatch(/Seoul, South Korea, Seoul/i);
+    expect(ds.forecastRead).not.toMatch(/one reporting period/i);
+    expect(ds.autoPolestarView).not.toMatch(/confirmed dates in Watch Next/i);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
 });
