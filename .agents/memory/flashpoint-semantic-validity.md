@@ -32,6 +32,9 @@ observable and forces deliberate re-adjudication when the rules change.
   of full ingest: finish one recent batch before the scheduler starts, then
   cover the report window in bounded background batches. Never infer production
   recovery from development backfill counts.
+- A same-timestamp group of `semantic validator failed` holds is a provider
+  batch failure, not semantic evidence. Retry one transient call immediately
+  and requeue unresolved transient rows after five minutes; do not relax gates.
 - Audit coverage must report current-version `needs_review` rows as adjudicated
   holds, separately from genuinely blank or stale decisions. Treating a hold as
   "unadjudicated" defeats the required three-state model and creates false gaps.

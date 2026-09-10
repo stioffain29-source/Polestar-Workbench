@@ -54,19 +54,19 @@ function dependencies(overrides: Partial<FlashpointBackfillDependencies> = {}): 
 }
 
 describe("bounded Flashpoint semantic backfill", () => {
-  it("selects stale versions immediately and retries transient failures only after cooldown", () => {
+  it("selects stale versions immediately and retries transient failures after five minutes", () => {
     expect(isFlashpointBackfillCandidate({ ...row, validityVersion: "semantic.3" }, now)).toBe(true);
     expect(isFlashpointBackfillCandidate({
       ...row,
       validityVersion: FLASHPOINT_VALIDITY_VERSION,
       validityReason: "semantic validator timeout",
-      validityEvaluatedAt: new Date(now.getTime() - 3_599_999),
+      validityEvaluatedAt: new Date(now.getTime() - 299_999),
     }, now)).toBe(false);
     expect(isFlashpointBackfillCandidate({
       ...row,
       validityVersion: FLASHPOINT_VALIDITY_VERSION,
       validityReason: "semantic validator timeout",
-      validityEvaluatedAt: new Date(now.getTime() - 3_600_000),
+      validityEvaluatedAt: new Date(now.getTime() - 300_000),
     }, now)).toBe(true);
     expect(isFlashpointBackfillCandidate({
       ...row,
@@ -76,12 +76,12 @@ describe("bounded Flashpoint semantic backfill", () => {
     }, now)).toBe(false);
   });
 
-  it("clamps work to 100 and supplies the one-hour cutoff", async () => {
+  it("clamps work to 100 and supplies the five-minute cutoff", async () => {
     const deps = dependencies();
     await backfillFlashpointValidity(999, deps);
     expect(deps.selectCandidates).toHaveBeenCalledWith(
       100,
-      new Date(now.getTime() - 3_600_000),
+      new Date(now.getTime() - 300_000),
     );
   });
 

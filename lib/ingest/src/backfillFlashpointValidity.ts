@@ -4,6 +4,7 @@ import { FLASHPOINT_VALIDITY_VERSION, isTransientFlashpointValidityReason, valid
 import { flashpointContentFingerprint } from "./flashpointFingerprint";
 
 export type IncidentSnapshot = typeof incidentsTable.$inferSelect;
+export const FLASHPOINT_VALIDITY_RETRY_MS = 5 * 60 * 1000;
 
 export function isFlashpointBackfillCandidate(
   row: Pick<IncidentSnapshot, "topic" | "validityVersion" | "validityReason" | "validityEvaluatedAt">,
@@ -13,7 +14,7 @@ export function isFlashpointBackfillCandidate(
   if (row.validityVersion !== FLASHPOINT_VALIDITY_VERSION) return true;
   return isTransientFlashpointValidityReason(row.validityReason)
     && row.validityEvaluatedAt !== null
-    && row.validityEvaluatedAt.getTime() <= now.getTime() - 3600000;
+    && row.validityEvaluatedAt.getTime() <= now.getTime() - FLASHPOINT_VALIDITY_RETRY_MS;
 }
 
 const EVIDENCE_FIELDS = [
@@ -95,7 +96,9 @@ const defaultDependencies: FlashpointBackfillDependencies = {
         source: row.source, sourceUrl: row.sourceUrl, country: row.country,
         location: row.location, occurredAt: row.occurredAt, incidentDate: row.incidentDate,
       }),
-      retryAfter: isTransientFlashpointValidityReason(result.reason) ? new Date(now.getTime() + 3600000) : null,
+      retryAfter: isTransientFlashpointValidityReason(result.reason)
+        ? new Date(now.getTime() + FLASHPOINT_VALIDITY_RETRY_MS)
+        : null,
     });
   },
 };
@@ -106,7 +109,10 @@ export async function backfillFlashpointValidity(
 ): Promise<{ considered: number; updated: number }> {
   const bounded = Math.max(1, Math.min(100, Math.trunc(limit)));
   const now = dependencies.now();
-  const rows = await dependencies.selectCandidates(bounded, new Date(now.getTime() - 3600000));
+  const rows = await dependencies.selectCandidates(
+    bounded,
+    new Date(now.getTime() - FLASHPOINT_VALIDITY_RETRY_MS),
+  );
   let updated = 0;
   for (let i = 0; i < rows.length; i += 4) {
     const results = await Promise.all(rows.slice(i, i + 4).map(async (row) => ({

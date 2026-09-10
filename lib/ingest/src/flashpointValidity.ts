@@ -71,36 +71,51 @@ export async function validateFlashpointEvent(input: {
       verdict: { type: "string", enum: ["valid", "invalid", "needs_review"] }, reason: { type: "string" },
     },
   };
-  try {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);
-    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
-      method: "POST", headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({ model: openAiFastModel(), max_completion_tokens: 8192,
-        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }],
-        response_format: { type: "json_schema", json_schema: { name: "flashpoint_validity", strict: true, schema } } }),
-    });
-    if (!res.ok) return unavailable(`semantic validator HTTP ${res.status}`);
-    const body = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    clearTimeout(timer);
-    const rawParsed = JSON.parse(body.choices?.[0]?.message?.content ?? "");
-    const normalized = rawParsed && typeof rawParsed === "object"
-      ? { ...rawParsed, eventDate: normalizeFlashpointEventDate(rawParsed.eventDate) }
-      : rawParsed;
-    const parsed = normalized?.verdict === "valid" &&
-      normalized?.eventOccurred === false &&
-      normalized?.currentness === "future"
-      ? { ...normalized, eventOccurred: true }
-      : normalized;
-    if (!parsed || !["valid", "invalid", "needs_review"].includes(parsed.verdict)) return unavailable("malformed semantic response");
-    const check = validateFlashpointSemanticContract({ ...parsed, version: FLASHPOINT_VALIDITY_VERSION } as FlashpointSemanticGates);
-    const definiteInvalid = parsed.verdict === "invalid" ||
-      (parsed.eventOccurred === false && parsed.currentness !== "future") ||
-      parsed.assignedCountrySupported === false || parsed.eventType === "non_flashpoint" || parsed.currentness === "historical";
-    const verdict: FlashpointValidityStatus = check.valid ? "valid" : definiteInvalid ? "invalid" : "needs_review";
-    return { ...parsed, verdict, reason: check.valid ? String(parsed.reason ?? "valid event").slice(0, 240) : check.failures.join(", ").slice(0, 240), version: FLASHPOINT_VALIDITY_VERSION } as FlashpointValidity;
-  } catch {
-    return unavailable("semantic validator failed");
+    try {
+      const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: "POST", headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({ model: openAiFastModel(), max_completion_tokens: 8192,
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: JSON.stringify(input) }],
+          response_format: { type: "json_schema", json_schema: { name: "flashpoint_validity", strict: true, schema } } }),
+      });
+      if (!res.ok) {
+        const transient = res.status === 408 || res.status === 429 || res.status >= 500;
+        if (attempt === 0 && transient) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          continue;
+        }
+        return unavailable(`semantic validator HTTP ${res.status}`);
+      }
+      const body = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const rawParsed = JSON.parse(body.choices?.[0]?.message?.content ?? "");
+      const normalized = rawParsed && typeof rawParsed === "object"
+        ? { ...rawParsed, eventDate: normalizeFlashpointEventDate(rawParsed.eventDate) }
+        : rawParsed;
+      const parsed = normalized?.verdict === "valid" &&
+        normalized?.eventOccurred === false &&
+        normalized?.currentness === "future"
+        ? { ...normalized, eventOccurred: true }
+        : normalized;
+      if (!parsed || !["valid", "invalid", "needs_review"].includes(parsed.verdict)) return unavailable("malformed semantic response");
+      const check = validateFlashpointSemanticContract({ ...parsed, version: FLASHPOINT_VALIDITY_VERSION } as FlashpointSemanticGates);
+      const definiteInvalid = parsed.verdict === "invalid" ||
+        (parsed.eventOccurred === false && parsed.currentness !== "future") ||
+        parsed.assignedCountrySupported === false || parsed.eventType === "non_flashpoint" || parsed.currentness === "historical";
+      const verdict: FlashpointValidityStatus = check.valid ? "valid" : definiteInvalid ? "invalid" : "needs_review";
+      return { ...parsed, verdict, reason: check.valid ? String(parsed.reason ?? "valid event").slice(0, 240) : check.failures.join(", ").slice(0, 240), version: FLASHPOINT_VALIDITY_VERSION } as FlashpointValidity;
+    } catch {
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        continue;
+      }
+      return unavailable("semantic validator failed");
+    } finally {
+      clearTimeout(timer);
+    }
   }
+  return unavailable("semantic validator failed");
 }

@@ -44,6 +44,28 @@ describe("flashpoint semantic validity", () => {
     expect(result.verdict).toBe("valid");
   });
 
+  it("retries one transient provider failure before holding the event", async () => {
+    process.env.OPENAI_API_KEY = "test";
+    const valid = {
+      eventOccurred: true, actor: "protesters", activity: "rally", physicalLocation: "Seoul",
+      country: "South Korea", eventType: "protest", eventDate: "2026-09-09",
+      currentness: "current", assignedCountrySupported: true,
+      confidence: { event: .9, classification: .9, geography: .95, date: .9 },
+      contradictions: [], verdict: "valid", reason: "reported event",
+    };
+    const fetchMock = jest.spyOn(global, "fetch")
+      .mockResolvedValueOnce(new Response("upstream unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(valid) } }],
+      }), { status: 200 }));
+
+    await expect(validateFlashpointEvent({
+      title: "Protesters rally in Seoul",
+      summary: "A rally took place in Seoul.",
+    })).resolves.toMatchObject({ verdict: "valid" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("treats a provider-valid scheduled future event as established without upgrading uncertainty", async () => {
     process.env.OPENAI_API_KEY = "test";
     const base = {
