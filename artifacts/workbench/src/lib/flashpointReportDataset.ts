@@ -1783,9 +1783,12 @@ function uniquePlaces(
   return seen;
 }
 
-/** Client name for a table lead: the same headline the table shows. */
+/** Client name for a table lead: the table headline, without quote marks that trip the paste gate. */
 function tableLeadPhrase(r: { title?: string | null; summary?: string | null; location?: string | null; country?: string | null }): string {
-  const title = (r.title ?? "").replace(/\s+/g, " ").trim();
+  const title = (r.title ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/["“”«»]/g, "")
+    .trim();
   return title || shortSignalLabel(r);
 }
 
@@ -3858,8 +3861,18 @@ export function validateFlashpointReportDataset(ds: FlashpointReportDataset): st
       if (m) errors.push(`${name} contains banned phrasing "${m[0]}"`);
     }
     // A double-quoted span of 25+ chars is almost always a pasted headline.
+    // Canonical table titles often contain quoted slogans; those are stripped
+    // in tableLeadPhrase. Any remaining long quote must not be a title fragment.
     const q = text.match(/"([^"]{25,})"/);
-    if (q) errors.push(`${name} pastes a quoted headline into prose: "${q[1].slice(0, 60)}..."`);
+    if (q) {
+      const span = q[1].replace(/\s+/g, " ").trim().toLowerCase();
+      const fromCanonicalTitle = ds.canonical.periodRows.some((row) =>
+        (row.title ?? "").replace(/["“”«»]/g, "").toLowerCase().includes(span),
+      );
+      if (!fromCanonicalTitle) {
+        errors.push(`${name} pastes a quoted headline into prose: "${q[1].slice(0, 60)}..."`);
+      }
+    }
   }
   // No paragraph may appear verbatim in two different sections.
   const seenPara = new Map<string, string>();

@@ -870,4 +870,25 @@ describe("flashpoint report consistency", () => {
     expect(ds.autoPolestarView).not.toMatch(/confirmed dates in Watch Next/i);
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
+
+  test("quoted slogans inside table titles do not fail the dataset paste gate", () => {
+    const rows = [
+      inc({
+        title: 'Policy Bank Union Members Gather for General Strike: "Must Remain in Seoul for Financial Competitiveness"',
+        country: "South Korea",
+        location: "Seoul",
+        severity: "moderate",
+      }),
+      inc({
+        title: "Traders march on parliament in Delhi over tax rules",
+        country: "India",
+        location: "Delhi",
+        severity: "low",
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
+    expect(ds.regionalCountryRead).toMatch(/Must Remain in Seoul for Financial Competitiveness/i);
+    expect(ds.regionalCountryRead).not.toMatch(/"Must Remain in Seoul for Financial Competitiveness"/);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
 });
