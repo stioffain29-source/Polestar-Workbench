@@ -92,4 +92,25 @@ describe("Flashpoint shared publication architecture", () => {
     const issues = validateFlashpointFinalEvidenceAudit(poisoned);
     expect(issues.map((issue) => issue.code)).toContain("BACKEND_CONFIDENCE_LEAK");
   });
+
+  it("does not block export when unrest most-serious is below a higher activism peak", () => {
+    const bundle = finalizeFlashpointPublication({
+      incidents: [
+        incident("Police clash with protesters in Kathmandu", {
+          country: "Nepal",
+          location: "Kathmandu",
+          severity: "high",
+          summary: "Riot police used tear gas after public disorder in the square.",
+        }),
+        incident("Nationwide strike shuts ports in Seoul", {
+          country: "South Korea",
+          location: "Seoul",
+          severity: "extreme",
+          summary: "Workers blocked roads and halted operations during a general strike.",
+        }),
+      ],
+      issueDate: ISSUE,
+    });
+    expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("SEVERITY_PARITY");
+  });
 });

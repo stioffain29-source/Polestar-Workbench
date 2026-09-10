@@ -40,6 +40,7 @@ export function flashpointEvidenceAuditInput(
     location: row.location,
     occurredAt: row.semanticEventDate || format(row.date, "yyyy-MM-dd"),
     severity: row.severity,
+    themes: [row.bucket],
   }));
   const developments: FinalReportTypedReference[] = evidence.map((row) => ({
     id: `incident-${row.id}`,

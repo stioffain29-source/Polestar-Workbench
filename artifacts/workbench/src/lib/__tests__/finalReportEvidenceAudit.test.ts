@@ -177,4 +177,38 @@ describe("shared final report evidence audit", () => {
     ).map((x) => x.code);
     expect(codes).toContain("SEVERITY_PARITY");
   });
+
+  it("does not treat a volume-lead country before 'most serious' as the named geography", () => {
+    const codes = auditFinalReportEvidence(
+      input(
+        {
+          forecastRead:
+            "South Korea and Bangladesh share the heaviest volume this week, but the most serious single incident was in Erewhon: harbour disorder, rated High.",
+        },
+        {
+          evidence: [
+            { id: 1, title: "Seoul march", country: "South Korea", location: "Seoul", severity: "moderate", occurredAt: "2026-08-03" },
+            { id: 2, title: "Dhaka march", country: "Bangladesh", location: "Dhaka", severity: "moderate", occurredAt: "2026-08-03" },
+            { id: 3, title: "Harbour disorder", country: "Erewhon", location: "Harbourtown", severity: "high", occurredAt: "2026-08-04" },
+          ],
+        },
+      ),
+    ).map((x) => x.code);
+    expect(codes).not.toContain("SEVERITY_PARITY");
+  });
+
+  it("scores civil-unrest 'most serious' against unrest evidence, not a higher activism row", () => {
+    const codes = auditFinalReportEvidence(
+      input(
+        { civilUnrestRead: "The most serious civil-unrest event was disorder in Harbourtown." },
+        {
+          evidence: [
+            { id: 1, title: "Harbour disorder", country: "Erewhon", location: "Harbourtown", severity: "high", occurredAt: "2026-08-04", themes: ["unrest"] },
+            { id: 2, title: "Capital march", country: "Freedonia", location: "Port Alpha", severity: "extreme", occurredAt: "2026-08-03", themes: ["activism"] },
+          ],
+        },
+      ),
+    ).map((x) => x.code);
+    expect(codes).not.toContain("SEVERITY_PARITY");
+  });
 });

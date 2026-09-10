@@ -171,6 +171,10 @@ function titleFragmentAppears(text: string, title: string): boolean {
   return titleWords.length >= 4 && titleWords.every((w) => text.toLowerCase().includes(w));
 }
 
+function escapeRe(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function geographyIn(sentence: string, records: FinalReportEvidenceRecord[]): string | null {
   const geographies = [
     ...new Set(
@@ -182,9 +186,40 @@ function geographyIn(sentence: string, records: FinalReportEvidenceRecord[]): st
   ];
   return (
     geographies.find((g) =>
-      new RegExp(`\\b${g.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(sentence),
+      new RegExp(`\\b${escapeRe(g)}\\b`, "i").test(sentence),
     ) ?? null
   );
+}
+
+/** Bind "most serious" to geography in that clause only — earlier volume-lead countries must not be scored. */
+function geographyForMostSerious(sentence: string, records: FinalReportEvidenceRecord[]): string | null {
+  const match = sentence.match(MOST_SERIOUS_RE);
+  const after = match && match.index != null ? sentence.slice(match.index) : sentence;
+  return geographyIn(after, records);
+}
+
+function recordMatchesGeography(record: FinalReportEvidenceRecord, geography: string): boolean {
+  const geo = geography.trim();
+  if (!geo) return false;
+  const geoRe = new RegExp(`\\b${escapeRe(geo)}\\b`, "i");
+  return [record.country, record.location].some((value) => {
+    if (!value?.trim()) return false;
+    return geoRe.test(value) || new RegExp(`\\b${escapeRe(value.trim())}\\b`, "i").test(geo);
+  });
+}
+
+function evidenceForSeverityClaim(
+  section: string,
+  records: FinalReportEvidenceRecord[],
+): FinalReportEvidenceRecord[] {
+  const key = section.toLowerCase();
+  const want =
+    /civilunrest|unrest/.test(key) ? "unrest"
+    : /activism/.test(key) ? "activism"
+    : null;
+  if (!want) return records;
+  const scoped = records.filter((record) => record.themes?.includes(want));
+  return scoped.length > 0 ? scoped : records;
 }
 
 /** Empty result means publishable. Every returned issue is a hard failure. */
@@ -313,26 +348,22 @@ export function auditFinalReportEvidence(
 
   const rankedEvidence = currentEvidence.filter((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] != null);
   if (rankedEvidence.length > 0) {
-    const maxSev = Math.max(
-      ...rankedEvidence.map((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] ?? 0),
-    );
     for (const [section, raw] of Object.entries(input.sections)) {
       const text = (raw ?? "").trim();
       if (!text) continue;
+      const scoped = evidenceForSeverityClaim(section, rankedEvidence);
+      const maxSev = Math.max(
+        0,
+        ...scoped.map((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] ?? 0),
+      );
       for (const sentence of text.split(SENTENCE_RE).filter(Boolean)) {
         if (!MOST_SERIOUS_RE.test(sentence)) continue;
-        const geography = geographyIn(sentence, rankedEvidence);
+        const geography = geographyForMostSerious(sentence, scoped);
         if (!geography) continue;
         const localMax = Math.max(
           0,
-          ...rankedEvidence
-            .filter((record) =>
-              [record.country, record.location].some(
-                (value) =>
-                  value &&
-                  new RegExp(`\\b${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(geography),
-              ),
-            )
+          ...scoped
+            .filter((record) => recordMatchesGeography(record, geography))
             .map((record) => SEV_RANK[String(record.severity ?? "").toLowerCase()] ?? 0),
         );
         if (localMax > 0 && localMax < maxSev) {
