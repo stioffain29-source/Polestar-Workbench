@@ -587,6 +587,9 @@ const GENERIC_FLASHPOINT_PROSE: string[] = [
   "risk level:",
   "disruption is most likely to remain localised",
   "prioritise route checks, short-notice movement planning and rapid",
+  "watch for confirmed mobilisation",
+  "enforcement notices, transport disruption",
+  "changes to access conditions",
 ];
 
 /** Saved AI/editor analyst prose that predates FP-14 voice rules. */
@@ -626,6 +629,7 @@ export function pickFlashpointAnalystProse(
   if (/^what matters most this week is that activity is spread across/i.test(t)) return auto;
   if (/^review staff movement and journey plans in/i.test(t)) return auto;
   if (/^polestar'?s view: this was an active week/i.test(t)) return auto;
+  if (/^watch for\b/i.test(t)) return auto;
   if (t.length >= 240) return t;
   return auto;
 }
@@ -4095,7 +4099,7 @@ export function resolveFlashpointRenderedModel(args: {
     regionalCountryRead: `${geography} Treat the accepted geography as the limit of the current assessment.`,
     whatMatters: "Use the accepted record to review staff movement, site access and communications readiness. Escalate only on confirmed changes.",
     implications: "Keep movement plans flexible, verify transport conditions close to departure and maintain practical communications contingencies.",
-    watchNext: "Watch for confirmed mobilisation, enforcement notices, transport disruption and changes to access conditions.",
+    watchNext: "",
     polestarView: "Maintain proportionate precautions based on the accepted record and refresh plans when confirmed reporting changes.",
   });
   assertFlashpointRenderedModelValid(countFree);

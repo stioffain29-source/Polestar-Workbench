@@ -256,6 +256,7 @@ export default function ReportEditor() {
   // dropdown. Keyed by id (not a bare boolean) so navigating between reports
   // never seeds the new report from the previous one's still-loaded topic set.
   const [seededId, setSeededId] = useState<number | null>(null);
+  const [pendingTopic, setPendingTopic] = useState<string | null>(null);
 
   // The builder only ever renders ONE topic's report, but a naive
   // useListIncidents({}) fetches EVERY relevance-passing incident (tens of
@@ -339,6 +340,15 @@ export default function ReportEditor() {
   });
 
   const incidents = rawIncidents;
+  const incidentWindowReady = rawIncidents !== undefined;
+
+  useEffect(() => {
+    if (pendingTopic === null) return;
+    if (form.topic !== pendingTopic) return;
+    if (!incidentWindowReady) return;
+    const frame = requestAnimationFrame(() => setPendingTopic(null));
+    return () => cancelAnimationFrame(frame);
+  }, [pendingTopic, form.topic, incidentWindowReady]);
   // Maritime movement (AIS) context for the Shipping Watch report. Context
   // only — never an incident; the board degrades to "movement data
   // unavailable" when empty.
@@ -755,12 +765,13 @@ export default function ReportEditor() {
 
   const flashpointProseDataset = useMemo(() => {
     if (form.topic !== "flashpoint" && form.topic !== "protests") return null;
+    if (!incidentWindowReady) return null;
     return buildFlashpointReportDataset(
       incidentsForExport,
       form.topic,
       form.issueDate,
     );
-  }, [form.topic, form.issueDate, incidentsForExport]);
+  }, [form.topic, form.issueDate, incidentsForExport, incidentWindowReady]);
 
   // Ground on the same set the report renders (parity with the cache
   // fingerprint). Summaries-enabled topics (conflict/shipping/cargo_watch/
@@ -1845,7 +1856,7 @@ export default function ReportEditor() {
   // PDF export gate. We pass an empty incident list when incidents are
   // still loading so the banner doesn't flicker into "no related incidents".
   const liveFuelData =
-    form.topic === "fuel" && form.issueDate
+    form.topic === "fuel" && form.issueDate && incidentWindowReady
       ? buildFuelWatchReportData(
           {
             title: form.title,
@@ -1864,12 +1875,28 @@ export default function ReportEditor() {
         )
       : null;
 
-  if (isLoading)
-    return <div className="text-sm text-muted-foreground">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div
+        className="flex flex-col items-center justify-center gap-3 py-24"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground">
+          Loading report
+        </div>
+      </div>
+    );
+  }
   if (!report)
     return (
       <div className="text-sm text-muted-foreground">Report not found.</div>
     );
+
+  const reportDetailsLoading = pendingTopic !== null || !incidentWindowReady;
+  const loadingTopicLabel =
+    TOPIC_LABELS[pendingTopic ?? form.topic] ?? "report";
 
   const scope = scopeFor(form.topic);
   // The rating a card pull would derive if the analyst leaves the override
@@ -1966,7 +1993,7 @@ export default function ReportEditor() {
             onClick={() => {
               void downloadPdf();
             }}
-            disabled={exporting}
+            disabled={exporting || reportDetailsLoading}
             className="rounded-sm"
           >
             {exporting ? (
@@ -2050,7 +2077,13 @@ export default function ReportEditor() {
           </Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Topic">
-              <Select value={form.topic} onValueChange={(v) => set("topic", v)}>
+              <Select
+                value={form.topic}
+                onValueChange={(v) => {
+                  setPendingTopic(v);
+                  set("topic", v);
+                }}
+              >
                 <SelectTrigger className="rounded-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -2105,6 +2138,16 @@ export default function ReportEditor() {
               />
             </Field>
           </div>
+          {reportDetailsLoading && (
+            <div
+              className="flex items-center gap-2 text-xs text-muted-foreground"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent shrink-0" />
+              Loading {loadingTopicLabel} details…
+            </div>
+          )}
           <Field label="Author">
             <Input
               value={form.author}
@@ -3257,9 +3300,11 @@ export default function ReportEditor() {
 
         <div
           ref={previewRef}
-          className="bg-white border border-border rounded-sm overflow-hidden"
+          className="bg-white border border-border rounded-sm overflow-hidden relative min-h-[480px]"
         >
-          {form.topic === "shipping" ? (
+          {reportDetailsLoading ? (
+            <ReportDetailsLoading topicLabel={loadingTopicLabel} />
+          ) : form.topic === "shipping" ? (
             <ShippingReportPreview
               report={form}
               incidents={incidentsForExport}
@@ -3320,6 +3365,25 @@ export default function ReportEditor() {
         </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ReportDetailsLoading({ topicLabel }: { topicLabel: string }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-3 py-24 px-6 text-center"
+      role="status"
+      aria-live="polite"
+    >
+      <Loader2 className="w-8 h-8 animate-spin text-accent" />
+      <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground">
+        Loading {topicLabel} details
+      </div>
+      <p className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+        Fetching incidents and building the preview. This can take a few seconds
+        after you change the report type.
+      </p>
     </div>
   );
 }

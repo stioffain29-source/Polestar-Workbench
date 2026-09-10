@@ -77,6 +77,27 @@ describe("Flashpoint shared publication architecture", () => {
     expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("SEVERITY_PARITY");
   });
 
+  it("replaces persisted generic Watch Next seed with canonical indicators", () => {
+    const rows = [
+      incident("Workers march in Seoul over wages", { country: "South Korea", location: "Seoul" }),
+    ];
+    const seeded = finalizeFlashpointPublication({
+      incidents: rows,
+      issueDate: ISSUE,
+    });
+    const bundle = finalizeFlashpointPublication({
+      incidents: rows,
+      issueDate: ISSUE,
+      report: {
+        datasetFingerprint: seeded.model.fingerprint,
+        watchNext:
+          "Watch for confirmed mobilisation, enforcement notices, transport disruption and changes to access conditions.\n\nWatch for police statements, union notices and any move that could affect staff routes in the week ahead.",
+      },
+    });
+    expect(bundle.model.prose.watchNext).not.toMatch(/Watch for confirmed mobilisation/i);
+    expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("WATCH_NEXT_UNGROUNDED");
+  });
+
   it("fails closed when persisted prose uses file/table narration", () => {
     const built = finalizeFlashpointPublication({
       incidents: [incident("Workers march in Delhi over wages")],
