@@ -22,12 +22,6 @@ import {
   toDraftableIncidents,
   type TopicAiProse,
 } from "@/lib/topicProseResolution";
-import {
-  resolveFuelEffectiveSections,
-  validateFuelReportConsistency as validateFuelEffectiveText,
-  validateFuelFinalEvidenceAudit,
-} from "@/lib/fuelReportConsistency";
-import { validateFuelReportConsistency as validateFuelCanonicalText } from "@/lib/fuelCanonicalFacts";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import {
@@ -46,7 +40,7 @@ import {
 } from "@/lib/cargoNarratives";
 import type { ProducerBuyerActionRow } from "@/lib/fuelNarratives";
 import {
-  buildFuelWatchReportData,
+  finalizeFuelPublication,
   fuelMarketLatestDate,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
@@ -775,9 +769,9 @@ export default function ReportPreview({
   }
   // Canonical Fuel Watch payload. Preview, PDF and the editor debug
   // panel all consume this — no renderer parses hardNumbers on its own.
-  const fuelData = isFuel && renderIssueDate
-    ? buildFuelWatchReportData(
-        {
+  const fuelBundle = isFuel && renderIssueDate
+    ? finalizeFuelPublication({
+        report: {
           title: report.title,
           issueDate: renderIssueDate,
           executiveSummary: report.executiveSummary,
@@ -790,8 +784,10 @@ export default function ReportPreview({
           hardNumbers: report.hardNumbers,
         },
         incidents,
-      )
+        aiProse,
+      })
     : null;
+  const fuelData = fuelBundle?.reportData ?? null;
   const periodLabel = report.topic && renderIssueDate
     ? resolveReportWindow(report.topic, renderIssueDate).label
     : "";
@@ -816,24 +812,7 @@ export default function ReportPreview({
   // FINAL EFFECTIVE Fuel narrative (analyst edit -> AI -> canonical) from the
   // ONE shared resolver the PDF exporter and editor prefill also call, so all
   // three surfaces render byte-identical section text.
-  const fuelEffective = fuelData
-    ? resolveFuelEffectiveSections({
-        report: {
-          executiveSummary: report.executiveSummary,
-          situation: report.situation,
-          whatHappened: report.whatHappened,
-          whatMatters: report.whatMatters,
-          polestarView: report.polestarView,
-          fuelMarketRead: report.fuelMarketRead,
-          fuelOperationalRead: report.fuelOperationalRead,
-          fuelRegionalHighlights: report.fuelRegionalHighlights,
-          implications: report.implications,
-          watchNext: report.watchNext,
-        },
-        aiProse,
-        fuelData,
-      })
-    : null;
+  const fuelEffective = fuelBundle?.effectiveSections ?? null;
   const execText = fuelEffective
     ? (fuelEffective.executiveSummary ?? "")
     : resolveSimpleProse(
@@ -848,23 +827,9 @@ export default function ReportPreview({
   // Two layers, exactly as the exporter runs them: the strict canonical gate
   // over the canonical payload (canonical text passes by construction), and
   // the prose-tolerant gate over the FINAL effective text (whichever tier wins).
-  const fuelConsistencyErrors = fuelData
-    ? validateFuelCanonicalText(fuelData.canonicalFacts, {
-        ...fuelData.narrativeData.canonicalSections,
-      })
-    : [];
-  const fuelEffectiveIssues =
-    fuelData && fuelEffective
-      ? validateFuelEffectiveText(fuelData.reportFacts, fuelEffective)
-      : [];
-  const fuelEvidenceAuditIssues =
-    fuelData && fuelEffective
-      ? validateFuelFinalEvidenceAudit(
-          fuelData.reportFacts,
-          fuelEffective,
-          fuelData.canonicalFacts.watchIndicators,
-        )
-      : [];
+  const fuelConsistencyErrors = fuelBundle?.auditIssues.canonical ?? [];
+  const fuelEffectiveIssues = fuelBundle?.auditIssues.consistency ?? [];
+  const fuelEvidenceAuditIssues = fuelBundle?.auditIssues.evidence ?? [];
   if (
     fuelConsistencyErrors.length > 0 ||
     fuelEffectiveIssues.length > 0 ||

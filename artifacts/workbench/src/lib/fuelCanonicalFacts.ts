@@ -16,6 +16,8 @@ import {
   type FuelMarketDirection,
   type FuelMarketTemporalStatus,
 } from "./fuelMarketIndicators";
+import { filterIncidentsToWindow, resolveReportWindow } from "./reportWindow";
+import { format } from "date-fns";
 
 export const FUEL_SEVERITIES = ["Insignificant", "Low", "Moderate", "High", "Extreme"] as const;
 export type FuelSeverity = (typeof FUEL_SEVERITIES)[number];
@@ -51,7 +53,25 @@ export interface CanonicalFuelIncident {
   evidenceStatus: EvidenceStatus;
   sourceUrl: string | null;
   source: string | null;
+  supportedClaims: string[];
+  evidenceFamilyId: string;
+  evidenceWeight: number;
   raw: TopicFastFactsIncident;
+}
+
+export type FuelEvidenceCoverageKind = "canonical" | "syndicated" | "follow-on" | "commentary";
+export interface FuelEvidenceFamilyMember {
+  record: TopicFastFactsIncident;
+  kind: FuelEvidenceCoverageKind;
+  weight: number;
+}
+export interface FuelEvidenceFamily {
+  id: string;
+  canonicalRecord: TopicFastFactsIncident;
+  members: FuelEvidenceFamilyMember[];
+  /** Bounded corroboration weight. Coverage volume can never become a count of
+   * independent developments. */
+  weight: number;
 }
 
 export interface FuelRankedPressurePoint {
@@ -79,7 +99,8 @@ export interface FuelMarketIndicatorFact {
 }
 
 export interface FuelCanonicalFacts {
-  reportingPeriod: { issueDate: string; incidentStart: string | null; incidentEnd: string | null };
+  reportingPeriod: { issueDate: string; start: string; end: string; incidentStart: string | null; incidentEnd: string | null };
+  evidenceFamilies: FuelEvidenceFamily[];
   qualifyingIncidents: CanonicalFuelIncident[];
   incidentCount: number;
   distinctIncidentDates: string[];
@@ -96,6 +117,15 @@ export interface FuelCanonicalFacts {
   analystReviewRequired: boolean;
   currentConditions: CanonicalFuelIncident[];
   watchIndicators: string[];
+  judgement: FuelJudgement;
+}
+
+export interface FuelJudgement {
+  mainRisk: string;
+  exposure: { geography: string | null; sector: string };
+  direction: "upward" | "downward" | "stable" | "uncertain";
+  trigger: string;
+  evidenceFamilyIds: string[];
 }
 
 export interface FuelCanonicalSections {
@@ -152,29 +182,74 @@ function fuelContinuityBoost(i: TopicFastFactsIncident): number {
       && /\b(shortage|ration|cut|disrupt|crisis|offline)\b/.test(hay)) return 12;
   return 0;
 }
-/** Collapse syndicated Red Sea / Yemen / Bab-el-Mandeb corridor copies to one record. */
-function fuelStoryFamilyKey(i: TopicFastFactsIncident): string | null {
-  const hay = `${i.title ?? ""} ${i.summary ?? ""}`.toLowerCase();
-  if (!/\b(red sea|bab[- ]el[- ]mandeb|bab al[- ]mandab|houthi|yemen)\b/.test(hay)) return null;
-  if (!/\b(vessel|tanker|ship|attack|strike|missile|shipping|maritime|crew)\b/.test(hay)) return null;
-  if (/\bbab[- ]el|bab al[- ]mandab/.test(hay)) return "corridor:bab-el-mandeb";
-  return "corridor:red-sea-yemen";
+const FAMILY_STOP = new Set("after about amid says said report reports update latest analysis opinion commentary market fuel oil gas new".split(" "));
+function familyTokens(i: TopicFastFactsIncident): Set<string> {
+  return new Set((`${i.title} ${i.summary ?? ""}`.toLowerCase().match(/[a-z0-9][a-z0-9-]{2,}/g) ?? [])
+    .filter((w) => !FAMILY_STOP.has(w)));
 }
-function dedupeFuelSyndication(incidents: TopicFastFactsIncident[]): TopicFastFactsIncident[] {
-  const unkeyed: TopicFastFactsIncident[] = [];
-  const families = new Map<string, TopicFastFactsIncident>();
-  for (const raw of incidents) {
-    const key = fuelStoryFamilyKey(raw);
-    if (!key) {
-      unkeyed.push(raw);
-      continue;
-    }
-    const prev = families.get(key);
-    if (!prev || SEVERITY_RANK[effectiveSeverityFor(raw)] > SEVERITY_RANK[effectiveSeverityFor(prev)]) {
-      families.set(key, raw);
-    }
+function normalizedUrl(i: TopicFastFactsIncident): string | null {
+  if (!i.sourceUrl) return null;
+  try {
+    const u = new URL(i.sourceUrl);
+    return `${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}`;
+  } catch { return i.sourceUrl.split(/[?#]/)[0].toLowerCase(); }
+}
+function sameEvidenceFamily(a: TopicFastFactsIncident, b: TopicFastFactsIncident): boolean {
+  const ad = day(a.occurredAt);
+  const bd = day(b.occurredAt);
+  const gap = Math.abs(Date.parse(`${ad}T00:00:00Z`) - Date.parse(`${bd}T00:00:00Z`)) / 86_400_000;
+  if (!Number.isFinite(gap) || gap > 3) return false;
+  const au = normalizedUrl(a); const bu = normalizedUrl(b);
+  if (au && bu && au === bu) return true;
+  const at = familyTokens(a); const bt = familyTokens(b);
+  const overlap = [...at].filter((t) => bt.has(t)).length;
+  const union = new Set([...at, ...bt]).size;
+  const titleA = new Set(familyTokens({ ...a, summary: "" }));
+  const titleB = new Set(familyTokens({ ...b, summary: "" }));
+  const titleOverlap = [...titleA].filter((token) => titleB.has(token)).length;
+  const geographyA = (deriveIncidentCountry(a) ?? a.location ?? "").toLowerCase();
+  const geographyB = (deriveIncidentCountry(b) ?? b.location ?? "").toLowerCase();
+  const geographyCompatible = !geographyA || !geographyB || geographyA === geographyB;
+  return geographyCompatible && titleOverlap >= 2 && overlap >= 3 && union > 0 && overlap / union >= 0.42;
+}
+function coverageKind(record: TopicFastFactsIncident, canonical: TopicFastFactsIncident): FuelEvidenceCoverageKind {
+  if (record === canonical) return "canonical";
+  const raw = record as unknown as Record<string, unknown>;
+  const explicit = `${raw.coverageType ?? raw.reportingType ?? ""}`.toLowerCase();
+  const hay = `${record.title} ${record.summary ?? ""}`.toLowerCase();
+  if (/comment|analysis|opinion|explainer/.test(explicit) || /\b(analysis|opinion|commentary|explainer)\b/.test(hay)) return "commentary";
+  if (/follow|update/.test(explicit) || /\b(update|aftermath|reopen|resume|investigation|follow-up)\b/.test(hay)) return "follow-on";
+  return "syndicated";
+}
+function canonicalScore(i: TopicFastFactsIncident): number {
+  return SEVERITY_RANK[effectiveSeverityFor(i)] * 100
+    + (i.sourceUrl ? 10 : 0) + (i.summary?.trim() ? 5 : 0)
+    - (isSocialPostTitle(i.title) ? 50 : 0);
+}
+/** General event-family ledger. It uses record similarity, time and geography;
+ * never country, headline, route or commodity exceptions. */
+export function buildFuelEvidenceLedger(records: TopicFastFactsIncident[]): FuelEvidenceFamily[] {
+  const groups: TopicFastFactsIncident[][] = [];
+  for (const record of records.slice().sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+    const group = groups.find((g) => g.some((member) => sameEvidenceFamily(member, record)));
+    if (group) group.push(record); else groups.push([record]);
   }
-  return [...unkeyed, ...families.values()];
+  return groups.map((group, index) => {
+    const canonicalRecord = group.slice().sort((a, b) =>
+      canonicalScore(b) - canonicalScore(a) || b.occurredAt.localeCompare(a.occurredAt) || a.title.localeCompare(b.title),
+    )[0];
+    const members = group.map((record) => {
+      const kind = coverageKind(record, canonicalRecord);
+      const weight = kind === "canonical" ? 1 : kind === "follow-on" ? 0.3 : kind === "syndicated" ? 0.15 : 0.1;
+      return { record, kind, weight };
+    });
+    return {
+      id: `fuel-family-${index + 1}`,
+      canonicalRecord,
+      members,
+      weight: Math.min(1.75, members.reduce((sum, member) => sum + member.weight, 0)),
+    };
+  });
 }
 function severityWord(value: FuelSeverity): string { return value.toLowerCase(); }
 // A quoted incident headline can carry its own percentage ("Jet fuel price
@@ -275,11 +350,13 @@ function marketFact(
   card: { label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string; referenceDate?: string; referenceValue?: number },
   issueDate: string,
   jetTrajectory?: { date: string; value: number }[],
+  window?: { start: string; end: string },
 ): FuelMarketIndicatorFact {
   const derived = deriveFuelMarketIndicator({
     card,
     issueDate,
     trajectory: /\bjet\b|kerosene/i.test(card.label) ? jetTrajectory : undefined,
+    window,
   });
   return {
     ...derived,
@@ -297,10 +374,23 @@ export function buildFuelCanonicalFacts(opts: {
   /** Jet trajectory points — when present, jet-fuel pct in prose matches the gate. */
   jetTrajectory?: { date: string; value: number }[];
   watchIndicators?: string[];
+  window?: { start: string; end: string };
 }): FuelCanonicalFacts {
-  const filtered = opts.qualifyingIncidents ?? filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
-  const deduped = dedupeFuelSyndication(filtered);
-  const qualifyingIncidents = deduped.map((raw, index): CanonicalFuelIncident => {
+  const fallbackWindow = resolveReportWindow("fuel", opts.issueDate);
+  const window = opts.window ?? { start: format(fallbackWindow.start, "yyyy-MM-dd"), end: format(fallbackWindow.end, "yyyy-MM-dd") };
+  const filtered = opts.qualifyingIncidents
+    ? opts.qualifyingIncidents.filter((incident) => {
+        const date = day(incident.occurredAt);
+        return date >= window.start && date <= window.end;
+      })
+    : filterTopicReportIncidents(
+        filterIncidentsToWindow(opts.incidents, "fuel", window.end),
+        "fuel",
+        window.end,
+      );
+  const evidenceFamilies = buildFuelEvidenceLedger(filtered);
+  const qualifyingIncidents = evidenceFamilies.map((family, index): CanonicalFuelIncident => {
+    const raw = family.canonicalRecord;
     const country = deriveIncidentCountry(raw);
     const physicalLocation = text(raw.location) ?? null;
     const severity = effectiveSeverityFor(raw);
@@ -308,7 +398,11 @@ export function buildFuelCanonicalFacts(opts: {
       id: String(raw.id ?? `${day(raw.occurredAt)}:${index}:${raw.title}`), title: raw.title, occurredAt: raw.occurredAt,
       date: day(raw.occurredAt), topic: raw.topic, severity, physicalLocation,
       country, routeOrChokepoint: routeFor(raw), widerRegionalRelevance: relevanceFor(routeFor(raw)), entities: entitiesFor(raw),
-      evidenceStatus: evidenceStatusFor(raw), sourceUrl: raw.sourceUrl ?? null, source: raw.source ?? null, raw,
+      evidenceStatus: evidenceStatusFor(raw), sourceUrl: raw.sourceUrl ?? null, source: raw.source ?? null,
+      supportedClaims: Array.isArray((raw as unknown as Record<string, unknown>).supportedClaims)
+        ? ((raw as unknown as Record<string, unknown>).supportedClaims as unknown[]).filter((x): x is string => typeof x === "string")
+        : [],
+      evidenceFamilyId: family.id, evidenceWeight: family.weight, raw,
     };
   });
   const groups = (pick: (i: CanonicalFuelIncident) => string | null) => {
@@ -323,7 +417,7 @@ export function buildFuelCanonicalFacts(opts: {
         label,
         count: rows.length,
         continuityBoost,
-        severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity], 0) + continuityBoost,
+        severityScore: rows.reduce((n, i) => n + SEVERITY_RANK[i.severity] * i.evidenceWeight, 0) + continuityBoost,
         maxSeverity: maxSeverityRank(rows),
         incidentIds: rows.map((i) => i.id),
       };
@@ -378,13 +472,35 @@ export function buildFuelCanonicalFacts(opts: {
   const overallSeverity = highestPriorityIncident?.severity ?? "Insignificant";
   const sourceCoverage = qualifyingIncidents.length === 0 ? 1 : qualifyingIncidents.filter((i) => Boolean(i.sourceUrl || i.source)).length / qualifyingIncidents.length;
   const evidenceConfidence = sourceCoverage >= 0.8 ? "High" : sourceCoverage >= 0.5 ? "Moderate" : "Low";
+  const periodIndicators = opts.marketCards.map((c) => marketFact(c, opts.issueDate, opts.jetTrajectory, window));
+  const up = periodIndicators.filter((i) => i.comparisonScope === "reporting-period" && i.direction === "rising").length;
+  const down = periodIndicators.filter((i) => i.comparisonScope === "reporting-period" && i.direction === "falling").length;
+  const judgement: FuelJudgement = {
+    mainRisk: highestPriorityIncident ? proseSafeTitle(highestPriorityIncident.title) : "No material current-period operational development",
+    exposure: {
+      geography: primaryPressurePoint.kind === "distributed" ? null : primaryPressurePoint.label,
+      sector: qualifyingIncidents.some((i) => /\b(shortage|ration|forecourt|depot)\b/i.test(`${i.title} ${i.raw.summary ?? ""}`))
+        ? "road fuel distribution" : qualifyingIncidents.some((i) => i.routeOrChokepoint)
+          ? "routing and fuel delivery" : "fuel procurement",
+    },
+    direction: up > down ? "upward" : down > up ? "downward" : periodIndicators.some((i) => i.comparisonScope === "reporting-period") ? "stable" : "uncertain",
+    trigger: qualifyingIncidents.some((i) => i.routeOrChokepoint)
+      ? "a confirmed change in transit availability"
+      : qualifyingIncidents.length ? "confirmed escalation or resolution of the lead development" : "new current-period operational evidence",
+    evidenceFamilyIds: highestPriorityIncident ? [highestPriorityIncident.evidenceFamilyId] : [],
+  };
   return {
-    reportingPeriod: { issueDate: opts.issueDate, incidentStart: qualifyingIncidents.map((i) => i.date).sort()[0] ?? null, incidentEnd: qualifyingIncidents.map((i) => i.date).sort().at(-1) ?? null },
+    reportingPeriod: { issueDate: opts.issueDate, start: window.start, end: window.end, incidentStart: qualifyingIncidents.map((i) => i.date).sort()[0] ?? null, incidentEnd: qualifyingIncidents.map((i) => i.date).sort().at(-1) ?? null },
+    evidenceFamilies,
     qualifyingIncidents, incidentCount: qualifyingIncidents.length, distinctIncidentDates: [...new Set(qualifyingIncidents.map((i) => i.date))].sort(), countries, routes,
     incidentLocations: [...new Set(qualifyingIncidents.map((i) => i.physicalLocation).filter((x): x is string => Boolean(x)))].sort(), severityDistribution,
-    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: opts.marketCards.map((c) => marketFact(c, opts.issueDate, opts.jetTrajectory)), overallSeverity,
+    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: periodIndicators, overallSeverity,
     evidenceConfidence, analystReviewRequired: evidenceConfidence === "Low" && overallSeverity !== "Insignificant", currentConditions: qualifyingIncidents.filter((i) => i.evidenceStatus !== "Potential"),
-    watchIndicators: [...new Set((opts.watchIndicators ?? []).map((x) => x.trim()).filter(Boolean))],
+    watchIndicators: [...new Set([
+      ...(opts.watchIndicators ?? []).map((x) => x.trim()).filter(Boolean),
+      judgement.trigger,
+    ])],
+    judgement,
   };
 }
 
@@ -395,6 +511,9 @@ function marketSentence(facts: FuelCanonicalFacts): string {
   const indicators = facts.marketIndicators.slice(0, 3);
   if (!indicators.length) return "No market indicators were supplied for this period.";
   return indicators.map((i) => {
+    if (i.temporalStatus !== "current-period") {
+      return `${i.label} is a contextual observation${i.currentDate ? ` dated ${i.currentDate}` : " with no date"} and does not establish reporting-period movement`;
+    }
     if (!i.direction) return `${i.label} has no comparable movement`;
     if (i.comparisonScope === "reporting-period") {
       return `${i.label} is ${i.direction} within the reporting period`;

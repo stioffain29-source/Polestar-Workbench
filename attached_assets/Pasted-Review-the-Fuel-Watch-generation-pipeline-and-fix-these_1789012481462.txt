@@ -1,0 +1,173 @@
+Review the Fuel Watch generation pipeline and fix these as general product rules. Do not patch individual countries, incidents, headlines or commodities. The objective is to prevent the same classes of failure recurring in future reports.
+
+1. Enforce strict reporting period integrity
+
+Every market statement must know the date range of the data behind it.
+
+If a price series ends before the reporting window, it may be shown as context, but the prose must not describe it as having risen or fallen “this week”, “over this window” or during the current reporting period.
+
+Market commentary must distinguish:
+current period movement
+lagged benchmark data
+historical comparison
+
+Do not allow stale benchmark data to be blended into current period language.
+
+2. Separate data freshness from analytical relevance
+
+A data point can still be useful even if lagged, but the prose must state its actual as-of date and use it only as contextual evidence.
+
+Do not infer a current trend from a stale series unless newer corroborating evidence exists.
+
+3. Remove backend taxonomy language from client-facing prose
+
+Terms that sound like internal fields, selectors or system state must never appear in the finished report.
+
+Examples of the class of language to remove:
+fixed risk picture
+current condition set
+condition set
+records indicate
+on file
+the dataset shows
+
+Translate internal state into natural analyst prose or omit it.
+
+4. Build prose from validated evidence, not category templates
+
+Do not generate generic paragraphs simply because the report has a MARKET READ, SITUATION or REGIONAL HIGHLIGHTS section.
+
+Every paragraph should be anchored to specific validated developments from the reporting period.
+
+Where there is insufficient evidence, say less.
+
+5. Strengthen evidence weighting
+
+Repeated reporting of the same underlying issue must not be treated as multiple independent developments.
+
+Distinguish:
+independent incidents
+syndicated reporting
+follow-on reporting
+commentary or analysis
+repeated reporting of the same market theme
+
+Do not allow volume of coverage to inflate the apparent significance of one underlying event.
+
+6. Keep section emphasis consistent
+
+Executive Summary, Situation, Regional Highlights, What Matters, Watch Next and Polestar View must all be based on the same weighted evidence.
+
+A geography or issue should not suddenly become a priority in one section if it has not been established by the evidence used elsewhere.
+
+If section emphasis differs, the system must be able to explain why.
+
+7. Require explicit evidence for causal claims
+
+Do not claim that an event caused:
+price rises
+rerouting
+shortages
+higher war-risk premiums
+availability problems
+refinery output changes
+higher landed cost
+
+unless the supporting source or validated evidence establishes that relationship.
+
+Where causation is uncertain, use cautious correlation language rather than stating it as fact.
+
+8. Make analytical writing specific
+
+Replace generic statements such as:
+“fuel pressure is rising”
+“supply disruption remains a concern”
+“physical restrictions are most visible”
+“the current condition is defined by”
+
+with specific statements that explain:
+what changed
+where it changed
+what caused or contributed to it
+who is affected
+what the operational consequence is
+what direction it is likely to take
+
+9. Improve regional analysis
+
+Regional Highlights should not simply list countries with generic wording.
+
+Each included market should have a clear reason for inclusion based on validated evidence.
+
+If a country has no material current-period development, do not manufacture a paragraph for it.
+
+10. Preserve the stronger What Matters model
+
+What Matters should remain the main judgement section.
+
+It should distinguish different types of exposure, for example:
+price pressure
+physical availability
+refinery disruption
+marine fuel continuity
+road fuel distribution
+aviation fuel cost
+routing/chokepoint risk
+
+Do not collapse these into a single generic “fuel risk” statement.
+
+11. Keep Implications for Business specific
+
+Actions must be tied to the actual exposure identified in the report.
+
+Avoid generic actions that could appear in any Fuel Watch.
+
+Each action should clearly link to a validated current risk or near-term indicator.
+
+12. Keep Watch Next evidence-led
+
+Every Watch Next item must trace to:
+a validated current-period development
+a credible announced future event
+a logical escalation trigger from the evidence
+
+Do not introduce orphan countries, themes or commodities that are not established elsewhere in the report.
+
+13. Strengthen Polestar View
+
+Polestar View should give one coherent judgement on:
+the main risk
+the most exposed geography or sector
+the likely near-term direction
+the key trigger that would change the assessment
+
+It must not contradict the priorities established in What Matters or Regional Highlights.
+
+14. Separate analytical confidence from backend confidence
+
+Internal model confidence, unresolved fields, classifier states or validation status must remain internal.
+
+If analytical confidence is shown to the client, it must be a deliberate Polestar judgement based on evidence quality, not a backend status leaking into prose.
+
+15. Add a final temporal and evidential prose audit before render
+
+Before PDF generation, test every material sentence for:
+
+Is the underlying evidence inside the reporting period?
+If not, is it clearly labelled as lagged/contextual?
+Is the geography supported?
+Is the causal relationship supported?
+Is this an independent development or repeated reporting?
+Does the sentence contradict another section?
+Is this natural analyst language rather than backend/system language?
+Does it add operational or analytical value?
+
+If any check fails, regenerate or remove the sentence.
+
+16. Apply these controls to the shared reporting architecture
+
+Do not solve this through report-specific keyword patches or hardcoded exceptions.
+
+These rules should be implemented in shared evidence, prose and validation logic so the same failure cannot recur under different countries, products, incidents or data sources.
+
+Inspect the existing Fuel Watch code and identify where date alignment, evidence weighting, section generation, causal language and final prose validation currently occur. Then implement the changes rather than only describing them.

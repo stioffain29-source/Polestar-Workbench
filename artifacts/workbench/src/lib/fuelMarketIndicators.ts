@@ -1,4 +1,4 @@
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import { resolveReportWindow } from "./reportWindow";
 
 export type FuelMarketDirection =
@@ -75,16 +75,6 @@ function percentageFromChange(change: string | undefined): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function inferredReferenceDate(change: string | undefined, currentDate: string | null): string | null {
-  if (!change || !currentDate) return null;
-  const amount = change.match(/\b(\d+)\s*(d|day|days|w|week|weeks)\b/i);
-  if (!amount) return null;
-  const date = new Date(`${currentDate}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  const count = Number(amount[1]) * (/^w/i.test(amount[2]) ? 7 : 1);
-  return format(subDays(date, count), "yyyy-MM-dd");
-}
-
 function temporalStatus(date: string | null, periodStart: string, periodEnd: string): FuelMarketTemporalStatus {
   if (!date) return "undated";
   if (date < periodStart) return "lagged";
@@ -102,10 +92,16 @@ export function deriveFuelMarketIndicator(opts: {
   card: FuelMarketObservationInput;
   issueDate: string;
   trajectory?: { date: string; value: number }[];
+  /** The publication window resolved by the Fuel bundle. Supplying it prevents
+   * market facts from independently resolving a subtly different period. */
+  window?: { start: string; end: string };
 }): DerivedFuelMarketIndicator {
-  const { start, end } = resolveReportWindow("fuel", opts.issueDate);
-  const periodStart = format(start, "yyyy-MM-dd");
-  const periodEnd = format(end, "yyyy-MM-dd");
+  const resolved = opts.window ?? (() => {
+    const { start, end } = resolveReportWindow("fuel", opts.issueDate);
+    return { start: format(start, "yyyy-MM-dd"), end: format(end, "yyyy-MM-dd") };
+  })();
+  const periodStart = resolved.start;
+  const periodEnd = resolved.end;
   const points = (opts.trajectory ?? [])
     .map((point) => ({ ...point, day: isoDay(point.date) }))
     .filter((point): point is typeof point & { day: string } => point.day !== null)
@@ -145,7 +141,9 @@ export function deriveFuelMarketIndicator(opts: {
     const current = numberOf(currentValue);
     if (current !== null && percentageChange !== null && percentageChange !== -100) {
       referenceValue = current / (1 + percentageChange / 100);
-      referenceDate = referenceDate ?? inferredReferenceDate(opts.card.change, currentDate);
+      // A free-form string such as "-2% 7d" does not establish a dated
+      // observation. Keep the comparison useful, but undated and contextual.
+      // Inventing currentDate - 7 days made stale cards look period-aligned.
       basis = "change-string";
     }
   }

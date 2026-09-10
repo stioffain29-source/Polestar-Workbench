@@ -31,7 +31,15 @@ export interface FinalReportEvidenceAuditInput {
   window?: { start: string; end: string };
   evidence: FinalReportEvidenceRecord[];
   sections: Record<string, string | null | undefined>;
-  validatedForwardIndicators: string[];
+  validatedForwardIndicators: Array<string | FinalReportTypedReference>;
+  typedReferences?: FinalReportTypedReference[];
+}
+
+export interface FinalReportTypedReference {
+  id: string;
+  type: "development" | "market-observation" | "forward-indicator" | "supported-claim";
+  text: string;
+  evidenceId?: string | number | null;
 }
 
 export type FinalReportEvidenceAuditCode =
@@ -75,7 +83,7 @@ const BOILERPLATE_RE =
 const SPECULATIVE_RE =
   /\b(could|may|might|potential|risk of|watch for|if\b|scenario|would)\b/i;
 const BACKEND_RE =
-  /\b(model confidence|backend confidence|evidence confidence|confidence score|validation status|unresolved fields?|classifier confidence|model uncertainty|low-confidence evidence)\b|\bconfidence (?:is|stays|remains) (?:low|moderate|high)\b[^.!?]{0,90}\b(?:unresolved|validation|location|event status|routing outcome)\b/i;
+  /\b(model confidence|backend confidence|evidence confidence|confidence score|validation status|unresolved fields?|classifier confidence|model uncertainty|low-confidence evidence|fixed risk picture|current condition set|condition set|records indicate|on file|(?:the )?dataset shows)\b|\bconfidence (?:is|stays|remains) (?:low|moderate|high)\b[^.!?]{0,90}\b(?:unresolved|validation|location|event status|routing outcome)\b/i;
 const PERIOD_DISCLAIMER_RE =
   /\b(?:not|rather than|cannot|does not|isn't|is not)\b[^.!?]{0,100}\b(?:evidence|indicat(?:e|ion)|direction|movement|move)\b[^.!?]{0,50}\b(?:within|for|in) (?:this|the) reporting period\b|\bcontext rather than (?:a )?reporting-period direction\b/i;
 const PRIORITY_RE =
@@ -96,7 +104,7 @@ function words(text: string): string[] {
   );
 }
 
-function corpusOf(records: FinalReportEvidenceRecord[], forward: string[]): string {
+function corpusOf(records: FinalReportEvidenceRecord[], forward: Array<string | FinalReportTypedReference>): string {
   return [
     ...records.flatMap((r) => [
       r.title,
@@ -107,15 +115,22 @@ function corpusOf(records: FinalReportEvidenceRecord[], forward: string[]): stri
       ...(r.supportedClaims ?? []),
       r.marketComparison?.indicator ?? "",
     ]),
-    ...forward,
+    ...forward.map((item) => typeof item === "string" ? item : item.text),
   ]
     .join(" ")
     .toLowerCase();
 }
 
-function hasGrounding(text: string, corpus: string, minimum = 1): boolean {
-  const distinctive = [...new Set(words(text))].filter((w) => w.length >= 4);
-  return distinctive.filter((w) => corpus.includes(w)).length >= minimum;
+function referenceGrounds(item: string, reference: FinalReportTypedReference): boolean {
+  const itemWords = [...new Set(words(item).filter((w) => w.length >= 4))];
+  const refWords = new Set(words(reference.text));
+  const overlap = itemWords.filter((word) => refWords.has(word)).length;
+  // A typed link must retain either the exact reference phrase or a substantial
+  // share of one specific reference. Two unrelated words spread across the
+  // complete corpus are deliberately insufficient.
+  return item.toLowerCase().includes(reference.text.toLowerCase())
+    || reference.text.toLowerCase().includes(item.toLowerCase())
+    || (overlap >= 2 && overlap / Math.max(1, Math.min(itemWords.length, refWords.size)) >= 0.5);
 }
 
 function unsupportedMatchedClaim(re: RegExp, text: string, corpus: string): string | null {
@@ -157,9 +172,23 @@ export function auditFinalReportEvidence(
   input: FinalReportEvidenceAuditInput,
 ): FinalReportEvidenceAuditIssue[] {
   const issues: FinalReportEvidenceAuditIssue[] = [];
-  const evidenceCorpus = corpusOf(input.evidence, []);
-  const allGrounding = corpusOf(input.evidence, input.validatedForwardIndicators);
+  const currentEvidence = input.window
+    ? input.evidence.filter((record) => {
+        if (record.marketComparison) return true;
+        const date = record.occurredAt?.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+        return Boolean(date && date >= input.window!.start && date <= input.window!.end);
+      })
+    : input.evidence;
+  const evidenceCorpus = corpusOf(currentEvidence, []);
   const market = input.evidence.filter((r) => r.marketComparison);
+  const typedReferences: FinalReportTypedReference[] = [
+    ...(input.typedReferences ?? []).filter((reference) =>
+      reference.evidenceId === undefined
+      || currentEvidence.some((record) => record.id === reference.evidenceId)),
+    ...input.validatedForwardIndicators.map((item, index) => typeof item === "string"
+      ? { id: `forward-${index}`, type: "forward-indicator" as const, text: item }
+      : item),
+  ];
 
   for (const [section, raw] of Object.entries(input.sections)) {
     const text = (raw ?? "").trim();
@@ -198,8 +227,16 @@ export function auditFinalReportEvidence(
       }
 
       if (EFFECT_RE.test(sentence) && CAUSAL_RE.test(sentence) && !SPECULATIVE_RE.test(sentence)) {
-        const unsupported = unsupportedMatchedClaim(EFFECT_RE, sentence, evidenceCorpus);
-        if (unsupported) {
+        const claimRefs = [
+          ...currentEvidence.flatMap((record, index) => (record.supportedClaims ?? []).map((claim, claimIndex) => ({
+            id: `claim-${record.id ?? index}-${claimIndex}`,
+            type: "supported-claim" as const,
+            text: claim,
+            evidenceId: record.id,
+          }))),
+          ...typedReferences.filter((reference) => reference.type === "supported-claim"),
+        ];
+        if (!claimRefs.some((reference) => referenceGrounds(sentence, reference))) {
           issues.push({ code: "UNSUPPORTED_CAUSAL_CLAIM", section, message: `Causal operating consequence is not supported by canonical evidence: "${sentence.trim().slice(0, 150)}"` });
         }
       }
@@ -215,13 +252,8 @@ export function auditFinalReportEvidence(
 
     if (section.toLowerCase() === "watchnext") {
       for (const item of text.split(/\n+|(?<=[.;!?])\s+/).filter((s) => words(s).length)) {
-        const explicitlyValidated = input.validatedForwardIndicators.some(
-          (indicator) =>
-            indicator.trim().length > 0 &&
-            (item.toLowerCase().includes(indicator.toLowerCase()) ||
-              indicator.toLowerCase().includes(item.toLowerCase())),
-        );
-        if (!explicitlyValidated && !hasGrounding(item, allGrounding, 2)) {
+        const explicitlyValidated = typedReferences.some((reference) => referenceGrounds(item, reference));
+        if (!explicitlyValidated) {
           issues.push({ code: "WATCH_NEXT_UNGROUNDED", section, message: `Watch item introduces a country or theme absent from evidence and validated indicators: "${item.trim().slice(0, 150)}"` });
         }
       }

@@ -25,6 +25,7 @@
 // ordinary analyst prose.
 
 import type { FuelReportFacts, MarketDirection } from "./fuelReportFacts";
+import type { FuelJudgement } from "./fuelCanonicalFacts";
 import {
   auditFinalReportEvidence,
   assertFinalReportEvidence,
@@ -37,7 +38,8 @@ export interface FuelConsistencyIssue {
     | "PRIMARY_PRESSURE"
     | "COUNT_TRACEABLE"
     | "SEVERITY_TERMS"
-    | "CURRENT_CONDITION";
+    | "CURRENT_CONDITION"
+    | "JUDGEMENT_CONSISTENCY";
   section: string;
   message: string;
 }
@@ -78,6 +80,7 @@ export function validateFuelFinalEvidenceAudit(
   return auditFinalReportEvidence({
     topic: "fuel",
     issueDate: facts.issueDate,
+    window: facts.reportWindow,
     evidence: [
       ...facts.incidents.map((r) => ({
         id: r.id,
@@ -86,6 +89,7 @@ export function validateFuelFinalEvidenceAudit(
         country: r.country,
         location: r.location,
         occurredAt: r.occurredAt,
+        supportedClaims: r.supportedClaims,
       })),
       ...facts.market.indicators
         .filter((m) => m.current !== null)
@@ -103,6 +107,19 @@ export function validateFuelFinalEvidenceAudit(
     ],
     sections: { ...sections },
     validatedForwardIndicators,
+    typedReferences: [
+      ...facts.incidents.map((r) => ({
+        id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
+        type: "development" as const,
+        text: [r.title, r.summary, r.country, r.location].filter(Boolean).join(" "),
+        evidenceId: r.id,
+      })),
+      ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
+        id: `market-${m.key}`,
+        type: "market-observation" as const,
+        text: `${m.label} ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
+      })),
+    ],
   });
 }
 
@@ -114,6 +131,7 @@ export function assertFuelFinalEvidenceAudit(
   assertFinalReportEvidence({
     topic: "fuel",
     issueDate: facts.issueDate,
+    window: facts.reportWindow,
     evidence: [
       ...facts.incidents.map((r) => ({
         id: r.id,
@@ -122,6 +140,7 @@ export function assertFuelFinalEvidenceAudit(
         country: r.country,
         location: r.location,
         occurredAt: r.occurredAt,
+        supportedClaims: r.supportedClaims,
       })),
       ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
         id: `market-${m.key}`,
@@ -137,6 +156,19 @@ export function assertFuelFinalEvidenceAudit(
     ],
     sections: { ...sections },
     validatedForwardIndicators,
+    typedReferences: [
+      ...facts.incidents.map((r) => ({
+        id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
+        type: "development" as const,
+        text: [r.title, r.summary, r.country, r.location].filter(Boolean).join(" "),
+        evidenceId: r.id,
+      })),
+      ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
+        id: `market-${m.key}`,
+        type: "market-observation" as const,
+        text: `${m.label} ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
+      })),
+    ],
   });
 }
 
@@ -523,6 +555,33 @@ export function validateFuelReportConsistency(
     }
   }
 
+  return issues;
+}
+
+/** Fail closed when the four judgement-bearing sections drift from the one
+ * structured assessment. Exact canonical values make this deterministic. */
+export function validateFuelJudgementConsistency(
+  judgement: FuelJudgement,
+  sections: FuelEffectiveSections,
+): FuelConsistencyIssue[] {
+  const requirements: Array<[keyof FuelEffectiveSections, string[]]> = [
+    ["whatMatters", [judgement.mainRisk, judgement.exposure.sector, judgement.direction, judgement.trigger]],
+    ["polestarView", [judgement.mainRisk, judgement.exposure.sector, judgement.direction, judgement.trigger]],
+    ["implications", [judgement.exposure.sector, judgement.trigger]],
+    ["watchNext", [judgement.trigger]],
+  ];
+  const issues: FuelConsistencyIssue[] = [];
+  for (const [section, values] of requirements) {
+    const body = (sections[section] ?? "").toLowerCase();
+    for (const value of values) {
+      if (body.includes(value.toLowerCase())) continue;
+      issues.push({
+        code: "JUDGEMENT_CONSISTENCY",
+        section,
+        message: `Final section omits the canonical judgement value "${value}".`,
+      });
+    }
+  }
   return issues;
 }
 

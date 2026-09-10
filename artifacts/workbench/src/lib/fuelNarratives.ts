@@ -194,40 +194,6 @@ export function buildFuelRegionalHighlights(opts: {
   );
   const lead = ranked.slice(0, 3);
 
-  // Country-specific overlays so secondary countries never reuse the
-  // chokepoint / Hormuz / war-risk sentence that belongs with Iran.
-  // Iran retains the chokepoint family; India and Pakistan get
-  // distinct framings emphasising pump-price/forecourt and
-  // availability/power-resilience respectively. The overlay applies
-  // to the `why` line only; `phrase` and `watch` still come from the
-  // matched family so the records-clause stays honest to the data.
-  interface CountryOverlay { why: string; watch?: string }
-  const COUNTRY_OVERLAY: Record<string, CountryOverlay> = {
-    iran: {
-      why: "War-risk premium and voyage delay on dependent crude and product routes persist even when barrels are still moving.",
-      watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
-    },
-    yemen: {
-      why: "Red Sea kinetic reporting keeps Bab-el-Mandeb and southern corridor risk elevated for product tankers.",
-      watch: "Watch for further missile activity, crew casualties and Suez–Red Sea rerouting decisions.",
-    },
-    india: {
-      why: "Pump-price moves, forecourt disruption and transport cost are where this lands first; local movement and distribution economics absorb the shock before the published headline catches up.",
-      watch: "Watch for state-level fuel-tax changes, fresh forecourt or rationing reports and any operator-side surcharge announcements on road and rail.",
-    },
-    pakistan: {
-      why: "Availability, pricing and power resilience are the main pressure points here; fuel for generators, freight and field operations is where it bites first, well before it shows up in the wider economy.",
-      watch: "Watch for load-shedding patterns, depot-stock advisories and any government action on fuel pricing or commercial allocation.",
-    },
-    russia: {
-      why: "Domestic rationing and refinery strain are restricting forecourt access and commercial allocation ahead of pump-price moves.",
-      watch: "Watch for purchase-limit changes, station closures and any export or allocation cuts to commercial buyers.",
-    },
-    ukraine: {
-      why: "The pressure here is on physical supply and distribution: refinery and depot damage, import dependence and the logistics of keeping fuel moving are what determine availability on the ground.",
-      watch: "Watch for damage to refining and storage, import and rail-supply arrangements and any rationing or allocation measures for commercial users.",
-    },
-  };
   const paragraphs: string[] = [];
   const usedWhy = new Set<string>();
   for (let idx = 0; idx < lead.length; idx++) {
@@ -271,27 +237,16 @@ function regionalSignalPhrase(
   items: TopicFastFactsIncident[],
   fam: IssueFamily | null,
 ): string {
-  const blob = items.map((i) => haystack(i)).join(" ").toLowerCase();
-  const key = country.toLowerCase();
-  if (key === "russia" && /\b(ration|rationing|shortage|moscow)\b/.test(blob)) {
-    return "Confirmed rationing and domestic shortage pressure remain the operational story there.";
-  }
-  if (key === "india" && /\b(windfall|duty|tax|levy|subsidy)\b/.test(blob)) {
-    return "Policy and export-duty moves were reported; their effect on refiner and buyer economics depends on implementation.";
-  }
-  if (key === "yemen" && /\b(red sea|houthi)\b/.test(blob)) {
-    return "Red Sea kinetic reporting is keeping corridor risk live for product movement.";
-  }
-  if (key === "iran" || (key !== "yemen" && /\b(hormuz|strait of hormuz)\b/.test(blob))) {
-    return "Hormuz transit disruption was reported; war-risk or delay could rise if dependent routes are constrained.";
-  }
   if (fam?.key === "shortage") {
     return "Forecourt and allocation pressure is the confirmed operational signal there.";
   }
   if (fam?.key === "policy") {
     return "Government fuel-policy moves are resetting local price and pass-through assumptions.";
   }
-  return `Material fuel-market pressure is confirmed in ${titleCase(country)}.`;
+  const development = stripWireCruft(items[0]?.title ?? "").trim();
+  return development
+    ? `${titleCase(country)} was linked to ${development.replace(/[.!?]+$/, "")}.`
+    : `A material fuel-market development was reported in ${titleCase(country)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1495,32 +1450,6 @@ export function buildFuelOperationalRead(opts: {
   return `${driverPara}\n\n${closingPara}`;
 }
 
-// ---------------------------------------------------------------------------
-// Bullet-section minimums (Watch Next / Implications for Business)
-//
-// The Fuel Watch "Watch Next" and "Implications for Business" sections render
-// as bullet lists. When an analyst saves a thin report (one or two bullets)
-// the section reads as an afterthought, so we top each list up to a minimum
-// with evergreen, fuel-relevant defaults. Stored bullets always lead; the
-// defaults only fill the gap up to the minimum and never beyond the cap.
-// ---------------------------------------------------------------------------
-
-export const FUEL_DEFAULT_WATCH_NEXT: string[] = [
-  "Subsidy or levy decisions — a single gazette notice can reset pump price and contract economics overnight.",
-  "Rationing or forecourt disruption — queue formation, allocation cuts or station closures are the fastest operational tells.",
-  "Refinery outages or force-majeure declarations — these feed into crack spreads and downstream pricing within days.",
-  "Tanker and route disruption — fresh Gulf, Hormuz or Red Sea advisories, naval movement or vessel reroutes shift war-risk premium and transit time.",
-  "Generator fuel availability — diesel and LPG stock cover at high-fuel-use sites is the continuity tell when forecourts tighten.",
-];
-
-export const FUEL_DEFAULT_IMPLICATIONS: string[] = [
-  "Revisit contract pricing on bulk fuel and surcharge pass-through clauses in freight and logistics agreements before the next billing cycle reprices them.",
-  "Forward-cover the bulk and aviation fuel lines you depend on rather than waiting for the spot move to be confirmed.",
-  "Check on-site fuel stock cover and generator runtime assumptions, and pull commercial-allocation conversations forward with suppliers.",
-  "Agree escalation triggers in advance — queues, allocation cuts, station closures — so mitigations fire automatically rather than after the fact.",
-  "Where Gulf or Red Sea routing matters, treat route diversification as a live mitigation, not a future option.",
-];
-
 function bulletNormKey(s: string): string {
   return s
     .toLowerCase()
@@ -1531,58 +1460,6 @@ function bulletNormKey(s: string): string {
     .filter((w) => w.length > 2 && !DEDUPE_STOP.has(w))
     .slice(0, 6)
     .join(" ");
-}
-
-/** Split stored bullet/prose text into discrete items, tolerant of
- *  "- "/"*"/"•" markers, blank-line paragraphs, or single-newline lists. */
-function splitStoredBullets(text: string | null | undefined): string[] {
-  const s = (text ?? "").trim();
-  if (!s) return [];
-  const lines = s.split(/\r?\n/).map((l) => l.trim());
-  const marked = lines
-    .filter((l) => /^[-*\u2022]\s+/.test(l))
-    .map((l) => l.replace(/^[-*\u2022]\s+/, "").trim())
-    .filter(Boolean);
-  if (marked.length > 0) return marked;
-  const byBlank = s.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean);
-  if (byBlank.length > 1) return byBlank;
-  return lines.filter(Boolean);
-}
-
-/**
- * Return a "- " bulleted block built from the stored text, topped up with
- * fuel-relevant defaults until it holds at least `min` items (never more
- * than `max`). Stored items lead and are de-duplicated against the defaults.
- */
-export function topUpFuelBullets(
-  stored: string | null | undefined,
-  defaults: string[],
-  min: number,
-  max: number,
-): string {
-  const items: string[] = [];
-  const keys = new Set<string>();
-  const tokenSets: Set<string>[] = [];
-  // Accept a candidate only if it is neither an exact normalised duplicate
-  // nor a near-duplicate (heavy token overlap) of anything already kept.
-  const tryAdd = (candidate: string): void => {
-    if (items.length >= max) return;
-    const c = candidate.trim();
-    if (!c) return;
-    const k = bulletNormKey(c);
-    if (k && keys.has(k)) return;
-    const toks = sigTokens(c);
-    if (tokenSets.some((t) => nearDuplicate(toks, t))) return;
-    items.push(c);
-    if (k) keys.add(k);
-    tokenSets.push(toks);
-  };
-  for (const s of splitStoredBullets(stored)) tryAdd(s);
-  for (const d of defaults) {
-    if (items.length >= min) break;
-    tryAdd(d);
-  }
-  return items.map((b) => `- ${b}`).join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -2286,7 +2163,9 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
     // clause, so malformed feed-title language is not copied into the report.
     return `${opener}: ${developmentSentence(i)} ${impact}`;
   });
-  return paras.join("\n\n");
+  const j = facts.judgement;
+  const judgement = `The main risk is ${j.mainRisk}. The principal exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}; the near-term direction is ${j.direction}. The assessment changes if ${j.trigger}.`;
+  return [judgement, ...paras].join("\n\n");
 }
 
 function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
@@ -2314,68 +2193,27 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   if (/\b(jet fuel|aviation fuel|airline|airways)\b/.test(hay)) {
     bullets.push("Test how any aviation fuel-cost change would affect route economics and surcharge discussions before schedule or capacity decisions harden.");
   }
-  return topUpFuelBullets(bullets.join("\n"), FUEL_DEFAULT_IMPLICATIONS, 3, 5);
+  bullets.unshift(`Prioritise ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}; reassess if ${facts.judgement.trigger}.`);
+  return bullets.slice(0, 5).join("\n");
 }
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
-  const hay = incidentsHaystack(facts.qualifyingIncidents);
-  const items: string[] = [];
-  if (/\b(ration|rationing|purchase limit|forecourt|queue)\b/.test(hay) && /\b(russia|moscow)\b/.test(hay)) {
-    items.push("Expansion or relaxation of Russian fuel-purchase limits and any widening of Moscow-area rationing.");
-  }
-  if (/\b(ration|rationing|forecourt|queue|station closure)\b/.test(hay)) {
-    items.push("Station closures, queues or diesel shortages in markets already showing allocation pressure.");
-  }
-  if (/\bnaftan\b/.test(hay)) {
-    items.push("The maintenance schedule and restart timing at the Naftan refinery.");
-  }
-  if (/\b(duty|duties|levy|levies|excise|subsidy|subsidies)\b/.test(hay)) {
-    items.push("Implementation or amendment of fuel-duty or subsidy decisions flagged this period.");
-  }
-  if (/\b(aramco|saudi)\b/.test(hay) && /\b(load|loading|resume|resumed|export)\b/.test(hay)) {
-    items.push("Further Saudi loading activity and any confirmed refinery disruption.");
-  }
-  if (/\b(jazan|refinery)\b/.test(hay) && /\b(attack|fire|damage|drone|missile)\b/.test(hay)) {
-    items.push("Confirmation of damage, restart or force-majeure at the affected Saudi refinery site.");
-  }
-  if (/\bhormuz|strait of hormuz|iranian export\b/.test(hay)) {
-    items.push("Changes affecting Hormuz fuel movements, transit advisories and Iranian export flows.");
-  }
-  if (/\b(india|indian)\b/.test(hay) && /\b(gasoline|petrol|export|shipment|ship)\b/.test(hay)) {
-    items.push("Follow-through on Indian product export or policy moves affecting cross-border gasoline flows.");
-  }
-  for (const w of facts.watchIndicators) {
-    if (w.trim()) items.push(w.trim());
-  }
-  return topUpFuelBullets(items.join("\n"), FUEL_DEFAULT_WATCH_NEXT, 3, 6);
+  const items = [
+    `${facts.judgement.trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
+    ...rankMaterialDevelopments(facts)
+      .slice(0, 3)
+      .map((incident) => `Follow-up confirmation for ${stripWireCruft(incident.title).replace(/[.!?]+$/, "")}.`),
+    ...facts.watchIndicators.filter((indicator) => indicator !== facts.judgement.trigger),
+  ];
+  return [...new Set(items)].slice(0, 6).join("\n");
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   if (facts.analystReviewRequired) {
     return "Hold wider circulation until sourcing is firm enough for operational claims. Several developments in the window still lack confirmed location or outcome, so cost and continuity judgements should stay provisional.";
   }
-  const periodMoves = facts.marketIndicators.filter((i) => i.comparisonScope === "reporting-period");
-  const rising = periodMoves.filter((i) => i.direction === "rising").length;
-  const falling = periodMoves.filter((i) => i.direction === "falling").length;
-  const costDir = rising > falling
-    ? "Cost risk is tilted upward for the next billing cycle."
-    : falling > rising
-      ? "Cost risk eased within the reporting period but can reverse quickly if route or supply stress returns."
-      : "Cost risk is broadly stable, with physical and routing shocks as the main repricing triggers.";
-  const exposure = facts.primaryPressurePoint.kind === "distributed"
-    ? "Exposure is spread across several markets and corridors rather than a single theatre."
-    : facts.primaryPressurePoint.kind === "route"
-      ? `${facts.primaryPressurePoint.label} routing is the clearest continuity exposure for bunker, freight and import-dependent sites.`
-      : `${facts.primaryPressurePoint.label} is the geography where availability or pass-through pressure could land first if the reported development persists.`;
-  const hay = incidentsHaystack(facts.qualifyingIncidents);
-  const nearTerm = hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)
-    ? `The near-term decision is to secure commercial allocation and road-transport cover where ${observedAccessCondition(hay)} persists.`
-    : hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)
-      ? "The near-term decision is to refresh routing, war-risk and landed-cost assumptions on any cargo still committed through affected chokepoints."
-      : rising > falling
-        ? "The near-term decision is to lock surcharge and indexation language before the next invoice cycle reprices exposed contracts."
-        : "The near-term decision is to keep current resilience measures in place while watching for fresh operational confirmation.";
-  return `${costDir} ${exposure} ${nearTerm}`;
+  const j = facts.judgement;
+  return `The main risk is ${j.mainRisk}. ${j.exposure.sector} is most exposed${j.exposure.geography ? ` in ${j.exposure.geography}` : " across the reported markets"}. The near-term direction is ${j.direction}; the assessment changes if ${j.trigger}.`;
 }
 
 /** Build count-free analytical sections from canonical facts. */
@@ -2399,11 +2237,16 @@ export function buildFuelAnalyticalSections(
       : facts.primaryPressurePoint.kind === "country"
         ? { distributed: false as const, primaryCountry: facts.primaryPressurePoint.label }
         : { distributed: false as const, primaryCountry: null };
+  const materialIncidents = facts.qualifyingIncidents.filter(
+    (incident) => incident.evidenceStatus !== "Potential"
+      && incident.evidenceWeight >= 1
+      && !["Insignificant", "Low"].includes(incident.severity),
+  );
   const regionalHighlights =
     buildFuelRegionalHighlights({
       issueDate: facts.reportingPeriod.issueDate,
-      incidents: facts.qualifyingIncidents.map((i) => i.raw),
-      window: facts.qualifyingIncidents.map((i) => i.raw),
+      incidents: materialIncidents.map((i) => i.raw),
+      window: materialIncidents.map((i) => i.raw),
       pressure,
     })
     ?? "No regional theatre carried a material, confirmed fuel-market development this period.";

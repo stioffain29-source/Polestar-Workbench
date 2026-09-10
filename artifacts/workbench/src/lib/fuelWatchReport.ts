@@ -27,11 +27,11 @@ import {
   buildFuelProducerBuyerActions,
   buildFuelGulfChokepointWatch,
   filterFuelContinuityCrossRead,
-  FUEL_DEFAULT_WATCH_NEXT,
   type ProducerBuyerActionRow,
   type FuelGulfChokepointWatch,
 } from "./fuelNarratives";
 import { clampIssueDateToLatestRecord } from "./reportWindow";
+import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { pickRead } from "./pickRead";
 import {
   buildFuelCanonicalFacts,
@@ -43,6 +43,16 @@ import {
   validateFuelReportConsistency,
 } from "./fuelCanonicalFacts";
 import { format, parseISO } from "date-fns";
+import type { TopicAiProse } from "./topicProseResolution";
+import {
+  resolveFuelEffectiveSections,
+  validateFuelReportConsistency as validateFuelEffectiveText,
+  validateFuelJudgementConsistency,
+  validateFuelFinalEvidenceAudit,
+  type FuelEffectiveSections,
+  type FuelConsistencyIssue,
+} from "./fuelReportConsistency";
+import type { FinalReportEvidenceAuditIssue } from "./finalReportEvidenceAudit";
 
 export type { FuelDataCard, JetFuelPricePoint, ProducerBuyerActionRow };
 
@@ -144,6 +154,8 @@ export interface FuelMarketData {
 
 export interface FuelIncidentData {
   fuelIncidents: TopicFastFactsIncident[];
+  /** Original in-window records retained for traceability, never for counting. */
+  originalRecords: TopicFastFactsIncident[];
   regionalHighlights: string | null;
   producerBuyerActions: ProducerBuyerActionRow[];
   /** Auto-derived 1-2 paragraph operational read of the incident set.
@@ -200,6 +212,22 @@ export interface FuelWatchReportData {
   validation: FuelValidation;
 }
 
+export interface FuelPublicationBundle {
+  reportData: FuelWatchReportData;
+  canonicalFacts: FuelCanonicalFacts;
+  effectiveSections: FuelEffectiveSections;
+  marketReadiness: {
+    ready: boolean;
+    missingRequired: string[];
+    warnings: string[];
+  };
+  auditIssues: {
+    canonical: FuelConsistencyError[];
+    consistency: FuelConsistencyIssue[];
+    evidence: FinalReportEvidenceAuditIssue[];
+  };
+}
+
 /**
  * The latest market-close date a Fuel Watch report carries — the max ISO
  * date across its price cards' `asOf` values, the jet-fuel snapshot `asOf`,
@@ -253,6 +281,11 @@ export function buildFuelWatchReportData(
   incidents: TopicFastFactsIncident[],
 ): FuelWatchReportData {
   const parsed = parseFuelHardNumbers(report.hardNumbers);
+  const resolved = resolveReportWindow("fuel", report.issueDate);
+  const reportWindow = {
+    start: format(resolved.start, "yyyy-MM-dd"),
+    end: format(resolved.end, "yyyy-MM-dd"),
+  };
   const prices = parsed.prices;
   const brent = findCard(prices, BRENT_RE);
   const wti = findCard(prices, WTI_RE);
@@ -328,10 +361,11 @@ export function buildFuelWatchReportData(
   // strike on a vessel in the Gulf of Oman is fuel-route pressure whether or
   // not the headline names a fuel cargo) and fuel-to-power continuity
   // failures filed under `energy` (gas-shortage load shedding, rationing).
-  const fuelTopicWindow = filterTopicReportIncidents(incidents, "fuel", report.issueDate);
+  const recordsInResolvedWindow = filterIncidentsToWindow(incidents, "fuel", reportWindow.end);
+  const fuelTopicWindow = filterTopicReportIncidents(recordsInResolvedWindow, "fuel", reportWindow.end);
   const fuelIncidents = [
     ...fuelTopicWindow,
-    ...filterFuelContinuityCrossRead(incidents, report.issueDate, fuelTopicWindow),
+    ...filterFuelContinuityCrossRead(recordsInResolvedWindow, reportWindow.end, fuelTopicWindow),
   ];
   // Canonical facts are built exactly once from the same filtered incident array
   // that all report counts and analytical sections consume.
@@ -341,7 +375,7 @@ export function buildFuelWatchReportData(
     qualifyingIncidents: fuelIncidents,
     marketCards: fastFactsCards,
     jetTrajectory: trajectoryPoints.length >= 2 ? trajectoryPoints : undefined,
-    watchIndicators: FUEL_DEFAULT_WATCH_NEXT,
+    window: reportWindow,
   });
   const canonicalSections = buildFuelCanonicalSections(canonicalFacts);
   // Prompt/gate facts — same issueDate/hardNumbers/incidents as canonicalFacts,
@@ -359,7 +393,12 @@ export function buildFuelWatchReportData(
     // counts, dates, countries and condition signals must describe the same
     // incident set the canonical prose was generated from, or the gate
     // false-blocks every cross-read-admitted event.
-    qualifyingIncidents: fuelIncidents,
+    qualifyingIncidents: canonicalFacts.qualifyingIncidents.map((incident) => incident.raw),
+    window: reportWindow,
+    familyMetadata: new Map(canonicalFacts.qualifyingIncidents.map((incident) => [
+      incident.raw,
+      { id: incident.evidenceFamilyId, supportedClaims: incident.supportedClaims },
+    ])),
   });
   const canonPrimary = canonicalFacts.primaryPressurePoint;
   const canonSeverityLower = canonicalFacts.overallSeverity.toLowerCase() as FuelReportFacts["overallSeverity"] & string;
@@ -395,7 +434,7 @@ export function buildFuelWatchReportData(
   const regionalHighlights = canonicalSections.regionalHighlights;
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
-    incidents,
+    incidents: canonicalFacts.qualifyingIncidents.map((incident) => incident.raw),
   });
   // Gulf/Hormuz developments stay in the canonical qualifying set and flow
   // through the normal sections (Operational Read, Regional Highlights,
@@ -527,7 +566,8 @@ export function buildFuelWatchReportData(
       jetDataNote,
     },
     incidentData: {
-      fuelIncidents,
+      fuelIncidents: canonicalFacts.qualifyingIncidents.map((incident) => incident.raw),
+      originalRecords: fuelIncidents,
       regionalHighlights,
       producerBuyerActions,
       operationalRead,
@@ -570,6 +610,48 @@ export function buildFuelWatchReportData(
 }
 
 /**
+ * Final publication boundary. Renderers call this immediately before drawing;
+ * it resolves the data, final text, market readiness and every audit from one
+ * immutable input path.
+ */
+export function finalizeFuelPublication(opts: {
+  report: FuelReportInput;
+  incidents: TopicFastFactsIncident[];
+  aiProse?: TopicAiProse | null;
+}): FuelPublicationBundle {
+  const reportData = buildFuelWatchReportData(opts.report, opts.incidents);
+  const effectiveSections = resolveFuelEffectiveSections({
+    report: opts.report,
+    aiProse: opts.aiProse,
+    fuelData: reportData,
+  });
+  const canonical = validateFuelCanonicalSections(
+    reportData.canonicalFacts,
+    reportData.narrativeData.canonicalSections,
+  );
+  const consistency = [
+    ...validateFuelEffectiveText(reportData.reportFacts, effectiveSections),
+    ...validateFuelJudgementConsistency(reportData.canonicalFacts.judgement, effectiveSections),
+  ];
+  const evidence = validateFuelFinalEvidenceAudit(
+    reportData.reportFacts,
+    effectiveSections,
+    reportData.canonicalFacts.watchIndicators,
+  );
+  return {
+    reportData,
+    canonicalFacts: reportData.canonicalFacts,
+    effectiveSections,
+    marketReadiness: {
+      ready: reportData.validation.hasRequiredFuelWatchData,
+      missingRequired: reportData.validation.missingRequired,
+      warnings: reportData.validation.warnings,
+    },
+    auditIssues: { canonical, consistency, evidence },
+  };
+}
+
+/**
  * Build the 2-paragraph "Market Read" prose from the parsed market
  * data. Lives here (next to the rest of the canonical builder) so
  * preview and PDF can never drift.
@@ -600,7 +682,15 @@ export function buildFuelMarketRead(opts: {
   const b = numVal(brent);
   const w = numVal(wti);
   const parts: string[] = [];
-  if (b !== null && !Number.isNaN(b) && w !== null && !Number.isNaN(w)) {
+  const crudeIndicators = (indicators ?? []).filter((i) => /\bbrent\b|\bwti\b/i.test(i.label));
+  const crudeContextOnly = crudeIndicators.some((i) => i.temporalStatus !== "current-period");
+  if (crudeContextOnly && (b !== null || w !== null)) {
+    const observations = [
+      b !== null && !Number.isNaN(b) ? `Brent ${b.toFixed(2)} ${brent?.unit ?? "USD/bbl"}${brent?.asOf ? ` on ${formatAsOfDate(brent.asOf)}` : " (undated)"}` : "",
+      w !== null && !Number.isNaN(w) ? `WTI ${w.toFixed(2)} ${wti?.unit ?? "USD/bbl"}${wti?.asOf ? ` on ${formatAsOfDate(wti.asOf)}` : " (undated)"}` : "",
+    ].filter(Boolean);
+    parts.push(`${observations.join(" and ")} are contextual observations only and do not establish reporting-period movement.`);
+  } else if (b !== null && !Number.isNaN(b) && w !== null && !Number.isNaN(w)) {
     parts.push(
       `Brent is sitting around ${b.toFixed(2)} ${brent?.unit ?? "USD/bbl"} and WTI around ${w.toFixed(2)} ${wti?.unit ?? "USD/bbl"}, which puts the crude complex in ${levelWord((b + w) / 2)} territory rather than a transient spike.`,
     );
@@ -628,8 +718,9 @@ export function buildFuelMarketRead(opts: {
         ? "against a lagged reference"
         : "against an undated reference";
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
+    const contextual = jetIndicator.temporalStatus !== "current-period" ? " This is contextual evidence only, not a current-period trend." : "";
     parts.push(
-      `The jet fuel series is ${dir} ${scope}, with the current figure at ${last.toFixed(3)} ${jetUnit}${jetIndicator.currentDate ? ` on ${formatAsOfDate(jetIndicator.currentDate)}` : ""} versus ${first.toFixed(3)}${jetIndicator.referenceDate ? ` on ${formatAsOfDate(jetIndicator.referenceDate)}` : ""} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
+      `The jet fuel series is ${dir} ${scope}, with the observed figure at ${last.toFixed(3)} ${jetUnit}${jetIndicator.currentDate ? ` on ${formatAsOfDate(jetIndicator.currentDate)}` : ""} versus ${first.toFixed(3)}${jetIndicator.referenceDate ? ` on ${formatAsOfDate(jetIndicator.referenceDate)}` : ""} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).${contextual}`,
     );
   } else if (jetFuel) {
     const jv = numVal(jetFuel);
@@ -659,15 +750,15 @@ export function buildFuelMarketRead(opts: {
   let para2: string;
   if (risingMoves > fallingMoves || (avgChangePct !== null && avgChangePct >= 2)) {
     para2 =
-      "Taken together, this points to sustained cost pressure rather than a one-off move. Fuel-linked costs rarely stay isolated; they feed into freight rates, generator running costs, staff movement and supplier pricing — so treat these market indicators as the cost floor for the decisions that follow.";
+      "Taken together, this points to sustained cost pressure rather than a one-off move. If suppliers pass the move through, it could affect freight rates, generator running costs, staff movement and supplier pricing.";
   } else if (fallingMoves > risingMoves || (avgChangePct !== null && avgChangePct <= -2)) {
     para2 =
-      "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
+      "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. If suppliers pass a later reversal through, freight rates, generator running costs, staff movement and supplier pricing could be affected.";
   } else {
     para2 =
       periodIndicators.length
-        ? "Taken together, the market picture is broadly flat within the reporting period rather than trending sharply in either direction. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing, so treat these market indicators as the cost floor for the decisions that follow."
-        : "The available comparisons use lagged or undated references, so they provide benchmark context rather than evidence of movement within this reporting period. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing.";
+        ? "Taken together, the market picture is broadly flat within the reporting period rather than trending sharply in either direction. Any effect on freight rates, generator running costs, staff movement or supplier pricing depends on supplier pass-through."
+        : "The available comparisons use lagged or undated references, so they provide benchmark context rather than evidence of movement within this reporting period. Any operating-cost consequence remains conditional on supplier pass-through.";
   }
   return para1 ? `${para1}\n\n${para2}` : para2;
 }

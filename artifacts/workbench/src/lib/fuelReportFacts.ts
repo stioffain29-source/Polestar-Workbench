@@ -41,6 +41,8 @@ import {
   type FuelMarketDirection,
   type FuelMarketTemporalStatus,
 } from "./fuelMarketIndicators";
+import { resolveReportWindow } from "./reportWindow";
+import { format } from "date-fns";
 
 export type MarketDirection = FuelMarketDirection;
 
@@ -117,10 +119,13 @@ export interface FuelReportFactsIncident {
    *  is computed from. */
   effectiveSeverity: string;
   occurredAt: string;
+  supportedClaims: string[];
+  evidenceFamilyId?: string;
 }
 
 export interface FuelReportFacts {
   issueDate: string;
+  reportWindow: { start: string; end: string };
   incidentCount: number;
   /** Distinct occurredAt calendar dates (ISO YYYY-MM-DD), sorted ascending. */
   distinctDates: string[];
@@ -185,12 +190,14 @@ function indicatorFromCard(
   card: FuelDataCard | null,
   trajectory?: { date: string; value: number }[],
   issueDate?: string,
+  window?: { start: string; end: string },
 ): FuelMarketIndicatorFact {
   const fallback = card ?? { label, value: Number.NaN };
   const derived = deriveFuelMarketIndicator({
     card: { ...fallback, label },
     issueDate: issueDate ?? "",
     trajectory: key === "jet" ? trajectory : undefined,
+    window,
   });
   const current = numOf(derived.currentValue);
   return {
@@ -251,7 +258,14 @@ export function buildFuelReportFacts(opts: {
    * makes the gate false-block cross-read-admitted events.
    */
   qualifyingIncidents?: TopicFastFactsIncident[];
+  window?: { start: string; end: string };
+  familyMetadata?: Map<TopicFastFactsIncident, { id: string; supportedClaims: string[] }>;
 }): FuelReportFacts {
+  const fallbackWindow = resolveReportWindow("fuel", opts.issueDate);
+  const reportWindow = opts.window ?? {
+    start: format(fallbackWindow.start, "yyyy-MM-dd"),
+    end: format(fallbackWindow.end, "yyyy-MM-dd"),
+  };
   const windowIncidents =
     opts.qualifyingIncidents ??
     filterTopicReportIncidents(opts.incidents, "fuel", opts.issueDate);
@@ -267,6 +281,11 @@ export function buildFuelReportFacts(opts: {
       capFuelMarketSeverity(i.severity, i.title, i.summary ?? "") || ""
     ).toLowerCase(),
     occurredAt: i.occurredAt,
+    supportedClaims: opts.familyMetadata?.get(i)?.supportedClaims
+      ?? (Array.isArray((i as unknown as Record<string, unknown>).supportedClaims)
+        ? ((i as unknown as Record<string, unknown>).supportedClaims as string[])
+        : []),
+    ...(opts.familyMetadata?.get(i)?.id ? { evidenceFamilyId: opts.familyMetadata.get(i)!.id } : {}),
   }));
 
   // Distinct calendar dates.
@@ -402,14 +421,15 @@ export function buildFuelReportFacts(opts: {
     date: p.date,
     value: p.value,
   }));
-  const brent = indicatorFromCard("brent", "Brent crude", brentCard, undefined, opts.issueDate);
-  const wti = indicatorFromCard("wti", "WTI crude", wtiCard, undefined, opts.issueDate);
+  const brent = indicatorFromCard("brent", "Brent crude", brentCard, undefined, opts.issueDate, reportWindow);
+  const wti = indicatorFromCard("wti", "WTI crude", wtiCard, undefined, opts.issueDate, reportWindow);
   const jet = indicatorFromCard(
     "jet",
     "Jet fuel",
     jetCard,
     trajPoints.length >= 2 ? trajPoints : undefined,
     opts.issueDate,
+    reportWindow,
   );
   const crudePcts = [brent.pctChange, wti.pctChange].filter(
     (v): v is number => v !== null,
@@ -458,6 +478,7 @@ export function buildFuelReportFacts(opts: {
 
   return {
     issueDate: opts.issueDate,
+    reportWindow,
     incidentCount: records.length,
     distinctDates,
     countries,

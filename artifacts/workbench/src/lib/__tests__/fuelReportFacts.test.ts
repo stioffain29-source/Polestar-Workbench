@@ -267,8 +267,8 @@ describe("buildFuelReportFacts", () => {
     expect(brent.referenceValue).toBe(brent.previous);
     expect(brent.currentValue).toBe(brent.current);
     expect(brent.currentDate).toBe(ISSUE);
-    expect(brent.referenceDate).toBe("2026-07-29");
-    expect(brent.comparisonScope).toBe("lagged-reference");
+    expect(brent.referenceDate).toBeNull();
+    expect(brent.comparisonScope).toBe("undated-reference");
     expect(brent.direction).toBe("falling");
     const wti = f.market.indicators.find((m) => m.key === "wti")!;
     expect(wti.direction).toBe("rising");
@@ -322,7 +322,7 @@ describe("buildFuelReportFacts", () => {
       hardNumbers({ brent: { value: 80, change: "+2.0% 7d" } }),
     );
     const prompt = serialiseFuelFactsForPrompt(f);
-    expect(prompt).toContain("vs lagged reference on 2026-07-29");
+    expect(prompt).toContain("vs reference (date unavailable)");
     expect(prompt).not.toContain("over this reporting period");
   });
 

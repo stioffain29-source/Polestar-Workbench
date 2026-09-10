@@ -84,17 +84,11 @@ import {
   filterTopicReportIncidents,
 } from "./topicFastFacts";
 import {
-  buildFuelWatchReportData,
+  finalizeFuelPublication,
   fuelMarketLatestDate,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
-import { assertFuelReportConsistent } from "./fuelCanonicalFacts";
-import {
-  resolveFuelEffectiveSections,
-  assertFuelReportConsistent as assertFuelEffectiveTextConsistent,
-  assertFuelFinalEvidenceAudit,
-} from "./fuelReportConsistency";
 import {
   capFuelMarketSeverity,
   type ProducerBuyerActionRow,
@@ -1044,9 +1038,9 @@ export async function exportTopicReportPdf(
 
   const aiProse = options.aiProse ?? null;
   // fuelIssueDate computed above for cover/body parity with preview.
-  const fuelData = isFuel
-    ? buildFuelWatchReportData(
-        {
+  const fuelBundle = isFuel
+    ? finalizeFuelPublication({
+        report: {
           title: data.title,
           issueDate: fuelIssueDate,
           author: data.author,
@@ -1064,49 +1058,31 @@ export async function exportTopicReportPdf(
           hardNumbers: data.hardNumbers,
         },
         incidents,
-      )
+        aiProse,
+      })
     : null;
+  const fuelData = fuelBundle?.reportData ?? null;
   // FINAL EFFECTIVE Fuel narrative — analyst edit -> AI -> canonical
   // deterministic, resolved by the ONE shared resolver the preview and the
   // editor prefill also call, so all three surfaces render byte-identical
   // section text.
-  const fuelEffective = fuelData
-    ? resolveFuelEffectiveSections({
-        report: {
-          executiveSummary: data.executiveSummary,
-          situation: data.situation,
-          whatHappened: data.whatHappened,
-          whatMatters: data.whatMatters,
-          polestarView: data.polestarView,
-          fuelMarketRead: data.fuelMarketRead,
-          fuelOperationalRead: data.fuelOperationalRead,
-          fuelRegionalHighlights: data.fuelRegionalHighlights,
-          implications: data.implications,
-          watchNext: data.watchNext,
-        },
-        aiProse,
-        fuelData,
-      })
-    : null;
+  const fuelEffective = fuelBundle?.effectiveSections ?? null;
   // Pre-render Fuel Watch consistency gate. This runs after all canonical facts
   // exist and before the first report section is drawn; it validates the FINAL
   // EFFECTIVE text (whatever tier wins), so analyst/AI prose can never smuggle
   // a contradictory claim past it.
-  if (fuelData && fuelEffective) {
+  if (fuelBundle && fuelData && fuelEffective) {
     // Strict canonical gate — validates the canonical payload (Gulf/Hormuz
     // developments flow through the normal analytical sections, not a
     // separate chokepoint heading); canonical text passes by construction.
-    assertFuelReportConsistent(fuelData.canonicalFacts, {
-      ...fuelData.narrativeData.canonicalSections,
-    });
-    // Prose-tolerant gate over the FINAL effective text — whichever tier wins
-    // (analyst edit / AI / canonical), its claims must agree with the facts.
-    assertFuelEffectiveTextConsistent(fuelData.reportFacts, fuelEffective);
-    assertFuelFinalEvidenceAudit(
-      fuelData.reportFacts,
-      fuelEffective,
-      fuelData.canonicalFacts.watchIndicators,
-    );
+    const issues = [
+      ...fuelBundle.auditIssues.canonical,
+      ...fuelBundle.auditIssues.consistency,
+      ...fuelBundle.auditIssues.evidence,
+    ];
+    if (issues.length) {
+      throw new Error(`FUEL_PUBLICATION_AUDIT_FAILED\n${issues.map((issue) => `${issue.section}: ${"message" in issue ? issue.message : issue.conflictingStatement}`).join("\n")}`);
+    }
   }
   // Deterministic per-topic draft — the labelled fallback beneath the AI
   // narrative and any analyst edit. Built from the SAME windowed incident
