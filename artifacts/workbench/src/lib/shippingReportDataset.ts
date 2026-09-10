@@ -135,6 +135,8 @@ export interface ShippingReportDataset {
   chokepointRows: ChokepointRow[];
   /** Vessel attacks over the report window. */
   vesselRows: VesselRow[];
+  /** Uncapped attack/seizure count represented by the Fast Fact. */
+  vesselAttackSeizureCount: number;
   /** Piracy / armed robbery over the report window. */
   piracyRows: PiracyRow[];
   regionRows: BarRow[];
@@ -1067,6 +1069,7 @@ export function buildShippingReportDataset(
     locationNotIdentifiedCount,
     chokepointRows,
     vesselRows: vesselRows.map(toShippingPresentationCanonical),
+    vesselAttackSeizureCount: vAttackSeize,
     piracyRows: piracyRows.map(toShippingPresentationCanonical),
     regionRows,
     countryRows,
@@ -1381,21 +1384,13 @@ function buildCommercialImpactRead(
     return "No confirmed commercial cost, insurance, rerouting or transit-time consequence is reported in this window.";
   }
   const n = commercialRecords.length;
-  const lead = commercialRecords[0];
-  const eventClass = semanticEventClass(lead) ?? "";
-  const eventLabel: Record<string, string> = {
-    commercial_attack: "commercial-vessel attack",
-    commercial_seizure: "commercial-vessel seizure",
-    piracy_or_armed_robbery: "piracy or armed-robbery event",
-    port_disruption: "port disruption",
-    chokepoint_disruption: "chokepoint disruption",
-    route_disruption: "route disruption",
-  };
-  const label = eventLabel[eventClass] ?? "maritime event";
-  const routeName = lead.maritimeSemantic?.routeRelationship?.routeName?.trim();
-  const place = lead.physicalLocation?.trim() || routeName;
-  const anchor = place ? ` at ${place}` : "";
-  return `${n} reported ${label} incident${n === 1 ? "" : "s"} carr${n === 1 ? "ies" : "y"} a documented commercial consequence${anchor}.`;
+  // Keep this sentence at the evidence level.  Naming an event class, route
+  // and "commercial consequence" together made the generated read sound as
+  // though every route-linked row had a cost/insurance outcome, while also
+  // repeating the same headline terms as the Chokepoint / Route Read.  The
+  // gate above already guarantees that every row has a confirmed or assessed
+  // routing/commercial consequence with a source claim and evidence quote.
+  return `The commercial-impact read reflects ${n} documented commercial consequence assessment${n === 1 ? "" : "s"} in this window.`;
 }
 
 function buildRegionalCountryRead(opts: {

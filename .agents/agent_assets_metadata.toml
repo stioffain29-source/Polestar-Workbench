@@ -961,3 +961,31 @@ mtime_ms = 1789047494200
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/04426d93-9776-4b6d-af52-633b078f76a8/34161fa9-f179-4787-9420-397a225cb35a"
 storage_version_token = "1789047522808558"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "1_vUcaCyYbAS64GE_or1f"
+uri = "file://screenshots/shipping-september10-proof/report-body.png"
+type = "image"
+title = "Shipping Watch — 4–10 September verification"
+description = "Saved development report rendered through the actual report component. No PDF-blocking banner; assessment remains pending because coverage is incomplete. Not a published-site capture."
+logical_id = "a837cd93-c038-4fb4-9e5f-6fc2ac877795"
+content_hash = "sha256:9e5bf9c9a7adea339f6513edd108b441d711c225c4806dd73d7db848aa4076ec"
+size = 249563
+mtime_ms = 1789055932347
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/a837cd93-c038-4fb4-9e5f-6fc2ac877795/78b1b6ba-1030-43e0-a4de-fbf4f9d0092e"
+storage_version_token = "1789055997208849"
+content_type = "image/png"
+
+[[outputs]]
+id = "DFd6yCegcZ55UU1LJLgjX"
+uri = "file://screenshots/shipping-september10-proof/saved-report.pdf"
+type = "pdf"
+title = "Shipping Watch — 4–10 September inspection PDF"
+description = "Browser-printed copy of the verified saved-report preview. The application’s PDF exporter also completed successfully for this exact reporting window."
+logical_id = "ab8fa080-ff84-43df-915c-a44b256f0798"
+content_hash = "sha256:20c78d978627e87e89b29c6f704a3477603c95db52ee7daa9cdae33b34a69584"
+size = 7444754
+mtime_ms = 1789055935355
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/ab8fa080-ff84-43df-915c-a44b256f0798/dfc9bc4a-279e-45b6-89dc-6dccf53dee7f"
+storage_version_token = "1789055998788015"
+content_type = "application/pdf"

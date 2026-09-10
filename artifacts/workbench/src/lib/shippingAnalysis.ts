@@ -4,7 +4,9 @@
 
 import {
   MARITIME_SEMANTIC_VERSION,
+  hasValidatedCommercialTarget,
   isValidatedMaritimeIncident,
+  maritimeEventRequiresCommercialTarget,
   validateMaritimeSemanticContract,
   type MaritimeSemanticEvidence,
 } from "@workspace/relevance";
@@ -200,11 +202,19 @@ export function semanticCommercialTargetValidated(
   record: SemanticRecord | null | undefined,
 ): boolean {
   const evidence = semanticOf(record);
-  return (
-    evidence?.commercialTargetValidated === true &&
-    typeof evidence.commercialTarget === "string" &&
-    !["none", "unknown"].includes(evidence.commercialTarget)
-  );
+  return hasValidatedCommercialTarget(evidence);
+}
+
+/**
+ * Shared class-level target rule for consumers that need to explain why a
+ * semantic row is withheld.  Keep the decision in the relevance contract;
+ * this adapter exists so Shipping admission and report derivations use the
+ * same predicate without inspecting raw text.
+ */
+export function semanticEventRequiresCommercialTarget(
+  record: SemanticRecord | null | undefined,
+): boolean {
+  return maritimeEventRequiresCommercialTarget(semanticEventClass(record));
 }
 
 export function semanticRouteEvidence(

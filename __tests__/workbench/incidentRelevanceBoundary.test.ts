@@ -22,4 +22,11 @@ describe("incident consumers preserve the shared relevance boundary", () => {
     expect(apiGate).toContain("validityGates");
     expect(apiGate).not.toContain("isNull(incidentsTable.relevanceStatus)");
   });
+
+  it("uses the shared commercial-target contract for maritime totals", () => {
+    const apiGate = source("artifacts/api-server/src/lib/relevanceFilter.ts");
+    expect(apiGate).toContain("MARITIME_COMMERCIAL_EVENT_CLASSES");
+    expect(apiGate).toContain("MARITIME_VALIDATED_COMMERCIAL_TARGETS");
+    expect(apiGate).toContain("commercialTargetEvidence");
+  });
 });

@@ -23,9 +23,13 @@ async function main() {
   Object.assign(globalThis, { React });
   const reportId = Number(process.env.REPORT_ID ?? "12");
   const saved = await fetchTopicReport(reportId) as HeadlessReportRow;
-  const report = buildHeadlessReportData(saved, process.env.ISSUE_DATE);
   const incidents = await fetchTopicIncidents() as Parameters<typeof finalizeShippingPublication>[0]["incidents"];
   const movement = await fetchMaritimeMovement(undefined, 200) as Parameters<typeof finalizeShippingPublication>[0]["movement"];
+  const dates = process.env.ISSUE_DATES?.split(",").map((date) => date.trim()).filter(Boolean)
+    ?? [process.env.ISSUE_DATE || saved.issueDate];
+  const results = [];
+  for (const date of dates) {
+  const report = buildHeadlessReportData(saved, date);
   const sectionOverrides = report.sectionOverrides as Parameters<typeof finalizeShippingPublication>[0]["sectionOverrides"];
   const options = {
     report, incidents, movement, sectionOverrides,
@@ -43,6 +47,7 @@ async function main() {
   const movementSamples = maritimeReportMovementTheatres(publication.maritimeBoard);
   const populatedChokepoints = maritimeReportChokepointCards(publication.maritimeBoard);
   const qualityChecks = {
+    pdfPublicationAllowed: pdfAllowed,
     maritimeCountLabelAccurate: cards.some((card) => card.label === "Confirmed Maritime Incidents · 7d") &&
       !cards.some((card) => card.label.startsWith("Chokepoint Incidents")),
     oneAisSamplePerTheatre: movementSamples.length === new Set(movementSamples.map((row) => row.theatre.toLowerCase())).size,
@@ -55,11 +60,8 @@ async function main() {
     incompleteRouteRisksExplicit: publication.completeness.complete ||
       populatedChokepoints.every((card) => card.risk.label === "Assessment pending"),
   };
-  if (process.env.ASSERT_QUALITY === "1" && Object.values(qualityChecks).some((passed) => !passed)) {
-    throw new Error(`Saved-report quality checks failed: ${JSON.stringify(qualityChecks)}`);
-  }
   if (process.env.OUT_HTML) writeFileSync(process.env.OUT_HTML, html);
-  console.log(JSON.stringify({
+  results.push({
     reportId, issueDate: report.issueDate, draftRenders, pdfAllowed,
     auditIssues: publication.auditIssues,
     fastFacts: publication.fastFacts,
@@ -69,7 +71,18 @@ async function main() {
       theatre: row.theatre, dataAsOf: row.dataAsOf, vessels: row.totalVessels,
     })),
     qualityChecks,
-  }, null, 2));
+  });
+  }
+  console.log(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
+  const failures = results.filter((result) =>
+    Object.values(result.qualityChecks).some((passed) => !passed));
+  if (process.env.ASSERT_QUALITY === "1" && failures.length) {
+    throw new Error(`Saved-report checks failed: ${JSON.stringify(failures.map((result) => ({
+      issueDate: result.issueDate,
+      auditIssues: result.auditIssues,
+      qualityChecks: result.qualityChecks,
+    })))}`);
+  }
 }
 
 main().catch((error) => {

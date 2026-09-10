@@ -44,6 +44,30 @@ export const MARITIME_COMMERCIAL_TARGETS = [
 export type MaritimeCommercialTarget =
   (typeof MARITIME_COMMERCIAL_TARGETS)[number];
 
+/**
+ * Event classes whose validity depends on positively identifying the affected
+ * commercial target.  Keep this list in the shared contract so SQL admission,
+ * report admission and publication audit cannot silently grow different
+ * definitions of a commercial incident.
+ */
+export const MARITIME_COMMERCIAL_EVENT_CLASSES = [
+  "commercial_attack",
+  "commercial_seizure",
+  "piracy_or_armed_robbery",
+  "port_disruption",
+] as const satisfies readonly MaritimeEventClass[];
+
+export type MaritimeCommercialEventClass =
+  (typeof MARITIME_COMMERCIAL_EVENT_CLASSES)[number];
+
+/** Values that can satisfy `commercialTargetValidated`. */
+export const MARITIME_VALIDATED_COMMERCIAL_TARGETS = [
+  "vessel",
+  "cargo",
+  "port_facility",
+  "shipping_operations",
+] as const satisfies readonly MaritimeCommercialTarget[];
+
 export const MARITIME_ROUTE_RELATIONSHIP_KINDS = [
   "physical",
   "direct_passage",
@@ -175,18 +199,51 @@ export type MaritimeSemanticInput = {
   candidateEventDate?: Date | string | null;
 };
 
-const COMMERCIAL_TARGETS = new Set<MaritimeCommercialTarget>([
-  "vessel",
-  "cargo",
-  "port_facility",
-  "shipping_operations",
-]);
+const COMMERCIAL_TARGETS = new Set<MaritimeCommercialTarget>(
+  MARITIME_VALIDATED_COMMERCIAL_TARGETS,
+);
 
 const finiteConfidence = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
 const nonEmpty = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
+
+/**
+ * Whether an event class is admitted only with a positively identified
+ * commercial target.  This is deliberately a semantic-class rule, never a
+ * title/raw-text inference.
+ */
+export function maritimeEventRequiresCommercialTarget(
+  eventClass: unknown,
+): eventClass is MaritimeCommercialEventClass {
+  return (MARITIME_COMMERCIAL_EVENT_CLASSES as readonly unknown[]).includes(
+    eventClass,
+  );
+}
+
+/**
+ * The common target-evidence predicate used by semantic validation and
+ * downstream consumers.  A target flag by itself is not evidence: the target
+ * must be one of the admitted commercial target values and carry a
+ * source-grounded evidence quote.
+ */
+export function hasValidatedCommercialTarget(
+  value:
+    | {
+        commercialTargetValidated?: unknown;
+        commercialTarget?: unknown;
+        commercialTargetEvidence?: unknown;
+      }
+    | null
+    | undefined,
+): boolean {
+  return (
+    value?.commercialTargetValidated === true &&
+    COMMERCIAL_TARGETS.has(value.commercialTarget as MaritimeCommercialTarget) &&
+    nonEmpty(value.commercialTargetEvidence)
+  );
+}
 
 export function sourceQuoteGrounded(
   quote: string | null | undefined,
@@ -347,11 +404,7 @@ export function validateMaritimeSemanticContract(
   const sourceQuotes = Array.isArray(value.sourceQuotes)
     ? value.sourceQuotes
     : [];
-  const targetRequired =
-    eventClass === "commercial_attack" ||
-    eventClass === "commercial_seizure" ||
-    eventClass === "piracy_or_armed_robbery" ||
-    eventClass === "port_disruption";
+  const targetRequired = maritimeEventRequiresCommercialTarget(eventClass);
 
   if (value.verdict === "valid") {
     if (!occurred) failures.push("valid event did not occur");
@@ -381,16 +434,10 @@ export function validateMaritimeSemanticContract(
         !Number.isFinite(Date.parse(`${value.eventDate}T00:00:00.000Z`)))) {
       failures.push("invalid event date");
     }
-    if (targetRequired && (
-      !value.commercialTargetValidated ||
-      !COMMERCIAL_TARGETS.has(value.commercialTarget as MaritimeCommercialTarget) ||
-      !nonEmpty(value.commercialTargetEvidence)
-    )) {
+    if (targetRequired && !hasValidatedCommercialTarget(value)) {
       failures.push("commercial event lacks confirmed target evidence");
     }
-    if (value.commercialTargetValidated &&
-      (!COMMERCIAL_TARGETS.has(value.commercialTarget as MaritimeCommercialTarget) ||
-        !nonEmpty(value.commercialTargetEvidence))) {
+    if (value.commercialTargetValidated && !hasValidatedCommercialTarget(value)) {
       failures.push("commercial target flag has no grounded target evidence");
     }
     if (value.severity !== null &&
@@ -432,7 +479,7 @@ export function validateMaritimeSemanticContract(
       eventClass === "military_exercise" ||
       eventClass === "drone_activity") &&
     value.commercialTargetValidated &&
-    !COMMERCIAL_TARGETS.has(value.commercialTarget as MaritimeCommercialTarget)
+    !hasValidatedCommercialTarget(value)
   ) {
     failures.push("military activity has invalid commercial target");
   }
@@ -508,7 +555,7 @@ export function isValidatedMaritimeIncident(
     evidence.eventClass === "military_exercise" ||
     evidence.eventClass === "drone_activity"
   ) {
-    return evidence.commercialTargetValidated;
+    return hasValidatedCommercialTarget(evidence);
   }
   return true;
 }

@@ -117,6 +117,63 @@ describe("Shipping publication final boundary", () => {
     expect(() => assertShippingPublication(publication)).not.toThrow();
   });
 
+  it("keeps the attack/seizure Fast Fact accurate when the vessel table cap applies", () => {
+    const incidents = Array.from({ length: 13 }, (_, index) =>
+      incident(index + 1, {
+        maritimeSemantic: semantic({
+          developmentKey: `dev-vessel-cap-${index + 1}`,
+        }),
+      }),
+    );
+    const publication = finalizeShippingPublication(
+      validOptions({ incidents }),
+    );
+    const vesselFact = publication.fastFacts.find(
+      (fact) => fact.label === "Vessel Attacks / Seizures",
+    );
+
+    expect(vesselFact?.value).toBe("13");
+    expect(publication.dataset.vesselRows).toHaveLength(12);
+    expect(publication.auditIssues.map((issue) => issue.code)).not.toContain(
+      "VESSEL_FAST_FACT_MISMATCH",
+    );
+  });
+
+  it("keeps generated consequence prose evidence-safe for provider route labels", () => {
+    const publication = finalizeShippingPublication(
+      validOptions({
+        incidents: [
+          incident(1, {
+            maritimeSemantic: semantic({
+              routeRelationship: {
+                kind: "direct_passage",
+                routeName: "Strait of Hormuz transit route",
+                evidence: "Tanker attack reported on Strait of Hormuz transit route",
+              },
+              routingConsequence: {
+                kind: "reported",
+                status: "confirmed",
+                claim: "Vessels diverted from Strait of Hormuz transit route",
+                evidenceQuote: "Vessels diverted from Strait of Hormuz transit route",
+                confidence: 0.9,
+                description: "Vessels diverted from the route.",
+                evidence: "Vessels diverted from Strait of Hormuz transit route",
+              },
+            }),
+          }),
+        ],
+      }),
+    );
+
+    expect(publication.prose.chokepointRouteRead).not.toContain(
+      "Strait of Hormuz transit route",
+    );
+    expect(publication.prose.commercialImpactRead).toBe(
+      "The commercial-impact read reflects 1 documented commercial consequence assessment in this window.",
+    );
+    expect(publication.auditIssues).toEqual([]);
+  });
+
   it("counts raw in-window validation coverage before canonical filtering", () => {
     const validated = incident(1, {
       severity: "high",
@@ -365,6 +422,58 @@ describe("Shipping publication final boundary", () => {
     expect(publication.maritimeBoard.risk.label).toBe("Assessment pending");
   });
 
+  it("holds a valid-verdict commercial row with no target as pending, not a publication blocker", () => {
+    const withheld = incident(73733, {
+      maritimeValidation: {
+        status: "validated",
+        version: MARITIME_SEMANTIC_VERSION,
+      },
+      maritimeSemantic: semantic({
+        commercialTargetValidated: false,
+        commercialTarget: "unknown",
+        commercialTargetName: null,
+        commercialTargetEvidence: null,
+      }),
+    });
+    const publication = finalizeShippingPublication(
+      validOptions({ incidents: [withheld] }),
+    );
+
+    expect(publication.dataset.canonicalIncidents).toHaveLength(0);
+    expect(publication.dataset.vesselRows).toHaveLength(0);
+    expect(publication.completeness).toMatchObject({
+      status: "incomplete",
+      validated: 0,
+      rejected: 0,
+      pending: 1,
+    });
+    expect(publication.auditIssues.map((item) => item.code)).not.toContain(
+      "UNVALIDATED_COMMERCIAL_TARGET",
+    );
+    expect(() => assertShippingPublication(publication)).not.toThrow();
+  });
+
+  it("still fails closed if a malformed commercial row is forced into a supplied canonical dataset", () => {
+    const row = incident(73733);
+    const dataset = buildShippingReportDataset([row], "shipping", ISSUE_DATE);
+    row.maritimeSemantic!.commercialTargetValidated = false;
+    row.maritimeSemantic!.commercialTarget = "unknown";
+    row.maritimeSemantic!.commercialTargetName = null;
+    row.maritimeSemantic!.commercialTargetEvidence = null;
+
+    const publication = finalizeShippingPublication(
+      validOptions({
+        incidents: [row],
+        dataset,
+      }),
+    );
+
+    expect(publication.auditIssues.map((item) => item.code)).toContain(
+      "UNVALIDATED_COMMERCIAL_TARGET",
+    );
+    expect(() => assertShippingPublication(publication)).toThrow();
+  });
+
   it("rejects analyst edits that contradict overall risk, severity, counts, country, or route", () => {
     const publication = finalizeShippingPublication(
       validOptions({
@@ -409,6 +518,7 @@ describe("Shipping publication final boundary", () => {
           fastFactOverrides: {
             "Confirmed Incidents": { value: "999" },
             "Highest Severity": { value: "Low" },
+            "Vessel Attacks / Seizures": { value: "999" },
           },
         },
         tableOverrides: { vessel: [{ id: 999, title: "Fabricated" }] },
@@ -421,6 +531,7 @@ describe("Shipping publication final boundary", () => {
       "UNSUPPORTED_TABLE_OVERRIDE",
       "FAST_FACT_COUNT_MISMATCH",
       "FAST_FACT_SEVERITY_MISMATCH",
+      "VESSEL_FAST_FACT_MISMATCH",
     ]));
     expect(codes.some((code) => code.startsWith("SUMMARY_"))).toBe(false);
   });
@@ -556,6 +667,63 @@ describe("Shipping publication final boundary", () => {
     expect(Object.values(publication.prose).join("\n")).not.toMatch(
       /\b(canonical set|source[- ]grounded|shown in the chart below|internal validation)\b/i,
     );
+  });
+
+  it("preserves legacy and custom dynamic prose unless it is an exact current candidate", () => {
+    const legacyWhatMatters =
+      "Assessment: maritime risk remains concentrated around Strait of Hormuz; the operational question is whether a further route disruption is reported.";
+    const customPolestar =
+      "Polestar assesses maritime risk from reported incidents rather than movement indicators. The leading reported geography is Oman. Analyst note: keep the country distinction visible.";
+    const publication = finalizeShippingPublication(
+      validOptions({
+        report: {
+          whatMatters: legacyWhatMatters,
+          polestarView: customPolestar,
+          commercialImpactRead:
+            '1 canonical incident carries structured commercial-consequence evidence. The listed example is "Tanker attacked at Bab-el-Mandeb" (commercial attack).',
+        },
+      }),
+    );
+    expect(publication.prose.whatMatters).toBe(legacyWhatMatters);
+    expect(publication.prose.polestarView).toBe(customPolestar);
+    expect(publication.prose.commercialImpactRead).toContain(
+      "canonical incident carries structured commercial-consequence evidence",
+    );
+    expect(publication.auditIssues.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    [
+      "whatMatters",
+      "Pressure here feeds straight into transit time, freight cost and war-risk premium exposure across the wider region. A small shift on any one chokepoint usually shows up in the freight and insurance picture soon after.",
+    ],
+    [
+      "implications",
+      "Re-walk routing options around affected chokepoints, port-call sequencing, bunker planning and war-risk premium exposure. Confirm crew-change and advisory triggers with operators.",
+    ],
+    [
+      "watchNext",
+      "Next week hinges on a handful of triggers: fresh port closures or strikes, naval movement near Hormuz, Bab-el-Mandeb or the Malacca approaches, new maritime advisories, and visible moves in war-risk premiums or freight indices.",
+    ],
+    [
+      "polestarView",
+      "Chokepoint exposure remains the dominant operational concern, supported by freight and insurance pressure and a thinner layer of commercial disruption. Strait of Hormuz saw the most activity this week.",
+    ],
+    [
+      "chokepointRouteRead",
+      "Little was reported on chokepoints or route disruption recently (the last 30 days). Read this as a gap in reporting rather than proof that pressure has eased — warnings on these routes come in bursts, and a quiet spell does not change the underlying risk around Hormuz, Bab-el-Mandeb or the Red Sea. Keep watching maritime advisories, naval movements and any operator decisions on routing or war-risk insurance. A return of activity usually shows up in advisories before it reaches commercial freight rates.",
+    ],
+    [
+      "commercialImpactRead",
+      '1 canonical incident carries structured commercial-consequence evidence. The listed example is "Tanker attacked at Bab-el-Mandeb" (commercial attack).',
+    ],
+  ] as const)("preserves an analyst sentence appended to legacy-looking %s prose", (field, generated) => {
+    const appended = `${generated} Analyst note: reassess this point against the next operator advisory.`;
+    const publication = finalizeShippingPublication(
+      validOptions({ report: { [field]: appended } }),
+    );
+
+    expect((publication.prose as Record<string, string>)[field]).toBe(appended);
   });
 
   it("keeps a non-generated saved edit while automatic prose follows the live fallback", () => {

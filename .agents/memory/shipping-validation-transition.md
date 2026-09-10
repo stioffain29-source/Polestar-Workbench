@@ -20,3 +20,9 @@ Rendering successfully and passing the publication gate are not sufficient evide
 **Why:** the owner rejected a passing preview that still displayed contradictory labels, repeated AIS snapshots, empty headings and a definitive risk tier despite incomplete coverage.
 
 **How to apply:** include incomplete-coverage risk qualification, accurate count labels, dated latest-per-theatre AIS sampling and omission of empty panels in saved-report acceptance. Label proof as development output, never as an authenticated published-site capture.
+
+Do not stop at one passing issue date when correcting publication blockers; replay neighbouring windows with the saved overrides intact and require the PDF assertion itself to pass.
+
+**Why:** a passing older week concealed a commercial-target blocker in the owner's current week. A wider replay then exposed count-definition mismatches, provider route-name aliases and generated commercial prose that failed its own audit.
+
+**How to apply:** verify the exact editor window first, then a bounded date sweep. Do not guess that saved prose is historical boilerplate: retain exact generated-candidate matching. Even fully anchored template regexes can discard analyst edits inserted into their variable slots.

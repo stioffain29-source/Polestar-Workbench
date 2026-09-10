@@ -37,6 +37,10 @@ import {
   type ChokepointKey,
 } from "./shippingAnalysis";
 import {
+  hasValidatedCommercialTarget,
+  maritimeEventRequiresCommercialTarget,
+} from "@workspace/relevance";
+import {
   applyFastFactOverrides,
   type TopicSectionOverrides,
 } from "./topicSectionOverrides";
@@ -375,7 +379,22 @@ function firstRoute(dataset: ShippingReportDataset): string {
     )
     .map((semantic) => trim(semantic.routeRelationship?.routeName))
     .filter(Boolean);
-  if (semanticRoutes.length > 0) return semanticRoutes[0];
+  if (semanticRoutes.length > 0) {
+    const route = semanticRoutes[0];
+    // Provider route labels are free text and occasionally append a generic
+    // descriptor (for example, "Strait of Hormuz transit route").  Preserve
+    // the supported chokepoint identity in reader-facing prose instead of
+    // leaking "transit" into every consequence audit sentence.
+    const knownChokepoint = dataset.chokepointRows
+      .filter((row) => row.count > 0)
+      .sort((a, b) => b.name.length - a.name.length)
+      .find((row) => normalizeText(route).includes(normalizeText(row.name)));
+    if (knownChokepoint) return knownChokepoint.name;
+    return route
+      .replace(/\b(?:transit|shipping|maritime)\s+route\b/gi, "route")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
   if (dataset.canonicalIncidents.some((row) => semanticFor(row))) return "";
   const route = dataset.chokepointRows.find((row) => row.count > 0)?.name;
   return route ?? "";
@@ -605,11 +624,12 @@ function addConsistencyIssues(
     );
   }
   const vesselFact = facts.find((fact) => fact.label === "Vessel Attacks / Seizures");
-  if (!vesselFact || vesselFact.value !== String(dataset.vesselRows.length)) {
+  const vesselAttackSeizureCount = dataset.vesselAttackSeizureCount;
+  if (!vesselFact || vesselFact.value !== String(vesselAttackSeizureCount)) {
     issue(
       issues,
       "VESSEL_FAST_FACT_MISMATCH",
-      "Vessel attack/seizure Fast Fact does not match the canonical vessel table.",
+      "Vessel attack/seizure Fast Fact does not match the canonical attack/seizure count.",
       "fastFacts",
     );
   }
@@ -775,12 +795,6 @@ function validateSemanticRows(
     "other_maritime_event",
     "non_event",
   ]);
-  const commercialClasses = new Set([
-    "commercial_attack",
-    "commercial_seizure",
-    "piracy_or_armed_robbery",
-    "port_disruption",
-  ]);
   const militaryClasses = new Set([
     "naval_activity",
     "military_naval_activity",
@@ -792,8 +806,15 @@ function validateSemanticRows(
     const id = row.id;
     const canonical = canonicalById.get(String(id));
     const section = `incident:${String(id)}`;
+    // A raw row which fails canonical admission is pending coverage, not a
+    // published incident.  Do not turn its withheld provider result into a
+    // publication blocker: that would contradict the admission boundary and
+    // make an incomplete report impossible to edit/export.  If a malformed
+    // row somehow reaches a caller-supplied canonical dataset, canonical is
+    // present and all fail-closed checks below still apply.
+    if (!canonical) continue;
     if (semantic.verdict !== "valid" || semantic.eventOccurred !== true) {
-      if (canonical) issue(issues, "INVALID_SEMANTIC_INCIDENT", "A non-valid semantic incident reached the canonical set.", section, [id]);
+      issue(issues, "INVALID_SEMANTIC_INCIDENT", "A non-valid semantic incident reached the canonical set.", section, [id]);
       continue;
     }
     if (!semantic.eventClass || !validClasses.has(semantic.eventClass)) {
@@ -802,14 +823,10 @@ function validateSemanticRows(
     if (!semantic.eventClass || semantic.eventClass === "non_event") {
       issue(issues, "NON_EVENT_IN_CANONICAL_SET", "A semantic non-event reached the canonical set.", section, [id]);
     }
-    const needsTarget = semantic.eventClass ? commercialClasses.has(semantic.eventClass) : false;
+    const needsTarget = maritimeEventRequiresCommercialTarget(semantic.eventClass);
     if (
       needsTarget &&
-      (!semantic.commercialTargetValidated ||
-        !trim(semantic.commercialTargetEvidence) ||
-        !semantic.commercialTarget ||
-        semantic.commercialTarget === "none" ||
-        semantic.commercialTarget === "unknown")
+      !hasValidatedCommercialTarget(semantic)
     ) {
       issue(issues, "UNVALIDATED_COMMERCIAL_TARGET", "A commercial event has no positively identified target evidence.", section, [id]);
     }
@@ -908,6 +925,7 @@ function referencesFor(
 }> {
   return dataset.canonicalIncidents.map((row) => {
     const semantic = semanticFor(row);
+    const semanticRouteName = trim(semantic?.routeRelationship?.routeName);
     const places = [
       row.incidentCountry,
       semantic ? null : row.country,
@@ -919,7 +937,15 @@ function referencesFor(
       .map(trim)
       .filter(Boolean);
     const route = [
-      semantic?.routeRelationship?.routeName,
+      semanticRouteName,
+      ...dataset.chokepointRows
+        .filter(
+          (chokepoint) =>
+            chokepoint.count > 0 &&
+            Boolean(semanticRouteName) &&
+            normalizeText(semanticRouteName).includes(normalizeText(chokepoint.name)),
+        )
+        .map((chokepoint) => chokepoint.name),
       semantic ? null : row.location,
       ...dataset.chokepointRows
         .filter((chokepoint) => chokepoint.count > 0)

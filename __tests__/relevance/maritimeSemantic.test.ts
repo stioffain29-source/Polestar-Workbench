@@ -1,7 +1,9 @@
 import {
   MARITIME_SEMANTIC_VERSION,
   countryFromPhysicalEvidence,
+  hasValidatedCommercialTarget,
   isValidatedMaritimeIncident,
+  maritimeEventRequiresCommercialTarget,
   validateMaritimeSemanticContract,
   type MaritimeSemanticEvidence,
 } from "../../lib/relevance/src/maritimeSemantic";
@@ -119,6 +121,35 @@ describe("maritime semantic contract", () => {
         commercialTargetEvidence: "A tanker was attacked",
       }, SOURCE).valid,
     ).toBe(true);
+  });
+
+  it("shares the commercial-target admission rule across all commercial event classes", () => {
+    for (const eventClass of [
+      "commercial_attack",
+      "commercial_seizure",
+      "piracy_or_armed_robbery",
+      "port_disruption",
+    ] as const) {
+      const missingTarget = evidence({
+        eventClass,
+        commercialTargetValidated: false,
+        commercialTarget: "unknown",
+        commercialTargetEvidence: null,
+      });
+      expect(maritimeEventRequiresCommercialTarget(eventClass)).toBe(true);
+      expect(hasValidatedCommercialTarget(missingTarget)).toBe(false);
+      expect(validateMaritimeSemanticContract(missingTarget, SOURCE).valid).toBe(false);
+      expect(isValidatedMaritimeIncident(missingTarget)).toBe(false);
+    }
+
+    const militaryContext = evidence({
+      eventClass: "naval_activity",
+      commercialTargetValidated: false,
+      commercialTarget: "none",
+      commercialTargetEvidence: null,
+    });
+    expect(maritimeEventRequiresCommercialTarget("naval_activity")).toBe(false);
+    expect(validateMaritimeSemanticContract(militaryContext, SOURCE).valid).toBe(true);
   });
 
   it("allows known events with unknown geography and never infers country", () => {

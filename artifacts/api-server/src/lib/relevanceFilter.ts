@@ -4,6 +4,8 @@ import {
   FLASHPOINT_ACCEPTED_EVENT_TYPES,
   FLASHPOINT_CONFIDENCE_THRESHOLDS,
   FLASHPOINT_VALIDITY_VERSION,
+  MARITIME_COMMERCIAL_EVENT_CLASSES,
+  MARITIME_VALIDATED_COMMERCIAL_TARGETS,
   MARITIME_SEMANTIC_VERSION,
   validateFlashpointSemanticContract,
   type FlashpointSemanticGates,
@@ -124,10 +126,25 @@ export function defaultRelevanceCondition(): SQL {
  * Count/report boundary for maritime rows.  Review rows remain retrievable
  * through the incident API (with maritimeSemantic.verdict=needs_review), but
  * cannot inflate validated incident totals until the relational projection
- * proves a discrete event.  Military/naval/drone context requires a validated
- * commercial target before it enters those totals.
+ * proves a discrete event.  Commercial event classes and
+ * military/naval/drone context require a validated commercial target before
+ * they enter those totals.
  */
 export function validatedMaritimeIncidentCondition(): SQL {
+  const targetRequiredClasses = sql.join(
+    [
+      ...MARITIME_COMMERCIAL_EVENT_CLASSES,
+      "naval_activity",
+      "military_naval_activity",
+      "military_exercise",
+      "drone_activity",
+    ].map((eventClass) => sql`${eventClass}`),
+    sql`, `,
+  );
+  const validatedTargets = sql.join(
+    MARITIME_VALIDATED_COMMERCIAL_TARGETS.map((target) => sql`${target}`),
+    sql`, `,
+  );
   return or(
     notInArray(incidentsTable.topic, ["shipping", "maritime"]),
     sql`EXISTS (
@@ -140,9 +157,13 @@ export function validatedMaritimeIncidentCondition(): SQL {
          AND ${maritimeSemanticEvidenceTable.eventClass} IS NOT NULL
          AND ${maritimeSemanticEvidenceTable.eventClass} <> 'non_event'
          AND (
-           ${maritimeSemanticEvidenceTable.eventClass} NOT IN
-             ('naval_activity', 'military_naval_activity', 'military_exercise', 'drone_activity')
-           OR ${maritimeSemanticEvidenceTable.commercialTargetValidated} = true
+            ${maritimeSemanticEvidenceTable.eventClass} NOT IN (${targetRequiredClasses})
+            OR (
+              ${maritimeSemanticEvidenceTable.commercialTargetValidated} = true
+              AND ${maritimeSemanticEvidenceTable.commercialTarget} IN (${validatedTargets})
+              AND ${maritimeSemanticEvidenceTable.commercialTargetEvidence} IS NOT NULL
+              AND btrim(${maritimeSemanticEvidenceTable.commercialTargetEvidence}) <> ''
+            )
          )
     )`,
   )!;
