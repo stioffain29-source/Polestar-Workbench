@@ -1,7 +1,7 @@
 # Action Plan — Report Quality Reset (10 Sep 2026)
 
-**Date:** 10 September 2026 (revised evening — Fuel Watch code landed on `develop-0909`)  
-**Context:** Steve Ward morning audit + Flashpoint PDF review + Fuel Watch architecture list. Afternoon 12:16: classes not named stories. Evening: teammates shipped Fuel Watch pipeline work (`0d5ba0fb`, `9f91ea08`). Bench runtime was healthy in the morning audit. **Production remains “not fully resolved”** until five transient semantic-provider holds clear and prod is checked directly. West Papua security rows stay on convergence retry — no manual force-through.
+**Date:** 10 September 2026 (revised evening — Fuel Watch code landed on `develop-0909`; Sprint A/B internally ready)  
+**Context:** Steve Ward morning audit + Flashpoint PDF review + Fuel Watch architecture list. Afternoon 12:16: classes not named stories. Evening: teammates shipped Fuel Watch pipeline work (`0d5ba0fb`, `9f91ea08`). Later: Sprint A (shared fail-closed audit on Fuel **and** Flashpoint) and Sprint B (Flashpoint unrest pipeline) are **internally ready** — class gates, not named-story patches. Next: **republish the application** so Steve can class-read live reports (Flashpoint first, then Fuel on the same audit). **Sprint C proof does not start until that check finishes and passes.** Bench runtime was healthy in the morning audit. **Production remains “not fully resolved”** until five transient semantic-provider holds clear and prod is checked directly. West Papua security rows stay on convergence retry — no manual force-through.
 
 **Steve 12:16 (binding):** Named stories on a single report are not the work. This is an **overall reporting failure**. If we patch Dhaka/Kathmandu this week, next cycle it is Jakarta (or Nepal, or a Fuel corridor). The same classes must fail closed everywhere, or we chase the tail.
 
@@ -45,7 +45,7 @@ Branch `develop-0909`. Commits:
 - No live 30-day Fuel relevance replay recorded in this repo (agent memory requires it before treating the version bump as accepted).
 - Flashpoint R21–R26 / R30 class gaps are unchanged.
 
-**Implication for this plan:** Sprint C is **code-complete on Fuel**, not Steve-complete. Remaining product work is (1) prove Fuel on a headless PDF + live relevance replay, (2) **consume the same audit on Flashpoint** rather than building a second stack, (3) close Flashpoint C4–C7/C9 on the 10 Sep fixture.
+**Implication for this plan:** Sprint A and B are internally ready (shared audit on both topics; Flashpoint unrest pipeline). Sprint C remains **code-complete on Fuel**, not Steve-complete. **Do not start Sprint C proof until Steve’s live class read of the republished app passes** (Flashpoint PDF first, then Fuel on the same audit — class read, not a city punch list). After that pass: (1) Fuel headless PDF + live relevance replay, (2) F5 geography remainder.
 
 ---
 
@@ -179,9 +179,9 @@ Steve: *“Fuel watch is worse than its ever been.”* His list is **shared repo
 
 | Priority | What we build | Classes | Status |
 | --- | --- | --- | --- |
-| **0** | **Shared `finalReportEvidenceAudit` on every commodity export** | C5–C8, C6, C7 | Module exists; **Fuel wired; Flashpoint not wired** |
-| **1** | **Prove on Flashpoint** — adapter + C1/C4/C5/C9 unrest validity + 10 Sep fixture | C1–C10 on protests/unrest | Open |
-| **2** | **Fuel Watch proof** — live relevance replay + headless PDF; close F5 geography assignment | C3 remainder; Steve read | Code in; proof **open** |
+| **0** | **Shared `finalReportEvidenceAudit` on every commodity export** | C5–C8, C6, C7 | **Sprint A internally ready** — Fuel and Flashpoint both wired |
+| **1** | **Prove on Flashpoint** — adapter + C1/C4/C5/C9 unrest validity | C1–C10 on protests/unrest | **Sprint B internally ready**; Steve live class read **pending republish** |
+| **2** | **Fuel Watch proof** — live relevance replay + headless PDF; close F5 geography assignment | C3 remainder; Steve read | Code in; proof **blocked until Steve’s A/B check passes** |
 | **3** | **Production reliability** — 5 semantic holds; prod spot-check | C10 | Open |
 | **4** | Cargo, country briefs, thin Energy/Fertiliser/Data Centres | Same audit, later | After P0–P2 Steve PDF |
 
@@ -230,11 +230,11 @@ pnpm test -- finalReportEvidenceAudit fuelSharedArchitecture fuelExcludes
 # After adapter: flashpointReportConsistency + a Flashpoint publication audit test
 ```
 
-**Sprint A exit:** RA codes run on Flashpoint **and** Fuel export paths. Class tests green. **No Steve PDF yet.**
+**Sprint A exit:** RA codes run on Flashpoint **and** Fuel export paths. Class tests green. Internally met. **Steve live PDF still required** after republish (Flashpoint first, then Fuel).
 
 ---
 
-## Sprint B — Prove classes on Flashpoint (Days 4–6) — still the main gap
+## Sprint B — Prove classes on Flashpoint (Days 4–6) — internally ready; Steve live read next
 
 **Not “close Dhaka.”** Prove C1–C9 on the unrest pipeline. Consume `finalReportEvidenceAudit`. The 10 Sep PDF is the **live fixture**.
 
@@ -248,21 +248,21 @@ pnpm test -- finalReportEvidenceAudit fuelSharedArchitecture fuelExcludes
 
 ### Day 4 — C4 + C5 on Flashpoint
 
-- [ ] Highest-severity claim = max severity in that subsection’s canonical table
-- [ ] “Most affected” / heaviest volume uses canonical counts; **ties must not pick a winner**
-- [ ] Hard-fail on those **shapes**, with fixtures that are not the 10 Sep countries
+- [x] Highest-severity claim = max severity in that subsection’s canonical table
+- [x] “Most affected” / heaviest volume uses canonical counts; **ties must not pick a winner**
+- [x] Hard-fail on those **shapes**, with fixtures that are not the 10 Sep countries
 
 ### Day 5 — C1, C2, C6, C9 on Flashpoint
 
-- [ ] Investigation/process/commentary out unless an in-window public-order event is evidenced
-- [ ] Activism and Protest Read from the canonical set only
-- [ ] Forecast: confirmed forward indicator + operational meaning only
+- [x] Investigation/process/commentary out unless an in-window public-order event is evidenced
+- [x] Activism and Protest Read from the canonical set only
+- [x] Forecast: confirmed forward indicator + operational meaning only
 
 ### Day 6 — C6 + C8 + protect wins
 
-- [ ] Polestar View from the same set; Watch Next is indicators, not dates
-- [ ] Regression lock: What Matters, Implications, Watch Next (R27–R29)
-- [ ] Headless PDF on 2026-09-10 must pass shared audit + class checklist
+- [x] Polestar View from the same set; Watch Next is indicators, not dates
+- [x] Regression lock: What Matters, Implications, Watch Next (R27–R29)
+- [x] Internal class checklist on current-issue Flashpoint PDF — hygiene/template scans clean; Distinct Incidents = 16; held-out class tests green. **Steve live class read after republish is still the acceptance signal.**
 
 **Verify:**
 
@@ -283,6 +283,8 @@ TOPIC=flashpoint ISSUE_DATE=2026-09-10 pnpm --filter workbench exec tsx --import
 ---
 
 ## Sprint C — Fuel Watch (code landed; proof remaining)
+
+**Gate:** Sprint C proof **starts only after Steve’s check of the republished app finishes and passes** — Flashpoint current-issue PDF class read first, then Fuel on the same audit. Until that pass, do not run live Fuel replay / headless Fuel PDF as the next client deliverable.
 
 **Do not restart Days 7–9 implementation.** Remaining is proof and the C3 remainder.
 
@@ -371,8 +373,10 @@ TOPIC=fuel ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./scripts
 | --- | --- |
 | **10 Sep morning** | Audit PASS (bench); Flashpoint PDF review; 12:16 correction — classes not stories |
 | **10 Sep evening** | Internal: Fuel shared-audit + consequence gate on `develop-0909` — **no Steve PDF** |
-| **End remaining Sprint A** | Internal: Flashpoint adapter on the same audit — no Steve PDF |
-| **End Sprint B** | **Flashpoint PDF** on 2026-09-10 + one-page class delta |
+| **End remaining Sprint A** | Internally done — Flashpoint adapter on the same audit |
+| **End Sprint B (internal)** | Internally done — unrest class gates; held-out tests green |
+| **After republish** | Steve class-reads **live Flashpoint** (current issue), then **Fuel** on the same audit — not a city punch list |
+| **Sprint C (after Steve pass)** | Continue Fuel proof: live relevance replay + headless PDF + F5. **Do not start until the A/B live check is finished and passed.** |
 | **End Sprint C proof** | **Fuel Watch PDF** + funnel diff + live-replay summary |
 | **End Sprint D** | Proof pack including non-fixture class tests; prod hold status |
 | **Weekly until sign-off** | Hold count, class-gate status, blockers — one short message |
@@ -381,14 +385,12 @@ TOPIC=fuel ISSUE_DATE=<date> pnpm --filter workbench exec tsx --import ./scripts
 
 ## Immediate next actions
 
-1. **Do not restart Fuel Watch implementation.** Review `finalizeFuelPublication` + `finalReportEvidenceAudit` and plan the Flashpoint adapter against that contract.
-2. **Live Fuel relevance replay** against stored rows at `2026-09-10.1`. Record kept/lost by class. Fix grammar if recall of real operational events collapsed.
-3. **Extend the shared audit** for Flashpoint C7 phrases Steve named (“the table above”, “Named locations”) as a language **class**.
-4. **Sprint B:** Flashpoint canonical set, ties, severity parity, process-vs-event, evidence-built Activism Read / Forecast / Polestar View; send Steve PDF only at exit.
-5. **Headless Fuel PDF** only after replay is green; then Steve read.
-6. **Lock** `polestar-report-flashpoint-202609101057.pdf` as the Flashpoint class fixture — examples of C4/C5/C6/C7/C9, not a city to-do list.
-7. **Track** semantic hold count daily until 0; prod spot-check before “fully resolved”.
-8. **Do not** change PDF layout; **do not** regress What Matters / Implications / Watch Next; **do not** send another PDF while C4/C5/C7 can still fire on a country we have not named yet.
+1. **Republish the application** so Steve can check live reports — Flashpoint first, then Fuel on the same audit.
+2. **Steve class read** of a current-issue Flashpoint PDF after publish (class gates, not a city punch list). Fuel follows on the same audit.
+3. **Sprint C waits.** Continue Fuel Watch proof (live relevance replay, headless PDF, F5 geography) **only once Steve’s check is finished and passed.** Do not restart Fuel implementation in parallel with the live A/B read.
+4. **Lock** `polestar-report-flashpoint-202609101057.pdf` as the Flashpoint class fixture — examples of C4/C5/C6/C7/C9, not a city to-do list.
+5. **Track** semantic hold count daily until 0; prod spot-check before “fully resolved”.
+6. **Do not** change PDF layout; **do not** regress What Matters / Implications / Watch Next.
 
 ---
 
