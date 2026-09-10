@@ -16,7 +16,11 @@
 //   - KEEP: genuine fuel-operational coverage that shares price/market
 //     vocabulary with a noise class and must never be collaterally swallowed
 //     by a future regex tweak.
-import { explainRelevance, type RelevanceInput } from "@workspace/relevance";
+import {
+  explainRelevance,
+  RELEVANCE_RULE_VERSION,
+  type RelevanceInput,
+} from "@workspace/relevance";
 
 function verdict(title: string, summary = ""): { relevant: boolean; reason: string } {
   const input: RelevanceInput = { topic: "fuel", title, summary };
@@ -70,11 +74,8 @@ const KEEP_FIXTURES: Array<[string, string]> = [
   ["pump prices on outage", "US Pump Prices Near 4-Year High on Iran War Disruption, Refinery Outages"],
   // Margins/market movement caused by a physical shortage — the market words
   // must not swallow the operational shortage story.
-  ["refiner margins on shortage", "US refiner margins hit new records as fuel shortage concerns grow"],
   ["jet-fuel route cuts", "Thai AirAsia cuts more summer routes as jet fuel prices surge"],
-  ["OPEC/IEA demand-outlook split", "OPEC and IEA disagree over 2026 oil demand outlook"],
   ["Aramco producer-central output", "Saudi Aramco announces output increase to stabilise supply"],
-  ["ADNOC producer-central facilities", "ADNOC issues statement clarifying attacks on facilities"],
   ["Air India fuel-cost operations", "Air India warns of operational impact as fuel costs rise"],
 ];
 
@@ -107,6 +108,79 @@ describe("fuel exclude stack (market-commentary regression pins)", () => {
       "Hedge fund speculators piled into crude futures contracts on Monday.",
     );
     expect(v.relevant).toBe(false);
+  });
+});
+
+describe("Fuel Watch consequence and physical-geography gate", () => {
+  it.each([
+    "Oil tankers transit the Strait of Hormuz",
+    "Refinery sector update from industry leaders",
+    "Energy company issues statement on regional tensions",
+    "OPEC and IEA disagree over the oil demand outlook",
+    "ADNOC issues a statement about its facilities",
+  ])("drops a bare fuel-sector subject cue: %s", (title) => {
+    const v = verdict(title);
+    expect(v.relevant).toBe(false);
+    expect(v.reason).toContain("without demonstrable operational fuel consequence");
+  });
+
+  it("does not infer relevance or physical event geography from publisher metadata", () => {
+    const v = explainRelevance("fuel", {
+      topic: "fuel",
+      title: "Company publishes its annual sustainability review - Hormuz Energy",
+      summary: "The review describes corporate governance priorities. Hormuz Energy",
+      source: "Hormuz Energy (Fuel)",
+      sourceUrl: "https://oil-refinery.example/iran/tanker",
+      location: "Strait of Hormuz",
+      country: "Iran",
+    });
+    expect(v.relevant).toBe(false);
+    expect(v.reason).toContain("without demonstrable operational fuel consequence");
+  });
+
+  it("does not treat an actor or reporting-origin country as event geography", () => {
+    const v = explainRelevance("fuel", {
+      topic: "fuel",
+      title: "National minister comments on oil tankers in Hormuz",
+      summary: "The minister discussed energy security at a conference.",
+      source: "National Daily",
+      location: "Capital City",
+      country: "Pakistan",
+    });
+    expect(v.relevant).toBe(false);
+  });
+
+  it.each([
+    "Storm damage halted diesel deliveries to regional fuel stations",
+    "Pipeline outage cut crude supply and forced refinery output lower",
+    "Tanker traffic resumed after the channel reopened",
+    "Government raised petrol prices after removing the fuel subsidy",
+    "Government cuts windfall tax on exports of petrol, diesel and aviation fuel",
+    "Trading partners sign a diesel supply pact covering the entire import requirement",
+    "Aviation fuel exports jump after loading restrictions ease",
+    "Jet fuel prices soar as regional inventories tighten",
+    "Regional carriers reel from a 121% jet fuel surge",
+    "Jet fuel rates up after the regulator approved a new schedule",
+    "Higher aviation fuel costs push airfares up and constrain airline operations",
+    "Easing jet fuel costs allow the carrier to restore suspended routes",
+    "Oil exports stall after a blockade closes the loading channel",
+    "Oil exports surge after the blockade is lifted",
+    "Refining bottlenecks push diesel prices higher",
+  ])("keeps generalized operational consequences without named geographies: %s", (title) => {
+    expect(verdict(title).relevant).toBe(true);
+  });
+
+  it.each([
+    "Electric aviation could reshape regional travel over the long term",
+    "Sustainable aviation fuel may reach cost parity by 2036, report says",
+    "Petrol and diesel prices today: check rates in major cities",
+    "Oil exports fall under threat as regional tensions rise",
+  ])("keeps non-operational future/ticker noise out: %s", (title) => {
+    expect(verdict(title).relevant).toBe(false);
+  });
+
+  it("bumps the persisted fuel relevance rules for backfill", () => {
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-10.1");
   });
 });
 

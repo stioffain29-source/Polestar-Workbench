@@ -25,6 +25,7 @@ import {
 import {
   resolveFuelEffectiveSections,
   validateFuelReportConsistency as validateFuelEffectiveText,
+  validateFuelFinalEvidenceAudit,
 } from "@/lib/fuelReportConsistency";
 import { validateFuelReportConsistency as validateFuelCanonicalText } from "@/lib/fuelCanonicalFacts";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
@@ -826,6 +827,8 @@ export default function ReportPreview({
           fuelMarketRead: report.fuelMarketRead,
           fuelOperationalRead: report.fuelOperationalRead,
           fuelRegionalHighlights: report.fuelRegionalHighlights,
+          implications: report.implications,
+          watchNext: report.watchNext,
         },
         aiProse,
         fuelData,
@@ -854,7 +857,19 @@ export default function ReportPreview({
     fuelData && fuelEffective
       ? validateFuelEffectiveText(fuelData.reportFacts, fuelEffective)
       : [];
-  if (fuelConsistencyErrors.length > 0 || fuelEffectiveIssues.length > 0) {
+  const fuelEvidenceAuditIssues =
+    fuelData && fuelEffective
+      ? validateFuelFinalEvidenceAudit(
+          fuelData.reportFacts,
+          fuelEffective,
+          fuelData.canonicalFacts.watchIndicators,
+        )
+      : [];
+  if (
+    fuelConsistencyErrors.length > 0 ||
+    fuelEffectiveIssues.length > 0 ||
+    fuelEvidenceAuditIssues.length > 0
+  ) {
     return (
       <div
         className="print-report bg-white"
@@ -888,6 +903,12 @@ export default function ReportPreview({
             ))}
             {fuelEffectiveIssues.map((issue, i) => (
               <li key={`eff-${i}`}>
+                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
+                [{issue.code}] {issue.message}
+              </li>
+            ))}
+            {fuelEvidenceAuditIssues.map((issue, i) => (
+              <li key={`audit-${i}`}>
                 <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
                 [{issue.code}] {issue.message}
               </li>

@@ -10,16 +10,21 @@ import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topic
 import { deriveIncidentCountry } from "./shippingCountry";
 import { isSocialPostTitle } from "./fuelReportFacts";
 import { capFuelMarketSeverity, buildFuelAnalyticalSections } from "./fuelNarratives";
+import {
+  deriveFuelMarketIndicator,
+  type FuelMarketComparisonScope,
+  type FuelMarketDirection,
+  type FuelMarketTemporalStatus,
+} from "./fuelMarketIndicators";
 
 export const FUEL_SEVERITIES = ["Insignificant", "Low", "Moderate", "High", "Extreme"] as const;
 export type FuelSeverity = (typeof FUEL_SEVERITIES)[number];
-export type FuelDirection = "rising" | "falling" | "unchanged" | "broadly stable";
+export type FuelDirection = FuelMarketDirection;
 export type EvidenceStatus = "Observed" | "Reported" | "Assessed" | "Potential";
 
 const SEVERITY_RANK: Record<FuelSeverity, number> = {
   Insignificant: 1, Low: 2, Moderate: 3, High: 4, Extreme: 5,
 };
-const NEUTRAL_CHANGE_PCT = 0.5;
 const UNKNOWN = "not identified";
 
 export interface FuelEntityFields {
@@ -59,12 +64,17 @@ export interface FuelRankedPressurePoint {
 export interface FuelMarketIndicatorFact {
   label: string;
   currentValue: number | string;
+  referenceValue: number | null;
   previousValue: number | null;
   absoluteChange: number | null;
   percentageChange: number | null;
-  direction: FuelDirection;
+  direction: FuelDirection | null;
   unit: string | null;
   asOf: string | null;
+  currentDate: string | null;
+  referenceDate: string | null;
+  temporalStatus: FuelMarketTemporalStatus;
+  comparisonScope: FuelMarketComparisonScope;
   source: string | null;
 }
 
@@ -261,50 +271,21 @@ function entitiesFor(i: TopicFastFactsIncident): FuelEntityFields {
     infrastructureOperator: get(raw, "infrastructureOperator"),
   };
 }
-function parsePercentageChange(change: unknown): number | null {
-  if (typeof change === "number" && Number.isFinite(change)) return change;
-  if (typeof change !== "string") return null;
-  const match = change.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
-  return match ? Number(match[1]) : null;
-}
 function marketFact(
-  card: { label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string },
+  card: { label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string; referenceDate?: string; referenceValue?: number },
+  issueDate: string,
   jetTrajectory?: { date: string; value: number }[],
 ): FuelMarketIndicatorFact {
-  const current = typeof card.value === "number" ? card.value : Number(card.value);
-  const numeric = Number.isFinite(current);
-  const isJet = /\bjet\b|kerosene/i.test(card.label);
-  if (isJet && jetTrajectory && jetTrajectory.length >= 2 && numeric) {
-    const first = jetTrajectory[0];
-    const last = jetTrajectory[jetTrajectory.length - 1];
-    const cur = current ?? last.value;
-    const pct = first.value !== 0 ? ((cur - first.value) / first.value) * 100 : 0;
-    const direction: FuelDirection =
-      Math.abs(pct) <= NEUTRAL_CHANGE_PCT
-        ? pct === 0 ? "unchanged" : "broadly stable"
-        : pct > 0 ? "rising" : "falling";
-    return {
-      label: card.label,
-      currentValue: card.value,
-      previousValue: first.value,
-      absoluteChange: cur - first.value,
-      percentageChange: pct,
-      direction,
-      unit: card.unit ?? null,
-      asOf: card.asOf ?? null,
-      source: card.source ?? null,
-    };
-  }
-  const percentageChange = parsePercentageChange(card.change);
-  const previousValue = numeric && percentageChange !== null && percentageChange !== -100
-    ? current / (1 + percentageChange / 100) : null;
-  const absoluteChange = numeric && previousValue !== null ? current - previousValue : null;
-  const direction: FuelDirection = percentageChange === null
-    ? "unchanged"
-    : Math.abs(percentageChange) <= NEUTRAL_CHANGE_PCT
-      ? (percentageChange === 0 ? "unchanged" : "broadly stable")
-      : percentageChange > 0 ? "rising" : "falling";
-  return { label: card.label, currentValue: card.value, previousValue, absoluteChange, percentageChange, direction, unit: card.unit ?? null, asOf: card.asOf ?? null, source: card.source ?? null };
+  const derived = deriveFuelMarketIndicator({
+    card,
+    issueDate,
+    trajectory: /\bjet\b|kerosene/i.test(card.label) ? jetTrajectory : undefined,
+  });
+  return {
+    ...derived,
+    previousValue: derived.referenceValue,
+    asOf: derived.currentDate,
+  };
 }
 
 export function buildFuelCanonicalFacts(opts: {
@@ -312,7 +293,7 @@ export function buildFuelCanonicalFacts(opts: {
   incidents: TopicFastFactsIncident[];
   /** Pass the already filtered report record set to avoid any second filtering. */
   qualifyingIncidents?: TopicFastFactsIncident[];
-  marketCards: Array<{ label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string }>;
+  marketCards: Array<{ label: string; value: number | string; change?: string; unit?: string; asOf?: string; source?: string; referenceDate?: string; referenceValue?: number }>;
   /** Jet trajectory points — when present, jet-fuel pct in prose matches the gate. */
   jetTrajectory?: { date: string; value: number }[];
   watchIndicators?: string[];
@@ -401,7 +382,7 @@ export function buildFuelCanonicalFacts(opts: {
     reportingPeriod: { issueDate: opts.issueDate, incidentStart: qualifyingIncidents.map((i) => i.date).sort()[0] ?? null, incidentEnd: qualifyingIncidents.map((i) => i.date).sort().at(-1) ?? null },
     qualifyingIncidents, incidentCount: qualifyingIncidents.length, distinctIncidentDates: [...new Set(qualifyingIncidents.map((i) => i.date))].sort(), countries, routes,
     incidentLocations: [...new Set(qualifyingIncidents.map((i) => i.physicalLocation).filter((x): x is string => Boolean(x)))].sort(), severityDistribution,
-    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: opts.marketCards.map((c) => marketFact(c, opts.jetTrajectory)), overallSeverity,
+    highestPriorityIncident, primaryPressurePoint, secondaryPressurePoints, marketIndicators: opts.marketCards.map((c) => marketFact(c, opts.issueDate, opts.jetTrajectory)), overallSeverity,
     evidenceConfidence, analystReviewRequired: evidenceConfidence === "Low" && overallSeverity !== "Insignificant", currentConditions: qualifyingIncidents.filter((i) => i.evidenceStatus !== "Potential"),
     watchIndicators: [...new Set((opts.watchIndicators ?? []).map((x) => x.trim()).filter(Boolean))],
   };
@@ -413,7 +394,14 @@ function pressureSentence(facts: FuelCanonicalFacts): string {
 function marketSentence(facts: FuelCanonicalFacts): string {
   const indicators = facts.marketIndicators.slice(0, 3);
   if (!indicators.length) return "No market indicators were supplied for this period.";
-  return indicators.map((i) => `${i.label} is ${i.direction}`).join("; ") + ".";
+  return indicators.map((i) => {
+    if (!i.direction) return `${i.label} has no comparable movement`;
+    if (i.comparisonScope === "reporting-period") {
+      return `${i.label} is ${i.direction} within the reporting period`;
+    }
+    const reference = i.referenceDate ? ` dated ${i.referenceDate}` : " with no date";
+    return `${i.label} is ${i.direction} against a ${i.comparisonScope === "lagged-reference" ? "lagged" : "undated"} reference${reference}`;
+  }).join("; ") + ".";
 }
 function list(values: string[]): string {
   if (!values.length) return "none";

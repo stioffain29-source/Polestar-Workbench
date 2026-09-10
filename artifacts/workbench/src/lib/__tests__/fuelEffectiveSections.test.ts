@@ -19,6 +19,7 @@ import {
   validateFuelReportConsistency,
   assertFuelReportConsistent,
   alignFuelProseToMarketFacts,
+  validateFuelFinalEvidenceAudit,
 } from "../fuelReportConsistency";
 import type { TopicFastFactsIncident } from "../topicFastFacts";
 
@@ -121,6 +122,21 @@ describe("resolveFuelEffectiveSections precedence", () => {
 
 describe("consistency gate over the FINAL effective text", () => {
   const fuelData = buildData();
+
+  it("shared final evidence audit accepts canonical Fuel text", () => {
+    const effective = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: null,
+      fuelData,
+    });
+    expect(
+      validateFuelFinalEvidenceAudit(
+        fuelData.reportFacts,
+        effective,
+        fuelData.canonicalFacts.watchIndicators,
+      ),
+    ).toEqual([]);
+  });
 
   it("builder honours caller-resolved implications/watchNext (analyst/AI) instead of discarding them", () => {
     const edited = buildFuelWatchReportData(

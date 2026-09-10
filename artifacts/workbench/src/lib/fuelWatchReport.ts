@@ -418,6 +418,7 @@ export function buildFuelWatchReportData(
     wti,
     jetFuel,
     trajectory: trajectoryPoints,
+    indicators: canonicalFacts.marketIndicators,
   });
   if (marketReadProse) {
     canonicalSections.marketRead = [canonicalSections.marketRead, marketReadProse]
@@ -591,8 +592,10 @@ export function buildFuelMarketRead(opts: {
   wti: FuelDataCard | null;
   jetFuel: FuelDataCard | null;
   trajectory: JetFuelPricePoint[];
+  /** Canonically derived indicators. Optional only for legacy direct callers. */
+  indicators?: FuelCanonicalFacts["marketIndicators"];
 }): string | null {
-  const { brent, wti, jetFuel, trajectory } = opts;
+  const { brent, wti, jetFuel, trajectory, indicators } = opts;
   if (!brent && !wti && !jetFuel) return null;
   const b = numVal(brent);
   const w = numVal(wti);
@@ -607,28 +610,26 @@ export function buildFuelMarketRead(opts: {
     parts.push(`WTI is sitting around ${w.toFixed(2)} ${wti?.unit ?? "USD/bbl"}, placing crude in ${levelWord(w)} territory.`);
   }
 
-  if (jetFuel && trajectory.length >= 2) {
-    const firstPoint = trajectory[0];
-    const lastPoint = trajectory[trajectory.length - 1];
-    const first = firstPoint.value;
-    const last = lastPoint.value;
-    const pct = first !== 0 ? ((last - first) / first) * 100 : 0;
-    // Direction wording must always agree with the sign of pct — a small
-    // negative move can never be described as "holding above" the earlier
-    // reading, and vice versa. The trajectory's first point is simply the
-    // earliest of the trailing observations the chart carries (it can sit
-    // before the reporting period when the underlying series has a
-    // reporting lag), so the sentence cites the actual dates rather than
-    // implying it is the period start.
-    let dir: string;
-    if (pct >= 3) dir = "rising over this window";
-    else if (pct <= -3) dir = "easing over this window";
-    else if (pct > 0) dir = "holding modestly above its earlier reading";
-    else if (pct < 0) dir = "holding modestly below its earlier reading";
-    else dir = "flat against its earlier reading";
+  const jetIndicator = indicators?.find((i) => /\bjet\b|kerosene/i.test(i.label));
+  if (jetFuel && jetIndicator && jetIndicator.referenceValue !== null && jetIndicator.percentageChange !== null) {
+    const last = Number(jetIndicator.currentValue);
+    const first = jetIndicator.referenceValue;
+    const pct = jetIndicator.percentageChange;
+    const dir = jetIndicator.direction === "rising"
+      ? "rising"
+      : jetIndicator.direction === "falling"
+        ? "easing"
+        : jetIndicator.direction === "unchanged"
+          ? "unchanged"
+          : "broadly stable";
+    const scope = jetIndicator.comparisonScope === "reporting-period"
+      ? "within the reporting period"
+      : jetIndicator.comparisonScope === "lagged-reference"
+        ? "against a lagged reference"
+        : "against an undated reference";
     const jetUnit = jetFuel.unit ?? trajectory[trajectory.length - 1].unit ?? "USD/gal";
     parts.push(
-      `The jet fuel series is ${dir}, with the latest figure at ${last.toFixed(3)} ${jetUnit} on ${formatAsOfDate(lastPoint.date)} versus ${first.toFixed(3)} on ${formatAsOfDate(firstPoint.date)} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
+      `The jet fuel series is ${dir} ${scope}, with the current figure at ${last.toFixed(3)} ${jetUnit}${jetIndicator.currentDate ? ` on ${formatAsOfDate(jetIndicator.currentDate)}` : ""} versus ${first.toFixed(3)}${jetIndicator.referenceDate ? ` on ${formatAsOfDate(jetIndicator.referenceDate)}` : ""} (${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%).`,
     );
   } else if (jetFuel) {
     const jv = numVal(jetFuel);
@@ -644,34 +645,17 @@ export function buildFuelMarketRead(opts: {
   // Brent/WTI fell sharply. Parsed from the same change strings already
   // shown in Fast Facts (e.g. "-7.3% 7d"), so the wording can never drift
   // from the number sitting next to it on the page.
-  const parseChangePct = (change?: string): number | null => {
-    if (!change) return null;
-    const m = change.match(/(-?\d+(?:\.\d+)?)\s*%/);
-    return m ? parseFloat(m[1]) : null;
-  };
-  const directionFromPct = (pct: number | null): "rising" | "falling" | "flat" => {
-    if (pct === null) return "flat";
-    if (Math.abs(pct) <= 0.5) return "flat";
-    return pct > 0 ? "rising" : "falling";
-  };
-  const changePcts = [parseChangePct(brent?.change), parseChangePct(wti?.change)].filter(
-    (v): v is number => v !== null,
+  const periodIndicators = (indicators ?? []).filter(
+    (i) => i.comparisonScope === "reporting-period" && i.direction,
   );
-  let jetPct: number | null = null;
-  if (jetFuel && trajectory.length >= 2) {
-    const first = trajectory[0].value;
-    const last = trajectory[trajectory.length - 1].value;
-    jetPct = first !== 0 ? ((last - first) / first) * 100 : 0;
-  }
-  const moveDirections = [
-    ...changePcts.map(directionFromPct),
-    directionFromPct(jetPct),
-  ].filter((d) => d !== "flat");
-  const risingMoves = moveDirections.filter((d) => d === "rising").length;
-  const fallingMoves = moveDirections.filter((d) => d === "falling").length;
-  const avgChangePct = changePcts.length
-    ? changePcts.reduce((sum, v) => sum + v, 0) / changePcts.length
-    : jetPct;
+  const risingMoves = periodIndicators.filter((i) => i.direction === "rising").length;
+  const fallingMoves = periodIndicators.filter((i) => i.direction === "falling").length;
+  const periodPcts = periodIndicators
+    .map((i) => i.percentageChange)
+    .filter((v): v is number => v !== null);
+  const avgChangePct = periodPcts.length
+    ? periodPcts.reduce((sum, v) => sum + v, 0) / periodPcts.length
+    : null;
   let para2: string;
   if (risingMoves > fallingMoves || (avgChangePct !== null && avgChangePct >= 2)) {
     para2 =
@@ -681,7 +665,9 @@ export function buildFuelMarketRead(opts: {
       "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. That said, the move follows a run of geopolitical and supply-side shocks and can reverse as quickly as it eased — fuel-linked costs feed into freight rates, generator running costs, staff movement and supplier pricing in either direction, so treat the current pullback as a temporary window rather than a settled floor.";
   } else {
     para2 =
-      "Taken together, the market picture is broadly flat rather than trending sharply in either direction. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing, so treat these market indicators as the cost floor for the decisions that follow.";
+      periodIndicators.length
+        ? "Taken together, the market picture is broadly flat within the reporting period rather than trending sharply in either direction. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing, so treat these market indicators as the cost floor for the decisions that follow."
+        : "The available comparisons use lagged or undated references, so they provide benchmark context rather than evidence of movement within this reporting period. Fuel-linked costs still feed into freight rates, generator running costs, staff movement and supplier pricing.";
   }
   return para1 ? `${para1}\n\n${para2}` : para2;
 }

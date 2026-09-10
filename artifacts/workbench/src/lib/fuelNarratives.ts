@@ -89,32 +89,32 @@ const ISSUE_FAMILIES: IssueFamily[] = [
     key: "chokepoint",
     test: [/\b(strait of hormuz|hormuz)\b/, /\bbab[- ]el[- ]mandeb\b/, /\bred sea\b/, /\bmalacca\b/, /\bsuez\b/],
     phrase: "chokepoint pressure and tanker-route disruption",
-    why: "Route pressure on Hormuz, Bab-el-Mandeb or the Red Sea feeds straight into bunker cost, transit time and war-risk premium.",
-    opMeaning: "Dependent fuel movement is forced onto longer, costlier routes even when the underlying barrels are still available.",
+    why: "Route pressure on Hormuz, Bab-el-Mandeb or the Red Sea could feed into bunker cost, transit time and war-risk premium.",
+    opMeaning: "Dependent fuel movement could be forced onto longer, costlier routes if the reported disruption constrains transit.",
     watch: "Watch for fresh advisories, vessel reroutes and any naval movement that signals escalation.",
   },
   {
     key: "refinery",
     test: [/\b(refinery|refineries) (outage|disruption|fire|attack|halt|maintenance|shutdown|closure)/],
     phrase: "refinery disruption and supply-side outage",
-    why: "Refinery outage typically tightens regional crack spreads and pushes downstream pump and bunker prices up within days.",
-    opMeaning: "Where output is actually curtailed, affected grades typically go on allocation first — commercial buyers tend to feel it before the published pump price moves.",
+    why: "A confirmed loss of refinery output could tighten regional product balances and downstream pricing.",
+    opMeaning: "If output is actually curtailed, affected grades may go on allocation before the published pump price moves.",
     watch: "Watch for restart timelines, force-majeure declarations and follow-on import announcements.",
   },
   {
     key: "shortage",
     test: [/\b(fuel|petrol|diesel|lpg|kerosene|jet fuel) (shortage|stockout|rationing|queue|queues)/, /\bforecourt (closure|shut|queue|disruption)/],
     phrase: "shortages, rationing and forecourt disruption",
-    why: "Forecourt shortages put road transport, staff movement and generator runtime under immediate continuity pressure.",
-    opMeaning: "When forecourts dry up the constraint stops being price and becomes physical access; informal markets and queueing rules take over.",
+    why: "Forecourt shortages could put road transport, staff movement and generator runtime under immediate continuity pressure.",
+    opMeaning: "If forecourts run dry, physical access rather than price may become the binding constraint.",
     watch: "Watch for rationing rules, allocation cuts to commercial users and convoy or queue management announcements.",
   },
   {
     key: "tanker",
     test: [/\btanker (driver|drivers|strike|shortage|attack|blockade|convoy)/, /\b(fuel|tanker) (convoy|hijack|seizure)/],
     phrase: "tanker and fuel-transport disruption",
-    why: "Tanker driver action or convoy disruption usually shows up as delivery delays at depots and forecourts inside a few days.",
-    opMeaning: "Inland distribution lags refinery output; depots draw down even when wholesale supply looks fine on paper.",
+    why: "Tanker driver action or convoy disruption could delay deliveries to depots and forecourts.",
+    opMeaning: "If inland distribution is constrained, depot stocks may draw down despite available wholesale supply.",
     watch: "Watch for negotiation outcomes, military or police escort decisions and downstream depot-stock levels.",
   },
   {
@@ -124,24 +124,24 @@ const ISSUE_FAMILIES: IssueFamily[] = [
       /\b(price control|price cap|price freeze|export ban|import ban)/,
     ],
     phrase: "policy and subsidy / levy moves",
-    why: "Policy moves on subsidies, levies or price controls reset operating cost assumptions and contract pass-through clauses.",
-    opMeaning: "Surcharge clauses and indexation formulas reset on the gazette date; today's contract economics may not hold for long.",
+    why: "Policy moves on subsidies, levies or price controls could reset operating-cost assumptions and contract pass-through clauses.",
+    opMeaning: "Surcharge clauses and indexation formulas may reset on the gazette date.",
     watch: "Watch for gazette dates, ministerial statements and any contract-renegotiation triggers from suppliers.",
   },
   {
     key: "pricing",
     test: [/\b(pump price|petrol price|diesel price|fuel price) (hike|rise|increase|cut|drop|fall|change)/, /\bfuel surcharge\b/],
     phrase: "pump and surcharge pricing pressure",
-    why: "Pump and surcharge moves flow through fleet cost, freight rates and supplier invoices within the next billing cycle.",
-    opMeaning: "Visible at the pump now, visible in freight invoices next — the gap between the two is the negotiation window.",
+    why: "Pump and surcharge moves could flow through fleet cost, freight rates and supplier invoices within the next billing cycle.",
+    opMeaning: "A pump-price move may reach freight invoices later, leaving a negotiation window.",
     watch: "Watch for surcharge revisions on freight contracts and any government push-back against price rises.",
   },
   {
     key: "crude",
     test: [/\b(oil|crude) (export ban|export halt|embargo|sanctions|sabotage|attack|spill)/],
     phrase: "crude supply-chain and sanctions pressure",
-    why: "Crude-side disruption rolls into bunker, jet and downstream pricing on a 1-2 week lag and is hard to hedge away cleanly.",
-    opMeaning: "The cost shock arrives with a lag, which makes it easy to under-budget for the months that absorb it.",
+    why: "Crude-side disruption could reach bunker, jet and downstream pricing with a lag.",
+    opMeaning: "Any resulting cost shock may arrive with a lag and create an under-budgeting risk.",
     watch: "Watch for OPEC+ commentary, sanctions enforcement signals and any retaliation in shipping lanes.",
   },
 ];
@@ -233,18 +233,13 @@ export function buildFuelRegionalHighlights(opts: {
   for (let idx = 0; idx < lead.length; idx++) {
     const [country, items] = lead[idx];
     const fam = familyFor(items);
-    const overlay = COUNTRY_OVERLAY[country.toLowerCase()];
-    let why = overlay?.why
-      ?? fam?.why
-      ?? "There is underlying pressure on local fuel availability and cost.";
+    let why = fam?.why
+      ?? "The reported development could affect local fuel availability or cost if it changes physical supply.";
     if (usedWhy.has(why)) {
-      why = overlay?.watch
-        ? `${why} The near-term watch is on operational follow-through rather than headline volume.`
-        : `${why} The pattern differs from adjacent theatres in how it reaches buyers and transport users.`;
+      why = `${why} The near-term watch is on operational follow-through rather than headline volume.`;
     }
     usedWhy.add(why.split(".")[0] ?? why);
-    const watch = overlay?.watch
-      ?? fam?.watch
+    const watch = fam?.watch
       ?? "Watch the coming weeks to confirm whether the pattern persists or eases.";
     const signal = regionalSignalPhrase(country, items, fam);
     let opener: string;
@@ -266,7 +261,7 @@ export function buildFuelRegionalHighlights(opts: {
     } else {
       opener = `${titleCase(country)} adds further weight to the picture.`;
     }
-    paragraphs.push(`${opener} ${overlay ? `${why} ${watch}` : `${signal} ${why} ${watch}`}`);
+    paragraphs.push(`${opener} ${signal} ${why} ${watch}`);
   }
   return paragraphs.join("\n\n");
 }
@@ -282,13 +277,13 @@ function regionalSignalPhrase(
     return "Confirmed rationing and domestic shortage pressure remain the operational story there.";
   }
   if (key === "india" && /\b(windfall|duty|tax|levy|subsidy)\b/.test(blob)) {
-    return "Policy and export-duty moves are resetting local refiner and buyer economics.";
+    return "Policy and export-duty moves were reported; their effect on refiner and buyer economics depends on implementation.";
   }
   if (key === "yemen" && /\b(red sea|houthi)\b/.test(blob)) {
     return "Red Sea kinetic reporting is keeping corridor risk live for product movement.";
   }
   if (key === "iran" || (key !== "yemen" && /\b(hormuz|strait of hormuz)\b/.test(blob))) {
-    return "Hormuz transit disruption is lifting war-risk and delay on dependent routes.";
+    return "Hormuz transit disruption was reported; war-risk or delay could rise if dependent routes are constrained.";
   }
   if (fam?.key === "shortage") {
     return "Forecourt and allocation pressure is the confirmed operational signal there.";
@@ -1467,7 +1462,11 @@ export function buildFuelOperationalRead(opts: {
 
   const themeLine = ordered
     .slice(0, 3)
-    .map(({ fam }) => fam.phrase)
+    .map(({ fam }) =>
+      fam.key === "shortage"
+        ? observedAccessCondition(window.map((i) => haystack(i)).join(" ").toLowerCase())
+        : fam.phrase,
+    )
     .join("; ");
 
   const lead = ordered[0];
@@ -1488,7 +1487,7 @@ export function buildFuelOperationalRead(opts: {
     .map(([c]) => titleCase(c));
   const where =
     sigCountries.length > 0
-      ? ` Physical restrictions are most visible in ${joinWithAnd(sigCountries)}.`
+      ? ` The reported operational themes are most visible in ${joinWithAnd(sigCountries)}.`
       : "";
 
   const closingPara = `${watchLines.join(" ")}${where}`.trim();
@@ -1688,25 +1687,38 @@ function proseDay(iso: string): string {
   return `${parseInt(m[3], 10)} ${PROSE_MONTHS[parseInt(m[2], 10) - 1]} ${m[1]}`;
 }
 
-function directionPhrase(direction: FuelDirection): string {
+function directionPhrase(direction: FuelDirection | null): string {
   switch (direction) {
-    case "rising": return "rose over the week";
-    case "falling": return "fell over the week";
+    case "rising": return "rose";
+    case "falling": return "fell";
     case "broadly stable": return "moved only marginally";
     case "unchanged": return "held flat";
+    default: return "has no comparable movement";
   }
 }
 
-function pctClause(pct: number | null): string {
+function pctClause(pct: number | null, suffix: string): string {
   if (pct === null || !Number.isFinite(pct)) return "";
   const sign = pct >= 0 ? "+" : "";
-  return ` (${sign}${pct.toFixed(1)}% over the week)`;
+  return ` (${sign}${pct.toFixed(1)}% ${suffix})`;
 }
 
 function marketPriceParagraph(facts: FuelCanonicalFacts): string {
   const lines = facts.marketIndicators.slice(0, 3).map((i) => {
     const dir = directionPhrase(i.direction);
-    return `${i.label} ${dir}${pctClause(i.percentageChange)}`;
+    const current = i.currentDate ? ` as at ${proseDay(i.currentDate)}` : " (current date unavailable)";
+    if (i.comparisonScope === "reporting-period") {
+      return `${i.label} ${dir}${pctClause(i.percentageChange, "within the reporting period")}${current}` +
+        (i.referenceDate ? ` from the ${proseDay(i.referenceDate)} reference` : "");
+    }
+    if (i.comparisonScope === "lagged-reference") {
+      return `${i.label} ${dir}${pctClause(i.percentageChange, "against a lagged reference")}${current}` +
+        (i.referenceDate ? ` versus ${proseDay(i.referenceDate)}` : "");
+    }
+    if (i.comparisonScope === "undated-reference") {
+      return `${i.label} ${dir}${pctClause(i.percentageChange, "against an undated reference")}${current}`;
+    }
+    return `${i.label} is reported${current}, without a comparable reference`;
   });
   if (!lines.length) {
     return "Market price observations were not supplied for this period; treat cost exposure from the prior week as unchanged until fresh quotes land.";
@@ -1722,19 +1734,28 @@ function hasPattern(hay: string, res: RegExp[]): boolean {
   return res.some((re) => re.test(hay));
 }
 
+/** Use only the physical-condition term the evidence actually contains. */
+function observedAccessCondition(hay: string): string {
+  if (/\bration(?:ing|ed)?\b/.test(hay)) return "rationing";
+  if (/\bforecourt (?:closure|shut|queue|disruption)\b|\bqueues?\b/.test(hay)) {
+    return "forecourt disruption";
+  }
+  return "fuel shortages";
+}
+
 function physicalSupplyParagraph(facts: FuelCanonicalFacts): string {
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   if (facts.qualifyingIncidents.length === 0) {
     return "No confirmed physical supply or distribution disruption was logged in the reporting window; cost pressure, if any, is market-led rather than availability-led.";
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    return "The most important physical issue is availability: rationing, forecourt limits or depot shortfalls are restricting access in at least one market, not just raising the posted price.";
+    return `The most important physical issue is ${observedAccessCondition(hay)}, which the evidence records in at least one market.`;
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test)) {
-    return "Refinery or production disruption is the main physical constraint, tightening regional product balances and feeding into crack spreads and downstream pump pressure.";
+    return "Refinery or production disruption is the main physical constraint; any confirmed output loss could tighten regional product balances and downstream supply.";
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
-    return "Route and chokepoint pressure is the dominant physical story: dependent flows are facing longer transit, higher war-risk premium or intermittent disruption even where barrels are still available.";
+    return "Route and chokepoint pressure is the dominant physical story; dependent flows could face longer transit or intermittent disruption if the reported events constrain passage.";
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "tanker")!.test)) {
     return "Inland distribution is the binding constraint: tanker, convoy or driver disruption is delaying delivery to depots and forecourts despite wholesale supply appearing adequate on paper.";
@@ -1742,7 +1763,7 @@ function physicalSupplyParagraph(facts: FuelCanonicalFacts): string {
   const label = facts.primaryPressurePoint.kind === "distributed"
     ? "several theatres"
     : facts.primaryPressurePoint.label;
-  return `Operational stress is concentrated around ${label}, where confirmed developments point to tighter availability or costlier delivery rather than a purely paper-market move.`;
+  return `Operational developments are concentrated around ${label}; any effect on availability or delivery cost remains conditional on operational follow-through.`;
 }
 
 function responseParagraph(facts: FuelCanonicalFacts): string {
@@ -1766,8 +1787,9 @@ function responseParagraph(facts: FuelCanonicalFacts): string {
 }
 
 function businessContinuityParagraph(facts: FuelCanonicalFacts): string {
-  const rising = facts.marketIndicators.some((i) => i.direction === "rising");
-  const falling = facts.marketIndicators.some((i) => i.direction === "falling");
+  const periodMoves = facts.marketIndicators.filter((i) => i.comparisonScope === "reporting-period");
+  const rising = periodMoves.some((i) => i.direction === "rising");
+  const falling = periodMoves.some((i) => i.direction === "falling");
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   const physical = hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)
     || hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test);
@@ -1778,9 +1800,11 @@ function businessContinuityParagraph(facts: FuelCanonicalFacts): string {
       ? "There is near-term relief on the cost line, but the move can reverse quickly while route and availability risks remain live."
       : "Cost exposure is broadly stable for now, but physical or routing shocks can reprice contracts with little notice.";
   const opsBit = physical
-    ? "Road transport, backup power and commercial allocation are the immediate continuity exposures where rationing or refinery curtailment persists."
+    ? hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)
+      ? `Road transport, backup power and commercial allocation could be exposed where ${observedAccessCondition(hay)} persists.`
+      : "Road transport, backup power and commercial allocation could be exposed if the reported refinery disruption curtails output."
     : route
-      ? "Transport and bunker-dependent operations face the clearest continuity risk through rerouting, delay and war-risk premium on affected corridors."
+      ? "Transport and bunker-dependent operations could face rerouting, delay or war-risk exposure if affected corridors become constrained."
       : "Continuity risk is mainly on cost pass-through rather than physical stock-outs this week.";
   return `${costBit} ${opsBit}`;
 }
@@ -2202,19 +2226,22 @@ function buildFuelExecutiveSummary(facts: FuelCanonicalFacts): string {
 function buildFuelSituationAssessment(facts: FuelCanonicalFacts): string {
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   const parts: string[] = [];
-  const marketDir = facts.marketIndicators.some((i) => i.direction === "rising")
+  const periodMoves = facts.marketIndicators.filter((i) => i.comparisonScope === "reporting-period");
+  const marketDir = periodMoves.some((i) => i.direction === "rising")
     ? "Market-price pressure is upward on crude and refined products."
-    : facts.marketIndicators.some((i) => i.direction === "falling")
-      ? "Market-price pressure eased over the week, but the backdrop remains sensitive to route and supply shocks."
-      : facts.marketIndicators.length
-        ? "Market prices are broadly stable, leaving physical and policy developments as the main swing factors."
+    : periodMoves.some((i) => i.direction === "falling")
+      ? "Market-price pressure eased within the reporting period, but the backdrop remains sensitive to route and supply shocks."
+      : periodMoves.length
+        ? "Market prices were broadly stable within the reporting period, leaving physical and policy developments as the main swing factors."
+        : facts.marketIndicators.length
+          ? "Supplied market comparisons use lagged or undated references, so they provide context rather than a reporting-period direction."
         : "Market-price direction is unclear from the supplied observations.";
   parts.push(marketDir);
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    parts.push("Physical shortages and rationing are live in at least one market, separating pump access from headline price.");
+    parts.push(`The evidence records ${observedAccessCondition(hay)} in at least one market.`);
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test)) {
-    parts.push("Refinery or production disruption is tightening regional product supply and pushing crack spreads wider.");
+    parts.push("Refinery or production disruption is confirmed; actual output loss could affect regional product supply or crack spreads.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "policy")!.test)) {
     parts.push("Government policy moves on duties, subsidies or allocation are resetting local price assumptions.");
@@ -2224,7 +2251,7 @@ function buildFuelSituationAssessment(facts: FuelCanonicalFacts): string {
     parts.push("Producer and buyer responses — export shifts, import tenders or cross-border product flows — are reshaping who supplies whom.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
-    parts.push("Route and chokepoint pressure on Hormuz, the Red Sea or adjacent corridors is lifting transit time and war-risk premium even when barrels are still moving.");
+    parts.push("Route and chokepoint events are confirmed; transit time and war-risk premium could rise if passage is constrained.");
   }
   if (facts.qualifyingIncidents.length === 0) {
     parts.push("With no fresh operational reporting in the window, the standing cost-and-continuity exposures carry over from recent weeks.");
@@ -2248,15 +2275,16 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
     return businessContinuityParagraph(facts);
   }
   const paras = lead.map((i, idx) => {
-    const where = eventLocationForProse(i);
     const impact = businessImpactForDevelopment(i);
     const opener = idx === 0
       ? "The development with the greatest business significance"
       : idx === 1
         ? "A second material line"
         : "Also worth weighting";
-    const loc = where && !locationAlreadyInClause(impact, where) ? ` in ${where}` : "";
-    return `${opener} is the confirmed change${loc} on ${proseDay(i.date)}. ${impact}`;
+    // Name the underlying event rather than referring vaguely to "the
+    // confirmed change". developmentSentence uses the normalised evidence
+    // clause, so malformed feed-title language is not copied into the report.
+    return `${opener}: ${developmentSentence(i)} ${impact}`;
   });
   return paras.join("\n\n");
 }
@@ -2264,25 +2292,27 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
 function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   const bullets: string[] = [];
-  const rising = facts.marketIndicators.some((i) => i.direction === "rising");
+  const rising = facts.marketIndicators.some(
+    (i) => i.comparisonScope === "reporting-period" && i.direction === "rising",
+  );
   if (rising) {
     bullets.push("Revisit bulk-fuel and aviation surcharge pass-through clauses now — elevated Brent, WTI or jet observations typically reach invoices on the next billing cycle, not the current one.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    bullets.push("Where rationing or forecourt limits apply, keep road-transport and commercial-allocation conversations live with suppliers rather than assuming pump access will hold.");
+    bullets.push(`Where ${observedAccessCondition(hay)} persists, keep road-transport and commercial-allocation conversations live with suppliers.`);
   }
   if (/\b(diesel|generator|lpg|backup power)\b/.test(hay)
       && hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    bullets.push("Check on-site diesel or LPG stock and generator runtime assumptions in markets showing rationing or depot shortfalls.");
+    bullets.push(`Check on-site diesel or LPG stock and generator runtime assumptions in markets reporting ${observedAccessCondition(hay)}.`);
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "policy")!.test)) {
     bullets.push("Align contract indexation and surcharge formulas to the gazette or policy effective dates flagged this period — today's economics may not survive the next duty or subsidy move.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
-    bullets.push("Where Gulf, Hormuz or Red Sea routing matters, refresh war-risk, transit-time and landed-cost assumptions on affected cargoes rather than treating reroutes as background noise.");
+    bullets.push("Where Gulf, Hormuz or Red Sea routing matters, test war-risk, transit-time and landed-cost assumptions against potential route changes.");
   }
   if (/\b(jet fuel|aviation fuel|airline|airways)\b/.test(hay)) {
-    bullets.push("Pass aviation fuel-cost pressure into route economics and surcharge discussions before schedule or capacity decisions harden for the next operating month.");
+    bullets.push("Test how any aviation fuel-cost change would affect route economics and surcharge discussions before schedule or capacity decisions harden.");
   }
   return topUpFuelBullets(bullets.join("\n"), FUEL_DEFAULT_IMPLICATIONS, 3, 5);
 }
@@ -2324,31 +2354,28 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   if (facts.analystReviewRequired) {
     return "Hold wider circulation until sourcing is firm enough for operational claims. Several developments in the window still lack confirmed location or outcome, so cost and continuity judgements should stay provisional.";
   }
-  const rising = facts.marketIndicators.filter((i) => i.direction === "rising").length;
-  const falling = facts.marketIndicators.filter((i) => i.direction === "falling").length;
+  const periodMoves = facts.marketIndicators.filter((i) => i.comparisonScope === "reporting-period");
+  const rising = periodMoves.filter((i) => i.direction === "rising").length;
+  const falling = periodMoves.filter((i) => i.direction === "falling").length;
   const costDir = rising > falling
     ? "Cost risk is tilted upward for the next billing cycle."
     : falling > rising
-      ? "Cost risk eased over the week but can reverse quickly if route or supply stress returns."
+      ? "Cost risk eased within the reporting period but can reverse quickly if route or supply stress returns."
       : "Cost risk is broadly stable, with physical and routing shocks as the main repricing triggers.";
   const exposure = facts.primaryPressurePoint.kind === "distributed"
     ? "Exposure is spread across several markets and corridors rather than a single theatre."
     : facts.primaryPressurePoint.kind === "route"
       ? `${facts.primaryPressurePoint.label} routing is the clearest continuity exposure for bunker, freight and import-dependent sites.`
-      : `${facts.primaryPressurePoint.label} is the geography where availability and pass-through pressure land first for local operations.`;
+      : `${facts.primaryPressurePoint.label} is the geography where availability or pass-through pressure could land first if the reported development persists.`;
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   const nearTerm = hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)
-    ? "The near-term decision is to secure commercial allocation and road-transport cover where rationing persists, not to wait for pump prices to catch up."
+    ? `The near-term decision is to secure commercial allocation and road-transport cover where ${observedAccessCondition(hay)} persists.`
     : hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)
       ? "The near-term decision is to refresh routing, war-risk and landed-cost assumptions on any cargo still committed through affected chokepoints."
       : rising > falling
         ? "The near-term decision is to lock surcharge and indexation language before the next invoice cycle reprices exposed contracts."
         : "The near-term decision is to keep current resilience measures in place while watching for fresh operational confirmation.";
-  const confidence = facts.evidenceConfidence === "High"
-    && facts.qualifyingIncidents.every((i) => i.physicalLocation || i.country)
-    ? ""
-    : " Confidence stays moderate while locations, event status or routing outcomes remain partly unresolved.";
-  return `${costDir} ${exposure} ${nearTerm}${confidence}`;
+  return `${costDir} ${exposure} ${nearTerm}`;
 }
 
 /** Build count-free analytical sections from canonical facts. */

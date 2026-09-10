@@ -42,6 +42,9 @@ export interface FuelDataCard {
   asOf?: string;
   source?: string;
   note?: string;
+  /** Explicit comparison evidence used by newer market-data payloads. */
+  referenceDate?: string;
+  referenceValue?: number;
 }
 
 export interface JetFuelSnapshot {
@@ -124,6 +127,8 @@ function parseDataCard(v: unknown): FuelDataCard | null {
   const asOf = str(v.asOf); if (asOf) out.asOf = asOf;
   const source = str(v.source); if (source) out.source = source;
   const note = str(v.note); if (note) out.note = note;
+  const referenceDate = str(v.referenceDate); if (referenceDate) out.referenceDate = referenceDate;
+  const referenceValue = num(v.referenceValue); if (referenceValue !== undefined) out.referenceValue = referenceValue;
   return out;
 }
 

@@ -244,6 +244,10 @@ const CARGO_LIVESTOCK_COMMERCIAL_ANCHOR_RE =
 const FUEL_EXCLUDE: RegExp[] = [
   /\b(share price|stock price|equity|investor (call|day|update)|earnings|quarterly (result|results|report)|annual report|dividend|buyback|ipo|market cap)/,
   /\b(oil futures|crude futures|brent futures|wti futures|futures contract|options trading|hedge fund|speculat(or|ors|ion|ive))/,
+  /\b(oil|crude|brent|wti) prices?\b[^.!?]{0,80}\binvestors?\b|\binvestors?\b[^.!?]{0,80}\b(oil|crude|brent|wti) prices?\b/,
+  // "Exports fall under threat" means they become threatened; it does not
+  // report that export volumes fell.
+  /\b(?:oil|crude|fuel|petrol|diesel|aviation fuel|jet fuel) exports? fall(?:s|en)? under threat\b/,
   /\b(analyst (note|target|forecast)|broker (note|target)|price target|sell[- ]side|buy[- ]side rating|upgrade rating|downgrade rating)/,
   /\b(oil (price|prices) (forecast|outlook|view|prediction|projection) (for|to))/,
   // Bank/research-house price-call commentary on crude / Brent / WTI.
@@ -262,8 +266,8 @@ const FUEL_EXCLUDE: RegExp[] = [
   // Generic "petrol prices today / diesel rates today" headlines with no
   // change indicator. These read as live-blog tickers, not operational
   // fuel signal, and dilute the Related Incidents table.
-  /\b(petrol|diesel|fuel) (price|prices|rate|rates) today\b/,
-  /\b(today'?s (petrol|diesel|fuel) (price|prices|rate|rates))/,
+  /\b(petrol|diesel|fuel|jet fuel|aviation fuel|aviation turbine fuel|atf) (price|prices|rate|rates) today\b/,
+  /\b(today'?s (petrol|diesel|fuel|jet fuel|aviation fuel|aviation turbine fuel|atf) (price|prices|rate|rates))/,
   // Records that the upstream classifier dropped into the catch-all
   // "Other fuel incident" bucket carry no operational signal and must
   // not lead a Fuel Watch.
@@ -273,6 +277,11 @@ const FUEL_EXCLUDE: RegExp[] = [
   // though it mentions oil.
   /\b(ev|electric vehicle|electric[- ]car|electric[- ]vehicle) sales?\b/,
   /\bsurge in ev\b/,
+  // Long-horizon aviation-transition commentary is not a present operational
+  // fuel event, even when a scenario projects future fuel-cost parity.
+  /\b(electric aviation|electric aircraft|battery[- ]electric aircraft)\b/,
+  /\b(sustainable aviation fuel|\bsaf\b)[^.!?]{0,80}\b(cost parity|parity|by 20\d{2}|long[- ]term|forecast|projection|scenario)\b/,
+  /\b(cost parity|parity|by 20\d{2}|long[- ]term|forecast|projection|scenario)\b[^.!?]{0,80}\b(sustainable aviation fuel|\bsaf\b)\b/,
   // PR / booster commentary — subsidy-leadership praise and industry-
   // dialogue applause are promotional, not operational fuel signal.
   /\b(applauds?|lauds?|praises?|hails?|welcomes?|congratulates?)\b.{0,40}(leadership|reform|initiative|vision|dialogue|effort|stewardship)/,
@@ -285,6 +294,127 @@ const FUEL_EXCLUDE: RegExp[] = [
   // markers are unambiguous consumer-travel-advisory signal, so dropping
   // them never suppresses a real operational fuel story.
   /\b(travell?ers? warned|travel (tips|advisory|warning)|emergency travel|things to know before you (travel|go)|what travell?ers? (need to|should) know|beach resorts?|visa (&|and) mastercard banned)\b/,
+];
+
+// Fuel Watch is consequence-led, not vocabulary-led. Oil, a tanker, Hormuz, a
+// refinery, an energy company or another fuel-sector noun only identifies the
+// subject of a story; it does not establish that a fuel event occurred. These
+// patterns require the article text to state an actual consequence for price,
+// production/refining, storage, distribution/availability, transport economics
+// or continuity of supply. Keep these generic: a new event must qualify because
+// of what happened, not because a particular company, country or headline was
+// enumerated here.
+const FUEL_MATERIAL_RE =
+  String.raw`(?:fuel|petrol|gasoline|diesel|kerosene|lpg|cng|jet fuel|jet a-?1|aviation turbine fuel|\batf\b|aviation fuel|crude(?: oil)?|oil|refiner(?:y|ies)?|petroleum|pipeline|fuel depot|oil terminal|loading terminal|petrol pumps?|fuel stations?|tankers?)`;
+const FUEL_CONSEQUENCE_RE =
+  String.raw`(?:shortage|stockout|crisis|shock|emergency|ration(?:ing|ed)|queues?|unavailable|availability (?:fell|falls|cut|reduced|restricted)|supply (?:cut|cuts|halt|halted|disruption|disrupted|squeeze|shortfall|interruption|stoppage|resumed?|restored)|production (?:cut|cuts|halt|halted|stoppage|fell|falls|decline|increas(?:e|ed)|rais(?:e|ed)|resum(?:e|ed))|output (?:cut|cuts|halt|halted|fell|falls|decline|increas(?:e|ed)|rais(?:e|ed)|resum(?:e|ed))|exports? (?:ban|banned|halt|halted|block(?:ed)?|suspend(?:ed)?|restrict(?:ed)?|resum(?:e|ed)|stall(?:ed)?|surge[ds]?|jump(?:ed|s)?|increas(?:e|ed|es)|rise|rose|risen|fall|fell|drop(?:ped|s)?|declin(?:e|ed|es))|imports? (?:halt|halted|block(?:ed)?|suspend(?:ed)?|restrict(?:ed)?|resum(?:e|ed)|stall(?:ed)?|surge[ds]?|jump(?:ed|s)?|increas(?:e|ed|es)|rise|rose|risen|fall|fell|drop(?:ped|s)?|declin(?:e|ed|es)|cut)|deliver(?:y|ies) (?:halt|halted|stopped|delayed|disrupted|suspended|resumed?)|distribution (?:halt|halted|stopped|delayed|disrupted|suspended|resumed?)|loading (?:halt|halted|stopped|suspended|resumed?)|inventor(?:y|ies) (?:fell|fall|dropped|drop|rose|rise|draw|drawdown|build)|stocks? (?:depleted|fell|fall|dropped|drop|rose|rise|draw|drawdown|build)|price[s]? (?:hikes?|hiked|raised|increas(?:e|ed|es)|rose|rise|risen|soar(?:ed|s)?|climb(?:ed|s)?|surge[ds]?|jump(?:ed|s)?|cut|cuts|slashed|lowered|eas(?:e|ed|es)|fell|fall|drop(?:ped|s)?|up\b|down\b|near [^.!?]{0,15}high)|rates? (?:hikes?|hiked|raised|increas(?:e|ed|es)|rose|rise|risen|soar(?:ed|s)?|climb(?:ed|s)?|surge[ds]?|jump(?:ed|s)?|cut|cuts|slashed|lowered|eas(?:e|ed|es)|fell|fall|drop(?:ped|s)?|up\b|down\b)|costs? (?:increas(?:e|ed|es)|rose|rise|risen|soar(?:ed|s)?|climb(?:ed|s)?|surge[ds]?|jump(?:ed|s)?|higher|eas(?:e|ed|ing|es)|lower|fell|fall|drop(?:ped|s)?)|subsid(?:y|ies) (?:cut|removed|reduced|raised|increased|restored|reintroduced)|(?:tax|taxes|levy|levies|duty|duties|excise) (?:hike|hiked|raised|increased|cut|removed|reduced)|refining (?:bottlenecks?|constraints?|disruption|shortfall)|outages?|shutdown|closure|close|closed|fire|ablaze|explosion|blast|attack|attacked|strike|struck|sabotage|damaged|offline|maintenance|rerout(?:e|ed|ing)|transit (?:halt|halted|blocked|suspended|delayed|resumed?)|traffic (?:halt|halted|blocked|suspended|delayed|resumed?)|route[s]? (?:cut|cancelled|canceled|suspended|rerouted)|operational impact)`;
+const FUEL_OPERATIONAL_CONSEQUENCE: RegExp[] = [
+  new RegExp(String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,140}\b${FUEL_CONSEQUENCE_RE}\b`, "i"),
+  new RegExp(String.raw`\b${FUEL_CONSEQUENCE_RE}\b[^.!?]{0,140}\b${FUEL_MATERIAL_RE}\b`, "i"),
+  // Active-voice price and logistics actions put the consequence verb before
+  // the fuel object ("government raised petrol prices", "storm halted diesel
+  // deliveries"). Requiring the affected price/flow noun prevents a bare verb
+  // plus a distant oil mention from qualifying.
+  new RegExp(
+    String.raw`\b(?:hik(?:e|es|ed|ing)|rais(?:e|es|ed|ing)|increas(?:e|es|ed|ing)|cut(?:s|ting)?|slash(?:es|ed|ing)|lower(?:s|ed|ing))\b[^.!?]{0,45}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,20}\b(?:price[s]?|costs?|subsid(?:y|ies)|tax(?:es)?|lev(?:y|ies)|dut(?:y|ies)|excise)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:halt(?:s|ed|ing)?|stop(?:s|ped|ping)?|delay(?:s|ed|ing)?|disrupt(?:s|ed|ing)?|suspend(?:s|ed|ing)?|resum(?:e|es|ed|ing)|rerout(?:e|es|ed|ing))\b[^.!?]{0,45}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,25}\b(?:deliver(?:y|ies)|distribution|supply|exports?|imports?|loading|traffic|transit|routes?)\b`,
+    "i",
+  ),
+  // Producer/refiner action can be demonstrated without spelling out the
+  // commodity when both a changed physical output and supply consequence are
+  // explicit. This preserves producer events without whitelisting an entity.
+  /\b(?:production|output|refining capacity)\b[^.!?]{0,35}\b(?:increas(?:e|ed)|rais(?:e|ed)|cut|cuts|halt(?:ed)?|resum(?:e|ed)|offline)\b[^.!?]{0,60}\bsupply\b/i,
+  /\bsupply\b[^.!?]{0,60}\b(?:production|output|refining capacity)\b[^.!?]{0,35}\b(?:increas(?:e|ed)|rais(?:e|ed)|cut|cuts|halt(?:ed)?|resum(?:e|ed)|offline)\b/i,
+  // Regulator wording commonly places the action before "the price of".
+  new RegExp(
+    String.raw`\b(?:hik(?:e|es|ed|ing)|rais(?:e|es|ed|ing)|increas(?:e|es|ed|ing)|cut(?:s|ting)?|slash(?:es|ed|ing)|lower(?:s|ed|ing))\b[^.!?]{0,25}\b(?:the )?price[s]? of\b[^.!?]{0,25}\b${FUEL_MATERIAL_RE}\b`,
+    "i",
+  ),
+  // Fiscal action on fuel exports, including "cuts windfall tax on exports of
+  // petrol..." where the affected product follows both the tax and export noun.
+  new RegExp(
+    String.raw`\b(?:cuts?|cutting|slash(?:es|ed|ing)?|reduc(?:e|es|ed|ing)|remov(?:e|es|ed|ing)|rais(?:e|es|ed|ing)|hik(?:e|es|ed|ing)|impos(?:e|es|ed|ing))\b[^.!?]{0,35}\b(?:windfall )?(?:tax(?:es)?|lev(?:y|ies)|dut(?:y|ies)|excise)\b[^.!?]{0,50}\b(?:exports? of )?${FUEL_MATERIAL_RE}\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:reduction|cut|slash|increase|hike)\b[^.!?]{0,25}\b(?:in|to|of)? ?(?:windfall )?(?:tax(?:es)?|lev(?:y|ies)|dut(?:y|ies)|excise)\b[^.!?]{0,60}\b${FUEL_MATERIAL_RE}\b`,
+    "i",
+  ),
+  // Executed supply contracts/pacts and quantified import commitments are
+  // continuity events. A bare discussion or proposed partnership does not pass.
+  new RegExp(
+    String.raw`\b(?:sign(?:s|ed|ing)?|secur(?:e|es|ed|ing)|agree(?:s|d|ing)?|conclud(?:e|es|ed|ing)|renew(?:s|ed|ing)?)\b[^.!?]{0,45}\b(?:supply (?:pact|deal|agreement|contract)|(?:pact|deal|agreement|contract) (?:for|on) supply|import (?:deal|agreement|contract|requirement))\b[^.!?]{0,70}\b${FUEL_MATERIAL_RE}\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,70}\b(?:sign(?:s|ed|ing)?|secur(?:e|es|ed|ing)|agree(?:s|d|ing)?|conclud(?:e|es|ed|ing)|renew(?:s|ed|ing)?)\b[^.!?]{0,45}\b(?:supply (?:pact|deal|agreement|contract)|import (?:deal|agreement|contract|requirement)|entire import requirement)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:sign(?:s|ed|ing)?|secur(?:e|es|ed|ing)|agree(?:s|d|ing)?|conclud(?:e|es|ed|ing)|renew(?:s|ed|ing)?|reach(?:es|ed|ing)?|ink(?:s|ed|ing)?)\b[^.!?]{0,45}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,35}\b(?:supply (?:pact|deal|agreement|contract)|import (?:deal|agreement|contract|requirement)|entire import requirement)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:supply (?:pact|deal|agreement|contract)|import (?:deal|agreement|contract)|entire import requirement)\b[^.!?]{0,70}\b${FUEL_MATERIAL_RE}\b`,
+    "i",
+  ),
+  // Explicit transport-economics transmission: changed fuel costs/prices must
+  // be tied to fares, schedules, routes, capacity or carrier operations.
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,45}\b(?:price[s]?|costs?|rates?)\b[^.!?]{0,45}\b(?:higher|lower|eas(?:e|ed|ing)|ris(?:e|en|ing)|rose|soar(?:ed|ing)?|climb(?:ed|ing)?|surge[ds]?|increas(?:e|ed|ing)|fell|falling|drop(?:ped|ping)?)\b[^.!?]{0,80}\b(?:airfares?|fares?|ticket prices?|airline|carrier|flight operations?|operations?|routes?|schedules?|capacity)\b`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b(?:higher|lower|eas(?:e|ed|ing)|ris(?:e|en|ing)|rose|soar(?:ed|ing)?|climb(?:ed|ing)?|surge[ds]?|increas(?:e|ed|ing)|fell|falling|drop(?:ped|ping)?)\b[^.!?]{0,30}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,20}\b(?:price[s]?|costs?|rates?)\b[^.!?]{0,80}\b(?:airfares?|fares?|ticket prices?|airline|carrier|flight operations?|operations?|routes?|schedules?|capacity)\b`,
+    "i",
+  ),
+  // Volume-change grammar may lead with the movement noun ("a 27% jump in
+  // aviation-fuel exports") rather than putting the verb after "exports".
+  new RegExp(
+    String.raw`\b(?:jump|surge|rise|increase|fall|drop|decline)\b[^.!?]{0,20}\bin\b[^.!?]{0,25}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,20}\b(?:exports?|imports?|deliveries|output|production)\b`,
+    "i",
+  ),
+  // Explicit carrier viability/operations effects of a fuel-price shock.
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,25}\b(?:price )?(?:shock|spike|surge|increase|rise|costs?)\b[^.!?]{0,80}\b(?:airlines?|carriers?|rivals?|operations?|routes?|flights?)\b[^.!?]{0,50}\b(?:struggl(?:e|es|ed)|wipe out|hit hard|weigh|constrain|cut|cancel|suspend|restore)\b`,
+    "i",
+  ),
+  // Price/rate modifiers commonly sit between the metric and movement
+  // ("jet-fuel prices for domestic airlines up 5.46%"). The movement remains
+  // mandatory, so this does not re-admit a bare price mention.
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,20}\b(?:price[s]?|costs?|rates?)\b[^.!?]{0,55}\b(?:hikes?|hiked|rais(?:e|es|ed)|increas(?:e|es|ed)|ris(?:e|es|en)|rose|soar(?:s|ed)?|climb(?:s|ed)?|surge[ds]?|jumps?|jumped|up\b|cuts?|cutting|slash(?:es|ed)?|lower(?:s|ed)?|eas(?:e|es|ed)|falls?|fell|drops?|dropped|down\b)\b`,
+    "i",
+  ),
+  // Export/import route descriptors can separate the flow noun from its
+  // movement verb ("crude exports via the Mediterranean route surge").
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,15}\b(?:exports?|imports?|deliveries)\b[^.!?]{0,65}\b(?:stall(?:s|ed)?|halt(?:s|ed)?|surge[ds]?|jump(?:s|ed)?|increas(?:e|es|ed)|ris(?:e|es|en)|rose|fall(?:s|en)?|fell|drop(?:s|ped)?|declin(?:e|es|ed)|more than double[ds]?)\b`,
+    "i",
+  ),
+  // Reverse transport-effect grammar ("airline hit hard as jet-fuel price
+  // rises") still requires both a concrete carrier effect and price movement.
+  new RegExp(
+    String.raw`\b(?:airlines?|carriers?|flights?|routes?|airfares?)\b[^.!?]{0,35}\b(?:hit hard|struggl(?:e|es|ed)|weigh(?:s|ed)?|constrain(?:s|ed)?|cut|cancel(?:s|led)?|suspend(?:s|ed)?|restore[ds]?)\b[^.!?]{0,80}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,20}\b(?:price[s]?|costs?|rates?)\b[^.!?]{0,30}\b(?:ris(?:e|es|en)|rose|increas(?:e|es|ed)|surge[ds]?|jump(?:s|ed)?|fall(?:s|en)?|fell|eas(?:e|es|ed)|drop(?:s|ped)?)\b`,
+    "i",
+  ),
+  // A quantified "jet-fuel surge/shock" is conventional shorthand for a
+  // price/cost movement; require either a number or explicit carrier impact.
+  new RegExp(
+    String.raw`(?:\b\d+(?:\.\d+)?%[^.!?]{0,20}\b${FUEL_MATERIAL_RE}\b[^.!?]{0,10}\b(?:surge|spike|jump)|\b${FUEL_MATERIAL_RE}\b[^.!?]{0,10}\b(?:surge|spike|shock)\b[^.!?]{0,50}\b(?:airlines?|carriers?|flights?|routes?|airfares?|rivals?))`,
+    "i",
+  ),
+  new RegExp(
+    String.raw`\b${FUEL_MATERIAL_RE}\b[^.!?]{0,15}\bsupply\b[^.!?]{0,35}\b(?:airlines?|carriers?)\b[^.!?]{0,35}\b(?:shrinking|contraction|cutbacks?|operational pressure|struggl(?:e|es|ed))\b`,
+    "i",
+  ),
+  // Industrial-action actors that are themselves part of the physical fuel
+  // network. Generic transport strikes still need an explicit fuel material.
+  /\b(?:petroleum dealers?|oil transporters?|tanker drivers?)\b[^.!?]{0,80}\b(?:strike|shutdown|blockade|boycott|closure|closed|halt)\b/i,
+  /\b(?:strike|shutdown|blockade|boycott|closure|closed|halt)\b[^.!?]{0,80}\b(?:petroleum dealers?|oil transporters?|tanker drivers?)\b/i,
 ];
 
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost
@@ -2409,8 +2539,25 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     }
   }
   if (topic === "fuel") {
-    const m = firstMatch(text, FUEL_EXCLUDE);
+    // Use article evidence only. Source names/URLs, assigned country and
+    // location are metadata, not proof of either a fuel consequence or its
+    // physical geography. mastheadStrippedGeoText also removes publisher
+    // suffixes duplicated into Google News titles/summaries, preventing a
+    // publisher city or fuel-sector masthead from manufacturing relevance.
+    const fuelEvidence = mastheadStrippedGeoText(i);
+    const m = firstMatch(fuelEvidence, FUEL_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: fuel off-topic (/${m.source}/)` };
+    const consequence = firstMatch(fuelEvidence, FUEL_OPERATIONAL_CONSEQUENCE);
+    if (!consequence) {
+      return {
+        relevant: false,
+        reason: "dropped: fuel subject mention without demonstrable operational fuel consequence",
+      };
+    }
+    return {
+      relevant: true,
+      reason: `kept: demonstrable operational fuel consequence (/${consequence.source}/)`,
+    };
   }
   if (topic === "cargo_watch") {
     const m = firstMatch(text, CARGO_EXCLUDE);

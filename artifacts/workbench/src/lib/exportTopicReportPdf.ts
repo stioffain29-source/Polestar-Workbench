@@ -93,6 +93,7 @@ import { assertFuelReportConsistent } from "./fuelCanonicalFacts";
 import {
   resolveFuelEffectiveSections,
   assertFuelReportConsistent as assertFuelEffectiveTextConsistent,
+  assertFuelFinalEvidenceAudit,
 } from "./fuelReportConsistency";
 import {
   capFuelMarketSeverity,
@@ -1080,6 +1081,8 @@ export async function exportTopicReportPdf(
           fuelMarketRead: data.fuelMarketRead,
           fuelOperationalRead: data.fuelOperationalRead,
           fuelRegionalHighlights: data.fuelRegionalHighlights,
+          implications: data.implications,
+          watchNext: data.watchNext,
         },
         aiProse,
         fuelData,
@@ -1099,6 +1102,11 @@ export async function exportTopicReportPdf(
     // Prose-tolerant gate over the FINAL effective text — whichever tier wins
     // (analyst edit / AI / canonical), its claims must agree with the facts.
     assertFuelEffectiveTextConsistent(fuelData.reportFacts, fuelEffective);
+    assertFuelFinalEvidenceAudit(
+      fuelData.reportFacts,
+      fuelEffective,
+      fuelData.canonicalFacts.watchIndicators,
+    );
   }
   // Deterministic per-topic draft — the labelled fallback beneath the AI
   // narrative and any analyst edit. Built from the SAME windowed incident

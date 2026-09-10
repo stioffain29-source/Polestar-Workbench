@@ -1,0 +1,15 @@
+Enforce reporting period alignment across every data series. A metric outside the report window must never be described as a weekly movement for that window.
+Separate current period evidence from lagged benchmark data. Older series can provide context, but the prose must clearly label them as lagged rather than treating them as contemporaneous.
+Strengthen the event relevance gate. Fuel Watch should only admit events with a demonstrable link to fuel price, production, refining, storage, distribution, availability, transport economics or supply continuity.
+Do not admit stories merely because they mention oil, tankers, Hormuz, refineries, energy or fuel related entities. The system must establish the operational fuel consequence first.
+Validate physical geography independently from article subject, publisher location or named entities. Geography must represent where the relevant fuel event actually occurred.
+Require evidence before causal language. The prose must not claim an event caused rerouting, shortages, higher costs or availability problems unless the underlying evidence supports that relationship.
+Stop generating generic market boilerplate. Every statement about shortages, crack spreads, rationing, route pressure, exports or availability must be traceable to validated evidence in that reporting window.
+Build analytical prose from specific validated developments, not generic templates. Each paragraph should explain what changed, why it matters, where the exposure sits and likely direction.
+Prevent raw feed language reaching the client output. Titles, malformed capitalisation, publisher fragments, vague headlines and incomplete sentences must be rewritten or rejected before render.
+Add a cross section consistency check. Executive Summary, What Matters, Regional Highlights and Polestar View must not identify different priority geographies or developments without explaining the change in judgement.
+Stop phrases such as “the confirmed change” unless the actual change is named. Client prose should always state the event directly.
+Watch Next must only contain signals that are grounded in the report evidence or a validated forward indicator. Do not introduce new countries or themes that have not been established elsewhere in the analysis.
+Separate backend confidence from analytical confidence. Model uncertainty, unresolved fields and validation status must remain internal unless Polestar deliberately chooses to express an analytical confidence level.
+Add a final evidence to prose audit before render: every material analytical claim should trace back to a validated record, metric or forward signal.
+Apply these controls as shared report architecture, not Fuel Watch specific patches, so the same failures cannot recur under different headlines, countries or commodities.

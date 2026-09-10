@@ -139,13 +139,19 @@ describe("buildFuelReportFacts", () => {
     // Speculative market commentary rated high must be capped for the
     // OVERALL call (capFuelMarketSeverity demote-only semantics). The title
     // still passes the fuel relevance gate via "fuel prices".
-    const f = facts([
-      inc({
+    const row = inc({
         title: "Fuel prices expected to climb, analysts say",
         summary: "Analysts expect fuel prices could rise further.",
         severity: "high",
-      }),
-    ]);
+      });
+    const f = buildFuelReportFacts({
+      issueDate: ISSUE,
+      hardNumbers: hardNumbers({}),
+      incidents: [row],
+      // This test targets severity capping, not the independently tested
+      // relevance predicate, so provide the already-qualified record contract.
+      qualifyingIncidents: [row],
+    });
     expect(f.incidentCount).toBe(1);
     expect(f.highestSeverity).toBe("high"); // raw distribution keeps stored tier
     expect(f.overallSeverity).not.toBe("high"); // capped for the overall call
@@ -254,10 +260,15 @@ describe("buildFuelReportFacts", () => {
   });
 
   it("market indicators derive previous from the change string and direction from the shared rule", () => {
-    const f = facts([], hardNumbers({ brent: { value: 80, change: "-4.0%" }, wti: { value: 76, change: "+2.0%" } }));
+    const f = facts([], hardNumbers({ brent: { value: 80, change: "-4.0% 7d" }, wti: { value: 76, change: "+2.0% 7d" } }));
     const brent = f.market.indicators.find((m) => m.key === "brent")!;
     expect(brent.pctChange).toBeCloseTo(-4, 5);
     expect(brent.previous).toBeCloseTo(80 / 0.96, 3);
+    expect(brent.referenceValue).toBe(brent.previous);
+    expect(brent.currentValue).toBe(brent.current);
+    expect(brent.currentDate).toBe(ISSUE);
+    expect(brent.referenceDate).toBe("2026-07-29");
+    expect(brent.comparisonScope).toBe("lagged-reference");
     expect(brent.direction).toBe("falling");
     const wti = f.market.indicators.find((m) => m.key === "wti")!;
     expect(wti.direction).toBe("rising");
@@ -265,7 +276,7 @@ describe("buildFuelReportFacts", () => {
     expect(f.market.crudeDirection).toBe("falling");
   });
 
-  it("jet direction comes from the trajectory first-vs-last", () => {
+  it("jet direction carries dated current and lagged reference observations", () => {
     const f = facts(
       [],
       hardNumbers({
@@ -279,6 +290,40 @@ describe("buildFuelReportFacts", () => {
     expect(jet.basis).toBe("trajectory");
     expect(jet.direction).toBe("rising");
     expect(jet.previous).toBe(2.0);
+    expect(jet.current).toBe(2.2);
+    expect(jet.currentDate).toBe("2026-08-01");
+    expect(jet.referenceDate).toBe("2026-07-01");
+    expect(jet.comparisonScope).toBe("lagged-reference");
+  });
+
+  it("jet uses an in-window trajectory reference instead of an older point", () => {
+    const f = facts(
+      [],
+      hardNumbers({
+        jetTrajectory: [
+          { date: "2026-07-01", value: 1.0 },
+          { date: "2026-08-01", value: 2.0 },
+          { date: "2026-08-04", value: 2.01 },
+        ],
+      }),
+    );
+    const jet = f.market.indicators.find((m) => m.key === "jet")!;
+    expect(jet.currentDate).toBe("2026-08-04");
+    expect(jet.referenceDate).toBe("2026-08-01");
+    expect(jet.previous).toBe(2.0);
+    expect(jet.pctChange).toBeCloseTo(0.5);
+    expect(jet.direction).toBe("broadly stable");
+    expect(jet.comparisonScope).toBe("reporting-period");
+  });
+
+  it("serialises lagged comparisons as lagged rather than this-window movement", () => {
+    const f = facts(
+      [],
+      hardNumbers({ brent: { value: 80, change: "+2.0% 7d" } }),
+    );
+    const prompt = serialiseFuelFactsForPrompt(f);
+    expect(prompt).toContain("vs lagged reference on 2026-07-29");
+    expect(prompt).not.toContain("over this reporting period");
   });
 
   it("current-condition signals only include classes observed in the window", () => {

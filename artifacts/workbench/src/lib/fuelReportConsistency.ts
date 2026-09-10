@@ -25,6 +25,11 @@
 // ordinary analyst prose.
 
 import type { FuelReportFacts, MarketDirection } from "./fuelReportFacts";
+import {
+  auditFinalReportEvidence,
+  assertFinalReportEvidence,
+  type FinalReportEvidenceAuditIssue,
+} from "./finalReportEvidenceAudit";
 
 export interface FuelConsistencyIssue {
   code:
@@ -62,6 +67,77 @@ export interface FuelEffectiveSections {
   regionalHighlights?: string | null;
   implications?: string | null;
   watchNext?: string | null;
+}
+
+/** Thin Fuel adapter for the shared, topic-independent final evidence audit. */
+export function validateFuelFinalEvidenceAudit(
+  facts: FuelReportFacts,
+  sections: FuelEffectiveSections,
+  validatedForwardIndicators: string[],
+): FinalReportEvidenceAuditIssue[] {
+  return auditFinalReportEvidence({
+    topic: "fuel",
+    issueDate: facts.issueDate,
+    evidence: [
+      ...facts.incidents.map((r) => ({
+        id: r.id,
+        title: r.title,
+        summary: r.summary,
+        country: r.country,
+        location: r.location,
+        occurredAt: r.occurredAt,
+      })),
+      ...facts.market.indicators
+        .filter((m) => m.current !== null)
+        .map((m) => ({
+          id: `market-${m.key}`,
+          title: m.label,
+          occurredAt: m.currentDate,
+          marketComparison: {
+            indicator: m.label,
+            currentDate: m.currentDate,
+            referenceDate: m.referenceDate,
+            comparisonScope: m.comparisonScope,
+          },
+        })),
+    ],
+    sections: { ...sections },
+    validatedForwardIndicators,
+  });
+}
+
+export function assertFuelFinalEvidenceAudit(
+  facts: FuelReportFacts,
+  sections: FuelEffectiveSections,
+  validatedForwardIndicators: string[],
+): void {
+  assertFinalReportEvidence({
+    topic: "fuel",
+    issueDate: facts.issueDate,
+    evidence: [
+      ...facts.incidents.map((r) => ({
+        id: r.id,
+        title: r.title,
+        summary: r.summary,
+        country: r.country,
+        location: r.location,
+        occurredAt: r.occurredAt,
+      })),
+      ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
+        id: `market-${m.key}`,
+        title: m.label,
+        occurredAt: m.currentDate,
+        marketComparison: {
+          indicator: m.label,
+          currentDate: m.currentDate,
+          referenceDate: m.referenceDate,
+          comparisonScope: m.comparisonScope,
+        },
+      })),
+    ],
+    sections: { ...sections },
+    validatedForwardIndicators,
+  });
 }
 
 // Sections that speak in the present tense about this window. Watch Next is
@@ -473,6 +549,8 @@ export interface FuelGateReportFields {
   fuelMarketRead?: string | null;
   fuelOperationalRead?: string | null;
   fuelRegionalHighlights?: string | null;
+  implications?: string | null;
+  watchNext?: string | null;
 }
 
 export function resolveFuelEffectiveSections(opts: {
@@ -531,10 +609,8 @@ export function resolveFuelEffectiveSections(opts: {
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
-    // Implications / Watch Next are deliberately NOT gated: they are generic
-    // topped-up bullet lists (forward-looking by design) whose stock phrasing
-    // carries no this-window quantitative claims — gating them lexically
-    // would only risk false blocks.
+    implications: fuelData.narrativeData.implications,
+    watchNext: fuelData.narrativeData.watchNext,
   };
 }
 

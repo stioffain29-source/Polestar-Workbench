@@ -33,15 +33,19 @@ import { parseFuelHardNumbers, type FuelDataCard } from "./jetFuelTrajectory";
 import { capFuelMarketSeverity } from "./fuelNarratives";
 import { aggregateIncidentSignificance } from "@workspace/country-engine";
 import { deriveIncidentCountry } from "./shippingCountry";
+import {
+  deriveFuelMarketIndicator,
+  fuelDirectionForPct,
+  FUEL_MARKET_DIRECTION_NEUTRAL_PCT,
+  type FuelMarketComparisonScope,
+  type FuelMarketDirection,
+  type FuelMarketTemporalStatus,
+} from "./fuelMarketIndicators";
 
-export type MarketDirection =
-  | "rising"
-  | "falling"
-  | "broadly stable"
-  | "unchanged";
+export type MarketDirection = FuelMarketDirection;
 
 /** Neutral band (in %): moves smaller than this are "broadly stable". */
-export const MARKET_DIRECTION_NEUTRAL_PCT = 0.75;
+export const MARKET_DIRECTION_NEUTRAL_PCT = FUEL_MARKET_DIRECTION_NEUTRAL_PCT;
 
 /** A leader must carry at least this multiple of the runner-up's score to be
  *  named the primary pressure point; otherwise pressure is "distributed". */
@@ -49,11 +53,7 @@ export const PRESSURE_LEADER_MARGIN = 1.25;
 
 /** The ONE direction rule. Every direction wording decision routes here. */
 export function directionForPct(pct: number | null | undefined): MarketDirection | null {
-  if (pct === null || pct === undefined || !Number.isFinite(pct)) return null;
-  if (pct === 0) return "unchanged";
-  if (pct >= MARKET_DIRECTION_NEUTRAL_PCT) return "rising";
-  if (pct <= -MARKET_DIRECTION_NEUTRAL_PCT) return "falling";
-  return "broadly stable";
+  return fuelDirectionForPct(pct);
 }
 
 export const SEVERITY_TIERS = [
@@ -77,17 +77,25 @@ export interface FuelMarketIndicatorFact {
   label: string;
   /** Latest value as stored. Null when the indicator is absent. */
   current: number | null;
+  /** Explicit name retained alongside `current` for newer consumers. */
+  currentValue: number | null;
+  currentDate: string | null;
   unit: string | null;
   asOf: string | null;
   /** Previous reference value. For Brent/WTI this is back-computed from the
    *  card's change string (current / (1 + pct/100)); for jet it is the first
    *  trajectory point when a trajectory exists. Null when underivable. */
   previous: number | null;
+  /** Explicit name retained alongside legacy `previous`. */
+  referenceValue: number | null;
+  referenceDate: string | null;
   absChange: number | null;
   pctChange: number | null;
   direction: MarketDirection | null;
   /** Where previous/pct came from: audit trail for the gate. */
-  basis: "change-string" | "trajectory" | "none";
+  basis: "explicit-reference" | "change-string" | "trajectory" | "none";
+  temporalStatus: FuelMarketTemporalStatus;
+  comparisonScope: FuelMarketComparisonScope;
 }
 
 export interface FuelPressurePointFact {
@@ -100,6 +108,8 @@ export interface FuelPressurePointFact {
 export interface FuelReportFactsIncident {
   id: number | string | null;
   title: string;
+  /** Canonical record summary retained for final evidence-to-prose audit. */
+  summary: string | null;
   country: string | null;
   location: string | null;
   severity: string;
@@ -174,52 +184,32 @@ function indicatorFromCard(
   label: string,
   card: FuelDataCard | null,
   trajectory?: { date: string; value: number }[],
+  issueDate?: string,
 ): FuelMarketIndicatorFact {
-  const current = numOf(card?.value);
-  let previous: number | null = null;
-  let basis: FuelMarketIndicatorFact["basis"] = "none";
-  let pct: number | null = null;
-
-  // Jet prefers the trajectory (real observed previous point) over the
-  // change-string back-computation.
-  if (key === "jet" && trajectory && trajectory.length >= 2) {
-    const first = trajectory[0];
-    const last = trajectory[trajectory.length - 1];
-    const cur = current ?? last.value;
-    previous = first.value;
-    pct = first.value !== 0 ? ((cur - first.value) / first.value) * 100 : 0;
-    basis = "trajectory";
-    return {
-      key,
-      label,
-      current: cur,
-      unit: card?.unit ?? null,
-      asOf: card?.asOf ?? last.date ?? null,
-      previous,
-      absChange: previous !== null ? cur - previous : null,
-      pctChange: pct,
-      direction: directionForPct(pct),
-      basis,
-    };
-  }
-
-  const changePct = parseChangePct(card?.change);
-  if (current !== null && changePct !== null) {
-    previous = current / (1 + changePct / 100);
-    pct = changePct;
-    basis = "change-string";
-  }
+  const fallback = card ?? { label, value: Number.NaN };
+  const derived = deriveFuelMarketIndicator({
+    card: { ...fallback, label },
+    issueDate: issueDate ?? "",
+    trajectory: key === "jet" ? trajectory : undefined,
+  });
+  const current = numOf(derived.currentValue);
   return {
     key,
     label,
     current,
-    unit: card?.unit ?? null,
-    asOf: card?.asOf ?? null,
-    previous,
-    absChange: previous !== null && current !== null ? current - previous : null,
-    pctChange: pct,
-    direction: directionForPct(pct),
-    basis,
+    currentValue: current,
+    currentDate: derived.currentDate,
+    unit: derived.unit,
+    asOf: derived.currentDate,
+    previous: derived.referenceValue,
+    referenceValue: derived.referenceValue,
+    referenceDate: derived.referenceDate,
+    absChange: derived.absoluteChange,
+    pctChange: derived.percentageChange,
+    direction: derived.direction,
+    basis: derived.basis,
+    temporalStatus: derived.temporalStatus,
+    comparisonScope: derived.comparisonScope,
   };
 }
 
@@ -269,6 +259,7 @@ export function buildFuelReportFacts(opts: {
   const records: FuelReportFactsIncident[] = windowIncidents.map((i) => ({
     id: i.id ?? null,
     title: i.title,
+    summary: i.summary ?? null,
     country: deriveIncidentCountry(i),
     location: i.location ?? null,
     severity: (i.severity ?? "").toLowerCase(),
@@ -411,13 +402,14 @@ export function buildFuelReportFacts(opts: {
     date: p.date,
     value: p.value,
   }));
-  const brent = indicatorFromCard("brent", "Brent crude", brentCard);
-  const wti = indicatorFromCard("wti", "WTI crude", wtiCard);
+  const brent = indicatorFromCard("brent", "Brent crude", brentCard, undefined, opts.issueDate);
+  const wti = indicatorFromCard("wti", "WTI crude", wtiCard, undefined, opts.issueDate);
   const jet = indicatorFromCard(
     "jet",
     "Jet fuel",
     jetCard,
     trajPoints.length >= 2 ? trajPoints : undefined,
+    opts.issueDate,
   );
   const crudePcts = [brent.pctChange, wti.pctChange].filter(
     (v): v is number => v !== null,
@@ -519,17 +511,25 @@ export function serialiseFuelFactsForPrompt(f: FuelReportFacts): string {
   }
   for (const m of f.market.indicators) {
     if (m.current === null) continue;
-    const bits = [`${m.label}: ${m.current}${m.unit ? ` ${m.unit}` : ""}`];
+    const bits = [`${m.label}: ${m.current}${m.unit ? ` ${m.unit}` : ""}${m.currentDate ? ` on ${m.currentDate}` : " (undated)"}`];
     if (m.pctChange !== null) {
       bits.push(
-        `${m.pctChange >= 0 ? "+" : ""}${m.pctChange.toFixed(1)}% vs previous`,
+        `${m.pctChange >= 0 ? "+" : ""}${m.pctChange.toFixed(1)}% vs ${m.comparisonScope === "lagged-reference" ? "lagged reference" : "reference"}` +
+          (m.referenceDate ? ` on ${m.referenceDate}` : " (date unavailable)"),
       );
     }
     if (m.direction) bits.push(`direction: ${m.direction}`);
     lines.push(bits.join(", "));
   }
   if (f.market.crudeDirection) {
-    lines.push(`Crude complex direction (Brent/WTI mean): ${f.market.crudeDirection}`);
+    const crudeComparisons = f.market.indicators.filter(
+      (m) => (m.key === "brent" || m.key === "wti") && m.pctChange !== null,
+    );
+    const scope = crudeComparisons.length > 0 &&
+      crudeComparisons.every((m) => m.comparisonScope === "reporting-period")
+      ? "within reporting period"
+      : "against supplied lagged/undated references; not reporting-period movement";
+    lines.push(`Crude complex direction (Brent/WTI mean, ${scope}): ${f.market.crudeDirection}`);
   }
   lines.push(
     `Observed current conditions this window: ${
