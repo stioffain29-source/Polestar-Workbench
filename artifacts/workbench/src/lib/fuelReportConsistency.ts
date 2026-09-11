@@ -24,12 +24,13 @@
 // lists) so the gate catches real contradictions without false-blocking
 // ordinary analyst prose.
 
-import type { FuelReportFacts, MarketDirection } from "./fuelReportFacts";
+import type { FuelReportFacts } from "./fuelReportFacts";
 import type { FuelJudgement } from "./fuelCanonicalFacts";
 import {
   auditFinalReportEvidence,
   assertFinalReportEvidence,
   type FinalReportEvidenceAuditIssue,
+  type FinalReportTypedReference,
 } from "./finalReportEvidenceAudit";
 
 export interface FuelConsistencyIssue {
@@ -71,6 +72,24 @@ export interface FuelEffectiveSections {
   watchNext?: string | null;
 }
 
+function fuelForwardReferences(
+  facts: FuelReportFacts,
+  indicators: string[],
+): FinalReportTypedReference[] {
+  const lead = facts.highestPriorityIncident;
+  const anchor = lead
+    ? [lead.title, lead.summary ?? "", lead.country ?? "", lead.location ?? ""].join(" ")
+    : "";
+  return indicators.map((text, index) => ({
+    id: `fuel-forward-${index}`,
+    type: "forward-indicator" as const,
+    // A forward signal remains forward-looking, but retains the one current
+    // evidence entity that justifies it. This prevents cross-country word bags.
+    text: [text, anchor].filter(Boolean).join(" "),
+    evidenceId: lead?.id,
+  }));
+}
+
 /** Thin Fuel adapter for the shared, topic-independent final evidence audit. */
 export function validateFuelFinalEvidenceAudit(
   facts: FuelReportFacts,
@@ -102,11 +121,16 @@ export function validateFuelFinalEvidenceAudit(
             currentDate: m.currentDate,
             referenceDate: m.referenceDate,
             comparisonScope: m.comparisonScope,
+            direction: m.direction,
+            currentValue: m.currentValue,
+            referenceValue: m.referenceValue,
+            pctChange: m.pctChange,
+            unit: m.unit,
           },
         })),
     ],
     sections: { ...sections },
-    validatedForwardIndicators,
+    validatedForwardIndicators: fuelForwardReferences(facts, validatedForwardIndicators),
     typedReferences: [
       ...facts.incidents.map((r) => ({
         id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
@@ -117,7 +141,7 @@ export function validateFuelFinalEvidenceAudit(
       ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
         id: `market-${m.key}`,
         type: "market-observation" as const,
-        text: `${m.label} ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
+        text: `${m.label} ${m.direction ?? "unavailable"} ${m.currentValue ?? "unavailable"} ${m.unit ?? ""} versus ${m.referenceValue ?? "unavailable"} (${m.pctChange ?? "unavailable"}%) ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
       })),
     ],
   });
@@ -151,11 +175,16 @@ export function assertFuelFinalEvidenceAudit(
           currentDate: m.currentDate,
           referenceDate: m.referenceDate,
           comparisonScope: m.comparisonScope,
+            direction: m.direction,
+            currentValue: m.currentValue,
+            referenceValue: m.referenceValue,
+            pctChange: m.pctChange,
+            unit: m.unit,
         },
       })),
     ],
     sections: { ...sections },
-    validatedForwardIndicators,
+    validatedForwardIndicators: fuelForwardReferences(facts, validatedForwardIndicators),
     typedReferences: [
       ...facts.incidents.map((r) => ({
         id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
@@ -166,7 +195,7 @@ export function assertFuelFinalEvidenceAudit(
       ...facts.market.indicators.filter((m) => m.current !== null).map((m) => ({
         id: `market-${m.key}`,
         type: "market-observation" as const,
-        text: `${m.label} ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
+        text: `${m.label} ${m.direction ?? "unavailable"} ${m.currentValue ?? "unavailable"} ${m.unit ?? ""} versus ${m.referenceValue ?? "unavailable"} (${m.pctChange ?? "unavailable"}%) ${m.currentDate ?? "undated"} ${m.comparisonScope}`,
       })),
     ],
   });
@@ -191,9 +220,9 @@ const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
 // Direction wording sets. Kept tight: only words that unambiguously assert a
 // direction for a price/market series.
 const RISING_RE =
-  /\b(rising|rose|risen|climbing|climbed|surging|surged|rallying|rallied|jumped|spiking|spiked|firming|firmed|gained|advancing|advanced|up sharply|moved higher|pushed higher|higher on the week)\b/i;
+  /\b(rise|rising|rose|risen|climbing|climbed|surging|surged|rallying|rallied|jumped|spiking|spiked|firming|firmed|gained|advancing|advanced|up sharply|moved higher|pushed higher|higher on the week)\b/i;
 const FALLING_RE =
-  /\b(falling|fell|declining|declined|easing|eased|retreating|retreated|slumped|sliding|slid|dropped|dropping|pulled back|pullback|moved lower|pushed lower|lower on the week|softened|softening)\b/i;
+  /\b(fall|falling|fell|declining|declined|easing|eased|retreating|retreated|slumped|sliding|slid|dropped|dropping|pulled back|pullback|moved lower|pushed lower|lower on the week|softened|softening)\b/i;
 
 // A sentence must carry price/market-movement context before its direction
 // wording is validated against the calculated series direction. "costs"
@@ -209,12 +238,58 @@ const INDICATOR_TOKENS: { key: "brent" | "wti" | "jet" | "crude"; re: RegExp }[]
   { key: "crude", re: /\bcrude\b|\boil price/i },
 ];
 
+const CLAIM_QUALIFIER_RE =
+  /\b(could|may|might|would|if\b|unless\b|conditional|contingen(?:cy|t)|potential|risk of|watch(?:ing)? for|monitor|previously|historically|last (?:week|month|year)|before the reporting period|was once)\b/i;
+
+function localClause(text: string, at: number): string {
+  const breaks = /\b(?:while|but|whereas|although|however)\b|[;:—]/gi;
+  let start = 0;
+  let end = text.length;
+  for (const match of text.matchAll(breaks)) {
+    const index = match.index ?? 0;
+    if (index < at) start = index + match[0].length;
+    else if (index > at) {
+      end = index;
+      break;
+    }
+  }
+  return text.slice(start, end);
+}
+
+function indicatorClause(sentence: string, indicator: RegExp): string {
+  const match = sentence.match(indicator);
+  return match?.index == null ? sentence : localClause(sentence, match.index);
+}
+
+function hasAssertedDirection(sentence: string, direction: RegExp): boolean {
+  const global = new RegExp(direction.source, `${direction.flags.replace("g", "")}g`);
+  for (const match of sentence.matchAll(global)) {
+    const at = match.index ?? 0;
+    const clauseStart = Math.max(
+        sentence.lastIndexOf(".", at),
+        sentence.lastIndexOf(";", at),
+        sentence.lastIndexOf(":", at),
+        sentence.lastIndexOf("—", at),
+      ) + 1;
+    const before = sentence.slice(clauseStart, at);
+    const after = sentence.slice(at + match[0].length, at + match[0].length + 30);
+    if (
+      !/\b(?:not|no|never|without)\b/i.test(before.slice(-24)) &&
+      !CLAIM_QUALIFIER_RE.test(before) &&
+      !/^\s*(?:if|unless)\b/i.test(after)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function directionConflict(
   sentence: string,
-  calculated: MarketDirection,
+  calculated: NonNullable<FuelReportFacts["market"]["crudeDirection"]>,
 ): string | null {
-  const saysRising = RISING_RE.test(sentence);
-  const saysFalling = FALLING_RE.test(sentence);
+  const saysRising = hasAssertedDirection(sentence, RISING_RE);
+  const saysFalling = hasAssertedDirection(sentence, FALLING_RE);
   if (calculated === "rising" && saysFalling && !saysRising)
     return "describes it as falling but the calculated direction is rising";
   if (calculated === "falling" && saysRising && !saysFalling)
@@ -227,142 +302,15 @@ function directionConflict(
   return null;
 }
 
-// Longer phrases first so "moved lower" is not partially rewritten by "lower".
-const FALLING_TO_RISING: Array<[RegExp, string]> = [
-  [/\blower on the week\b/gi, "higher on the week"],
-  [/\bmoved lower\b/gi, "moved higher"],
-  [/\bpushed lower\b/gi, "pushed higher"],
-  [/\bpulled back\b/gi, "moved higher"],
-  [/\bpullback\b/gi, "move higher"],
-  [/\bfalling\b/gi, "rising"],
-  [/\bdeclining\b/gi, "climbing"],
-  [/\bdeclined\b/gi, "climbed"],
-  [/\beasing\b/gi, "climbing"],
-  [/\beased\b/gi, "climbed"],
-  [/\bretreating\b/gi, "advancing"],
-  [/\bretreated\b/gi, "advanced"],
-  [/\bslumped\b/gi, "jumped"],
-  [/\bsliding\b/gi, "climbing"],
-  [/\bslid\b/gi, "climbed"],
-  [/\bdropped\b/gi, "climbed"],
-  [/\bdropping\b/gi, "climbing"],
-  [/\bsoftened\b/gi, "firmed"],
-  [/\bsoftening\b/gi, "firming"],
-  [/\bfell\b/gi, "climbed"],
-];
-
-const RISING_TO_FALLING: Array<[RegExp, string]> = [
-  [/\bhigher on the week\b/gi, "lower on the week"],
-  [/\bmoved higher\b/gi, "moved lower"],
-  [/\bpushed higher\b/gi, "pushed lower"],
-  [/\bup sharply\b/gi, "lower on the week"],
-  [/\brising\b/gi, "falling"],
-  [/\bclimbing\b/gi, "falling"],
-  [/\bclimbed\b/gi, "fell"],
-  [/\bsurging\b/gi, "falling"],
-  [/\bsurged\b/gi, "fell"],
-  [/\brallying\b/gi, "retreating"],
-  [/\brallied\b/gi, "retreated"],
-  [/\bjumped\b/gi, "dropped"],
-  [/\bspiking\b/gi, "sliding"],
-  [/\bspiked\b/gi, "slid"],
-  [/\bfirming\b/gi, "softening"],
-  [/\bfirmed\b/gi, "softened"],
-  [/\bgained\b/gi, "fell"],
-  [/\badvancing\b/gi, "retreating"],
-  [/\badvanced\b/gi, "retreated"],
-  [/\brisen\b/gi, "fallen"],
-  [/\brose\b/gi, "fell"],
-];
-
-const DIRECTION_TO_STABLE: Array<[RegExp, string]> = [
-  ...FALLING_TO_RISING.map(([re]) => [re, "held steady"] as [RegExp, string]),
-  ...RISING_TO_FALLING.map(([re]) => [re, "held steady"] as [RegExp, string]),
-];
-
-function pairsForDirection(calculated: MarketDirection): Array<[RegExp, string]> {
-  if (calculated === "rising") return FALLING_TO_RISING;
-  if (calculated === "falling") return RISING_TO_FALLING;
-  return DIRECTION_TO_STABLE;
-}
-
-function applyDirectionPairs(text: string, pairs: Array<[RegExp, string]>): string {
-  let out = text;
-  for (const [re, to] of pairs) {
-    out = out.replace(new RegExp(re.source, re.flags), to);
-  }
-  return out;
-}
-
-function rewriteDirectionNearIndicator(
-  sentence: string,
-  indicatorRe: RegExp,
-  calculated: MarketDirection,
-): string {
-  const re = new RegExp(indicatorRe.source, "gi");
-  const matches = [...sentence.matchAll(re)];
-  if (!matches.length) return sentence;
-  const pairs = pairsForDirection(calculated);
-  let out = sentence;
-  // Right-to-left so earlier indices stay valid after a replacement.
-  for (let i = matches.length - 1; i >= 0; i--) {
-    const m = matches[i];
-    const at = m.index ?? 0;
-    const start = Math.max(0, at - 24);
-    const end = Math.min(out.length, at + m[0].length + 80);
-    out =
-      out.slice(0, start) +
-      applyDirectionPairs(out.slice(start, end), pairs) +
-      out.slice(end);
-  }
-  return out;
-}
-
-function alignSentence(
-  sentence: string,
-  dirByKey: Record<string, MarketDirection | null>,
-): string {
-  if (!PRICE_CONTEXT_RE.test(sentence)) return sentence;
-  let out = sentence;
-  for (const tok of INDICATOR_TOKENS) {
-    if (!tok.re.test(out)) continue;
-    const calc = dirByKey[tok.key];
-    if (!calc) continue;
-    if (!directionConflict(out, calc)) continue;
-    out = rewriteDirectionNearIndicator(out, tok.re, calc);
-  }
-  return out;
-}
-
 function dirByKeyFromFacts(
   facts: FuelReportFacts,
-): Record<string, MarketDirection | null> {
+): Record<string, NonNullable<FuelReportFacts["market"]["crudeDirection"]> | null> {
   return {
     brent: facts.market.indicators.find((m) => m.key === "brent")?.direction ?? null,
     wti: facts.market.indicators.find((m) => m.key === "wti")?.direction ?? null,
     jet: facts.market.indicators.find((m) => m.key === "jet")?.direction ?? null,
     crude: facts.market.crudeDirection,
   };
-}
-
-/**
- * Rewrite Brent/WTI/jet/crude direction wording so it agrees with the
- * calculated facts. Used on AI (and AI-prefilled) Fuel Watch prose: the model
- * copies incident headlines ("as jet fuel costs eased") that contradict the
- * EIA series, and the fail-closed gate then blocks preview and PDF export.
- * Genuine analyst overrides are NOT rewritten — those still fail closed.
- */
-export function alignFuelProseToMarketFacts(
-  text: string,
-  facts: FuelReportFacts,
-): string {
-  if (!text.trim()) return text;
-  const dirByKey = dirByKeyFromFacts(facts);
-  const parts = text.split(/((?<=[.!?])\s+)/);
-  for (let i = 0; i < parts.length; i += 2) {
-    parts[i] = alignSentence(parts[i], dirByKey);
-  }
-  return parts.join("");
 }
 
 // Leader-claim phrasing: "X is the clearest/primary/main/leading pressure
@@ -380,9 +328,7 @@ const OVERALL_SEVERITY_RE =
   /\boverall severity\b[^.!?]{0,40}\b(insignificant|low|moderate|high|extreme)\b|\b(insignificant|low|moderate|high|extreme)\b[^.!?]{0,25}\boverall severity\b|\brated\s+(insignificant|low|moderate|high|extreme)\s+overall\b/i;
 
 // Live current-condition assertions, mapped to the facts signal class they
-// require. Speculative framing ("could", "risk of", "if") is excluded.
-const SPECULATIVE_RE =
-  /\b(could|may|might|would|risk of|potential|if\b|were to|watch for|likely to)\b/i;
+// require. Modality and negation are checked at the matched claim below.
 const CONDITION_CLAIMS: { key: string; re: RegExp; what: string }[] = [
   {
     key: "shortage",
@@ -439,7 +385,7 @@ export function validateFuelReportConsistency(
         if (!tok.re.test(sentence)) continue;
         const calc = dirByKey[tok.key];
         if (!calc) continue;
-        const conflict = directionConflict(sentence, calc);
+        const conflict = directionConflict(indicatorClause(sentence, tok.re), calc);
         if (conflict) {
           issues.push({
             code: "MARKET_DIRECTION",
@@ -522,10 +468,11 @@ export function validateFuelReportConsistency(
     // 5. Unsupported current-condition claims.
     if (CURRENT_SECTIONS.has(section)) {
       for (const sentence of sentences) {
-        if (SPECULATIVE_RE.test(sentence)) continue;
         for (const claim of CONDITION_CLAIMS) {
           if (
             claim.re.test(sentence) &&
+            !claimIsQualified(sentence, claim.re) &&
+            !isNegated(sentence, claim.re) &&
             !facts.currentConditionSignals.includes(claim.key)
           ) {
             issues.push({
@@ -558,27 +505,163 @@ export function validateFuelReportConsistency(
   return issues;
 }
 
-/** Fail closed when the four judgement-bearing sections drift from the one
- * structured assessment. Exact canonical values make this deterministic. */
+const LOWER_COST_RE =
+  /\b(?:lower|falling|reduced|easing|eased)\s+(?:fuel\s+|energy\s+|oil\s+)?(?:costs?|prices?)\b|\b(?:fuel\s+|energy\s+|oil\s+)?(?:costs?|prices?)\s+(?:are|remain|have become)\s+(?:lower|falling|reduced|easing)\b/i;
+const RELIABLE_SUPPLY_RE =
+  /\b(?:fuel\s+|road\s+)?(?:supply|availability|distribution|deliver(?:y|ies))\s+(?:is|are|remains?)\s+(?:reliable|uninterrupted|secure|fully available)\b|\b(?:reliable|uninterrupted|secure|fully available)\s+(?:road\s+)?(?:fuel\s+)?(?:supply|availability|distribution|deliver(?:y|ies))\b|\bno\s+(?:material\s+)?(?:fuel\s+|road\s+)?(?:supply|availability|distribution|delivery)\s+(?:risk|disruption)\b/i;
+
+function isNegated(sentence: string, match: RegExp): boolean {
+  const found = sentence.match(match);
+  if (!found || found.index == null) return false;
+  return /\b(?:not|no|never|without)\b/i.test(
+    sentence.slice(Math.max(0, found.index - 24), found.index),
+  );
+}
+
+function claimIsQualified(sentence: string, match: RegExp): boolean {
+  const found = sentence.match(match);
+  if (!found || found.index == null) return false;
+  const at = found.index;
+  const clauseStart = Math.max(
+    sentence.lastIndexOf(".", at),
+    sentence.lastIndexOf(";", at),
+    sentence.lastIndexOf(":", at),
+    sentence.lastIndexOf("—", at),
+  ) + 1;
+  const before = sentence.slice(clauseStart, at);
+  const after = sentence.slice(at + found[0].length, at + found[0].length + 30);
+  return CLAIM_QUALIFIER_RE.test(before)
+    || /^\s*(?:if|unless)\b/i.test(after)
+    || /^\s*(?:\w+\s+){0,4}(?:if|unless)\b/i.test(after);
+}
+
+function hasUnknownGeography(sentence: string, facts: FuelReportFacts): boolean {
+  const qualifier = sentence.match(
+    /\b(?:in|across|within|for)\s+(?:the\s+)?([A-Z][A-Za-z-]*(?:\s+[A-Z][A-Za-z-]*)?)/,
+  )?.[1];
+  return Boolean(
+    qualifier &&
+    !facts.countries.some((country) =>
+      country.name.toLowerCase() === qualifier.toLowerCase(),
+    ),
+  );
+}
+
+function relevantMarketIndicators(
+  facts: FuelReportFacts,
+  sentence: string,
+) {
+  return facts.market.indicators.filter((indicator) => {
+    const marker =
+      indicator.key === "brent" ? /\bbrent\b/i
+      : indicator.key === "wti" ? /\bwti\b|west\s*texas/i
+      : /\bjet\s*fuel\b|\bkerosene\b/i;
+    return marker.test(sentence);
+  });
+}
+
+function hasCurrentRisingFuelCostEvidence(
+  facts: FuelReportFacts,
+  sentence: string,
+): boolean {
+  if (hasUnknownGeography(sentence, facts)) return false;
+  return relevantMarketIndicators(facts, sentence).some((indicator) =>
+    indicator.comparisonScope === "reporting-period" &&
+    indicator.direction === "rising" &&
+    indicator.currentValue != null &&
+    indicator.referenceValue != null &&
+    indicator.pctChange != null &&
+    indicator.pctChange > 0,
+  );
+}
+
+function countryForClaim(sentence: string, facts: FuelReportFacts): string | null {
+  return facts.countries.find((country) =>
+    new RegExp(`\\b${escapeRe(country.name)}\\b`, "i").test(sentence),
+  )?.name ?? null;
+}
+
+function sameFuelProduct(claim: string, evidence: string): boolean {
+  if (/\bdiesel\b/i.test(claim)) return /\bdiesel\b/i.test(evidence);
+  if (/\bpetrol\b|\bgasoline\b/i.test(claim)) {
+    return /\bpetrol\b|\bgasoline\b/i.test(evidence);
+  }
+  if (/\broad\s+fuel\b|\bfuel\s+(?:supply|availability|distribution)\b/i.test(claim)) {
+    return /\b(road\s+fuel|diesel|petrol|gasoline|forecourt)\b/i.test(evidence);
+  }
+  return false;
+}
+
+function hasCurrentRoadSupplyRiskEvidence(
+  facts: FuelReportFacts,
+  sentence: string,
+): boolean {
+  const country = countryForClaim(sentence, facts);
+  if (!country || hasUnknownGeography(sentence, facts)) return false;
+  return facts.incidents.some((incident) => {
+    if (incident.country?.toLowerCase() !== country.toLowerCase()) return false;
+    const evidence = `${incident.title} ${incident.summary ?? ""}`;
+    return /\b(shortage|ration(?:ing)?|fuel\s+(?:is\s+)?unavailable)\b/i.test(evidence)
+      && sameFuelProduct(sentence, evidence);
+  });
+}
+
+function judgementContradiction(
+  judgement: FuelJudgement,
+  sentence: string,
+  facts: FuelReportFacts | undefined,
+): string | null {
+  // Unknown semantic support must remain non-blocking.
+  if (!facts) return null;
+  if (
+    hasCurrentRisingFuelCostEvidence(facts, sentence) &&
+    LOWER_COST_RE.test(sentence) &&
+    !isNegated(sentence, LOWER_COST_RE) &&
+    !claimIsQualified(sentence, LOWER_COST_RE)
+  ) {
+    return "asserts lower fuel costs despite current rising market evidence";
+  }
+  if (
+    judgement.exposure.sector === "road fuel distribution" &&
+    hasCurrentRoadSupplyRiskEvidence(facts, sentence) &&
+    RELIABLE_SUPPLY_RE.test(sentence) &&
+    !isNegated(sentence, RELIABLE_SUPPLY_RE) &&
+    !claimIsQualified(sentence, RELIABLE_SUPPLY_RE)
+  ) {
+    return "asserts reliable road-fuel supply despite current disruption evidence";
+  }
+  return null;
+}
+
+/**
+ * Detect only explicit reversals of the structured Fuel assessment. This
+ * deliberately does not inspect `mainRisk`: it is a source-derived incident
+ * title, not wording that final analysis must repeat. Omitted source facts,
+ * labels and derived indicators are never a consistency failure.
+ */
 export function validateFuelJudgementConsistency(
   judgement: FuelJudgement,
   sections: FuelEffectiveSections,
+  facts?: FuelReportFacts,
 ): FuelConsistencyIssue[] {
-  const requirements: Array<[keyof FuelEffectiveSections, string[]]> = [
-    ["whatMatters", [judgement.mainRisk, judgement.exposure.sector, judgement.direction, judgement.trigger]],
-    ["polestarView", [judgement.mainRisk, judgement.exposure.sector, judgement.direction, judgement.trigger]],
-    ["implications", [judgement.exposure.sector, judgement.trigger]],
-    ["watchNext", [judgement.trigger]],
+  const requirements: Array<keyof FuelEffectiveSections> = [
+    "executiveSummary",
+    "whatMatters",
+    "polestarView",
+    "implications",
+    "watchNext",
   ];
   const issues: FuelConsistencyIssue[] = [];
-  for (const [section, values] of requirements) {
-    const body = (sections[section] ?? "").toLowerCase();
-    for (const value of values) {
-      if (body.includes(value.toLowerCase())) continue;
+  for (const section of requirements) {
+    const body = (sections[section] ?? "").trim();
+    if (!body) continue;
+    for (const sentence of body.split(SENTENCE_SPLIT_RE)) {
+      const contradiction = judgementContradiction(judgement, sentence, facts);
+      if (!contradiction) continue;
       issues.push({
         code: "JUDGEMENT_CONSISTENCY",
         section,
-        message: `Final section omits the canonical judgement value "${value}".`,
+        message: `Final assessment ${contradiction}: "${sentence.trim().slice(0, 140)}"`,
       });
     }
   }
@@ -624,52 +707,29 @@ export function resolveFuelEffectiveSections(opts: {
   // either model prose grounded on the canonical FIXED FACTS or the canonical
   // projection itself, and the gate validates whichever tier wins.
   const canonical = fuelData.narrativeData.canonicalSections;
-  const facts = fuelData.reportFacts;
-  // AI (and Fuel Watch's editor prefill, which copies the AI byte-for-byte)
-  // must not ship headline direction wording that contradicts the series.
-  // Genuine analyst overrides — text that is present AND different from the
-  // AI — stay fail-closed so a deliberate edit is not silently rewritten.
-  const resolveAligned = (
+  // Preserve the final text verbatim. Contradictory generated or analyst prose
+  // must be reported by validation, never silently replaced by a fallback.
+  const resolveText = (
     editor: string | null | undefined,
     ai: string | null | undefined,
-    det: string,
+    deterministic: string,
   ): string => {
     const e = (editor ?? "").trim();
     const a = (ai ?? "").trim();
     if (e && (!a || e !== a)) return e;
-    return alignFuelProseToMarketFacts(a || det, facts);
+    return a || deterministic;
   };
   return {
-    executiveSummary: resolveAligned(
-      report.executiveSummary,
-      aiProse?.executiveSummary,
-      canonical.executiveSummary,
-    ),
-    situation: resolveAligned(
-      report.situation,
-      aiProse?.situation,
-      canonical.situation,
-    ),
-    whatHappened: resolveAligned(
-      report.whatHappened,
-      aiProse?.whatHappened,
-      canonical.whatHappened,
-    ),
-    whatMatters: resolveAligned(
-      report.whatMatters,
-      aiProse?.whatMatters,
-      canonical.whatMatters,
-    ),
-    polestarView: resolveAligned(
-      report.polestarView,
-      aiProse?.polestarView,
-      canonical.polestarView,
-    ),
+    executiveSummary: resolveText(report.executiveSummary, aiProse?.executiveSummary, canonical.executiveSummary),
+    situation: resolveText(report.situation, aiProse?.situation, canonical.situation),
+    whatHappened: resolveText(report.whatHappened, aiProse?.whatHappened, canonical.whatHappened),
+    whatMatters: resolveText(report.whatMatters, aiProse?.whatMatters, canonical.whatMatters),
+    polestarView: resolveText(report.polestarView, aiProse?.polestarView, canonical.polestarView),
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
-    implications: fuelData.narrativeData.implications,
-    watchNext: fuelData.narrativeData.watchNext,
+    implications: resolveText(report.implications, aiProse?.implications, canonical.implications),
+    watchNext: resolveText(report.watchNext, aiProse?.watchNext, canonical.watchNext),
   };
 }
 

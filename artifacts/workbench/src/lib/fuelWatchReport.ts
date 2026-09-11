@@ -631,7 +631,11 @@ export function finalizeFuelPublication(opts: {
   );
   const consistency = [
     ...validateFuelEffectiveText(reportData.reportFacts, effectiveSections),
-    ...validateFuelJudgementConsistency(reportData.canonicalFacts.judgement, effectiveSections),
+    ...validateFuelJudgementConsistency(
+      reportData.canonicalFacts.judgement,
+      effectiveSections,
+      reportData.reportFacts,
+    ),
   ];
   const evidence = validateFuelFinalEvidenceAudit(
     reportData.reportFacts,

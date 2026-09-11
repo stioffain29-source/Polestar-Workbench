@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import { exportTopicReportPdf } from "../src/lib/exportTopicReportPdf";
 import ReportPreview from "../src/components/ReportPreview";
 import { TOPIC_LABELS } from "../src/lib/topics";
+import { buildFuelWatchReportData } from "../src/lib/fuelWatchReport";
+import { resolveFuelEffectiveSections } from "../src/lib/fuelReportConsistency";
 
 declare global {
   interface Window {
@@ -25,7 +27,7 @@ window.__runFuelCoverageVerify__ = async () => {
     createElement(ReportPreview, {
       report: data.report,
       incidents: data.incidents,
-      aiProse: null,
+      aiProse: data.actualAiProse,
       hiddenSections: data.hiddenSections,
       sectionOverrides: data.sectionOverrides,
     }),
@@ -88,6 +90,70 @@ window.__runFuelCoverageVerify__ = async () => {
   const relatedTitlesFound = expectedTitles.map((title: string) =>
     relatedRows.some((row) => row.includes(title)),
   );
+  const canonicalKeys = [
+    "executiveSummary",
+    "situation",
+    "whatHappened",
+    "whatMatters",
+    "implications",
+    "watchNext",
+    "polestarView",
+  ] as const;
+  const aiPreviewAiSectionsFound = canonicalKeys.filter(
+    (key) =>
+      typeof data.actualAiProse[key] === "string" &&
+      normalized(previewText).includes(
+        normalized(data.actualAiProse[key]).slice(0, 100),
+      ),
+  );
+  const aiPreviewMissingSections = canonicalKeys.filter(
+    (key) => !aiPreviewAiSectionsFound.includes(key),
+  );
+  const canonicalTextMissingKeys = canonicalKeys.filter(
+    (key) =>
+      data.expected.canonicalSections[key] &&
+      !normalized(previewText).includes(
+        normalized(data.expected.canonicalSections[key]),
+      ),
+  );
+  const actualPreviewGateIssues = [
+    ...host.querySelectorAll<HTMLElement>(
+      '[data-fuel-validation-blocked="true"] li',
+    ),
+  ].map((item) => item.innerText || item.textContent || "");
+
+  // Exercise the actual stored report fields as a direct analyst tier. These
+  // are production values, not synthetic invalid prose. The editor's actual
+  // stale-draft path clears them before rendering; this host records what the
+  // direct saved-field path would do without replacing the text.
+  const analystHost = document.createElement("div");
+  analystHost.id = "fuel-analyst-override-verify-host";
+  document.body.append(analystHost);
+  createRoot(analystHost).render(
+    createElement(ReportPreview, {
+      report: {
+        ...data.storedReport,
+      },
+      incidents: data.incidents,
+      aiProse: null,
+      hiddenSections: data.hiddenSections,
+      sectionOverrides: data.sectionOverrides,
+    }),
+  );
+  await document.fonts.ready;
+  for (let i = 0; i < 35; i++) {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+  }
+  const analystPreviewBlocked =
+    analystHost.querySelector('[data-fuel-validation-blocked="true"]') !==
+    null;
+  const analystPreviewGateIssues = [
+    ...analystHost.querySelectorAll<HTMLElement>(
+      '[data-fuel-validation-blocked="true"] li',
+    ),
+  ].map((item) => item.innerText || item.textContent || "");
 
   let captured: ArrayBuffer | null = null;
   let saveCalls = 0;
@@ -110,7 +176,7 @@ window.__runFuelCoverageVerify__ = async () => {
       TOPIC_LABELS,
       "fuel-report-23-coverage-verify.pdf",
       {
-        aiProse: null,
+        aiProse: data.actualAiProse,
         hiddenSections: data.hiddenSections,
         sectionOverrides: data.sectionOverrides,
       },
@@ -118,6 +184,46 @@ window.__runFuelCoverageVerify__ = async () => {
   } catch (error) {
     exportError = error instanceof Error ? error.message : String(error);
   }
+  let analystExportError: string | null = null;
+  let analystSaveCalls = saveCalls;
+  try {
+    await exportTopicReportPdf(
+      data.storedReport,
+      data.incidents,
+      TOPIC_LABELS,
+      "fuel-report-23-invalid-analyst-verify.pdf",
+      {
+        aiProse: null,
+        hiddenSections: data.hiddenSections,
+        sectionOverrides: data.sectionOverrides,
+      },
+    );
+  } catch (error) {
+    analystExportError = error instanceof Error ? error.message : String(error);
+  }
+  analystSaveCalls = saveCalls - analystSaveCalls;
+
+  // This is the same cleared-report call made by ReportEditor's Fuel prefill.
+  // It must resolve from generated AI-or-canonical text, never from an AI
+  // string copied into report fields.
+  const prefillFuelData = buildFuelWatchReportData(
+    { issueDate: data.report.issueDate, hardNumbers: data.report.hardNumbers },
+    data.incidents,
+  );
+  const prefillResolved = resolveFuelEffectiveSections({
+    report: {},
+    aiProse: data.actualAiProse,
+    fuelData: prefillFuelData,
+  });
+  const prefillMatchesCanonical = canonicalKeys.every(
+    (key) =>
+      prefillResolved[key] ===
+      prefillFuelData.narrativeData.canonicalSections[key],
+  );
+  const prefillMatchesActualResolved = canonicalKeys.every(
+    (key) => prefillResolved[key] === data.expected.prefillResolved[key],
+  );
+  analystHost.remove();
 
   let base64 = "";
   if (captured) {
@@ -138,6 +244,18 @@ window.__runFuelCoverageVerify__ = async () => {
     relatedVisible,
     relatedRowCount: relatedRows.length,
     relatedTitlesFound,
+    aiPreviewBlocked:
+      host.querySelector('[data-fuel-validation-blocked="true"]') !== null,
+    aiPreviewAiSectionsFound,
+    aiPreviewMissingSections,
+    canonicalTextMissingKeys,
+    actualPreviewGateIssues,
+    analystPreviewBlocked,
+    analystPreviewGateIssues,
+    analystExportError,
+    analystSaveCalls,
+    prefillMatchesCanonical,
+    prefillMatchesActualResolved,
     saveCalls,
     exportError,
     pdfBytes: captured?.byteLength ?? 0,

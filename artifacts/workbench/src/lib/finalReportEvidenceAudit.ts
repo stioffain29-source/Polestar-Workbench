@@ -4,6 +4,8 @@
  * this small contract; the audit contains no commodity, headline or country
  * exceptions.
  */
+import { deriveIncidentCountry } from "./shippingCountry";
+
 export interface FinalReportEvidenceRecord {
   id?: string | number | null;
   title: string;
@@ -24,6 +26,12 @@ export interface FinalReportEvidenceRecord {
       | "lagged-reference"
       | "undated-reference"
       | "none";
+    /** Fuel's canonical calculation only; omitted by every other adapter. */
+    direction?: "rising" | "falling" | "broadly stable" | "unchanged" | null;
+    currentValue?: number | null;
+    referenceValue?: number | null;
+    pctChange?: number | null;
+    unit?: string | null;
   };
 }
 
@@ -84,8 +92,13 @@ const CAUSAL_RE =
   /\b(caused?|led to|resulted in|drove|driven by|forced?|triggered?|due to|because of|as a result)\b/i;
 const BOILERPLATE_RE =
   /\b(shortages?|crack spreads?|rationing|rerout(?:e|ed|ing)|route pressure|export pressure|exports? (?:fell|rose|halted|tightened)|availability (?:fell|declined|tightened|worsened)|supply (?:pressure|tightness|shortfall)|cost pressure|higher costs?)\b/i;
+// Fuel prose frequently names the product between "higher" and "costs".
+// Keep that extra synthesis pattern Fuel-scoped so other report topics retain
+// their existing, narrower boilerplate contract.
+const FUEL_BOILERPLATE_RE =
+  /\b(shortages?|crack spreads?|rationing|rerout(?:e|ed|ing)|route pressure|export pressure|exports? (?:fell|rose|halted|tightened)|availability (?:fell|declined|tightened|worsened)|supply (?:pressure|tightness|shortfall)|(?:fuel|energy|oil|jet fuel)?\s*cost pressure|higher (?:fuel |energy |oil |jet fuel )?costs?)\b/i;
 const SPECULATIVE_RE =
-  /\b(could|may|might|potential|risk of|watch for|if\b|scenario|would)\b/i;
+  /\b(could|may|might|possible|potential|risk of|watch for|if\b|scenario|would)\b/i;
 const BACKEND_RE =
   /\b(model confidence|backend confidence|evidence confidence|confidence score|validation status|unresolved fields?|classifier confidence|model uncertainty|low-confidence evidence|fixed risk picture|current condition set|condition set|records indicate|on file|(?:the )?dataset shows)\b|\bconfidence (?:is|stays|remains) (?:low|moderate|high)\b[^.!?]{0,90}\b(?:unresolved|validation|location|event status|routing outcome)\b/i;
 /** Client-facing engine/file/table talk as a class — not a per-phrase product list. */
@@ -166,6 +179,311 @@ function unsupportedMatchedClaim(re: RegExp, text: string, corpus: string): stri
     const phrase = match[0].toLowerCase();
     const roots = words(phrase).map((w) => w.replace(/(?:ing|ed|es|s)$/, ""));
     if (!roots.some((root) => root.length >= 4 && corpus.includes(root))) return phrase;
+  }
+  return null;
+}
+
+function fuelWatchEntities(text: string): string[] {
+  const entities = new Set<string>();
+  // Keep country recognition aligned with shipping's country/demonym
+  // gazetteer instead of maintaining a smaller Fuel-only alias list. Looking
+  // at short word windows lets us retain every named country in a list such as
+  // "Pakistan, India and Indonesia". `deriveIncidentCountry` deliberately
+  // leaves bare "Korean" unresolved, so it cannot become both Koreas here.
+  const tokens = text.match(/[A-Za-zÀ-ÿ]+/g) ?? [];
+  for (let start = 0; start < tokens.length; start += 1) {
+    for (let size = 1; size <= 3 && start + size <= tokens.length; size += 1) {
+      const country = deriveIncidentCountry({
+        title: tokens.slice(start, start + size).join(" "),
+      });
+      if (country) {
+        entities.add(country.toLowerCase());
+      }
+    }
+  }
+  return [...entities];
+}
+
+function fuelRecordAnchorsEntity(
+  entity: string,
+  record: Pick<FinalReportEvidenceRecord, "title" | "summary" | "country" | "location">,
+): boolean {
+  const source = [record.title, record.summary ?? "", record.country ?? "", record.location ?? ""].join(" ");
+  if (fuelWatchEntities(source).includes(entity)) return true;
+  return false;
+}
+
+type FuelClaimFamily = "availability" | "cost" | "routing" | "exports" | "refinery" | "security" | "marine" | "aviation";
+
+function fuelClaimFamilies(text: string): FuelClaimFamily[] {
+  const families = new Set<FuelClaimFamily>();
+  if (/\b(shortages?|scarcity|rationing|queues?|sales limits?|allocation|availability|supply (?:pressure|tightness|shortfall|disrupt))/i.test(text)) {
+    families.add("availability");
+  }
+  if (/\b(costs?|prices?|pricing|benchmark|crude|brent|wti|freight|insurance)\b/i.test(text)) {
+    families.add("cost");
+  }
+  if (/\b(rerout(?:e|ed|ing)|divert(?:ed|ing)?|route|transit|delay|corridor)\b/i.test(text)) {
+    families.add("routing");
+  }
+  if (/\b(exports?|sales limits?|product flows?)\b/i.test(text)) {
+    families.add("exports");
+  }
+  if (/\b(refiner(?:y|ies)|refining|product output|operations?)\b/i.test(text)) {
+    families.add("refinery");
+  }
+  if (/\b(incident|attack|strike|disruption|security|threat|restriction|escalation|resolution|lead development)\b/i.test(text)) {
+    families.add("security");
+  }
+  if (/\b(port|bunker(?:ing)?|ship(?:ping)? fuel|marine fuel|vessel|tanker)\b/i.test(text)) {
+    families.add("marine");
+  }
+  if (/\b(jet fuel|aviation|airlines?)\b/i.test(text)) {
+    families.add("aviation");
+  }
+  return [...families];
+}
+
+function fuelRecordText(record: FinalReportEvidenceRecord): string {
+  return [
+    record.title,
+    record.summary ?? "",
+    record.country ?? "",
+    record.location ?? "",
+    ...(record.themes ?? []),
+    ...(record.supportedClaims ?? []),
+  ].join(" ");
+}
+
+function fuelRecordSupportsFamily(record: FinalReportEvidenceRecord, family: FuelClaimFamily): boolean {
+  return fuelClaimFamilies(fuelRecordText(record)).includes(family);
+}
+
+function fuelClaimContext(sentence: string, offset: number, length: number): string {
+  const boundary = /[;:]|\b(?:but|while|whereas|although|however)\b/gi;
+  let start = 0;
+  let end = sentence.length;
+  for (const match of sentence.matchAll(boundary)) {
+    const index = match.index ?? 0;
+    if (index < offset) start = index + match[0].length;
+    if (index >= offset + length) {
+      end = index;
+      break;
+    }
+  }
+  return sentence.slice(start, end);
+}
+
+function fuelClaimIsQualified(sentence: string, offset: number, length: number): boolean {
+  const local = fuelClaimContext(sentence, offset, length);
+  return SPECULATIVE_RE.test(local)
+    || /\b(?:no|not|never|without|neither|nor|did not|does not|do not|is not|are not|was not|were not|has not|have not)\b/i.test(local);
+}
+
+function fuelHasUnqualifiedCausalClaim(sentence: string): boolean {
+  const effects = new RegExp(EFFECT_RE.source, `${EFFECT_RE.flags.replace("g", "")}g`);
+  for (const match of sentence.matchAll(effects)) {
+    const offset = match.index ?? 0;
+    const local = fuelClaimContext(sentence, offset, match[0].length);
+    if (CAUSAL_RE.test(local) && !fuelClaimIsQualified(sentence, offset, match[0].length)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function fuelClaimGeographiesSupported(
+  sentence: string,
+  currentEvidence: FinalReportEvidenceRecord[],
+  family: FuelClaimFamily,
+): boolean {
+  const entities = fuelWatchEntities(sentence);
+  return entities.every((entity) =>
+    currentEvidence.some((record) =>
+      fuelRecordAnchorsEntity(entity, record) && fuelRecordSupportsFamily(record, family),
+    ),
+  );
+}
+
+function fuelBoilerplateGroundingDetail(
+  sentence: string,
+  currentEvidence: FinalReportEvidenceRecord[],
+): string | null {
+  const global = new RegExp(FUEL_BOILERPLATE_RE.source, `${FUEL_BOILERPLATE_RE.flags.replace("g", "")}g`);
+  for (const match of sentence.matchAll(global)) {
+    const claim = match[0];
+    const offset = match.index ?? 0;
+    if (fuelClaimIsQualified(sentence, offset, claim.length)) continue;
+    const local = fuelClaimContext(sentence, offset, claim.length);
+    const family = fuelClaimFamilies(claim)[0];
+    if (!family) continue;
+    const missing = fuelWatchEntities(local).filter((entity) =>
+      !currentEvidence.some((record) =>
+        fuelRecordAnchorsEntity(entity, record) && fuelRecordSupportsFamily(record, family),
+      ),
+    );
+    if (missing.length) {
+      const theme = /\bship fuel\b/i.test(local) && /\bshortages?\b/i.test(claim)
+        ? "ship-fuel shortage"
+        : family;
+      return `no selected current source for the ${theme} theme in ${missing.map(fuelEntityLabel).join(", ")}`;
+    }
+  }
+  return null;
+}
+
+function fuelMarketKey(record: FinalReportEvidenceRecord): "brent" | "wti" | "jet" | "crude" | null {
+  const indicator = record.marketComparison?.indicator ?? "";
+  if (/\bjet\b|\bkerosene\b/i.test(indicator)) return "jet";
+  if (/\bbrent\b/i.test(indicator)) return "brent";
+  if (/\bwti\b|west texas/i.test(indicator)) return "wti";
+  if (/\bcrude\b|\boil\b/i.test(indicator)) return "crude";
+  return null;
+}
+
+function fuelRequestedMarketKey(text: string): "brent" | "wti" | "jet" | "crude" | null {
+  return /\bjet fuel\b|\baviation\b|\bairlines?\b/i.test(text) ? "jet"
+    : /\bbrent\b/i.test(text) ? "brent"
+    : /\bwti\b|west texas/i.test(text) ? "wti"
+    : /\bcrude\b|\boil\b/i.test(text) ? "crude"
+    : null;
+}
+
+function fuelSourceSupportsClaim(
+  record: FinalReportEvidenceRecord,
+  family: FuelClaimFamily,
+  sentence: string,
+): boolean {
+  if (!fuelRecordSupportsFamily(record, family)) return false;
+  if (family !== "cost") return true;
+  const requested = fuelRequestedMarketKey(sentence);
+  return !requested || fuelMarketKey({
+    ...record,
+    marketComparison: { indicator: fuelRecordText(record), comparisonScope: "none" },
+  }) === requested;
+}
+
+function fuelMarketSupportsCostSynthesis(
+  claim: string,
+  sentence: string,
+  market: FinalReportEvidenceRecord[],
+  currentEvidence: FinalReportEvidenceRecord[],
+): boolean {
+  if (
+    !/\b(higher|rising|increased|increasing)\s+(?:fuel\s+|energy\s+|oil\s+|jet\s+fuel\s+)?(?:costs?|prices?)\b|\b(?:fuel\s+|energy\s+|oil\s+|jet\s+fuel\s+)?cost pressure\b/i.test(
+      claim,
+    )
+  ) {
+    return false;
+  }
+  if (
+    !/\b(?:fuel|oil|energy|brent|wti|jet)\b/i.test(sentence) ||
+    /\b(?:next|future|following)\s+(?:operating\s+)?(?:week|month|quarter)\b/i.test(sentence)
+  ) {
+    return false;
+  }
+  if (!fuelClaimGeographiesSupported(sentence, currentEvidence, "cost")) {
+    return false;
+  }
+  const rising = market.filter((record) => {
+    const comparison = record.marketComparison;
+    return currentEvidence.includes(record)
+      && comparison?.comparisonScope === "reporting-period"
+      && comparison.direction === "rising"
+      && comparison.currentValue != null
+      && comparison.referenceValue != null
+      && comparison.pctChange != null
+      && comparison.pctChange > 0;
+  });
+  const requested = fuelRequestedMarketKey(`${claim} ${sentence}`);
+  if (requested) {
+    return rising.some((record) => fuelMarketKey(record) === requested);
+  }
+  // "Fuel costs" without a named series is an analytical synthesis, not a
+  // licence to select the convenient rising series from mixed markets. It is
+  // grounded only where every available price basis points the same way.
+  const directional = market.filter((record) =>
+    currentEvidence.includes(record)
+    && record.marketComparison?.comparisonScope === "reporting-period"
+    && fuelMarketKey(record) !== null
+    && record.marketComparison?.direction != null,
+  );
+  return directional.length > 0
+    && directional.every((record) => rising.includes(record));
+}
+
+function fuelEntityLabel(entity: string): string {
+  return entity.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function fuelForwardGroundingFailure(
+  item: string,
+  currentEvidence: FinalReportEvidenceRecord[],
+): string | null {
+  const families = fuelClaimFamilies(item);
+  if (!families.length) return "no identifiable supported theme";
+  // The shared resolver intentionally does not assign "Korean" to either
+  // state. A forward item must name North or South Korea before it can make a
+  // country-specific claim.
+  if (/\bkorean\b/i.test(item) && !/\b(?:north|south)\s+korean\b/i.test(item)) {
+    return "Korean is ambiguous; name North or South Korea";
+  }
+  const entities = fuelWatchEntities(item);
+  const unsupportedEntities = entities.filter((entity) =>
+    !currentEvidence.some((record) =>
+      fuelRecordAnchorsEntity(entity, record)
+      && families.some((family) => fuelRecordSupportsFamily(record, family)),
+    ),
+  );
+  if (unsupportedEntities.length) {
+    return `no selected current ${families.join("/")} evidence for ${unsupportedEntities.map(fuelEntityLabel).join(", ")}`;
+  }
+  // Proper nouns not resolved by the shared country gazetteer (for example a
+  // refinery city) must still be present in a current source. This closes the
+  // "invented country/theme" hole without treating bare Korean as either
+  // Korean state.
+  const properTerms = [...item.matchAll(/\b[A-Z][a-z]{3,}\b/g)]
+    .map((match) => match[0].toLowerCase())
+    .filter((term) =>
+      !["monitor", "any", "new", "changes", "follow", "port", "further"].includes(term)
+      && !deriveIncidentCountry({ title: term }),
+    );
+  if (!properTerms.every((term) =>
+    currentEvidence.some((record) => new RegExp(`\\b${escapeRe(term)}\\b`, "i").test(fuelRecordText(record))),
+  )) {
+    const absent = properTerms.filter((term) =>
+      !currentEvidence.some((record) => new RegExp(`\\b${escapeRe(term)}\\b`, "i").test(fuelRecordText(record))),
+    );
+    return `no selected current evidence for ${absent.join(", ")}`;
+  }
+  if (!currentEvidence.some((record) =>
+    families.some((family) => fuelRecordSupportsFamily(record, family)),
+  )) {
+    return `no selected current ${families.join("/")} evidence`;
+  }
+  return null;
+}
+
+function fuelUnsupportedBoilerplateClaim(
+  sentence: string,
+  market: FinalReportEvidenceRecord[],
+  currentEvidence: FinalReportEvidenceRecord[],
+): string | null {
+  const global = new RegExp(FUEL_BOILERPLATE_RE.source, `${FUEL_BOILERPLATE_RE.flags.replace("g", "")}g`);
+  for (const match of sentence.matchAll(global)) {
+    const claim = match[0];
+    const offset = match.index ?? 0;
+    if (fuelClaimIsQualified(sentence, offset, claim.length)) continue;
+    const localClaim = fuelClaimContext(sentence, offset, claim.length);
+    const families = fuelClaimFamilies(claim);
+    const sourceEvidence = currentEvidence.filter((record) => !record.marketComparison);
+    const supportedBySource = families.some((family) =>
+      fuelClaimGeographiesSupported(localClaim, sourceEvidence, family)
+      && sourceEvidence.some((record) => fuelSourceSupportsClaim(record, family, sentence)),
+    );
+    if (!supportedBySource && !fuelMarketSupportsCostSynthesis(claim, localClaim, market, currentEvidence)) {
+      return claim;
+    }
   }
   return null;
 }
@@ -288,7 +606,10 @@ export function auditFinalReportEvidence(
         }
       }
 
-      if (EFFECT_RE.test(sentence) && CAUSAL_RE.test(sentence) && !SPECULATIVE_RE.test(sentence)) {
+      const causalClaimAsserted = input.topic === "fuel"
+        ? fuelHasUnqualifiedCausalClaim(sentence)
+        : EFFECT_RE.test(sentence) && CAUSAL_RE.test(sentence) && !SPECULATIVE_RE.test(sentence);
+      if (causalClaimAsserted) {
         const claimRefs = [
           ...currentEvidence.flatMap((record, index) => (record.supportedClaims ?? []).map((claim, claimIndex) => ({
             id: `claim-${record.id ?? index}-${claimIndex}`,
@@ -302,21 +623,34 @@ export function auditFinalReportEvidence(
           issues.push({ code: "UNSUPPORTED_CAUSAL_CLAIM", section, message: `Causal operating consequence is not supported by canonical evidence: "${sentence.trim().slice(0, 150)}"` });
         }
       }
+      const unsupportedBoilerplate = input.topic === "fuel"
+        ? fuelUnsupportedBoilerplateClaim(sentence, market, currentEvidence)
+        : unsupportedMatchedClaim(BOILERPLATE_RE, sentence, evidenceCorpus);
+      const boilerplateRe = input.topic === "fuel" ? FUEL_BOILERPLATE_RE : BOILERPLATE_RE;
       if (
         section.toLowerCase() !== "watchnext" &&
-        BOILERPLATE_RE.test(sentence) &&
-        !SPECULATIVE_RE.test(sentence) &&
-        unsupportedMatchedClaim(BOILERPLATE_RE, sentence, evidenceCorpus) !== null
+        boilerplateRe.test(sentence) &&
+        unsupportedBoilerplate !== null
       ) {
-        issues.push({ code: "UNSUPPORTED_BOILERPLATE", section, message: `Generic market/fuel consequence is not traceable to specific evidence: "${sentence.trim().slice(0, 150)}"` });
+        const fuelDetail = input.topic === "fuel"
+          ? fuelBoilerplateGroundingDetail(sentence, currentEvidence)
+          : null;
+        const detail = fuelDetail ? ` (${fuelDetail})` : "";
+        issues.push({ code: "UNSUPPORTED_BOILERPLATE", section, message: `Generic market/fuel consequence is not traceable to specific evidence${detail}: "${sentence.trim().slice(0, 150)}"` });
       }
     }
 
     if (section.toLowerCase() === "watchnext") {
       for (const item of text.split(/\n+|(?<=[.;!?])\s+/).filter((s) => words(s).length)) {
-        const explicitlyValidated = typedReferences.some((reference) => referenceGrounds(item, reference));
+        const fuelFailure = input.topic === "fuel"
+          ? fuelForwardGroundingFailure(item, currentEvidence)
+          : null;
+        const explicitlyValidated = input.topic === "fuel"
+          ? fuelFailure === null
+          : typedReferences.some((reference) => referenceGrounds(item, reference));
         if (!explicitlyValidated) {
-          issues.push({ code: "WATCH_NEXT_UNGROUNDED", section, message: `Watch item introduces a country or theme absent from evidence and validated indicators: "${item.trim().slice(0, 150)}"` });
+          const detail = fuelFailure ? ` (${fuelFailure})` : "";
+          issues.push({ code: "WATCH_NEXT_UNGROUNDED", section, message: `Watch item introduces a country or theme absent from evidence and validated indicators${detail}: "${item.trim().slice(0, 150)}"` });
         }
       }
     }

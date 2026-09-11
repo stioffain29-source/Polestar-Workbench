@@ -1,0 +1,161 @@
+STOP.
+
+The new Fuel Watch consistency gate is incorrectly blocking valid report export.
+
+Do NOT rewrite the Fuel Watch narrative to satisfy the current gate.
+
+The problem is in the validation logic.
+
+The current validator is treating raw or derived values such as:
+
+"Oil Surges Past $99 After Saudi Refinery Attack"
+"road fuel distribution"
+"upward"
+"a confirmed change in transit availability"
+
+as mandatory canonical judgement values and requiring them to appear in multiple final sections including:
+
+whatMatters
+polestarView
+implications
+watchNext
+
+This is incorrect.
+
+These values are not all analytical judgements.
+
+Some are:
+incident titles
+issue labels
+directional values
+derived status phrases
+
+They must NOT be required verbatim in every analytical section.
+
+
+FIX THE CONSISTENCY VALIDATOR
+
+1. Do not use exact string inclusion as the test for judgement consistency.
+
+2. Do not treat incident titles, category labels, directional words or derived status phrases as mandatory narrative text.
+
+3. Separate:
+
+SOURCE FACTS
+from
+DERIVED INDICATORS
+from
+ANALYTICAL JUDGEMENTS.
+
+Only genuine analytical judgements should be checked for consistency across final analytical sections.
+
+4. A section should pass consistency validation when it is semantically compatible with the canonical assessment.
+
+It does NOT need to repeat the same wording.
+
+Example:
+
+Canonical assessment:
+Fuel prices are rising and road fuel distribution faces increased disruption risk.
+
+Valid Polestar View:
+The principal operational pressure is higher fuel cost combined with increased uncertainty around road supply.
+
+This must PASS.
+
+Do not require literal repetition of:
+"upward"
+"road fuel distribution"
+or an incident headline.
+
+
+SECTION-SPECIFIC VALIDATION
+
+Do not require every canonical judgement to appear in every section.
+
+Different sections have different purposes.
+
+BLUF / Executive Summary:
+Must accurately represent the principal overall findings.
+
+What Matters:
+Must explain operational significance.
+
+Implications for Business:
+Must contain actions logically supported by the findings.
+
+Watch Next:
+Must contain forward indicators grounded in the evidence and assessment.
+
+Polestar View:
+Must remain consistent with the overall risk judgement.
+
+These sections should be mutually consistent, but they should NOT contain identical mandatory phrases.
+
+
+WATCH NEXT
+
+Keep grounding checks for Watch Next, but validate them against:
+
+selected incidents
+validated current-period evidence
+explicitly derived indicators
+
+Do not permit invented countries, themes or developments.
+
+However, a Watch Next item may be a reasonable forward indicator derived from confirmed evidence.
+
+It does not need to already have happened.
+
+Example:
+
+Confirmed current evidence:
+Repeated refinery strikes affecting Russian fuel supply.
+
+Valid Watch Next:
+Further refinery strikes affecting Russian fuel availability.
+
+This should PASS because it is a forward indicator directly derived from current evidence.
+
+
+UNSUPPORTED BOILERPLATE
+
+Keep the unsupported-boilerplate check, but do not reject analytical synthesis merely because the exact sentence does not exist in one source.
+
+The report is an intelligence assessment.
+
+Derived consequences are permitted when they are clearly supported by the selected evidence.
+
+Reject only genuinely unsupported claims.
+
+
+MOST IMPORTANT
+
+Do not modify Energy Watch or other report renderers while fixing this.
+
+This regression is in the shared consistency / export validation logic used by Fuel Watch.
+
+Identify the exact validator/function introduced or changed that caused this behaviour.
+
+Fix that validator.
+
+Do not weaken validation globally to the point that unsupported claims pass.
+
+The required outcome is:
+
+STRICT FACTUAL GROUNDING
++
+SEMANTIC JUDGEMENT CONSISTENCY
+
+NOT
+
+LITERAL STRING REPETITION.
+
+
+TEMPORARY SAFETY
+
+Until the corrected semantic validator is working, restore the previous Fuel Watch export behaviour rather than blocking exports on these false JUDGEMENT_CONSISTENCY failures.
+
+After fixing it, rerun this exact Fuel Watch report and show which validation failures remain.
+
+Do not change the report prose merely to make the errors disappear.

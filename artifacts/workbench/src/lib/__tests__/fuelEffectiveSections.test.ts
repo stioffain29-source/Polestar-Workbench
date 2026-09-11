@@ -13,14 +13,16 @@
  *   5. the prose-tolerant gate validates the FINAL effective text, so a
  *      contradictory analyst/AI claim blocks while ordinary prose passes.
  */
-import { buildFuelWatchReportData } from "../fuelWatchReport";
+import { buildFuelWatchReportData, finalizeFuelPublication } from "../fuelWatchReport";
 import {
   resolveFuelEffectiveSections,
   validateFuelReportConsistency,
+  validateFuelJudgementConsistency,
   assertFuelReportConsistent,
-  alignFuelProseToMarketFacts,
   validateFuelFinalEvidenceAudit,
 } from "../fuelReportConsistency";
+import { auditFinalReportEvidence } from "../finalReportEvidenceAudit";
+import type { FuelJudgement } from "../fuelCanonicalFacts";
 import type { TopicFastFactsIncident } from "../topicFastFacts";
 
 const ISSUE = "2026-08-05";
@@ -45,6 +47,13 @@ function buildData(incidents: TopicFastFactsIncident[] = [inc(), inc(), inc()]) 
     { issueDate: ISSUE, hardNumbers: { prices: [] } },
     incidents,
   );
+}
+
+function fullGeneratedProse(
+  data: ReturnType<typeof buildFuelWatchReportData>,
+  over: Partial<NonNullable<Parameters<typeof resolveFuelEffectiveSections>[0]["aiProse"]>> = {},
+) {
+  return { ...data.narrativeData.canonicalSections, ...over };
 }
 
 const PROSE_KEYS = [
@@ -242,6 +251,150 @@ describe("consistency gate over the FINAL effective text", () => {
   });
 });
 
+const RISING_ROAD_FUEL_JUDGEMENT: FuelJudgement = {
+  mainRisk: "Oil Surges Past $99 After Saudi Refinery Attack",
+  exposure: { geography: "Saudi Arabia", sector: "road fuel distribution" },
+  direction: "upward",
+  trigger: "a confirmed change in transit availability",
+  evidenceFamilyIds: ["lead-development"],
+};
+
+function fuelAudit(
+  sections: Record<string, string>,
+  marketDirection: "rising" | "falling" | null = "rising",
+  topic: "fuel" | "generic-topic" = "fuel",
+) {
+  return auditFinalReportEvidence({
+    topic,
+    issueDate: ISSUE,
+    window: { start: "2026-07-30", end: ISSUE },
+    evidence: [{
+      id: "refinery-strikes",
+      title: "Repeated refinery strikes affect Russian fuel supply",
+      summary: "Russian refinery strikes disrupted fuel supply.",
+      country: "Russia",
+      occurredAt: "2026-08-03",
+    }, {
+      id: "brent",
+      title: "Brent crude",
+      marketComparison: {
+        indicator: "Brent crude",
+        currentDate: ISSUE,
+        referenceDate: "2026-07-29",
+        comparisonScope: "reporting-period",
+        direction: marketDirection,
+        currentValue: 99,
+        referenceValue: 94,
+        pctChange: 5.3,
+        unit: "USD/bbl",
+      },
+    }],
+    sections,
+    validatedForwardIndicators: [],
+    typedReferences: [{
+      id: "refinery-strikes",
+      type: "development",
+      text: "Repeated refinery strikes affect Russian fuel supply",
+      evidenceId: "refinery-strikes",
+    }],
+  });
+}
+
+describe("Fuel semantic judgement and evidence regressions", () => {
+  it("accepts a valid paraphrase without source-title, label, direction or trigger repetition", () => {
+    const facts = risingJetData().reportFacts;
+    expect(validateFuelJudgementConsistency(RISING_ROAD_FUEL_JUDGEMENT, {
+      whatMatters: "The principal operational pressure is higher fuel cost combined with increased uncertainty around road supply.",
+      polestarView: "Maintain fuel contingency options while distribution conditions remain exposed.",
+      implications: "Review delivery resilience.",
+      watchNext: "Monitor further changes in transit conditions.",
+    }, facts)).toEqual([]);
+  });
+
+  it("rejects only unqualified reversals and permits conditional future alternatives", () => {
+    const facts = risingJetData().reportFacts;
+    const inverted = validateFuelJudgementConsistency(RISING_ROAD_FUEL_JUDGEMENT, {
+      whatMatters: "Jet fuel costs are lower and reliable road fuel supply is now established.",
+    }, facts);
+    expect(inverted.some((issue) => issue.code === "JUDGEMENT_CONSISTENCY")).toBe(true);
+    expect(validateFuelJudgementConsistency(RISING_ROAD_FUEL_JUDGEMENT, {
+      whatMatters: "Fuel costs could fall if transit availability normalises.",
+      watchNext: "Road fuel supply may become reliable if the route reopens.",
+    }, facts)).toEqual([]);
+  });
+
+  it("requires an explicit current shortage, matching geography and product before rejecting reliable supply", () => {
+    const attackOnly = risingJetData().reportFacts;
+    expect(validateFuelJudgementConsistency(RISING_ROAD_FUEL_JUDGEMENT, {
+      whatMatters: "Road fuel supply in Pakistan is reliable.",
+    }, attackOnly)).toEqual([]);
+
+    const shortageData = buildData([inc({
+      country: "Pakistan",
+      summary: "A diesel shortage is active at Pakistan forecourts.",
+    })]);
+    expect(validateFuelJudgementConsistency(RISING_ROAD_FUEL_JUDGEMENT, {
+      whatMatters: "Diesel supply is reliable in Pakistan.",
+    }, shortageData.reportFacts).map((issue) => issue.code)).toContain(
+      "JUDGEMENT_CONSISTENCY",
+    );
+  });
+
+  it("permits a higher-cost synthesis grounded in a current calculated market movement", () => {
+    expect(fuelAudit({
+      whatMatters: "Higher fuel costs are increasing operating pressure.",
+    }).map((issue) => issue.code)).not.toContain("UNSUPPORTED_BOILERPLATE");
+    expect(fuelAudit({
+      whatMatters: "Higher fuel costs are increasing operating pressure.",
+    }, "rising", "generic-topic").map((issue) => issue.code)).not.toContain("UNSUPPORTED_BOILERPLATE");
+    expect(fuelAudit({
+      whatMatters: "Higher fuel costs are increasing operating pressure and shortages are worsening.",
+    }).map((issue) => issue.code)).toContain("UNSUPPORTED_BOILERPLATE");
+  });
+
+  it("allows a fuel-specific future watch anchored to one confirmed entity and rejects an invented country", () => {
+    expect(fuelAudit({
+      watchNext: "Monitor further refinery strikes affecting Russian fuel availability.",
+    }).map((issue) => issue.code)).not.toContain("WATCH_NEXT_UNGROUNDED");
+    expect(fuelAudit({
+      watchNext: "Monitor further refinery strikes affecting Iranian fuel availability.",
+    }).map((issue) => issue.code)).toContain("WATCH_NEXT_UNGROUNDED");
+  });
+
+  it("retains numeric and direction failures in the existing report-facts gate", () => {
+    const data = risingJetData();
+    const codes = validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Jet fuel prices fell 99% this week.",
+    }).map((issue) => issue.code);
+    expect(codes).toContain("MARKET_DIRECTION");
+    expect(codes).toContain("COUNT_TRACEABLE");
+  });
+
+  it("treats direction modality and negation per claim, not per sentence", () => {
+    const data = risingJetData();
+    expect(validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Jet fuel prices may fall if demand weakens.",
+    }).map((issue) => issue.code)).not.toContain("MARKET_DIRECTION");
+    expect(validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Jet fuel prices did not fall this week.",
+    }).map((issue) => issue.code)).not.toContain("MARKET_DIRECTION");
+    expect(validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Jet fuel prices fell this week, but may rise later.",
+    }).map((issue) => issue.code)).toContain("MARKET_DIRECTION");
+    const clauseIssues = validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Brent prices rose while jet fuel prices fell.",
+    });
+    expect(clauseIssues.filter((issue) => issue.code === "MARKET_DIRECTION")).toHaveLength(1);
+    expect(clauseIssues[0]?.message).toMatch(/JET/);
+    expect(validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Fuel shortages are active, although jet fuel prices could fall.",
+    }).map((issue) => issue.code)).toContain("CURRENT_CONDITION");
+    expect(validateFuelReportConsistency(data.reportFacts, {
+      whatMatters: "Fuel shortages are active if the depot closes.",
+    }).map((issue) => issue.code)).not.toContain("CURRENT_CONDITION");
+  });
+});
+
 const JET_EASING_HEADLINE =
   "The same window also carried repeated reporting on a stand-off over airline pricing as jet fuel costs eased, while Pakistan saw diesel price rises.";
 
@@ -269,8 +422,8 @@ function risingJetData() {
   );
 }
 
-describe("AI jet-direction headlines are aligned to the calculated series", () => {
-  it("rewrites 'jet fuel costs eased' when the jet series is rising", () => {
+describe("AI jet-direction headlines retain the original report text", () => {
+  it("flags 'jet fuel costs eased' when the jet series is rising", () => {
     const data = risingJetData();
     const jet = data.reportFacts.market.indicators.find((m) => m.key === "jet");
     expect(jet?.direction).toBe("rising");
@@ -280,52 +433,130 @@ describe("AI jet-direction headlines are aligned to the calculated series", () =
       ),
     ).toBe(true);
 
-    const aligned = alignFuelProseToMarketFacts(JET_EASING_HEADLINE, data.reportFacts);
-    expect(aligned).toMatch(/jet fuel costs climbed/i);
-    expect(aligned).not.toMatch(/\beased\b/i);
-    expect(
-      validateFuelReportConsistency(data.reportFacts, { whatHappened: aligned }).filter(
-        (i) => i.code === "MARKET_DIRECTION",
-      ),
-    ).toHaveLength(0);
   });
 
-  it("aligns AI whatHappened (and the editor prefill copy of it) so the gate stays green", () => {
+  it("keeps contradictory AI whatHappened visible for the gate", () => {
     const data = risingJetData();
     const fromAi = resolveFuelEffectiveSections({
       report: {},
-      aiProse: { whatHappened: JET_EASING_HEADLINE },
+      aiProse: fullGeneratedProse(data, { whatHappened: JET_EASING_HEADLINE }),
       fuelData: data,
     });
-    expect(fromAi.whatHappened).toMatch(/jet fuel costs climbed/i);
-    expect(validateFuelReportConsistency(data.reportFacts, fromAi).filter((i) => i.code === "MARKET_DIRECTION")).toHaveLength(0);
+    expect(fromAi.whatHappened).toBe(JET_EASING_HEADLINE);
+    expect(validateFuelReportConsistency(data.reportFacts, fromAi).some((i) => i.code === "MARKET_DIRECTION")).toBe(true);
 
-    // Fuel Watch prefill copies the AI text into the editor box; that must
-    // still be treated as AI, not as a genuine analyst override.
     const fromPrefill = resolveFuelEffectiveSections({
       report: { whatHappened: JET_EASING_HEADLINE },
-      aiProse: { whatHappened: JET_EASING_HEADLINE },
+      aiProse: fullGeneratedProse(data, { whatHappened: JET_EASING_HEADLINE }),
       fuelData: data,
     });
-    expect(fromPrefill.whatHappened).toBe(fromAi.whatHappened);
-    expect(
-      validateFuelReportConsistency(data.reportFacts, fromPrefill).filter(
-        (i) => i.code === "MARKET_DIRECTION",
-      ),
-    ).toHaveLength(0);
+    expect(fromPrefill.whatHappened).toBe(JET_EASING_HEADLINE);
+    expect(validateFuelReportConsistency(data.reportFacts, fromPrefill).some((i) => i.code === "MARKET_DIRECTION")).toBe(true);
   });
 
   it("a genuine analyst override that contradicts jet direction still fail-closes", () => {
     const data = risingJetData();
     const eff = resolveFuelEffectiveSections({
       report: { whatHappened: JET_EASING_HEADLINE },
-      aiProse: { whatHappened: "Airline pricing talks continued without a market-direction claim." },
+      aiProse: fullGeneratedProse(data, {
+        whatHappened: "Airline pricing talks continued without a market-direction claim.",
+      }),
       fuelData: data,
     });
     expect(eff.whatHappened).toBe(JET_EASING_HEADLINE);
     expect(
       validateFuelReportConsistency(data.reportFacts, eff).some((i) => i.code === "MARKET_DIRECTION"),
     ).toBe(true);
+  });
+
+  it("atomically rejects a full cached/generated payload that omits the canonical Fuel judgement", () => {
+    // This is the production failure mode from report 23: a real, non-null
+    // seven-section AI response was loaded, but its generic prose dropped the
+    // lead development, road-fuel exposure, upward trajectory and transit
+    // trigger. It also asserted ungrounded shortages and an unrelated watch.
+    const report = {
+      issueDate: ISSUE,
+      hardNumbers: {
+        prices: [
+          { label: "Brent crude", value: 99.4, unit: "USD/bbl", change: "+5.0% 7d", asOf: ISSUE },
+          { label: "WTI crude", value: 96.1, unit: "USD/bbl", change: "+4.0% 7d", asOf: ISSUE },
+          { label: "Jet fuel", value: 2.3, unit: "USD/gal", change: "+3.0% 7d", asOf: ISSUE },
+        ],
+        jetFuelTrajectory: {
+          benchmark: "US Gulf Coast kerosene-type",
+          unit: "USD/gal",
+          points: [
+            { date: "2026-08-01", value: 2.1 },
+            { date: ISSUE, value: 2.3 },
+          ],
+        },
+      },
+    };
+    const incidents = [inc({
+      title: "Oil Surges Past $99 After Saudi Refinery Attack",
+      summary: "The Saudi refinery attack disrupted a fuel depot and road fuel distribution, with transit availability through the Strait of Hormuz affected.",
+      country: "Saudi Arabia",
+      location: "Strait of Hormuz",
+      severity: "high",
+    })];
+    const data = buildFuelWatchReportData(report, incidents);
+    expect(data.canonicalFacts.judgement).toMatchObject({
+      mainRisk: "Oil Surges Past $99 After Saudi Refinery Attack",
+      exposure: { sector: "road fuel distribution" },
+      direction: "upward",
+      trigger: "a confirmed change in transit availability",
+    });
+    const invalidGenerated = fullGeneratedProse(data, {
+      executiveSummary: "Fuel shortages are worsening across the region.",
+      situation: "The operating picture remains uncertain.",
+      whatHappened: "Refinery disruption is creating a difficult operating environment.",
+      whatMatters: "Generic cost pressure is now affecting the market.",
+      implications: "Review contingency plans.",
+      watchNext: "Monitor unrelated electricity pricing in Jakarta.",
+      polestarView: "Maintain a cautious posture while conditions evolve.",
+    });
+
+    const finalised = finalizeFuelPublication({
+      report,
+      incidents,
+      aiProse: invalidGenerated,
+    });
+    expect(finalised.effectiveSections.whatMatters).toBe(
+      "Generic cost pressure is now affecting the market.",
+    );
+    expect(finalised.auditIssues.consistency.some(
+      (issue) => issue.code === "CURRENT_CONDITION",
+    )).toBe(true);
+    expect(finalised.auditIssues.evidence.some((issue) => issue.code === "WATCH_NEXT_UNGROUNDED")).toBe(true);
+  });
+
+  it("keeps an invalid direct analyst edit visible and publication-blocking", () => {
+    const data = risingJetData();
+    const finalised = finalizeFuelPublication({
+      report: {
+        issueDate: ISSUE,
+        hardNumbers: {
+          prices: [
+            { label: "Brent crude", value: 80, unit: "USD/bbl", change: "+1.2%", asOf: ISSUE },
+            { label: "WTI crude", value: 76, unit: "USD/bbl", change: "+0.9%", asOf: ISSUE },
+            { label: "Jet fuel", value: 2.2, unit: "USD/gal", change: "+10.0%", asOf: ISSUE },
+          ],
+          jetFuelTrajectory: {
+            benchmark: "US Gulf Coast kerosene-type",
+            unit: "USD/gal",
+            points: [
+              { date: "2026-08-01", value: 2.0 },
+              { date: "2026-08-04", value: 2.2 },
+            ],
+          },
+        },
+        whatHappened: JET_EASING_HEADLINE,
+      },
+      incidents: [inc(), inc(), inc()],
+      aiProse: fullGeneratedProse(data),
+    });
+    expect(finalised.effectiveSections.whatHappened).toBe(JET_EASING_HEADLINE);
+    expect(finalised.auditIssues.consistency.some((issue) => issue.code === "MARKET_DIRECTION")).toBe(true);
   });
 });
 
@@ -364,17 +595,18 @@ describe("flagged automatic-claim regressions", () => {
     );
     const effective = resolveFuelEffectiveSections({
       report: {},
-      aiProse: {
+      aiProse: fullGeneratedProse(data, {
         whatHappened:
           "Air India warns jet fuel costs eased while reviewing operating costs.",
-      },
+      }),
       fuelData: data,
     });
 
-    expect(effective.whatHappened).toMatch(/jet fuel costs climbed/i);
-    expect(effective.whatHappened).not.toMatch(/\beased\b/i);
+    expect(effective.whatHappened).toMatch(/jet fuel costs eased/i);
     expect(effective.marketRead).toMatch(/jet fuel series is rising/i);
-    expect(validateFuelReportConsistency(data.reportFacts, effective)).toEqual([]);
+    expect(validateFuelReportConsistency(data.reportFacts, effective).some(
+      (issue) => issue.code === "MARKET_DIRECTION",
+    )).toBe(true);
   });
 
   it("does not restore fixed sustained-pressure or next-operating-month wording", () => {

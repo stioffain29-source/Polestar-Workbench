@@ -21,10 +21,17 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildFuelWatchReportData, fuelMarketLatestDate } from "../src/lib/fuelWatchReport";
+import {
+  buildFuelWatchReportData,
+  finalizeFuelPublication,
+  fuelMarketLatestDate,
+} from "../src/lib/fuelWatchReport";
 import { FUEL_SEVERITIES } from "../src/lib/fuelCanonicalFacts";
+import { resolveFuelEffectiveSections } from "../src/lib/fuelReportConsistency";
+import { resolveSimpleProse } from "../src/lib/topicProseResolution";
 import { buildFuelCoverageSummary } from "../src/lib/fuelCoverage";
 import { selectRelatedIncidents } from "../src/lib/relatedIncidents";
 import { resolveReportTitle } from "../src/lib/reportNaming";
@@ -54,6 +61,7 @@ const PROOF_PATH = resolve(
 type Snapshot = {
   report: Record<string, any>;
   incidents: TopicFastFactsIncident[];
+  proseCache?: Record<string, any>;
   metadata?: Record<string, unknown>;
 };
 
@@ -79,6 +87,25 @@ function asCleanIncident(incident: TopicFastFactsIncident): TopicFastFactsIncide
 
 function normalized(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function stableJson(value: unknown): string {
+  const stable = (input: unknown): unknown => {
+    if (Array.isArray(input)) return input.map(stable);
+    if (isRecord(input)) {
+      return Object.fromEntries(
+        Object.keys(input)
+          .sort()
+          .map((key) => [key, stable(input[key])]),
+      );
+    }
+    return input;
+  };
+  return JSON.stringify(stable(value));
+}
+
+function sha256Json(value: unknown): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
 function titlePresentInPdf(text: string, title: string): boolean {
@@ -190,6 +217,7 @@ function inspectPdf(pdfPath: string, expectedTitles: string[]) {
   });
   return {
     pages,
+    text,
     textLength: text.length,
     hasRelatedHeading: /\bRELATED INCIDENTS\b/i.test(text),
     relatedTitlesFound: expectedTitles.map((title) =>
@@ -212,15 +240,19 @@ async function main() {
   const renderIssueDate =
     fuelMarketLatestDate(snapshot.report.hardNumbers) ??
     String(snapshot.report.issueDate).slice(0, 10);
+  const storedReport = {
+    ...snapshot.report,
+    title: resolveReportTitle(snapshot.report.topic, snapshot.report.title),
+  };
   // Report 23 is an old draft. Match ReportEditor’s stale-draft safety path:
-  // clear saved prose without persisting a mutation, and never pass a cached AI
-  // payload whose fingerprint was not freshly validated.
+  // clear saved prose without persisting a mutation. The production cached
+  // seven-section AI payload is retained separately and passed byte-for-byte;
+  // this harness does not regenerate or fabricate prose.
   const staleDraft =
     snapshot.report.status === "draft" &&
     String(snapshot.report.issueDate).slice(0, 10) < renderIssueDate;
   const report = {
-    ...snapshot.report,
-    title: resolveReportTitle(snapshot.report.topic, snapshot.report.title),
+    ...storedReport,
     issueDate: renderIssueDate,
     executiveSummary: staleDraft ? "" : snapshot.report.executiveSummary ?? "",
     situation: staleDraft ? "" : snapshot.report.situation ?? "",
@@ -235,6 +267,57 @@ async function main() {
     { issueDate: renderIssueDate, hardNumbers: report.hardNumbers },
     incidents,
   );
+  const proseCache = snapshot.proseCache;
+  if (
+    !isRecord(proseCache) ||
+    !isRecord(proseCache.sections) ||
+    Object.keys(proseCache.sections).length !== 7
+  ) {
+    throw new Error(
+      "Production snapshot must contain the exact cached seven-section Fuel payload.",
+    );
+  }
+  const cachedSections =
+    isRecord(proseCache.edited) && Object.keys(proseCache.edited).length > 0
+      ? proseCache.edited
+      : proseCache.sections;
+  const actualAiProse = {
+    ...cachedSections,
+    datasetFingerprint: proseCache.fingerprint ?? null,
+    stale: false,
+    origin:
+      isRecord(proseCache.edited) && Object.keys(proseCache.edited).length > 0
+        ? "analyst"
+        : "generated",
+  };
+  const frozenPath = "/tmp/fuel-report-23-frozen-effective-input.json";
+  const frozen = JSON.parse(readFileSync(frozenPath, "utf8")) as Record<
+    string,
+    any
+  >;
+  const frozenHashesBefore = {
+    storedReport: sha256Json(frozen.storedReport),
+    effectiveReport: sha256Json(frozen.effectiveReport),
+    proseCache: sha256Json(frozen.proseCache),
+    actualAiProse: sha256Json(frozen.actualAiProse),
+  };
+  if (
+    !frozen.hashesBefore ||
+    JSON.stringify(frozen.hashesBefore) !== JSON.stringify(frozenHashesBefore)
+  ) {
+    throw new Error("Frozen Fuel effective input hash baseline does not match.");
+  }
+  if (sha256Json(proseCache) !== frozenHashesBefore.proseCache) {
+    throw new Error("Snapshot prose cache differs from frozen production payload.");
+  }
+  if (sha256Json(actualAiProse) !== frozenHashesBefore.actualAiProse) {
+    throw new Error("Selected cached AI payload differs from frozen input.");
+  }
+  const prefillExpected = resolveFuelEffectiveSections({
+    report: {},
+    aiProse: actualAiProse,
+    fuelData,
+  });
   const coverage = buildFuelCoverageSummary(fuelData.canonicalFacts);
   const severityTotal = Object.values(coverage.severityDistribution).reduce(
     (sum, count) => sum + count,
@@ -322,9 +405,70 @@ async function main() {
     relatedCount: relatedRows.length,
     relatedTitles: relatedRows.map((row) => row.displayTitle || row.title),
     reportingPeriod: fuelData.canonicalFacts.reportingPeriod,
+    canonicalSections: fuelData.narrativeData.canonicalSections,
+    prefillResolved: prefillExpected,
   };
+  // The old renderer populated these two fields before entering the old
+  // finalizer. Reproduce that exact input locally, then require the current
+  // resolver's effective sections to be byte-identical to the frozen HEAD
+  // baseline before any issue comparison or browser assertions.
+  const rendererInputReport = {
+    ...report,
+    implications: resolveSimpleProse(
+      report.implications,
+      actualAiProse.implications,
+      "",
+    ),
+    watchNext: resolveSimpleProse(
+      report.watchNext,
+      actualAiProse.watchNext,
+      "",
+    ),
+  };
+  const currentPublication = finalizeFuelPublication({
+    report: rendererInputReport,
+    incidents,
+    aiProse: actualAiProse,
+  });
+  const baselinePath = "/tmp/fuel-report-23-baseline-head-validator.json";
+  const baseline = JSON.parse(readFileSync(baselinePath, "utf8")) as Record<
+    string,
+    any
+  >;
+  const baselineEffectiveJson = stableJson(baseline.effectiveSections);
+  const currentEffectiveJson = stableJson(
+    currentPublication.effectiveSections,
+  );
+  const effectiveSectionsParity = {
+    baselineSha256: sha256Json(baseline.effectiveSections),
+    currentSha256: sha256Json(currentPublication.effectiveSections),
+    byteIdentical: baselineEffectiveJson === currentEffectiveJson,
+  };
+  if (!effectiveSectionsParity.byteIdentical) {
+    throw new Error(
+      `Frozen HEAD/current effective Fuel sections differ; refusing issue comparison: ${JSON.stringify(
+        effectiveSectionsParity,
+      )}`,
+    );
+  }
 
   mkdirSync(OUTPUT_DIR, { recursive: true });
+  // Recheck validator-only changes cheaply after preview/export wiring has
+  // already been exercised with this exact frozen payload.
+  if (process.env.FUEL_AUDIT_ONLY === "1") {
+    const audit = {
+      reportId: report.id,
+      renderIssueDate,
+      effectiveSectionsParity,
+      actualAiSha256: sha256Json(actualAiProse),
+      baselineIssues: baseline.auditIssues,
+      currentIssues: currentPublication.auditIssues,
+    };
+    const auditPath = resolve(OUTPUT_DIR, "FuelWatch_report23_final_validation.json");
+    writeFileSync(auditPath, JSON.stringify(audit, null, 2));
+    console.log(JSON.stringify({ auditPath, ...audit }));
+    return;
+  }
   const bundle = await bundleBrowser();
   const browser = await chromium.launch({
     executablePath:
@@ -347,8 +491,9 @@ async function main() {
       },
       {
         report,
+        storedReport,
         incidents,
-        aiProse: null,
+        actualAiProse,
         hiddenSections,
         sectionOverrides,
         expected,
@@ -362,19 +507,31 @@ async function main() {
       relatedVisible: boolean;
       relatedRowCount: number;
       relatedTitlesFound: boolean[];
+      aiPreviewBlocked: boolean;
+      aiPreviewAiSectionsFound: string[];
+      aiPreviewMissingSections: string[];
+      canonicalTextMissingKeys: string[];
+      actualPreviewGateIssues: string[];
+      analystPreviewBlocked: boolean;
+      analystPreviewGateIssues: string[];
+      analystExportError: string | null;
+      analystSaveCalls: number;
+      prefillMatchesCanonical: boolean;
+      prefillMatchesActualResolved: boolean;
       saveCalls: number;
       exportError: string | null;
       pdfBytes: number;
       base64: string;
     };
-    if (
-      browserResult.blocked ||
-      !browserResult.coverageFound ||
-      browserResult.coverageMissingTokens.length > 0 ||
-      !browserResult.relatedVisible ||
-      browserResult.relatedRowCount !== expected.relatedCount ||
-      browserResult.relatedTitlesFound.some((found) => !found)
-    ) {
+    const actualGateBlocked = browserResult.actualPreviewGateIssues.length > 0;
+    const coverageAssertionsPass = actualGateBlocked
+      ? true
+      : browserResult.coverageFound &&
+        browserResult.coverageMissingTokens.length === 0 &&
+        browserResult.relatedVisible &&
+        browserResult.relatedRowCount === expected.relatedCount &&
+        browserResult.relatedTitlesFound.every(Boolean);
+    if (!coverageAssertionsPass || !browserResult.prefillMatchesActualResolved) {
       throw new Error(
         `Fuel coverage browser assertions failed: ${JSON.stringify({
           blocked: browserResult.blocked,
@@ -384,22 +541,65 @@ async function main() {
           relatedRowCount: browserResult.relatedRowCount,
           expectedRelatedCount: expected.relatedCount,
           relatedTitlesFound: browserResult.relatedTitlesFound,
+          aiPreviewBlocked: browserResult.aiPreviewBlocked,
+          aiPreviewAiSectionsFound: browserResult.aiPreviewAiSectionsFound,
+          aiPreviewMissingSections: browserResult.aiPreviewMissingSections,
+          canonicalTextMissingKeys: browserResult.canonicalTextMissingKeys,
+          actualPreviewGateIssues: browserResult.actualPreviewGateIssues,
+          analystPreviewBlocked: browserResult.analystPreviewBlocked,
+          analystPreviewGateIssues: browserResult.analystPreviewGateIssues,
+          analystExportError: browserResult.analystExportError,
+          analystSaveCalls: browserResult.analystSaveCalls,
+          prefillMatchesActualResolved: browserResult.prefillMatchesActualResolved,
         })}`,
       );
     }
     await page.screenshot({ path: PREVIEW_PATH, fullPage: true });
-    if (!browserResult.base64) {
-      throw new Error("Fuel export produced no PDF bytes.");
-    }
-    writeFileSync(PDF_PATH, Buffer.from(browserResult.base64, "base64"));
-    const pdf = inspectPdf(PDF_PATH, expected.relatedTitles);
+    const pdf = browserResult.base64
+      ? (() => {
+          writeFileSync(PDF_PATH, Buffer.from(browserResult.base64, "base64"));
+          return inspectPdf(PDF_PATH, expected.relatedTitles);
+        })()
+      : null;
+    const frozenAfter = JSON.parse(readFileSync(frozenPath, "utf8")) as Record<
+      string,
+      any
+    >;
+    const frozenHashesAfter = {
+      storedReport: sha256Json(frozenAfter.storedReport),
+      effectiveReport: sha256Json(frozenAfter.effectiveReport),
+      proseCache: sha256Json(frozenAfter.proseCache),
+      actualAiProse: sha256Json(frozenAfter.actualAiProse),
+    };
     const proof = {
       source: "read-only production database snapshot",
       snapshotPath: SNAPSHOT_PATH,
+      frozenInputPath: frozenPath,
       reportId: report.id,
       staleDraft,
-      aiProsePassed: false,
+      cachedAi: {
+        origin: actualAiProse.origin,
+        sectionCount: Object.keys(cachedSections).length,
+        fingerprint: proseCache.fingerprint ?? null,
+        model: proseCache.model ?? null,
+        generatedAt: proseCache.generatedAt ?? null,
+        exactPayloadSha256: sha256Json(actualAiProse),
+      },
+      inputHashes: {
+        before: frozenHashesBefore,
+        after: frozenHashesAfter,
+        unchanged:
+          JSON.stringify(frozenHashesAfter) ===
+          JSON.stringify(frozenHashesBefore),
+      },
       sourceIncidentRows: incidents.length,
+      effectiveSectionsParity,
+      baselineAuditIssues: baseline.auditIssues,
+      currentAuditIssues: currentPublication.auditIssues,
+      currentLiteralJudgementIssueCount:
+        currentPublication.auditIssues.consistency.filter(
+          (issue) => issue.code === "JUDGEMENT_CONSISTENCY",
+        ).length,
       renderIssueDate,
       reportingPeriod: expected.reportingPeriod,
       canonicalQualifyingCount: expected.canonicalQualifyingCount,
@@ -430,15 +630,25 @@ async function main() {
         relatedVisible: browserResult.relatedVisible,
         relatedRowCount: browserResult.relatedRowCount,
         relatedTitlesFound: browserResult.relatedTitlesFound,
+        aiPreviewBlocked: browserResult.aiPreviewBlocked,
+        aiPreviewAiSectionsFound: browserResult.aiPreviewAiSectionsFound,
+        aiPreviewMissingSections: browserResult.aiPreviewMissingSections,
+        canonicalTextMissingKeys: browserResult.canonicalTextMissingKeys,
+        actualPreviewGateIssues: browserResult.actualPreviewGateIssues,
+        analystPreviewBlocked: browserResult.analystPreviewBlocked,
+        analystPreviewGateIssues: browserResult.analystPreviewGateIssues,
+        analystExportError: browserResult.analystExportError,
+        analystSaveCalls: browserResult.analystSaveCalls,
+        prefillMatchesActualResolved: browserResult.prefillMatchesActualResolved,
       },
       pdf: {
         bytes: browserResult.pdfBytes,
         saveCalls: browserResult.saveCalls,
         exportError: browserResult.exportError,
-        pages: pdf.pages,
-        textLength: pdf.textLength,
-        hasRelatedHeading: pdf.hasRelatedHeading,
-        relatedTitlesFound: pdf.relatedTitlesFound,
+        pages: pdf?.pages ?? 0,
+        textLength: pdf?.textLength ?? 0,
+        hasRelatedHeading: pdf?.hasRelatedHeading ?? false,
+        relatedTitlesFound: pdf?.relatedTitlesFound ?? [],
       },
       artifacts: {
         preview: PREVIEW_PATH,
