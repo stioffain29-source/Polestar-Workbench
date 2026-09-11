@@ -24,6 +24,7 @@ import {
 } from "@/lib/topicProseResolution";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
+import { segmentEnergySituationProse } from "@/lib/energySituationLayout";
 import {
   buildCargoSecurityRead,
   buildCargoWhatHappened,
@@ -48,6 +49,8 @@ import {
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportSection } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
+import EnergySituationVisual from "@/components/EnergySituationVisual";
+import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
 import { buildCargoCountryIntensity } from "@/lib/cargoReportChoropleth";
@@ -633,6 +636,351 @@ function RelatedIncidentsTable({ rows, summaries }: { rows: TopicFastFactsIncide
   );
 }
 
+type ReportSectionGate = (key: string) => boolean;
+
+function EnergySituationProse({ text }: { text?: string | null }) {
+  const segments = segmentEnergySituationProse(text);
+  if (segments.length === 0) return null;
+
+  return (
+    <div>
+      {segments.map((segment, index) => (
+        <div
+          key={index}
+          data-energy-situation-segment={segment.kind}
+          style={{ breakInside: "avoid", marginBottom: 10 }}
+        >
+          {segment.heading && (
+            <h3
+              className="uppercase tracking-wide"
+              style={{
+                color: NAVY,
+                fontFamily: "Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: 13,
+                marginBottom: 8,
+              }}
+            >
+              {segment.kind === "standalone-label" ? segment.text : segment.heading}
+            </h3>
+          )}
+          {segment.kind === "paragraph" && <Paragraphs text={segment.text} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EnergyReportFooter() {
+  return (
+    <div
+      className="pdf-preview-footer px-10 flex items-center justify-between"
+      style={{
+        background: POLAR,
+        color: DUSK,
+        fontFamily: "Roboto, sans-serif",
+        fontSize: 11,
+        minHeight: 36,
+        WebkitPrintColorAdjust: "exact",
+        printColorAdjust: "exact",
+      }}
+    >
+      <span>polestar-advisory.com</span>
+      <span>info@polestar-advisory.com</span>
+      <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
+    </div>
+  );
+}
+
+function EnergyReportPages({
+  resolvedTitle,
+  periodLabel,
+  coverUrl,
+  fastFacts,
+  execText,
+  situationText,
+  whatHappenedText,
+  whatMattersText,
+  implicationsText,
+  watchNextText,
+  polestarViewText,
+  energyIntensity,
+  marketPrices,
+  relatedRows,
+  incidentSummaries,
+  show,
+  ffOverrides,
+  sectionOverrides,
+}: {
+  resolvedTitle: string;
+  periodLabel: string;
+  coverUrl?: string;
+  fastFacts: KpiPreviewCard[];
+  execText: string;
+  situationText: string;
+  whatHappenedText: string;
+  whatMattersText: string;
+  implicationsText: string;
+  watchNextText: string;
+  polestarViewText: string;
+  energyIntensity: Map<string, number>;
+  marketPrices?: MarketPrice[];
+  relatedRows: TopicFastFactsIncident[];
+  incidentSummaries: Record<string, string>;
+  show: ReportSectionGate;
+  ffOverrides?: TopicSectionOverrides["fastFactOverrides"];
+  sectionOverrides?: TopicSectionOverrides | null;
+}) {
+  const showRelated = relatedRows.length > 0 && show("related-incidents");
+
+  return (
+    <div
+      className="energy-report-pages"
+      style={{
+        background: "#e2e2e2",
+        padding: "16px 0",
+      }}
+    >
+      <style>{`
+        .energy-report-page {
+          width: 210mm;
+          min-height: 297mm;
+          height: 297mm;
+          margin: 0 auto 2rem;
+          padding: 15mm 20mm;
+          box-sizing: border-box;
+          background: #fff;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          position: relative;
+          overflow: visible;
+          page-break-after: always;
+          break-after: page;
+        }
+        .energy-report-cover-page {
+          padding: 0;
+          overflow: hidden;
+        }
+        @media print {
+          .energy-report-pages {
+            background: transparent !important;
+            padding: 0 !important;
+          }
+          .energy-report-page {
+            width: 100%;
+            min-height: 297mm;
+            height: auto;
+            margin: 0;
+            box-shadow: none;
+          }
+          .energy-report-cover-page {
+            width: 100%;
+            height: 297mm;
+            min-height: 297mm;
+          }
+        }
+      `}</style>
+
+      {/* PAGE 1 — Existing cover. */}
+      <div className="energy-report-page energy-report-cover-page" data-energy-page="1">
+        <div className="pdf-cover-page">
+          {/* 1. Top gradient band — full width, logo left, no margins. */}
+          <div
+            className="flex items-center"
+            style={{
+              background: BRAND_GRADIENT,
+              color: "#fff",
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
+              height: 64,
+              paddingLeft: 24,
+              paddingRight: 24,
+            }}
+          >
+            <img
+              src={polestarLogo}
+              alt="Polestar Advisory"
+              style={{ height: 26, width: "auto", maxWidth: 180, display: "block" }}
+            />
+          </div>
+
+          {/* 2. Hero band — existing registered cover image/gradient. */}
+          <div
+            style={{
+              width: "100%",
+              aspectRatio: "16 / 9",
+              background: BRAND_GRADIENT,
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
+              overflow: "hidden",
+            }}
+          >
+            {coverUrl && (
+              <img
+                src={coverUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            )}
+          </div>
+
+          {/* 3. Existing bottom gradient title block. */}
+          <div
+            style={{
+              background: BRAND_GRADIENT,
+              color: "#fff",
+              WebkitPrintColorAdjust: "exact",
+              printColorAdjust: "exact",
+              paddingLeft: 32,
+              paddingRight: 32,
+              paddingTop: 40,
+              paddingBottom: 28,
+            }}
+          >
+            <h1
+              className="mb-4"
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: 44,
+                lineHeight: 1.05,
+                letterSpacing: "0",
+                textTransform: "uppercase",
+              }}
+            >
+              {resolvedTitle || "Untitled report"}
+            </h1>
+            <div
+              className="uppercase"
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: 13,
+                letterSpacing: "0.22em",
+                marginBottom: 6,
+              }}
+            >
+              POLESTAR INSIGHTS
+            </div>
+            {periodLabel && (
+              <div
+                className="uppercase"
+                style={{
+                  fontFamily: "Roboto, sans-serif",
+                  fontWeight: 400,
+                  fontSize: 12,
+                  letterSpacing: "0.18em",
+                  color: "rgba(255,255,255,0.92)",
+                }}
+              >
+                REPORTING PERIOD: {periodLabel.replace(/^reporting period:\s*/i, "").toUpperCase()}
+              </div>
+            )}
+            <div
+              className="uppercase"
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: 11,
+                letterSpacing: "0.18em",
+                marginTop: 32,
+              }}
+            >
+              polestar-advisory.com
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* PAGE 2 — Fast Facts, BLUF, then the existing Energy topic map. */}
+      <div
+        className="energy-report-page"
+        data-energy-page="2"
+        style={{ display: "flex", flexDirection: "column" }}
+      >
+        <Section hidden={!show("fast-facts")} title="Fast Facts">
+          <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} />
+        </Section>
+        {execText.trim() && (
+          <Section hidden={!show("executive-summary")} title="BLUF">
+            <Paragraphs text={execText} />
+          </Section>
+        )}
+        <div style={{ marginTop: "auto" }}>
+          <Section hidden={!show("situation")} title="Energy Situation">
+            <EnergySituationVisual intensity={energyIntensity} mapHeight={220} />
+          </Section>
+        </div>
+      </div>
+
+      {/* PAGE 3 — Market Prices only. The explicit break after this page keeps
+          the next prose page from sharing any price cards. */}
+      <div
+        className="energy-report-page"
+        data-energy-page="3"
+        style={{ breakAfter: "page", pageBreakAfter: "always" }}
+      >
+        <Section hidden={!show("market-prices")} title="Market Prices">
+          <MarketPricesReportSection
+            rows={applyMarketPriceOverrides(
+              marketPrices ?? [],
+              sectionOverrides?.marketPriceOverrides,
+            )}
+          />
+        </Section>
+      </div>
+
+      {/* PAGE 4 — Saved Energy Situation prose, with What Happened folded into
+          the same section without its own heading. Location sub-headings are
+          source-preserving and only appear for safe helper segments. */}
+      <div className="energy-report-page" data-energy-page="4">
+        {(() => {
+          const energySituationText = [
+            show("situation") ? situationText : "",
+            show("what-happened") ? whatHappenedText : "",
+          ]
+            .filter((text) => text.trim())
+            .join("\n");
+          return energySituationText.trim() ? (
+            <Section title="Energy Situation">
+              <EnergySituationProse text={energySituationText} />
+            </Section>
+          ) : null;
+        })()}
+        <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={whatMattersText} />
+      </div>
+
+      {/* PAGE 5 — Closing assessment. */}
+      <div className="energy-report-page" data-energy-page="5">
+        <BulletsSection
+          hidden={!show("implications")}
+          title="Implications for Business"
+          text={implicationsText}
+        />
+        <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={watchNextText} max={8} />
+        <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={polestarViewText} />
+      </div>
+
+      {/* PAGE 6 — Related is explicitly kept on a fresh page; Disclaimer
+          remains the existing unchanged text. */}
+      <div
+        className="energy-report-page"
+        data-energy-page="6"
+        style={{ breakBefore: "page", pageBreakBefore: "always" }}
+      >
+        {showRelated && (
+          <Section title="Related Incidents">
+            <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />
+          </Section>
+        )}
+        <Section title="Disclaimer">
+          <Paragraphs text={DISCLAIMER_TEXT} />
+        </Section>
+        <EnergyReportFooter />
+      </div>
+    </div>
+  );
+}
+
 function computePreviewFastFacts(
   report: ReportPreviewData,
   incidents: TopicFastFactsIncident[],
@@ -675,6 +1023,7 @@ export default function ReportPreview({
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
+  const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest
   // market close the report carries, NOT the stored issue date. Deriving the
   // render date here keeps the cover date, period label, incident window and
@@ -720,6 +1069,20 @@ export default function ReportPreview({
       )
     : null;
   const cargoPorts = isCargo ? buildCargoPortBreakdown(cargoWindow) : null;
+  // Energy Situation reuses the existing topic-monitor world choropleth. The
+  // intensity is the same in-window, topic-relevant country count used by the
+  // monitor; no new location classification is introduced by the preview.
+  const energyIntensity = (() => {
+    if (!isEnergy || !report.issueDate) return new Map<string, number>();
+    const counts = new Map<string, number>();
+    for (const incident of filterTopicReportIncidents(incidents, "energy", report.issueDate)) {
+      const country = (incident.country ?? "").trim();
+      if (country) counts.set(country, (counts.get(country) ?? 0) + 1);
+    }
+    return buildCountryIntensity(
+      Array.from(counts.entries()).map(([country, count]) => ({ country, count })),
+    );
+  })();
   // Cargo Incident Clusters dataset — the regrouped/clustered view shared with
   // the PDF (exportTopicReportPdf rebuilds it from the identical windowed set).
   const cargoGrouped =
@@ -891,6 +1254,60 @@ export default function ReportPreview({
             ))}
           </ul>
         </div>
+      </div>
+    );
+  }
+
+  if (isEnergy) {
+    return (
+      <div
+        className="print-report bg-white"
+        style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
+      >
+        <EnergyReportPages
+          resolvedTitle={resolvedTitle}
+          periodLabel={periodLabel}
+          coverUrl={coverUrl}
+          fastFacts={fastFacts}
+          execText={execText}
+          situationText={resolveSimpleProse(
+            report.situation,
+            aiProse?.situation,
+            proseDraft.situation,
+          )}
+          whatHappenedText={resolveSimpleProse(
+            report.whatHappened,
+            aiProse?.whatHappened,
+            proseDraft.whatHappened,
+          )}
+          whatMattersText={resolveSimpleProse(
+            report.whatMatters,
+            aiProse?.whatMatters,
+            proseDraft.whatMatters,
+          )}
+          implicationsText={resolveSimpleProse(
+            report.implications,
+            aiProse?.implications,
+            proseDraft.implications,
+          )}
+          watchNextText={resolveSimpleProse(
+            report.watchNext,
+            aiProse?.watchNext,
+            proseDraft.watchNext,
+          )}
+          polestarViewText={resolveSimpleProse(
+            report.polestarView,
+            aiProse?.polestarView,
+            proseDraft.polestarView,
+          )}
+          energyIntensity={energyIntensity}
+          marketPrices={marketPrices}
+          relatedRows={relatedRows}
+          incidentSummaries={incidentSummaries}
+          show={show}
+          ffOverrides={ffOverrides}
+          sectionOverrides={sectionOverrides}
+        />
       </div>
     );
   }

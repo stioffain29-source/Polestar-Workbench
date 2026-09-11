@@ -14,11 +14,18 @@
 // Run: cd artifacts/workbench && npx tsx scripts/verifyEnergyMarketPricesPdf.ts
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
-import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq, asc, desc } from "drizzle-orm";
-import { db, reportsTable, marketPricesTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  reportsTable,
+  marketPricesTable,
+  reportProseTable,
+} from "@workspace/db";
 import { fetchTopicReport, fetchTopicIncidents } from "./topicReportData";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +38,19 @@ const ASSETS = resolve(WORKBENCH, "..", "..", "attached_assets");
 const TOPIC = (process.env.TOPIC ?? "energy").toLowerCase();
 // Optional analyst overrides to exercise (JSON TopicSectionOverrides).
 const OVERRIDES = process.env.OVERRIDES ? JSON.parse(process.env.OVERRIDES) : undefined;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function mergeSectionOverrides(
+  saved: unknown,
+  requested: unknown,
+): unknown {
+  if (requested === undefined) return saved;
+  if (!isRecord(saved) || !isRecord(requested)) return requested;
+  return { ...saved, ...requested };
+}
 
 async function fetchLatestReportId(): Promise<number> {
   const [row] = await db
@@ -52,12 +72,46 @@ async function fetchGroupMarketPrices(): Promise<unknown[]> {
   return JSON.parse(JSON.stringify(rows));
 }
 
+// Read the existing prose cache only. This deliberately does not call the
+// report-prose API: that endpoint can generate and persist a new narrative on
+// a cache miss, which a verification harness must never do.
+async function fetchSavedAiProse(reportId: number): Promise<unknown | null> {
+  const [row] = await db
+    .select()
+    .from(reportProseTable)
+    .where(eq(reportProseTable.reportId, reportId))
+    .limit(1);
+  if (!row) return null;
+
+  const sections = row.edited ?? row.sections;
+  if (!sections) return null;
+  const stale =
+    !!row.edited &&
+    (row.editedFingerprint == null ||
+      row.editedFingerprint !== row.fingerprint ||
+      row.editedGenerationBasisFingerprint !== row.generationBasisFingerprint);
+  return {
+    ...sections,
+    datasetFingerprint:
+      (row.edited
+        ? row.editedGenerationBasisFingerprint
+        : row.generationBasisFingerprint) ?? undefined,
+    stale,
+  };
+}
+
 async function bundleBrowser(): Promise<string> {
   const req = createRequire(import.meta.url);
   const esbuildMain = req.resolve(
     "/home/runner/workspace/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js",
   );
   const { build } = (await import(esbuildMain)) as typeof import("esbuild");
+  const cartoBasemapKey = process.env.VITE_CARTO_BASEMAP_KEY?.trim();
+  if (!cartoBasemapKey) {
+    throw new Error(
+      "VITE_CARTO_BASEMAP_KEY is required to bundle the browser verification harness.",
+    );
+  }
   const result = await build({
     entryPoints: [resolve(HERE, "verifyEnergyMarketPricesPdf.browser.tsx")],
     bundle: true,
@@ -81,6 +135,10 @@ async function bundleBrowser(): Promise<string> {
       "import.meta.env.DEV": "false",
       "import.meta.env.PROD": "true",
       "process.env.NODE_ENV": '"production"',
+      // CountryChoroplethMap imports the shared CARTO config at module load.
+      // Inject the secret value into the browser bundle without ever printing
+      // it or exposing it in harness diagnostics.
+      "__CARTO_BASEMAP_KEY__": JSON.stringify(cartoBasemapKey),
     },
     plugins: [
       {
@@ -120,18 +178,129 @@ async function bundleBrowser(): Promise<string> {
   return result.outputFiles![0].text;
 }
 
+const PDF_HEADINGS = new Map(
+  [
+    "FAST FACTS",
+    "BLUF",
+    "ENERGY SITUATION",
+    "MARKET PRICES",
+    "WHAT HAPPENED",
+    "WHAT MATTERS",
+    "IMPLICATIONS FOR BUSINESS",
+    "WATCH NEXT",
+    "POLESTAR VIEW",
+    "RELATED INCIDENTS",
+    "DISCLAIMER",
+  ].map((heading) => [heading, heading]),
+);
+
+function pageHeadings(text: string): string[] {
+  const found: string[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.replace(/\s+/g, " ").trim().toUpperCase();
+    if (!PDF_HEADINGS.has(line) || found.includes(line)) continue;
+    found.push(line);
+  }
+  return found;
+}
+
+function inspectRenderedPdf(pdfPath: string, outDir: string): {
+  physicalPages: number;
+  headingsByPage: Array<{ page: number; headings: string[] }>;
+  overflow: boolean;
+  overflowPages: number[];
+} {
+  mkdirSync(outDir, { recursive: true });
+  const info = execFileSync("pdfinfo", [pdfPath], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  const pagesMatch = info.match(/^Pages:\s+(\d+)/m);
+  const physicalPages = pagesMatch ? Number(pagesMatch[1]) : 0;
+  if (!physicalPages) throw new Error("Unable to determine the exported PDF page count.");
+
+  const headingsByPage = [];
+  for (let page = 1; page <= physicalPages; page++) {
+    const text = execFileSync(
+      "pdftotext",
+      ["-f", String(page), "-l", String(page), "-layout", pdfPath, "-"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    headingsByPage.push({ page, headings: pageHeadings(text) });
+  }
+
+  // Energy Watch has a fixed six-page contract. A seventh (or later) physical
+  // page is the observable form of body overflow; render the contract pages
+  // regardless so the proof pack still contains pages 2–6 for inspection.
+  const expectedPages = 6;
+  const overflowPages = Array.from(
+    { length: Math.max(0, physicalPages - expectedPages) },
+    (_, index) => expectedPages + index + 1,
+  );
+  const renderThrough = Math.min(expectedPages, physicalPages);
+  if (renderThrough >= 2) {
+    execFileSync(
+      "pdftoppm",
+      [
+        "-f",
+        "2",
+        "-l",
+        String(renderThrough),
+        "-png",
+        "-r",
+        "144",
+        pdfPath,
+        resolve(outDir, "page"),
+      ],
+      { stdio: "ignore" },
+    );
+  }
+  return {
+    physicalPages,
+    headingsByPage,
+    overflow: overflowPages.length > 0,
+    overflowPages,
+  };
+}
+
 async function main() {
   const reportId = await fetchLatestReportId();
   const report = await fetchTopicReport(reportId);
-  const incidents = await fetchTopicIncidents();
+  const allIncidents = await fetchTopicIncidents();
+  // Every renderer in the energy/fertiliser branch applies a byTopic window
+  // filter before reading incidents. Drop unrelated topic rows before crossing
+  // the Node → Chromium boundary; this preserves the exporter input it can
+  // observe while avoiding a 100MB+ CDP payload from unrelated archives.
+  const incidents = allIncidents.filter(
+    (incident) => isRecord(incident) && incident.topic === TOPIC,
+  );
   const marketPrices = await fetchGroupMarketPrices();
+  const savedAiProse = await fetchSavedAiProse(reportId);
+  const savedSectionOverrides = isRecord(report)
+    ? report.sectionOverrides
+    : undefined;
+  const sectionOverrides = mergeSectionOverrides(
+    savedSectionOverrides,
+    OVERRIDES,
+  );
+  const hiddenSections =
+    isRecord(sectionOverrides) && Array.isArray(sectionOverrides.hiddenSections)
+      ? sectionOverrides.hiddenSections
+      : undefined;
+  const reportIssueDate =
+    isRecord(report) && typeof report.issueDate === "string"
+      ? report.issueDate
+      : "unknown";
   console.log(
-    `${TOPIC} report ${reportId}; incidents=${incidents.length}; ${TOPIC} market prices=${marketPrices.length}`,
+    `SAVED DEVELOPMENT REPORT · ${TOPIC} · id=${reportId} · issueDate=${reportIssueDate}`,
+  );
+  console.log(
+    `incidents=${incidents.length}; ${TOPIC} market prices=${marketPrices.length}; savedAiProse=${savedAiProse ? "yes" : "no"}`,
   );
   if (marketPrices.length === 0) {
     throw new Error(`No ${TOPIC} market prices — cannot verify card rendering.`);
   }
-  if (OVERRIDES) console.log(`Applying overrides: ${JSON.stringify(OVERRIDES)}`);
+  if (OVERRIDES) console.log("Applying requested section overrides on top of saved overrides.");
 
   const bundle = await bundleBrowser();
   console.log(`Bundled browser harness (${(bundle.length / 1024).toFixed(0)} KB).`);
@@ -144,8 +313,7 @@ async function main() {
   });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 1600 } });
-    page.on("console", (m) => console.log(`[page:${m.type()}]`, m.text()));
-    page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+    page.on("crash", () => console.error("Chromium page crashed during PDF export."));
     await page.setContent("<!doctype html><html><head><meta charset=utf-8></head><body></body></html>");
     await page.addScriptTag({ content: bundle });
     const resultJson = await page.evaluate(
@@ -153,7 +321,16 @@ async function main() {
         (window as unknown as { __VERIFY_DATA__: unknown }).__VERIFY_DATA__ = data;
         return await (window as unknown as { __runVerify__: () => Promise<string> }).__runVerify__();
       },
-      [{ report, incidents, marketPrices, sectionOverrides: OVERRIDES }] as const,
+      [
+        {
+          report,
+          incidents,
+          marketPrices,
+          aiProse: savedAiProse,
+          hiddenSections,
+          sectionOverrides,
+        },
+      ] as const,
     );
     const result = JSON.parse(resultJson) as {
       saveCalls: number;
@@ -170,6 +347,45 @@ async function main() {
     );
     writeFileSync(out, Buffer.from(result.base64, "base64"));
     console.log(`Wrote ${out} (${(result.base64.length * 0.75 / 1024).toFixed(0)} KB)`);
+    const inspection = inspectRenderedPdf(
+      out,
+      resolve(WORKBENCH, "screenshots", `${TOPIC}-MarketPrices-pages`),
+    );
+    writeFileSync(
+      resolve(WORKBENCH, "screenshots", `${TOPIC}_MarketPrices_verify.json`),
+      JSON.stringify(
+        {
+          reportId,
+          issueDate: reportIssueDate,
+          savedDevelopmentReport: true,
+          savedAiProse: !!savedAiProse,
+          physicalPages: inspection.physicalPages,
+          headingsByPage: inspection.headingsByPage,
+          overflow: inspection.overflow,
+          overflowPages: inspection.overflowPages,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(
+      JSON.stringify(
+        {
+          issueDate: reportIssueDate,
+          physicalPages: inspection.physicalPages,
+          headingsByPage: inspection.headingsByPage,
+          overflow: inspection.overflow,
+          overflowPages: inspection.overflowPages,
+        },
+        null,
+        2,
+      ),
+    );
+    if (inspection.overflow) {
+      throw new Error(
+        `Energy Watch PDF overflowed the six-page contract: physical pages ${inspection.physicalPages}.`,
+      );
+    }
   } finally {
     await browser.close();
   }
@@ -178,4 +394,4 @@ async function main() {
 main().catch((e) => {
   console.error(e);
   process.exit(1);
-});
+}).finally(() => pool.end());

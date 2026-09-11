@@ -27,3 +27,9 @@ built from) BEFORE the export constructs its pdf. Symptom of the wrong patch:
 in `pdftotext`; card text (commodity names, "As of…") is ABSENT from the text
 layer because the grid is an image; render the page with `pdftoppm` to eyeball
 four cards + mini SVG trajectory + provenance, no clipping.
+
+**Static-map constraint:** Running the exporter in Chromium still does not mount effects in a component passed through `renderToStaticMarkup`. Interactive Leaflet maps therefore remain blank in that path even in a real browser.
+
+**Why:** the rasterisation host receives static HTML, not a mounted React tree; a successful six-page export can contain a chart-failure message instead of its map.
+
+**How to apply:** use a shared static SVG/GeoJSON projection for report maps consumed by that host, or explicitly mount and await the interactive map. Inspect the rendered chart, not only the page count and headings. Keep layout-only fixes separate from narrative generation.

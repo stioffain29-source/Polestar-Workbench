@@ -2,6 +2,8 @@ import { createElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
+import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
+import EnergySituationVisual from "@/components/EnergySituationVisual";
 import type { MarketPrice } from "@workspace/api-client-react";
 import {
   buildCargoPatternModel,
@@ -20,6 +22,7 @@ import {
   newPage,
   ensureSpace,
   drawSectionHeading,
+  drawSubtitle,
   renderProse,
   drawSectionWithProse,
   drawFastFactsKpiCards,
@@ -77,6 +80,7 @@ import {
   toDraftableIncidents,
   type TopicAiProse,
 } from "./topicProseResolution";
+import { segmentEnergySituationProse } from "./energySituationLayout";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -1180,7 +1184,11 @@ export async function exportTopicReportPdf(
             aiProse?.executiveSummary,
             proseDraft.executiveSummary,
           );
-  if (show("executive-summary") && execText.trim()) {
+  if (
+    data.topic !== "energy" &&
+    show("executive-summary") &&
+    execText.trim()
+  ) {
     drawSectionHeading(ctx, "Executive Summary");
     renderProse(ctx, execText);
     if (isCargo && cargoModel?.highSeverityNote.trim()) {
@@ -1209,6 +1217,177 @@ export async function exportTopicReportPdf(
       location: i.location ?? null,
     }),
   );
+
+  // Energy Watch has a fixed six-page presentation contract. Keep this
+  // branch ahead of the generic topic flow so the existing layout for every
+  // other topic remains byte-for-byte unchanged.
+  if (data.topic === "energy") {
+    // PAGE 2 — Fast Facts, the existing executive-summary text as a BLUF,
+    // then the existing topic geography visual in the lower half.
+    if (show("fast-facts")) {
+      drawSectionHeading(ctx, "Fast Facts");
+      drawFastFactsKpiCards(
+        ctx,
+        applyFastFactOverrides(
+          computeTopicFastFacts({
+            topic: data.topic,
+            issueDate: data.issueDate,
+            incidents,
+            topicLabel: topicLabels[data.topic] ?? data.topic,
+          }) as KpiCardData[],
+          ffOverrides,
+        ),
+      );
+    }
+    if (show("executive-summary") && execText.trim()) {
+      // BLUF replaces the generic "Executive Summary" heading. execText is
+      // rendered directly below it so its paragraphs and wording are not
+      // rewritten.
+      drawSectionHeading(ctx, "BLUF");
+      renderProse(ctx, execText);
+    }
+    if (show("situation")) {
+      const countryCounts = new Map<string, number>();
+      for (const incident of windowIncidents) {
+        const country = incident.country?.trim();
+        if (!country || /^unknown$/i.test(country)) continue;
+        countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
+      }
+      const intensity = buildCountryIntensity(
+        Array.from(countryCounts.entries()).map(([country, count]) => ({
+          country,
+          count,
+        })),
+      );
+      // Keep the static shared visual in the lower half of page 2 without
+      // changing its underlying incident set.
+      const lowerHalf = ctx.TOP + (ctx.H - ctx.TOP - ctx.BOTTOM) / 2;
+      if (ctx.y < lowerHalf) ctx.y = lowerHalf;
+      await embedReactChartInPdf(
+        ctx,
+        createElement(EnergySituationVisual, {
+          intensity,
+          // Keep the visual compact enough to remain on page 2 beneath Fast
+          // Facts and BLUF.
+          mapHeight: 220,
+        }),
+        { heading: "Energy Situation" },
+      );
+    }
+
+    // PAGE 3 — Market Prices only.
+    newPage(ctx);
+    if (show("market-prices")) {
+      const rows = applyMarketPriceOverrides(
+        options.marketPrices ?? [],
+        options.sectionOverrides?.marketPriceOverrides,
+      );
+      if (rows.length === 0) {
+        drawSectionHeading(ctx, "Market Prices");
+        renderProse(ctx, MARKET_PRICES_REPORT_EMPTY_TEXT);
+      } else {
+        await embedReactChartInPdf(
+          ctx,
+          createElement(MarketPricesReportGrid, { rows }),
+          { heading: "Market Prices" },
+        );
+      }
+    }
+
+    // PAGE 4 — Energy Situation prose, followed by the saved What Happened
+    // prose in the same block, then What Matters. Only the explicit saved
+    // geography labels are promoted without changing any paragraph text.
+    newPage(ctx);
+    const energySituation = resolveSimpleProse(
+      data.situation,
+      aiProse?.situation,
+      proseDraft.situation,
+    );
+    const whatHappened = resolveSimpleProse(
+      data.whatHappened,
+      aiProse?.whatHappened,
+      proseDraft.whatHappened,
+    );
+    const renderEnergySituationSegments = (text: string) => {
+      for (const segment of segmentEnergySituationProse(text)) {
+        if (segment.kind === "standalone-label") {
+          drawSubtitle(ctx, segment.text);
+          continue;
+        }
+        if (segment.heading) drawSubtitle(ctx, segment.heading);
+        renderProse(ctx, segment.text);
+      }
+    };
+    if (show("situation") || (show("what-happened") && whatHappened.trim())) {
+      drawSectionHeading(ctx, "Energy Situation");
+      if (show("situation")) renderEnergySituationSegments(energySituation);
+      // What Happened remains independently gated, but its exact source prose
+      // is folded into this block without a second section heading.
+      if (show("what-happened") && whatHappened.trim()) {
+        renderEnergySituationSegments(whatHappened);
+      }
+    }
+    if (show("what-matters")) {
+      const whatMatters = resolveSimpleProse(
+        data.whatMatters,
+        aiProse?.whatMatters,
+        proseDraft.whatMatters,
+      );
+      if (whatMatters.trim()) {
+        drawSectionWithProse(ctx, "What Matters", whatMatters);
+      }
+    }
+
+    // PAGE 5 — client actions and Polestar judgement, then stop this branch.
+    newPage(ctx);
+    if (show("implications")) {
+      const implications = resolveSimpleProse(
+        data.implications,
+        aiProse?.implications,
+        proseDraft.implications,
+      );
+      if (implications.trim()) {
+        drawBulletSection(ctx, "Implications for Business", implications);
+      }
+    }
+    if (show("watch-next")) {
+      const watchNext = resolveSimpleProse(
+        data.watchNext,
+        aiProse?.watchNext,
+        proseDraft.watchNext,
+      );
+      if (watchNext.trim()) drawBulletSection(ctx, "Watch Next", watchNext, 8);
+    }
+    if (show("polestar-view")) {
+      const polestarView = resolveSimpleProse(
+        data.polestarView,
+        aiProse?.polestarView,
+        proseDraft.polestarView,
+      );
+      if (polestarView.trim()) {
+        drawSectionWithProse(ctx, "Polestar View", polestarView);
+      }
+    }
+
+    // PAGE 6 — force the complete register onto its own final page, followed
+    // by the unchanged shared disclaimer.
+    newPage(ctx);
+    if (show("related-incidents")) {
+      drawRelatedIncidents(
+        ctx,
+        filterTopicReportIncidents(incidents, data.topic, data.issueDate),
+        data.topic,
+        topicLabels,
+        options.incidentSummaries ?? {},
+      );
+    }
+    ensureRoomForDisclaimer(ctx);
+    drawDisclaimer(ctx);
+    drawFooters(ctx.pdf, undefined, undefined, true);
+    ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+    return;
+  }
+
   if (isFuel && fuelData) {
     // Fail closed: refuse to export a polished but hollow report unless
     // the caller explicitly opted in via options.allowMissingMarketData.

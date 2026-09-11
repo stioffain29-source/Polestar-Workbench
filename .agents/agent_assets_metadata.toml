@@ -1003,3 +1003,17 @@ mtime_ms = 1789059341986
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/339406d2-3d4f-420b-a20b-8943fb1a1040/b23420c3-5aa4-4c4f-98cd-763ec9fd05eb"
 storage_version_token = "1789059483357759"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "hXBEORWqZgNNTPhaExgr2"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_MarketPrices_verify.pdf"
+type = "pdf"
+title = "Energy Watch — six-page layout proof"
+description = "Layout verification using the saved development report dated 23 May 2026. Not the current production report. Market Prices occupies page 3; Related Incidents and Disclaimer occupy page 6."
+logical_id = "e6e7f57f-18da-4aeb-b638-5aa99cec0d6e"
+content_hash = "sha256:ed5e2d9cb0372690d92440d96f1841812af5ca5f3d5a12ca99b28a509ca17e2f"
+size = 910150
+mtime_ms = 1789085641320
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e6e7f57f-18da-4aeb-b638-5aa99cec0d6e/92d93d1e-ae99-4f05-aeb2-0beea1dbdab8"
+storage_version_token = "1789085749394914"
+content_type = "application/pdf"

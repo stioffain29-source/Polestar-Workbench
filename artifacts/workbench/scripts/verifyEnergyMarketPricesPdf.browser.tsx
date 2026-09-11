@@ -30,6 +30,8 @@ interface VerifyData {
   incidents: unknown[];
   marketPrices: unknown[];
   sectionOverrides?: unknown;
+  hiddenSections?: string[];
+  aiProse?: unknown;
 }
 
 declare global {
@@ -54,7 +56,14 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
   (jsPDF as unknown as { API: { save: (f: string) => jsPDF } }).API.save =
     capture;
 
-  const { report, incidents, marketPrices, sectionOverrides } =
+  const {
+    report,
+    incidents,
+    marketPrices,
+    aiProse,
+    hiddenSections,
+    sectionOverrides,
+  } =
     window.__VERIFY_DATA__;
   let err: string | null = null;
   try {
@@ -65,6 +74,8 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
       "market_prices_verify.pdf",
       {
         marketPrices: marketPrices as Parameters<typeof exportTopicReportPdf>[4]["marketPrices"],
+        aiProse: aiProse as Parameters<typeof exportTopicReportPdf>[4]["aiProse"],
+        hiddenSections,
         sectionOverrides: sectionOverrides as Parameters<typeof exportTopicReportPdf>[4]["sectionOverrides"],
       },
     );
