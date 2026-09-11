@@ -1265,9 +1265,11 @@ export async function exportTopicReportPdf(
         ctx,
         createElement(EnergySituationVisual, {
           intensity,
-          // Keep the visual compact enough to remain on page 2 beneath Fast
-          // Facts and BLUF.
-          mapHeight: 270,
+          // Fit the map viewport to the ACTUAL remaining page space after
+          // the saved BLUF, not a fixed height tested against shorter prose.
+          // Reserve heading (54), legend/capture padding and trailing gap
+          // (60). Reproject the full geography rather than cropping it.
+          mapHeight: Math.max(120, Math.min(270, Math.floor(ctx.H - ctx.BOTTOM - ctx.y - 54 - 60))),
         }),
         { heading: "Energy Situation" },
       );

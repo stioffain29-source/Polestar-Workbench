@@ -60,7 +60,13 @@ window.__previewVerify__ = async () => {
   const pages = Array.from(host.querySelectorAll<HTMLElement>(".energy-report-page"));
   const checks = pages.map((page) => {
     const bounds = page.getBoundingClientRect();
-    const blocks = Array.from(page.querySelectorAll<HTMLElement>("[data-energy-flow-block]"));
+    // Overview used to report zero checked blocks, allowing its map/legend
+    // to overflow even though the detail-page pagination checks passed.
+    const blocks = Array.from(page.querySelectorAll<HTMLElement>(
+      page.dataset.energyPage === "2"
+        ? ".report-section, [data-energy-map-slot] svg, [data-report-raster-scale] > div:last-child"
+        : "[data-energy-flow-block]",
+    ));
     return {
       page: page.dataset.energyPage,
       blockCount: blocks.length,

@@ -722,6 +722,9 @@ export function EnergyReportPages({
           padding: 0;
           overflow: hidden;
         }
+        .energy-report-page[data-energy-page="2"] > .report-section {
+          flex-shrink: 0;
+        }
         @media print {
           .energy-report-pages {
             background: transparent !important;
@@ -867,9 +870,9 @@ export function EnergyReportPages({
             <Paragraphs text={execText} />
           </Section>
         )}
-        <div style={{ marginTop: "auto" }}>
+        <div data-energy-map-slot style={{ flex: "1 1 0", minHeight: 0 }}>
           <Section hidden={!show("situation")} title="Energy Situation">
-            <EnergySituationVisual intensity={energyIntensity} mapHeight={270} />
+            <EnergySituationVisual intensity={energyIntensity} mapHeight={270} fitToPage />
           </Section>
         </div>
       </div>

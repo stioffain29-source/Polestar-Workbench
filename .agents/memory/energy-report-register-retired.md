@@ -9,6 +9,10 @@ Do not restore Related Incidents to Energy Watch reports. Keep the full disclaim
 
 **How to apply:** keep this removal scoped to Energy Watch, preserve its prose and incident data, and do not remove registers from other report types without instruction. After the overview, let prices and narrative flow by actual available space rather than forcing one section per page. Check against the attached report's actual prose length, not only a shorter development report.
 
+Keep the overview cards, unchanged BLUF and complete map/legend together by sizing the map to remaining space, not by cropping it.
+
+**Why:** a later, longer BLUF exposed the fixed map-height assumption: the map moved to a nearly empty separate page. Detail-page overflow checks alone do not verify the overview.
+
 Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
 
 Do not add country-name or incident-count labels to the Energy map.

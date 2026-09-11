@@ -1008,14 +1008,14 @@ content_type = "application/pdf"
 id = "hXBEORWqZgNNTPhaExgr2"
 uri = "file://artifacts/workbench/screenshots/EnergyWatch_MarketPrices_verify.pdf"
 type = "pdf"
-title = "Energy Watch — corrected layout proof"
-description = "Five-page development export showing the sharper map including New Zealand, smaller Fast Facts, and compact market cards. Uses your uploaded prose with saved development incident and price data; not the published report."
+title = "Energy Watch — cards and map together"
+description = "Verified five-page development export using the prose from your latest attachment. Cards, full BLUF, map and legend fit together on page 2. Incident and price values use development data."
 logical_id = "e6e7f57f-18da-4aeb-b638-5aa99cec0d6e"
-content_hash = "sha256:b417a69b9fd5c6ca41a207a6014fc473cce3bf4181b9ba401b50ebd46c3779d9"
-size = 1258469
-mtime_ms = 1789091861428
-storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e6e7f57f-18da-4aeb-b638-5aa99cec0d6e/12a1529e-b660-4686-9191-58cf6fd328c5"
-storage_version_token = "1789091876799015"
+content_hash = "sha256:0b997bbf13a3a9161194187bc5fec67db20fc2ae923dd209e8142618b39839a2"
+size = 1164659
+mtime_ms = 1789104667540
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e6e7f57f-18da-4aeb-b638-5aa99cec0d6e/69b72b4a-9b25-491a-88c9-47840e224645"
+storage_version_token = "1789104701936124"
 content_type = "application/pdf"
 
 [[outputs]]

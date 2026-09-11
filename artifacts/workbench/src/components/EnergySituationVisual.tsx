@@ -8,6 +8,7 @@
  */
 
 import type { Feature, FeatureCollection, Geometry } from "geojson";
+import { useLayoutEffect, useRef, useState } from "react";
 import worldCompleteGeo from "@/assets/worldComplete.geo.json";
 import {
   COUNT_BANDS,
@@ -456,14 +457,39 @@ function resolveLabels(
 
 export interface EnergySituationVisualProps {
   intensity: Map<string, number>;
-  /** Height of the map viewport in pixels. Preview uses 300; PDF uses 220. */
+  /** Maximum viewport height; projection always preserves the full bounds. */
   mapHeight?: number;
+  /** Preview only: fit to the remaining overview space after cards and BLUF. */
+  fitToPage?: boolean;
 }
 
 export function EnergySituationVisual({
   intensity,
   mapHeight = DEFAULT_MAP_HEIGHT,
+  fitToPage = false,
 }: EnergySituationVisualProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [availableHeight, setAvailableHeight] = useState(mapHeight);
+  useLayoutEffect(() => {
+    if (!fitToPage) return;
+    const root = rootRef.current;
+    const slot = root?.closest<HTMLElement>("[data-energy-map-slot]");
+    if (!root || !slot) return;
+    const measure = () => {
+      const legendHeight = root.lastElementChild?.getBoundingClientRect().height ?? 36;
+      const section = root.closest<HTMLElement>(".report-section");
+      const trailing = section ? parseFloat(getComputedStyle(section).marginBottom) || 0 : 0;
+      const space = slot.getBoundingClientRect().bottom - root.getBoundingClientRect().top;
+      setAvailableHeight(Math.max(120, Math.min(mapHeight, Math.floor(space - legendHeight - trailing - 4))));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(slot);
+    observer.observe(root);
+    let active = true;
+    document.fonts.ready.then(() => { if (active) measure(); });
+    return () => { active = false; observer.disconnect(); };
+  }, [fitToPage, mapHeight, intensity.size]);
   if (intensity.size === 0) {
     return (
       <div
@@ -490,11 +516,12 @@ export function EnergySituationVisual({
     ? [...affectedFeatures, newZealand]
     : affectedFeatures;
   const bounds = focusBounds(framingFeatures) ?? worldFallbackBounds();
-  const viewportHeight = Math.max(120, mapHeight);
+  const viewportHeight = Math.max(120, fitToPage ? availableHeight : mapHeight);
   const projection = buildProjection(bounds, SVG_WIDTH, viewportHeight);
 
   return (
     <div
+      ref={rootRef}
       data-report-raster-scale="4"
       style={{
         color: DUSK,
@@ -505,7 +532,7 @@ export function EnergySituationVisual({
       <svg
         viewBox={`0 0 ${projection.width} ${projection.height}`}
         width={SVG_WIDTH}
-        height={mapHeight}
+        height={viewportHeight}
         preserveAspectRatio="xMidYMid meet"
         style={{
           background: "#f8f9fb",
