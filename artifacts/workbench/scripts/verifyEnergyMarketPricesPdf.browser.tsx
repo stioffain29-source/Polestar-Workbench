@@ -11,6 +11,9 @@
 import { jsPDF } from "jspdf";
 import { exportTopicReportPdf } from "../src/lib/exportTopicReportPdf";
 import { TOPIC_LABELS } from "../src/lib/topics";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import ReportPreview from "../src/components/ReportPreview";
 
 interface VerifyData {
   report: {
@@ -38,8 +41,36 @@ declare global {
   interface Window {
     __VERIFY_DATA__: VerifyData;
     __runVerify__: () => Promise<string>;
+    __previewVerify__: () => Promise<unknown>;
   }
 }
+
+window.__previewVerify__ = async () => {
+  const host = document.createElement("div");
+  document.body.append(host);
+  createRoot(host).render(createElement(
+    ReportPreview,
+    window.__VERIFY_DATA__ as unknown as Parameters<typeof ReportPreview>[0],
+  ));
+  await document.fonts.ready;
+  // Measured pagination schedules layout after React commits and fonts settle.
+  for (let i = 0; i < 20; i++) {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }
+  const pages = Array.from(host.querySelectorAll<HTMLElement>(".energy-report-page"));
+  const checks = pages.map((page) => {
+    const bounds = page.getBoundingClientRect();
+    const blocks = Array.from(page.querySelectorAll<HTMLElement>("[data-energy-flow-block]"));
+    return {
+      page: page.dataset.energyPage,
+      blockCount: blocks.length,
+      overflow: blocks.some((block) => block.getBoundingClientRect().bottom > bounds.bottom - 45),
+    };
+  });
+  if (!checks.some((page) => page.blockCount > 0)) throw new Error("Preview pagination did not render.");
+  if (checks.some((page) => page.overflow)) throw new Error(`Preview overflow: ${JSON.stringify(checks)}`);
+  return checks;
+};
 
 window.__runVerify__ = async function runVerify(): Promise<string> {
   let captured: ArrayBuffer | null = null;

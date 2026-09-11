@@ -24,7 +24,10 @@ import {
 } from "@/lib/topicProseResolution";
 import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
-import { segmentEnergySituationProse } from "@/lib/energySituationLayout";
+import {
+  EnergyFlowPages,
+  type EnergyReportSectionGate,
+} from "@/components/EnergyFlowPages";
 import {
   buildCargoSecurityRead,
   buildCargoWhatHappened,
@@ -77,6 +80,7 @@ const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
+type ReportSectionGate = EnergyReportSectionGate;
 
 // Severity accent colours come from the shared SEV_COLOR ramp in pdfChrome
 // (lowercase keys, Extreme = #A33232) so the on-screen Fast Facts accent
@@ -636,63 +640,7 @@ function RelatedIncidentsTable({ rows, summaries }: { rows: TopicFastFactsIncide
   );
 }
 
-type ReportSectionGate = (key: string) => boolean;
-
-function EnergySituationProse({ text }: { text?: string | null }) {
-  const segments = segmentEnergySituationProse(text);
-  if (segments.length === 0) return null;
-
-  return (
-    <div>
-      {segments.map((segment, index) => (
-        <div
-          key={index}
-          data-energy-situation-segment={segment.kind}
-          style={{ breakInside: "avoid", marginBottom: 10 }}
-        >
-          {segment.heading && (
-            <h3
-              className="uppercase tracking-wide"
-              style={{
-                color: NAVY,
-                fontFamily: "Roboto, sans-serif",
-                fontWeight: 700,
-                fontSize: 13,
-                marginBottom: 8,
-              }}
-            >
-              {segment.kind === "standalone-label" ? segment.text : segment.heading}
-            </h3>
-          )}
-          {segment.kind === "paragraph" && <Paragraphs text={segment.text} />}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function EnergyReportFooter() {
-  return (
-    <div
-      className="pdf-preview-footer px-10 flex items-center justify-between"
-      style={{
-        background: POLAR,
-        color: DUSK,
-        fontFamily: "Roboto, sans-serif",
-        fontSize: 11,
-        minHeight: 36,
-        WebkitPrintColorAdjust: "exact",
-        printColorAdjust: "exact",
-      }}
-    >
-      <span>polestar-advisory.com</span>
-      <span>info@polestar-advisory.com</span>
-      <span style={{ opacity: 0.7 }}>Page numbers added at export</span>
-    </div>
-  );
-}
-
-function EnergyReportPages({
+export function EnergyReportPages({
   resolvedTitle,
   periodLabel,
   coverUrl,
@@ -907,79 +855,17 @@ function EnergyReportPages({
         </div>
       </div>
 
-      {/* PAGE 3 — Market Prices only. The explicit break after this page keeps
-          the next prose page from sharing any price cards. */}
-      <div
-        className="energy-report-page"
-        data-energy-page="3"
-        style={{ breakAfter: "page", pageBreakAfter: "always" }}
-      >
-        <Section hidden={!show("market-prices")} title="Market Prices">
-          <MarketPricesReportSection
-            rows={applyMarketPriceOverrides(
-              marketPrices ?? [],
-              sectionOverrides?.marketPriceOverrides,
-            )}
-          />
-        </Section>
-      </div>
-
-      {/* PAGE 4 — Saved Energy Situation prose, with What Happened folded into
-          the same section without its own heading. Location sub-headings are
-          source-preserving and only appear for safe helper segments. */}
-      <div className="energy-report-page" data-energy-page="4">
-        {(() => {
-          const energySituationText = [
-            show("situation") ? situationText : "",
-            show("what-happened") ? whatHappenedText : "",
-          ]
-            .filter((text) => text.trim())
-            .join("\n");
-          return energySituationText.trim() ? (
-            <Section title="Energy Situation">
-              <EnergySituationProse text={energySituationText} />
-            </Section>
-          ) : null;
-        })()}
-        <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={whatMattersText} />
-      </div>
-
-      {/* PAGE 5 — Closing assessment. */}
-      <div className="energy-report-page" data-energy-page="5" style={{ display: "flex", flexDirection: "column" }}>
-        <BulletsSection
-          hidden={!show("implications")}
-          title="Implications for Business"
-          text={implicationsText}
-        />
-        <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={watchNextText} max={8} />
-        <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={polestarViewText} />
-        <aside
-          data-energy-disclaimer
-          style={{
-            marginTop: "auto",
-            padding: "10px 13px",
-            fontFamily: "Roboto, sans-serif",
-            color: DUSK,
-            breakInside: "avoid",
-            pageBreakInside: "avoid",
-            flexShrink: 0,
-          }}
-        >
-          <h2 style={{ margin: "0 0 6px", fontSize: "9pt", fontWeight: 700, color: NAVY }}>DISCLAIMER</h2>
-          <p
-            style={{
-              margin: 0,
-              fontFamily: "Roboto, sans-serif",
-              fontSize: "9pt",
-              lineHeight: 1.2,
-              fontWeight: 300,
-            }}
-          >
-            {DISCLAIMER_TEXT}
-          </p>
-        </aside>
-        <EnergyReportFooter />
-      </div>
+      <EnergyFlowPages
+        marketPrices={marketPrices}
+        situationText={situationText}
+        whatHappenedText={whatHappenedText}
+        whatMattersText={whatMattersText}
+        implicationsText={implicationsText}
+        watchNextText={watchNextText}
+        polestarViewText={polestarViewText}
+        show={show}
+        sectionOverrides={sectionOverrides}
+      />
     </div>
   );
 }

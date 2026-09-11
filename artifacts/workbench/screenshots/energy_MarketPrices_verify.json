@@ -1,6 +1,6 @@
 {
   "reportId": 8,
-  "issueDate": "2026-05-23",
+  "issueDate": "2026-09-10",
   "savedDevelopmentReport": true,
   "savedAiProse": false,
   "physicalPages": 5,
@@ -20,20 +20,20 @@
     {
       "page": 3,
       "headings": [
-        "MARKET PRICES"
+        "MARKET PRICES",
+        "ENERGY SITUATION"
       ]
     },
     {
       "page": 4,
       "headings": [
-        "ENERGY SITUATION",
-        "WHAT MATTERS"
+        "WHAT MATTERS",
+        "IMPLICATIONS FOR BUSINESS"
       ]
     },
     {
       "page": 5,
       "headings": [
-        "IMPLICATIONS FOR BUSINESS",
         "WATCH NEXT",
         "POLESTAR VIEW",
         "DISCLAIMER"

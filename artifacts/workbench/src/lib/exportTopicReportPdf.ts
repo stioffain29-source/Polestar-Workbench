@@ -1219,9 +1219,9 @@ export async function exportTopicReportPdf(
     }),
   );
 
-  // Energy Watch has a fixed five-page presentation contract. Keep this
-  // branch ahead of the generic topic flow so the existing layout for every
-  // other topic remains byte-for-byte unchanged.
+  // Energy keeps its cover and overview, then paginates by available space.
+  // Fixed section-page breaks stranded overflow paragraphs on almost-empty
+  // pages. This branch remains isolated from every other topic.
   if (data.topic === "energy") {
     // PAGE 2 — Fast Facts, the existing executive-summary text as a BLUF,
     // then the existing topic geography visual in the lower half.
@@ -1260,10 +1260,6 @@ export async function exportTopicReportPdf(
           count,
         })),
       );
-      // Keep the static shared visual in the lower half of page 2 without
-      // changing its underlying incident set.
-      const lowerHalf = ctx.TOP + (ctx.H - ctx.TOP - ctx.BOTTOM) / 2;
-      if (ctx.y < lowerHalf) ctx.y = lowerHalf;
       await embedReactChartInPdf(
         ctx,
         createElement(EnergySituationVisual, {
@@ -1276,7 +1272,8 @@ export async function exportTopicReportPdf(
       );
     }
 
-    // PAGE 3 — Market Prices only.
+    // Start the detail pages with compact prices; subsequent sections flow
+    // into the remaining space rather than forcing a prices-only page.
     newPage(ctx);
     if (show("market-prices")) {
       const rows = applyMarketPriceOverrides(
@@ -1289,16 +1286,15 @@ export async function exportTopicReportPdf(
       } else {
         await embedReactChartInPdf(
           ctx,
-          createElement(MarketPricesReportGrid, { rows }),
+          createElement(MarketPricesReportGrid, { rows, compact: true }),
           { heading: "Market Prices" },
         );
       }
     }
 
-    // PAGE 4 — Energy Situation prose, followed by the saved What Happened
+    // Energy Situation prose, followed by the saved What Happened
     // prose in the same block, then What Matters. Only the explicit saved
     // geography labels are promoted without changing any paragraph text.
-    newPage(ctx);
     const energySituation = resolveSimpleProse(
       data.situation,
       aiProse?.situation,
@@ -1309,18 +1305,35 @@ export async function exportTopicReportPdf(
       aiProse?.whatHappened,
       proseDraft.whatHappened,
     );
+    let energyHeadingPending = true;
+    let savedLocationHeading = "";
     const renderEnergySituationSegments = (text: string) => {
       for (const segment of segmentEnergySituationProse(text)) {
         if (segment.kind === "standalone-label") {
-          drawSubtitle(ctx, segment.text);
+          savedLocationHeading = segment.text;
           continue;
         }
-        if (segment.heading) drawSubtitle(ctx, segment.heading);
+        // Reserve the heading and first paragraph as a unit. Subheadings must
+        // not be left behind when renderProse moves their paragraph.
+        setRoboto(ctx.pdf, "light");
+        ctx.pdf.setFontSize(11);
+        const firstParagraph = sanitize(segment.text).split(/\n+/).find((p) => p.trim()) ?? "";
+        const firstHeight = ctx.pdf.splitTextToSize(firstParagraph, ctx.CW).length * 17 + 18;
+        const locationHeading = savedLocationHeading || segment.heading;
+        const headingHeight = (energyHeadingPending ? 50 : 0) + (locationHeading ? 16 : 0);
+        if (firstHeight + headingHeight <= ctx.H - ctx.TOP - ctx.BOTTOM) {
+          ensureSpace(ctx, firstHeight + headingHeight);
+        }
+        if (energyHeadingPending) {
+          drawSectionHeading(ctx, "Energy Situation");
+          energyHeadingPending = false;
+        }
+        if (locationHeading) drawSubtitle(ctx, locationHeading);
+        savedLocationHeading = "";
         renderProse(ctx, segment.text);
       }
     };
     if (show("situation") || (show("what-happened") && whatHappened.trim())) {
-      drawSectionHeading(ctx, "Energy Situation");
       if (show("situation")) renderEnergySituationSegments(energySituation);
       // What Happened remains independently gated, but its exact source prose
       // is folded into this block without a second section heading.
@@ -1339,8 +1352,7 @@ export async function exportTopicReportPdf(
       }
     }
 
-    // PAGE 5 — client actions and Polestar judgement, then stop this branch.
-    newPage(ctx);
+    // Client actions follow the narrative without an unconditional page break.
     if (show("implications")) {
       const implications = resolveSimpleProse(
         data.implications,
@@ -1359,6 +1371,18 @@ export async function exportTopicReportPdf(
       );
       if (watchNext.trim()) drawBulletSection(ctx, "Watch Next", watchNext, 8);
     }
+    // Reserve the legal block before rendering the final judgement. This uses
+    // exactly the same 9pt wrapping/spacing as the disclaimer below, so longer
+    // saved prose cannot collide with it or push it to a disclaimer-only page.
+    const disclaimerFontSize = 9;
+    const disclaimerLineHeightFactor = 1.2;
+    const disclaimerLineHeight = disclaimerFontSize * disclaimerLineHeightFactor;
+    setRoboto(ctx.pdf, "light");
+    ctx.pdf.setFontSize(disclaimerFontSize);
+    const disclaimerLines: string[] = ctx.pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), ctx.CW - 20);
+    const disclaimerHeight = 32 + disclaimerLines.length * disclaimerLineHeight;
+    const originalBottom = ctx.BOTTOM;
+    ctx.BOTTOM += disclaimerHeight + 12;
     if (show("polestar-view")) {
       const polestarView = resolveSimpleProse(
         data.polestarView,
@@ -1370,22 +1394,11 @@ export async function exportTopicReportPdf(
       }
     }
 
-    // Energy ends on page 5. Related Incidents was removed by the owner;
-    // retain the unchanged legal text in 9pt Roboto on the plain page.
-    const disclaimerFontSize = 9;
-    const disclaimerLineHeightFactor = 1.2;
-    const disclaimerLineHeight =
-      disclaimerFontSize * disclaimerLineHeightFactor;
-    setRoboto(ctx.pdf, "light");
-    ctx.pdf.setFontSize(disclaimerFontSize);
-    const disclaimerLines: string[] = ctx.pdf.splitTextToSize(
-      sanitize(DISCLAIMER_TEXT),
-      ctx.CW - 20,
-    );
-    const disclaimerHeight =
-      32 + disclaimerLines.length * disclaimerLineHeight;
-    const originalBottom = ctx.BOTTOM;
-    const disclaimerY = ctx.H - originalBottom - disclaimerHeight;
+    ctx.BOTTOM = originalBottom;
+    // Related Incidents remains removed. The full legal text follows Polestar
+    // View on the plain page; it is never overlaid at a fixed footer position.
+    ensureSpace(ctx, disclaimerHeight + 12);
+    const disclaimerY = ctx.y + 12;
     setText(ctx.pdf, NAVY);
     setRoboto(ctx.pdf, "bold");
     ctx.pdf.setFontSize(8);

@@ -15,7 +15,7 @@
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq, asc, desc } from "drizzle-orm";
@@ -264,7 +264,14 @@ function inspectRenderedPdf(pdfPath: string, outDir: string): {
 
 async function main() {
   const reportId = await fetchLatestReportId();
-  const report = await fetchTopicReport(reportId);
+  const report = {
+    ...await fetchTopicReport(reportId),
+    // Read-only reproduction of an attached report's exact prose. Never saves
+    // these overrides or generates/replaces cached analyst text.
+    ...(process.env.REPORT_OVERRIDES_FILE
+      ? JSON.parse(readFileSync(process.env.REPORT_OVERRIDES_FILE, "utf8"))
+      : {}),
+  };
   const allIncidents = await fetchTopicIncidents();
   // Every renderer in the energy/fertiliser branch applies a byTopic window
   // filter before reading incidents. Drop unrelated topic rows before crossing
@@ -339,6 +346,19 @@ async function main() {
     console.log(`saveCalls=${result.saveCalls}`);
     if (result.err) console.log("export error:\n" + result.err);
     if (!result.base64) throw new Error("export produced no PDF bytes");
+    if (TOPIC === "energy") {
+    const cssDir = resolve(WORKBENCH, "dist/public/assets");
+    const css = readdirSync(cssDir).filter((file) => file.endsWith(".css"))
+      .map((file) => readFileSync(resolve(cssDir, file), "utf8")).join("\n");
+    await page.addStyleTag({ content: css });
+    const previewChecks = await page.evaluate(async () =>
+      (window as unknown as { __previewVerify__: () => Promise<unknown> }).__previewVerify__(),
+    );
+    console.log("Preview page bounds:", JSON.stringify(previewChecks));
+    await page.locator('[data-energy-page="3"]').screenshot({
+      path: resolve(WORKBENCH, "screenshots/energy-preview-flow-page3.png"),
+    });
+    }
     const out = resolve(
       WORKBENCH,
       "screenshots",
