@@ -14,6 +14,8 @@ export interface EmbedChartOptions {
   heading?: string;
   /** Energy moves an intact visual to the next page instead of squeezing it. */
   fitRemaining?: boolean;
+  /** Match browser typography: CSS uses 96 px/in; jsPDF uses 72 pt/in. */
+  useCssPixelUnits?: boolean;
 }
 
 // Vertical room a section heading consumes when it is kept together with the
@@ -299,10 +301,11 @@ export async function embedChartMarkupInPdf(
   }
 
   const widthPt = ctx.CW;
+  const widthCss = options.useCssPixelUnits ? widthPt * 96 / 72 : widthPt;
   const host = document.createElement("div");
   host.setAttribute("data-report-chart-export", "");
   host.style.cssText = [
-    `width:${widthPt}px`,
+    `width:${widthCss}px`,
     "box-sizing:border-box",
     "background:#fff",
     "font-family:Roboto,sans-serif",
@@ -344,8 +347,8 @@ export async function embedChartMarkupInPdf(
       scale: host.querySelector("[data-report-raster-scale]") ? 4 : 1.5,
       backgroundColor: "#ffffff",
       logging: false,
-      width: widthPt,
-      windowWidth: widthPt,
+      width: widthCss,
+      windowWidth: widthCss,
     });
 
     if (canvasIsMostlyBlank(canvas)) {

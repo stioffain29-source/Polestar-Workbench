@@ -15,6 +15,12 @@ Keep the section sequence fixed but let ALL post-cover sections flow. No fixed o
 
 **How to apply:** keep short assessment sections together when practical, keep Polestar intact, and let the separately atomic 9pt white-background disclaimer move to the next page when necessary. Never cap or shorten recommendations or watch items. Preserve the hierarchy: snapshot → map → markets → situation/issue analysis → what matters → implications → watch next → Polestar → disclaimer.
 
+Match CSS and PDF physical units when rasterising Energy visuals: browser pixels are 96/inch, PDF points are 72/inch. Do not fix inflated captures by shrinking charts into leftover space.
+
+**Why:** a point-valued column width used directly as a CSS pixel width enlarged the exported visuals relative to the preview. The map moved off the snapshot, leaving a large blank tail, even though it fit at its normal browser size. Page-bound checks alone passed this bad layout.
+
+**How to apply:** convert both the DOM capture width and html2canvas viewport width; keep the output width in PDF points. Keep this correction scoped to Energy unless other topics have been verified.
+
 Energy overview and detailed analysis must have distinct jobs: a brief cross-cutting overview, then each geographic/issue development once. Headings must come from the source, never from spotting a familiar place name in a paragraph.
 
 **Why:** the owner rejected repeated Visayas/Dhaka passages after the pagination work. A three-country heading classifier turned overview mentions into duplicate country sections; the generation prompt also encouraged overview/detail retelling. Pagination checks did not catch this content defect.

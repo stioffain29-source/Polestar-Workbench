@@ -1263,7 +1263,7 @@ export async function exportTopicReportPdf(
           intensity,
           mapHeight: ENERGY_REPORT_MAP_HEIGHT,
         }),
-        { heading: "Energy Situation Map", fitRemaining: false },
+        { heading: "Energy Situation Map", fitRemaining: false, useCssPixelUnits: true },
       );
     }
 
@@ -1279,7 +1279,7 @@ export async function exportTopicReportPdf(
         await embedReactChartInPdf(
           ctx,
           createElement(MarketPricesReportGrid, { rows, compact: true }),
-          { heading: "Market Prices", fitRemaining: false },
+          { heading: "Market Prices", fitRemaining: false, useCssPixelUnits: true },
         );
       }
     }

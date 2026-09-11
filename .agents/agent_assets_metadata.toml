@@ -1059,3 +1059,17 @@ mtime_ms = 1789112240913
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/19567427-7168-44a7-b5eb-efdfc3f265f7/6aa28a08-a606-4896-8158-0eeec34f3c86"
 storage_version_token = "1789112317515499"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "3PVA4r9mzlP0mFBQwrgFJ"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_Pagination_Corrected.pdf"
+type = "pdf"
+title = "Energy Watch — corrected pagination"
+description = "Four-page development proof using the exact narrative from your latest uploaded PDF. Corrected chart scaling keeps the map below the BLUF. Every paragraph and recommendation was retained; body text size and section order are unchanged. Fast Facts and charts use development data."
+logical_id = "68193d2e-6b24-4c8d-a139-da7bb33bb511"
+content_hash = "sha256:454d3a743b82160be088336d46d3c85a26977d8153e7a62c116801cc70d29b0f"
+size = 1267913
+mtime_ms = 1789112945904
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/68193d2e-6b24-4c8d-a139-da7bb33bb511/d0e743c2-0d40-4abd-a14f-043b7d7ed412"
+storage_version_token = "1789112995096398"
+content_type = "application/pdf"

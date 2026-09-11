@@ -25,6 +25,14 @@ def prose_between(start, end):
         if paragraph.strip()
     )
 
+def list_between(start, end):
+    # The PDF already contains a bullet glyph. Restore one source marker,
+    # rather than adding "- " in front of it and printing a doubled bullet.
+    return "\n".join(
+        "- " + re.sub(r"^(?:[-*•]\s*)+", "", paragraph)
+        for paragraph in prose_between(start, end).split("\n\n")
+    )
+
 # The first Energy Situation is the map caption; the second is body prose.
 body = text.split("ENERGY SITUATION", 2)[2].split("WHAT MATTERS", 1)[0]
 situation = "\n\n".join(
@@ -45,8 +53,8 @@ payload = {
     "situation": situation,
     "whatHappened": "",
     "whatMatters": prose_between("WHAT MATTERS", "IMPLICATIONS FOR BUSINESS"),
-    "implications": "\n".join("- " + p for p in prose_between("IMPLICATIONS FOR BUSINESS", "WATCH NEXT").split("\n\n")),
-    "watchNext": "\n".join("- " + p for p in prose_between("WATCH NEXT", "POLESTAR VIEW").split("\n\n")),
+    "implications": list_between("IMPLICATIONS FOR BUSINESS", "WATCH NEXT"),
+    "watchNext": list_between("WATCH NEXT", "POLESTAR VIEW"),
     "polestarView": prose_between("POLESTAR VIEW", "DISCLAIMER"),
 }
 with open(output, "w") as file:
