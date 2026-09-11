@@ -6,6 +6,13 @@ import {
 import type { TopicFastFactsIncident } from "@/lib/topicFastFacts";
 
 describe("summarizeFuelDevelopmentClause", () => {
+  it("does not invent sustained pressure or fare negotiations from a jet-price headline", () => {
+    const clause = summarizeFuelDevelopmentClause({
+      title: "Jet fuel prices fall as airline demand softens",
+    });
+    expect(clause).toMatch(/prices fall/i);
+    expect(clause).not.toMatch(/sustained|surcharge|negotiations/i);
+  });
   it("rewrites ADNOC Hormuz attack without mangling the acronym", () => {
     const clause = summarizeFuelDevelopmentClause({
       title: "ADNOC vessel attacked in Strait of Hormuz, no injuries",

@@ -750,7 +750,7 @@ export function buildFuelMarketRead(opts: {
   let para2: string;
   if (risingMoves > fallingMoves || (avgChangePct !== null && avgChangePct >= 2)) {
     para2 =
-      "Taken together, this points to sustained cost pressure rather than a one-off move. If suppliers pass the move through, it could affect freight rates, generator running costs, staff movement and supplier pricing.";
+      "Some reporting-period benchmarks rose. If suppliers pass those increases through, they could affect freight rates, generator running costs, staff movement and supplier pricing.";
   } else if (fallingMoves > risingMoves || (avgChangePct !== null && avgChangePct <= -2)) {
     para2 =
       "Crude has pulled back over this window rather than climbed, so this is relief on the cost line for now, not pressure. If suppliers pass a later reversal through, freight rates, generator running costs, staff movement and supplier pricing could be affected.";

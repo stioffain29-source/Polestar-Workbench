@@ -1810,7 +1810,8 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
     return "India cut windfall taxes on petrol, diesel and aviation-fuel exports, resetting refiner export economics";
   }
   if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|surge|costs?|prices?)\b/.test(t)) {
-    return "aviation operators faced sustained jet-fuel cost pressure feeding into fares and surcharge negotiations";
+    // Preserve the reported development, not an inferred fare/surcharge effect.
+    return declarativeFromHeadline(normalizeFuelHeadline(opts.title));
   }
   if (/\b(trump|sanction|blockade)\b/.test(t) && /\b(hormuz|iran)\b/.test(t)) {
     return "reporting flagged potential Iran sanctions and continued naval pressure in the Strait of Hormuz without a confirmed closure";
@@ -1923,7 +1924,7 @@ function businessImpactForDevelopment(i: CanonicalFuelIncident): string {
     return "Hormuz transit pressure lifts war-risk premium and delays tanker movement even when barrels remain available elsewhere.";
   }
   if (/\b(jet fuel|aviation fuel|airline)\b/.test(t)) {
-    return "Jet-fuel cost pressure flows to aviation surcharges and route profitability within the next operating month.";
+    return "Changes in jet-fuel prices could affect aviation surcharges and route profitability; timing depends on airline pricing and fuel contracts.";
   }
   const fam = ISSUE_FAMILIES.find((f) => f.test.some((re) => re.test(t)));
   return fam?.opMeaning

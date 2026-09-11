@@ -8,10 +8,10 @@ description: One facts object drives all Fuel Watch narrative surfaces; lexical 
 **Why:** Sections previously resolved authored > AI > deterministic independently and each re-derived trend/leader/counts, so a polished report could contradict itself (rising vs falling crude, different leader per section). Owner spec demanded root-cause fix, fail-closed gate, property tests.
 
 **How to apply (post round-2 landing):**
-- Fuel's five analytical sections (Exec Summary, Situation, What Happened, What Matters, Polestar View + Market/Operational/Regional reads) are NON-OVERRIDABLE deterministic projections of the canonical facts module — analyst edits and AI prose never surface for fuel (they still do for every other topic; fuel is excluded from the ReportEditor precedence test loops on purpose).
+- The earlier non-overridable-only decision was superseded by direct editing. Preserve genuine analyst prose during gate fixes; fix unsupported generated assertions at their source instead of clearing edits or weakening the evidence gate.
 - The builder self-validates (validation.consistencyErrors); preview shows a blocking panel from those errors and the PDF exporter throws on the same gate — never let preview render what the PDF would refuse.
 - Situation and What Happened must stay DISTINCT sections (verbatim-duplicated prose was an owner-flagged defect); highestPriorityIncident must skip raw social-post titles (handle-prefixed @user:/RT captures) unless the window is social-only.
 - Gate/builder must agree by construction: when pressure is distributed the sections say "pressure is distributed across …", so the validator accepts distributed phrasing, not just the literal "Distributed pressure" label.
 - Fuel's effective report date is market-anchored (latest market close ?? issue date) — preview, AI facts/cache key and PDF must all use it or the gate diverges across surfaces.
-- A SECOND facts module (the AI-prompt facts + fingerprint for the editor) still exists with slightly different bands/margins — it no longer drives any rendered fuel section, but don't let prompt facts be mistaken for rendered facts.
+- Do not confuse AI-prompt facts with the final rendered evidence. Fingerprint-stale AI and legacy saved prose are not valid stand-ins for the editor's current effective payload when verifying an unblock.
 - Deterministic builders that still rank internally (Regional Highlights helper, kept for other callers) must take the facts pressure decision and switch to spread phrasing when distributed.
