@@ -485,6 +485,8 @@ export default function CargoWatch() {
         </div>
       </div>
 
+      <TopicReportPanel topic="cargo_watch" />
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-px bg-border p-px rounded-sm overflow-hidden">
         <Kpi label="Total Incidents" value={total} sub={`Cargo Watch · ${rangeText}`} />
@@ -937,10 +939,6 @@ export default function CargoWatch() {
         )}
       </div>
 
-      {/* Report Builder, folded into the topic page — drafts for this topic
-          live here instead of a separate /reports destination you have to
-          jump to. */}
-      <TopicReportPanel topic="cargo_watch" />
     </div>
   );
 }
