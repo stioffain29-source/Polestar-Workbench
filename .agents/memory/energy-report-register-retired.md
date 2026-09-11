@@ -15,6 +15,10 @@ Keep the overview cards, unchanged BLUF and complete map/legend together by sizi
 
 Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
 
+Keep a stable full-world geographic frame, with North and South America adjacent and the wrap seam at the date line.
+
+**Why:** the owner rejected the Americas appearing on opposite sides after the map was shortened. Data-centred country-by-country wrapping is not acceptable geographic context.
+
 Do not add country-name or incident-count labels to the Energy map.
 
 **Why:** the owner explicitly rejected the unsolicited labels on 2026-09-11. Sharper rendering and wider geography were not permission to add annotations.

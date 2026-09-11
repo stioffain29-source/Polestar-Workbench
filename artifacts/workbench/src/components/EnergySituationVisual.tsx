@@ -8,7 +8,7 @@
  */
 
 import type { Feature, FeatureCollection, Geometry } from "geojson";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import worldCompleteGeo from "@/assets/worldComplete.geo.json";
 import {
   COUNT_BANDS,
@@ -468,6 +468,7 @@ export function EnergySituationVisual({
   mapHeight = DEFAULT_MAP_HEIGHT,
   fitToPage = false,
 }: EnergySituationVisualProps) {
+  const clipId = `energy-world-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const rootRef = useRef<HTMLDivElement>(null);
   const [availableHeight, setAvailableHeight] = useState(mapHeight);
   useLayoutEffect(() => {
@@ -506,18 +507,15 @@ export function EnergySituationVisual({
     );
   }
 
-  const affectedFeatures = worldGeo.features.filter(
-    (feature) => countForFeature(featureCountryName(feature), intensity) > 0,
-  );
-  // New Zealand is required geographic context even in a quiet reporting
-  // window. Include its full geometry in framing, without inventing incidents.
-  const newZealand = worldGeo.features.find((feature) => featureCountryName(feature) === "New Zealand");
-  const framingFeatures = newZealand && !affectedFeatures.includes(newZealand)
-    ? [...affectedFeatures, newZealand]
-    : affectedFeatures;
-  const bounds = focusBounds(framingFeatures) ?? worldFallbackBounds();
+  // Use one stable world frame, with the seam at ±180°. A data-centred
+  // longitude frame cut through the Americas; independently unwrapped
+  // country rings then placed North and South America on opposite edges.
+  const bounds = worldFallbackBounds();
   const viewportHeight = Math.max(120, fitToPage ? availableHeight : mapHeight);
   const projection = buildProjection(bounds, SVG_WIDTH, viewportHeight);
+  const [worldLeft, worldTop] = projection.projectUnwrapped(-180, bounds.maxLat);
+  const [worldRight, worldBottom] = projection.projectUnwrapped(180, bounds.minLat);
+  const worldWidth = worldRight - worldLeft;
 
   return (
     <div
@@ -550,21 +548,35 @@ export function EnergySituationVisual({
           height={projection.height}
           fill="#f8f9fb"
         />
-        {worldGeo.features.map((feature, index) => {
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={worldLeft} y={worldTop} width={worldWidth} height={worldBottom - worldTop} />
+          </clipPath>
+        </defs>
+        <g clipPath={`url(#${clipId})`}>
+        {worldGeo.features.flatMap((feature, index) => {
           const country = featureCountryName(feature);
           const count = countForFeature(country, intensity);
           const fill = countBandColor(count);
-          return (
+          const path = projectedFeaturePath(feature, projection);
+          // Date-line-crossing Russia/Fiji rings extend beyond one edge.
+          // Wrapped copies, clipped to the SAME world rectangle, preserve
+          // those fragments without connecting them across the ocean.
+          return [-1, 0, 1].map((copy) => (
             <path
-              key={`${country || "country"}-${index}`}
-              d={projectedFeaturePath(feature, projection)}
+              key={`${country || "country"}-${index}-${copy}`}
+              data-country={country}
+              data-world-copy={copy}
+              transform={`translate(${copy * worldWidth} 0)`}
+              d={path}
               fill={fill ?? EMPTY_FILL}
               fillOpacity={fill ? 0.9 : 1}
               stroke={BORDER}
               strokeWidth={0.6}
             />
-          );
+          ));
         })}
+        </g>
       </svg>
       <div
         style={{
