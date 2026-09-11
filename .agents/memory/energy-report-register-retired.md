@@ -15,4 +15,10 @@ Do not add country-name or incident-count labels to the Energy map.
 
 **Why:** the owner explicitly rejected the unsolicited labels on 2026-09-11. Sharper rendering and wider geography were not permission to add annotations.
 
+Energy Fast Facts must contain substantive reporting evidence, not record-count/severity/classifier metadata. Retain reporting period and most affected country, and populate the remaining cards with specific supported developments.
+
+**Why:** the owner rejected the generic cards and explicitly corrected the suggestion to remove them: useful facts must be populated, not omitted just to simplify the layout.
+
+**How to apply:** preserve places, operational consequences and source-supported quantities; never turn a warning into a confirmed outage or invent numbers to fill a card.
+
 **Why:** the owner explicitly rejected the map omitting New Zealand and requested slightly smaller Fast Facts to accommodate it. Static maps need a complete geographic base, not the monitor's selected-country overlays rendered as standalone land.

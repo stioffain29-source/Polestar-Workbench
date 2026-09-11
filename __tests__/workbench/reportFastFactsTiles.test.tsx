@@ -1,5 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 
+// ReportPreview only needs the pure country-intensity reducer for this suite.
+// Keep the Leaflet / geojson renderer out of the Node test environment; this
+// does not mock Fast Facts or any report data.
+jest.mock("@/components/CountryChoroplethMap", () => ({
+  __esModule: true,
+  buildCountryIntensity: () => new Map(),
+  default: () => null,
+}));
+
 import ReportPreview from "../../artifacts/workbench/src/components/ReportPreview";
 import { FUEL_MARKET_DATA_SAMPLE } from "../../artifacts/workbench/src/lib/fuelWatchReport";
 import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
@@ -39,7 +48,9 @@ const report = {
 };
 
 // ---------------------------------------------------------------------------
-// Generic topic report (energy) — six computeTopicFastFacts tiles.
+// Generic topic report (energy) — the reporting-period and country anchors
+// plus source-specific evidence cards. Energy deliberately does not expose
+// generic record/severity/type/latest counters.
 // ---------------------------------------------------------------------------
 
 describe("ReportPreview (topic) Fast Facts tiles", () => {
@@ -47,31 +58,42 @@ describe("ReportPreview (topic) Fast Facts tiles", () => {
     {
       id: "e1",
       topic: "energy",
-      title: "Power grid blackout disrupts Jakarta",
+      title: "Substation fire cuts power to Dhaka",
+      displayTitle: "Substation fire cuts power to parts of Dhaka for hours",
       severity: "high",
       occurredAt: "2026-06-14T00:00:00.000Z",
-      country: "Indonesia",
-      summary: "A power outage hit the capital.",
+      country: "Bangladesh",
+      summary: "A substation fire cut power to parts of Dhaka for hours.",
       source: "Test Source",
     },
     {
       id: "e2",
       topic: "energy",
-      title: "Substation fire causes rolling blackout in Manila",
+      title: "Cebu faces longer brownouts as Visayas power shortage worsens",
       severity: "moderate",
       occurredAt: "2026-06-12T00:00:00.000Z",
       country: "Philippines",
-      summary: "Rolling blackouts followed a substation failure.",
+      summary: "Cebu faces longer brownouts as a Visayas power shortage worsens.",
       source: "Test Source",
     },
     {
       id: "e3",
       topic: "energy",
-      title: "Gas shortage triggers power rationing in Indonesia",
+      title: "DOUBLE WHAMMY: Brownouts now, higher Visayas power bills in September",
       severity: "low",
       occurredAt: "2026-06-10T00:00:00.000Z",
-      country: "Indonesia",
-      summary: "Energy rationing introduced amid a gas shortage.",
+      country: "Philippines",
+      summary: "Brownouts now are followed by higher Visayas power bills in September.",
+      source: "Test Source",
+    },
+    {
+      id: "e4",
+      topic: "energy",
+      title: "Colon Night Market vendors grapple with rotational brownouts",
+      severity: "moderate",
+      occurredAt: "2026-06-09T00:00:00.000Z",
+      country: "Philippines",
+      summary: "Colon Night Market vendors grapple with rotational brownouts.",
       source: "Test Source",
     },
   ];
@@ -80,33 +102,35 @@ describe("ReportPreview (topic) Fast Facts tiles", () => {
     <ReportPreview report={{ ...report, topic: "energy" }} incidents={incidents} />,
   );
 
-  it("emits the six standard Fast Facts tile labels", () => {
+  it("emits the reporting anchors and one card for each observed evidence family", () => {
     for (const label of [
       "Reporting Period",
-      "Total Records",
-      "Highest Severity",
-      "Top Issue Type",
       "Most Affected Country",
-      "Latest Incident",
+      "Power Supply",
+      "Infrastructure Outage",
+      "Electricity Costs",
+      "Business Impact",
     ]) {
       expect(hasTile(html, label)).toBe(true);
     }
+    for (const label of ["Total Records", "Highest Severity", "Top Issue Type", "Latest Incident"]) {
+      expect(hasTile(html, label)).toBe(false);
+    }
   });
 
-  it("fills Total Records with the in-window count, not a placeholder", () => {
-    expect(tileValue(html, "Total Records")).toBe("3");
+  it("keeps the observed country and specific evidence values", () => {
+    expect(tileValue(html, "Most Affected Country")).toBe("Philippines");
+    expect(tileValue(html, "Power Supply")).toBe("Longer brownouts");
+    expect(tileValue(html, "Infrastructure Outage")).toBe("Substation fire");
+    expect(tileValue(html, "Electricity Costs")).toBe("Higher electricity costs");
+    expect(tileValue(html, "Business Impact")).toBe("Market vendors affected");
   });
 
-  it("derives Highest Severity from the incident set", () => {
-    expect(tileValue(html, "Highest Severity")).toBe("High");
-  });
-
-  it("derives Most Affected Country from attributed countries", () => {
-    expect(tileValue(html, "Most Affected Country")).toBe("Indonesia");
-  });
-
-  it("derives Latest Incident from the newest in-window record", () => {
-    expect(tileValue(html, "Latest Incident")).toBe("14 Jun 2026");
+  it("carries the cleaned source headlines and their observed details", () => {
+    expect(html).toContain("Substation fire cuts power to parts of Dhaka for hours");
+    expect(html).toContain("Cebu faces longer brownouts as Visayas power shortage worsens");
+    expect(html).toContain("Brownouts now, higher Visayas power bills in September");
+    expect(html).toContain("Colon Night Market vendors grapple with rotational brownouts");
   });
 });
 
@@ -178,7 +202,13 @@ describe("ReportPreview (cargo) Fast Facts tiles", () => {
 describe("ReportPreview (fuel) Fast Facts tiles", () => {
   const html = renderToStaticMarkup(
     <ReportPreview
-      report={{ ...report, topic: "fuel", hardNumbers: FUEL_MARKET_DATA_SAMPLE }}
+      report={{
+        ...report,
+        topic: "fuel",
+        hardNumbers: FUEL_MARKET_DATA_SAMPLE,
+        whatMatters:
+          "No material current-period operational development. Fuel procurement remains uncertain pending new current-period operational evidence.",
+      }}
       incidents={[]}
     />,
   );

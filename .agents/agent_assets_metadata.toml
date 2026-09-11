@@ -1017,3 +1017,17 @@ mtime_ms = 1789091861428
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e6e7f57f-18da-4aeb-b638-5aa99cec0d6e/12a1529e-b660-4686-9191-58cf6fd328c5"
 storage_version_token = "1789091876799015"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "hiTx6LiQVUY6KGEhqsEX_"
+uri = "file://artifacts/workbench/screenshots/energy-MarketPrices-pages/page-2.png"
+type = "image"
+title = "Energy Watch — populated Fast Facts"
+description = "Verified development PDF page with four source-backed operational facts, alongside the reporting period and most affected country. Development data, not a published report."
+logical_id = "c563c212-9ce2-45ef-809e-8b6a870664fe"
+content_hash = "sha256:a6dddc653390cc76ec9aaef6a6a7ba4462402d75e9baa818475290d1ac1ac518"
+size = 272718
+mtime_ms = 1789093749072
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/c563c212-9ce2-45ef-809e-8b6a870664fe/7df59a29-e5cf-4931-85ec-998b29adb4f5"
+storage_version_token = "1789094018902611"
+content_type = "image/png"

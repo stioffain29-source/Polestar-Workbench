@@ -1,9 +1,9 @@
 import { computeTopicFastFacts } from "../../artifacts/workbench/src/lib/topicFastFacts";
 
-describe("topicFastFacts — Top Issue Type apology (TC-02)", () => {
+describe("topicFastFacts — Energy evidence cards", () => {
   const issueDate = "2026-06-20";
 
-  it("shows Data quality issue when the leader is Other energy incident", () => {
+  it("keeps the anchors but emits no obsolete metadata for forecast-only rows", () => {
     const cards = computeTopicFastFacts({
       topic: "energy",
       topicLabel: "Energy Watch",
@@ -25,12 +25,23 @@ describe("topicFastFacts — Top Issue Type apology (TC-02)", () => {
         },
       ],
     });
-    const topType = cards.find((c) => c.label === "Top Issue Type");
-    expect(topType?.value).toBe("Multiple energy incident types");
-    expect(topType?.note).toBe("Data quality issue");
+    const cardLabels = cards.map((card) => card.label);
+    expect(cardLabels).toEqual(
+      expect.arrayContaining(["Reporting Period", "Most Affected Country"]),
+    );
+    expect(cardLabels).not.toEqual(
+      expect.arrayContaining([
+        "Total Records",
+        "Highest Severity",
+        "Top Issue Type",
+        "Latest Incident",
+      ]),
+    );
+    expect(cards.some((card) => (card.note ?? "").includes("forecast"))).toBe(false);
+    expect(cards.some((card) => (card.note ?? "").includes("Data quality issue"))).toBe(false);
   });
 
-  it("shows a count note for a real Power outage plurality", () => {
+  it("uses source headlines as evidence instead of generic issue metadata", () => {
     const cards = computeTopicFastFacts({
       topic: "energy",
       topicLabel: "Energy Watch",
@@ -52,8 +63,16 @@ describe("topicFastFacts — Top Issue Type apology (TC-02)", () => {
         },
       ],
     });
-    const topType = cards.find((c) => c.label === "Top Issue Type");
-    expect(topType?.value).toBe("Power outage");
-    expect(topType?.note).toBe("2 records");
+    const evidenceNotes = cards.map((card) => card.note ?? "").join(" ");
+    expect(evidenceNotes).toContain("Power outages hit Karachi after transmission fault");
+    expect(evidenceNotes).toContain("More power outages reported across Sindh");
+    expect(cards.map((card) => card.label)).not.toEqual(
+      expect.arrayContaining([
+        "Total Records",
+        "Highest Severity",
+        "Top Issue Type",
+        "Latest Incident",
+      ]),
+    );
   });
 });

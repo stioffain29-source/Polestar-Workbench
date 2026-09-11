@@ -11,6 +11,7 @@ import { classifyIncidentType } from "./incidentClassifier";
 import { isTopicRelevant, sanitizeFactValue, splitAttributedCountries } from "./topicRelevance";
 import { isCargoInScope } from "./cargoAnalysis";
 import type { ShippingMaritimeSemanticEvidence } from "./shippingAnalysis";
+import { buildEnergyEvidenceCards } from "./energyFastFacts";
 
 export interface TopicFastFactsIncident {
   id?: number | string;
@@ -131,6 +132,18 @@ export function computeTopicFastFacts(opts: {
   let topCountryN = 0;
   for (const [c, n] of countryCount) {
     if (n > topCountryN) { topCountryN = n; topCountry = c; }
+  }
+
+  if (topic === "energy") {
+    return [
+      { label: "Reporting Period", value: reportingPeriod },
+      {
+        label: "Most Affected Country",
+        value: topCountry === "—" ? "Country not identified" : sanitizeFactValue(topic, topCountry),
+        note: topCountryN ? `${topCountryN} ${topCountryN === 1 ? "record" : "records"}` : "No attributed reporting",
+      },
+      ...buildEnergyEvidenceCards(windowIncidents),
+    ];
   }
 
   // Latest incident date
