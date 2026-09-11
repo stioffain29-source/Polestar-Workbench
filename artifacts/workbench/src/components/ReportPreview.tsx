@@ -706,8 +706,6 @@ function EnergyReportPages({
   polestarViewText,
   energyIntensity,
   marketPrices,
-  relatedRows,
-  incidentSummaries,
   show,
   ffOverrides,
   sectionOverrides,
@@ -725,13 +723,10 @@ function EnergyReportPages({
   polestarViewText: string;
   energyIntensity: Map<string, number>;
   marketPrices?: MarketPrice[];
-  relatedRows: TopicFastFactsIncident[];
-  incidentSummaries: Record<string, string>;
   show: ReportSectionGate;
   ffOverrides?: TopicSectionOverrides["fastFactOverrides"];
   sectionOverrides?: TopicSectionOverrides | null;
 }) {
-  const showRelated = relatedRows.length > 0 && show("related-incidents");
 
   return (
     <div
@@ -950,7 +945,7 @@ function EnergyReportPages({
       </div>
 
       {/* PAGE 5 — Closing assessment. */}
-      <div className="energy-report-page" data-energy-page="5">
+      <div className="energy-report-page" data-energy-page="5" style={{ display: "flex", flexDirection: "column" }}>
         <BulletsSection
           hidden={!show("implications")}
           title="Implications for Business"
@@ -958,23 +953,21 @@ function EnergyReportPages({
         />
         <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={watchNextText} max={8} />
         <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={polestarViewText} />
-      </div>
-
-      {/* PAGE 6 — Related is explicitly kept on a fresh page; Disclaimer
-          remains the existing unchanged text. */}
-      <div
-        className="energy-report-page"
-        data-energy-page="6"
-        style={{ breakBefore: "page", pageBreakBefore: "always" }}
-      >
-        {showRelated && (
-          <Section title="Related Incidents">
-            <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />
-          </Section>
-        )}
-        <Section title="Disclaimer">
-          <Paragraphs text={DISCLAIMER_TEXT} />
-        </Section>
+        <aside
+          data-energy-disclaimer
+          style={{
+            marginTop: "auto",
+            padding: "10px 13px",
+            fontFamily: "Roboto, sans-serif",
+            color: DUSK,
+            breakInside: "avoid",
+            pageBreakInside: "avoid",
+            flexShrink: 0,
+          }}
+        >
+          <h2 style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: NAVY }}>DISCLAIMER</h2>
+          <p style={{ margin: 0, fontSize: 10, lineHeight: 1.2, fontWeight: 300 }}>{DISCLAIMER_TEXT}</p>
+        </aside>
         <EnergyReportFooter />
       </div>
     </div>
@@ -1302,8 +1295,6 @@ export default function ReportPreview({
           )}
           energyIntensity={energyIntensity}
           marketPrices={marketPrices}
-          relatedRows={relatedRows}
-          incidentSummaries={incidentSummaries}
           show={show}
           ffOverrides={ffOverrides}
           sectionOverrides={sectionOverrides}

@@ -3,7 +3,7 @@
   "issueDate": "2026-05-23",
   "savedDevelopmentReport": true,
   "savedAiProse": false,
-  "physicalPages": 6,
+  "physicalPages": 5,
   "headingsByPage": [
     {
       "page": 1,
@@ -35,13 +35,7 @@
       "headings": [
         "IMPLICATIONS FOR BUSINESS",
         "WATCH NEXT",
-        "POLESTAR VIEW"
-      ]
-    },
-    {
-      "page": 6,
-      "headings": [
-        "RELATED INCIDENTS",
+        "POLESTAR VIEW",
         "DISCLAIMER"
       ]
     }

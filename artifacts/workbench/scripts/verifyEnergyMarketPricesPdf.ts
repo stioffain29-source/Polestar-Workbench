@@ -229,10 +229,9 @@ function inspectRenderedPdf(pdfPath: string, outDir: string): {
     headingsByPage.push({ page, headings: pageHeadings(text) });
   }
 
-  // Energy Watch has a fixed six-page contract. A seventh (or later) physical
-  // page is the observable form of body overflow; render the contract pages
-  // regardless so the proof pack still contains pages 2–6 for inspection.
-  const expectedPages = 6;
+  // Energy Watch ends on page 5; any later page is body overflow.
+  // Render the contract pages for visual inspection.
+  const expectedPages = TOPIC === "energy" ? 5 : 6;
   const overflowPages = Array.from(
     { length: Math.max(0, physicalPages - expectedPages) },
     (_, index) => expectedPages + index + 1,
@@ -383,7 +382,7 @@ async function main() {
     );
     if (inspection.overflow) {
       throw new Error(
-        `Energy Watch PDF overflowed the six-page contract: physical pages ${inspection.physicalPages}.`,
+        `Energy Watch PDF overflowed the five-page contract: physical pages ${inspection.physicalPages}.`,
       );
     }
   } finally {

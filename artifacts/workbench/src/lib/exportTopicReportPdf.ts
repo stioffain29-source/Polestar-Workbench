@@ -28,6 +28,7 @@ import {
   drawFastFactsKpiCards,
   drawBulletSection,
   drawDisclaimer,
+  DISCLAIMER_TEXT,
   drawSectionWithProseAndDisclaimer,
   ensureRoomForDisclaimer,
   drawFooters,
@@ -1218,7 +1219,7 @@ export async function exportTopicReportPdf(
     }),
   );
 
-  // Energy Watch has a fixed six-page presentation contract. Keep this
+  // Energy Watch has a fixed five-page presentation contract. Keep this
   // branch ahead of the generic topic flow so the existing layout for every
   // other topic remains byte-for-byte unchanged.
   if (data.topic === "energy") {
@@ -1369,20 +1370,27 @@ export async function exportTopicReportPdf(
       }
     }
 
-    // PAGE 6 — force the complete register onto its own final page, followed
-    // by the unchanged shared disclaimer.
-    newPage(ctx);
-    if (show("related-incidents")) {
-      drawRelatedIncidents(
-        ctx,
-        filterTopicReportIncidents(incidents, data.topic, data.issueDate),
-        data.topic,
-        topicLabels,
-        options.incidentSummaries ?? {},
-      );
-    }
-    ensureRoomForDisclaimer(ctx);
-    drawDisclaimer(ctx);
+    // Energy ends on page 5. Related Incidents was removed by the owner;
+    // retain the unchanged legal text in small Roboto on the plain page.
+    setRoboto(ctx.pdf, "light");
+    ctx.pdf.setFontSize(7.5);
+    const disclaimerLines: string[] = ctx.pdf.splitTextToSize(
+      sanitize(DISCLAIMER_TEXT),
+      ctx.CW - 20,
+    );
+    const disclaimerHeight = 32 + disclaimerLines.length * 9;
+    const originalBottom = ctx.BOTTOM;
+    const disclaimerY = ctx.H - originalBottom - disclaimerHeight;
+    setText(ctx.pdf, NAVY);
+    setRoboto(ctx.pdf, "bold");
+    ctx.pdf.setFontSize(8);
+    ctx.pdf.text("DISCLAIMER", ctx.MX + 10, disclaimerY + 15);
+    setText(ctx.pdf, DUSK);
+    setRoboto(ctx.pdf, "light");
+    ctx.pdf.setFontSize(7.5);
+    ctx.pdf.text(disclaimerLines, ctx.MX + 10, disclaimerY + 29, {
+      lineHeightFactor: 1.2,
+    });
     drawFooters(ctx.pdf, undefined, undefined, true);
     ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
     return;
