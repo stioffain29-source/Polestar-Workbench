@@ -582,8 +582,8 @@ export default function ConflictReportPreview({
 
         <Section title="Disclaimer">
           <p
-            className="text-[12px] leading-[1.7]"
-            style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}
+            className="leading-[1.7]"
+            style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: "9pt" }}
           >
             {DISCLAIMER_TEXT}
           </p>

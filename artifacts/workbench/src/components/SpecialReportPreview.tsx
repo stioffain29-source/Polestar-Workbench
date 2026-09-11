@@ -551,7 +551,7 @@ export default function SpecialReportPreview({ report, incidents }: SpecialRepor
             paddingTop: 12,
             borderTop: `1px solid ${POLAR}`,
             fontFamily: ROBOTO,
-            fontSize: 10,
+            fontSize: "9pt",
             lineHeight: 1.5,
             color: DUSK,
           }}

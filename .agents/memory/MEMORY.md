@@ -154,3 +154,4 @@
 - [No follow-up proposals](no-follow-up-proposals.md) — owner rule: proposals became never-ending without real improvement; report findings plainly, never queue tasks.
 - [Global sports-fixture gate](sports-fixture-global-gate.md) — owner: NO sport in any report; one gate + unrest override immune to sports idioms (injury time/shot/crush/dead rubber); keep cues must be SUMMARY-safe ("stoppage time" trap).
 - [Energy register retired](energy-report-register-retired.md) — owner removed Related Incidents from Energy Watch; retain full compact disclaimer on page 5, not a separate page.
+- [Disclaimer typography](report-disclaimer-typography.md) — all Workbench report disclaimer bodies use 9-point Roboto in previews and exports; do not resize other prose.

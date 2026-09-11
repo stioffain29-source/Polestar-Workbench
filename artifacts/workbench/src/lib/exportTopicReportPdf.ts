@@ -1371,14 +1371,19 @@ export async function exportTopicReportPdf(
     }
 
     // Energy ends on page 5. Related Incidents was removed by the owner;
-    // retain the unchanged legal text in small Roboto on the plain page.
+    // retain the unchanged legal text in 9pt Roboto on the plain page.
+    const disclaimerFontSize = 9;
+    const disclaimerLineHeightFactor = 1.2;
+    const disclaimerLineHeight =
+      disclaimerFontSize * disclaimerLineHeightFactor;
     setRoboto(ctx.pdf, "light");
-    ctx.pdf.setFontSize(7.5);
+    ctx.pdf.setFontSize(disclaimerFontSize);
     const disclaimerLines: string[] = ctx.pdf.splitTextToSize(
       sanitize(DISCLAIMER_TEXT),
       ctx.CW - 20,
     );
-    const disclaimerHeight = 32 + disclaimerLines.length * 9;
+    const disclaimerHeight =
+      32 + disclaimerLines.length * disclaimerLineHeight;
     const originalBottom = ctx.BOTTOM;
     const disclaimerY = ctx.H - originalBottom - disclaimerHeight;
     setText(ctx.pdf, NAVY);
@@ -1387,9 +1392,9 @@ export async function exportTopicReportPdf(
     ctx.pdf.text("DISCLAIMER", ctx.MX + 10, disclaimerY + 15);
     setText(ctx.pdf, DUSK);
     setRoboto(ctx.pdf, "light");
-    ctx.pdf.setFontSize(7.5);
+    ctx.pdf.setFontSize(disclaimerFontSize);
     ctx.pdf.text(disclaimerLines, ctx.MX + 10, disclaimerY + 29, {
-      lineHeightFactor: 1.2,
+      lineHeightFactor: disclaimerLineHeightFactor,
     });
     drawFooters(ctx.pdf, undefined, undefined, true);
     ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

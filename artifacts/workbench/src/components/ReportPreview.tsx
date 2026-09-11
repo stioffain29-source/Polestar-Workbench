@@ -965,8 +965,18 @@ function EnergyReportPages({
             flexShrink: 0,
           }}
         >
-          <h2 style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: NAVY }}>DISCLAIMER</h2>
-          <p style={{ margin: 0, fontSize: 10, lineHeight: 1.2, fontWeight: 300 }}>{DISCLAIMER_TEXT}</p>
+          <h2 style={{ margin: "0 0 6px", fontSize: "9pt", fontWeight: 700, color: NAVY }}>DISCLAIMER</h2>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: "Roboto, sans-serif",
+              fontSize: "9pt",
+              lineHeight: 1.2,
+              fontWeight: 300,
+            }}
+          >
+            {DISCLAIMER_TEXT}
+          </p>
         </aside>
         <EnergyReportFooter />
       </div>
@@ -1619,7 +1629,12 @@ export default function ReportPreview({
       {/* Full-bleed Polar Gray footer — website, email, page note */}
       <div className="px-10 pb-10">
         <Section title="Disclaimer">
-          <Paragraphs text={DISCLAIMER_TEXT} />
+          <p
+            className="leading-[1.7] mb-3 font-light"
+            style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: "9pt" }}
+          >
+            {DISCLAIMER_TEXT}
+          </p>
         </Section>
       </div>
 

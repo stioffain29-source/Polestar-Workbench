@@ -1835,17 +1835,24 @@ function drawRelatedRegistry(
   ctx.y = y;
 }
 
-function drawShallowDisclaimerFooter(ctx: Ctx) {
+function drawShallowDisclaimerFooter9pt(ctx: Ctx) {
   const { pdf, MX, CW, H } = ctx;
+  const disclaimerFontSize = 9;
+  const disclaimerLineHeightFactor = 1.2;
+  const disclaimerLineHeight =
+    disclaimerFontSize * disclaimerLineHeightFactor;
   setRoboto(pdf, "light");
-  pdf.setFontSize(6.1);
+  pdf.setFontSize(disclaimerFontSize);
   const lines = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW - 14);
-  const h = Math.max(30, lines.length * 7 + 12);
+  const h = Math.max(30, lines.length * disclaimerLineHeight + 12);
   const y = H - FOOTER_BAND_H - h - 5;
   setFill(pdf, POLAR);
   pdf.rect(MX, y, CW, h, "F");
   setText(pdf, DUSK);
-  pdf.text(lines, MX + 7, y + 10, { lineHeightFactor: 1.1 });
+  pdf.setFontSize(disclaimerFontSize);
+  pdf.text(lines, MX + 7, y + 10, {
+    lineHeightFactor: disclaimerLineHeightFactor,
+  });
 }
 
 // Exporter ------------------------------------------------------------------
@@ -1976,7 +1983,7 @@ export async function exportShippingReportPdf(
     startInteriorPage(ctx, "Polestar View and Related Incidents");
     if (show("polestar-view")) drawPolestarPanel(ctx, publication);
     if (show("related-incidents")) drawRelatedRegistry(ctx, presentation);
-    drawShallowDisclaimerFooter(ctx);
+    drawShallowDisclaimerFooter9pt(ctx);
   }
 
   drawFooters(ctx.pdf, undefined, undefined, true);

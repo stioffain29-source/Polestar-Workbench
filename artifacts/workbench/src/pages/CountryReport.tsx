@@ -2685,7 +2685,17 @@ export default function CountryReport() {
 
       {/* Disclaimer */}
       <Section title="Disclaimer">
-        <Prose text={DISCLAIMER_TEXT} />
+        <p
+          style={{
+            fontFamily: ROBOTO,
+            fontSize: "9pt",
+            lineHeight: 1.55,
+            color: DUSK,
+            margin: "0 0 10px 0",
+          }}
+        >
+          {DISCLAIMER_TEXT}
+        </p>
       </Section>
 
         </div>

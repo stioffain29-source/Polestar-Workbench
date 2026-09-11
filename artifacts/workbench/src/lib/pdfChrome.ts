@@ -581,17 +581,36 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
 //
 // The heading and body MUST stay together — never let the "Disclaimer"
 // heading sit on page N with the prose flowing onto page N+1. We
-// measure the wrapped body at the actual text width so the block
-// estimate matches what `renderProse` will draw.
+// measure the wrapped body at the actual text width so the block estimate
+// matches the explicit disclaimer renderer below. Disclaimer prose is
+// intentionally smaller than ordinary report prose; do not change
+// `renderProse` to achieve this.
 
-export function measureDisclaimerHeight(ctx: Ctx): number {
+const DISCLAIMER_BODY_SIZE = 9;
+const DISCLAIMER_BODY_LINE_HEIGHT_FACTOR = 1.2;
+const DISCLAIMER_BODY_LINE_H =
+  DISCLAIMER_BODY_SIZE * DISCLAIMER_BODY_LINE_HEIGHT_FACTOR;
+const DISCLAIMER_LEAD_IN = 8;
+const DISCLAIMER_PARAGRAPH_TRAILING = 6;
+
+function disclaimerLines(ctx: Ctx): string[] {
   const { pdf, CW } = ctx;
   setRoboto(pdf, "light");
-  pdf.setFontSize(11);
-  const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
-  const headingBlockH = 6 + 14 + 8;
-  const bodyH = wrapped.length * 14 + 6 + 6;
-  return 8 + headingBlockH + bodyH + 4;
+  pdf.setFontSize(DISCLAIMER_BODY_SIZE);
+  return pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
+}
+
+export function measureDisclaimerHeight(ctx: Ctx): number {
+  const wrapped = disclaimerLines(ctx);
+  // drawDisclaimer adds the lead-in before drawSectionHeading. That means the
+  // heading helper's normal between-section gap is also part of this block,
+  // including when the disclaimer starts on an otherwise empty body page.
+  const headingGap =
+    ctx.y + DISCLAIMER_LEAD_IN > ctx.TOP + 4 ? 20 : 0;
+  const headingBlockH = 30; // drawSectionHeading: title baseline + divider
+  const bodyH =
+    wrapped.length * DISCLAIMER_BODY_LINE_H + DISCLAIMER_PARAGRAPH_TRAILING;
+  return DISCLAIMER_LEAD_IN + headingGap + headingBlockH + bodyH;
 }
 
 /** Estimate rendered prose height for keep-together pagination. */
@@ -652,22 +671,29 @@ export function drawSectionWithProseAndDisclaimer(
 }
 
 export function drawDisclaimer(ctx: Ctx) {
-  const { pdf, CW } = ctx;
-  // Match renderProse setup so splitTextToSize uses the same metrics.
-  setRoboto(pdf, "light");
-  pdf.setFontSize(11);
-  const wrapped: string[] = pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), CW);
-  const headingBlockH = 6 + 14 + 8; // pre-heading pad + heading line + post-heading pad
-  const bodyH = wrapped.length * 14 + 6 + 6; // line height matches renderProse
-  // 8pt lead-in (the else branch below) plus a small safety margin.
+  const { pdf, MX } = ctx;
   const need = measureDisclaimerHeight(ctx);
-  if (ctx.y + need > ctx.H - ctx.BOTTOM) {
+  const startsOnNewPage = ctx.y + need > ctx.H - ctx.BOTTOM;
+  if (startsOnNewPage) {
     newPage(ctx);
   } else {
-    ctx.y += 8;
+    ctx.y += DISCLAIMER_LEAD_IN;
   }
-  drawSectionHeading(ctx, "Disclaimer");
-  renderProse(ctx, DISCLAIMER_TEXT);
+
+  // The full block was reserved above, so the heading and every wrapped body
+  // line remain on one page. On a fresh page omit the lead-in that only exists
+  // when the disclaimer follows preceding content.
+  drawSectionHeading(ctx, "Disclaimer", { skipEnsureSpace: true });
+
+  const wrapped = disclaimerLines(ctx);
+  setText(pdf, DUSK);
+  setRoboto(pdf, "light");
+  pdf.setFontSize(DISCLAIMER_BODY_SIZE);
+  pdf.text(wrapped, MX, ctx.y + DISCLAIMER_BODY_SIZE, {
+    lineHeightFactor: DISCLAIMER_BODY_LINE_HEIGHT_FACTOR,
+  });
+  ctx.y += wrapped.length * DISCLAIMER_BODY_LINE_H;
+  ctx.y += DISCLAIMER_PARAGRAPH_TRAILING;
 }
 
 /**

@@ -1095,7 +1095,10 @@ export default function ShippingReportPreview({
             <RelatedIncidentsTable rows={presentation.register.rows} />
           </div>}
 
-         <div className="bg-[#e2e2e2] p-4 text-[10px] text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-sm mt-auto mb-[15mm]">
+          <div
+            className="bg-[#e2e2e2] p-4 text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-sm mt-auto mb-[15mm]"
+            style={{ fontSize: "9pt" }}
+          >
            {DISCLAIMER_TEXT}
           </div>
          <div className="page-footer"><span>Shipping Watch</span><span>Page 7</span></div>

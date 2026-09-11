@@ -222,7 +222,7 @@ export async function downloadSpotReportDocx(
     new Paragraph({
       spacing: { before: 240 },
       alignment: AlignmentType.LEFT,
-      children: [new TextRun({ text: DISCLAIMER_TEXT, italics: true, font: "Roboto", size: 16, color: DUSK_HEX })],
+      children: [new TextRun({ text: DISCLAIMER_TEXT, italics: true, font: "Roboto", size: 18, color: DUSK_HEX })],
     }),
   );
 
