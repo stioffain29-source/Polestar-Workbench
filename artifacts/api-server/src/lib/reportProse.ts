@@ -35,6 +35,11 @@ const MAX_COMPLETION_TOKENS = 8192;
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v3";
+// Energy has a deliberately different section contract (notably its
+// evidence-led Markdown headings), so its prompt change must invalidate only
+// Energy rows. Keep the general topic version above stable: changing it would
+// unnecessarily invalidate cached prose for every other topic.
+export const ENERGY_REPORT_PROSE_PROMPT_VERSION = "v1";
 
 export { isLlmAvailable, MAX_PROSE_INCIDENTS_ACCEPTED };
 export type { ProseIncidentInput };
@@ -151,7 +156,12 @@ export function computeReportProseFingerprint(input: {
 }): string {
   const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
-    v: REPORT_PROSE_PROMPT_VERSION,
+    // Energy's prompt is versioned independently so changing its section
+    // contract does not invalidate the other topic caches.
+    v:
+      input.topic === "energy"
+        ? ENERGY_REPORT_PROSE_PROMPT_VERSION
+        : REPORT_PROSE_PROMPT_VERSION,
     kind: "topic-prose",
     reportId: input.reportId,
     topic: input.topic,
@@ -181,10 +191,30 @@ MARITIME GROUNDING — additional non-negotiable rules:
 - Do not retell the same development in multiple sections or append a new unsupported event, location, route, target or consequence.
 `
       : "";
+  const energyGuardrails =
+    label === "Energy Watch"
+      ? `
+ENERGY WATCH — additional non-negotiable rules:
+- Keep "situation" genuinely brief: one short cross-cutting synthesis of the energy-system pattern in this window. It must not name a country, region, city, province, district, facility, grid, plant, site or other locality, and it must not retell an incident, date, actor or event-specific detail.
+- Make "whatHappened" the substantive evidence-led section. Organise it with explicit Markdown level-two headings in the form "## Heading". Every heading must be a geography or issue label sourced from the supplied incident evidence; do not invent headings, use generic headings such as "Overview", or use a fixed country list. Use one heading per evidenced geography or issue, combine all facts belonging to that geography or issue beneath it, and never repeat a heading or its facts.
+- Retain every unique source-supported detail in "whatHappened" exactly once, including distinct outage, supply, tariff, infrastructure and fuel-to-power evidence. Do not omit a detail to meet an arbitrary word, heading, geography or country cap, and do not pad thin evidence with generic prose.
+- "whatMatters" must provide analytical implications of the evidence for continuity, access, dependencies, cost or resilience rather than another recap. Do not re-list the places, incidents or facts merely to summarise them.
+- Every "watchNext" item must be a concrete, forward-looking indicator tied to a geography or issue and to evidence in the incident block. Do not use generic monitoring advice or invented indicators.
+`
+      : "";
+  const proseFormatRule =
+    label === "Energy Watch"
+      ? "- British English. Professional, neutral register. No hyperbole or emojis. Markdown level-two headings are permitted ONLY inside the energy `whatHappened` string, as required above; do not use Markdown elsewhere."
+      : "- British English. Professional, neutral register. No hyperbole, no emojis, no markdown.";
+  const concreteWritingRule =
+    label === "Energy Watch"
+      ? "- Write concrete, information-dense sentences. Name actual places, actors and event types from the incidents where the section calls for them; in `situation`, follow the dedicated no-locality, no-incident-retelling rule above. No filler, no hedging boilerplate, no generic risk-management truisms."
+      : "- Write concrete, information-dense sentences. Name the actual places, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.";
   return `You are a senior security-intelligence analyst writing the ${label} report for corporate clients (security managers, travel-risk and operations teams). You write the way an experienced human analyst writes: specific, measured and genuinely useful. You are given the actual incidents recorded over a reporting window and you produce the narrative sections of the report.
 
 This report covers ${focus}.
 ${maritimeGuardrails}
+${energyGuardrails}
 
 GROUNDING — non-negotiable:
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
@@ -196,11 +226,11 @@ WRITING RULES:
 - Each section does a DISTINCT job. Never repeat the same fact or sentence across sections; in particular do not restate the lead location or event type in more than one section.
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the report.
 - Severity words, when used, must be EXACTLY one of: Insignificant, Low, Moderate, High, Extreme. Use no other severity words and never overstate.
-- Write concrete, information-dense sentences. Name the actual places, actors and event types from the incidents. No filler, no hedging boilerplate, no generic risk-management truisms.
+${concreteWritingRule}
 - Write impersonally about the topic and its risk trajectory. NEVER address, name or label the reader or audience. Do not use words such as "corporate operators", "operators", "clients", "companies", "businesses", "organisations" or "the reader", and never write "[anyone] should expect ...". State what is likely to happen and where pressure is likely — not what a reader should expect. (The imperative actions in implications are the only place for direct advice, and even there name the action, not the audience.)
 - Never use slash-joined category labels (e.g. "crime / public safety"); write natural prose.
 - Do NOT mention any internal tools, systems, software, dashboards, data pipelines, de-duplication, relevance screening, geocoding, "open-source reporting" or how the data was collected. Write as the analyst, about the situation — not about the process.
-- British English. Professional, neutral register. No hyperbole, no emojis, no markdown.
+${proseFormatRule}
 - PARAGRAPHING: any prose section longer than about 70 words MUST be split into 2-3 short paragraphs separated by a blank line (a literal "\n\n" inside the JSON string). Never return a single unbroken wall of text.
 
 PLAIN-ENGLISH RULES — mandatory:

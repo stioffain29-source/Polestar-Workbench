@@ -15,6 +15,12 @@ Keep the section sequence fixed but let ALL post-cover sections flow. No fixed o
 
 **How to apply:** keep short assessment sections together when practical, keep Polestar intact, and let the separately atomic 9pt white-background disclaimer move to the next page when necessary. Never cap or shorten recommendations or watch items. Preserve the hierarchy: snapshot → map → markets → situation/issue analysis → what matters → implications → watch next → Polestar → disclaimer.
 
+Energy overview and detailed analysis must have distinct jobs: a brief cross-cutting overview, then each geographic/issue development once. Headings must come from the source, never from spotting a familiar place name in a paragraph.
+
+**Why:** the owner rejected repeated Visayas/Dhaka passages after the pagination work. A three-country heading classifier turned overview mentions into duplicate country sections; the generation prompt also encouraged overview/detail retelling. Pagination checks did not catch this content defect.
+
+**How to apply:** check narrative repetition as well as page bounds against the supplied report. Preserve distinct detail and analyst edits; never solve repetition by capping paragraphs or recommendations. Keep Energy prompt invalidation separate from other topics.
+
 Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
 
 Keep a stable full-world geographic frame, with North and South America adjacent and the wrap seam at the date line.

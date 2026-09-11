@@ -1,8 +1,16 @@
+import { createHash } from "node:crypto";
 import {
+  computeReportProseFingerprint,
+  ENERGY_REPORT_PROSE_PROMPT_VERSION,
   generateReportProse,
+  REPORT_PROSE_PROMPT_VERSION,
   type GenerateReportProseInput,
   type ProseIncidentInput,
 } from "../../artifacts/api-server/src/lib/reportProse";
+import {
+  canonicalIncidents,
+  incidentIdentity,
+} from "../../artifacts/api-server/src/lib/countryProse";
 import { clearIntegrationEnv } from "./integrationEnvTestHelpers";
 
 // Exercises the INTERNALS of generateReportProse / callOnce — the prompt
@@ -153,6 +161,36 @@ describe("generateReportProse — request assembly", () => {
     expect(system.content).toMatch(/"polestarView"/);
   });
 
+  it("uses the Energy-only section contract without changing other topic prompts", async () => {
+    mockModelReply(topicReply());
+
+    await generateReportProse(
+      input({ topic: "energy", title: "Energy Watch" }),
+      0,
+    );
+
+    const [energySystem] = calls[0].body.messages;
+    expect(energySystem.content).toMatch(/ENERGY WATCH — additional non-negotiable rules/);
+    expect(energySystem.content).toMatch(/"situation" genuinely brief/i);
+    expect(energySystem.content).toMatch(/must not name a country, region, city/i);
+    expect(energySystem.content).toMatch(/"whatHappened" the substantive evidence-led section/i);
+    expect(energySystem.content).toContain('"## Heading"');
+    expect(energySystem.content).toMatch(/one heading per evidenced geography or issue/i);
+    expect(energySystem.content).toMatch(/fixed country list/i);
+    expect(energySystem.content).toMatch(/"whatMatters" must provide analytical implications/i);
+    expect(energySystem.content).toMatch(/"watchNext" item must be a concrete/i);
+    expect(energySystem.content).toMatch(/every unique source-supported detail/i);
+    expect(energySystem.content).toMatch(/do not pad thin evidence/i);
+    expect(energySystem.content).not.toMatch(/no hyperbole, no emojis, no markdown\./i);
+
+    calls = [];
+    mockModelReply(topicReply());
+    await generateReportProse(input(), 0);
+    const [shippingSystem] = calls[0].body.messages;
+    expect(shippingSystem.content).not.toMatch(/ENERGY WATCH — additional/i);
+    expect(shippingSystem.content).toMatch(/no hyperbole, no emojis, no markdown\./i);
+  });
+
   it("threads a numbered incident block, most-recent-first, and invents no third item", async () => {
     mockModelReply(topicReply());
 
@@ -194,6 +232,73 @@ describe("generateReportProse — request assembly", () => {
     expect(user.content).toMatch(/FIXED FACTS/);
     expect(user.content).toMatch(/direction: rising/);
     expect(user.content).toMatch(/do not write that jet fuel costs eased/i);
+  });
+});
+
+describe("computeReportProseFingerprint — Energy-only prompt version", () => {
+  function fingerprintWithVersion(
+    over: Partial<Parameters<typeof computeReportProseFingerprint>[0]>,
+    version: string,
+  ): string {
+    const value = {
+      reportId: 42,
+      topic: "shipping",
+      title: "Shipping & Maritime Security",
+      issueDate: "2026-06-13",
+      basisDays: 7,
+      incidents: INCIDENTS,
+      ...over,
+    };
+    const ids = canonicalIncidents(value.incidents).map(incidentIdentity);
+    return createHash("sha256")
+      .update(
+        JSON.stringify({
+          v: version,
+          kind: "topic-prose",
+          reportId: value.reportId,
+          topic: value.topic,
+          title: value.title,
+          issueDate: value.issueDate,
+          basisDays: value.basisDays,
+          facts: value.facts ?? "",
+          generationBasisFingerprint:
+            value.generationBasisFingerprint ?? "",
+          ids,
+        }),
+      )
+      .digest("hex");
+  }
+
+  it("keeps non-Energy fingerprints on the shared version", () => {
+    const value = {
+      reportId: 42,
+      topic: "shipping",
+      title: "Shipping & Maritime Security",
+      issueDate: "2026-06-13",
+      basisDays: 7,
+      incidents: INCIDENTS,
+    };
+    expect(REPORT_PROSE_PROMPT_VERSION).toBe("v3");
+    expect(computeReportProseFingerprint(value)).toBe(
+      fingerprintWithVersion(value, REPORT_PROSE_PROMPT_VERSION),
+    );
+  });
+
+  it("invalidates the prior Energy fingerprint without changing the shared version", () => {
+    const value = {
+      reportId: 42,
+      topic: "energy",
+      title: "Energy Watch",
+      issueDate: "2026-06-13",
+      basisDays: 7,
+      incidents: INCIDENTS,
+    };
+    expect(ENERGY_REPORT_PROSE_PROMPT_VERSION).not.toBe(
+      REPORT_PROSE_PROMPT_VERSION,
+    );
+    expect(computeReportProseFingerprint(value)).not.toBe(
+      fingerprintWithVersion(value, REPORT_PROSE_PROMPT_VERSION),
+    );
   });
 });
 

@@ -1,110 +1,64 @@
 /**
- * Source-preserving layout helpers for the Energy Situation read.
- *
- * This module does not rewrite, merge, or classify incident data. It only
- * decides whether an already-saved prose paragraph can safely receive one of
- * the report's requested visual geography labels. Both the HTML preview and
- * the PDF renderer should consume these segments so their paragraph order and
- * heading decisions stay identical.
+ * Energy headings belong to the source, not to a hardcoded country classifier.
+ * An overview mentioning a place must not become a second country section.
  */
-
-export type EnergySituationHeading =
-  | "Bangladesh / Dhaka"
-  | "Philippines / Visayas"
-  | "Pakistan";
+export type EnergySituationHeading = string;
 
 export type EnergySituationSegment = {
-  /** Exact paragraph/label text from the saved situation field. */
   text: string;
-  /**
-   * A heading is present only when this paragraph is a standalone saved label
-   * or exclusively names one geography. Multi-geography and unlocated
-   * paragraphs deliberately receive null.
-   */
   heading: EnergySituationHeading | null;
-  /** Standalone labels are rendered as labels, not repeated as body prose. */
   kind: "paragraph" | "standalone-label";
 };
 
-type HeadingRule = {
-  heading: EnergySituationHeading;
-  terms: RegExp[];
-};
-
-const HEADING_RULES: HeadingRule[] = [
-  {
-    heading: "Bangladesh / Dhaka",
-    terms: [/\bbangladesh\b/i, /\bdhaka\b/i],
-  },
-  {
-    heading: "Philippines / Visayas",
-    terms: [/\bphilippines\b/i, /\bvisayas\b/i],
-  },
-  {
-    heading: "Pakistan",
-    terms: [/\bpakistan\b/i],
-  },
-];
-
-const STANDALONE_LABELS: Array<{
-  heading: EnergySituationHeading;
-  pattern: RegExp;
-}> = [
-  {
-    heading: "Bangladesh / Dhaka",
-    pattern: /^(?:#{1,6}\s*)?(?:bangladesh\s*\/\s*dhaka|dhaka\s*\/\s*bangladesh)\s*:?\s*$/i,
-  },
-  {
-    heading: "Philippines / Visayas",
-    pattern: /^(?:#{1,6}\s*)?(?:philippines\s*\/\s*visayas|visayas\s*\/\s*philippines)\s*:?\s*$/i,
-  },
-  {
-    heading: "Pakistan",
-    pattern: /^(?:#{1,6}\s*)?pakistan\s*:?\s*$/i,
-  },
-];
-
-function standaloneHeading(text: string): EnergySituationHeading | null {
-  const trimmed = text.trim();
-  for (const candidate of STANDALONE_LABELS) {
-    if (candidate.pattern.test(trimmed)) return candidate.heading;
-  }
+function sourceHeading(line: string): string | null {
+  const text = line.trim();
+  const marked = text.match(/^#{1,6}\s+(.+?)\s*#*$/) ??
+    text.match(/^\*\*(.+?)\*\*:?\s*$/);
+  if (marked) return marked[1].replace(/:$/, "").trim();
+  // Accept legacy labels, but never infer a heading from a narrative sentence.
+  if (text.length > 120 || /[.!?;]$/.test(text)) return null;
+  if (/^[\p{L}\p{N}][^.!?;]+:$/u.test(text)) return text.slice(0, -1).trim();
+  if (/\p{L}/u.test(text) && text === text.toUpperCase()) return text;
+  if (/^[\p{Lu}][\p{L}'’-]*(?:\s*(?:\/|—|–)\s*[\p{Lu}][\p{L}'’-]*)+$/u.test(text)) return text;
+  if (/^[\p{Lu}][\p{L}'’-]*(?:\s+[\p{Lu}][\p{L}'’-]*){0,5}$/u.test(text)) return text;
   return null;
 }
 
-function exclusiveHeading(text: string): EnergySituationHeading | null {
-  const matches = HEADING_RULES.filter((rule) =>
-    rule.terms.some((term) => term.test(text)),
-  );
-  return matches.length === 1 ? matches[0].heading : null;
-}
-
-/**
- * Split saved Energy Situation text using the same newline paragraph boundary
- * used by the existing preview. Empty lines are presentation spacing and are
- * discarded, but every non-empty paragraph is returned once, in source order,
- * with its wording untouched.
- */
+/** Combine repeated explicit sections; preserve every distinct paragraph. */
 export function segmentEnergySituationProse(
   text: string | null | undefined,
 ): EnergySituationSegment[] {
-  const source = text ?? "";
-  return source
-    .split(/\r?\n+/)
-    .filter((paragraph) => paragraph.trim().length > 0)
-    .map((paragraph) => {
-      const savedLabel = standaloneHeading(paragraph);
-      if (savedLabel) {
-        return {
-          text: paragraph,
-          heading: savedLabel,
-          kind: "standalone-label" as const,
-        };
+  const groups: Array<{ heading: string | null; paragraphs: string[] }> = [];
+  const byHeading = new Map<string, (typeof groups)[number]>();
+  let current = { heading: null as string | null, paragraphs: [] as string[] };
+  groups.push(current);
+  for (const line of (text ?? "").split(/\r?\n+/).filter((p) => p.trim())) {
+    const heading = sourceHeading(line);
+    if (heading) {
+      const key = heading.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+      let group = byHeading.get(key);
+      if (!group) {
+        group = { heading, paragraphs: [] };
+        byHeading.set(key, group);
+        groups.push(group);
       }
-      return {
-        text: paragraph,
-        heading: exclusiveHeading(paragraph),
-        kind: "paragraph" as const,
-      };
-    });
+      current = group;
+    } else {
+      const key = line.trim().replace(/\s+/g, " ");
+      if (!current.paragraphs.some((p) => p.trim().replace(/\s+/g, " ") === key)) {
+        current.paragraphs.push(line);
+      }
+    }
+  }
+  return groups.flatMap((group): EnergySituationSegment[] => {
+    if (!group.paragraphs.length) return [];
+    return [
+      ...(group.heading ? [{
+        text: group.heading, heading: group.heading, kind: "standalone-label" as const,
+      }] : []),
+      ...group.paragraphs.map((paragraph) => ({
+        text: paragraph, heading: null, kind: "paragraph" as const,
+      })),
+    ];
+  });
 }

@@ -1302,7 +1302,7 @@ export async function exportTopicReportPdf(
     const renderEnergySituationSegments = (text: string) => {
       for (const segment of segmentEnergySituationProse(text)) {
         if (segment.kind === "standalone-label") {
-          savedLocationHeading = segment.text;
+          savedLocationHeading = segment.heading ?? segment.text;
           continue;
         }
         const locationHeading = savedLocationHeading || segment.heading;
@@ -1314,12 +1314,12 @@ export async function exportTopicReportPdf(
       }
     };
     if (show("situation") || (show("what-happened") && whatHappened.trim())) {
-      if (show("situation")) renderEnergySituationSegments(energySituation);
-      // What Happened remains independently gated, but its exact source prose
-      // is folded into this block without a second section heading.
-      if (show("what-happened") && whatHappened.trim()) {
-        renderEnergySituationSegments(whatHappened);
-      }
+      // One pass across both fields: repeated explicit sections are grouped
+      // once, just as in the preview. Mentions in overview prose aren't labels.
+      renderEnergySituationSegments([
+        show("situation") ? energySituation : "",
+        show("what-happened") ? whatHappened : "",
+      ].filter(Boolean).join("\n\n"));
     }
     if (show("what-matters")) {
       const whatMatters = resolveSimpleProse(

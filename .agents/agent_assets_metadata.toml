@@ -1045,3 +1045,17 @@ mtime_ms = 1789111056003
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/f9080a72-4cd8-4192-a169-19ff91dfd3b9/9d22fbeb-135a-4539-b2fd-378b3d8a3782"
 storage_version_token = "1789111086039017"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "s5Aro6gfcYAB_sIs-HlRn"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_Duplication_Correction.pdf"
+type = "pdf"
+title = "Energy Watch — duplication correction"
+description = "Development proof using the factual narrative from your attached report. Overview and detailed analysis regenerated through the corrected Energy engine; verified one Visayas, Dhaka and Simkot section each, with distinct supporting details retained. Charts and Fast Facts use development data. Not a published replacement."
+logical_id = "19567427-7168-44a7-b5eb-efdfc3f265f7"
+content_hash = "sha256:9e3df83a9d96f661c7964c3157294945543913687622fff17ad4b1e1113107bd"
+size = 1259860
+mtime_ms = 1789112240913
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/19567427-7168-44a7-b5eb-efdfc3f265f7/6aa28a08-a606-4896-8158-0eeec34f3c86"
+storage_version_token = "1789112317515499"
+content_type = "application/pdf"
