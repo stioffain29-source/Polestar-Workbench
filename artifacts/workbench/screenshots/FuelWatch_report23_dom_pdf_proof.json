@@ -1,0 +1,30 @@
+{
+  "source": "production read-only snapshot report 23",
+  "storedIssueDate": "2026-06-22",
+  "renderIssueDate": "2026-09-11",
+  "today": "2026-09-11",
+  "draftAdvanced": true,
+  "groundingRows": 10,
+  "cachedAiFingerprintFresh": false,
+  "staleCacheDiscarded": true,
+  "preview": {
+    "blocked": false,
+    "length": 7374,
+    "hasMarketRead": true,
+    "hasJetFuel": true,
+    "hasUnsupportedLegacyWording": false
+  },
+  "pdf": {
+    "saveCalls": 1,
+    "bytes": 892206,
+    "error": null,
+    "textLength": 8301,
+    "hasMarketRead": true,
+    "hasJetFuel": true,
+    "hasUnsupportedLegacyWording": false
+  },
+  "artifacts": {
+    "previewPng": "/home/runner/workspace/artifacts/workbench/screenshots/FuelWatch_report23_dom_preview.png",
+    "pdf": "/home/runner/workspace/artifacts/workbench/screenshots/FuelWatch_report23_dom_export.pdf"
+  }
+}

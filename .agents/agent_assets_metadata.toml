@@ -1073,3 +1073,17 @@ mtime_ms = 1789112945904
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/68193d2e-6b24-4c8d-a139-da7bb33bb511/d0e743c2-0d40-4abd-a14f-043b7d7ed412"
 storage_version_token = "1789112995096398"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "nfbRNSvB47afhSdWyP-i0"
+uri = "file://artifacts/workbench/screenshots/FuelWatch_report23_dom_export.pdf"
+type = "pdf"
+title = "Fuel Watch — verified PDF export"
+description = "Verification export using a read-only production-data snapshot with the corrected code and current stale-draft/cache handling. Preview rendered without the block; PDF exported successfully. This is a verification copy, not a published replacement."
+logical_id = "4608f01d-6896-4c1c-b656-f534b41c638e"
+content_hash = "sha256:2979952a99d04bfd4682a428f6b75ba06184856a73728eb25b9370b552578b50"
+size = 892206
+mtime_ms = 1789117120593
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/4608f01d-6896-4c1c-b656-f534b41c638e/f4e5dbc5-eb9e-475a-9bb6-4bb2b19ec55c"
+storage_version_token = "1789117382488704"
+content_type = "application/pdf"

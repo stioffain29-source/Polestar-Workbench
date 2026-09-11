@@ -12,7 +12,7 @@ import {
   type StrikeLike, strikeText, deriveTarget, deriveWeapon, groupCount,
 } from "@/lib/strikeAnalysis";
 
-const WINDOWS = [7, 14, 30, 60, 90, 120] as const;
+const WINDOWS = [7, 14, 30, 60, 90, 120, 365] as const;
 
 // ---------------------------------------------------------------------------
 // Client-side derivation
@@ -229,7 +229,7 @@ export default function Strikes() {
                     "px-2.5 py-1 text-xs font-sans",
                     days === d ? "bg-accent text-accent-foreground" : "bg-card hover:bg-muted",
                   )}
-                >{d}d</button>
+                >{d === 365 ? "1y" : `${d}d`}</button>
               ))}
             </div>
           </FilterRow>

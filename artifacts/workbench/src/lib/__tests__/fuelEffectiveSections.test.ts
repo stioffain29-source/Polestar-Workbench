@@ -259,8 +259,8 @@ function risingJetData() {
           benchmark: "US Gulf Coast kerosene-type",
           unit: "USD/gal",
           points: [
-            { date: "2026-07-01", value: 2.0 },
-            { date: "2026-08-01", value: 2.2 },
+            { date: "2026-08-01", value: 2.0 },
+            { date: "2026-08-04", value: 2.2 },
           ],
         },
       },
@@ -326,5 +326,93 @@ describe("AI jet-direction headlines are aligned to the calculated series", () =
     expect(
       validateFuelReportConsistency(data.reportFacts, eff).some((i) => i.code === "MARKET_DIRECTION"),
     ).toBe(true);
+  });
+});
+
+describe("flagged automatic-claim regressions", () => {
+  it("runs rising aviation-price inputs through the builder and effective resolver", () => {
+    const data = buildFuelWatchReportData(
+      {
+        issueDate: ISSUE,
+        hardNumbers: {
+          prices: [
+            { label: "Brent crude", value: 80, unit: "USD/bbl", change: "+1.2%", asOf: ISSUE },
+            { label: "WTI crude", value: 76, unit: "USD/bbl", change: "+0.9%", asOf: ISSUE },
+            { label: "Jet fuel", value: 2.2, unit: "USD/gal", change: "+10.0%", asOf: ISSUE },
+          ],
+          jetFuelTrajectory: {
+            benchmark: "US Gulf Coast kerosene-type",
+            unit: "USD/gal",
+            points: [
+              { date: "2026-07-01", value: 2.0 },
+              { date: "2026-08-01", value: 2.2 },
+            ],
+          },
+        },
+      },
+      [
+        inc({
+          title: "Air India warns jet fuel prices are rising",
+          summary: "Jet fuel prices rose; the airline is reviewing operating costs.",
+          country: "India",
+        }),
+      ],
+    );
+
+    expect(data.reportFacts.market.indicators.find((m) => m.key === "jet")?.direction).toBe(
+      "rising",
+    );
+    const effective = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: {
+        whatHappened:
+          "Air India warns jet fuel costs eased while reviewing operating costs.",
+      },
+      fuelData: data,
+    });
+
+    expect(effective.whatHappened).toMatch(/jet fuel costs climbed/i);
+    expect(effective.whatHappened).not.toMatch(/\beased\b/i);
+    expect(effective.marketRead).toMatch(/jet fuel series is rising/i);
+    expect(validateFuelReportConsistency(data.reportFacts, effective)).toEqual([]);
+  });
+
+  it("does not restore fixed sustained-pressure or next-operating-month wording", () => {
+    const data = risingJetData();
+    const canonical = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(canonical.marketRead).not.toMatch(/sustained cost pressure/i);
+    expect(canonical.marketRead).toMatch(/reporting-period benchmarks rose/i);
+    expect(canonical.watchNext).not.toMatch(/next operating month/i);
+  });
+
+  it("keeps the legacy aviation fare/surcharge claim blocked by the final gate", () => {
+    const data = risingJetData();
+    const legacy =
+      "Sustained jet-fuel cost pressure is feeding into airline fares and surcharge negotiations in the next operating month.";
+    const effective = resolveFuelEffectiveSections({
+      report: { whatMatters: legacy },
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(effective.whatMatters).toBe(legacy);
+    const evidenceIssues = validateFuelFinalEvidenceAudit(
+      data.reportFacts,
+      effective,
+      data.canonicalFacts.watchIndicators,
+    );
+    expect(evidenceIssues.some((issue) => issue.code === "UNSUPPORTED_BOILERPLATE")).toBe(true);
+    expect(() =>
+      assertFuelFinalEvidenceAudit(
+        data.reportFacts,
+        effective,
+        data.canonicalFacts.watchIndicators,
+      ),
+    ).toThrow();
   });
 });
