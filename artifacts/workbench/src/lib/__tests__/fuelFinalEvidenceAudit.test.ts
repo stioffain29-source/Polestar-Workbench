@@ -84,6 +84,30 @@ function fuelAudit(
 }
 
 describe("Fuel final evidence audit", () => {
+  it("allows only the exact canonical Fuel evidence-confidence assessment", () => {
+    const base = {
+      topic: "fuel",
+      issueDate: ISSUE_DATE,
+      window: { start: "2026-08-28", end: ISSUE_DATE },
+      evidence: currentFuelEvidence,
+      validatedForwardIndicators: [],
+    } as const;
+    expect(
+      auditFinalReportEvidence({
+        ...base,
+        canonicalEvidenceConfidence: "moderate",
+        sections: { situation: "Evidence confidence is moderate." },
+      }).map((issue) => issue.code),
+    ).not.toContain("BACKEND_CONFIDENCE_LEAK");
+    expect(
+      auditFinalReportEvidence({
+        ...base,
+        canonicalEvidenceConfidence: "high",
+        sections: { situation: "Evidence confidence is moderate." },
+      }).map((issue) => issue.code),
+    ).toContain("BACKEND_CONFIDENCE_LEAK");
+  });
+
   it("accepts forward indicators derived from current evidence without requiring events to recur", () => {
     const codes = fuelAudit({
       watchNext: [

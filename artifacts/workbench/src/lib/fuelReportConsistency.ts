@@ -100,6 +100,7 @@ export function validateFuelFinalEvidenceAudit(
     topic: "fuel",
     issueDate: facts.issueDate,
     window: facts.reportWindow,
+    canonicalEvidenceConfidence: facts.evidenceConfidence,
     evidence: [
       ...facts.incidents.map((r) => ({
         id: r.id,
@@ -156,6 +157,7 @@ export function assertFuelFinalEvidenceAudit(
     topic: "fuel",
     issueDate: facts.issueDate,
     window: facts.reportWindow,
+    canonicalEvidenceConfidence: facts.evidenceConfidence,
     evidence: [
       ...facts.incidents.map((r) => ({
         id: r.id,

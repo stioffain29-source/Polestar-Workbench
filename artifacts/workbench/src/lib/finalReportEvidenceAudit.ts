@@ -39,6 +39,12 @@ export interface FinalReportEvidenceAuditInput {
   topic: string;
   issueDate: string;
   window?: { start: string; end: string };
+  /**
+   * A client-facing Fuel assessment may state this computed, canonical
+   * confidence tier. It is deliberately distinct from backend/model
+   * confidence and is omitted by every other topic adapter.
+   */
+  canonicalEvidenceConfidence?: "low" | "moderate" | "high";
   evidence: FinalReportEvidenceRecord[];
   sections: Record<string, string | null | undefined>;
   validatedForwardIndicators: Array<string | FinalReportTypedReference>;
@@ -496,6 +502,16 @@ function titleFragmentAppears(text: string, title: string): boolean {
   return titleWords.length >= 4 && titleWords.every((w) => text.toLowerCase().includes(w));
 }
 
+function hasOnlyCanonicalFuelConfidenceAssessment(
+  text: string,
+  canonicalEvidenceConfidence: FinalReportEvidenceAuditInput["canonicalEvidenceConfidence"],
+): boolean {
+  if (!canonicalEvidenceConfidence) return false;
+  const assessments = [...text.matchAll(/\bevidence confidence\s+(?:is|remains|stays)\s+(low|moderate|high)\b/gi)];
+  return assessments.length > 0
+    && assessments.every((match) => match[1].toLowerCase() === canonicalEvidenceConfidence);
+}
+
 function escapeRe(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -578,7 +594,17 @@ export function auditFinalReportEvidence(
     if (/\bthe confirmed change\b/i.test(text)) {
       issues.push({ code: "VAGUE_CHANGE", section, message: 'Name the development instead of saying "the confirmed change".' });
     }
-    if (BACKEND_RE.test(text) || DATASET_NARRATION_RE.test(text)) {
+    const permittedFuelConfidence =
+      input.topic === "fuel"
+      && hasOnlyCanonicalFuelConfidenceAssessment(text, input.canonicalEvidenceConfidence);
+    const backendWithoutCanonicalFuelConfidence = text.replace(
+      /\bevidence confidence\s+(?:is|remains|stays)\s+(?:low|moderate|high)\b/gi,
+      "",
+    );
+    if (
+      (permittedFuelConfidence ? BACKEND_RE.test(backendWithoutCanonicalFuelConfidence) : BACKEND_RE.test(text))
+      || DATASET_NARRATION_RE.test(text)
+    ) {
       issues.push({ code: "BACKEND_CONFIDENCE_LEAK", section, message: "Internal model, file, table or evidence-confidence state reached client prose." });
     }
     for (const record of input.evidence) {
