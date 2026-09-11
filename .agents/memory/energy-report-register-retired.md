@@ -8,3 +8,7 @@ Do not restore Related Incidents to Energy Watch reports. Keep the full disclaim
 **Why:** the owner explicitly removed the incident-register page because it added no value, then rejected the gray disclaimer panel. On 2026-09-11 the owner subsequently required smaller price cards and corrected pagination after the fixed page breaks stranded a paragraph on its own page. This supersedes the earlier fixed-five-page architecture, not the prohibition on rewriting prose.
 
 **How to apply:** keep this removal scoped to Energy Watch, preserve its prose and incident data, and do not remove registers from other report types without instruction. After the overview, let prices and narrative flow by actual available space rather than forcing one section per page. Check against the attached report's actual prose length, not only a shorter development report.
+
+Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
+
+**Why:** the owner explicitly rejected the map omitting New Zealand and requested slightly smaller Fast Facts to accommodate it. Static maps need a complete geographic base, not the monitor's selected-country overlays rendered as standalone land.

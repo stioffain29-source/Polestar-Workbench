@@ -213,11 +213,22 @@ async function rasterizeSvgsToCanvas(host: HTMLElement): Promise<void> {
     const attrW = parseFloat(svg.getAttribute("width") ?? "");
     const attrH = parseFloat(svg.getAttribute("height") ?? "");
     const rect = svg.getBoundingClientRect();
-    const w = vb.width > 0 ? vb.width : (Number.isFinite(attrW) && attrW > 0 ? attrW : rect.width) || 640;
-    const h = vb.height > 0 ? vb.height : (Number.isFinite(attrH) && attrH > 0 ? attrH : rect.height) || 240;
+    // Energy's compact charts must retain their CSS layout size. Replacing a
+    // 230px-wide chart with its 300-unit viewBox inflated/clipped the cards.
+    // Opt-in keeps the existing render contracts of other report types intact.
+    const rasterScope = svg.closest<HTMLElement>("[data-report-raster-scale]");
+    const w = rasterScope ? rect.width : vb.width > 0 ? vb.width : (Number.isFinite(attrW) && attrW > 0 ? attrW : rect.width) || 640;
+    const h = rasterScope ? rect.height : vb.height > 0 ? vb.height : (Number.isFinite(attrH) && attrH > 0 ? attrH : rect.height) || 240;
     if (w < 1 || h < 1) continue;
 
-    const xml = new XMLSerializer().serializeToString(svg);
+    const source = svg.cloneNode(true) as SVGSVGElement;
+    if (rasterScope) {
+      source.setAttribute("width", String(w));
+      source.setAttribute("height", String(h));
+      source.style.width = `${w}px`;
+      source.style.height = `${h}px`;
+    }
+    const xml = new XMLSerializer().serializeToString(source);
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
@@ -226,7 +237,7 @@ async function rasterizeSvgsToCanvas(host: HTMLElement): Promise<void> {
       img.src = url;
     });
 
-    const scale = 2;
+    const scale = rasterScope ? 4 : 2;
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(w * scale));
     canvas.height = Math.max(1, Math.round(h * scale));
@@ -328,7 +339,7 @@ export async function embedChartMarkupInPdf(
       console.warn("[embedReportChartInPdf] SVG pre-rasterize failed", err);
     }
     const canvas = await html2canvas(host, {
-      scale: 1.5,
+      scale: host.querySelector("[data-report-raster-scale]") ? 4 : 1.5,
       backgroundColor: "#ffffff",
       logging: false,
       width: widthPt,
@@ -401,13 +412,16 @@ export async function embedChartMarkupInPdf(
 
     // Centre horizontally when the image was scaled narrower than the column.
     const drawX = ctx.MX + (widthPt - imgW) / 2;
+    const lossless = !!host.querySelector("[data-report-raster-scale]");
     ctx.pdf.addImage(
-      canvas.toDataURL("image/jpeg", 0.82),
-      "JPEG",
+      lossless ? canvas.toDataURL("image/png") : canvas.toDataURL("image/jpeg", 0.82),
+      lossless ? "PNG" : "JPEG",
       drawX,
       ctx.y,
       imgW,
       imgH,
+      undefined,
+      "FAST",
     );
     ctx.y += imgH + 8;
     return true;

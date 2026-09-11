@@ -1238,6 +1238,7 @@ export async function exportTopicReportPdf(
           }) as KpiCardData[],
           ffOverrides,
         ),
+        true,
       );
     }
     if (show("executive-summary") && execText.trim()) {
@@ -1266,7 +1267,7 @@ export async function exportTopicReportPdf(
           intensity,
           // Keep the visual compact enough to remain on page 2 beneath Fast
           // Facts and BLUF.
-          mapHeight: 220,
+          mapHeight: 270,
         }),
         { heading: "Energy Situation" },
       );

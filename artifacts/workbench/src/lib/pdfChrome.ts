@@ -433,7 +433,11 @@ export interface KpiCardData {
   source?: string;
 }
 
-export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
+export function drawFastFactsKpiCards(
+  ctx: Ctx,
+  cards: KpiCardData[],
+  compact = false,
+) {
   if (cards.length === 0) return;
   const { pdf, MX, CW } = ctx;
   const cols = 3;
@@ -442,14 +446,14 @@ export function drawFastFactsKpiCards(ctx: Ctx, cards: KpiCardData[]) {
   const STRIP_W = 3;
   const PAD_L = STRIP_W + 8;
   const PAD_R = 8;
-  const PAD_V = 10;
+  const PAD_V = compact ? 7 : 10;
   const innerW = cardW - PAD_L - PAD_R;
 
   const LABEL_SIZE = 7;
-  const VALUE_SIZE = 14;
+  const VALUE_SIZE = compact ? 12.5 : 14;
   const NOTE_SIZE = 7.5;
   const LABEL_H = 10;
-  const VALUE_LINE_H = 16;
+  const VALUE_LINE_H = compact ? 14 : 16;
   const NOTE_LINE_H = 10;
   const LABEL_VALUE_GAP = 3;
   const VALUE_NOTE_GAP = 6;

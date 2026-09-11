@@ -262,7 +262,7 @@ function focusBounds(
   const rawLatSpan = raw.maxLat - raw.minLat;
   const clustered =
     affectedFeatures.length === 1 ||
-    (rawLonSpan <= 120 && rawLatSpan <= 65);
+    (rawLonSpan <= 150 && rawLatSpan <= 110);
   if (!clustered) return null;
 
   // Geographic padding gives a country on the edge enough breathing room for
@@ -483,13 +483,23 @@ export function EnergySituationVisual({
   const affectedFeatures = worldGeo.features.filter(
     (feature) => countForFeature(featureCountryName(feature), intensity) > 0,
   );
-  const bounds = focusBounds(affectedFeatures) ?? worldFallbackBounds();
+  // New Zealand is required geographic context even in a quiet reporting
+  // window. Include its full geometry in framing, without inventing incidents.
+  const newZealand = worldGeo.features.find((feature) => featureCountryName(feature) === "New Zealand");
+  const framingFeatures = newZealand && !affectedFeatures.includes(newZealand)
+    ? [...affectedFeatures, newZealand]
+    : affectedFeatures;
+  const bounds = focusBounds(framingFeatures) ?? worldFallbackBounds();
   const viewportHeight = Math.max(120, mapHeight);
   const projection = buildProjection(bounds, SVG_WIDTH, viewportHeight);
   const labels = resolveLabels(affectedFeatures, intensity, projection);
+  const nzAnchor = newZealand && countForFeature("New Zealand", intensity) === 0
+    ? featureAnchor(newZealand, projection)
+    : null;
 
   return (
     <div
+      data-report-raster-scale="4"
       style={{
         color: DUSK,
         fontFamily: "Roboto, sans-serif",
@@ -532,6 +542,20 @@ export function EnergySituationVisual({
             />
           );
         })}
+        {nzAnchor && (
+          <text
+            x={Math.min(SVG_WIDTH - 34, nzAnchor[0])}
+            y={Math.min(viewportHeight - 6, nzAnchor[1] + 17)}
+            textAnchor="middle"
+            fontSize={8}
+            fill={NAVY}
+            stroke="#f8f9fb"
+            strokeWidth={2.5}
+            paintOrder="stroke"
+          >
+            New Zealand
+          </text>
+        )}
         {labels.map((label) => {
           const fill = countBandColor(label.count) ?? EMPTY_FILL;
           const ink = label.count >= 21 ? "#ffffff" : NAVY;

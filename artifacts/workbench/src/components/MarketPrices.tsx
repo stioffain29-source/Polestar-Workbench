@@ -123,7 +123,7 @@ function MiniTrajectory({
   compact?: boolean;
 }) {
   const W = 300;
-  const H = compact ? 70 : 96;
+  const H = compact ? 54 : 96;
   const padL = 36, padR = 10, padT = compact ? 7 : 10, padB = compact ? 16 : 20;
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
@@ -155,9 +155,9 @@ function MiniTrajectory({
       ))}
       <path d={path} fill="none" stroke={ELECTRIC} strokeWidth={1.5} />
       <circle cx={x(points.length - 1)} cy={y(last.value)} r={3} fill={NAVY} />
-      <text x={W - padR} y={H - padB + 14} fontSize={8} fill={DUSK} textAnchor="end">
+      {!compact && <text x={W - padR} y={H - padB + 14} fontSize={8} fill={DUSK} textAnchor="end">
         {unit}
-      </text>
+      </text>}
     </svg>
   );
 }
@@ -174,7 +174,7 @@ function ReportPriceCard({ p, compact = false }: { p: MarketPrice; compact?: boo
         background: "#fff",
         border: `1px solid ${POLAR}`,
         borderRadius: 2,
-        padding: compact ? 9 : 14,
+        padding: compact ? 7 : 14,
         position: "relative",
         overflow: "hidden",
         fontFamily: "Roboto, sans-serif",
@@ -186,10 +186,10 @@ function ReportPriceCard({ p, compact = false }: { p: MarketPrice; compact?: boo
         {p.label}
       </div>
       {p.benchmark ? (
-        <div style={{ fontSize: 11, color: DUSK, opacity: 0.75, marginTop: 2, lineHeight: 1.3 }}>{p.benchmark}</div>
+        <div style={{ fontSize: compact ? 10 : 11, color: DUSK, opacity: 0.75, marginTop: 2, lineHeight: 1.3 }}>{p.benchmark}</div>
       ) : null}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: compact ? 5 : 8 }}>
-        <span style={{ fontFamily: "'Roboto Condensed', Roboto, sans-serif", fontWeight: 700, color: NAVY, fontSize: 24, lineHeight: 1 }}>
+        <span style={{ fontFamily: "'Roboto Condensed', Roboto, sans-serif", fontWeight: 700, color: NAVY, fontSize: compact ? 20 : 24, lineHeight: 1 }}>
           {valueStr}
         </span>
         <span style={{ fontSize: 11, color: DUSK, opacity: 0.75 }}>{p.unit}</span>
@@ -198,7 +198,7 @@ function ReportPriceCard({ p, compact = false }: { p: MarketPrice; compact?: boo
         {p.change ?? "no prior observation"}
       </div>
       {traj.length > 1 ? <MiniTrajectory points={traj} unit={p.unit} compact={compact} /> : null}
-      <div style={{ fontSize: 10, color: DUSK, opacity: 0.7, marginTop: compact ? 6 : 10, lineHeight: 1.3 }}>
+      <div style={{ fontSize: 10, color: DUSK, opacity: 0.7, marginTop: compact ? 3 : 10, lineHeight: 1.3 }}>
         As of {formatAsOf(p.asOf, p.change)} · {p.source}
       </div>
     </div>
@@ -219,7 +219,7 @@ export function MarketPricesReportGrid({
 }) {
   const sorted = [...rows].sort((a, b) => a.label.localeCompare(b.label));
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+    <div data-report-raster-scale={compact ? "4" : undefined} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: compact ? 8 : 12 }}>
       {sorted.map((p) => <ReportPriceCard key={`${p.group}:${p.key}`} p={p} compact={compact} />)}
     </div>
   );

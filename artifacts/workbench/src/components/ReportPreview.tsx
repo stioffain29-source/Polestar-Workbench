@@ -197,7 +197,13 @@ interface KpiPreviewCard {
   source?: string;
 }
 
-function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
+function FastFactsGrid({
+  cards,
+  compact = false,
+}: {
+  cards: KpiPreviewCard[];
+  compact?: boolean;
+}) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {cards.map((c, i) => {
@@ -207,7 +213,13 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
           <div
             key={i}
             className="bg-white border rounded-sm relative"
-            style={{ borderColor: POLAR, paddingLeft: 14, paddingRight: 12, paddingTop: 10, paddingBottom: 10 }}
+            style={{
+              borderColor: POLAR,
+              paddingLeft: 14,
+              paddingRight: 12,
+              paddingTop: compact ? 7 : 10,
+              paddingBottom: compact ? 7 : 10,
+            }}
           >
             {/* Vertical accent strip on the left edge — no horizontal top bar. */}
             <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 4, background: accent }} />
@@ -218,7 +230,14 @@ function FastFactsGrid({ cards }: { cards: KpiPreviewCard[] }) {
               {c.label}
             </div>
             <div
-              style={{ fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 20, color: NAVY, marginTop: 4, lineHeight: 1.1 }}
+              style={{
+                fontFamily: "Roboto, sans-serif",
+                fontWeight: 700,
+                fontSize: compact ? 16 : 20,
+                color: NAVY,
+                marginTop: 4,
+                lineHeight: 1.1,
+              }}
             >
               {c.value}
             </div>
@@ -841,7 +860,7 @@ export function EnergyReportPages({
         style={{ display: "flex", flexDirection: "column" }}
       >
         <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} />
+          <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} compact />
         </Section>
         {execText.trim() && (
           <Section hidden={!show("executive-summary")} title="BLUF">
@@ -850,7 +869,7 @@ export function EnergyReportPages({
         )}
         <div style={{ marginTop: "auto" }}>
           <Section hidden={!show("situation")} title="Energy Situation">
-            <EnergySituationVisual intensity={energyIntensity} mapHeight={220} />
+            <EnergySituationVisual intensity={energyIntensity} mapHeight={270} />
           </Section>
         </div>
       </div>
