@@ -12,6 +12,8 @@ export interface EmbedChartOptions {
    * never orphan at the foot of a page with its chart pushed to the next one.
    */
   heading?: string;
+  /** Energy moves an intact visual to the next page instead of squeezing it. */
+  fitRemaining?: boolean;
 }
 
 // Vertical room a section heading consumes when it is kept together with the
@@ -380,6 +382,9 @@ export async function embedChartMarkupInPdf(
     // foot and spill a stray fragment onto the top of the next page.
     const maxImgH = pageContent - headingReserve - 8;
     if (maxImgH > 0 && imgH > maxImgH) {
+      if (options.fitRemaining === false) {
+        throw new Error(`${options.heading ?? "Visual section"} exceeds one page at its readable size. It cannot be exported by shrinking or clipping its cards.`);
+      }
       imgW = widthPt * (maxImgH / imgH);
       imgH = maxImgH;
     }
@@ -397,7 +402,7 @@ export async function embedChartMarkupInPdf(
     const MIN_FILL_SCALE = 0.75;
     const remaining = ctx.H - ctx.BOTTOM - ctx.y;
     const needed = headingReserve + imgH + 8;
-    if (needed > remaining) {
+    if (options.fitRemaining !== false && needed > remaining) {
       const fitH = remaining - headingReserve - 8;
       if (fitH > 0 && fitH / imgH >= MIN_FILL_SCALE) {
         imgW = imgW * (fitH / imgH);

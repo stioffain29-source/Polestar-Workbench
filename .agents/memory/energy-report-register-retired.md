@@ -9,9 +9,11 @@ Do not restore Related Incidents to Energy Watch reports. Keep the full disclaim
 
 **How to apply:** keep this removal scoped to Energy Watch, preserve its prose and incident data, and do not remove registers from other report types without instruction. After the overview, let prices and narrative flow by actual available space rather than forcing one section per page. Check against the attached report's actual prose length, not only a shorter development report.
 
-Keep the overview cards, unchanged BLUF and complete map/legend together by sizing the map to remaining space, not by cropping it.
+Keep the section sequence fixed but let ALL post-cover sections flow. No fixed overview page, market-price page, final-assessment page or maximum page count. Keep the map at its natural aspect ratio; move it instead of compressing it into remaining space.
 
-**Why:** a later, longer BLUF exposed the fixed map-height assumption: the map moved to a nearly empty separate page. Detail-page overflow checks alone do not verify the overview.
+**Why:** the owner's later explicit flexible-pagination specification supersedes the earlier demand to force the overview onto one page. Five pages was an example, never a contract. Verify short and long cases, including more than five pages.
+
+**How to apply:** keep short assessment sections together when practical, keep Polestar intact, and let the separately atomic 9pt white-background disclaimer move to the next page when necessary. Never cap or shorten recommendations or watch items. Preserve the hierarchy: snapshot → map → markets → situation/issue analysis → what matters → implications → watch next → Polestar → disclaimer.
 
 Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
 

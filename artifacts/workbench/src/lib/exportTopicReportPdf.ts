@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
-import EnergySituationVisual from "@/components/EnergySituationVisual";
+import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
 import type { MarketPrice } from "@workspace/api-client-react";
 import {
   buildCargoPatternModel,
@@ -54,6 +54,7 @@ import {
   type KpiCardData,
 } from "./pdfChrome";
 import { embedReactChartInPdf } from "./embedReportChartInPdf";
+import { drawEnergyProse } from "./energyPdfFlow";
 import {
   resolveReportWindow,
   filterIncidentsToWindow,
@@ -1219,12 +1220,8 @@ export async function exportTopicReportPdf(
     }),
   );
 
-  // Energy keeps its cover and overview, then paginates by available space.
-  // Fixed section-page breaks stranded overflow paragraphs on almost-empty
-  // pages. This branch remains isolated from every other topic.
+  // Energy has a fixed information hierarchy, not fixed physical pages.
   if (data.topic === "energy") {
-    // PAGE 2 — Fast Facts, the existing executive-summary text as a BLUF,
-    // then the existing topic geography visual in the lower half.
     if (show("fast-facts")) {
       drawSectionHeading(ctx, "Fast Facts");
       drawFastFactsKpiCards(
@@ -1245,8 +1242,7 @@ export async function exportTopicReportPdf(
       // BLUF replaces the generic "Executive Summary" heading. execText is
       // rendered directly below it so its paragraphs and wording are not
       // rewritten.
-      drawSectionHeading(ctx, "BLUF");
-      renderProse(ctx, execText);
+      drawEnergyProse(ctx, "BLUF", execText);
     }
     if (show("situation")) {
       const countryCounts = new Map<string, number>();
@@ -1265,32 +1261,25 @@ export async function exportTopicReportPdf(
         ctx,
         createElement(EnergySituationVisual, {
           intensity,
-          // Fit the map viewport to the ACTUAL remaining page space after
-          // the saved BLUF, not a fixed height tested against shorter prose.
-          // Reserve heading (54), legend/capture padding and trailing gap
-          // (60). Reproject the full geography rather than cropping it.
-          mapHeight: Math.max(120, Math.min(270, Math.floor(ctx.H - ctx.BOTTOM - ctx.y - 54 - 60))),
+          mapHeight: ENERGY_REPORT_MAP_HEIGHT,
         }),
-        { heading: "Energy Situation" },
+        { heading: "Energy Situation Map", fitRemaining: false },
       );
     }
 
-    // Start the detail pages with compact prices; subsequent sections flow
-    // into the remaining space rather than forcing a prices-only page.
-    newPage(ctx);
+    // Prices may share a page when they fit at their normal readable size.
     if (show("market-prices")) {
       const rows = applyMarketPriceOverrides(
         options.marketPrices ?? [],
         options.sectionOverrides?.marketPriceOverrides,
       );
       if (rows.length === 0) {
-        drawSectionHeading(ctx, "Market Prices");
-        renderProse(ctx, MARKET_PRICES_REPORT_EMPTY_TEXT);
+        drawEnergyProse(ctx, "Market Prices", MARKET_PRICES_REPORT_EMPTY_TEXT);
       } else {
         await embedReactChartInPdf(
           ctx,
           createElement(MarketPricesReportGrid, { rows, compact: true }),
-          { heading: "Market Prices" },
+          { heading: "Market Prices", fitRemaining: false },
         );
       }
     }
@@ -1316,24 +1305,12 @@ export async function exportTopicReportPdf(
           savedLocationHeading = segment.text;
           continue;
         }
-        // Reserve the heading and first paragraph as a unit. Subheadings must
-        // not be left behind when renderProse moves their paragraph.
-        setRoboto(ctx.pdf, "light");
-        ctx.pdf.setFontSize(11);
-        const firstParagraph = sanitize(segment.text).split(/\n+/).find((p) => p.trim()) ?? "";
-        const firstHeight = ctx.pdf.splitTextToSize(firstParagraph, ctx.CW).length * 17 + 18;
         const locationHeading = savedLocationHeading || segment.heading;
-        const headingHeight = (energyHeadingPending ? 50 : 0) + (locationHeading ? 16 : 0);
-        if (firstHeight + headingHeight <= ctx.H - ctx.TOP - ctx.BOTTOM) {
-          ensureSpace(ctx, firstHeight + headingHeight);
-        }
-        if (energyHeadingPending) {
-          drawSectionHeading(ctx, "Energy Situation");
-          energyHeadingPending = false;
-        }
-        if (locationHeading) drawSubtitle(ctx, locationHeading);
+        drawEnergyProse(ctx, energyHeadingPending ? "Energy Situation" : undefined, segment.text, {
+          subheading: locationHeading || undefined,
+        });
+        energyHeadingPending = false;
         savedLocationHeading = "";
-        renderProse(ctx, segment.text);
       }
     };
     if (show("situation") || (show("what-happened") && whatHappened.trim())) {
@@ -1351,7 +1328,7 @@ export async function exportTopicReportPdf(
         proseDraft.whatMatters,
       );
       if (whatMatters.trim()) {
-        drawSectionWithProse(ctx, "What Matters", whatMatters);
+        drawEnergyProse(ctx, "What Matters", whatMatters);
       }
     }
 
@@ -1363,7 +1340,7 @@ export async function exportTopicReportPdf(
         proseDraft.implications,
       );
       if (implications.trim()) {
-        drawBulletSection(ctx, "Implications for Business", implications);
+        drawEnergyProse(ctx, "Implications for Business", implications, { bullets: true });
       }
     }
     if (show("watch-next")) {
@@ -1372,11 +1349,10 @@ export async function exportTopicReportPdf(
         aiProse?.watchNext,
         proseDraft.watchNext,
       );
-      if (watchNext.trim()) drawBulletSection(ctx, "Watch Next", watchNext, 8);
+      if (watchNext.trim()) drawEnergyProse(ctx, "Watch Next", watchNext, { bullets: true });
     }
-    // Reserve the legal block before rendering the final judgement. This uses
-    // exactly the same 9pt wrapping/spacing as the disclaimer below, so longer
-    // saved prose cannot collide with it or push it to a disclaimer-only page.
+    // The legal block follows the intact judgement, moving separately if
+    // needed. Never distort the assessment to reserve a disclaimer-only page.
     const disclaimerFontSize = 9;
     const disclaimerLineHeightFactor = 1.2;
     const disclaimerLineHeight = disclaimerFontSize * disclaimerLineHeightFactor;
@@ -1384,8 +1360,6 @@ export async function exportTopicReportPdf(
     ctx.pdf.setFontSize(disclaimerFontSize);
     const disclaimerLines: string[] = ctx.pdf.splitTextToSize(sanitize(DISCLAIMER_TEXT), ctx.CW - 20);
     const disclaimerHeight = 32 + disclaimerLines.length * disclaimerLineHeight;
-    const originalBottom = ctx.BOTTOM;
-    ctx.BOTTOM += disclaimerHeight + 12;
     if (show("polestar-view")) {
       const polestarView = resolveSimpleProse(
         data.polestarView,
@@ -1393,11 +1367,10 @@ export async function exportTopicReportPdf(
         proseDraft.polestarView,
       );
       if (polestarView.trim()) {
-        drawSectionWithProse(ctx, "Polestar View", polestarView);
+        drawEnergyProse(ctx, "Polestar View", polestarView, { atomic: true });
       }
     }
 
-    ctx.BOTTOM = originalBottom;
     // Related Incidents remains removed. The full legal text follows Polestar
     // View on the plain page; it is never overlaid at a fixed footer position.
     ensureSpace(ctx, disclaimerHeight + 12);

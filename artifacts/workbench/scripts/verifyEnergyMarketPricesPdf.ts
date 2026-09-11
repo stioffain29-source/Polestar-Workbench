@@ -32,6 +32,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKBENCH = resolve(HERE, "..");
 const SRC = resolve(WORKBENCH, "src");
 const ASSETS = resolve(WORKBENCH, "..", "..", "attached_assets");
+const OUTPUT_DIR = process.env.VERIFY_OUTPUT_DIR
+  ? resolve(process.env.VERIFY_OUTPUT_DIR)
+  : resolve(WORKBENCH, "screenshots");
 
 // Topic under test — energy by default; fertiliser shares the exact same
 // Market Prices branch (grid + overrides), so the harness covers both.
@@ -183,6 +186,7 @@ const PDF_HEADINGS = new Map(
     "FAST FACTS",
     "BLUF",
     "ENERGY SITUATION",
+    "ENERGY SITUATION MAP",
     "MARKET PRICES",
     "WHAT HAPPENED",
     "WHAT MATTERS",
@@ -229,14 +233,22 @@ function inspectRenderedPdf(pdfPath: string, outDir: string): {
     headingsByPage.push({ page, headings: pageHeadings(text) });
   }
 
-  // Energy Watch ends on page 5; any later page is body overflow.
-  // Render the contract pages for visual inspection.
-  const expectedPages = TOPIC === "energy" ? 5 : 6;
-  const overflowPages = Array.from(
-    { length: Math.max(0, physicalPages - expectedPages) },
-    (_, index) => expectedPages + index + 1,
-  );
-  const renderThrough = Math.min(expectedPages, physicalPages);
+  // Page count is an outcome, never a pagination failure. Check actual
+  // out-of-page text coordinates instead of declaring page six overflow.
+  const overflowPages: number[] = [];
+  const bbox = execFileSync("pdftotext", ["-bbox", pdfPath, "-"], {
+    encoding: "utf8", stdio: ["ignore", "pipe", "ignore"],
+  });
+  let pageNumber = 0;
+  for (const page of bbox.matchAll(/<page width="([\d.]+)" height="([\d.]+)">([\s\S]*?)<\/page>/g)) {
+    pageNumber++;
+    const width = Number(page[1]), height = Number(page[2]);
+    const outside = [...page[3].matchAll(/<word xMin="(-?[\d.]+)" yMin="(-?[\d.]+)" xMax="(-?[\d.]+)" yMax="(-?[\d.]+)"/g)]
+      .some((word) => Number(word[1]) < -1 || Number(word[2]) < -1 ||
+        Number(word[3]) > width + 1 || Number(word[4]) > height + 1);
+    if (outside) overflowPages.push(pageNumber);
+  }
+  const renderThrough = physicalPages;
   if (renderThrough >= 2) {
     execFileSync(
       "pdftoppm",
@@ -263,6 +275,7 @@ function inspectRenderedPdf(pdfPath: string, outDir: string): {
 }
 
 async function main() {
+  mkdirSync(OUTPUT_DIR, { recursive: true });
   const reportId = await fetchLatestReportId();
   const report = {
     ...await fetchTopicReport(reportId),
@@ -355,23 +368,22 @@ async function main() {
       (window as unknown as { __previewVerify__: () => Promise<unknown> }).__previewVerify__(),
     );
     console.log("Preview page bounds:", JSON.stringify(previewChecks));
-    await page.locator('[data-energy-page="3"]').screenshot({
-      path: resolve(WORKBENCH, "screenshots/energy-preview-flow-page3.png"),
+    await page.locator('.energy-report-page').nth(1).screenshot({
+      path: resolve(OUTPUT_DIR, "energy-preview-first-body-page.png"),
     });
     }
     const out = resolve(
-      WORKBENCH,
-      "screenshots",
+      OUTPUT_DIR,
       `${TOPIC === "energy" ? "EnergyWatch" : "FertiliserWatch"}_MarketPrices_verify.pdf`,
     );
     writeFileSync(out, Buffer.from(result.base64, "base64"));
     console.log(`Wrote ${out} (${(result.base64.length * 0.75 / 1024).toFixed(0)} KB)`);
     const inspection = inspectRenderedPdf(
       out,
-      resolve(WORKBENCH, "screenshots", `${TOPIC}-MarketPrices-pages`),
+      resolve(OUTPUT_DIR, `${TOPIC}-MarketPrices-pages`),
     );
     writeFileSync(
-      resolve(WORKBENCH, "screenshots", `${TOPIC}_MarketPrices_verify.json`),
+      resolve(OUTPUT_DIR, `${TOPIC}_MarketPrices_verify.json`),
       JSON.stringify(
         {
           reportId,
@@ -402,7 +414,7 @@ async function main() {
     );
     if (inspection.overflow) {
       throw new Error(
-        `Energy Watch PDF overflowed the five-page contract: physical pages ${inspection.physicalPages}.`,
+        `PDF contains content outside page bounds: ${inspection.overflowPages.join(", ")}.`,
       );
     }
   } finally {

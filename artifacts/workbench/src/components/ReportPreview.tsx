@@ -52,7 +52,7 @@ import {
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
 import { MarketPricesReportSection } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
-import EnergySituationVisual from "@/components/EnergySituationVisual";
+import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import CargoTrendChart from "@/components/CargoTrendChart";
 import CargoChoroplethStatic from "@/components/CargoChoroplethStatic";
@@ -722,9 +722,6 @@ export function EnergyReportPages({
           padding: 0;
           overflow: hidden;
         }
-        .energy-report-page[data-energy-page="2"] > .report-section {
-          flex-shrink: 0;
-        }
         @media print {
           .energy-report-pages {
             background: transparent !important;
@@ -856,28 +853,16 @@ export function EnergyReportPages({
         </div>
       </div>
 
-      {/* PAGE 2 — Fast Facts, BLUF, then the existing Energy topic map. */}
-      <div
-        className="energy-report-page"
-        data-energy-page="2"
-        style={{ display: "flex", flexDirection: "column" }}
-      >
-        <Section hidden={!show("fast-facts")} title="Fast Facts">
-          <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} compact />
-        </Section>
-        {execText.trim() && (
-          <Section hidden={!show("executive-summary")} title="BLUF">
-            <Paragraphs text={execText} />
-          </Section>
-        )}
-        <div data-energy-map-slot style={{ flex: "1 1 0", minHeight: 0 }}>
-          <Section hidden={!show("situation")} title="Energy Situation">
-            <EnergySituationVisual intensity={energyIntensity} mapHeight={270} fitToPage />
-          </Section>
-        </div>
-      </div>
-
+      {/* All post-cover sections are measured and paginated from their current
+          content. The page labels below are a display concern, not a layout
+          contract: Fast Facts through legal copy may naturally span any number
+          of physical pages. */}
       <EnergyFlowPages
+        fastFactsContent={
+          <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} compact />
+        }
+        execText={execText}
+        mapContent={<EnergySituationVisual intensity={energyIntensity} mapHeight={ENERGY_REPORT_MAP_HEIGHT} />}
         marketPrices={marketPrices}
         situationText={situationText}
         whatHappenedText={whatHappenedText}

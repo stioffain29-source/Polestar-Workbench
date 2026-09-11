@@ -1,0 +1,242 @@
+IMPORTANT – ENERGY WATCH MUST USE FLEXIBLE PAGINATION
+
+Do NOT hardcode Energy Watch to five pages.
+
+The current report happens to fit well at approximately five pages, but future reporting periods may contain substantially more or less material.
+
+The Energy Watch template must therefore be CONTENT-DRIVEN rather than PAGE-NUMBER-DRIVEN.
+
+Lock the SECTION ORDER and VISUAL HIERARCHY.
+
+Do not lock sections permanently to specific numbered pages.
+
+
+REQUIRED SECTION ORDER
+
+The Energy Watch report must always follow this sequence:
+
+1. COVER
+
+2. FAST FACTS
+
+3. BLUF
+
+4. ENERGY SITUATION MAP
+
+5. MARKET PRICES
+
+6. ENERGY SITUATION
+
+7. CURRENT GEOGRAPHIC / ISSUE SECTIONS
+
+8. WHAT MATTERS
+
+9. IMPLICATIONS FOR BUSINESS
+
+10. WATCH NEXT
+
+11. POLESTAR VIEW
+
+12. DISCLAIMER
+
+
+RELATED INCIDENTS
+
+Do not include the Related Incidents table in the client-facing Energy Watch PDF.
+
+Keep the underlying incident records in Workbench only.
+
+
+PAGINATION BEHAVIOUR
+
+Allow the report to expand or contract naturally according to the amount of substantive material in that reporting period.
+
+Do not force the report to remain five pages.
+
+If more analysis is required, allow additional pages.
+
+If less analysis is required, do not create unnecessary blank pages.
+
+
+KEEP SECTIONS TOGETHER WHERE PRACTICAL
+
+Use intelligent page-break controls.
+
+Do not allow:
+
+A heading to appear at the bottom of one page with its content starting on the next page.
+
+A short assessment block to be split unnecessarily across two pages.
+
+Polestar View to split across pages.
+
+The disclaimer heading to appear separately from the disclaimer text.
+
+Fast Facts cards to split across pages.
+
+Individual Market Price cards to split across pages.
+
+
+MARKET PRICES
+
+Market Prices should be treated as a coherent visual section.
+
+If the complete Market Prices section fits comfortably in the remaining page space, it may remain there.
+
+If it does not fit comfortably, move the whole Market Prices section to the next page.
+
+Do not force unrelated narrative underneath the Market Prices section merely to fill white space.
+
+Do not force Market Prices permanently onto “Page 3”.
+
+
+ENERGY SITUATION
+
+Energy Situation may use one or more pages depending on the amount of significant reporting.
+
+Generate geographic or issue-based subsections dynamically from the current reporting period.
+
+Do not hardcode countries.
+
+Do not restrict the analysis simply to keep the report within a fixed page count.
+
+The most important locations or issues should receive the greatest analytical space.
+
+
+WHAT MATTERS
+
+What Matters should follow the Energy Situation analysis.
+
+Keep the section together where reasonably possible.
+
+If there is not enough room for the complete section, begin it on the next page rather than leaving one paragraph stranded on another page.
+
+
+IMPLICATIONS FOR BUSINESS
+
+Follow What Matters.
+
+Allow the section to flow naturally according to the number of material recommendations.
+
+Do not truncate recommendations to meet a fixed page target.
+
+
+WATCH NEXT
+
+Follow Implications for Business.
+
+Populate dynamically from the current reporting period.
+
+Keep the section together where practical.
+
+
+POLESTAR VIEW
+
+Polestar View must remain the final analytical section of the report.
+
+Keep it together as one assessment block.
+
+Do not split it across pages.
+
+Do not force it onto a specific numbered page.
+
+
+DISCLAIMER
+
+The disclaimer must always follow Polestar View.
+
+Keep the existing wording unchanged.
+
+Use smaller text than the main report body.
+
+Use the normal white page background.
+
+Do not place it in a grey panel, coloured box or shaded area.
+
+Keep the heading and disclaimer body together.
+
+If there is room beneath Polestar View, place it there.
+
+If there is genuinely insufficient room, allow it to continue naturally without distorting the preceding analytical content.
+
+
+OVERFLOW PRIORITY
+
+When a page is close to overflowing, use this order of adjustment:
+
+1. Remove excessive vertical whitespace.
+2. Reduce unnecessary section spacing.
+3. Reduce excessive card padding.
+4. Move the next complete section to the following page.
+5. Add another report page if substantive content genuinely requires it.
+
+Do NOT:
+
+Shrink body text to an unreadable size.
+
+Delete substantive analysis.
+
+Cut recommendations.
+
+Compress charts excessively.
+
+Force sections into unsuitable page space.
+
+Create awkward section splits merely to achieve a predetermined page count.
+
+
+DESIGN PRINCIPLE
+
+Energy Watch should have a consistent INFORMATION ARCHITECTURE but flexible pagination.
+
+The reader journey must always remain:
+
+SNAPSHOT
+Fast Facts
+BLUF
+Map
+
+MARKETS
+Market Prices
+
+ANALYSIS
+Energy Situation
+Geographic / issue analysis
+What Matters
+
+ACTION
+Implications for Business
+Watch Next
+
+JUDGEMENT
+Polestar View
+
+LEGAL
+Disclaimer
+
+
+The number of physical pages may vary from issue to issue.
+
+A quiet reporting period may produce a shorter report.
+
+A significant reporting period may produce a longer report.
+
+That variation is intentional.
+
+Do not sacrifice useful intelligence merely to achieve a fixed page count.
+
+
+IMPORTANT
+
+Implement these rules in the shared Energy Watch PDF renderer so they apply to ALL future Energy Watch reports.
+
+Do not hardcode:
+
+Page numbers
+Countries
+Incident counts
+Current reporting-period content
+Current Fast Facts
+Current narrative
+
+Preserve the section hierarchy while allowing pagination to respond dynamically to the amount of material being reported.

@@ -1031,3 +1031,17 @@ mtime_ms = 1789105002536
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/c563c212-9ce2-45ef-809e-8b6a870664fe/9d51f03c-fd56-438c-af04-203645f11887"
 storage_version_token = "1789105065133725"
 content_type = "image/png"
+
+[[outputs]]
+id = "4P-lvd7d4r-wxndIkhzuX"
+uri = "file://artifacts/workbench/screenshots/EnergyWatch_FlexiblePagination_verify.pdf"
+type = "pdf"
+title = "Energy Watch — flexible-pagination proof"
+description = "Development PDF using your latest report prose. Section order is fixed; page count follows content. Separate short and long tests produced four and eleven pages without truncating recommendations. Incident and price values use development data."
+logical_id = "f9080a72-4cd8-4192-a169-19ff91dfd3b9"
+content_hash = "sha256:ee593b298955d788066306e60fceb27a22cfe666b130ab694b57e7fbcac51863"
+size = 1256650
+mtime_ms = 1789111056003
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/f9080a72-4cd8-4192-a169-19ff91dfd3b9/9d22fbeb-135a-4539-b2fd-378b3d8a3782"
+storage_version_token = "1789111086039017"
+content_type = "application/pdf"

@@ -184,6 +184,15 @@ function worldFallbackBounds(): GeographicBounds {
   };
 }
 
+/** Natural world aspect ratio: remove empty canvas, not geographic detail. */
+export const ENERGY_REPORT_MAP_HEIGHT = (() => {
+  const bounds = worldFallbackBounds();
+  const latitudeSpan = bounds.maxLat - bounds.minLat;
+  const midLatitude = (bounds.maxLat + bounds.minLat) / 2;
+  const geographicWidth = 360 * Math.cos(midLatitude * Math.PI / 180);
+  return Math.ceil((SVG_WIDTH - MAP_PADDING * 2) * latitudeSpan / geographicWidth + MAP_PADDING * 2);
+})();
+
 function countForFeature(
   name: string,
   intensity: Map<string, number>,

@@ -1,0 +1,45 @@
+{
+  "reportId": 8,
+  "issueDate": "2026-09-10",
+  "savedDevelopmentReport": true,
+  "savedAiProse": false,
+  "physicalPages": 5,
+  "headingsByPage": [
+    {
+      "page": 1,
+      "headings": []
+    },
+    {
+      "page": 2,
+      "headings": [
+        "FAST FACTS",
+        "BLUF"
+      ]
+    },
+    {
+      "page": 3,
+      "headings": [
+        "ENERGY SITUATION MAP",
+        "MARKET PRICES"
+      ]
+    },
+    {
+      "page": 4,
+      "headings": [
+        "ENERGY SITUATION",
+        "WHAT MATTERS",
+        "IMPLICATIONS FOR BUSINESS"
+      ]
+    },
+    {
+      "page": 5,
+      "headings": [
+        "WATCH NEXT",
+        "POLESTAR VIEW",
+        "DISCLAIMER"
+      ]
+    }
+  ],
+  "overflow": false,
+  "overflowPages": []
+}
