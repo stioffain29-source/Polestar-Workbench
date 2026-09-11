@@ -1087,3 +1087,17 @@ mtime_ms = 1789117120593
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/4608f01d-6896-4c1c-b656-f534b41c638e/f4e5dbc5-eb9e-475a-9bb6-4bb2b19ec55c"
 storage_version_token = "1789117382488704"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Xplq-htVyOLiaEzJFMHtA"
+uri = "file://artifacts/workbench/screenshots/FuelWatch_report23_coverage_final_proof.pdf"
+type = "pdf"
+title = "Fuel Watch — expanded coverage proof"
+description = "Verified preview/PDF output from a read-only production-data snapshot: reporting-period development totals, daily activity, severity mix, country breakdown including unattributed developments, and expanded Related Incidents. Verification copy; not published."
+logical_id = "4b2f938b-da6b-467a-aa31-7cd86f33cd68"
+content_hash = "sha256:e3066b4c37b4660d6b755c00c1dafc2596d70d33ef129f790547f8a2989e2566"
+size = 1113934
+mtime_ms = 1789138749967
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/4b2f938b-da6b-467a-aa31-7cd86f33cd68/01a61f44-7c39-41f7-acbb-9d33462a81ab"
+storage_version_token = "1789138832755893"
+content_type = "application/pdf"

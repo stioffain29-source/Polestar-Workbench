@@ -449,6 +449,7 @@ export const FUEL_GATED_SECTIONS: GatedSection[] = [
   { key: "market-read", heading: "Market Read", sentinelToken: "" },
   { key: "operational-read", heading: "Operational Read", sentinelToken: "" },
   { key: "regional-highlights", heading: "Regional Highlights", sentinelToken: "" },
+  { key: "related-incidents", heading: "Related Incidents", sentinelToken: "" },
 ];
 
 export const ENERGY_GATED_SECTIONS: GatedSection[] = [

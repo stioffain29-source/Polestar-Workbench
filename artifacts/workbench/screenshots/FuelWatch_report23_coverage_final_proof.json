@@ -1,0 +1,235 @@
+{
+  "source": "read-only production database snapshot",
+  "snapshotPath": "/tmp/fuel-report-23-production-snapshot.json",
+  "reportId": 23,
+  "staleDraft": true,
+  "aiProsePassed": false,
+  "sourceIncidentRows": 632,
+  "renderIssueDate": "2026-09-11",
+  "reportingPeriod": {
+    "issueDate": "2026-09-11",
+    "start": "2026-09-05",
+    "end": "2026-09-11",
+    "incidentStart": "2026-09-05",
+    "incidentEnd": "2026-09-11"
+  },
+  "canonicalQualifyingCount": 18,
+  "coverage": {
+    "totalDistinctDevelopments": 18,
+    "activeCountries": 5,
+    "canonicalSeverityDistribution": {
+      "Insignificant": 0,
+      "Low": 6,
+      "Moderate": 11,
+      "High": 1,
+      "Extreme": 0
+    },
+    "severityDistribution": {
+      "Insignificant": 0,
+      "Low": 6,
+      "Moderate": 11,
+      "High": 1,
+      "Extreme": 0
+    },
+    "dailyTrend": [
+      {
+        "date": "2026-09-05",
+        "label": "05 Sep",
+        "count": 1
+      },
+      {
+        "date": "2026-09-06",
+        "label": "06 Sep",
+        "count": 1
+      },
+      {
+        "date": "2026-09-07",
+        "label": "07 Sep",
+        "count": 2
+      },
+      {
+        "date": "2026-09-08",
+        "label": "08 Sep",
+        "count": 3
+      },
+      {
+        "date": "2026-09-09",
+        "label": "09 Sep",
+        "count": 5
+      },
+      {
+        "date": "2026-09-10",
+        "label": "10 Sep",
+        "count": 1
+      },
+      {
+        "date": "2026-09-11",
+        "label": "11 Sep",
+        "count": 5
+      }
+    ],
+    "affectedCountries": [
+      {
+        "country": "Iran",
+        "count": 4,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 4,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Pakistan",
+        "count": 3,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 3,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Russia",
+        "count": 3,
+        "highestSeverity": "Low",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 3,
+          "Moderate": 0,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "India",
+        "count": 1,
+        "highestSeverity": "Low",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 1,
+          "Moderate": 0,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Saudi Arabia",
+        "count": 1,
+        "highestSeverity": "High",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 0,
+          "High": 1,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Unattributed",
+        "count": 6,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 2,
+          "Moderate": 4,
+          "High": 0,
+          "Extreme": 0
+        }
+      }
+    ],
+    "reconciliation": {
+      "severityTotal": 18,
+      "dailyTotal": 18,
+      "affectedCountryTotal": 18,
+      "canonicalAttributedCountryTotal": 12,
+      "expectedUnattributedCount": 6,
+      "unattributedRowCount": 6,
+      "activeCountryRows": 5,
+      "canonicalActiveCountries": 5,
+      "severityParity": true,
+      "severityMatchesTotal": true,
+      "dailyMatchesTotal": true,
+      "countriesMatchCanonical": true
+    }
+  },
+  "related": {
+    "canonicalQualifyingCount": 18,
+    "selectedCount": 14,
+    "selectedTitles": [
+      "IRGC Says Iranian Navy Attacked U.S. Unmanned Vessel in Strait of Hormuz",
+      "Houthi Rebels Seize Key Port City Near Bab el-Mandeb Strait in New Attacks",
+      "One unit of Adani power plant shuts down, exacerbating load-shedding",
+      "Sudden Shutdown of Multiple Power Plants Worsens Load-Shedding",
+      "Simkot residents face 22 hours of daily load-shedding",
+      "Iran claims it struck US unmanned surveillance vessel in Strait of Hormuz",
+      "Iran likely to reverse-engineer captured U.S. underwater drone",
+      "Dangote Says Global Fuel Shortage Could Outlast Iran War",
+      "Load shedding: Devastation caused by the five Pandavas",
+      "Ukraine Hits Saratov Refinery Again as Russian Fuel Crisis Deepens",
+      "Oil Surges Past $99 After Saudi Refinery Attack",
+      "Ship fuel shortage looms as refiners strained by war favour other products",
+      "Global ship fuel shortage looms as war disruptions squeeze refinery output",
+      "Shipping Fuel Shortage Looms as Refiners Prioritize Diesel"
+    ],
+    "visibleInPreview": true,
+    "noFixedSixAssertion": true
+  },
+  "preview": {
+    "blocked": false,
+    "textLength": 11326,
+    "coverageFound": true,
+    "coverageMissingTokens": [],
+    "relatedVisible": true,
+    "relatedRowCount": 14,
+    "relatedTitlesFound": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "pdf": {
+    "bytes": 1113934,
+    "saveCalls": 1,
+    "exportError": null,
+    "pages": 8,
+    "textLength": 11258,
+    "hasRelatedHeading": true,
+    "relatedTitlesFound": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "artifacts": {
+    "preview": "/tmp/fuel-report-23-coverage-artifacts/FuelWatch_report23_coverage_preview.png",
+    "pdf": "/tmp/fuel-report-23-coverage-artifacts/FuelWatch_report23_coverage.pdf",
+    "proof": "/tmp/fuel-report-23-coverage-artifacts/FuelWatch_report23_coverage_proof.json"
+  }
+}

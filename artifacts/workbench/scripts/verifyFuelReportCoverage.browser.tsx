@@ -1,0 +1,146 @@
+import { jsPDF } from "jspdf";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import { exportTopicReportPdf } from "../src/lib/exportTopicReportPdf";
+import ReportPreview from "../src/components/ReportPreview";
+import { TOPIC_LABELS } from "../src/lib/topics";
+
+declare global {
+  interface Window {
+    __FUEL_COVERAGE_VERIFY_DATA__: any;
+    __runFuelCoverageVerify__: () => Promise<string>;
+  }
+}
+
+function normalized(value: string): string {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+window.__runFuelCoverageVerify__ = async () => {
+  const data = window.__FUEL_COVERAGE_VERIFY_DATA__;
+  const host = document.createElement("div");
+  host.id = "fuel-coverage-verify-host";
+  document.body.append(host);
+  createRoot(host).render(
+    createElement(ReportPreview, {
+      report: data.report,
+      incidents: data.incidents,
+      aiProse: null,
+      hiddenSections: data.hiddenSections,
+      sectionOverrides: data.sectionOverrides,
+    }),
+  );
+  await document.fonts.ready;
+  for (let i = 0; i < 35; i++) {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+  }
+
+  const print = host.querySelector<HTMLElement>(".print-report");
+  if (!print) throw new Error("Fuel preview did not render .print-report");
+  const previewText = print.innerText || print.textContent || "";
+  const coverage = host.querySelector<HTMLElement>(
+    "[data-fuel-coverage-summary]",
+  );
+  const coverageText = coverage?.innerText || coverage?.textContent || "";
+  const relatedSection = [...host.querySelectorAll<HTMLElement>(".report-section")].find(
+    (section) =>
+      normalized(section.querySelector("h2")?.textContent ?? "") ===
+      "related incidents",
+  );
+  const relatedVisible =
+    relatedSection !== undefined &&
+    getComputedStyle(relatedSection).display !== "none" &&
+    getComputedStyle(relatedSection).visibility !== "hidden" &&
+    relatedSection.getAttribute("aria-hidden") !== "true";
+  const relatedRows = relatedSection
+    ? [...relatedSection.querySelectorAll("tbody tr")].map((row) =>
+        normalized(row.textContent ?? ""),
+      )
+    : [];
+  const expectedCoverageTokens = [
+    data.expected.coverage.reportingPeriod.start,
+    data.expected.coverage.reportingPeriod.end,
+    String(data.expected.coverage.totalDistinctDevelopments),
+    String(data.expected.coverage.activeCountries),
+    ...Object.entries(data.expected.coverage.severityDistribution).flatMap(
+      ([label, count]) => [label, String(count)],
+    ),
+    ...data.expected.coverage.dailyTrend.flatMap((day: { label: string; count: number }) => [
+      day.label,
+      String(day.count),
+    ]),
+    ...data.expected.coverage.affectedCountries.flatMap(
+      (country: { country: string; count: number }) => [
+        country.country,
+        String(country.count),
+      ],
+    ),
+  ];
+  const normalizedCoverage = normalized(coverageText);
+  const missingCoverageTokens = expectedCoverageTokens.filter(
+    (token: string) => !normalizedCoverage.includes(normalized(token)),
+  );
+  const expectedTitles = data.expected.relatedTitles.map((title: string) =>
+    normalized(title),
+  );
+  const relatedTitlesFound = expectedTitles.map((title: string) =>
+    relatedRows.some((row) => row.includes(title)),
+  );
+
+  let captured: ArrayBuffer | null = null;
+  let saveCalls = 0;
+  const capture = function (this: jsPDF) {
+    saveCalls++;
+    captured = this.output("arraybuffer") as ArrayBuffer;
+    return this;
+  };
+  (jsPDF.prototype as unknown as { save: (fileName: string) => jsPDF }).save =
+    capture;
+  (
+    jsPDF as unknown as { API: { save: (fileName: string) => jsPDF } }
+  ).API.save = capture;
+
+  let exportError: string | null = null;
+  try {
+    await exportTopicReportPdf(
+      data.report,
+      data.incidents,
+      TOPIC_LABELS,
+      "fuel-report-23-coverage-verify.pdf",
+      {
+        aiProse: null,
+        hiddenSections: data.hiddenSections,
+        sectionOverrides: data.sectionOverrides,
+      },
+    );
+  } catch (error) {
+    exportError = error instanceof Error ? error.message : String(error);
+  }
+
+  let base64 = "";
+  if (captured) {
+    const bytes = new Uint8Array(captured);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    base64 = btoa(binary);
+  }
+
+  return JSON.stringify({
+    blocked:
+      host.querySelector('[data-fuel-validation-blocked="true"]') !== null,
+    previewLength: previewText.length,
+    coverageFound: coverage !== null,
+    coverageMissingTokens: missingCoverageTokens,
+    relatedVisible,
+    relatedRowCount: relatedRows.length,
+    relatedTitlesFound,
+    saveCalls,
+    exportError,
+    pdfBytes: captured?.byteLength ?? 0,
+    base64,
+  });
+};

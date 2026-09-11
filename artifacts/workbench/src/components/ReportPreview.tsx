@@ -50,6 +50,7 @@ import {
   FUEL_MISSING_REQUIRED_NOTE,
 } from "@/lib/fuelWatchReport";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import FuelCoverageSummary from "@/components/FuelCoverageSummary";
 import { MarketPricesReportSection } from "@/components/MarketPrices";
 import type { MarketPrice } from "@workspace/api-client-react";
 import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
@@ -1004,7 +1005,7 @@ export default function ReportPreview({
   // preview lists the SAME rows, in the same order, as the PDF's
   // drawRelatedIncidents (parity guarantee). The window here matches the PDF's
   // windowIncidents exactly (filterTopicReportIncidents == the PDF filter).
-  // Fuel has its own bespoke preview branch and is excluded.
+  // Fuel has its own canonical-family preview branch assembled below.
   const relatedRows =
     !isFuel && report.topic && report.issueDate
       ? selectRelatedIncidents(
@@ -1047,6 +1048,21 @@ export default function ReportPreview({
       })
     : null;
   const fuelData = fuelBundle?.reportData ?? null;
+  // Fuel related rows use the canonical evidence-family representatives, not
+  // the broader raw incident feed. This keeps the coverage summary and the
+  // register on one qualifying current-period dataset while preserving the
+  // shared title/weak-row safeguards in selectRelatedIncidents.
+  const fuelRelatedRows =
+    isFuel && fuelBundle
+      ? selectRelatedIncidents(
+          fuelBundle.canonicalFacts.qualifyingIncidents.map((incident) => ({
+            ...incident.raw,
+            id: incident.raw.id ?? incident.id,
+            severity: incident.severity.toLowerCase(),
+          })),
+          "fuel",
+        )
+      : [];
   const periodLabel = report.topic && renderIssueDate
     ? resolveReportWindow(report.topic, renderIssueDate).label
     : "";
@@ -1357,6 +1373,11 @@ export default function ReportPreview({
                   {w}
                 </p>
               ))}
+              {fuelBundle && (
+                <div style={{ marginTop: 12 }}>
+                  <FuelCoverageSummary canonicalFacts={fuelBundle.canonicalFacts} />
+                </div>
+              )}
             </Section>
 
             <Section hidden={!show("jet-fuel-trajectory")} title="Jet Fuel Price Trajectory">
@@ -1400,6 +1421,11 @@ export default function ReportPreview({
             <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelData.narrativeData.implications} />
             <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />
             <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelEffective?.polestarView} />
+            {fuelRelatedRows.length > 0 && (
+              <Section hidden={!show("related-incidents")} title="Related Incidents">
+                <RelatedIncidentsTable rows={fuelRelatedRows} summaries={incidentSummaries} />
+              </Section>
+            )}
           </>
         ) : (
           <>

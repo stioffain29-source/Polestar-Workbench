@@ -7,7 +7,7 @@ description: Why the Related Incidents table row-selection must live in one shar
 
 The Related Incidents table is rendered by BOTH the on-screen preview and the
 jsPDF builder. Row selection (title dedupe, weak-bucket + generic-cargo-title
-filtering, recency sort, per-topic cap fuel<=6 else<=10) is the single source of
+filtering, recency sort, per-topic limits) is the single source of
 truth in `selectRelatedIncidents(window, topic)` in `src/lib/relatedIncidents.ts`.
 
 **Why:** the selection logic used to live inline ONLY in the PDF builder, and the
@@ -21,15 +21,18 @@ in AND the same selector. Both surfaces now feed `filterTopicReportIncidents(...
 flashpoint↔protests alias) into `selectRelatedIncidents`. The PDF's `windowIncidents`
 (`filterIncidentsToWindow(byTopic)+isTopicRelevant`) is for Fast Facts/prose ONLY —
 do NOT feed it to the Related Incidents table or cargo/flashpoint will diverge.
-Fuel renders NO related table on EITHER surface (preview `!isFuel`, PDF call guarded
-`if (topic !== "fuel")`). `filterTopicReportIncidents` is generic
+Fuel report coverage must represent canonical evidence families rather than raw
+headline volume, including assessed severity in the detailed register.
+**Why:** raw feed severity can contradict Fuel's deliberately capped assessment.
+`filterTopicReportIncidents` is generic
 (`<T extends TopicFastFactsIncident>`) so it preserves the caller's element type.
 
 **How to apply:**
 - Never re-inline the dedupe/weak/cap logic in either surface. Both call
   `selectRelatedIncidents`.
-- Feed the table from `filterTopicReportIncidents`, never the prose window. Keep the
-  fuel skip in lockstep on both surfaces.
+- Feed non-Fuel tables from `filterTopicReportIncidents`, never the prose window.
+  Fuel's coverage summary and related table must share canonical current-period
+  evidence families; retain relevance and weak-row safeguards.
 - The selector classifies via `classifyIncidentType` from `./incidentClassifier`
   (NOT `cargoAnalysis` — different classifier), which requires a `topic` field on
   the input. `RelatedIncidentInput` therefore carries `topic`; both caller row

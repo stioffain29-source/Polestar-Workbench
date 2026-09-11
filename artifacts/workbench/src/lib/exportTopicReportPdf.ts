@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { format, parseISO } from "date-fns";
 import JetFuelTrajectoryChart from "@/components/JetFuelTrajectoryChart";
+import FuelCoverageSummary from "@/components/FuelCoverageSummary";
+import { buildFuelCoverageSummary } from "@/lib/fuelCoverage";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
@@ -29,7 +31,6 @@ import {
   drawBulletSection,
   drawDisclaimer,
   DISCLAIMER_TEXT,
-  drawSectionWithProseAndDisclaimer,
   ensureRoomForDisclaimer,
   drawFooters,
   drawPolestarCover,
@@ -627,7 +628,7 @@ function drawRelatedIncidents(
 
     const sevKeyStr = sevKey(i.severity);
     const sevDisplay = SEV_LABEL[sevKeyStr] ?? i.severity ?? "";
-    setFill(pdf, SEV_COLOR[sevKeyStr] ?? "#999999");
+    setFill(pdf, SEV_COLOR[sevKeyStr] ?? SEV_COLOR.insignificant);
     const chipX = MX + colDateW + colTypeW + colTitleW + 6;
     const sevText = sanitize(sevDisplay.toUpperCase());
     const isSmallText = sevText === "HIGH" || sevText === "LOW";
@@ -1068,6 +1069,20 @@ export async function exportTopicReportPdf(
       })
     : null;
   const fuelData = fuelBundle?.reportData ?? null;
+  // Render Fuel's related register from the same canonical evidence-family
+  // representatives used by the coverage summary. The shared selector still
+  // applies title dedupe, weak-row safeguards and the current report ceiling.
+  const fuelRelatedRows =
+    isFuel && fuelBundle
+      ? selectRelatedIncidents(
+          fuelBundle.canonicalFacts.qualifyingIncidents.map((incident) => ({
+            ...incident.raw,
+            id: incident.raw.id ?? incident.id,
+            severity: incident.severity.toLowerCase(),
+          })),
+          "fuel",
+        )
+      : [];
   // FINAL EFFECTIVE Fuel narrative — analyst edit -> AI -> canonical
   // deterministic, resolved by the ONE shared resolver the preview and the
   // editor prefill also call, so all three surfaces render byte-identical
@@ -1422,6 +1437,36 @@ export async function exportTopicReportPdf(
         drawFastFactsKpiCards(ctx, kpis);
         for (const w of fuelData.validation.warnings) renderProse(ctx, w);
       }
+      if (fuelBundle) {
+        const coverageModel = buildFuelCoverageSummary(fuelBundle.canonicalFacts);
+        // Keep the visual atomic but paginate the country register as bounded
+        // readable chunks. The embed helper must never shrink a full-country
+        // table into an illegible strip merely to fit the current page tail.
+        const countryRows = coverageModel.affectedCountries;
+        const chunkSize = 12;
+        const countryChunks =
+          countryRows.length === 0
+            ? [[]]
+            : Array.from(
+                { length: Math.ceil(countryRows.length / chunkSize) },
+                (_, index) => countryRows.slice(index * chunkSize, (index + 1) * chunkSize),
+              );
+        for (const [index, rows] of countryChunks.entries()) {
+          await embedReactChartInPdf(
+            ctx,
+            createElement(FuelCoverageSummary, {
+              model: coverageModel,
+              countryRows: rows,
+              showMetrics: index === 0,
+              continued: index > 0,
+            }),
+            // CSS pixels are converted to jsPDF points by the helper. A
+            // bounded chunk either fits at readable size or starts naturally
+            // on the next page; it is never arbitrarily scaled down.
+            { useCssPixelUnits: true, fitRemaining: false },
+          );
+        }
+      }
     }
 
     // Jet Fuel Price Trajectory — rasterise the same React chart the preview
@@ -1518,10 +1563,24 @@ export async function exportTopicReportPdf(
       );
     }
     if (show("polestar-view")) {
-      drawSectionWithProseAndDisclaimer(ctx, "Polestar View", fuelEffective?.polestarView ?? "");
-    } else {
-      drawDisclaimer(ctx);
+      const polestarView = fuelEffective?.polestarView ?? "";
+      if (polestarView.trim()) {
+        drawSectionWithProse(ctx, "Polestar View", polestarView);
+      }
     }
+    // Fuel's register is the normal end-of-report detail section. It follows
+    // every narrative/analysis section and sits immediately before the legal
+    // disclaimer, matching the preview's document order.
+    if (show("related-incidents") && fuelRelatedRows.length > 0) {
+      drawRelatedIncidents(
+        ctx,
+        fuelRelatedRows,
+        data.topic,
+        topicLabels,
+        options.incidentSummaries ?? {},
+      );
+    }
+    drawDisclaimer(ctx);
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
     // read the model's deterministic executive summary.
@@ -1770,12 +1829,11 @@ export async function exportTopicReportPdf(
 
   // Related Incidents shares the preview's exact input
   // (filterTopicReportIncidents) and selector (selectRelatedIncidents) so the
-  // PDF table can never disagree with the on-screen preview. Fuel uses a
-  // bespoke price-led layout that intentionally carries no related table, so
-  // the PDF omits it here too (matching the fuel preview branch). Cargo Watch
-  // is a pattern report — it renders its own condensed appendix (one row per
-  // unique incident) inside its branch above, so it omits both the Cargo
-  // Incident Clusters and Related Incidents sections here.
+  // PDF table can never disagree with the on-screen preview. Fuel renders its
+  // canonical-family register inside the Fuel branch above. Cargo Watch is a
+  // pattern report — it renders its own condensed appendix (one row per unique
+  // incident) inside its branch above, so it omits both the Cargo Incident
+  // Clusters and Related Incidents sections here.
   if (
     data.topic !== "fuel" &&
     data.topic !== "cargo_watch" &&

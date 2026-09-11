@@ -71,10 +71,12 @@ function titleKey(s: string): string {
   return significantTitleTokens(s).slice(0, 8).join(" ");
 }
 
-// Hard per-topic row caps for the Related Incidents table. Fuel runs a tighter
-// table than the other topic/conflict reports. These bound the rendered rows
-// regardless of the wider `relatedIncidentsLimit` ceiling.
-export const FUEL_RELATED_ROW_CAP = 6;
+// Hard per-topic row caps for the Related Incidents table. Fuel used to have a
+// tighter six-row table, which meant qualifying developments disappeared from
+// the report even though they were inside the same current reporting window.
+// Keep this exported name as a compatibility alias for callers/tests, but bind
+// it to the shared report-window ceiling: Fuel no longer has a special cap.
+export const FUEL_RELATED_ROW_CAP = relatedIncidentsLimit("fuel").max;
 export const DEFAULT_RELATED_ROW_CAP = 10;
 
 // The largest number of rows `selectRelatedIncidents` can ever return, across
@@ -151,7 +153,7 @@ export function selectRelatedIncidents<T extends RelatedIncidentInput>(
 
   const effectiveMax =
     topic === "fuel"
-      ? Math.min(max, FUEL_RELATED_ROW_CAP)
+      ? max
       : Math.min(max, DEFAULT_RELATED_ROW_CAP);
   return sorted.slice(0, effectiveMax);
 }
