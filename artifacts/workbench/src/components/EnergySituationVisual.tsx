@@ -492,10 +492,6 @@ export function EnergySituationVisual({
   const bounds = focusBounds(framingFeatures) ?? worldFallbackBounds();
   const viewportHeight = Math.max(120, mapHeight);
   const projection = buildProjection(bounds, SVG_WIDTH, viewportHeight);
-  const labels = resolveLabels(affectedFeatures, intensity, projection);
-  const nzAnchor = newZealand && countForFeature("New Zealand", intensity) === 0
-    ? featureAnchor(newZealand, projection)
-    : null;
 
   return (
     <div
@@ -540,62 +536,6 @@ export function EnergySituationVisual({
               stroke={BORDER}
               strokeWidth={0.6}
             />
-          );
-        })}
-        {nzAnchor && (
-          <text
-            x={Math.min(SVG_WIDTH - 34, nzAnchor[0])}
-            y={Math.min(viewportHeight - 6, nzAnchor[1] + 17)}
-            textAnchor="middle"
-            fontSize={8}
-            fill={NAVY}
-            stroke="#f8f9fb"
-            strokeWidth={2.5}
-            paintOrder="stroke"
-          >
-            New Zealand
-          </text>
-        )}
-        {labels.map((label) => {
-          const fill = countBandColor(label.count) ?? EMPTY_FILL;
-          const ink = label.count >= 21 ? "#ffffff" : NAVY;
-          return (
-            <g key={label.key}>
-              {Math.abs(label.x - label.anchorX) > 4 ||
-              Math.abs(label.y - label.anchorY) > 4 ? (
-                <line
-                  x1={label.anchorX}
-                  y1={label.anchorY}
-                  x2={label.x}
-                  y2={label.y}
-                  stroke={BORDER}
-                  strokeWidth={0.7}
-                />
-              ) : null}
-              <rect
-                x={label.x - label.width / 2}
-                y={label.y - label.height / 2}
-                width={label.width}
-                height={label.height}
-                rx={2}
-                fill={fill}
-                fillOpacity={0.95}
-                stroke={BORDER}
-                strokeWidth={0.5}
-              />
-              <text
-                x={label.x}
-                y={label.y}
-                aria-label={`${label.name} incidents`}
-                dominantBaseline="middle"
-                fill={ink}
-                fontSize={9}
-                fontWeight={700}
-                textAnchor="middle"
-              >
-                {label.name}
-              </text>
-            </g>
           );
         })}
       </svg>

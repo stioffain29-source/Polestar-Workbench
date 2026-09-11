@@ -11,4 +11,8 @@ Do not restore Related Incidents to Energy Watch reports. Keep the full disclaim
 
 Energy's map must include New Zealand as geographic context even when it has no reported incidents; do not turn this framing requirement into invented data.
 
+Do not add country-name or incident-count labels to the Energy map.
+
+**Why:** the owner explicitly rejected the unsolicited labels on 2026-09-11. Sharper rendering and wider geography were not permission to add annotations.
+
 **Why:** the owner explicitly rejected the map omitting New Zealand and requested slightly smaller Fast Facts to accommodate it. Static maps need a complete geographic base, not the monitor's selected-country overlays rendered as standalone land.
