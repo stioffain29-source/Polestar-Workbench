@@ -35,6 +35,7 @@ import {
   finalizeShippingPublication,
   shippingPublicationIssueAction,
   shippingPublicationIssueSection,
+  type ShippingPublicationIssue,
 } from "@/lib/shippingPublication";
 import type { ShippingSevenPageRegisterRow } from "@/lib/shippingSevenPagePresentation";
 import {
@@ -174,14 +175,10 @@ function Section({ title, children, hidden }: { title: string; children: React.R
 function ShippingPublicationWarnings({
   issues,
 }: {
-  issues: Array<{
-    code: string;
-    section?: string;
-    message: string;
-    incidentIds?: Array<number | string>;
-  }>;
+  issues: ShippingPublicationIssue[];
 }) {
   if (issues.length === 0) return null;
+  const hasBlockingErrors = issues.some((issue) => issue.level === "ERROR");
   return (
     <aside
       aria-label="Shipping Watch draft validation warnings"
@@ -189,7 +186,9 @@ function ShippingPublicationWarnings({
       className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
     >
       <h2 className="font-semibold">
-        Draft preview — PDF export is blocked until these checks are resolved
+        {hasBlockingErrors
+          ? "Draft preview — PDF export is blocked until these errors are resolved"
+          : "Draft preview — review these warnings before export"}
       </h2>
       <p className="mt-1 leading-6">
         The report below is still your live draft. Saved edits and all report
@@ -207,6 +206,9 @@ function ShippingPublicationWarnings({
             >
               <div>
                 <strong>{section}</strong>
+                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
+                  {item.level}
+                </span>
                 <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
                   {item.code}
                 </span>
@@ -777,7 +779,8 @@ export default function ShippingReportPreview({
 
   // Validation is an editor warning state, not a reason to replace the draft.
   // The PDF exporter still calls assertShippingPublication and therefore
-  // remains fail-closed; the preview must keep the cover, tables and saved
+  // remains fail-closed for ERROR issues; WARNING issues stay visible without
+  // blocking the export. The preview keeps the cover, tables and saved
   // analyst edits visible so the owner can fix the associated section.
 
   const presentation = publication.sevenPage;

@@ -107,6 +107,7 @@ import {
   buildHardNumbersFromForm,
   fuelMarketFormFromData,
   fuelMarketLatestDate,
+  fuelMarketReadinessIssue,
   buildFuelReportFacts,
   serialiseFuelFactsForPrompt,
   resolveFuelPeriodEnd,
@@ -1286,15 +1287,15 @@ export default function ReportEditor() {
     }
     try {
       const allow = opts?.forceAllowMissing === true || allowMissingExport;
+      const fuelReadinessIssue =
+        form.topic === "fuel" && liveFuelData
+          ? fuelMarketReadinessIssue(liveFuelData.validation)
+          : null;
       if (
-        form.topic === "fuel" &&
-        liveFuelData &&
-        !liveFuelData.validation.hasRequiredFuelWatchData &&
+        fuelReadinessIssue?.level === "ERROR" &&
         !allow
       ) {
-        setExportError(
-          `Fuel Watch export requires market data. Missing: ${liveFuelData.validation.missingRequired.join(", ")}.`,
-        );
+        setExportError(fuelReadinessIssue.message);
         return;
       }
 

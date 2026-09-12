@@ -1,5 +1,6 @@
 import {
   assertShippingPublication,
+  classifyShippingPublicationIssue,
   finalizeShippingPublication,
   type ShippingPublicationOptions,
 } from "../../artifacts/workbench/src/lib/shippingPublication";
@@ -115,6 +116,27 @@ describe("Shipping publication final boundary", () => {
     ).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
     expect(publication.incidentSummaries["1"]).toBeUndefined();
     expect(() => assertShippingPublication(publication)).not.toThrow();
+  });
+
+  it("treats Watch Next grounding uncertainty as a warning without blocking publication", () => {
+    const publication = finalizeShippingPublication(
+      validOptions({
+        report: { watchNext: "Monitor the wider market." },
+      }),
+    );
+
+    expect(publication.auditIssues.length).toBeGreaterThan(0);
+    expect(publication.auditIssues.every((issue) => issue.level === "WARNING")).toBe(true);
+    expect(publication.auditIssues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining(["UNSUPPORTED_WATCH_NEXT", "UNGROUNDED_WATCH_NEXT"]),
+    );
+    expect(() => assertShippingPublication(publication)).not.toThrow();
+  });
+
+  it("classifies serious Shipping issues as errors and Watch Next uncertainty as warnings", () => {
+    expect(classifyShippingPublicationIssue("UNSUPPORTED_WATCH_NEXT", "watchNext")).toBe("WARNING");
+    expect(classifyShippingPublicationIssue("WATCH_NEXT_UNGROUNDED", "watchNext")).toBe("WARNING");
+    expect(classifyShippingPublicationIssue("RISK_CONTRADICTION", "risk")).toBe("ERROR");
   });
 
   it("keeps the attack/seizure Fast Fact accurate when the vessel table cap applies", () => {

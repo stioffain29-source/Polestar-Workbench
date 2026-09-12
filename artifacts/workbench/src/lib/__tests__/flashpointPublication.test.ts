@@ -1,4 +1,5 @@
 import {
+  assertFlashpointPublication,
   finalizeFlashpointPublication,
   validateFlashpointFinalEvidenceAudit,
 } from "../flashpointPublication";
@@ -133,5 +134,45 @@ describe("Flashpoint shared publication architecture", () => {
       issueDate: ISSUE,
     });
     expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("SEVERITY_PARITY");
+  });
+
+  it("allows warning findings through the Flashpoint publication boundary", () => {
+    const bundle = finalizeFlashpointPublication({
+      incidents: [incident("Workers march in Delhi over wages")],
+      issueDate: ISSUE,
+    });
+    expect(() =>
+      assertFlashpointPublication({
+        ...bundle,
+        auditIssues: [
+          {
+            code: "VAGUE_CHANGE",
+            section: "whatMatters",
+            message: "Use a named development.",
+            level: "WARNING",
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("blocks only ERROR findings at the Flashpoint publication boundary", () => {
+    const bundle = finalizeFlashpointPublication({
+      incidents: [incident("Workers march in Delhi over wages")],
+      issueDate: ISSUE,
+    });
+    expect(() =>
+      assertFlashpointPublication({
+        ...bundle,
+        auditIssues: [
+          {
+            code: "VAGUE_CHANGE",
+            section: "whatMatters",
+            message: "Use a named development.",
+            level: "ERROR",
+          },
+        ],
+      }),
+    ).toThrow(/VAGUE_CHANGE/);
   });
 });

@@ -1096,79 +1096,24 @@ export default function ReportPreview({
         proseDraft.executiveSummary,
       );
 
-  // Fuel Watch HARD consistency gate — the SAME reconciliation the PDF
-  // exporter throws on, surfaced here as a blocking panel so preview == PDF:
-  // a contradictory payload can neither be previewed as clean nor exported.
-  // Two layers, exactly as the exporter runs them: the strict canonical gate
-  // over the canonical payload (canonical text passes by construction), and
-  // the prose-tolerant gate over the FINAL effective text (whichever tier wins).
+  // Validation never replaces a draft preview. Analysts need the rendered
+  // report in view while resolving findings. Canonical and consistency issues
+  // are errors; the shared evidence audit carries its own ERROR/WARNING/INFO
+  // level. Only ERROR findings block the final PDF boundary.
   const fuelConsistencyErrors = fuelBundle?.auditIssues.canonical ?? [];
   const fuelEffectiveIssues = fuelBundle?.auditIssues.consistency ?? [];
   const fuelEvidenceAuditIssues = fuelBundle?.auditIssues.evidence ?? [];
-  if (
-    fuelConsistencyErrors.length > 0 ||
-    fuelEffectiveIssues.length > 0 ||
-    fuelEvidenceAuditIssues.length > 0
-  ) {
-    return (
-      <div
-        className="print-report bg-white"
-        style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
-        data-fuel-validation-blocked="true"
-      >
-        <h1
-          style={{
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 700,
-            fontSize: 28,
-            lineHeight: 1.1,
-            marginBottom: 24,
-          }}
-        >
-          {resolvedTitle || "Untitled report"}
-        </h1>
-        <div style={{ border: "2px solid #A33232", padding: 24 }}>
-          <div
-            style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
-              fontWeight: 700,
-              fontSize: 20,
-              color: "#A33232",
-              marginBottom: 12,
-            }}
-          >
-            Fuel Watch consistency gate failed — export blocked
-          </div>
-          <p style={{ fontSize: 13, marginBottom: 16 }}>
-            The rendered sections contradict the report's calculated facts.
-            Fix the flagged sections and the report will render and export
-            normally.
-          </p>
-          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
-            {fuelConsistencyErrors.map((issue, i) => (
-              <li key={i}>
-                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
-                {issue.conflictingStatement} — canonical value{" "}
-                {issue.canonicalValue} ({issue.sourceField})
-              </li>
-            ))}
-            {fuelEffectiveIssues.map((issue, i) => (
-              <li key={`eff-${i}`}>
-                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
-                [{issue.code}] {issue.message}
-              </li>
-            ))}
-            {fuelEvidenceAuditIssues.map((issue, i) => (
-              <li key={`audit-${i}`}>
-                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
-                [{issue.code}] {issue.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    );
-  }
+  const fuelEvidenceErrors = fuelEvidenceAuditIssues.filter(
+    (issue) => issue.level === "ERROR",
+  );
+  const fuelValidationIssueCount =
+    fuelConsistencyErrors.length +
+    fuelEffectiveIssues.length +
+    fuelEvidenceAuditIssues.length;
+  const fuelBlockingIssueCount =
+    fuelConsistencyErrors.length +
+    fuelEffectiveIssues.length +
+    fuelEvidenceErrors.length;
 
   if (isEnergy) {
     return (
@@ -1224,6 +1169,58 @@ export default function ReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      {isFuel && fuelValidationIssueCount > 0 && (
+        <aside
+          data-report-validation-findings="true"
+          data-fuel-validation-blocked={fuelBlockingIssueCount > 0 ? "true" : "false"}
+          aria-label="Fuel Watch validation findings"
+          style={{
+            margin: 24,
+            padding: 20,
+            border: `2px solid ${fuelBlockingIssueCount > 0 ? "#A33232" : "#B7791F"}`,
+            background: fuelBlockingIssueCount > 0 ? "#FFF7F7" : "#FFFBEB",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "'Roboto Condensed', sans-serif",
+              fontWeight: 700,
+              fontSize: 18,
+              color: fuelBlockingIssueCount > 0 ? "#A33232" : "#8A5A00",
+              marginBottom: 8,
+            }}
+          >
+            {fuelBlockingIssueCount > 0
+              ? "Fuel Watch validation errors — final export blocked"
+              : "Fuel Watch validation warnings — analyst review"}
+          </div>
+          <p style={{ fontSize: 13, marginBottom: 12 }}>
+            The complete draft remains visible and editable. Warnings do not
+            block saving or PDF export.
+          </p>
+          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
+            {fuelConsistencyErrors.map((issue, i) => (
+              <li key={`canonical-${i}`}>
+                <strong>ERROR — {issue.section}:</strong>{" "}
+                {issue.conflictingStatement} — canonical value{" "}
+                {issue.canonicalValue} ({issue.sourceField})
+              </li>
+            ))}
+            {fuelEffectiveIssues.map((issue, i) => (
+              <li key={`eff-${i}`}>
+                <strong>ERROR — {issue.section}:</strong>{" "}
+                [{issue.code}] {issue.message}
+              </li>
+            ))}
+            {fuelEvidenceAuditIssues.map((issue, i) => (
+              <li key={`audit-${i}`} data-level={issue.level}>
+                <strong>{issue.level} — {issue.section}:</strong>{" "}
+                [{issue.code}] {issue.message}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
       <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div

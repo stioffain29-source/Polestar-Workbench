@@ -70,10 +70,41 @@ export type FinalReportEvidenceAuditCode =
   | "RANKING_TIE"
   | "SEVERITY_PARITY";
 
+export type ReportValidationLevel = "ERROR" | "WARNING" | "INFO";
+
 export interface FinalReportEvidenceAuditIssue {
   code: FinalReportEvidenceAuditCode;
   section: string;
   message: string;
+  level: ReportValidationLevel;
+}
+
+const FINAL_REPORT_ISSUE_LEVELS: Record<
+  FinalReportEvidenceAuditCode,
+  ReportValidationLevel
+> = {
+  PERIOD_ALIGNMENT: "ERROR",
+  UNSUPPORTED_CAUSAL_CLAIM: "ERROR",
+  UNSUPPORTED_BOILERPLATE: "ERROR",
+  VAGUE_CHANGE: "ERROR",
+  WATCH_NEXT_UNGROUNDED: "WARNING",
+  BACKEND_CONFIDENCE_LEAK: "ERROR",
+  RAW_EVIDENCE_TITLE: "ERROR",
+  PRIORITY_GEOGRAPHY_CONTRADICTION: "ERROR",
+  RANKING_TIE: "ERROR",
+  SEVERITY_PARITY: "ERROR",
+};
+
+export function finalReportIssueLevel(
+  code: FinalReportEvidenceAuditCode,
+): ReportValidationLevel {
+  return FINAL_REPORT_ISSUE_LEVELS[code];
+}
+
+export function isFinalReportIssueBlocking(
+  issue: Pick<FinalReportEvidenceAuditIssue, "level">,
+): boolean {
+  return issue.level === "ERROR";
 }
 
 export class FinalReportEvidenceAuditError extends Error {
@@ -563,11 +594,11 @@ function evidenceForSeverityClaim(
   return scoped.length > 0 ? scoped : records;
 }
 
-/** Empty result means publishable. Every returned issue is a hard failure. */
+/** Returns all findings. Only ERROR-level findings block final export. */
 export function auditFinalReportEvidence(
   input: FinalReportEvidenceAuditInput,
 ): FinalReportEvidenceAuditIssue[] {
-  const issues: FinalReportEvidenceAuditIssue[] = [];
+  const issues: Array<Omit<FinalReportEvidenceAuditIssue, "level">> = [];
   const currentEvidence = input.window
     ? input.evidence.filter((record) => {
         if (record.marketComparison) return true;
@@ -762,10 +793,13 @@ export function auditFinalReportEvidence(
       message: `Priority geography changes without explanation: ${priorities.map((p) => `${p.section}=${p.geography}`).join(", ")}.`,
     });
   }
-  return issues;
+  return issues.map((issue) => ({
+    ...issue,
+    level: finalReportIssueLevel(issue.code),
+  }));
 }
 
 export function assertFinalReportEvidence(input: FinalReportEvidenceAuditInput): void {
-  const issues = auditFinalReportEvidence(input);
+  const issues = auditFinalReportEvidence(input).filter(isFinalReportIssueBlocking);
   if (issues.length) throw new FinalReportEvidenceAuditError(issues);
 }

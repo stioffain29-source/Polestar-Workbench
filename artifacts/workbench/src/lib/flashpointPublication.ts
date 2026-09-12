@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import {
   auditFinalReportEvidence,
   FinalReportEvidenceAuditError,
+  isFinalReportIssueBlocking,
   type FinalReportEvidenceAuditIssue,
   type FinalReportEvidenceAuditInput,
   type FinalReportTypedReference,
@@ -109,7 +110,8 @@ export function finalizeFlashpointPublication(opts: {
 
 export function assertFlashpointPublication(bundle: FlashpointPublicationBundle): void {
   assertFlashpointRenderedModelValid(bundle.model);
-  if (bundle.auditIssues.length) {
-    throw new FinalReportEvidenceAuditError(bundle.auditIssues);
+  const blockingIssues = bundle.auditIssues.filter(isFinalReportIssueBlocking);
+  if (blockingIssues.length) {
+    throw new FinalReportEvidenceAuditError(blockingIssues);
   }
 }

@@ -210,11 +210,70 @@ export interface ShippingPublicationTables {
   related: EnrichedIncident[];
 }
 
+export type ShippingPublicationIssueLevel = "ERROR" | "WARNING" | "INFO";
+
 export interface ShippingPublicationIssue {
   code: string;
   section?: string;
   message: string;
   incidentIds?: Array<number | string>;
+  level: ShippingPublicationIssueLevel;
+}
+
+/**
+ * Watch Next is deliberately advisory.  A failure to ground a forward-looking
+ * indicator should remain visible to an analyst, but must not prevent an
+ * otherwise evidence-safe report from being published.  Keep this
+ * classification in one place so all Shipping validators (including the
+ * generic evidence adapter) make the same decision.
+ */
+const WATCH_NEXT_UNCERTAINTY_CODES = new Set([
+  "UNSUPPORTED_WATCH_NEXT",
+  "UNGROUNDED_WATCH_NEXT",
+  "WATCH_NEXT_NOT_ASSESSMENT",
+  "WATCH_NEXT_UNGROUNDED",
+  "GENERIC_WATCH_NEXT_UNGROUNDED",
+]);
+
+function isWatchNextSection(section: string | undefined): boolean {
+  return Boolean(
+    section
+      ?.split("/")
+      .some((part) => part.trim().toLowerCase() === "watchnext"),
+  );
+}
+
+/**
+ * Classify a Shipping publication issue for publication gating.
+ *
+ * The default is intentionally fail-closed: a newly-added validation code is
+ * an ERROR until it is explicitly established as advisory.  INFO is retained
+ * as a supported level for non-blocking diagnostics that may be added later.
+ */
+export function classifyShippingPublicationIssue(
+  code: string,
+  section?: string,
+): ShippingPublicationIssueLevel {
+  const normalizedCode = trim(code).toUpperCase();
+  if (
+    WATCH_NEXT_UNCERTAINTY_CODES.has(normalizedCode) ||
+    (isWatchNextSection(section) &&
+      (normalizedCode.startsWith("GENERIC_WATCH_NEXT_") ||
+        normalizedCode.endsWith("_WATCH_NEXT")))
+  ) {
+    return "WARNING";
+  }
+  return "ERROR";
+}
+
+/** Resolve the level of an already-created Shipping issue. */
+export function shippingPublicationIssueLevel(
+  publicationIssue: Pick<ShippingPublicationIssue, "code" | "section">,
+): ShippingPublicationIssueLevel {
+  return classifyShippingPublicationIssue(
+    publicationIssue.code,
+    publicationIssue.section,
+  );
 }
 
 /**
@@ -269,8 +328,8 @@ export function shippingPublicationIssueSection(
 
 /**
  * Keep remediation guidance next to the original evidence warning.  This is
- * presentation guidance only: the validator and the PDF fail-closed gate
- * remain unchanged.
+ * presentation guidance only; publication gating is controlled by the issue
+ * level assigned by classifyShippingPublicationIssue.
  */
 export function shippingPublicationIssueAction(
   publicationIssue: ShippingPublicationIssue,
@@ -576,7 +635,13 @@ function issue(
   section?: string,
   incidentIds?: Array<number | string>,
 ): void {
-  issues.push({ code, message, section, incidentIds });
+  issues.push({
+    code,
+    message,
+    section,
+    incidentIds,
+    level: classifyShippingPublicationIssue(code, section),
+  });
 }
 
 function validateClientFacingBoard(
@@ -1473,7 +1538,12 @@ function auditWithGenericEvidence(
       typedReferences,
     });
     for (const finding of generic) {
-      issue(issues, `GENERIC_${finding.code ?? "EVIDENCE"}`, finding.message, finding.section);
+      issues.push({
+        code: `GENERIC_${finding.code ?? "EVIDENCE"}`,
+        message: finding.message,
+        section: finding.section,
+        level: finding.level,
+      });
     }
   } catch (error) {
     issue(issues, "GENERIC_EVIDENCE_AUDIT", error instanceof Error ? error.message : "Evidence audit failed.");
@@ -1886,8 +1956,11 @@ export class ShippingPublicationValidationError extends Error {
 export function assertShippingPublication(
   publication: ShippingPublicationBundle,
 ): ShippingPublicationBundle {
-  if (publication.auditIssues.length > 0) {
-    throw new ShippingPublicationValidationError(publication.auditIssues);
+  const blockingIssues = publication.auditIssues.filter(
+    (publicationIssue) => publicationIssue.level === "ERROR",
+  );
+  if (blockingIssues.length > 0) {
+    throw new ShippingPublicationValidationError(blockingIssues);
   }
   return publication;
 }

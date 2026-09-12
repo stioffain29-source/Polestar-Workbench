@@ -1,5 +1,6 @@
 import {
   auditFinalReportEvidence,
+  assertFinalReportEvidence,
   type FinalReportEvidenceAuditInput,
 } from "../finalReportEvidenceAudit";
 
@@ -105,12 +106,48 @@ describe("shared final report evidence audit", () => {
     expect(codes).toContain("BACKEND_CONFIDENCE_LEAK");
   });
 
-  it("blocks ungrounded Watch Next themes", () => {
+  it("reports ungrounded Watch Next themes as non-blocking warnings", () => {
+    const warningInput = input({
+      watchNext: "Monitor lithium mine strikes in Nowhere Republic.",
+    });
+    const issue = auditFinalReportEvidence(warningInput).find(
+      (candidate) => candidate.code === "WATCH_NEXT_UNGROUNDED",
+    );
+    expect(issue).toMatchObject({
+      code: "WATCH_NEXT_UNGROUNDED",
+      level: "WARNING",
+    });
+    expect(() => assertFinalReportEvidence(warningInput)).not.toThrow();
+  });
+
+  it("still blocks ERROR-level factual findings", () => {
+    expect(() =>
+      assertFinalReportEvidence(
+        input({
+          whatMatters:
+            "A storm caused rerouting and higher costs across the network.",
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("assigns an explicit validation level to every finding", () => {
+    const issues = auditFinalReportEvidence(
+      input({
+        whatMatters:
+          "A storm caused rerouting and higher costs. The confirmed change remains important.",
+        watchNext: "Monitor lithium mine strikes in Nowhere Republic.",
+      }),
+    );
+    expect(issues.length).toBeGreaterThan(0);
+    expect(issues.every((issue) =>
+      ["ERROR", "WARNING", "INFO"].includes(issue.level),
+    )).toBe(true);
     expect(
-      auditFinalReportEvidence(
-        input({ watchNext: "Monitor lithium mine strikes in Nowhere Republic." }),
-      ).map((x) => x.code),
-    ).toContain("WATCH_NEXT_UNGROUNDED");
+      issues
+        .filter((issue) => issue.code !== "WATCH_NEXT_UNGROUNDED")
+        .every((issue) => issue.level === "ERROR"),
+    ).toBe(true);
   });
 
   it("blocks verbatim malformed titles", () => {

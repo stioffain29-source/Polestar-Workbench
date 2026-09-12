@@ -86,6 +86,31 @@ function fuelAudit(
 }
 
 describe("Fuel final evidence audit", () => {
+  it("keeps the published Watch Next prose unchanged and reports all three findings as warnings", () => {
+    const watchNext = [
+      "Additional attacks or outages at Saudi refining infrastructure",
+      "Changes to aircraft refuelling restrictions at Russian airports",
+      "Signs that refiners continue prioritising diesel over ship fuel",
+    ].join("\n");
+    const issues = fuelAudit({ watchNext }).filter(
+      (issue) => issue.code === "WATCH_NEXT_UNGROUNDED",
+    );
+    expect(issues).toHaveLength(3);
+    expect(issues.every((issue) => issue.level === "WARNING")).toBe(true);
+
+    const fuelData = buildFuelWatchReportData(
+      { issueDate: ISSUE_DATE, hardNumbers: { prices: [] } },
+      [],
+    );
+    expect(
+      resolveFuelEffectiveSections({
+        report: { watchNext },
+        aiProse: null,
+        fuelData,
+      }).watchNext,
+    ).toBe(watchNext);
+  });
+
   it("repairs only the three exact legacy generated Fuel strings before final resolution", () => {
     const fuelData = buildFuelWatchReportData(
       { issueDate: ISSUE_DATE, hardNumbers: { prices: [] } },

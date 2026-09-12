@@ -153,6 +153,7 @@ export interface FuelConsistencyError {
   conflictingStatement: string;
   canonicalValue: string;
   sourceField: string;
+  level: "ERROR";
 }
 
 function text(value: unknown): string | null {
@@ -545,7 +546,13 @@ export function buildFuelCanonicalSections(facts: FuelCanonicalFacts): FuelCanon
 }
 
 function err(section: string, conflictingStatement: string, canonicalValue: unknown, sourceField: string): FuelConsistencyError {
-  return { section, conflictingStatement, canonicalValue: String(canonicalValue), sourceField };
+  return {
+    section,
+    conflictingStatement,
+    canonicalValue: String(canonicalValue),
+    sourceField,
+    level: "ERROR",
+  };
 }
 function extractSeverity(body: string): string | null {
   return body.match(/overall severity:\s*(Insignificant|Low|Moderate|High|Extreme)/i)?.[1] ?? null;

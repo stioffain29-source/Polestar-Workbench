@@ -43,6 +43,7 @@ export interface FuelConsistencyIssue {
     | "JUDGEMENT_CONSISTENCY";
   section: string;
   message: string;
+  level: "ERROR";
 }
 
 export class FuelReportConsistencyError extends Error {
@@ -362,7 +363,7 @@ export function validateFuelReportConsistency(
   facts: FuelReportFacts,
   sections: FuelEffectiveSections,
 ): FuelConsistencyIssue[] {
-  const issues: FuelConsistencyIssue[] = [];
+  const issues: Array<Omit<FuelConsistencyIssue, "level">> = [];
 
   const knownPcts = facts.market.indicators
     .map((m) => m.pctChange)
@@ -504,7 +505,7 @@ export function validateFuelReportConsistency(
     }
   }
 
-  return issues;
+  return issues.map((issue) => ({ ...issue, level: "ERROR" }));
 }
 
 const LOWER_COST_RE =
@@ -653,7 +654,7 @@ export function validateFuelJudgementConsistency(
     "implications",
     "watchNext",
   ];
-  const issues: FuelConsistencyIssue[] = [];
+  const issues: Array<Omit<FuelConsistencyIssue, "level">> = [];
   for (const section of requirements) {
     const body = (sections[section] ?? "").trim();
     if (!body) continue;
@@ -667,7 +668,7 @@ export function validateFuelJudgementConsistency(
       });
     }
   }
-  return issues;
+  return issues.map((issue) => ({ ...issue, level: "ERROR" }));
 }
 
 function escapeRe(s: string): string {

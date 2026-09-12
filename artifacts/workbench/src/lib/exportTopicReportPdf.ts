@@ -93,6 +93,7 @@ import {
 import {
   finalizeFuelPublication,
   fuelMarketLatestDate,
+  fuelMarketReadinessIssue,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
@@ -1100,7 +1101,7 @@ export async function exportTopicReportPdf(
       ...fuelBundle.auditIssues.canonical,
       ...fuelBundle.auditIssues.consistency,
       ...fuelBundle.auditIssues.evidence,
-    ];
+    ].filter((issue) => issue.level === "ERROR");
     if (issues.length) {
       throw new Error(`FUEL_PUBLICATION_AUDIT_FAILED\n${issues.map((issue) => `${issue.section}: ${"message" in issue ? issue.message : issue.conflictingStatement}`).join("\n")}`);
     }
@@ -1408,8 +1409,9 @@ export async function exportTopicReportPdf(
   if (isFuel && fuelData) {
     // Fail closed: refuse to export a polished but hollow report unless
     // the caller explicitly opted in via options.allowMissingMarketData.
+    const readinessIssue = fuelMarketReadinessIssue(fuelData.validation);
     if (
-      !fuelData.validation.hasRequiredFuelWatchData &&
+      readinessIssue?.level === "ERROR" &&
       !options.allowMissingMarketData
     ) {
       throw new FuelRequiredDataMissingError(

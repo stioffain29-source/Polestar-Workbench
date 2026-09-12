@@ -228,6 +228,26 @@ export interface FuelPublicationBundle {
   };
 }
 
+export interface FuelMarketReadinessIssue {
+  code: "MISSING_REQUIRED_MARKET_DATA";
+  section: "marketData";
+  message: string;
+  level: "ERROR";
+}
+
+/** Missing core market series is a structural publication error, not a warning. */
+export function fuelMarketReadinessIssue(
+  validation: FuelValidation,
+): FuelMarketReadinessIssue | null {
+  if (validation.hasRequiredFuelWatchData) return null;
+  return {
+    code: "MISSING_REQUIRED_MARKET_DATA",
+    section: "marketData",
+    message: `Fuel Watch export requires market data. Missing: ${validation.missingRequired.join(", ")}.`,
+    level: "ERROR",
+  };
+}
+
 /**
  * The latest market-close date a Fuel Watch report carries — the max ISO
  * date across its price cards' `asOf` values, the jet-fuel snapshot `asOf`,

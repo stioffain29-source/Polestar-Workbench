@@ -19,6 +19,10 @@ import {
 import {
   finalizeFlashpointPublication,
 } from "@/lib/flashpointPublication";
+import {
+  isFinalReportIssueBlocking,
+  type FinalReportEvidenceAuditIssue,
+} from "@/lib/finalReportEvidenceAudit";
 import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
@@ -355,6 +359,73 @@ function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
   );
 }
 
+function FlashpointPublicationIssues({
+  issues,
+}: {
+  issues: FinalReportEvidenceAuditIssue[];
+}) {
+  if (issues.length === 0) return null;
+
+  const blockingIssues = issues.filter(isFinalReportIssueBlocking);
+  return (
+    <aside
+      aria-label="Flashpoint publication validation"
+      data-testid="flashpoint-publication-issues"
+      className="mx-6 mb-5 rounded border p-4 text-sm"
+      style={{
+        borderColor: blockingIssues.length > 0 ? "#A33232" : "#D19A00",
+        background: blockingIssues.length > 0 ? "#FFF7F7" : "#FFFBEB",
+        color: NAVY,
+      }}
+    >
+      <h2
+        className="font-semibold"
+        data-testid="flashpoint-publication-issues-heading"
+      >
+        {blockingIssues.length > 0
+          ? "Flashpoint preview — PDF export is blocked until errors are resolved"
+          : "Flashpoint preview — validation findings"}
+      </h2>
+      <p className="mt-1 leading-6">
+        The complete report remains visible below. Resolve errors before
+        exporting; warnings and informational findings do not block publication.
+      </p>
+      <ul className="mt-3 space-y-2">
+        {issues.map((issue, index) => {
+          const isError = isFinalReportIssueBlocking(issue);
+          const level = issue.level;
+          const accent =
+            level === "ERROR" ? "#A33232" : level === "WARNING" ? "#B7791F" : "#465BFF";
+          return (
+            <li
+              key={`${issue.code}-${issue.section}-${index}`}
+              data-testid="flashpoint-publication-issue"
+              data-level={level}
+              className="border-l-2 pl-3 leading-6"
+              style={{ borderColor: accent }}
+            >
+              <div>
+                <strong>{issue.section}</strong>{" "}
+                <span
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide"
+                  style={{
+                    background: isError ? "#FDE2E2" : level === "WARNING" ? "#FEF3C7" : "#E8EDFF",
+                    color: accent,
+                  }}
+                >
+                  {level}
+                </span>{" "}
+                <span>[{issue.code}]</span>
+              </div>
+              <div>{issue.message}</div>
+            </li>
+          );
+        })}
+      </ul>
+    </aside>
+  );
+}
+
 export default function FlashpointReportPreview({
   report,
   incidents,
@@ -400,41 +471,6 @@ export default function FlashpointReportPreview({
   );
   const model = bundle.model;
   const ds = model.dataset;
-  if (bundle.auditIssues.length > 0) {
-    return (
-      <div
-        className="print-report bg-white"
-        style={{ color: NAVY, fontFamily: "Roboto, sans-serif", padding: 40 }}
-        data-flashpoint-validation-blocked="true"
-      >
-        <div style={{ border: "2px solid #A33232", padding: 24 }}>
-          <div
-            style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
-              fontWeight: 700,
-              fontSize: 20,
-              color: "#A33232",
-              marginBottom: 12,
-            }}
-          >
-            Flashpoint evidence audit failed — export blocked
-          </div>
-          <p style={{ fontSize: 13, marginBottom: 16 }}>
-            Final client prose failed the shared report architecture gate.
-            Named cities are not the work — the same class must fail closed on the next cycle.
-          </p>
-          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
-            {bundle.auditIssues.map((issue, i) => (
-              <li key={i}>
-                <span style={{ fontWeight: 700 }}>{issue.section}:</span>{" "}
-                [{issue.code}] {issue.message}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    );
-  }
 
   // Mirror the PDF: the Executive Summary renders the data-driven
   // ds.autoExecutiveSummary unless the analyst has written a genuine
@@ -447,6 +483,7 @@ export default function FlashpointReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+      <FlashpointPublicationIssues issues={bundle.auditIssues} />
       <div className="pdf-cover-page">
       <div
         className="flex items-center"
