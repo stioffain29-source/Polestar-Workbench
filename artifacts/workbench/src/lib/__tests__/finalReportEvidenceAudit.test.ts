@@ -120,6 +120,20 @@ describe("shared final report evidence audit", () => {
     expect(() => assertFinalReportEvidence(warningInput)).not.toThrow();
   });
 
+  it("reports unsupported generic prose as a non-blocking warning", () => {
+    const warningInput = input({
+      polestarView: "The confirmed change remains important.",
+    });
+    const issue = auditFinalReportEvidence(warningInput).find(
+      (candidate) => candidate.code === "UNSUPPORTED_BOILERPLATE",
+    );
+    expect(issue).toMatchObject({
+      code: "UNSUPPORTED_BOILERPLATE",
+      level: "WARNING",
+    });
+    expect(() => assertFinalReportEvidence(warningInput)).not.toThrow();
+  });
+
   it("still blocks ERROR-level factual findings", () => {
     expect(() =>
       assertFinalReportEvidence(
