@@ -1,0 +1,111 @@
+FIX THE REPORT VALIDATION GATE. IT IS CURRENTLY PREVENTING REPORT CREATION.
+
+The right-hand panel shows:
+
+“Fuel Watch consistency gate failed – export blocked.”
+
+The ONLY remaining failures are WATCH_NEXT_UNGROUNDED.
+
+This validator must NOT prevent the report from rendering or being created.
+
+Fix the shared validation behaviour at root cause.
+
+1. REPORT CREATION AND PREVIEW MUST NOT BE BLOCKED
+
+A report in DRAFT status must always be able to:
+
+render
+preview
+save
+be edited
+
+Validation findings must be displayed as warnings beside the rendered report.
+
+Do not replace the rendered report with an error screen.
+
+2. WATCH NEXT GROUNDING FAILURES ARE WARNINGS, NOT FATAL ERRORS
+
+WATCH_NEXT_UNGROUNDED should be a non-fatal validation warning.
+
+It should flag the item for analyst review but must NOT block rendering or report creation.
+
+Watch Next is inherently forward-looking. It is not appropriate to treat every questionable forward indicator as a fatal consistency failure.
+
+3. ONLY GENUINELY SERIOUS VALIDATION FAILURES SHOULD BLOCK FINAL EXPORT
+
+Hard blocking should be reserved for issues such as:
+
+direct contradiction of validated facts
+unsupported casualty figures
+unsupported locations
+invented incidents
+materially incorrect risk ratings
+impossible or contradictory dates
+report content referring to evidence that does not exist
+
+Do NOT hard-block because of:
+
+Watch Next grounding uncertainty
+wording differences
+semantic paraphrasing
+non-critical analytical judgement differences
+
+4. USE VALIDATION LEVELS
+
+Implement at least:
+
+ERROR
+Serious factual or structural failure. May block final export.
+
+WARNING
+Analyst should review, but report still renders and can be saved.
+
+INFO
+Quality or editorial suggestion only.
+
+WATCH_NEXT_UNGROUNDED = WARNING.
+
+5. DO NOT HIDE THE REPORT
+
+The current behaviour replaces the report preview with the validation failure panel.
+
+Change this.
+
+Always render the report preview.
+
+Show validation messages separately above or alongside the preview.
+
+The analyst must be able to see the actual report while resolving warnings.
+
+6. DO NOT PATCH THESE THREE WATCH NEXT ITEMS MANUALLY
+
+Do not delete or rewrite:
+
+“Additional attacks or outages at Saudi refining infrastructure”
+
+“Changes to aircraft refuelling restrictions at Russian airports”
+
+“Signs that refiners continue prioritising diesel over ship fuel”
+
+merely to make the error screen disappear.
+
+Fix the validator behaviour.
+
+7. APPLY THIS TO THE SHARED REPORT VALIDATION SYSTEM
+
+Do not make a one-off Fuel Watch workaround.
+
+Review the shared consistency gate used across Polestar Insights reports and make sure non-fatal analytical warnings cannot stop analysts creating reports.
+
+REQUIRED OUTCOME
+
+After the fix:
+
+Fuel Watch renders normally.
+Save works.
+The report preview remains visible.
+The three Watch Next issues appear as warnings for analyst review.
+They do not replace the report with a red failure screen.
+Only genuinely serious factual errors can hard-block final export.
+
+Do not change the report prose to achieve this. Fix the validation architecture.
