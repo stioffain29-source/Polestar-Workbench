@@ -121,16 +121,20 @@ describe("shared final report evidence audit", () => {
   });
 
   it("reports unsupported generic prose as a non-blocking warning", () => {
-    const warningInput = input({
-      polestarView: "The confirmed change remains important.",
-    });
-    const issue = auditFinalReportEvidence(warningInput).find(
+    const warningInput = input(
+      {
+        executiveSummary:
+          "The clearest driver was strain around the Strait of Hormuz alongside a Saudi refinery attack, with benchmark crude prices rising and shortage reporting.",
+        whatHappened:
+          "Reporting from Pakistan and Indonesia said refiners were favouring diesel, squeezing bunker fuel availability and raising the prospect of marine fuel shortages.",
+      },
+      { topic: "fuel" },
+    );
+    const issues = auditFinalReportEvidence(warningInput).filter(
       (candidate) => candidate.code === "UNSUPPORTED_BOILERPLATE",
     );
-    expect(issue).toMatchObject({
-      code: "UNSUPPORTED_BOILERPLATE",
-      level: "WARNING",
-    });
+    expect(issues).toHaveLength(2);
+    expect(issues.every((issue) => issue.level === "WARNING")).toBe(true);
     expect(() => assertFinalReportEvidence(warningInput)).not.toThrow();
   });
 
@@ -159,7 +163,12 @@ describe("shared final report evidence audit", () => {
     )).toBe(true);
     expect(
       issues
-        .filter((issue) => issue.code !== "WATCH_NEXT_UNGROUNDED")
+        .filter(
+          (issue) =>
+            !["WATCH_NEXT_UNGROUNDED", "UNSUPPORTED_BOILERPLATE"].includes(
+              issue.code,
+            ),
+        )
         .every((issue) => issue.level === "ERROR"),
     ).toBe(true);
   });

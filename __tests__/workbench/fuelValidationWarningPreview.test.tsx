@@ -24,6 +24,10 @@ describe("Fuel Watch warning-only draft preview", () => {
           topic: "fuel",
           status: "draft",
           issueDate: "2026-09-11",
+          executiveSummary:
+            "The clearest driver was strain around the Strait of Hormuz alongside a Saudi refinery attack, with benchmark crude prices rising and shortage reporting.",
+          whatHappened:
+            "Reporting from Pakistan and Indonesia said refiners were favouring diesel, squeezing bunker fuel availability and raising the prospect of marine fuel shortages.",
           watchNext: WATCH_NEXT,
         },
         incidents: [],
@@ -33,6 +37,9 @@ describe("Fuel Watch warning-only draft preview", () => {
     expect(html).toContain("Fuel Watch validation warnings — analyst review");
     expect(html).toContain('data-fuel-validation-blocked="false"');
     expect(html).toContain("WARNING — watchNext:");
+    expect(html).toContain("WARNING — executiveSummary:");
+    expect(html).toContain("WARNING — whatHappened:");
+    expect(html).not.toContain("final export blocked");
     expect(html).toContain(
       "Additional attacks or outages at Saudi refining infrastructure",
     );
