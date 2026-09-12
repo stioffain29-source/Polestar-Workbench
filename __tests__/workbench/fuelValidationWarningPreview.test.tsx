@@ -34,8 +34,10 @@ describe("Fuel Watch warning-only draft preview", () => {
       } as never),
     );
 
-    expect(html).toContain("Fuel Watch validation warnings — analyst review");
+    expect(html).toContain("review findings — warnings only; export available");
     expect(html).toContain('data-fuel-validation-blocked="false"');
+    expect(html).toContain('class="no-print"');
+    expect(html).not.toContain("<details open");
     expect(html).toContain("WARNING — watchNext:");
     expect(html).toContain("WARNING — executiveSummary:");
     expect(html).toContain("WARNING — whatHappened:");

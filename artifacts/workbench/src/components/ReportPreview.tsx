@@ -1170,30 +1170,32 @@ export default function ReportPreview({
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
       {isFuel && fuelValidationIssueCount > 0 && (
-        <aside
+        <details
+          open={fuelBlockingIssueCount > 0}
+          className="no-print"
           data-report-validation-findings="true"
           data-fuel-validation-blocked={fuelBlockingIssueCount > 0 ? "true" : "false"}
           aria-label="Fuel Watch validation findings"
           style={{
             margin: 24,
-            padding: 20,
-            border: `2px solid ${fuelBlockingIssueCount > 0 ? "#A33232" : "#B7791F"}`,
+            padding: 12,
+            border: `1px solid ${fuelBlockingIssueCount > 0 ? "#A33232" : "#D6B45B"}`,
             background: fuelBlockingIssueCount > 0 ? "#FFF7F7" : "#FFFBEB",
           }}
         >
-          <div
+          <summary
             style={{
               fontFamily: "'Roboto Condensed', sans-serif",
               fontWeight: 700,
-              fontSize: 18,
+              fontSize: 14,
               color: fuelBlockingIssueCount > 0 ? "#A33232" : "#8A5A00",
-              marginBottom: 8,
+              cursor: "pointer",
             }}
           >
             {fuelBlockingIssueCount > 0
               ? "Fuel Watch validation errors — final export blocked"
-              : "Fuel Watch validation warnings — analyst review"}
-          </div>
+              : `${fuelValidationIssueCount} review findings — warnings only; export available`}
+          </summary>
           <p style={{ fontSize: 13, marginBottom: 12 }}>
             The complete draft remains visible and editable. Warnings do not
             block saving or PDF export.
@@ -1219,7 +1221,7 @@ export default function ReportPreview({
               </li>
             ))}
           </ul>
-        </aside>
+        </details>
       )}
       <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
