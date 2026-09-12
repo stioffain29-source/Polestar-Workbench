@@ -1,0 +1,205 @@
+TOP MODIFYING THE VALIDATOR. THE VALIDATOR IS NOW WORKING.
+
+The current Fuel Watch screenshot shows five warnings, but export is available. That is correct behaviour.
+
+The remaining defect is in the Fuel Watch content-generation pipeline.
+
+Fuel Watch is still generating narrative and Watch Next items that are not grounded in the selected current-period evidence.
+
+Do NOT suppress these warnings.
+
+Do NOT whitelist the current strings.
+
+Do NOT weaken UNSUPPORTED_BOILERPLATE or WATCH_NEXT_UNGROUNDED.
+
+Fix the upstream generator at root cause.
+
+CURRENT FAILURES
+
+whatHappened
+
+Generated unsupported material concerning:
+
+“ship-fuel shortage theme in India, Indonesia”
+
+and:
+
+“Separate reporting linked the wider disruption to war-related strain on refinery output, with refiners said to be favouring diesel over ship fuel”
+
+The validator reports there is no selected current source supporting this.
+
+watchNext
+
+Fuel Watch generated:
+
+“Expansion of aircraft refuelling restrictions beyond the airports already affected in Russia”
+
+“Additional strikes by oil transporters or freight carriers in Pakistan”
+
+“Clear signs that refiners continue prioritising diesel over ship fuel”
+
+“Any move from shortage warnings to confirmed bunkering disruption at South Asian ports”
+
+The validator correctly reports that these themes are not supported by the selected current evidence.
+
+ROOT CAUSE TO INVESTIGATE
+
+Trace exactly where whatHappened and watchNext are generated.
+
+Determine whether they are being built from:
+
+old report content
+
+unselected incidents
+
+historical incidents outside the current reporting window
+
+generic Fuel Watch theme templates
+
+cached AI output
+
+inferred regional themes
+
+previous-period Watch Next items
+
+raw source rows that were not selected for the report
+
+The generator must not use any of those as current evidence unless explicitly permitted and labelled.
+
+REQUIRED GENERATION RULE
+
+Fuel Watch narrative generation must start from the final selected current-period evidence set.
+
+The generation sequence must be:
+
+SELECT CURRENT EVIDENCE
+
+→ VALIDATE / DEDUPLICATE
+
+→ DERIVE SUPPORTED THEMES
+
+→ GENERATE REPORT SECTIONS
+
+It must NOT be:
+
+GENERATE THEMES FROM GENERAL FUEL CONTEXT
+
+→ TRY TO FIND EVIDENCE AFTERWARDS
+
+WHAT HAPPENED
+
+Every material factual theme in whatHappened must be traceable to at least one selected current-period evidence item.
+
+Analytical synthesis is allowed.
+
+Unsupported theme creation is not.
+
+Do not generate claims about:
+
+countries
+
+fuel shortages
+
+refinery behaviour
+
+transport disruption
+
+aviation fuel restrictions
+
+bunker fuel
+
+strikes
+
+shipping fuel availability
+
+unless the selected evidence supports them.
+
+WATCH NEXT
+
+Build Watch Next only from supported current themes.
+
+Each Watch Next item must have an explicit parent theme or incident from the selected evidence.
+
+Example:
+
+Selected evidence:
+Russian airports currently restricting aircraft refuelling.
+
+Valid Watch Next:
+“Any expansion of existing aircraft refuelling restrictions to additional Russian airports.”
+
+But if no selected evidence establishes current Russian airport refuelling restrictions, do not generate that Watch Next item at all.
+
+The same rule applies to Pakistan strikes, diesel prioritisation, bunker fuel disruption and every other future indicator.
+
+ADD TRACEABILITY
+
+Internally attach each generated analytical item to supporting evidence IDs.
+
+For example:
+
+watchNextItem.supportingEvidenceIds
+
+whatHappenedParagraph.supportingEvidenceIds
+
+theme.supportingEvidenceIds
+
+If a generated item has zero valid supporting evidence IDs, do not include it in the report.
+
+This should happen before final rendering.
+
+DO NOT USE PREVIOUS REPORT CONTENT AS CURRENT EVIDENCE
+
+Previous-period narrative may be used only as historical context when explicitly requested and clearly labelled.
+
+It must not silently seed:
+
+What Happened
+
+Watch Next
+
+What Matters
+
+Polestar View
+
+or current-period regional themes.
+
+DO NOT PATCH THIS ONE REPORT
+
+Do not manually delete these five strings.
+
+Do not hardcode Russia, Pakistan, India, Indonesia or South Asia.
+
+Fix the shared Fuel Watch generator so future reports cannot create unsupported current-period themes.
+
+DEBUG OUTPUT REQUIRED
+
+Before changing prose, show me:
+
+The function that generates whatHappened.
+The function that generates watchNext.
+The evidence collection each function currently receives.
+Whether unselected, historical or cached material is entering either function.
+Where supporting evidence IDs are lost or ignored.
+
+Then fix that data flow.
+
+SUCCESS CRITERIA
+
+Regenerate this exact Fuel Watch after the fix.
+
+The report should render with:
+
+zero unsupported generated themes
+
+zero stale Watch Next items
+
+zero invented country references
+
+zero warnings caused by content that the generator itself introduced without evidence
+
+If a warning remains, show the generated sentence and the exact selected evidence it was supposed to derive from.
+
+Do not change the validator to make the warnings disappear.
+
+Fix the generation logic that is causing them.

@@ -120,7 +120,8 @@ export interface FuelReportFactsIncident {
   effectiveSeverity: string;
   occurredAt: string;
   supportedClaims: string[];
-  evidenceFamilyId?: string;
+  evidenceFamilyId: string;
+  evidenceStatus: "Observed" | "Reported" | "Assessed" | "Potential";
 }
 
 export interface FuelReportFacts {
@@ -285,12 +286,27 @@ export function buildFuelReportFacts(opts: {
       ?? (Array.isArray((i as unknown as Record<string, unknown>).supportedClaims)
         ? ((i as unknown as Record<string, unknown>).supportedClaims as string[])
         : []),
-    ...(opts.familyMetadata?.get(i)?.id ? { evidenceFamilyId: opts.familyMetadata.get(i)!.id } : {}),
+    evidenceFamilyId: opts.familyMetadata?.get(i)?.id
+      ?? `fuel-family-unresolved-${String(i.id ?? i.occurredAt)}`,
+    evidenceStatus: (() => {
+      const explicit = (i as unknown as Record<string, unknown>).evidenceStatus;
+      if (
+        explicit === "Observed" ||
+        explicit === "Reported" ||
+        explicit === "Assessed" ||
+        explicit === "Potential"
+      ) return explicit;
+      return /\b(may|might|could|potential|possible|expected|forecast|risk of|watch for)\b/i
+        .test(`${i.title} ${i.summary ?? ""}`)
+        ? "Potential"
+        : "Reported";
+    })(),
   }));
+  const currentRecords = records.filter((record) => record.evidenceStatus !== "Potential");
 
   // Distinct calendar dates.
   const dateSet = new Set<string>();
-  for (const r of records) {
+  for (const r of currentRecords) {
     const m = (r.occurredAt ?? "").match(/^\d{4}-\d{2}-\d{2}/);
     if (m) dateSet.add(m[0]);
   }
@@ -300,6 +316,7 @@ export function buildFuelReportFacts(opts: {
   const countryCount = new Map<string, number>();
   const byCountry = new Map<string, TopicFastFactsIncident[]>();
   windowIncidents.forEach((i, idx) => {
+    if (records[idx].evidenceStatus === "Potential") return;
     const c = records[idx].country;
     if (!c) return;
     countryCount.set(c, (countryCount.get(c) ?? 0) + 1);
@@ -322,7 +339,7 @@ export function buildFuelReportFacts(opts: {
   };
   let highestSeverity: SeverityTier | null = null;
   let overallSeverity: SeverityTier | null = null;
-  for (const r of records) {
+  for (const r of currentRecords) {
     const raw = tierOf(r.severity);
     if (raw) {
       severityDistribution[raw] += 1;
@@ -354,7 +371,7 @@ export function buildFuelReportFacts(opts: {
     );
   };
   let highestPriorityIncident: FuelReportFactsIncident | null = null;
-  for (const r of records) {
+  for (const r of currentRecords) {
     if (isSocialPostTitle(r.title)) continue;
     if (!highestPriorityIncident || pick(r, highestPriorityIncident)) {
       highestPriorityIncident = r;
@@ -363,7 +380,7 @@ export function buildFuelReportFacts(opts: {
   if (!highestPriorityIncident) {
     // Social-only window: fall back, but the consumer still gets a flag via
     // isSocialPostTitle to decide how to phrase it.
-    for (const r of records) {
+    for (const r of currentRecords) {
       if (!highestPriorityIncident || pick(r, highestPriorityIncident)) {
         highestPriorityIncident = r;
       }
@@ -439,15 +456,17 @@ export function buildFuelReportFacts(opts: {
     : null;
 
   // Evidence confidence — documented rule: volume + attribution coverage.
-  const attributed = records.filter((r) => r.country).length;
-  const attributionShare = records.length ? attributed / records.length : 0;
+  const attributed = currentRecords.filter((r) => r.country).length;
+  const attributionShare = currentRecords.length ? attributed / currentRecords.length : 0;
   let evidenceConfidence: FuelReportFacts["evidenceConfidence"] = "low";
-  if (records.length >= 8 && attributionShare >= 0.6) evidenceConfidence = "high";
-  else if (records.length >= 3) evidenceConfidence = "moderate";
+  if (currentRecords.length >= 8 && attributionShare >= 0.6) evidenceConfidence = "high";
+  else if (currentRecords.length >= 3) evidenceConfidence = "moderate";
 
   // Observed current-condition classes.
   const signalSet = new Set<string>();
-  for (const i of windowIncidents) {
+  for (let idx = 0; idx < windowIncidents.length; idx++) {
+    if (records[idx].evidenceStatus === "Potential") continue;
+    const i = windowIncidents[idx];
     const hay = `${i.title} ${i.summary ?? ""}`;
     for (const s of CONDITION_SIGNALS) if (s.re.test(hay)) signalSet.add(s.key);
   }
@@ -559,6 +578,17 @@ export function serialiseFuelFactsForPrompt(f: FuelReportFacts): string {
         : "none recorded"
     }. Anything not listed here may be discussed ONLY as a forward watch indicator, never as a current condition.`,
   );
+  if (f.incidents.length) {
+    lines.push(
+      `Selected current-period evidence (ID | family | status | supported claims): ${f.incidents
+        .map((i) =>
+          `${i.id ?? "missing"} | ${i.evidenceFamilyId} | ${i.evidenceStatus} | ${
+            i.supportedClaims.length ? i.supportedClaims.join(", ") : "none recorded"
+          }`,
+        )
+        .join("; ")}`,
+    );
+  }
   lines.push(`Evidence confidence: ${f.evidenceConfidence}`);
   return lines.join("\n");
 }

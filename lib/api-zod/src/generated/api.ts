@@ -386,7 +386,8 @@ export const GetDashboardOverviewResponse = zod.object({
 })).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().nullish()
 }))
 })
 
@@ -2115,7 +2116,8 @@ export const ListReportsResponseItem = zod.object({
 })).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().nullish()
 })
 export const ListReportsResponse = zod.array(ListReportsResponseItem)
 
@@ -2464,7 +2466,8 @@ export const GetReportResponse = zod.object({
 })).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().nullish()
 })
 
 
@@ -2839,7 +2842,8 @@ export const UpdateReportResponse = zod.object({
 })).optional()
 }),zod.null()]).optional(),
   "author": zod.string().nullish(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date().nullish()
 })
 
 
@@ -5891,7 +5895,11 @@ export const GenerateCountryProseBody = zod.object({
   "country": zod.string().nullish(),
   "severity": zod.string().nullish(),
   "occurredAt": zod.string().nullish(),
-  "source": zod.string().nullish()
+  "source": zod.string().nullish(),
+  "evidenceId": zod.string().nullish(),
+  "evidenceFamilyId": zod.string().nullish(),
+  "evidenceStatus": zod.union([zod.literal('Observed'),zod.literal('Reported'),zod.literal('Assessed'),zod.literal('Potential'),zod.literal(null)]).nullish(),
+  "supportedClaims": zod.array(zod.string()).nullish()
 })),
   "baseline": zod.union([zod.object({
   "operatingEnvironment": zod.string().nullish(),
@@ -6169,7 +6177,11 @@ export const GenerateReportIncidentSummariesBody = zod.object({
   "country": zod.string().nullish(),
   "severity": zod.string().nullish(),
   "occurredAt": zod.string().nullish(),
-  "source": zod.string().nullish()
+  "source": zod.string().nullish(),
+  "evidenceId": zod.string().nullish(),
+  "evidenceFamilyId": zod.string().nullish(),
+  "evidenceStatus": zod.union([zod.literal('Observed'),zod.literal('Reported'),zod.literal('Assessed'),zod.literal('Potential'),zod.literal(null)]).nullish(),
+  "supportedClaims": zod.array(zod.string()).nullish()
 }))
 })
 
@@ -6215,6 +6227,7 @@ export const GenerateReportProseBody = zod.object({
   "force": zod.boolean().optional(),
   "facts": zod.string().optional(),
   "generationBasisFingerprint": zod.string().optional(),
+  "canonicalEvidenceIds": zod.array(zod.string()).optional(),
   "incidents": zod.array(zod.object({
   "id": zod.string().nullish(),
   "topic": zod.string().nullish(),
@@ -6224,7 +6237,11 @@ export const GenerateReportProseBody = zod.object({
   "country": zod.string().nullish(),
   "severity": zod.string().nullish(),
   "occurredAt": zod.string().nullish(),
-  "source": zod.string().nullish()
+  "source": zod.string().nullish(),
+  "evidenceId": zod.string().nullish(),
+  "evidenceFamilyId": zod.string().nullish(),
+  "evidenceStatus": zod.union([zod.literal('Observed'),zod.literal('Reported'),zod.literal('Assessed'),zod.literal('Potential'),zod.literal(null)]).nullish(),
+  "supportedClaims": zod.array(zod.string()).nullish()
 }))
 })
 

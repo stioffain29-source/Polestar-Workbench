@@ -5,6 +5,7 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProseIncidentInputEvidenceStatus } from './proseIncidentInputEvidenceStatus';
 
 export interface ProseIncidentInput {
   /** @nullable */
@@ -25,4 +26,12 @@ export interface ProseIncidentInput {
   occurredAt?: string | null;
   /** @nullable */
   source?: string | null;
+  /** @nullable */
+  evidenceId?: string | null;
+  /** @nullable */
+  evidenceFamilyId?: string | null;
+  /** @nullable */
+  evidenceStatus?: ProseIncidentInputEvidenceStatus;
+  /** @nullable */
+  supportedClaims?: string[] | null;
 }

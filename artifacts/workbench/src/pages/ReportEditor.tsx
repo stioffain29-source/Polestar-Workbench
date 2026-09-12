@@ -935,6 +935,28 @@ export default function ReportEditor() {
     );
   }, [form.topic, form.issueDate, incidentsForExport, incidentWindowReady]);
 
+  // Fuel prose must be grounded on the same canonical, de-duplicated
+  // current-period evidence set as FIXED FACTS and the final renderer. Never
+  // send the raw fuel-topic bucket here: it may contain syndicated rows,
+  // shipping/energy cross-read rows that were not selected, or potential
+  // evidence that is not a current theme.
+  const fuelProseData = useMemo(() => {
+    if (form.topic !== "fuel" || !form.issueDate || !incidentWindowReady) return null;
+    const hardNumbers = hardNumbersEdited ?? report?.hardNumbers;
+    const renderIssueDate = fuelMarketLatestDate(hardNumbers) ?? form.issueDate;
+    return buildFuelWatchReportData(
+      { issueDate: renderIssueDate, hardNumbers },
+      incidentsForExport,
+    );
+  }, [
+    form.topic,
+    form.issueDate,
+    incidentWindowReady,
+    hardNumbersEdited,
+    report?.hardNumbers,
+    incidentsForExport,
+  ]);
+
   // Ground on the same set the report renders (parity with the cache
   // fingerprint). Summaries-enabled topics (conflict/shipping/cargo_watch/
   // energy/fertiliser) already build the EXACT rendered related set;
@@ -948,7 +970,23 @@ export default function ReportEditor() {
           return [...flashpointProseDataset.canonical.periodRows, ...flashpointProseDataset.canonical.futureRows]
             .find((r) => `${typeof r.id}:${String(r.id)}` === k)!;
         })
-      : summariesEnabled
+       : fuelProseData
+         ? fuelProseData.canonicalFacts.qualifyingIncidents.map((i) => ({
+             id: i.id,
+             evidenceId: i.id,
+             evidenceFamilyId: i.evidenceFamilyId,
+             evidenceStatus: i.evidenceStatus,
+             supportedClaims: i.supportedClaims,
+             topic: i.topic,
+             title: i.title,
+             summary: i.raw.summary ?? "",
+             location: i.physicalLocation ?? "",
+             country: i.country ?? "",
+             severity: i.severity,
+             occurredAt: i.occurredAt,
+             source: i.source ?? "",
+           }))
+         : summariesEnabled
         ? relatedForSummaries
         : filterTopicReportIncidents(
           incidentsForExport,
@@ -956,6 +994,12 @@ export default function ReportEditor() {
           form.issueDate,
         );
     return groundingRows.map((i) => {
+      const provenance = i as unknown as {
+        evidenceId?: string;
+        evidenceFamilyId?: string;
+        evidenceStatus?: "Observed" | "Reported" | "Assessed" | "Potential";
+        supportedClaims?: string[];
+      };
       const translatedTitle =
         "displayTitle" in i && typeof i.displayTitle === "string"
           ? i.displayTitle
@@ -976,11 +1020,26 @@ export default function ReportEditor() {
             ? `${String(i.semanticEventDate)}T00:00:00Z`
             : typeof i.occurredAt === "string" ? i.occurredAt : "",
         source: typeof i.source === "string" ? i.source : "",
+        ...(typeof provenance.evidenceId === "string"
+          ? {
+              evidenceId: provenance.evidenceId,
+              evidenceFamilyId:
+                typeof provenance.evidenceFamilyId === "string"
+                  ? provenance.evidenceFamilyId
+                  : undefined,
+              evidenceStatus:
+                typeof provenance.evidenceStatus === "string"
+                  ? provenance.evidenceStatus
+                  : undefined,
+              supportedClaims: provenance.supportedClaims ?? [],
+            }
+          : {}),
       };
     });
   }, [
     proseEnabled,
     flashpointProseDataset,
+    fuelProseData,
     summariesEnabled,
     relatedForSummaries,
     incidentsForExport,
@@ -1006,25 +1065,26 @@ export default function ReportEditor() {
         })),
       });
     }
-    if (form.topic !== "fuel" || !form.issueDate) return null;
-    const hn = hardNumbersEdited ?? report?.hardNumbers;
-    const renderIssueDate = fuelMarketLatestDate(hn) ?? form.issueDate;
+    if (form.topic !== "fuel" || !form.issueDate || !fuelProseData) return null;
     // Use the shared payload's RECONCILED reportFacts (pressure leadership
     // agrees with the canonical sections) so the AI FIXED FACTS block, the
     // rendered canonical prose and the effective-text gate all describe the
     // same pressure picture.
-    return serialiseFuelFactsForPrompt(
-      buildFuelWatchReportData(
-        { issueDate: renderIssueDate, hardNumbers: hn },
-        incidentsForExport,
-      ).reportFacts,
-    );
-  }, [form.topic, form.issueDate, hardNumbersEdited, report, incidentsForExport, flashpointProseDataset]);
+    return serialiseFuelFactsForPrompt(fuelProseData.reportFacts);
+  }, [
+    form.topic,
+    form.issueDate,
+    fuelProseData,
+    flashpointProseDataset,
+  ]);
   const proseBasisDays = reportCadence(form.topic) === "monthly" ? 30 : 7;
   const prosePeriodWord =
     reportCadence(form.topic) === "monthly" ? "this month" : "this week";
 
   const [proseRes, setProseRes] = useState<ReportProseResult | null>(null);
+  const [staleSavedProse, setStaleSavedProse] = useState<
+    Record<string, string>
+  >({});
   const [proseUnavailable, setProseUnavailable] = useState(false);
   const lastProseKey = useRef<string>("");
   const generateProse = useGenerateReportProse();
@@ -1065,7 +1125,16 @@ export default function ReportEditor() {
           issueDate: form.issueDate,
           incidents: proseGrounding,
           ...(proseFacts ? { facts: proseFacts } : {}),
-          ...(flashpointProseDataset
+           ...(fuelProseData
+             ? {
+                 generationBasisFingerprint:
+                   fuelProseData.generationBasisFingerprint,
+                 canonicalEvidenceIds:
+                   fuelProseData.canonicalFacts.qualifyingIncidents.map(
+                     (incident) => incident.id,
+                   ),
+               }
+             : flashpointProseDataset
             ? {
                 generationBasisFingerprint:
                   flashpointProseDataset.canonical.fingerprint,
@@ -1092,31 +1161,42 @@ export default function ReportEditor() {
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, proseEnabled, form.topic, form.title, form.issueDate, proseBasisDays, prosePeriodWord, proseGrounding, proseFacts, incidents]);
+  }, [id, proseEnabled, form.topic, form.title, form.issueDate, proseBasisDays, prosePeriodWord, proseGrounding, proseFacts, fuelProseData, incidents]);
 
   // AI narrative handed to the preview + PDF as the fallback layer. The full
   // 7-section result is structurally compatible with the 4-field
   // ConflictAiProse prop (extra keys are ignored).
   const aiProseSections = proseRes
     ? (() => {
+        const liveFuelBasis = fuelProseData?.generationBasisFingerprint ?? null;
         const editedIsCurrent =
           !!proseRes.edited &&
-          (!flashpointProseDataset ||
+          (!flashpointProseDataset && !fuelProseData ||
             (!proseRes.stale &&
-              proseRes.editedGenerationBasisFingerprint ===
-                flashpointProseDataset.canonical.fingerprint));
+              (fuelProseData
+                ? proseRes.editedGenerationBasisFingerprint === liveFuelBasis
+                : proseRes.editedGenerationBasisFingerprint ===
+                  flashpointProseDataset?.canonical.fingerprint)));
         const useEdited = !!proseRes.edited && editedIsCurrent;
         const generationBasisFingerprint = useEdited
           ? proseRes.editedGenerationBasisFingerprint
           : proseRes.generationBasisFingerprint;
+        const basisCurrent =
+          !liveFuelBasis || generationBasisFingerprint === liveFuelBasis;
         return {
-          ...(useEdited ? proseRes.edited : proseRes.sections ?? {}),
+          ...(basisCurrent
+            ? useEdited
+              ? proseRes.edited
+              : proseRes.sections ?? {}
+            : {}),
           datasetFingerprint: generationBasisFingerprint ?? undefined,
-          isAnalystEdited: useEdited,
-          stale: flashpointProseDataset
-            ? generationBasisFingerprint !==
-              flashpointProseDataset.canonical.fingerprint
-            : !!proseRes.stale,
+          isAnalystEdited: useEdited && basisCurrent,
+          stale:
+            (liveFuelBasis
+              ? generationBasisFingerprint !== liveFuelBasis
+              : flashpointProseDataset
+                ? generationBasisFingerprint !== flashpointProseDataset.canonical.fingerprint
+                : false) || !!proseRes.stale,
         };
       })()
     : null;
@@ -1443,6 +1523,13 @@ export default function ReportEditor() {
             incidents ?? [],
             dataTopic,
           );
+    const seedFuelBasis =
+      topic === "fuel"
+        ? buildFuelWatchReportData(
+            { issueDate, hardNumbers: report.hardNumbers },
+            incidents ?? [],
+          ).generationBasisFingerprint
+        : null;
     const inputs: DraftableIncident[] = (incidents ?? []).map((i) => ({
       id: i.id,
       topic: i.topic,
@@ -1479,7 +1566,37 @@ export default function ReportEditor() {
       computeStale(topic, issueDate) != null ||
       (!!seededFlashpointDataset &&
         report.proseBasisFingerprint !==
-          seededFlashpointDataset.canonical.fingerprint);
+          seededFlashpointDataset.canonical.fingerprint) ||
+      (topic === "fuel" &&
+        // A missing basis is legacy content: retain it for reconciliation,
+        // but do not let it outrank the current canonical Fuel projection.
+        Object.values({
+          executiveSummary: report.executiveSummary,
+          situation: report.situation,
+          whatHappened: report.whatHappened,
+          whatMatters: report.whatMatters,
+          implications: report.implications,
+          watchNext: report.watchNext,
+        }).some((value) => Boolean(value?.trim())) &&
+        (!seedFuelBasis ||
+          report.proseBasisFingerprint !==
+            seedFuelBasis));
+    if (proseIsStale && topic === "fuel") {
+      const staleEntries = Object.entries({
+        executiveSummary: report.executiveSummary,
+        situation: report.situation,
+        whatHappened: report.whatHappened,
+        whatMatters: report.whatMatters,
+        implications: report.implications,
+        watchNext: report.watchNext,
+      }).filter(
+        (entry): entry is [string, string] =>
+          typeof entry[1] === "string" && entry[1].trim().length > 0,
+      );
+      setStaleSavedProse(Object.fromEntries(staleEntries));
+    } else {
+      setStaleSavedProse({});
+    }
 
     // Topics whose previews/PDFs resolve prose via resolveSimpleProse seed
     // SAVED-ONLY: the AI narrative + deterministic auto occupy the fallback
@@ -1846,6 +1963,11 @@ export default function ReportEditor() {
           : (pruned as NonNullable<ReportUpdate["sectionOverrides"]>);
     }
     if (form.topic === "fuel") {
+      // Persist the canonical Fuel basis alongside the report snapshot. This
+      // lets the next editor load compare saved/generated prose with the exact
+      // evidence set rather than only with the issue date.
+      payload.proseBasisFingerprint =
+        fuelProseData?.generationBasisFingerprint ?? null;
       // Direct-edit prefill semantics: the boxes were pre-filled with the
       // rendered auto/AI text so the owner can cut/replace it in place. A box
       // still byte-equal to its prefill baseline was NOT edited — persist ""
@@ -3464,6 +3586,39 @@ export default function ReportEditor() {
             from freshly generated text for the current data. Review and Save to
             persist, or change the issue date to re-cover the latest window.
           </div>
+        )}
+        {((proseRes?.stale && proseRes.edited) ||
+          Object.keys(staleSavedProse).length > 0) && (
+          <details
+            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            style={{
+              borderColor: "#9a6700",
+              background: "#fff8e6",
+              color: "#6b4a00",
+            }}
+          >
+            <summary className="cursor-pointer font-bold">
+              Retained stale analyst edit (not rendered or exported)
+            </summary>
+            <p className="mt-2 mb-2">
+              This text is retained for reconciliation against the current
+              evidence basis. It remains recoverable here, but cannot drive the
+              current report until it is deliberately reapplied and saved.
+            </p>
+            <div className="space-y-2 whitespace-pre-wrap max-h-96 overflow-auto">
+              {Object.entries({
+                ...staleSavedProse,
+                ...(proseRes?.edited ?? {}),
+              })
+                .filter(([, value]) => typeof value === "string" && value.trim())
+                .map(([key, value]) => (
+                  <div key={key}>
+                    <div className="font-bold">{key}</div>
+                    <div>{value}</div>
+                  </div>
+                ))}
+            </div>
+          </details>
         )}
 
         {maritimeValidationSummary &&

@@ -94,6 +94,35 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     });
     return;
   }
+  const canonicalEvidenceIds = body.canonicalEvidenceIds ?? [];
+  if (body.topic === "fuel") {
+    const supplied = new Set(
+      canonicalEvidenceIds.filter((id) => typeof id === "string" && id.trim() && id !== "0"),
+    );
+    if (supplied.size !== canonicalEvidenceIds.length) {
+      res.status(400).json({
+        error: "Fuel canonicalEvidenceIds must be non-empty and unique",
+      });
+      return;
+    }
+    const seen = new Set<string>();
+    for (const incident of incidents) {
+      const evidenceId = incident.evidenceId ?? null;
+      if (!evidenceId || !supplied.has(evidenceId) || seen.has(evidenceId)) {
+        res.status(400).json({
+          error: "Fuel prose incidents must carry unique evidence IDs from canonicalEvidenceIds",
+        });
+        return;
+      }
+      seen.add(evidenceId);
+    }
+    if (seen.size !== supplied.size) {
+      res.status(400).json({
+        error: "Fuel canonicalEvidenceIds must exactly match the supplied canonical incidents",
+      });
+      return;
+    }
+  }
 
   const fingerprint = computeReportProseFingerprint({
     reportId,
@@ -104,6 +133,7 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     incidents,
     facts: body.facts ?? null,
     generationBasisFingerprint,
+    canonicalEvidenceIds,
   });
 
   const [existing] = await db
@@ -146,6 +176,8 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
     issueDate: body.issueDate,
     incidents,
     facts: body.facts ?? null,
+    generationBasisFingerprint,
+    canonicalEvidenceIds,
   });
 
   if (!outcome.ok) {

@@ -57,6 +57,7 @@ export interface GenerateReportProseInput {
    *  them, never recalculate or contradict them. */
   facts?: string | null;
   generationBasisFingerprint?: string | null;
+  canonicalEvidenceIds?: string[];
 }
 
 export type ReportProseOutcome =
@@ -153,6 +154,7 @@ export function computeReportProseFingerprint(input: {
   incidents: ProseIncidentInput[];
   facts?: string | null;
   generationBasisFingerprint?: string | null;
+  canonicalEvidenceIds?: string[];
 }): string {
   const ids = canonicalIncidents(input.incidents).map(incidentIdentity);
   const payload = JSON.stringify({
@@ -173,6 +175,7 @@ export function computeReportProseFingerprint(input: {
     // prose is stale and must regenerate.
     facts: input.facts ?? "",
     generationBasisFingerprint: input.generationBasisFingerprint ?? "",
+    canonicalEvidenceIds: [...(input.canonicalEvidenceIds ?? [])].sort(),
     ids,
   });
   return createHash("sha256").update(payload).digest("hex");
@@ -202,6 +205,15 @@ ENERGY WATCH — additional non-negotiable rules:
 - Every "watchNext" item must be a concrete, forward-looking indicator tied to a geography or issue and to evidence in the incident block. Do not use generic monitoring advice or invented indicators.
 `
       : "";
+  const fuelGuardrails =
+    label === "Fuel Watch"
+      ? `
+FUEL EVIDENCE TRACEABILITY — additional non-negotiable rules:
+- The supplied canonical current-period evidence IDs are the complete authority for current Fuel themes. Do not introduce a country, shortage, refinery behaviour, transport disruption, aviation restriction, bunker-fuel or strike theme without a supporting supplied ID.
+- Return whatHappened as an array of objects, each containing text, supportingEvidenceIds and supportingClaim. Return watchNext in the same shape. supportingClaim must be copied exactly from a supported claim shown for one cited record; do not invent or paraphrase claims.
+- The parser renders the verified claim for whatHappened, so an unsupported paraphrase cannot survive. For watchNext, include the exact parent claim in the text plus explicit future/conditional modality. Potential evidence can support Watch Next only in that conditional form; it cannot support current whatHappened.
+`
+      : "";
   const proseFormatRule =
     label === "Energy Watch"
       ? "- British English. Professional, neutral register. No hyperbole or emojis. Markdown level-two headings are permitted ONLY inside the energy `whatHappened` string, as required above; do not use Markdown elsewhere."
@@ -215,6 +227,7 @@ ENERGY WATCH — additional non-negotiable rules:
 This report covers ${focus}.
 ${maritimeGuardrails}
 ${energyGuardrails}
+${fuelGuardrails}
 
 GROUNDING — non-negotiable:
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
@@ -248,10 +261,10 @@ Return STRICT JSON with EXACTLY these keys and no others:
 {
   "executiveSummary": string,  // 2-4 sentences: the headline judgement for this window — the dominant theme and what it means for operations now.
   "situation": string,         // The current operating picture for this topic: the standing backdrop framed against what this window actually shows.
-  "whatHappened": string,      // Only the window's actual developments, told concretely with the specific places, actors and event types from the incidents — synthesised into a narrative, not enumerated.
+   "whatHappened": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : "string"},      // Only the window's actual developments, told concretely with the specific places, actors and event types from the incidents — synthesised into a narrative, not enumerated.
   "whatMatters": string,       // Why it matters for staff movement, site access, supply or continuity, and where to focus attention.
   "implications": string[],    // 4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash.
-  "watchNext": string[],       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
+   "watchNext": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : "string[]"},       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
   "polestarView": string       // The bottom-line analyst judgement with useful advice: state the appropriate risk level, where disruption is most likely, and what to do. Do not repeat the incident summary.${
     polestarViewMinWords
       ? ` MUST be at least ${polestarViewMinWords} words (aim for ${polestarViewMinWords}-${polestarViewMinWords + 40}): cover the overall judgement, what the data does and does not support, reporting limitations, the near-term outlook and your confidence level, each as its own sentence.`
@@ -283,6 +296,13 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
       : []),
     "INCIDENTS (the ONLY source of this-window facts):",
     incidentBlock(input.incidents),
+    ...(input.topic === "fuel"
+      ? [
+          "",
+          `CANONICAL CURRENT EVIDENCE IDS: ${(input.canonicalEvidenceIds ?? []).join(", ") || "none"}`,
+          "Fuel traceability contract: return whatHappened as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`; return watchNext as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`. supportingClaim MUST be copied exactly from a supported claim supplied for one cited canonical record. Every factual whatHappened paragraph and every watchNext item MUST carry at least one verified claim. Potential evidence may support Watch Next only when the text is explicitly future/conditional; it must not support current whatHappened.",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -308,7 +328,23 @@ function coerceJoined(v: unknown): string {
   return "";
 }
 
-function parseTopicSections(content: string): TopicProseSections | null {
+// Claims are the only machine-verifiable semantic contract for Fuel AI
+// material. IDs establish which records may be cited; this normalized exact
+// comparison establishes what those records actually support. No topic or
+// country vocabulary is embedded here.
+function normalizeSupportedClaim(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, " ").trim();
+}
+
+function isExplicitlyConditional(text: string): boolean {
+  return /\b(?:if|may|might|could|possible|possibly|potential|risk|uncertain|monitor|watch|subject to|contingent|would)\b/i
+    .test(text);
+}
+
+export function parseTopicSections(
+  content: string,
+  input?: GenerateReportProseInput,
+): TopicProseSections | null {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
@@ -332,6 +368,82 @@ function parseTopicSections(content: string): TopicProseSections | null {
     watchNext: coerceJoined(o.watchNext),
     polestarView: coerceStr(o.polestarView),
   };
+  if (input?.topic === "fuel") {
+    const validIds = new Set(
+      (input.canonicalEvidenceIds ?? []).filter((id) => id.trim() && id !== "0"),
+    );
+    const statusById = new Map(
+      input.incidents.map((incident) => [
+        incident.evidenceId ?? incident.id ?? "",
+        incident.evidenceStatus ?? "Reported",
+      ]),
+    );
+    const traceableItems = (
+      value: unknown,
+      section: "whatHappened" | "watchNext",
+    ): string[] => {
+      const items = Array.isArray(value) ? value : [value];
+      return items.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const row = item as Record<string, unknown>;
+        const text = typeof row.text === "string"
+          ? row.text.trim()
+          : typeof row.paragraph === "string"
+            ? row.paragraph.trim()
+            : "";
+        const ids = Array.isArray(row.supportingEvidenceIds)
+          ? row.supportingEvidenceIds.filter((id): id is string => typeof id === "string")
+          : Array.isArray(row.evidenceIds)
+            ? row.evidenceIds.filter((id): id is string => typeof id === "string")
+            : [];
+        const valid = ids.filter((id) => validIds.has(id));
+        const supportingClaim = typeof row.supportingClaim === "string"
+          ? row.supportingClaim
+          : typeof row.supportedClaim === "string"
+            ? row.supportedClaim
+            : "";
+        if (!text || valid.length === 0 || !supportingClaim) return [];
+        const claimNorm = normalizeSupportedClaim(supportingClaim);
+        if (!claimNorm) return [];
+        const bindings = valid.flatMap((id) => {
+          const incident = input.incidents.find(
+            (candidate) => (candidate.evidenceId ?? candidate.id ?? "") === id,
+          );
+          if (!incident) return [];
+          const claim = (incident.supportedClaims ?? []).find(
+            (candidate) => normalizeSupportedClaim(candidate) === claimNorm,
+          );
+          return claim
+            ? [{ id, claim, status: statusById.get(id) ?? "Reported" }]
+            : [];
+        });
+        if (!bindings.length) return [];
+        if (section === "whatHappened") {
+          // Mixed citations are valid when one cited non-Potential record
+          // verifies the claim; a Potential extra citation does not poison it.
+          const current = bindings.find((binding) => binding.status !== "Potential");
+          return current ? [current.claim] : [];
+        }
+        if (
+          !isExplicitlyConditional(text) ||
+          !normalizeSupportedClaim(text).includes(claimNorm)
+        ) return [];
+        // Rebuild from the verified claim rather than rendering the model's
+        // free-form paraphrase. Novel entities/themes cannot survive.
+        return [
+          `Monitor whether ${bindings[0].claim.replace(/[.!?]+$/, "")}.`,
+        ];
+      });
+    };
+    // A legacy string is deliberately not accepted for these two Fuel fields:
+    // it has no way to prove current-period support. Other topics retain the
+    // existing string API and parser unchanged.
+    const happened = traceableItems(o.whatHappened, "whatHappened");
+    const watch = traceableItems(o.watchNext, "watchNext");
+    sections.whatHappened = happened.join("\n\n");
+    sections.watchNext = watch.join("\n");
+    if (!sections.whatHappened) return null;
+  }
   // Require the core paragraphs; the bullet lists may legitimately be short. If
   // the model returned an unusable shell, treat it as bad-json so the caller
   // retries and ultimately falls back to the deterministic template.
@@ -394,7 +506,7 @@ async function callOnce(input: GenerateReportProseInput): Promise<ReportProseOut
     const content = choice?.message?.content;
     if (!content) return { ok: false, error: `empty-content(${choice?.finish_reason ?? "?"})` };
 
-    const sections = parseTopicSections(content);
+    const sections = parseTopicSections(content, input);
     if (!sections) return { ok: false, error: "bad-json" };
     return { ok: true, sections, model: MODEL };
   } catch (err) {

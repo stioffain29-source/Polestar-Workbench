@@ -1,4 +1,7 @@
-import { buildFuelCanonicalFacts, buildFuelEvidenceLedger } from "../fuelCanonicalFacts";
+import {
+  buildFuelCanonicalFacts,
+  buildFuelEvidenceLedger,
+} from "../fuelCanonicalFacts";
 import { auditFinalReportEvidence } from "../finalReportEvidenceAudit";
 import { finalizeFuelPublication } from "../fuelWatchReport";
 import type { TopicFastFactsIncident } from "../topicFastFacts";
@@ -32,6 +35,20 @@ describe("Fuel shared publication architecture", () => {
     );
     expect(ledger[0].weight).toBeGreaterThan(1);
     expect(ledger[0].weight).toBeLessThanOrEqual(1.75);
+  });
+
+  it("chooses a non-Potential family representative over a higher-scoring Potential row", () => {
+    const reported = incident(11, "Port Alpha depot outage interrupts diesel deliveries", {
+      severity: "low",
+      evidenceStatus: "Reported",
+    } as Partial<TopicFastFactsIncident> & { evidenceStatus: string });
+    const potential = incident(12, "Port Alpha depot outage interrupts diesel deliveries", {
+      severity: "extreme",
+      evidenceStatus: "Potential",
+    } as Partial<TopicFastFactsIncident> & { evidenceStatus: string });
+    const ledger = buildFuelEvidenceLedger([potential, reported]);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].canonicalRecord.id).toBe(11);
   });
 
   it("excludes out-of-window incidents and treats stale market observations as context", () => {
@@ -109,6 +126,40 @@ describe("Fuel shared publication architecture", () => {
     ]);
     expect(result.effectiveSections.watchNext).not.toMatch(
       /subsidy or levy decisions|refinery outages or force-majeure|tanker and route disruption/i,
+    );
+  });
+
+  it("keeps potential-only themes out of current deterministic sections", () => {
+    const report = { issueDate: ISSUE, hardNumbers: { prices: [] } };
+    const result = finalizeFuelPublication({
+      report,
+      incidents: [
+        incident(1, "Depot outage interrupts diesel deliveries at Port Alpha"),
+        incident(2, "Potential ship-fuel shortage in India", {
+          country: "India",
+          summary: "A possible shortage may affect ship fuel.",
+        }),
+      ],
+    });
+    expect(result.effectiveSections.whatHappened).not.toMatch(/India|ship-fuel shortage/i);
+    expect(result.effectiveSections.watchNext).not.toMatch(/India|ship-fuel shortage/i);
+    expect(result.canonicalFacts.generationBasisFingerprint).toBeTruthy();
+  });
+
+  it("changes Fuel generation basis when the canonical selected evidence changes", () => {
+    const first = finalizeFuelPublication({
+      report: { issueDate: ISSUE, hardNumbers: { prices: [] } },
+      incidents: [incident(1, "Depot outage interrupts diesel deliveries at Port Alpha")],
+    });
+    const second = finalizeFuelPublication({
+      report: { issueDate: ISSUE, hardNumbers: { prices: [] } },
+      incidents: [
+        incident(1, "Depot outage interrupts diesel deliveries at Port Alpha"),
+        incident(9, "Refinery shutdown affects product supply at Port Alpha"),
+      ],
+    });
+    expect(first.reportData.generationBasisFingerprint).not.toBe(
+      second.reportData.generationBasisFingerprint,
     );
   });
 });

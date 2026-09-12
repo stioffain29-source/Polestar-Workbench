@@ -1,4 +1,4 @@
-import { db, incidentsTable, reportsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable } from "@workspace/db";
+import { db, incidentsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
@@ -311,34 +311,6 @@ async function repairSourceHealthDashboardNoise(): Promise<void> {
     );
 }
 
-// Topics that must each have at least one report card in the Report Builder.
-// Kept in sync with TOPIC_LABELS on the client.
-const REQUIRED_TOPIC_REPORTS: Array<{
-  topic: string;
-  title: string;
-}> = [
-  { topic: "energy",      title: "APAC Energy Watch" },
-  { topic: "fuel",        title: "APAC Fuel Watch" },
-  { topic: "fertiliser",  title: "South Asia Fertiliser Watch" },
-  { topic: "cargo_watch", title: "APAC Cargo Watch" },
-  { topic: "shipping",    title: "Hormuz Maritime Watch" },
-  { topic: "protests",    title: "APAC Flashpoint" },
-  { topic: "conflict",    title: "Conflict Watch" },
-];
-
-// Reports that were previously auto-seeded but have since been retired.
-// Removed on startup so they disappear from every environment without
-// requiring manual deletion in the UI.
-const RETIRED_REPORT_TITLES: string[] = [
-  "Indo-Pacific Flashpoint Tracker",
-  "APAC Fuel Theft & Diversion Outlook",
-  "South Asia Fertiliser Supply Risk Brief",
-  "APAC Cargo Theft & Hijack Monthly",
-  "Weekly Energy Brief - GCC Grid Pressure",
-  "Hormuz Maritime Threat Update",
-  "PNG Election Cycle Risk Brief",
-];
-
 async function ensureIngestRunWriteFence(): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.execute(sql`
@@ -572,64 +544,8 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS section_overrides jsonb`,
     );
 
-    // Schema: DB-level backstop against duplicate draft accumulation. The
-    // "New Report" dialog's create button could fire twice (slow network,
-    // an impatient re-click) with no server-side dedup, leaving duplicate
-    // draft rows for the same topic/date/title. The /reports POST route now
-    // checks for an existing match before inserting (app-level idempotency),
-    // but two near-simultaneous requests could both pass that check before
-    // either has inserted. This partial unique index closes that race at
-    // the database level: a second insert with the same topic + issue_date
-    // + title while status = 'draft' is rejected outright. Scoped to
-    // status = 'draft' only — review/published rows are deliberate
-    // analyst-chosen snapshots, not creation retries, so they are never
-    // constrained by this index. drizzle push only reaches dev; the
-    // writable prod primary gains it here on boot. Idempotent.
-    //
-    // ONE-TIME cleanup MUST run first: CREATE UNIQUE INDEX fails outright if
-    // any pre-existing duplicate draft rows already violate it, and every
-    // migration below this point in the file runs inside the same try block
-    // (see the catch at the bottom of this function) — an unhandled failure
-    // here would silently skip all of them on every boot until fixed. Keep
-    // the earliest row (lowest id) per duplicate group, drop the rest.
-    // Marker-gated so it only scans once; safe no-op after the first run
-    // since the index below then makes new duplicates impossible.
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS app_migration_markers (
-        key text PRIMARY KEY,
-        applied_at timestamptz NOT NULL DEFAULT now()
-      )
-    `);
-    {
-      const markerKey = "reports_draft_dedupe_v1";
-      const existingMarker = await db.execute(sql`
-        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
-      `);
-      if ((existingMarker.rowCount ?? 0) === 0) {
-        const res = await db.execute(sql`
-          DELETE FROM reports
-          WHERE status = 'draft'
-            AND id NOT IN (
-              SELECT MIN(id) FROM reports
-              WHERE status = 'draft'
-              GROUP BY topic, issue_date, title
-            )
-        `);
-        await db.execute(sql`
-          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
-          ON CONFLICT (key) DO NOTHING
-        `);
-        logger.info(
-          { rows: res.rowCount ?? 0, marker: markerKey },
-          "One-time duplicate-draft-report cleanup (kept earliest row per topic/date/title group)",
-        );
-      }
-    }
-    await db.execute(sql`
-      CREATE UNIQUE INDEX IF NOT EXISTS reports_draft_topic_date_title_unique
-        ON reports (topic, issue_date, title)
-        WHERE status = 'draft'
-    `);
+    // Draft identities are intentionally distinct. The old same-day dedupe
+    // index and its destructive duplicate cleanup were retired.
 
     // Schema: `edited_fingerprint` on the prose caches. An analyst prose edit is
     // now KEPT across a data-basis regenerate (instead of being dropped); this
@@ -1806,51 +1722,6 @@ export async function runDataMigrations(): Promise<void> {
         logger.info({ rows: res.rowCount }, "Reclassified fertiliser incidents");
       }
     }
-    // 3) Ensure every topic has at least one report card in the Report
-    //    Builder. Idempotent: only inserts when no report exists for the
-    //    topic, so re-runs and new environments self-heal without
-    //    duplicating cards.
-    // 3a) Remove any reports retired from the seed list, in every env.
-    for (const retiredTitle of RETIRED_REPORT_TITLES) {
-      try {
-        const res = await db
-          .delete(reportsTable)
-          .where(eq(reportsTable.title, retiredTitle));
-        if (res.rowCount && res.rowCount > 0) {
-          logger.info({ title: retiredTitle, rows: res.rowCount }, "Removed retired report");
-        }
-      } catch (delErr) {
-        logger.error({ err: delErr, title: retiredTitle }, "Failed to remove retired report");
-      }
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    logger.info({ count: REQUIRED_TOPIC_REPORTS.length }, "runDataMigrations: entering report seed loop");
-    for (const seed of REQUIRED_TOPIC_REPORTS) {
-      try {
-        const [existing] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(reportsTable)
-          .where(eq(reportsTable.title, seed.title));
-        const n = existing?.n ?? 0;
-        logger.info({ topic: seed.topic, title: seed.title, existing: n }, "runDataMigrations: report seed check");
-        if (n === 0) {
-          const inserted = await db
-            .insert(reportsTable)
-            .values({
-              title: seed.title,
-              topic: seed.topic,
-              status: "draft",
-              issueDate: today,
-              author: "J. Sterling",
-            })
-            .returning({ id: reportsTable.id });
-          logger.info({ topic: seed.topic, title: seed.title, id: inserted[0]?.id }, "Seeded missing topic report");
-        }
-      } catch (seedErr) {
-        logger.error({ err: seedErr, topic: seed.topic }, "Failed to seed topic report");
-      }
-    }
     // 3b) ONE-TIME reset of legacy shipping report prose.
     //
     //     The Shipping preview/PDF render What Matters, Implications, Watch
@@ -1902,6 +1773,12 @@ export async function runDataMigrations(): Promise<void> {
         );
       }
     }
+
+    // Older deployments created a draft dedupe index which made a second
+    // explicit same-day report impossible. Drop only that obsolete schema
+    // constraint; this does not alter any report row.
+    await db.execute(sql`DROP INDEX IF EXISTS reports_draft_topic_date_title_unique`);
+
     // 3b-ii) ONE-TIME removal of byte-identical TAPA cargo-crime duplicates.
     //
     //     Overlapping-date TAPA exports promoted the same incident more than

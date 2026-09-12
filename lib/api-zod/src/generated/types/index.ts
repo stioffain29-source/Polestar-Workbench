@@ -192,6 +192,7 @@ export * from './officialMilitaryMaritimeSourcePrimaryWatch';
 export * from './officialMilitaryMaritimeSourceWatchTagsItem';
 export * from './proseBaselineContext';
 export * from './proseIncidentInput';
+export * from './proseIncidentInputEvidenceStatus';
 export * from './reliefWebReport';
 export * from './report';
 export * from './reportConflictAreaReads';

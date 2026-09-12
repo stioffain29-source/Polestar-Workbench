@@ -1604,7 +1604,11 @@ function marketPriceParagraph(facts: FuelCanonicalFacts): string {
 }
 
 function incidentsHaystack(incidents: CanonicalFuelIncident[]): string {
-  return incidents.map((i) => `${i.title} ${i.raw.summary ?? ""}`).join(" ").toLowerCase();
+  return incidents
+    .filter((i) => i.evidenceStatus !== "Potential")
+    .map((i) => `${i.title} ${i.raw.summary ?? ""}`)
+    .join(" ")
+    .toLowerCase();
 }
 
 function hasPattern(hay: string, res: RegExp[]): boolean {
@@ -1622,7 +1626,7 @@ function observedAccessCondition(hay: string): string {
 
 function physicalSupplyParagraph(facts: FuelCanonicalFacts): string {
   const hay = incidentsHaystack(facts.qualifyingIncidents);
-  if (facts.qualifyingIncidents.length === 0) {
+  if (!facts.qualifyingIncidents.some((i) => i.evidenceStatus !== "Potential")) {
     return "No confirmed physical supply or distribution disruption was logged in the reporting window; cost pressure, if any, is market-led rather than availability-led.";
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
@@ -2020,6 +2024,7 @@ function keepMaterialDevelopment(
 
 function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
   const sorted = facts.qualifyingIncidents
+    .filter((i) => i.evidenceStatus !== "Potential")
     .slice()
     .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
   const kept: CanonicalFuelIncident[] = [];
@@ -2046,6 +2051,7 @@ function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncid
 
 function rankBusinessSignificantDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
   const sorted = facts.qualifyingIncidents
+    .filter((i) => i.evidenceStatus !== "Potential")
     .slice()
     .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
   const kept: CanonicalFuelIncident[] = [];
@@ -2131,20 +2137,33 @@ function buildFuelSituationAssessment(facts: FuelCanonicalFacts): string {
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
     parts.push("Route and chokepoint events are confirmed; transit time and war-risk premium could rise if passage is constrained.");
   }
-  if (facts.qualifyingIncidents.length === 0) {
+  if (!facts.qualifyingIncidents.some((i) => i.evidenceStatus !== "Potential")) {
     parts.push("With no fresh operational reporting in the window, the standing cost-and-continuity exposures carry over from recent weeks.");
   }
   return parts.join(" ");
 }
 
+function buildFuelWhatHappenedItems(facts: FuelCanonicalFacts): Array<{
+  text: string;
+  supportingEvidenceIds: string[];
+}> {
+  const rows = rankMaterialDevelopments(facts)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+    .map((incident) => ({
+      text: developmentSentence(incident),
+      supportingEvidenceIds: incident.id && incident.evidenceStatus !== "Potential"
+        ? [incident.id]
+        : [],
+    }));
+  return rows.filter((item) => item.supportingEvidenceIds.length > 0);
+}
+
 function buildFuelWhatHappenedProse(facts: FuelCanonicalFacts): string {
-  if (facts.qualifyingIncidents.length === 0) {
+  const items = buildFuelWhatHappenedItems(facts);
+  if (items.length === 0) {
     return "No material fuel-market developments were confirmed in the reporting window; the assessment leans on market observations and standing route exposure until fresh operational reporting lands.";
   }
-  return rankMaterialDevelopments(facts)
-    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
-    .map(developmentSentence)
-    .join("\n\n");
+  return items.map((item) => item.text).join("\n\n");
 }
 
 function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
@@ -2199,14 +2218,28 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
-  const items = [
-    `${facts.judgement.trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
-    ...rankMaterialDevelopments(facts)
-      .slice(0, 3)
-      .map((incident) => `Follow-up confirmation for ${stripWireCruft(incident.title).replace(/[.!?]+$/, "")}.`),
-    ...facts.watchIndicators.filter((indicator) => indicator !== facts.judgement.trigger),
-  ];
-  return [...new Set(items)].slice(0, 6).join("\n");
+  const items: Array<{ text: string; supportingEvidenceIds: string[] }> = [];
+  const triggerIds = facts.judgement.evidenceIds ?? [];
+  if (triggerIds.length > 0) {
+    items.push({
+      text: `${facts.judgement.trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
+      supportingEvidenceIds: triggerIds,
+    });
+  }
+  for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
+    if (!incident.id || incident.evidenceStatus === "Potential") continue;
+    items.push({
+      text: `Follow-up confirmation for ${stripWireCruft(incident.title).replace(/[.!?]+$/, "")}.`,
+      supportingEvidenceIds: [incident.id],
+    });
+  }
+  // Caller-provided indicators have no evidence identity in the canonical
+  // record, so they are intentionally not promoted into rendered Watch Next.
+  return [...new Map(
+    items
+      .filter((item) => item.supportingEvidenceIds.length > 0)
+      .map((item) => [item.text, item]),
+  ).values()].slice(0, 6).map((item) => item.text).join("\n");
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
@@ -2231,7 +2264,10 @@ export function buildFuelAnalyticalSections(
   | "operationalRead"
   | "implications"
   | "watchNext"
-> {
+> & {
+  whatHappenedEvidenceIds: string[][];
+  watchNextEvidenceIds: string[][];
+} {
   const pressure =
     facts.primaryPressurePoint.kind === "distributed"
       ? { distributed: true as const, primaryCountry: null }
@@ -2254,10 +2290,24 @@ export function buildFuelAnalyticalSections(
   const operationalRead =
     buildFuelOperationalRead({
       issueDate: facts.reportingPeriod.issueDate,
-      incidents: facts.qualifyingIncidents.map((i) => i.raw),
-      window: facts.qualifyingIncidents.map((i) => i.raw),
+      incidents: facts.qualifyingIncidents
+        .filter((i) => i.evidenceStatus !== "Potential")
+        .map((i) => i.raw),
+      window: facts.qualifyingIncidents
+        .filter((i) => i.evidenceStatus !== "Potential")
+        .map((i) => i.raw),
     })
     ?? "No confirmed operational fuel constraint dominated the reporting window.";
+  const whatHappenedItems = buildFuelWhatHappenedItems(facts);
+  const watchNextItems = (() => {
+    const out: string[][] = [];
+    const triggerIds = facts.judgement.evidenceIds ?? [];
+    if (triggerIds.length) out.push(triggerIds);
+    for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
+      if (incident.id && incident.evidenceStatus !== "Potential") out.push([incident.id]);
+    }
+    return out;
+  })();
   return {
     executiveSummary: buildFuelExecutiveSummary(facts),
     situation: buildFuelSituationAssessment(facts),
@@ -2268,5 +2318,7 @@ export function buildFuelAnalyticalSections(
     operationalRead,
     implications: buildFuelImplicationsProse(facts),
     watchNext: buildFuelWatchNextFromFacts(facts),
+    whatHappenedEvidenceIds: whatHappenedItems.map((item) => item.supportingEvidenceIds),
+    watchNextEvidenceIds: watchNextItems,
   };
 }

@@ -1,0 +1,243 @@
+NVESTIGATE AND FIX THE SHARED COMMODITY REPORT DRAFT SYSTEM AT ROOT CAUSE.
+
+This affects the commodity report builders collectively:
+
+ENERGY WATCH
+CONFLICT WATCH
+SHIPPING WATCH
+CARGO WATCH
+FERTILISER WATCH
+and check FUEL WATCH and any other Watch product using the same shared Report Builder infrastructure.
+
+Do NOT patch individual dates.
+
+Do NOT hardcode September 2026.
+
+Do NOT manually edit the existing draft cards.
+
+The screenshots show a clear shared defect:
+
+ENERGY WATCH
+visible drafts dated 22 Jun 2026 and 23 Jun 2026
+live latest incident 12 Sep 2026
+
+CONFLICT WATCH
+visible draft dated 17 Jun 2026
+live latest incident 12 Sep 2026
+
+SHIPPING WATCH
+visible drafts dated 17 Jun 2026 and 18 Jun 2026
+live maritime intelligence is current
+
+CARGO WATCH
+visible draft dated 25 May 2026
+live Cargo Watch metrics are current
+
+FERTILISER WATCH
+visible drafts dated 16 Jun 2026 and 18 Jun 2026
+live latest incident 31 Aug 2026
+
+The live intelligence layers are updating. The stale behaviour is concentrated in the REPORT BUILDER DRAFT layer.
+
+DO NOT ASSUME THIS IS JUST A DISPLAY DATE BUG.
+
+Trace the complete shared draft lifecycle first.
+
+Inspect:
+
+draft database/table/schema
+draft creation function
+“New [Watch]” action
+template cloning logic
+get-or-create draft logic
+report issue date defaults
+reporting period defaults
+createdAt
+updatedAt
+issueDate
+reportingPeriodStart
+reportingPeriodEnd
+list/query logic for draft cards
+sort order
+filters by report type/status
+cached draft state
+seeded/demo/fixture records
+migrations that created initial drafts
+persistent browser/local state if used
+
+ESTABLISH WHAT THE DATE SHOWN ON EACH DRAFT CARD ACTUALLY IS.
+
+Is the card displaying:
+
+creation date?
+
+issue date?
+
+reporting period date?
+
+template seed date?
+
+last updated date?
+
+some other field?
+
+Do not change it until that is known.
+
+CHECK WHETHER OLD DRAFTS ARE BEING REUSED AS SINGLETON WORKSPACES.
+
+Determine whether opening or creating a new Watch report:
+
+creates a genuinely new draft record
+
+OR
+
+silently reopens an old May/June draft and replaces its content.
+
+If the system is using one persistent draft per Watch type, that is likely the underlying lifecycle defect.
+
+A new report must not inherit an unrelated old draft identity/date simply because an earlier draft exists.
+
+CHECK FOR SEEDED OR DEMO DRAFTS.
+
+The clustering around May and June strongly suggests some of these may be initial seeded/development records.
+
+Identify whether old seeded drafts are still being returned by the production Report Builder query.
+
+Seed/demo data must not masquerade as active analyst drafts.
+
+Do not simply delete records until you know their origin.
+
+NEW REPORT BEHAVIOUR
+
+Clicking:
+
+New Energy Watch
+New Conflict Watch
+New Shipping Watch
+New Cargo Watch
+New Fertiliser Watch
+New Fuel Watch
+
+must create a fresh draft identity unless the analyst explicitly chooses to resume or clone an existing draft.
+
+A new draft should initialise its issue date/reporting period from the current reporting context or current date according to that Watch product’s existing rules.
+
+It must not inherit a May/June issue date from a template or prior draft.
+
+EXISTING DRAFTS
+
+Genuine historical drafts should retain their legitimate original dates.
+
+Do not rewrite history merely to make the cards look current.
+
+The fix is to distinguish:
+
+genuinely old unfinished drafts
+
+from
+
+incorrectly reused/stale active drafts.
+
+If old drafts are legitimate, determine whether the UI needs:
+
+archive/delete controls
+
+a stale-draft indicator
+
+sorting by most recently updated
+
+or separation between ACTIVE DRAFTS and older saved drafts.
+
+But do not invent UI changes until the lifecycle issue is understood.
+
+DRAFT CARD DISPLAY
+
+Once the correct lifecycle is established, ensure the card communicates useful metadata.
+
+If the displayed date is intended to mean ISSUE DATE, display the actual draft issueDate.
+
+If it currently shows createdAt while users reasonably interpret it as the report date, correct that mismatch.
+
+Do not silently label one date as another.
+
+SORTING
+
+Active drafts should not appear in arbitrary old-date order.
+
+Review whether the shared listing should sort by:
+
+most recently updated active draft first
+
+with issue date shown separately where appropriate.
+
+Do not make this change blindly; first confirm the intended product behaviour.
+
+IMPORTANT DATA BOUNDARY
+
+Do not touch:
+
+incident ingestion
+
+live dashboard metrics
+
+incident dates
+
+market feeds
+
+analytical calculations
+
+simply to make the draft cards appear newer.
+
+The screenshots already demonstrate that the live data layer is newer than the Report Builder draft layer.
+
+ROOT CAUSE OUTPUT REQUIRED
+
+Before applying a cosmetic fix, identify:
+
+The shared component that renders the commodity draft cards.
+The shared query/API that supplies those drafts.
+The database fields used for the displayed date.
+The function called by each “New [Watch]” button.
+Whether new reports create new rows or reuse old rows.
+Whether May/June seed/demo records are still active.
+Whether cloning retains an old issueDate.
+Whether stale cache/local state is involved.
+
+Then fix the underlying shared behaviour.
+
+REGRESSION TEST
+
+After the fix:
+
+Create one new test draft in:
+
+Energy Watch
+Conflict Watch
+Shipping Watch
+Cargo Watch
+Fertiliser Watch
+Fuel Watch
+
+Confirm for each:
+
+a new draft record/ID is created where expected
+
+the issue/reporting date is correctly initialised
+
+no old template date is inherited
+
+reopening the draft preserves its own correct metadata
+
+old legitimate historical drafts remain historical
+
+the draft list sorts and displays dates consistently
+
+the live incident/dashboard data is unchanged
+
+FINAL PRINCIPLE
+
+Fix the shared COMMODITY REPORT BUILDER DRAFT LIFECYCLE.
+
+Do not solve this by changing six dates on six screens.
+
+The May/June dates are symptoms. Find why the shared system is still surfacing or reusing those old drafts and correct that behaviour at source.

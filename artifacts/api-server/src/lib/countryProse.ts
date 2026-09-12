@@ -50,6 +50,11 @@ export interface ProseIncidentInput {
   severity?: string | null;
   occurredAt?: string | null;
   source?: string | null;
+  /** Fuel-only provenance fields. Other topic callers may omit them. */
+  evidenceId?: string | null;
+  evidenceFamilyId?: string | null;
+  evidenceStatus?: "Observed" | "Reported" | "Assessed" | "Potential" | null;
+  supportedClaims?: string[] | null;
 }
 
 export interface ProseBaselineContext {
@@ -108,6 +113,10 @@ export function incidentIdentity(i: ProseIncidentInput): string {
     norm(i.topic),
     norm(i.source),
     norm(i.summary),
+    norm(i.evidenceId),
+    norm(i.evidenceFamilyId),
+    norm(i.evidenceStatus),
+    (i.supportedClaims ?? []).map((claim) => norm(claim)).sort().join(","),
   ].join("|");
 }
 
@@ -289,8 +298,14 @@ export function incidentBlock(incidents: ProseIncidentInput[]): string {
       const place = [i.location, i.country].map((s) => (s ?? "").trim()).filter(Boolean).join(", ") || "location unclear";
       const src = (i.source ?? "").trim();
       const summary = (i.summary ?? "").trim().replace(/\s+/g, " ").slice(0, 300);
-      const head = `${idx + 1}. [${sev}] ${date} — ${title} — ${place}${src ? ` (${src})` : ""}`;
-      return summary ? `${head}\n   ${summary}` : head;
+       const evidence = i.evidenceId
+         ? ` [evidenceId=${i.evidenceId}${i.evidenceFamilyId ? ` family=${i.evidenceFamilyId}` : ""}${i.evidenceStatus ? ` status=${i.evidenceStatus}` : ""}]`
+         : "";
+       const claims = i.supportedClaims?.length
+         ? `\n   Supported claims: ${i.supportedClaims.join("; ")}`
+         : "";
+       const head = `${idx + 1}. [${sev}] ${date} — ${title} — ${place}${src ? ` (${src})` : ""}${evidence}`;
+       return summary ? `${head}\n   ${summary}${claims}` : `${head}${claims}`;
     })
     .join("\n");
 }

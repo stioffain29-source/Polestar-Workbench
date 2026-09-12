@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
+import { useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  type Report,
   useListReports,
   useCreateReport,
   getListReportsQueryKey,
@@ -12,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { reportStatusClass } from "@/lib/topics";
 import { canonicalTopic, isReportableTopic } from "@/lib/reportNaming";
 import { cn } from "@/lib/utils";
+import { currentReportDate, splitReportsByLifecycle } from "@/lib/reportLifecycle";
 
 /**
  * Report Builder, folded into the topic page it belongs to. Replaces the old
@@ -37,31 +40,38 @@ export function TopicReportPanel({ topic }: { topic: string }) {
   if (!reportable) return null;
 
   const canonical = canonicalTopic(topic);
-  const sorted = [...reports].sort(
-    (a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime(),
-  );
+  const { current, older, completed } = splitReportsByLifecycle(reports);
+  const sorted = [...current, ...older, ...completed];
   const visible = sorted.slice(0, 6);
+  const visibleCurrent = visible.filter((report) => current.includes(report));
+  const visibleOlder = visible.filter((report) => older.includes(report));
+  const visibleCompleted = visible.filter((report) => completed.includes(report));
+  const createBusy = useRef(false);
 
   const handleNewDraft = () => {
-    // Same isPending guard used on the standalone Reports page's create
-    // button — stops an impatient re-click or slow network from firing the
-    // create request twice. The server also dedupes identical draft
-    // creates (same topic + issueDate + title) as a backstop.
-    if (create.isPending) return;
+    // Every click is a request for a new identity. The client-side guard
+    // prevents double-submit; the API intentionally does not reuse same-day
+    // drafts as an identity/idempotency mechanism.
+    if (create.isPending || createBusy.current) return;
+    createBusy.current = true;
     create.mutate(
       {
         data: {
           title: canonical.title,
           topic: topic as never,
-          issueDate: new Date().toISOString().slice(0, 10),
+          issueDate: currentReportDate(),
           status: "draft",
         } as never,
       },
       {
         onSuccess: (r) => {
+          createBusy.current = false;
           qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
           qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
           setLocation(`/reports/${(r as { id: number }).id}`);
+        },
+        onError: () => {
+          createBusy.current = false;
         },
       },
     );
@@ -100,39 +110,28 @@ export function TopicReportPanel({ topic }: { topic: string }) {
       )}
 
       {visible.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {visible.map((r) => (
-            <Link
-              key={r.id}
-              href={`/reports/${r.id}`}
-              className="block bg-background border border-border rounded-sm p-3 hover:border-accent transition-colors group"
-              data-testid={`link-topic-report-${r.id}`}
-            >
-              <div className="flex items-center justify-between">
-                <span
-                  className={cn(
-                    "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
-                    reportStatusClass(r.status),
-                  )}
-                >
-                  {r.status}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+        <>
+          {visibleCurrent.length > 0 && <ReportGroupHeading>Current in-progress</ReportGroupHeading>}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {visibleCurrent.map((r) => <ReportCard key={r.id} report={r} />)}
+          </div>
+          {visibleOlder.length > 0 && (
+            <>
+              <ReportGroupHeading>Older in-progress</ReportGroupHeading>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {visibleOlder.map((r) => <ReportCard key={r.id} report={r} />)}
               </div>
-              <div className="text-sm font-sans font-medium text-primary mt-2 truncate">{r.title}</div>
-              <div className="text-xs text-muted-foreground font-mono mt-1">
-                {(() => {
-                  try {
-                    return format(parseISO((r.issueDate ?? "").slice(0, 10)), "d MMM yyyy");
-                  } catch {
-                    return r.issueDate ?? "—";
-                  }
-                })()}
-                {r.author ? ` · ${r.author}` : ""}
+            </>
+          )}
+          {visibleCompleted.length > 0 && (
+            <>
+              <ReportGroupHeading>Completed reports</ReportGroupHeading>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {visibleCompleted.map((r) => <ReportCard key={r.id} report={r} />)}
               </div>
-            </Link>
-          ))}
-        </div>
+            </>
+          )}
+        </>
       )}
 
       {sorted.length > visible.length && (
@@ -147,5 +146,47 @@ export function TopicReportPanel({ topic }: { topic: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ReportGroupHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-2 mt-3">
+      {children}
+    </div>
+  );
+}
+
+function ReportCard({ report: r }: { report: Report }) {
+  return (
+    <Link
+      href={`/reports/${r.id}`}
+      className="block bg-background border border-border rounded-sm p-3 hover:border-accent transition-colors group"
+      data-testid={`link-topic-report-${r.id}`}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className={cn(
+            "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
+            reportStatusClass(r.status),
+          )}
+        >
+          {r.status}
+        </span>
+        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+      </div>
+      <div className="text-sm font-sans font-medium text-primary mt-2 truncate">{r.title}</div>
+      <div className="text-xs text-muted-foreground font-mono mt-1">
+        <span>Issue date: </span>
+        {(() => {
+          try {
+            return format(parseISO((r.issueDate ?? "").slice(0, 10)), "d MMM yyyy");
+          } catch {
+            return r.issueDate ?? "—";
+          }
+        })()}
+        {r.author ? ` · ${r.author}` : ""}
+      </div>
+    </Link>
   );
 }

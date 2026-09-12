@@ -16,5 +16,6 @@ export interface GenerateReportProseInput {
   force?: boolean;
   facts?: string;
   generationBasisFingerprint?: string;
+  canonicalEvidenceIds?: string[];
   incidents: ProseIncidentInput[];
 }

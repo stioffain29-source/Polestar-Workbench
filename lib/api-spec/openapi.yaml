@@ -2601,6 +2601,7 @@ components:
             - type: "null"
         author: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
+        updatedAt: { type: ["string", "null"], format: date-time }
 
     KpiCard:
       type: object
@@ -4080,6 +4081,15 @@ components:
         severity: { type: ["string", "null"] }
         occurredAt: { type: ["string", "null"] }
         source: { type: ["string", "null"] }
+        # Fuel-only traceability fields. Other topic callers may omit them.
+        evidenceId: { type: ["string", "null"] }
+        evidenceFamilyId: { type: ["string", "null"] }
+        evidenceStatus:
+          type: ["string", "null"]
+          enum: [Observed, Reported, Assessed, Potential, null]
+        supportedClaims:
+          type: ["array", "null"]
+          items: { type: string }
 
     ProseBaselineContext:
       type: object
@@ -4238,6 +4248,11 @@ components:
         # Canonical domain snapshot identity supplied by the caller. This is
         # provenance, not the API's independent SHA-256 cache identity.
         generationBasisFingerprint: { type: string }
+        # Required by Fuel callers and validated server-side against every
+        # evidenceId supplied in the canonical incident set.
+        canonicalEvidenceIds:
+          type: array
+          items: { type: string }
         incidents:
           type: array
           items: { $ref: "#/components/schemas/ProseIncidentInput" }

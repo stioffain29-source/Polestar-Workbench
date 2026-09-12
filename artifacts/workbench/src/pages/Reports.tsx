@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  type Report,
   useListReports, useCreateReport, useDeleteReport,
-  useGetDashboardOverview,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
 } from "@workspace/api-client-react";
-import { fuelMarketLatestDate } from "@/lib/fuelWatchReport";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,6 +16,10 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { canonicalTopic, REPORT_TOPICS } from "@/lib/reportNaming";
+import {
+  currentReportDate,
+  splitReportsByLifecycle,
+} from "@/lib/reportLifecycle";
 
 export default function Reports() {
   const qc = useQueryClient();
@@ -28,46 +31,22 @@ export default function Reports() {
   if (topic) params.topic = topic;
   if (status) params.status = status;
   const { data: reports = [] } = useListReports(params);
-  const { data: overview } = useGetDashboardOverview();
   const del = useDeleteReport();
   const create = useCreateReport();
-
-  // Per-topic latest record date, so a card can clamp its displayed date the
-  // same way the editor does (protests reads the flashpoint feed).
-  // Format the latest record date in LOCAL time, identically to the editor's
-  // clampIssueDateToLatestRecord (which does format(latestRecordDate(...),
-  // "yyyy-MM-dd")). A bare .slice(0,10) on the UTC ISO string would drift one
-  // day from the editor near timezone boundaries.
-  const latestByTopic: Record<string, string> = {};
-  for (const c of overview?.topicCards ?? []) {
-    if (c.latestAt) latestByTopic[c.topic] = format(parseISO(c.latestAt), "yyyy-MM-dd");
-  }
-  // Drafts are living documents: the editor advances a stale draft's effective
-  // issue date to today, then clamps it down to the latest data the topic
-  // actually has (Fuel Watch clamps to its freshest market close). The card
-  // must show that SAME effective date — otherwise the list looks frozen on the
-  // old stored date while the editor shows the current window. Published reports
-  // are frozen snapshots and keep their stored issue date.
-  const cardIssueDate = (r: (typeof reports)[number]): string => {
-    const stored = (r.issueDate ?? "").slice(0, 10);
-    if (r.status !== "draft") return stored;
-    const today = new Date().toISOString().slice(0, 10);
-    let eff = stored && stored > today ? stored : today;
-    const dataTopic = r.topic === "protests" ? "flashpoint" : r.topic;
-    const latest =
-      r.topic === "fuel"
-        ? fuelMarketLatestDate(r.hardNumbers) ?? latestByTopic["fuel"]
-        : latestByTopic[dataTopic];
-    if (latest && latest < eff) eff = latest;
-    return eff;
-  };
+  const {
+    current: currentReports,
+    older: olderReports,
+    completed: completedReports,
+  } = splitReportsByLifecycle(reports);
+  const visibleReports = [...currentReports, ...olderReports, ...completedReports];
 
   const [form, setForm] = useState({
     title: "",
     topic: "fuel",
-    issueDate: new Date().toISOString().slice(0, 10),
+    issueDate: currentReportDate(),
     status: "draft",
   });
+  const createBusy = useRef(false);
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-5">
@@ -100,21 +79,22 @@ export default function Reports() {
               </div>
               <Button
                 onClick={() => {
-                  // Reliability guard: the server now dedupes identical
-                  // draft creates (same topic + issueDate + title), but the
-                  // isPending check here stops the request from ever being
-                  // sent twice in the common case — an impatient re-click
-                  // before the dialog closes, or a slow network making the
-                  // button look unresponsive.
-                  if (create.isPending) return;
+                  // Every create is a new report identity. Prevent duplicate
+                  // requests in the UI rather than reusing a same-day draft.
+                  if (create.isPending || createBusy.current) return;
+                  createBusy.current = true;
                   create.mutate(
                     { data: { title: form.title, topic: form.topic, issueDate: form.issueDate, status: form.status } as never },
                     {
                       onSuccess: (r) => {
+                        createBusy.current = false;
                         qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
                         qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
                         setCreateOpen(false);
                         setLocation(`/reports/${(r as { id: number }).id}`);
+                      },
+                      onError: () => {
+                        createBusy.current = false;
                       },
                     },
                   );
@@ -148,37 +128,16 @@ export default function Reports() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {reports.length === 0 && <div className="text-sm text-muted-foreground">No reports match.</div>}
-        {reports.map((r) => (
-          <div key={r.id} className="bg-card border border-border rounded-sm p-5 group">
-            <div className="flex items-start justify-between">
-              <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", reportStatusClass(r.status))}>{r.status}</span>
-              <button onClick={() => { if (confirm("Delete report?")) del.mutate({ id: r.id }, { onSuccess: () => { qc.invalidateQueries({ queryKey: getListReportsQueryKey() }); qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }); } }); }} className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></button>
-            </div>
-            {(() => {
-              const card = canonicalTopic(r.topic);
-              return (
-                <Link href={`/reports/${r.id}`} className="block mt-3">
-                  <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Polestar Insights</div>
-                  <div className="text-[11px] font-sans uppercase tracking-wider text-primary mt-0.5">
-                    {card.topicLine} · {card.cadence}
-                  </div>
-                  {card.subtitle && (
-                    <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-0.5">{card.subtitle}</div>
-                  )}
-                  <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-1.5">{card.title}</h2>
-                </Link>
-              );
-            })()}
-            <div className="text-xs text-muted-foreground mt-2 font-mono">
-              {format(parseISO(cardIssueDate(r)), "d MMM yyyy")}{r.author ? ` · ${r.author}` : ""}
-            </div>
-            <Link href={`/reports/${r.id}`}>
-              <div className="mt-4 pt-3 border-t border-border text-xs font-sans uppercase tracking-wider text-accent inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                Open Editor <ArrowRight className="w-3.5 h-3.5" />
-              </div>
-            </Link>
-          </div>
-        ))}
+        {visibleReports.length > 0 && (
+          <>
+            {currentReports.length > 0 && <ReportGroupHeading>Current in-progress</ReportGroupHeading>}
+            {currentReports.map((r) => <ReportCard key={r.id} report={r} del={del} qc={qc} />)}
+            {olderReports.length > 0 && <ReportGroupHeading>Older in-progress</ReportGroupHeading>}
+            {olderReports.map((r) => <ReportCard key={r.id} report={r} del={del} qc={qc} />)}
+            {completedReports.length > 0 && <ReportGroupHeading>Completed reports</ReportGroupHeading>}
+            {completedReports.map((r) => <ReportCard key={r.id} report={r} del={del} qc={qc} />)}
+          </>
+        )}
       </div>
     </div>
   );
@@ -189,6 +148,70 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground block mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function ReportGroupHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="col-span-full text-[10px] font-sans uppercase tracking-widest text-muted-foreground mb-0 mt-2">
+      {children}
+    </div>
+  );
+}
+
+function ReportCard({
+  report: r,
+  del,
+  qc,
+}: {
+  report: Report;
+  del: ReturnType<typeof useDeleteReport>;
+  qc: ReturnType<typeof useQueryClient>;
+}) {
+  const card = canonicalTopic(r.topic);
+  return (
+    <div className="bg-card border border-border rounded-sm p-5 group">
+      <div className="flex items-start justify-between">
+        <span className={cn("px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm", reportStatusClass(r.status))}>{r.status}</span>
+        <button
+          onClick={() => {
+            if (confirm("Delete report?")) {
+              del.mutate({
+                id: r.id,
+              }, {
+                onSuccess: () => {
+                  qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
+                  qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+                },
+              });
+            }
+          }}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <Link href={`/reports/${r.id}`} className="block mt-3">
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Polestar Insights</div>
+        <div className="text-[11px] font-sans uppercase tracking-wider text-primary mt-0.5">
+          {card.topicLine} · {card.cadence}
+        </div>
+        {card.subtitle && (
+          <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-0.5">{card.subtitle}</div>
+        )}
+        <h2 className="font-serif font-bold text-lg text-primary group-hover:text-accent transition-colors mt-1.5">{card.title}</h2>
+      </Link>
+      <div className="text-xs text-muted-foreground mt-2 font-mono">
+        <span>Issue date: </span>
+        {format(parseISO((r.issueDate ?? "").slice(0, 10)), "d MMM yyyy")}
+        {r.author ? ` · ${r.author}` : ""}
+      </div>
+      <Link href={`/reports/${r.id}`}>
+        <div className="mt-4 pt-3 border-t border-border text-xs font-sans uppercase tracking-wider text-accent inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+          Open Editor <ArrowRight className="w-3.5 h-3.5" />
+        </div>
+      </Link>
     </div>
   );
 }

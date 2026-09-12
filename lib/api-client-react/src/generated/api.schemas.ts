@@ -853,6 +853,8 @@ export interface Report {
   /** @nullable */
   author?: string | null;
   createdAt: string;
+  /** @nullable */
+  updatedAt?: string | null;
 }
 
 /**
@@ -2133,6 +2135,19 @@ export interface CountryEngineAuditRow {
   createdAt: string;
 }
 
+/**
+ * @nullable
+ */
+export type ProseIncidentInputEvidenceStatus = typeof ProseIncidentInputEvidenceStatus[keyof typeof ProseIncidentInputEvidenceStatus] | null;
+
+
+export const ProseIncidentInputEvidenceStatus = {
+  Observed: 'Observed',
+  Reported: 'Reported',
+  Assessed: 'Assessed',
+  Potential: 'Potential',
+} as const;
+
 export interface ProseIncidentInput {
   /** @nullable */
   id?: string | null;
@@ -2152,6 +2167,14 @@ export interface ProseIncidentInput {
   occurredAt?: string | null;
   /** @nullable */
   source?: string | null;
+  /** @nullable */
+  evidenceId?: string | null;
+  /** @nullable */
+  evidenceFamilyId?: string | null;
+  /** @nullable */
+  evidenceStatus?: ProseIncidentInputEvidenceStatus;
+  /** @nullable */
+  supportedClaims?: string[] | null;
 }
 
 export interface ProseBaselineContext {
@@ -2267,6 +2290,7 @@ export interface GenerateReportProseInput {
   force?: boolean;
   facts?: string;
   generationBasisFingerprint?: string;
+  canonicalEvidenceIds?: string[];
   incidents: ProseIncidentInput[];
 }
 

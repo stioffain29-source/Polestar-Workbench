@@ -2,13 +2,10 @@ import express, { type Express } from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
-// "New Report" is a single client button that can fire twice (slow network,
-// an impatient re-click before the dialog closes), and drafts have
-// accumulated in exactly this way. POST /reports must be idempotent for
-// draft creates: an identical topic + issueDate + title + status:"draft"
-// retry must return the EXISTING row, not insert a duplicate. Distinct
-// drafts (different title, topic, date, or non-draft status) must always
-// insert normally.
+// POST /reports represents an explicit "new report" action. Each accepted
+// request must create a fresh identity, including same-day requests with the
+// same title. The UI prevents accidental double-submit; the API must not
+// silently reopen or reuse an older workspace.
 
 import { db } from "@workspace/db";
 import reportsRouter from "../../artifacts/api-server/src/routes/reports";
@@ -100,6 +97,15 @@ async function post(body: Record<string, unknown>) {
   return { status: res.status, json };
 }
 
+async function patch(id: number, body: Record<string, unknown>) {
+  const res = await fetch(`${baseUrl}/reports/${id}`, {
+    method: "PATCH",
+    headers: adminAuthHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+}
+
 const draftBody = {
   title: "Fuel Watch — 3 Aug",
   topic: "fuel",
@@ -107,17 +113,80 @@ const draftBody = {
   status: "draft",
 };
 
-describe("POST /reports — duplicate-draft accumulation guard", () => {
-  it("returns the existing draft (200) instead of inserting a duplicate when topic+issueDate+title+status match", async () => {
-    const existingRow = { id: 42, ...draftBody };
-    stubSelectQueue([[existingRow]]);
-    stubInsert([{ id: 999, ...draftBody }]);
+const commodityTopics = ["energy", "conflict", "shipping", "cargo_watch", "fertiliser", "fuel"];
+
+describe("POST /reports — fresh draft identity lifecycle", () => {
+  it.each(commodityTopics)("creates a distinct fresh %s draft on each explicit request", async (topic) => {
+    let nextId = 100;
+    jest.spyOn(db, "insert").mockImplementation(() => {
+      insertCallCount++;
+      const row = { id: nextId++, ...draftBody, topic };
+      const chain: Record<string, unknown> = {
+        values: () => chain,
+        returning: () => Promise.resolve([row]),
+      };
+      return chain as never;
+    });
+
+    const first = await post({ ...draftBody, topic });
+    const second = await post({ ...draftBody, topic });
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect((first.json as { id: number }).id).not.toBe((second.json as { id: number }).id);
+    expect(insertCallCount).toBe(2);
+  });
+
+  it("inserts a fresh row for an explicit same-day draft request", async () => {
+    const newRow = { id: 42, ...draftBody };
+    stubInsert([newRow]);
 
     const { status, json } = await post(draftBody);
 
-    expect(status).toBe(200);
-    expect(json).toEqual(existingRow);
-    expect(insertCallCount).toBe(0);
+    expect(status).toBe(201);
+    expect(json).toEqual(newRow);
+    expect(insertCallCount).toBe(1);
+    expect((capturedInsertValues as { updatedAt: unknown }).updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("does not inherit content or an old issue date from another draft", async () => {
+    stubInsert([{ id: 43, ...draftBody }]);
+    await post({
+      ...draftBody,
+      issueDate: "2026-09-12",
+      executiveSummary: undefined,
+      hardNumbers: undefined,
+    });
+
+    expect(capturedInsertValues).toMatchObject({
+      title: draftBody.title,
+      topic: draftBody.topic,
+      issueDate: "2026-09-12",
+      status: "draft",
+    });
+    expect(capturedInsertValues).not.toHaveProperty("executiveSummary");
+    expect(capturedInsertValues).not.toHaveProperty("hardNumbers");
+  });
+
+  it("marks an explicit PATCH as activity with updatedAt", async () => {
+    let capturedUpdate: Record<string, unknown> | undefined;
+    jest.spyOn(db, "update").mockImplementation(() => {
+      const chain: Record<string, unknown> = {
+        set: (value: Record<string, unknown>) => {
+          capturedUpdate = value;
+          return chain;
+        },
+        where: () => chain,
+        returning: () => Promise.resolve([{ id: 44, ...draftBody }]),
+      };
+      return chain as never;
+    });
+
+    const result = await patch(44, { title: "Edited Fuel Watch" });
+
+    expect(result.status).toBe(200);
+    expect(capturedUpdate?.title).toBe("Edited Fuel Watch");
+    expect(capturedUpdate?.updatedAt).toBeInstanceOf(Date);
   });
 
   it("inserts normally (201) when no matching draft exists yet", async () => {
@@ -148,30 +217,6 @@ describe("POST /reports — duplicate-draft accumulation guard", () => {
     const { status } = await post({ ...draftBody, title: "Fuel Watch — Supplemental" });
 
     expect(status).toBe(201);
-    expect(insertCallCount).toBe(1);
-  });
-
-  it("falls back to the existing row (200) when the DB unique index rejects a racing insert", async () => {
-    // Simulates the race the app-level select-then-insert check can't
-    // close: the initial select finds nothing (both concurrent requests
-    // passed it), the insert then hits the partial unique index and
-    // Postgres rejects it with code 23505, and the route must re-query and
-    // return the row the other request just created — not a 500.
-    const winnerRow = { id: 7, ...draftBody };
-    stubSelectQueue([[], [winnerRow]]);
-    jest.spyOn(db, "insert").mockImplementation(() => {
-      insertCallCount++;
-      const chain: Record<string, unknown> = {
-        values: () => chain,
-        returning: () => Promise.reject({ code: "23505" }),
-      };
-      return chain as never;
-    });
-
-    const { status, json } = await post(draftBody);
-
-    expect(status).toBe(200);
-    expect(json).toEqual(winnerRow);
     expect(insertCallCount).toBe(1);
   });
 

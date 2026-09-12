@@ -5,9 +5,7 @@ import {
   timestamp,
   jsonb,
   date,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 /**
  * Durable analyst curation of a topic report — hide canonical sections,
@@ -167,20 +165,10 @@ export const reportsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    // Nullable for legacy rows created before activity tracking was added.
+    // Lists fall back to createdAt when this is null.
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
-  (t) => ({
-    // DB-level backstop against duplicate draft accumulation (belt-and-
-    // suspenders alongside the app-level idempotency check in the /reports
-    // POST route): a create request that races another identical create for
-    // the same topic + issueDate + title can never insert twice, even if
-    // both requests pass the app-level "does this exist?" check before
-    // either has inserted. Scoped to status = 'draft' only — review/
-    // published rows are deliberate analyst-chosen snapshots, not creation
-    // retries, so they are never constrained by this index.
-    draftDedupeUnique: uniqueIndex("reports_draft_topic_date_title_unique")
-      .on(t.topic, t.issueDate, t.title)
-      .where(sql`${t.status} = 'draft'`),
-  }),
 );
 
 export type Report = typeof reportsTable.$inferSelect;

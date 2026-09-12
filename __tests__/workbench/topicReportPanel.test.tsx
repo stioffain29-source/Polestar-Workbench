@@ -168,4 +168,14 @@ describe("TopicReportPanel", () => {
 
     expect(mockCreateMutate).not.toHaveBeenCalled();
   });
+
+  it("does not send a second request before the first response", () => {
+    render(<TopicReportPanel topic="shipping" />);
+    const button = screen.getByTestId("button-new-topic-report");
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(mockCreateMutate).toHaveBeenCalledTimes(1);
+  });
 });

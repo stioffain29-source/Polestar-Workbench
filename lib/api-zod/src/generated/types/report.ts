@@ -74,4 +74,6 @@ export interface Report {
   /** @nullable */
   author?: string | null;
   createdAt: Date;
+  /** @nullable */
+  updatedAt?: Date | null;
 }

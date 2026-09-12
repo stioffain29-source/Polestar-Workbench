@@ -183,7 +183,11 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
     .select()
     .from(reportsTable)
     .where(ne(reportsTable.status, "published"))
-    .orderBy(desc(reportsTable.issueDate))
+    .orderBy(
+      desc(sql`coalesce(${reportsTable.updatedAt}, ${reportsTable.createdAt})`),
+      desc(reportsTable.issueDate),
+      desc(reportsTable.id),
+    )
     .limit(8);
 
   res.json({

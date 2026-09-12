@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, reportsTable } from "@workspace/db";
 import type { FuelHardNumbers, InsertReport } from "@workspace/db";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
   CreateReportBody,
   UpdateReportBody,
@@ -55,7 +55,12 @@ router.get("/reports", async (req, res): Promise<void> => {
     .select()
     .from(reportsTable)
     .where(conds.length ? and(...conds) : undefined)
-    .orderBy(desc(reportsTable.issueDate));
+    // Legacy rows have no activity timestamp; coalesce to createdAt.
+    .orderBy(
+      desc(sql`coalesce(${reportsTable.updatedAt}, ${reportsTable.createdAt})`),
+      desc(reportsTable.issueDate),
+      desc(reportsTable.id),
+    );
   res.json(rows);
 });
 
@@ -77,71 +82,19 @@ router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
   }
   const { issueDate, hardNumbers, ...rest } = parsed.data;
   const normalizedIssueDate = dateToYmd(issueDate);
-  // Reliability guard: "New Report" is a single client button that can fire
-  // twice (slow network, an impatient re-click before the dialog closes), and
-  // any other caller retrying a timed-out POST hits the same risk. Without a
-  // check here every retry inserts ANOTHER identical draft, and drafts have
-  // accumulated in exactly this way. Only status: "draft" is deduped —
-  // review/published are deliberate state transitions the analyst chose, not
-  // creation retries, so they always insert. Match on topic + issueDate +
-  // title so a genuinely distinct draft for the same topic/day (different
-  // title) is never blocked.
-  if (rest.status === "draft") {
-    const [existing] = await db
-      .select()
-      .from(reportsTable)
-      .where(
-        and(
-          eq(reportsTable.topic, rest.topic),
-          eq(reportsTable.issueDate, normalizedIssueDate),
-          eq(reportsTable.title, rest.title),
-          eq(reportsTable.status, "draft"),
-        ),
-      )
-      .limit(1);
-    if (existing) {
-      res.status(200).json(existing);
-      return;
-    }
-  }
   const insertValues: InsertReport = {
     ...rest,
     issueDate: normalizedIssueDate,
-    hardNumbers: normalizeHardNumbers(hardNumbers),
+    updatedAt: new Date(),
   };
-  try {
-    const [row] = await db.insert(reportsTable).values(insertValues).returning();
-    res.status(201).json(row);
-  } catch (err) {
-    // DB-level backstop for the race the select-then-insert check above
-    // can't close: two near-simultaneous draft creates for the same
-    // topic + issueDate + title can both pass the "does this exist?"
-    // check before either has inserted. A partial unique index
-    // (reports_draft_topic_date_title_unique, draft-status only) rejects
-    // the second insert with Postgres code 23505 — treat that exactly like
-    // the app-level dedup hit above: return the now-existing row instead
-    // of a 500. Any other insert failure is a real error and rethrows.
-    const pgCode = (err as { code?: string } | null)?.code;
-    if (pgCode === "23505" && rest.status === "draft") {
-      const [existing] = await db
-        .select()
-        .from(reportsTable)
-        .where(
-          and(
-            eq(reportsTable.topic, rest.topic),
-            eq(reportsTable.issueDate, normalizedIssueDate),
-            eq(reportsTable.title, rest.title),
-            eq(reportsTable.status, "draft"),
-          ),
-        )
-        .limit(1);
-      if (existing) {
-        res.status(200).json(existing);
-        return;
-      }
-    }
-    throw err;
+  if (hardNumbers !== undefined) {
+    insertValues.hardNumbers = normalizeHardNumbers(hardNumbers);
   }
+  // A POST explicitly means "new report". Double-submit prevention belongs
+  // to the client button; same-day topic/title matching must never reuse an
+  // existing analyst workspace or identity.
+  const [row] = await db.insert(reportsTable).values(insertValues).returning();
+  res.status(201).json(row);
 });
 
 router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
@@ -153,6 +106,9 @@ router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> 
   }
   const { issueDate, hardNumbers, ...rest } = parsed.data;
   const updateData: Partial<InsertReport> = { ...rest };
+  // Every successful edit is activity, including edits that only change
+  // metadata. Legacy rows remain nullable and fall back to createdAt.
+  updateData.updatedAt = new Date();
   if (issueDate !== undefined) {
     updateData.issueDate = dateToYmd(issueDate);
   }

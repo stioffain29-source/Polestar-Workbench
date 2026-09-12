@@ -118,6 +118,8 @@ export interface FuelCanonicalFacts {
   currentConditions: CanonicalFuelIncident[];
   watchIndicators: string[];
   judgement: FuelJudgement;
+  /** Identity of the exact selected current-period evidence basis. */
+  generationBasisFingerprint?: string;
 }
 
 export interface FuelJudgement {
@@ -126,6 +128,8 @@ export interface FuelJudgement {
   direction: "upward" | "downward" | "stable" | "uncertain";
   trigger: string;
   evidenceFamilyIds: string[];
+  /** Stable selected evidence ids used by deterministic watch items. */
+  evidenceIds?: string[];
 }
 
 export interface FuelCanonicalSections {
@@ -141,6 +145,9 @@ export interface FuelCanonicalSections {
   operationalRead: string;
   implications: string;
   watchNext: string;
+  /** Internal traceability for deterministic prose; never rendered. */
+  whatHappenedEvidenceIds?: string[][];
+  watchNextEvidenceIds?: string[][];
 }
 
 /** Renderer-ready Fuel Watch prose, including the bespoke Chokepoint Watch. */
@@ -227,6 +234,54 @@ function canonicalScore(i: TopicFastFactsIncident): number {
     + (i.sourceUrl ? 10 : 0) + (i.summary?.trim() ? 5 : 0)
     - (isSocialPostTitle(i.title) ? 50 : 0);
 }
+
+function stableDigest(value: string): string {
+  // Small deterministic digest suitable for browser/server provenance keys.
+  // It is not used as a security primitive.
+  let h = 2166136261;
+  for (let n = 0; n < value.length; n++) {
+    h ^= value.charCodeAt(n);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+function evidenceIdFor(i: TopicFastFactsIncident): string {
+  const explicit = i.id;
+  if (explicit !== undefined && explicit !== null && String(explicit) !== "0" && String(explicit).trim()) {
+    return String(explicit);
+  }
+  return `fuel-evidence-${stableDigest([
+    day(i.occurredAt),
+    i.topic,
+    i.title,
+    i.summary ?? "",
+    i.location ?? "",
+  ].join("|"))}`;
+}
+
+/** Stable identity shared by Fuel AI generation, cache comparison and renderers. */
+export function computeFuelGenerationBasisFingerprint(
+  facts: Pick<FuelCanonicalFacts, "qualifyingIncidents" | "reportingPeriod">,
+): string {
+  const evidence = facts.qualifyingIncidents
+    .map((i) => ({
+      id: i.id,
+      familyId: i.evidenceFamilyId,
+      status: i.evidenceStatus,
+      title: i.title,
+      summary: i.raw.summary ?? "",
+      occurredAt: i.occurredAt,
+      country: i.country,
+      location: i.physicalLocation,
+      supportedClaims: [...i.supportedClaims].sort(),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return `fuel-basis-${stableDigest(JSON.stringify({
+    period: facts.reportingPeriod,
+    evidence,
+  }))}`;
+}
 /** General event-family ledger. It uses record similarity, time and geography;
  * never country, headline, route or commodity exceptions. */
 export function buildFuelEvidenceLedger(records: TopicFastFactsIncident[]): FuelEvidenceFamily[] {
@@ -235,9 +290,13 @@ export function buildFuelEvidenceLedger(records: TopicFastFactsIncident[]): Fuel
     const group = groups.find((g) => g.some((member) => sameEvidenceFamily(member, record)));
     if (group) group.push(record); else groups.push([record]);
   }
-  return groups.map((group, index) => {
+  return groups.map((group) => {
     const canonicalRecord = group.slice().sort((a, b) =>
-      canonicalScore(b) - canonicalScore(a) || b.occurredAt.localeCompare(a.occurredAt) || a.title.localeCompare(b.title),
+      (evidenceStatusFor(b) === "Potential" ? 0 : 1) -
+        (evidenceStatusFor(a) === "Potential" ? 0 : 1) ||
+      canonicalScore(b) - canonicalScore(a) ||
+      b.occurredAt.localeCompare(a.occurredAt) ||
+      a.title.localeCompare(b.title),
     )[0];
     const members = group.map((record) => {
       const kind = coverageKind(record, canonicalRecord);
@@ -245,7 +304,12 @@ export function buildFuelEvidenceLedger(records: TopicFastFactsIncident[]): Fuel
       return { record, kind, weight };
     });
     return {
-      id: `fuel-family-${index + 1}`,
+      // The family id is derived from its member identities rather than the
+      // input array position. Adding a newer family must not silently rename
+      // every family below it and invalidate otherwise-current prose.
+      id: `fuel-family-${stableDigest(
+        group.map((record) => evidenceIdFor(record)).sort().join("|"),
+      )}`,
       canonicalRecord,
       members,
       weight: Math.min(1.75, members.reduce((sum, member) => sum + member.weight, 0)),
@@ -331,6 +395,15 @@ function relevanceFor(route: string | null): string | null {
   return `${route} routing and fuel-delivery exposure`;
 }
 function evidenceStatusFor(i: TopicFastFactsIncident): EvidenceStatus {
+  const explicit = (i as unknown as Record<string, unknown>).evidenceStatus;
+  if (
+    explicit === "Observed" ||
+    explicit === "Reported" ||
+    explicit === "Assessed" ||
+    explicit === "Potential"
+  ) {
+    return explicit;
+  }
   const value = `${i.title ?? ""} ${i.summary ?? ""}`.toLowerCase();
   return /\b(may|might|could|potential|possible|expected|forecast|risk of|watch for)\b/.test(value) ? "Potential" : "Reported";
 }
@@ -390,13 +463,13 @@ export function buildFuelCanonicalFacts(opts: {
         window.end,
       );
   const evidenceFamilies = buildFuelEvidenceLedger(filtered);
-  const qualifyingIncidents = evidenceFamilies.map((family, index): CanonicalFuelIncident => {
+  const qualifyingIncidents = evidenceFamilies.map((family): CanonicalFuelIncident => {
     const raw = family.canonicalRecord;
     const country = deriveIncidentCountry(raw);
     const physicalLocation = text(raw.location) ?? null;
     const severity = effectiveSeverityFor(raw);
     return {
-      id: String(raw.id ?? `${day(raw.occurredAt)}:${index}:${raw.title}`), title: raw.title, occurredAt: raw.occurredAt,
+      id: evidenceIdFor(raw), title: raw.title, occurredAt: raw.occurredAt,
       date: day(raw.occurredAt), topic: raw.topic, severity, physicalLocation,
       country, routeOrChokepoint: routeFor(raw), widerRegionalRelevance: relevanceFor(routeFor(raw)), entities: entitiesFor(raw),
       evidenceStatus: evidenceStatusFor(raw), sourceUrl: raw.sourceUrl ?? null, source: raw.source ?? null,
@@ -406,9 +479,14 @@ export function buildFuelCanonicalFacts(opts: {
       evidenceFamilyId: family.id, evidenceWeight: family.weight, raw,
     };
   });
+  // Potential/unconfirmed records remain in the selected evidence ledger for
+  // traceability and Watch Next, but cannot establish a factual current theme.
+  const currentQualifyingIncidents = qualifyingIncidents.filter(
+    (incident) => incident.evidenceStatus !== "Potential",
+  );
   const groups = (pick: (i: CanonicalFuelIncident) => string | null) => {
     const map = new Map<string, CanonicalFuelIncident[]>();
-    for (const i of qualifyingIncidents) {
+    for (const i of currentQualifyingIncidents) {
       const key = pick(i); if (!key) continue;
       map.set(key, [...(map.get(key) ?? []), i]);
     }
@@ -448,7 +526,7 @@ export function buildFuelCanonicalFacts(opts: {
     .filter((point) => primaryPressurePoint.kind === "distributed" ? point.severityScore < topScore : !(point.kind === primaryPressurePoint.kind && point.label === primaryPressurePoint.label))
     .slice(0, 3).map((point) => ({ kind: point.kind, label: point.label, score: point.severityScore, incidentIds: point.incidentIds }));
   const severityDistribution = FUEL_SEVERITIES.reduce((out, severity) => ({ ...out, [severity]: 0 }), {} as Record<FuelSeverity, number>);
-  for (const i of qualifyingIncidents) severityDistribution[i.severity]++;
+  for (const i of currentQualifyingIncidents) severityDistribution[i.severity]++;
   // Raw social-media captures (handle-prefixed X/Instagram post titles) are
   // deprioritised below every news-titled record regardless of severity —
   // a raw post must never headline as the highest-priority incident. The
@@ -468,10 +546,10 @@ export function buildFuelCanonicalFacts(opts: {
     };
     return score(b) - score(a) || b.date.localeCompare(a.date) || a.title.localeCompare(b.title);
   };
-  const newsTitled = qualifyingIncidents.filter((i) => !isSocialPostTitle(i.title));
-  const highestPriorityIncident = (newsTitled.length ? newsTitled : qualifyingIncidents).slice().sort(byPriority)[0] ?? null;
+  const newsTitled = currentQualifyingIncidents.filter((i) => !isSocialPostTitle(i.title));
+  const highestPriorityIncident = (newsTitled.length ? newsTitled : currentQualifyingIncidents).slice().sort(byPriority)[0] ?? null;
   const overallSeverity = highestPriorityIncident?.severity ?? "Insignificant";
-  const sourceCoverage = qualifyingIncidents.length === 0 ? 1 : qualifyingIncidents.filter((i) => Boolean(i.sourceUrl || i.source)).length / qualifyingIncidents.length;
+  const sourceCoverage = currentQualifyingIncidents.length === 0 ? 1 : currentQualifyingIncidents.filter((i) => Boolean(i.sourceUrl || i.source)).length / currentQualifyingIncidents.length;
   const evidenceConfidence = sourceCoverage >= 0.8 ? "High" : sourceCoverage >= 0.5 ? "Moderate" : "Low";
   const periodIndicators = opts.marketCards.map((c) => marketFact(c, opts.issueDate, opts.jetTrajectory, window));
   const up = periodIndicators.filter((i) => i.comparisonScope === "reporting-period" && i.direction === "rising").length;
@@ -480,17 +558,18 @@ export function buildFuelCanonicalFacts(opts: {
     mainRisk: highestPriorityIncident ? proseSafeTitle(highestPriorityIncident.title) : "No material current-period operational development",
     exposure: {
       geography: primaryPressurePoint.kind === "distributed" ? null : primaryPressurePoint.label,
-      sector: qualifyingIncidents.some((i) => /\b(shortage|ration|forecourt|depot)\b/i.test(`${i.title} ${i.raw.summary ?? ""}`))
-        ? "road fuel distribution" : qualifyingIncidents.some((i) => i.routeOrChokepoint)
+      sector: currentQualifyingIncidents.some((i) => /\b(shortage|ration|forecourt|depot)\b/i.test(`${i.title} ${i.raw.summary ?? ""}`))
+        ? "road fuel distribution" : currentQualifyingIncidents.some((i) => i.routeOrChokepoint)
           ? "routing and fuel delivery" : "fuel procurement",
     },
     direction: up > down ? "upward" : down > up ? "downward" : periodIndicators.some((i) => i.comparisonScope === "reporting-period") ? "stable" : "uncertain",
-    trigger: qualifyingIncidents.some((i) => i.routeOrChokepoint)
+    trigger: currentQualifyingIncidents.some((i) => i.routeOrChokepoint)
       ? "a confirmed change in transit availability"
-      : qualifyingIncidents.length ? "confirmed escalation or resolution of the lead development" : "new current-period operational evidence",
+      : currentQualifyingIncidents.length ? "confirmed escalation or resolution of the lead development" : "new current-period operational evidence",
     evidenceFamilyIds: highestPriorityIncident ? [highestPriorityIncident.evidenceFamilyId] : [],
+      evidenceIds: highestPriorityIncident ? [highestPriorityIncident.id] : [],
   };
-  return {
+  const result: FuelCanonicalFacts = {
     reportingPeriod: { issueDate: opts.issueDate, start: window.start, end: window.end, incidentStart: qualifyingIncidents.map((i) => i.date).sort()[0] ?? null, incidentEnd: qualifyingIncidents.map((i) => i.date).sort().at(-1) ?? null },
     evidenceFamilies,
     qualifyingIncidents, incidentCount: qualifyingIncidents.length, distinctIncidentDates: [...new Set(qualifyingIncidents.map((i) => i.date))].sort(), countries, routes,
@@ -503,6 +582,8 @@ export function buildFuelCanonicalFacts(opts: {
     ])],
     judgement,
   };
+  result.generationBasisFingerprint = computeFuelGenerationBasisFingerprint(result);
+  return result;
 }
 
 function pressureSentence(facts: FuelCanonicalFacts): string {
@@ -572,7 +653,9 @@ export function validateFuelReportConsistency(facts: FuelCanonicalFacts, section
   const VOLUME_PROSE_RE =
     /\b\d+\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(?:incidents?|records?|events?|reports?|days?)\b|\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;
   for (const [section, body] of Object.entries(sections)) {
-    if (!body) continue;
+    // Internal deterministic traceability arrays are intentionally not prose
+    // and must never enter the renderer-level wording checks.
+    if (typeof body !== "string" || !body) continue;
     if (VOLUME_PROSE_RE.test(body)) {
       errors.push(err(section, statementSnippet(body, VOLUME_PROSE_RE), "none in analytical prose", "incidentCount"));
     }

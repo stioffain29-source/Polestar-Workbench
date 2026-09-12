@@ -36,6 +36,7 @@ import { pickRead } from "./pickRead";
 import {
   buildFuelCanonicalFacts,
   buildFuelCanonicalSections,
+  computeFuelGenerationBasisFingerprint,
   type FuelCanonicalFacts,
   type FuelCanonicalRenderableSections,
   type FuelCanonicalSections,
@@ -204,6 +205,8 @@ export interface FuelWatchReportData {
   narrativeData: FuelNarrativeData;
   /** The only facts object Fuel Watch sections are allowed to consume. */
   canonicalFacts: FuelCanonicalFacts;
+  /** Fingerprint of the exact canonical current-period evidence set. */
+  generationBasisFingerprint: string;
   /** The prompt/gate facts object (same inputs as canonicalFacts) — feeds the
    *  AI FIXED FACTS block and the prose-tolerant consistency gate that
    *  validates the FINAL effective text (analyst edit -> AI -> canonical).
@@ -454,7 +457,9 @@ export function buildFuelWatchReportData(
   const regionalHighlights = canonicalSections.regionalHighlights;
   const producerBuyerActions = buildFuelProducerBuyerActions({
     issueDate: report.issueDate,
-    incidents: canonicalFacts.qualifyingIncidents.map((incident) => incident.raw),
+    incidents: canonicalFacts.qualifyingIncidents
+      .filter((incident) => incident.evidenceStatus !== "Potential")
+      .map((incident) => incident.raw),
   });
   // Gulf/Hormuz developments stay in the canonical qualifying set and flow
   // through the normal sections (Operational Read, Regional Highlights,
@@ -465,7 +470,9 @@ export function buildFuelWatchReportData(
     issueDate: report.issueDate,
     periodEnd: fuelMarketLatestDate(report.hardNumbers) ?? undefined,
     incidents,
-    qualifyingIncidents: canonicalFacts.qualifyingIncidents,
+    qualifyingIncidents: canonicalFacts.qualifyingIncidents.filter(
+      (incident) => incident.evidenceStatus !== "Potential",
+    ),
   });
   const operationalRead = canonicalSections.operationalRead;
 
@@ -498,7 +505,9 @@ export function buildFuelWatchReportData(
   const hasJetFuelTrajectory = trajectoryPoints.length >= 2;
   const hasSupplyOrPolicy =
     parsed.supply.length > 0 || parsed.policy.length > 0 || parsed.routes.length > 0;
-  const hasRelatedIncidents = fuelIncidents.length > 0;
+  const hasRelatedIncidents = canonicalFacts.qualifyingIncidents.some(
+    (incident) => incident.evidenceStatus !== "Potential",
+  );
 
   const missingRequired: string[] = [];
   if (!hasBrent) missingRequired.push("Brent crude price");
@@ -586,8 +595,12 @@ export function buildFuelWatchReportData(
       jetDataNote,
     },
     incidentData: {
-      fuelIncidents: canonicalFacts.qualifyingIncidents.map((incident) => incident.raw),
-      originalRecords: fuelIncidents,
+      fuelIncidents: canonicalFacts.qualifyingIncidents
+        .filter((incident) => incident.evidenceStatus !== "Potential")
+        .map((incident) => incident.raw),
+      originalRecords: canonicalFacts.qualifyingIncidents
+        .filter((incident) => incident.evidenceStatus !== "Potential")
+        .map((incident) => incident.raw),
       regionalHighlights,
       producerBuyerActions,
       operationalRead,
@@ -610,6 +623,9 @@ export function buildFuelWatchReportData(
       canonicalSections,
     },
     canonicalFacts,
+    generationBasisFingerprint:
+      canonicalFacts.generationBasisFingerprint ??
+      computeFuelGenerationBasisFingerprint(canonicalFacts),
     reportFacts,
     validation: {
       hasPrices,

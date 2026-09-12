@@ -733,6 +733,18 @@ export function resolveFuelEffectiveSections(opts: {
   // either model prose grounded on the canonical FIXED FACTS or the canonical
   // projection itself, and the gate validates whichever tier wins.
   const canonical = fuelData.narrativeData.canonicalSections;
+  // A generated payload that carries a Fuel basis must match the exact
+  // canonical evidence snapshot being rendered. Legacy callers without a
+  // basis remain compatible, but an explicitly stale payload is never allowed
+  // to outrank current deterministic prose. Deliberate analyst edits retain
+  // their existing precedence and are still validated below.
+  const generatedFuelIsCurrent =
+    !aiProse ||
+    aiProse.isAnalystEdited === true ||
+    (!aiProse.stale &&
+      (!aiProse.datasetFingerprint ||
+        aiProse.datasetFingerprint === fuelData.generationBasisFingerprint));
+  const generated = generatedFuelIsCurrent ? aiProse : null;
   // Preserve the final text verbatim. Contradictory generated or analyst prose
   // must be reported by validation, never silently replaced by a fallback.
   const resolveText = (
@@ -741,28 +753,28 @@ export function resolveFuelEffectiveSections(opts: {
     deterministic: string,
   ): string => {
     const e = (editor ?? "").trim();
-    const rawGenerated = (ai ?? "").trim();
+    const rawGenerated = generatedFuelIsCurrent ? (ai ?? "").trim() : "";
     // A report field may have been pre-filled from the AI cache. It remains
     // generated text when it is byte-identical to that cache value, so apply
     // the same exact repair before it becomes an accidental higher-precedence
     // override. Any divergent editor value remains untouched.
-    const repairedGenerated = aiProse?.isAnalystEdited
+    const repairedGenerated = generated?.isAnalystEdited
       ? rawGenerated
       : repairLegacyFuelGeneratedText(rawGenerated).trim();
     if (e && (!rawGenerated || e !== rawGenerated)) return e;
     return repairedGenerated || deterministic;
   };
   return {
-    executiveSummary: resolveText(report.executiveSummary, aiProse?.executiveSummary, canonical.executiveSummary),
-    situation: resolveText(report.situation, aiProse?.situation, canonical.situation),
-    whatHappened: resolveText(report.whatHappened, aiProse?.whatHappened, canonical.whatHappened),
-    whatMatters: resolveText(report.whatMatters, aiProse?.whatMatters, canonical.whatMatters),
-    polestarView: resolveText(report.polestarView, aiProse?.polestarView, canonical.polestarView),
+    executiveSummary: resolveText(report.executiveSummary, generated?.executiveSummary, canonical.executiveSummary),
+    situation: resolveText(report.situation, generated?.situation, canonical.situation),
+    whatHappened: resolveText(report.whatHappened, generated?.whatHappened, canonical.whatHappened),
+    whatMatters: resolveText(report.whatMatters, generated?.whatMatters, canonical.whatMatters),
+    polestarView: resolveText(report.polestarView, generated?.polestarView, canonical.polestarView),
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
-    implications: resolveText(report.implications, aiProse?.implications, canonical.implications),
-    watchNext: resolveText(report.watchNext, aiProse?.watchNext, canonical.watchNext),
+    implications: resolveText(report.implications, generated?.implications, canonical.implications),
+    watchNext: resolveText(report.watchNext, generated?.watchNext, canonical.watchNext),
   };
 }
 

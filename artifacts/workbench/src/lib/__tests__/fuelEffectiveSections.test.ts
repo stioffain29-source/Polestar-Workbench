@@ -95,6 +95,31 @@ describe("resolveFuelEffectiveSections precedence", () => {
     expect(eff.polestarView).toBe("AI polestar.");
   });
 
+  it("drops stale generated prose while retaining an explicit stale analyst edit", () => {
+    const staleGenerated = fullGeneratedProse(fuelData, {
+      situation: "Stale generated situation",
+      datasetFingerprint: "fuel-basis-old",
+      stale: true,
+    });
+    const generatedResult = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: staleGenerated,
+      fuelData,
+    });
+    expect(generatedResult.situation).toBe(fuelData.narrativeData.canonicalSections.situation);
+
+    const retainedEdit = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: {
+        ...staleGenerated,
+        situation: "Retained analyst reconciliation text",
+        isAnalystEdited: true,
+      },
+      fuelData,
+    });
+    expect(retainedEdit.situation).toBe("Retained analyst reconciliation text");
+  });
+
   it("analyst row field beats AI; blank/whitespace row falls through (blank = auto)", () => {
     const eff = resolveFuelEffectiveSections({
       report: { executiveSummary: "Analyst exec.", situation: "   " },
