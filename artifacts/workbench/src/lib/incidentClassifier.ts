@@ -53,6 +53,14 @@ function classifyCargo(i: ClassifiableIncident): string {
 // seizure. Near-miss records fold into Vessel attack so the issue chart
 // stays at the ten-label vocabulary the dashboard now publishes.
 function classifyShipping(t: string): string {
+  // Passenger/coast-guard vessel fires are maritime operational incidents,
+  // not attacks merely because a casualty, missing-person or survivor update
+  // appears in the same report.
+  if (
+    /\b(?:(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off)[^.\n]{0,80}(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)|(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)[^.\n]{0,80}(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off))\b/i.test(t)
+  ) {
+    return "Maritime / vessel fire";
+  }
   if (/\b(piracy|pirat(e|es)|armed robbery (against|at sea|on board|in port|at anchorage)|robbery (against|at sea) (a |the )?(ship|vessel|tanker)|robbery on board|attempted boarding|boarded by (pirates|robbers|armed (men|gang|gunmen))|pirates? boarded|robbers? boarded|armed (men|gang|gunmen) boarded|suspicious approach|small craft approach|approached by (a )?skiffs?|skiff (sighted|approach)|crew (kidnap|abduct|held hostage|taken hostage)|theft from vessel|petty theft .{0,15}(anchorage|vessel|ship)|theft .{0,15}anchorage)\b/.test(t)) return "Piracy / armed robbery";
   if (/\b(vessel seiz|ship seiz|tanker seiz|seized .{0,30}(ship|tanker|vessel|dhow|carrier|cargo)|seizure of .{0,20}(ship|tanker|vessel|dhow|carrier)|hijack(ed)?|commandeered|detained .{0,20}(vessel|tanker|ship|crew|cargo)|stopped in iranian waters|bulk carrier stopped|us[- ]seized vessels?|iran seized|seized two .{0,20}ships?|seized .{0,5}foreign|forced (sale|transfer))\b/.test(t)) return "Vessel seizure";
   if (/\b(vessel attack|tanker attack|ship attack|attack(ed|s)? .{0,30}(ship|tanker|vessel|carrier|dhow|cargo|bulk carrier|container ship)|attack(ed)? by (multiple )?(small (craft|boats?)|skiffs?|iranian)|attack on (a |the )?(ship|tanker|vessel|carrier|dhow|cargo|hmm)|missile .{0,20}(ship|tanker|vessel|carrier|hmm|cargo)|drone .{0,20}(ship|tanker|vessel|carrier|cargo)|fired (upon|at|on)|fired on by|tanker (fired upon|hit|struck|set ablaze|ablaze|on fire)|(ship|vessel|carrier|cargo ship|bulk carrier|container ship|tanker) .{0,20}(hit|struck|set ablaze|ablaze|on fire|catches fire|caught fire|attacked|ablaze)|hit by (gunfire|projectile|projectiles|unknown projectile|unknown projectiles|small craft)|three (vessels|ships|container ships) (hit|targeted|attacked)|gunfire (hit|near|in|in strait)|fire (aboard|on board|aboard a|aboard the|breaks out on|happened at|extinguished on)|fire breaks out on .{0,20}vessels?|external strike|came under fire|comes under fire|targeted by .{0,30}(vessel|ship|iranian|missile|drone)|skiff attack|houthi attack|iranian (attack|strike|vessel)|repel(led)? drone|targeted .{0,20}iranian|ship attack debris|attack debris|near miss|warning shot|narrowly (missed|avoided)|missile (fell|landed) near|drone (fell|landed) near|intercepted near|missile alert)\b/.test(t)) return "Vessel attack";
@@ -214,6 +222,14 @@ function classifyUnrest(t: string): string {
  */
 export function classifyIncidentType(i: ClassifiableIncident): string {
   const t = blob(i);
+  // Country/flashpoint records can carry a topic-specific route that bypasses
+  // the shipping switch. Apply the maritime-fire safety rule globally first so
+  // a passenger vessel fire cannot fall through to a natural-hazard fallback.
+  if (
+    /\b(?:(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off)[^.\n]{0,80}(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)|(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)[^.\n]{0,80}(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off))\b/i.test(t)
+  ) {
+    return "Maritime / vessel fire";
+  }
   switch (i.topic) {
     case "cargo_watch":
       return classifyCargo(i);
@@ -248,7 +264,7 @@ export function classifyIncidentType(i: ClassifiableIncident): string {
       if (/\bfertili[sz]er|urea|potash|dap\b/.test(t)) return classifyFertiliser(t);
       if (/\b(power|grid|blackout|outages?|load shedd|substations?)\b/.test(t)) return classifyEnergy(t);
       if (/\b(data cent(?:re|er)s?|hyperscale|colocation|server farm)\b/.test(t)) return classifyDataCentre(t);
-      if (/\b(protest|riot|strike|militant|tribal|robbery|roadblock|election|unrest)\b/.test(t)) return classifyUnrest(t);
+      if (/\b(protest(?:s|ers?|ing)?|riot(?:s|ing)?|strike|militant|tribal|robbery|roadblock|election|unrest)\b/.test(t)) return classifyUnrest(t);
       return FALLBACK;
   }
 }

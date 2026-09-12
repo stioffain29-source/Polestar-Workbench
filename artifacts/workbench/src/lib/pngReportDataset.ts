@@ -35,6 +35,7 @@ import {
 } from "@workspace/ingest/jakartaExtract";
 import {
   clusterSameStoryRows,
+  consolidateCountryStories,
   incidentTypeKey,
   readableRepresentativeIndex,
   storySimilarity,
@@ -43,7 +44,7 @@ import {
 } from "./countrySameStory";
 import { subDays, format as formatDate } from "date-fns";
 import { isLikelyNonEnglish, stripWireCruft } from "./incidentTitle";
-import { buildUpcomingSignalRows, type UpcomingSignalRow } from "./upcomingSignals";
+import { buildUpcomingSignalRows, hasUpcomingSignal, type UpcomingSignalRow } from "./upcomingSignals";
 import { isNonKineticAssistanceItem, correctSeverity } from "./pngSeverityCorrection";
 import { classifyFireCause } from "./countryFireCause";
 import { applyTopThreeCuration } from "./countrySectionOverrides";
@@ -114,6 +115,8 @@ export interface PngSourceIncident {
   category?: string | null;
   businessImpact?: string | null;
   incidentDate?: string | null;
+  sourceMembers?: PngSourceIncident[];
+  latestFollowOn?: PngSourceIncident;
 }
 
 // Generic word-boundary helper — used only by the watchlist-gap check further
@@ -774,6 +777,8 @@ export interface PngReportItem {
   severity: string;
   severityLabel: string;
   severityRank: number;
+  sourceMembers?: PngSourceIncident[];
+  latestFollowOn?: PngSourceIncident;
   reportedDate: Date;
   incidentDate: Date | null;
   occurredEarlier: boolean;
@@ -1117,11 +1122,12 @@ function toItem(
   // assistance/PR (veto-guarded), never up-rates. A theatre can opt out with
   // demoteNonKineticWire: false.
   const rawSev = (i.severity ?? "").toLowerCase();
+  const validatedSev = rawSev === "severe" ? "high" : rawSev;
   const sev =
     config.demoteNonKineticWire !== false &&
     isNonKineticAssistanceItem(i.title, i.summary)
-      ? correctSeverity(rawSev)
-      : rawSev;
+      ? correctSeverity(validatedSev)
+      : validatedSev;
   const reportedDate = new Date(i.occurredAt);
   const incidentDate = i.incidentDate ? new Date(i.incidentDate) : null;
   const title = stripGalleryFraming(
@@ -1139,7 +1145,12 @@ function toItem(
     id: String(i.id ?? `${i.title}-${i.occurredAt}`),
     title,
     rawTitle,
-    summary: (i.summary ?? "").trim(),
+    summary: [
+      (i.summary ?? "").trim(),
+      ...(i.sourceMembers ?? [])
+        .map((m) => (m.summary ?? "").trim())
+        .filter(Boolean),
+    ].filter(Boolean).filter((v, n, all) => all.indexOf(v) === n).join(" "),
     province,
     location: (i.location ?? "").trim() || null,
     category,
@@ -1159,6 +1170,8 @@ function toItem(
     confidence: (i.confidence ?? "").trim().toLowerCase() || "unrated",
     latitude: i.latitude ?? null,
     longitude: i.longitude ?? null,
+    sourceMembers: i.sourceMembers,
+    latestFollowOn: i.latestFollowOn,
   };
 }
 
@@ -1570,6 +1583,7 @@ function clusterSameStory(
     severityRank: it.severityRank,
     category: it.category,
     displayCategory: it.displayCategory,
+    location: it.location ?? null,
     // Original-language headline. `title` above is already resolved to the
     // English display_title, so a translated copy and its still-untranslated
     // sibling of the SAME story diverge and never match on `title`. The raw
@@ -1703,10 +1717,21 @@ export function buildStructuredReportDataset(
   args: BuildArgs,
   config: StructuredTheatreConfig,
 ): PngReportDataset {
-  const { windowIncidents, previousWindowIncidents, baselineWatchlist, periodLabel } = args;
+  const { previousWindowIncidents, baselineWatchlist, periodLabel } = args;
+  // The page normally supplies the shared semantic event set. Keep this
+  // boundary defensive as the builder is also used directly by PDF/tests:
+  // structured calculations must never fall back to title-only dedupe.
+  const rawWindowCount = args.windowIncidents.length;
+  const upcomingSource = args.windowIncidents.filter((i) => hasUpcomingSignal(i));
+  const confirmedWindowIncidents = args.windowIncidents.filter((i) => {
+    if (!hasUpcomingSignal(i)) return true;
+    return /\b(killed|dead|died|injured|wounded|occurred|took place|was held|fire broke|evacuated)\b/i.test(
+      `${i.title} ${i.summary ?? ""}`,
+    );
+  });
+  const windowIncidents = consolidateCountryStories(confirmedWindowIncidents);
   // Raw (pre-dedup) window size — kept so Reporting Confidence can read how much
   // syndication the dedup pass collapsed (dedup strength, spec §16).
-  const rawWindowCount = windowIncidents.length;
   // PNG-only: drop low-value development / promotional wire copy so every
   // narrative surface (Top 3, Executive Summary, BLUF, Outlook, watchlist,
   // location sections) leads with genuine security reporting rather than
@@ -1742,7 +1767,7 @@ export function buildStructuredReportDataset(
   const dedupedWindowItems = dedupeByTitle(
     windowIncidents.map((i) => toItem(i, config, args.windowStart)),
   );
-  const windowItems = applyRetrospectiveFilter(applyWireFilter(dedupedWindowItems));
+  const candidateItems = applyRetrospectiveFilter(applyWireFilter(dedupedWindowItems));
   // Prior 7-day window, deduped the same way, for the week-on-week delta. Empty
   // when the caller supplies none (delta degrades to a "limited history" note).
   const previousWindowItems = applyRetrospectiveFilter(
@@ -1766,7 +1791,25 @@ export function buildStructuredReportDataset(
   // rendered section, map, count or Top-3). Prior-period events (the preceding
   // window of equal length) enable trend wording (§16); absent → trends barred.
   const engineSlug = config.engineSlug ?? config.countryName;
-  const engineResult: EngineResult = runCountryEngine(windowItems, engineSlug);
+  const engineResult: EngineResult = runCountryEngine(candidateItems, engineSlug);
+  // From this point onward there is exactly one rendered event collection:
+  // included engine events mapped back to their consolidated source items.
+  // Held/excluded rows cannot leak into a count, trend, card, prose, bucket,
+  // action, outlook or map surface.
+  const sourceById = new Map(candidateItems.map((it) => [String(it.id), it]));
+  const windowItems = engineResult.included.map((event) => {
+    const ids = [event.eventId, ...event.supportingSourceIds];
+    const source = ids.map((id) => sourceById.get(String(id))).find(Boolean) ?? null;
+    if (!source) return null;
+    const severity = event.severity.toLowerCase();
+    const severityRank = SEV_RANK[severity] ?? source.severityRank;
+    return {
+      ...source,
+      severity,
+      severityLabel: SEV_LABEL[severity] ?? source.severityLabel,
+      severityRank,
+    };
+  }).filter((it): it is PngReportItem => it !== null);
   const priorEngineResult: EngineResult | null = hasPreviousWindow
     ? runCountryEngine(previousWindowItems, engineSlug)
     : null;
@@ -2529,7 +2572,12 @@ export function buildStructuredReportDataset(
     locationWatchlist,
     outlook,
     upcomingSignals,
-    topIncidentsHeading: config.topIncidentsHeading,
+    // A short window with fewer than three distinct semantic events should
+    // not claim a full priority slate.  Keep the neutral, data-led heading in
+    // that case; the configured priority heading remains for a complete set.
+    topIncidentsHeading: topThree.length < 3
+      ? "KEY DEVELOPMENTS"
+      : config.topIncidentsHeading,
     proseVariant: config.proseVariant,
     polestarView,
     reportingConfidence,

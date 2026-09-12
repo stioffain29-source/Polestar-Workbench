@@ -697,6 +697,29 @@ export interface FuelGateReportFields {
   watchNext?: string | null;
 }
 
+/**
+ * A narrowly-scoped correction for one known generated Fuel cache variant.
+ * This is intentionally exact-text-only: it neither rewrites newly generated
+ * prose nor touches an analyst edit. Applying it in the common final resolver
+ * keeps editor prefill, preview and PDF on identical corrected text without a
+ * production cache write.
+ */
+function repairLegacyFuelGeneratedText(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(
+      "Evidence confidence is moderate, so the trend is clear even where the duration and depth of disruption are not yet settled.",
+      "The duration and depth of disruption are not yet settled.",
+    )
+    .replace(
+      "from India, Pakistan and Indonesia",
+      "",
+    )
+    .replace(
+      "in Pakistan, India and Indonesia",
+      "",
+    );
+}
+
 export function resolveFuelEffectiveSections(opts: {
   report: FuelGateReportFields;
   aiProse: TopicAiProse | null | undefined;
@@ -717,9 +740,16 @@ export function resolveFuelEffectiveSections(opts: {
     deterministic: string,
   ): string => {
     const e = (editor ?? "").trim();
-    const a = (ai ?? "").trim();
-    if (e && (!a || e !== a)) return e;
-    return a || deterministic;
+    const rawGenerated = (ai ?? "").trim();
+    // A report field may have been pre-filled from the AI cache. It remains
+    // generated text when it is byte-identical to that cache value, so apply
+    // the same exact repair before it becomes an accidental higher-precedence
+    // override. Any divergent editor value remains untouched.
+    const repairedGenerated = aiProse?.isAnalystEdited
+      ? rawGenerated
+      : repairLegacyFuelGeneratedText(rawGenerated).trim();
+    if (e && (!rawGenerated || e !== rawGenerated)) return e;
+    return repairedGenerated || deterministic;
   };
   return {
     executiveSummary: resolveText(report.executiveSummary, aiProse?.executiveSummary, canonical.executiveSummary),

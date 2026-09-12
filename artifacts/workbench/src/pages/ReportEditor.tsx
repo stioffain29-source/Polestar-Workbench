@@ -1111,6 +1111,7 @@ export default function ReportEditor() {
         return {
           ...(useEdited ? proseRes.edited : proseRes.sections ?? {}),
           datasetFingerprint: generationBasisFingerprint ?? undefined,
+          isAnalystEdited: useEdited,
           stale: flashpointProseDataset
             ? generationBasisFingerprint !==
               flashpointProseDataset.canonical.fingerprint
@@ -1195,7 +1196,7 @@ export default function ReportEditor() {
       whatHappened: effective.whatHappened ?? "",
       whatMatters: effective.whatMatters ?? "",
       implications: fuelData.narrativeData.implications ?? "",
-      watchNext: fuelData.narrativeData.watchNext ?? "",
+      watchNext: effective.watchNext ?? "",
       polestarView: effective.polestarView ?? "",
       fuelMarketRead: effective.marketRead ?? "",
       fuelOperationalRead: effective.operationalRead ?? "",

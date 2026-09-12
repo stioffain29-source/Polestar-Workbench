@@ -15,9 +15,10 @@
 #   PROD_DATABASE_URL=... bash scripts/verifyCountryBriefs.sh
 set -uo pipefail
 
-cd "$(dirname "$0")/.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/.."
 # shellcheck source=resolveProdDatabaseUrl.sh
-source "$(dirname "$0")/resolveProdDatabaseUrl.sh"
+source "$SCRIPT_DIR/resolveProdDatabaseUrl.sh"
 
 if [ -z "${DATABASE_URL:-}" ]; then
   echo "verifyCountryBriefs: PROD_DATABASE_URL or DATABASE_URL is not set — cannot export country briefs." >&2

@@ -1,0 +1,452 @@
+{
+  "source": "read-only production database snapshot",
+  "snapshotPath": "/tmp/fuel-report-23-production-snapshot.json",
+  "frozenInputPath": "/tmp/fuel-report-23-frozen-effective-input.json",
+  "reportId": 23,
+  "staleDraft": true,
+  "cachedAi": {
+    "origin": "generated",
+    "sectionCount": 7,
+    "fingerprint": "0269a7d1dec5f09dc82855f9e8a24dae00e79be7911de3998d5dc6be055970b9",
+    "model": "gpt-5.4",
+    "generatedAt": "2026-09-11T22:04:30.308+00:00",
+    "exactPayloadSha256": "dab296b7eb51954e8a5f9188e844803e57d85654a96878c2308330b09c4c4f50"
+  },
+  "inputHashes": {
+    "before": {
+      "storedReport": "4bc10e1fbd64e8d70e86b28be05eea784ee6c7db874276451ccdbbded45fb663",
+      "effectiveReport": "fe61cf5f6ffa4c74f4d179074e98df51b979853f4f021314ab616a021b63cc9e",
+      "proseCache": "353baca12d95038fbf87fd622230056ad22ab593049bdb701e3eadcada2956f9",
+      "actualAiProse": "dab296b7eb51954e8a5f9188e844803e57d85654a96878c2308330b09c4c4f50"
+    },
+    "after": {
+      "storedReport": "4bc10e1fbd64e8d70e86b28be05eea784ee6c7db874276451ccdbbded45fb663",
+      "effectiveReport": "fe61cf5f6ffa4c74f4d179074e98df51b979853f4f021314ab616a021b63cc9e",
+      "proseCache": "353baca12d95038fbf87fd622230056ad22ab593049bdb701e3eadcada2956f9",
+      "actualAiProse": "dab296b7eb51954e8a5f9188e844803e57d85654a96878c2308330b09c4c4f50"
+    },
+    "unchanged": true
+  },
+  "sourceIncidentRows": 631,
+  "effectiveSectionsParity": {
+    "baselineSha256": "84464186c2a0d061ea8e00916bd3102e6896987d20c80017e2ca60d480a1f00c",
+    "expectedCorrectedSha256": "3ee669ecb2bf9b82310e1e3e1da6607081eafe6703f9deefd5aada07ebfa9da9",
+    "currentSha256": "3ee669ecb2bf9b82310e1e3e1da6607081eafe6703f9deefd5aada07ebfa9da9",
+    "changedSections": [
+      "situation",
+      "watchNext",
+      "whatHappened"
+    ],
+    "expectedChangedSections": [
+      "situation",
+      "watchNext",
+      "whatHappened"
+    ],
+    "unauthorizedChangedSections": [],
+    "authorizedChanges": [
+      {
+        "section": "situation",
+        "rawPhrasePresent": true,
+        "expectedPhraseRemoved": true,
+        "currentMatchesExpected": true,
+        "beforeSha256": "126ca0eed1d004fcd645b0368f4e673c7c33f53b8267079dbf8998323af9e8ff",
+        "expectedAfterSha256": "8c79c71de0646307356f2873b79b0c0f3cd8d77bdb9473c8fb63ab040786c9ee",
+        "currentAfterSha256": "8c79c71de0646307356f2873b79b0c0f3cd8d77bdb9473c8fb63ab040786c9ee"
+      },
+      {
+        "section": "whatHappened",
+        "rawPhrasePresent": true,
+        "expectedPhraseRemoved": true,
+        "currentMatchesExpected": true,
+        "beforeSha256": "bf1b4d72ea847132c9272b52709bb577f2f136851674a0abe177146f0c8f2cdd",
+        "expectedAfterSha256": "205bfd12c59614810dbaef4e4966caf2db955b13c08f428ff0e6ba9ed8494cf2",
+        "currentAfterSha256": "205bfd12c59614810dbaef4e4966caf2db955b13c08f428ff0e6ba9ed8494cf2"
+      },
+      {
+        "section": "watchNext",
+        "rawPhrasePresent": true,
+        "expectedPhraseRemoved": true,
+        "currentMatchesExpected": true,
+        "beforeSha256": "76f95e9b3bc46aa2af7dc2cc6b167cb75c15ecf9dfbfb8ead6ec03855a9dac4b",
+        "expectedAfterSha256": "8f6975695afceed9627bc1041ff85b886d0463c0973b45fbbd3cfd95988def50",
+        "currentAfterSha256": "8f6975695afceed9627bc1041ff85b886d0463c0973b45fbbd3cfd95988def50"
+      }
+    ],
+    "exactAuthorizedChanges": true
+  },
+  "staticFuelBulletRendererAssertion": {
+    "previewUsesFuelEffective": true,
+    "pdfUsesFuelEffective": true,
+    "noCanonicalBulletBypass": true
+  },
+  "baselineAuditIssues": {
+    "canonical": [],
+    "consistency": [
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "whatMatters",
+        "message": "Final section omits the canonical judgement value \"Oil Surges Past $99 After Saudi Refinery Attack\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "whatMatters",
+        "message": "Final section omits the canonical judgement value \"road fuel distribution\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "whatMatters",
+        "message": "Final section omits the canonical judgement value \"upward\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "whatMatters",
+        "message": "Final section omits the canonical judgement value \"a confirmed change in transit availability\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "polestarView",
+        "message": "Final section omits the canonical judgement value \"Oil Surges Past $99 After Saudi Refinery Attack\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "polestarView",
+        "message": "Final section omits the canonical judgement value \"road fuel distribution\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "polestarView",
+        "message": "Final section omits the canonical judgement value \"upward\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "polestarView",
+        "message": "Final section omits the canonical judgement value \"a confirmed change in transit availability\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "implications",
+        "message": "Final section omits the canonical judgement value \"road fuel distribution\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "implications",
+        "message": "Final section omits the canonical judgement value \"a confirmed change in transit availability\"."
+      },
+      {
+        "code": "JUDGEMENT_CONSISTENCY",
+        "section": "watchNext",
+        "message": "Final section omits the canonical judgement value \"a confirmed change in transit availability\"."
+      }
+    ],
+    "evidence": [
+      {
+        "code": "BACKEND_CONFIDENCE_LEAK",
+        "section": "situation",
+        "message": "Internal model, file, table or evidence-confidence state reached client prose."
+      },
+      {
+        "code": "UNSUPPORTED_BOILERPLATE",
+        "section": "situation",
+        "message": "Generic market/fuel consequence is not traceable to specific evidence: \"Brent and WTI both rose, and jet fuel also rose, which increases transport and aviation cost pressure while supply continuity concerns remain active.\""
+      },
+      {
+        "code": "UNSUPPORTED_BOILERPLATE",
+        "section": "whatMatters",
+        "message": "Generic market/fuel consequence is not traceable to specific evidence: \"The operational issue is not only higher fuel costs but the combination of cost pressure with selective disruption to product flows.\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"Any further incident affecting Saudi refining infrastructure\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"New disruption or security reporting around the Strait of Hormuz\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"Changes in Russian fuel sales limits, queues or regional availability\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"Follow-on reporting on Saratov refinery operations and product output\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"Port and bunker-market notices in Pakistan, India and Indonesia\""
+      },
+      {
+        "code": "WATCH_NEXT_UNGROUNDED",
+        "section": "watchNext",
+        "message": "Watch item introduces a country or theme absent from evidence and validated indicators: \"Further increases in jet fuel pricing pressure affecting Indian aviation\""
+      }
+    ]
+  },
+  "currentAuditIssues": {
+    "canonical": [],
+    "consistency": [],
+    "evidence": []
+  },
+  "currentLiteralJudgementIssueCount": 0,
+  "renderIssueDate": "2026-09-11",
+  "reportingPeriod": {
+    "issueDate": "2026-09-11",
+    "start": "2026-09-05",
+    "end": "2026-09-11",
+    "incidentStart": "2026-09-05",
+    "incidentEnd": "2026-09-11"
+  },
+  "canonicalQualifyingCount": 17,
+  "coverage": {
+    "totalDistinctDevelopments": 17,
+    "activeCountries": 5,
+    "canonicalSeverityDistribution": {
+      "Insignificant": 0,
+      "Low": 6,
+      "Moderate": 10,
+      "High": 1,
+      "Extreme": 0
+    },
+    "severityDistribution": {
+      "Insignificant": 0,
+      "Low": 6,
+      "Moderate": 10,
+      "High": 1,
+      "Extreme": 0
+    },
+    "dailyTrend": [
+      {
+        "date": "2026-09-05",
+        "label": "05 Sep",
+        "count": 1
+      },
+      {
+        "date": "2026-09-06",
+        "label": "06 Sep",
+        "count": 0
+      },
+      {
+        "date": "2026-09-07",
+        "label": "07 Sep",
+        "count": 2
+      },
+      {
+        "date": "2026-09-08",
+        "label": "08 Sep",
+        "count": 3
+      },
+      {
+        "date": "2026-09-09",
+        "label": "09 Sep",
+        "count": 5
+      },
+      {
+        "date": "2026-09-10",
+        "label": "10 Sep",
+        "count": 1
+      },
+      {
+        "date": "2026-09-11",
+        "label": "11 Sep",
+        "count": 5
+      }
+    ],
+    "affectedCountries": [
+      {
+        "country": "Iran",
+        "count": 4,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 4,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Russia",
+        "count": 3,
+        "highestSeverity": "Low",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 3,
+          "Moderate": 0,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Pakistan",
+        "count": 2,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 2,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "India",
+        "count": 1,
+        "highestSeverity": "Low",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 1,
+          "Moderate": 0,
+          "High": 0,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Saudi Arabia",
+        "count": 1,
+        "highestSeverity": "High",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 0,
+          "Moderate": 0,
+          "High": 1,
+          "Extreme": 0
+        }
+      },
+      {
+        "country": "Unattributed",
+        "count": 6,
+        "highestSeverity": "Moderate",
+        "severityDistribution": {
+          "Insignificant": 0,
+          "Low": 2,
+          "Moderate": 4,
+          "High": 0,
+          "Extreme": 0
+        }
+      }
+    ],
+    "reconciliation": {
+      "severityTotal": 17,
+      "dailyTotal": 17,
+      "affectedCountryTotal": 17,
+      "canonicalAttributedCountryTotal": 11,
+      "expectedUnattributedCount": 6,
+      "unattributedRowCount": 6,
+      "activeCountryRows": 5,
+      "canonicalActiveCountries": 5,
+      "severityParity": true,
+      "severityMatchesTotal": true,
+      "dailyMatchesTotal": true,
+      "countriesMatchCanonical": true
+    }
+  },
+  "related": {
+    "canonicalQualifyingCount": 17,
+    "selectedCount": 14,
+    "selectedTitles": [
+      "IRGC Says Iranian Navy Attacked U.S. Unmanned Vessel in Strait of Hormuz",
+      "Houthi Rebels Seize Key Port City Near Bab el-Mandeb Strait in New Attacks",
+      "One unit of Adani power plant shuts down, exacerbating load-shedding",
+      "Sudden Shutdown of Multiple Power Plants Worsens Load-Shedding",
+      "Simkot residents face 22 hours of daily load-shedding",
+      "Iran claims it struck US unmanned surveillance vessel in Strait of Hormuz",
+      "Iran likely to reverse-engineer captured U.S. underwater drone",
+      "Dangote Says Global Fuel Shortage Could Outlast Iran War",
+      "Load shedding: Devastation caused by the five Pandavas",
+      "Ukraine Hits Saratov Refinery Again as Russian Fuel Crisis Deepens",
+      "Oil Surges Past $99 After Saudi Refinery Attack",
+      "Ship fuel shortage looms as refiners strained by war favour other products",
+      "Global ship fuel shortage looms as war disruptions squeeze refinery output",
+      "Shipping Fuel Shortage Looms as Refiners Prioritize Diesel"
+    ],
+    "visibleInPreview": true,
+    "noFixedSixAssertion": true
+  },
+  "preview": {
+    "blocked": false,
+    "textLength": 11119,
+    "coverageFound": true,
+    "coverageMissingTokens": [],
+    "relatedVisible": true,
+    "relatedRowCount": 14,
+    "relatedTitlesFound": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "aiPreviewBlocked": false,
+    "aiPreviewAiSectionsFound": [
+      "executiveSummary",
+      "situation",
+      "whatHappened",
+      "whatMatters",
+      "watchNext",
+      "polestarView"
+    ],
+    "aiPreviewMissingSections": [
+      "implications"
+    ],
+    "canonicalTextMissingKeys": [
+      "executiveSummary",
+      "situation",
+      "whatHappened",
+      "whatMatters",
+      "implications",
+      "watchNext",
+      "polestarView"
+    ],
+    "actualPreviewGateIssues": [],
+    "analystPreviewBlocked": true,
+    "analystPreviewGateIssues": [
+      "situation: [PRIMARY_PRESSURE] Names Russia as the leading pressure point; the calculated primary pressure point is Saudi Arabia.",
+      "watchNext: [WATCH_NEXT_UNGROUNDED] Watch item introduces a country or theme absent from evidence and validated indicators (no selected current availability/routing evidence for Saudi Arabia): \"a confirmed change in transit availability for road fuel distribution in Saudi Arabia.\""
+    ],
+    "analystExportError": "FUEL_PUBLICATION_AUDIT_FAILED\nsituation: Names Russia as the leading pressure point; the calculated primary pressure point is Saudi Arabia.\nwatchNext: Watch item introduces a country or theme absent from evidence and validated indicators (no selected current availability/routing evidence for Saudi Arabia): \"a confirmed change in transit availability for road fuel distribution in Saudi Arabia.\"",
+    "analystSaveCalls": 0,
+    "prefillMatchesActualResolved": true
+  },
+  "pdf": {
+    "bytes": 1057757,
+    "saveCalls": 1,
+    "exportError": null,
+    "pages": 7,
+    "textLength": 10710,
+    "hasRelatedHeading": true,
+    "relatedTitlesFound": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "artifacts": {
+    "preview": "/home/runner/workspace/artifacts/workbench/screenshots/FuelWatch_report23_coverage_preview.png",
+    "pdf": "/home/runner/workspace/artifacts/workbench/screenshots/FuelWatch_report23_coverage.pdf",
+    "proof": "/home/runner/workspace/artifacts/workbench/screenshots/FuelWatch_report23_coverage_proof.json"
+  }
+}

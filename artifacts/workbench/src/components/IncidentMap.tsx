@@ -73,8 +73,12 @@ export default function IncidentMap({
         (p) =>
           typeof p.lat === "number" &&
           typeof p.lng === "number" &&
-          !Number.isNaN(p.lat) &&
-          !Number.isNaN(p.lng),
+          Number.isFinite(p.lat) &&
+          Number.isFinite(p.lng) &&
+          p.lat >= -90 &&
+          p.lat <= 90 &&
+          p.lng >= -180 &&
+          p.lng <= 180,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pointsSig],
@@ -170,7 +174,9 @@ export default function IncidentMap({
 
     if (plottable.length === 0) {
       if (doFit) {
-        map.setView([0, 120], 2);
+        // No active incident means there is no evidence-derived viewport to
+        // fit. Leave Leaflet's neutral world view untouched rather than
+        // inventing a country/city centre.
         lastFitKeyRef.current = fitKey;
       }
       map.off("move zoom zoomend resize viewreset", positionAll);

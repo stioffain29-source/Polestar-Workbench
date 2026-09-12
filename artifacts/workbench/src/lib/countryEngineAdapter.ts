@@ -43,6 +43,8 @@ export interface CanonicalAdapterItem {
   reportedDate?: Date | string | null;
   incidentDate?: Date | string | null;
   occurredAt?: string | null;
+  sourceMembers?: Array<{ id?: string | number }>;
+  latestFollowOn?: { id?: string | number };
 }
 
 function toIso(v: Date | string | null | undefined): string | null {
@@ -82,6 +84,11 @@ export function toEngineInput(
     severity: (item.severity ?? "").toLowerCase() || null,
     source: item.source ?? null,
     sourceUrl: item.url ?? item.sourceUrl ?? null,
+    supportingSourceIds: [
+      String(item.id),
+      ...(item.sourceMembers ?? []).map((m) => String(m.id)).filter((id) => id !== "undefined"),
+    ],
+    relatedEventIds: item.latestFollowOn?.id != null ? [String(item.latestFollowOn.id)] : [],
   };
 }
 

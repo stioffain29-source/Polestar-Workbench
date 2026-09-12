@@ -51,3 +51,24 @@ describe("classifyIncidentType — data centres buckets (TC-01/TC-02)", () => {
     ).toBe("Community opposition");
   });
 });
+
+describe("classifyIncidentType — vessel-fire precedence", () => {
+  it("classifies passenger ferry fires as maritime operational incidents", () => {
+    expect(
+      classifyIncidentType(
+        row(
+          "flashpoint",
+          "Coast guard rescues passengers after ferry fire; several missing and survivors evacuated",
+        ),
+      ),
+    ).toBe("Maritime / vessel fire");
+  });
+
+  it("does not let a nearby natural-hazard cue turn a ship fire into a hazard", () => {
+    expect(
+      classifyIncidentType(
+        row("flashpoint", "Passenger vessel fire during storm leaves survivors missing"),
+      ),
+    ).toBe("Maritime / vessel fire");
+  });
+});

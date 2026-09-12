@@ -1418,8 +1418,8 @@ export default function ReportPreview({
               ) : null;
             })()}
             <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={fuelEffective?.whatMatters} />
-            <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelData.narrativeData.implications} />
-            <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelData.narrativeData.watchNext} max={8} />
+            <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelEffective?.implications} />
+            <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelEffective?.watchNext} max={8} />
             <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelEffective?.polestarView} />
             {fuelRelatedRows.length > 0 && (
               <Section hidden={!show("related-incidents")} title="Related Incidents">

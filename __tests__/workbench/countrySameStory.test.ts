@@ -10,8 +10,9 @@ import {
   readableRepresentativeIndex,
   type SameStoryRow,
 } from "@/lib/countrySameStory";
+import { classifyIncidentType } from "@/lib/incidentClassifier";
 import { isLikelyNonEnglish } from "@/lib/incidentTitle";
-import { buildWestPapuaReportDataset } from "@/lib/pngReportDataset";
+import { buildWestPapuaReportDataset, buildThailandReportDataset } from "@/lib/pngReportDataset";
 
 const DAY = 86_400_000;
 const base = Date.parse("2026-06-20T08:00:00.000Z");
@@ -37,6 +38,189 @@ describe("storySimilarity — 3-day fold window", () => {
     );
     expect(s.jaccard).toBeGreaterThanOrEqual(0.5);
     expect(s.within3d).toBe(false);
+  });
+});
+
+describe("shared country semantic event stage", () => {
+  it("keeps candidate comparisons bounded for a large mostly-distinct window", () => {
+    const comparisons = { n: 0 };
+    const alpha = (n: number) => {
+      let s = "";
+      do { s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+      return s;
+    };
+    const rows = Array.from({ length: 2500 }, (_, n) => row({
+      title: `uniqueevent${alpha(n)} location${alpha(n + 3000)}`,
+      dateMs: base + (n % 5) * DAY,
+      category: "Other",
+    }));
+    const clusters = clusterSameStoryRows(rows, {
+      onCandidateComparison: () => { comparisons.n += 1; },
+    });
+    expect(clusters).toHaveLength(2500);
+    expect(comparisons.n).toBeLessThan(10000);
+  });
+
+  it("keeps a planned announcement only in upcoming signals, not canonical events", () => {
+    const planned = {
+      id: "planned-1",
+      title: "Union plans protest next week over wage dispute",
+      summary: "Organisers announced a march for next week.",
+      severity: "moderate",
+      occurredAt: "2026-08-10T08:00:00Z",
+      country: "Thailand",
+      location: "Bangkok",
+    };
+    const ds = buildThailandReportDataset({
+      windowIncidents: [planned],
+      previousWindowIncidents: [],
+      thirtyDay: [planned],
+      ninetyDay: [planned],
+      baselineWatchlist: [],
+      periodLabel: "10–16 Aug 2026",
+    });
+    expect(ds.windowItems).toHaveLength(0);
+    expect(ds.topThree).toHaveLength(0);
+  });
+
+  it("collapses Thailand kindergarten shooting publisher variants", () => {
+    const out = consolidateCountryStories([
+      {
+        id: "th-a", title: "Gunman opens fire at Bangkok kindergarten, children killed",
+        displayTitle: null, severity: "high", occurredAt: "2026-08-10T08:00:00Z",
+        category: "Homicide", location: "Bangkok",
+      },
+      {
+        id: "th-b", title: "Children killed as shooting strikes Bangkok kindergarten",
+        displayTitle: null, severity: "moderate", occurredAt: "2026-08-10T12:00:00Z",
+        category: "Homicide", location: "Bangkok",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].sourceMembers).toHaveLength(2);
+  });
+
+  it("bridges the full kindergarten act, victim and surrender chain", () => {
+    const titles = [
+      ["Thai police officer who allegedly gunned down his wife at kindergarten surrenders after standoff", "kindergarten wife police officer"],
+      ["Suspected gunman in Thailand kindergarten shooting surrenders after standoff", "kindergarten shooting gunman"],
+      ["Teacher shot dead at Chonburi kindergarten, police officer husband suspected", "kindergarten teacher police officer husband"],
+      ["Gunman shoots and kills a teacher at a kindergarten in eastern Thailand", "kindergarten teacher gunman"],
+      ["Gunman kills teacher at kindergarten in eastern Thailand", "kindergarten teacher gunman"],
+      ["Gunman shoots and kills kindergarten teacher in Thailand", "kindergarten teacher gunman"],
+      ["Gunman shoots and kills a teacher at a kindergarten in eastern Thailand", "kindergarten teacher gunman"],
+      ["Policeman kills teacher wife at Thai school, kids safe", "kindergarten teacher wife police officer"],
+      ["Police officer shoots wife dead at Chonburi kindergarten", "kindergarten wife police officer"],
+      ["Suspected gunman in Thailand kindergarten shooting surrenders after standoff", "kindergarten shooting gunman"],
+    ] as const;
+    const out = consolidateCountryStories(titles.map(([title, summary], n) => ({
+      id: 81000 + n, title, summary, country: "Thailand", location: null,
+      displayTitle: null, severity: n === 1 ? "moderate" : "high",
+      occurredAt: new Date(base + n * 3_600_000).toISOString(), category: "Homicide",
+    })));
+    expect(out).toHaveLength(1);
+    expect(out[0].sourceMembers).toHaveLength(10);
+    expect(out[0].latestFollowOn).toBeDefined();
+  });
+
+  it("does not merge a generic school knife attack into a kindergarten shooting", () => {
+    const out = consolidateCountryStories([
+      {
+        id: 83001, title: "Gunman kills teacher at kindergarten in Thailand",
+        summary: "Kindergarten shooting leaves teacher dead", country: "Thailand",
+        location: "Chonburi", displayTitle: null, severity: "high",
+        occurredAt: "2026-09-09T10:00:00.000Z", category: "Homicide",
+      },
+      {
+        id: 83002, title: "School guard arrested after janitor dies following knife attack",
+        summary: "School guard arrested after knife attack at school", country: "Thailand",
+        location: "Phra Nakhon Si Ayutthaya", displayTitle: null, severity: "high",
+        occurredAt: "2026-09-09T12:00:00.000Z", category: "Homicide",
+      },
+    ]);
+    expect(out).toHaveLength(2);
+  });
+
+  it("bridges named-vessel fire reports through rescue outcomes without merging another fire", () => {
+    const rows = [
+      ["Fire aboard MV June Aster leaves passengers missing", "MV June Aster fire missing passengers"],
+      ["MV June Aster ferry blaze kills two", "June Aster ferry fire deaths"],
+      ["Survivors rescued after June Aster vessel fire", "June Aster survivors rescued"],
+      ["Search continues for June Aster passengers", "June Aster search assistance"],
+      ["Authorities assist June Aster ferry passengers", "June Aster assistance"],
+      ["June Aster fire victims taken to hospital", "June Aster injured survivors"],
+      ["MV June Aster declared safe after fire", "June Aster vessel fire survivors"],
+      ["MV June Aster passenger ferry fire update", "June Aster ferry fire"],
+      ["Search teams dispatched after June Aster blaze", "June Aster search"],
+      ["MV Palawan Star catches fire in separate port", "MV Palawan Star fire"],
+      ["Palawan Star fire injures crew", "Palawan Star fire injured"],
+    ] as const;
+    const out = consolidateCountryStories(rows.map(([title, summary], n) => ({
+      id: 82000 + n, title, summary, country: "Philippines", location: n < 9 ? "Palawan" : "Cebu",
+      displayTitle: null, severity: n === 0 ? "high" : "moderate",
+      occurredAt: new Date(base + n * 3_600_000).toISOString(), category: "Fire",
+    })));
+    expect(out).toHaveLength(2);
+    expect(out.find((r) => r.sourceMembers?.some((m) => m.id === 82000))?.sourceMembers).toHaveLength(9);
+    expect(out.find((r) => r.sourceMembers?.some((m) => m.id === 82009))?.sourceMembers).toHaveLength(2);
+  });
+
+  it("collapses Philippines ferry-fire headline variants", () => {
+    const out = consolidateCountryStories([
+      {
+        id: "ph-a", title: "Fire breaks out aboard passenger ferry near Cebu",
+        displayTitle: null, severity: "high", occurredAt: "2026-08-11T08:00:00Z",
+        category: "Fire", location: "Cebu",
+      },
+      {
+        id: "ph-b", title: "Passenger vessel blaze reported off Cebu as passengers evacuated",
+        displayTitle: null, severity: "moderate", occurredAt: "2026-08-12T08:00:00Z",
+        category: "Fire", location: "Cebu",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+  });
+
+  it("keeps an attack and same-place evacuation as one follow-on event", () => {
+    const out = consolidateCountryStories([
+      {
+        id: "pg-a", title: "Armed group attack kills workers in Wamena",
+        displayTitle: null, severity: "high", occurredAt: "2026-08-10T08:00:00Z",
+        category: "Armed conflict", location: "Wamena, Papua",
+      },
+      {
+        id: "pg-b", title: "Victims evacuated and arrive for treatment after attack",
+        displayTitle: null, severity: "moderate", occurredAt: "2026-08-11T08:00:00Z",
+        category: "Medical", location: "Wamena, Papua",
+      },
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].latestFollowOn?.id).toBe("pg-b");
+    expect(
+      consolidateCountryStories([
+        { id: "pg-c", title: "Armed group attack kills workers in Wamena", severity: "high", occurredAt: "2026-08-10T08:00:00Z", category: "Armed conflict", location: "Wamena" },
+        { id: "pg-d", title: "Victims evacuated after attack", severity: "moderate", occurredAt: "2026-08-15T08:00:00Z", category: "Medical", location: "Wamena" },
+      ]),
+    ).toHaveLength(2);
+  });
+
+  it("reconciles the maximum allowed tier and normalises legacy severe", () => {
+    const out = consolidateCountryStories([
+      { id: "s-a", title: "Attack at named site", severity: "severe", occurredAt: "2026-08-10T08:00:00Z", category: "Attack" },
+      { id: "s-b", title: "Attack at named site", severity: "moderate", occurredAt: "2026-08-10T09:00:00Z", category: "Attack" },
+    ]);
+    expect(out[0].severity).toBe("high");
+  });
+
+  it("classifies protest context ahead of storm/flood and keeps entertainment out of operations", () => {
+    expect(classifyIncidentType({
+      topic: "country", title: "Protesters rally against flood and storm response",
+      summary: "",
+    })).toBe("Protest");
+    expect(classifyIncidentType({
+      topic: "country", title: "TV drama attack plot causes fictional disruption",
+      summary: "Entertainment programme review",
+    })).not.toBe("Operational Disruption");
   });
 });
 

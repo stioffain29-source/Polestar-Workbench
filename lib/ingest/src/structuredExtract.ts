@@ -45,6 +45,16 @@ export type IncidentCategory =
 // Ordered most-specific-first. The first regex to match wins.
 const CATEGORY_RULES: Array<{ re: RegExp; category: IncidentCategory; impact: string }> = [
   {
+    // A fire aboard a passenger vessel is a maritime/transport disruption, not
+    // a natural hazard (and not violent crime merely because the report gives a
+    // casualty, missing-person or survivor update).  Keep this ahead of the
+    // homicide, natural-hazard and generic maritime rules: those broad rules
+    // otherwise let "killed", "missing" or a nearby storm decide the category.
+    re: /\b(?:(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off)[^.\n]{0,80}(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)|(?:fire|blaze|burn(?:ed|ing)?|inferno|engulf\w*|caught fire|on fire|ablaze)[^.\n]{0,80}(?:passenger|coast guard|rescue|ferry|ferries|ship|vessel|boat|craft|ferryboat|liner|tugboat|ro-ro|roll[- ]on\/roll[- ]off))\b/i,
+    category: "Maritime / port",
+    impact: "Maritime-transport disruption and possible passenger-safety impact; confirm vessel status, port access and alternate routes.",
+  },
+  {
     // Explosive remnants of war (ERW) / accidental legacy-ordnance explosions.
     // Placed BEFORE terrorism so a Bahasa "Ledakan Bom Sisa Perang Dunia II"
     // (an 80-year-old munition detonating) classifies here, NOT as terrorism

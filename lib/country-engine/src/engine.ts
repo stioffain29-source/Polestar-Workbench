@@ -361,10 +361,12 @@ export function buildCanonicalEvents(
     const isResponse = responseIds.has(p.input.id);
     events.push(
       makeEvent(p, {
-        supportingSourceIds: [p.input.id],
+        supportingSourceIds: p.input.supportingSourceIds?.length
+          ? p.input.supportingSourceIds
+          : [p.input.id],
         publicationDates: [p.input.occurredAt].filter(Boolean),
         duplicateGroupId: null,
-        relatedEventIds: [],
+        relatedEventIds: p.input.relatedEventIds ?? [],
         forcedExclusion: isResponse ? "response_only_followup" : undefined,
       }),
     );

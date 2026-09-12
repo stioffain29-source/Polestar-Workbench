@@ -73,6 +73,7 @@ import {
   overrideActionGroups,
 } from "./countryIncidentThemes";
 import { acceptedCountryTokens } from "./countryMatch";
+import { consolidateCountryStories } from "./countrySameStory";
 import { runCountryReportQc } from "./countryReportQc";
 import type { JakartaOperatingPictureRow } from "./jakartaBrief";
 import type { ReliefWebReport } from "@workspace/api-client-react";
@@ -655,7 +656,7 @@ function drawJakartaStrandLabel(ctx: Ctx, label: string) {
   const { pdf, MX } = ctx;
   setRoboto(pdf, "bold");
   pdf.setFontSize(8);
-  setText(pdf, ELECTRIC);
+  setText(pdf, NAVY);
   pdf.text(sanitize(label.toUpperCase()), MX, ctx.y + 11);
   ctx.y += 20;
 }
@@ -872,11 +873,21 @@ function drawStructuredItemCard(
 // the script-generated PDF and the on-screen DOM-rasterised PDF stay in
 // lockstep. Reached for those three theatres only; Jakarta has its own
 // renderer and every other theatre keeps the generic country layout below.
-function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
+function renderJakartaWeeklyBrief(
+  ctx: Ctx,
+  dataset: PngReportDataset,
+  mapImage?: string,
+) {
   const d = dataset;
   const tactical = d.jakartaTacticalBrief;
   if (!tactical) return;
 
+  drawMapSection(ctx, {
+    mapImage,
+    plottedCount: d.mapPoints.length,
+    totalInWindow: d.windowItems.length,
+    basisShort: d.periodLabel,
+  });
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
   // A week with no developments renders NO "Top 3 Developments" section at all
@@ -919,13 +930,23 @@ function renderJakartaWeeklyBrief(ctx: Ctx, dataset: PngReportDataset) {
 // The shared structured country brief remains unchanged for the other
 // theatres. Jakarta takes the dedicated city-weekly renderer above so it never
 // regains the generic Current Situation / Outlook / Polestar sections.
-function renderStructuredBrief(ctx: Ctx, dataset: PngReportDataset) {
+function renderStructuredBrief(
+  ctx: Ctx,
+  dataset: PngReportDataset,
+  mapImage?: string,
+) {
   const d = dataset;
   if (d.jakartaTacticalBrief) {
-    renderJakartaWeeklyBrief(ctx, d);
+    renderJakartaWeeklyBrief(ctx, d, mapImage);
     return;
   }
 
+  drawMapSection(ctx, {
+    mapImage,
+    plottedCount: d.mapPoints.length,
+    totalInWindow: d.windowItems.length,
+    basisShort: d.periodLabel,
+  });
   drawSectionWithProse(ctx, "Bottom Line Up Front", d.bluf || "Not populated.");
 
   // No developments → omit the section entirely (matches the on-screen body).
@@ -1070,10 +1091,18 @@ export async function exportCountryReportPdf(
     todayIso,
   );
   const active = resolveActiveCountryWindow(layers, todayIso);
+  // Consolidate only the bounded reporting windows. Running semantic
+  // clustering over a country's full 90-day source pool is unnecessary and
+  // becomes expensive for large national feeds; report counts, prose, tables
+  // and trend comparisons are defined by the current and previous windows.
+  const currentEvents = consolidateCountryStories(active.incidents);
+  const previousEvents = consolidateCountryStories(
+    resolvePreviousCountryWindow(layers, todayIso),
+  );
   const facts = computeCountryFastFacts({
     issueDate: todayIso,
     incidents: incidents as CountryFastFactsIncident[],
-    windowIncidents: active.incidents,
+    windowIncidents: currentEvents,
     standingIncidents: layers.ninetyDay,
     periodLabel: active.periodShortLabel,
   });
@@ -1108,9 +1137,6 @@ export async function exportCountryReportPdf(
   });
   beginBodyPages(ctx);
 
-  // Coverage banner — only renders when the weekly window is empty.
-  if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
-
   // PNG / West Papua / Indonesia / Thailand / Philippines / Jakarta all carry
   // their OWN canonical brief (mirrors the on-screen PngCountryReportBody). Build
   // the SAME dataset the screen uses with the matching builder, render those
@@ -1136,11 +1162,8 @@ export async function exportCountryReportPdf(
               : null;
   if (structuredBuilder) {
     const structuredDataset = structuredBuilder({
-      windowIncidents: active.incidents as unknown as PngSourceIncident[],
-      previousWindowIncidents: resolvePreviousCountryWindow(
-        layers,
-        todayIso,
-      ) as unknown as PngSourceIncident[],
+      windowIncidents: currentEvents as unknown as PngSourceIncident[],
+      previousWindowIncidents: previousEvents as unknown as PngSourceIncident[],
       thirtyDay: layers.thirtyDay as unknown as PngSourceIncident[],
       ninetyDay: layers.ninetyDay as unknown as PngSourceIncident[],
       baselineWatchlist: (extras.baseline?.locationWatchlist ?? []).map(
@@ -1179,18 +1202,26 @@ export async function exportCountryReportPdf(
     // Surface the §33 fail-closed gate result in headless runs too (the
     // on-screen page blocks the PDF on a critical failure; the headless font
     // audit at minimum needs the result visible in its log).
-    if (typeof console !== "undefined") {
-      const g = structuredDataset.gate;
-      // eslint-disable-next-line no-console
-      console.log(
-        `[countryGate] ${country.name}: passed=${g.passed}` +
-          ` hasPriorData=${structuredDataset.gateReport?.hasPriorData ?? false}` +
-          (g.failures.length
-            ? ` failures=${g.failures.map((f) => `${f.check}(${f.severity})`).join(", ")}`
-            : ""),
+    const gate = structuredDataset.gate;
+    // Keep the release sweep's machine-readable audit contract. This is
+    // deliberately emitted before the fail-closed check and before any PDF
+    // rendering/save, so failed exports remain observable.
+    // eslint-disable-next-line no-console
+    console.error(
+      `[countryGate] ${country.name}: passed=${gate.passed}` +
+        ` hasPriorData=${structuredDataset.gateReport?.hasPriorData ?? false}` +
+        (gate.failures.length
+          ? ` failures=${gate.failures.map((f) => `${f.check}(${f.severity})`).join(", ")}`
+          : ""),
+    );
+    if (!gate.passed) {
+      throw new Error(
+        `Country report quality gate failed for ${country.name}: ` +
+          gate.failures.map((f) => f.message).join("; "),
       );
     }
-    renderStructuredBrief(ctx, structuredDataset);
+    renderStructuredBrief(ctx, structuredDataset, extras.mapImage);
+    if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
 
     // Non-blocking §13 quality-control pass (mirrors the on-screen advisory
     // banner). Logged only — the headless export never blocks — using the SAME
@@ -1198,7 +1229,7 @@ export async function exportCountryReportPdf(
     try {
       const qcWarnings = runCountryReportQc(
         structuredDataset,
-        active.incidents as unknown as CountryFastFactsIncident[],
+        currentEvents as unknown as CountryFastFactsIncident[],
       );
       if (qcWarnings.length > 0) {
         // eslint-disable-next-line no-console
@@ -1227,7 +1258,18 @@ export async function exportCountryReportPdf(
     return;
   }
 
-  // 1. Executive Summary
+  // 1. Map — the first content-page evidence slot follows the cover and
+  // precedes the opening narrative. The map is fed only by consolidated
+  // current-window records supplied to this export.
+  drawMapSection(ctx, {
+    mapImage: extras.mapImage,
+    plottedCount,
+    totalInWindow: windowIncidents.length,
+    basisShort: active.basisShort,
+  });
+  if (extras.coverage) drawCoverageBanner(ctx, extras.coverage);
+
+  // 2. Executive Summary
   drawNarrative(
     ctx,
     "Executive Summary",
@@ -1235,20 +1277,20 @@ export async function exportCountryReportPdf(
     `Brief for ${country.name} covering the ${active.basisShort} reporting period. See the sections below for the operating picture, what changed, why it matters, implications and what to watch next.`,
   );
 
-  // 2. Fast Facts
+  // 3. Fast Facts
   drawSectionHeading(ctx, "Fast Facts");
   drawFastFactsKpiCards(ctx, buildKpiCards(facts));
 
-  // 3. Situation (overview)
+  // 4. Situation (overview)
   drawNarrative(ctx, "Situation", country.overview);
 
-  // 4. What Happened (trendSummary)
+  // 5. What Happened (trendSummary)
   drawNarrative(ctx, "What Happened", country.trendSummary);
 
-  // 5. What Matters (auto)
+  // 6. What Matters (auto)
   drawNarrative(ctx, "What Matters", extras.whatMatters);
 
-  // 6. Implications for Business (implications)
+  // 7. Implications for Business (implications)
   drawNarrative(ctx, "Implications for Business", country.implications);
 
   // 6a. Country Baseline (only if curated)
@@ -1276,32 +1318,6 @@ export async function exportCountryReportPdf(
     extras.lookback?.ninetyDay,
     `No 90-day lookback computed for ${country.name}.`,
   );
-
-  // 7. Map — structured city reports return above; this generic path uses the
-  // standard incident map for every remaining country.
-  drawMapSection(ctx, {
-    mapImage: extras.mapImage,
-    plottedCount,
-    totalInWindow: windowIncidents.length,
-    basisShort: active.basisShort,
-  });
-  // Honest caption so the map is never read as the full risk picture.
-  {
-    const { pdf, MX } = ctx;
-    ensureSpace(ctx, 14);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(8);
-    setText(pdf, DUSK);
-    pdf.text(
-      sanitize(
-        `The map reflects ${active.basisShort} window records only. The Country Baseline, Location Watchlist and 30 / 90-day context sections above carry the standing operating picture.`,
-      ),
-      MX,
-      ctx.y + 10,
-    );
-    setRoboto(pdf, "regular");
-    ctx.y += 16;
-  }
 
   // 8. Severity Distribution
   drawSeverityChart(ctx, facts);

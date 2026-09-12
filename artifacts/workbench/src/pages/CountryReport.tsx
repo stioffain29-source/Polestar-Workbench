@@ -418,7 +418,9 @@ export default function CountryReport() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   // Durable analyst layout controls (persisted per-report, OUTSIDE the AI prose
   // fingerprint cache so changing layout never regenerates the narrative).
-  const [mapPlacement, setMapPlacement] = useState<CountryMapPlacement>("end");
+  // Keep the evidence map immediately after the cover, before BLUF.
+  // A saved analyst placement (including "end" or "none") remains authoritative.
+  const [mapPlacement, setMapPlacement] = useState<CountryMapPlacement>("before-bluf");
   const [photoPlacement, setPhotoPlacement] = useState<CountryPhotoPlacement>("none");
   const [reportPhotos, setReportPhotos] = useState<CountryReportPhoto[]>([]);
   // Durable analyst curation of the rendered brief — hidden canonical sections,
@@ -582,7 +584,7 @@ export default function CountryReport() {
   // per distinct event, matching what the brief would show.
   const curationPool = useMemo(
     () =>
-      consolidateCountryStories(active.incidents).filter(
+      dedupedWindowIncidents.filter(
         (i) => i.id != null,
       ) as Array<{
         id: number | string;
@@ -591,7 +593,7 @@ export default function CountryReport() {
         severity: string;
         location?: string | null;
       }>,
-    [active],
+    [dedupedWindowIncidents],
   );
 
   // Compute Fast Facts against the active window once per render. For PNG only,
@@ -639,7 +641,10 @@ export default function CountryReport() {
   const pngDataset = useMemo(() => {
     if (!country) return null;
     const args = {
-      windowIncidents: curatedWindowIncidents as PngSourceIncident[],
+       // One shared semantic event set is the input to BOTH report families.
+       // Do not hand the structured builder the raw curated rows: its legacy
+       // title-only pass cannot see the same event clusters as Fast Facts/map.
+       windowIncidents: dedupedWindowIncidents as PngSourceIncident[],
       previousWindowIncidents: resolvePreviousCountryWindow(layers, issueDate) as PngSourceIncident[],
       thirtyDay: layers.thirtyDay as PngSourceIncident[],
       ninetyDay: layers.ninetyDay as PngSourceIncident[],
@@ -697,7 +702,7 @@ export default function CountryReport() {
       default:
         return buildCountryOperatingRiskDataset(args, country.name ?? "");
     }
-  }, [structuredTheatre, curatedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds, sectionOverrides.top3CustomItems, sectionOverrides.themeParagraphs, sectionOverrides.actionGroups]);
+  }, [structuredTheatre, dedupedWindowIncidents, active, layers, baseline, issueDate, country, coverage.state, sectionOverrides.top3PinnedIds, sectionOverrides.top3ExcludedIds, sectionOverrides.top3CustomItems, sectionOverrides.themeParagraphs, sectionOverrides.actionGroups]);
 
   // --- AI-generated prose -------------------------------------------------
   // The narrative is generated server-side, grounded strictly on the same
@@ -765,7 +770,8 @@ export default function CountryReport() {
         source: it.source ?? null,
       }));
     }
-    // Generic country report: ground the prose on the FULL active window set.
+    // Generic country report: ground the prose on the same canonical,
+    // consolidated included-event set used by Fast Facts, map and tables.
     // We pass `id` so the model's number-keyed per-incident summaries map back to
     // each incident. We deliberately ground on active.incidents (not the deduped
     // table subset): the full set's id list is order-stable under the server's
@@ -773,7 +779,7 @@ export default function CountryReport() {
     // a non-deterministic representative per cluster and would flip the
     // fingerprint every load (regeneration loop). Every deduped table row's id is
     // a subset of this set, so each shown row still resolves a summary.
-    return curatedWindowIncidents.map((i) => ({
+    return dedupedWindowIncidents.map((i) => ({
       id: i.id != null ? String(i.id) : undefined,
       topic: i.topic,
       title: displayIncidentTitle(i.title, i.displayTitle),
@@ -781,7 +787,7 @@ export default function CountryReport() {
       location: i.location, country: i.country,
       severity: i.severity, occurredAt: i.occurredAt, source: i.source,
     }));
-  }, [isStructured, pngDataset, curatedWindowIncidents, country]);
+  }, [isStructured, pngDataset, dedupedWindowIncidents, country]);
 
   const periodWord = useMemo(
     () =>
@@ -1094,7 +1100,7 @@ export default function CountryReport() {
       trendSummary: pick(country.trendSummary, draftedProse?.trendSummary ?? ""),
       implications: pick(country.implications, draftedProse?.implications ?? ""),
     });
-    setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
+    setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "before-bluf");
     setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
     setReportPhotos(country.reportPhotos ?? []);
     {
@@ -1310,7 +1316,7 @@ export default function CountryReport() {
         trendSummary: country.trendSummary ?? "",
         implications: country.implications ?? "",
       });
-      setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "end");
+      setMapPlacement((country.mapPlacement as CountryMapPlacement | null) ?? "before-bluf");
       setPhotoPlacement((country.photoPlacement as CountryPhotoPlacement | null) ?? "none");
       setReportPhotos(country.reportPhotos ?? []);
       {
@@ -1855,7 +1861,11 @@ export default function CountryReport() {
         </div>
 
         <div className="px-10 py-10 space-y-8">
-      {/* "Cover" photo placement — analyst-attached imagery leads the report. */}
+      {/* The evidence map is the first content-page element after the cover.
+          Country reports have one invariant map position; saved alternate
+          placements are intentionally ignored. */}
+      {mapNode}
+      {/* "Cover" photo placement — retained, but never before the map. */}
       {photoPlacement === "cover" && photoBlock}
       {!sourcesLoading && coverage.showBanner && (
         <div
@@ -1991,11 +2001,12 @@ export default function CountryReport() {
             <label style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, display: "block" }}>
               Incident map placement
               <select
-                value={mapPlacement}
-                onChange={(e) => setMapPlacement(e.target.value as CountryMapPlacement)}
+                value="before-bluf"
+                onChange={() => setMapPlacement("before-bluf")}
                 style={{ fontFamily: ROBOTO, border: `1px solid ${POLAR}`, padding: 8, color: DUSK, width: "100%", marginTop: 4 }}
               >
                 <option value="none">Hidden</option>
+                <option value="before-bluf">After Cover / Before BLUF</option>
                 <option value="after-bluf">After Bottom Line</option>
                 <option value="after-top3">After Top 3 Developments</option>
                 <option value="after-incident-details">After Incident Details</option>
@@ -2222,7 +2233,7 @@ export default function CountryReport() {
         <PngCountryReportBody
           dataset={pngEffectiveDataset}
           incidentSummaries={incidentSummaries}
-          mapPlacement={mapPlacement}
+          mapPlacement="none"
           mapNode={mapNode}
           photoPlacement={photoPlacement}
           photoNode={photoBlock}
@@ -2621,8 +2632,6 @@ export default function CountryReport() {
 
       {/* "End" map placement — the incident map renders here, just above the
           shared analytics block, when the analyst leaves it at the default. */}
-      {mapPlacement === "end" && mapNode}
-
       {/* Situational Context reference layer — rendered below the written brief
           for EVERY country (structured and generic). Per the reworked country
           standard the Severity Distribution and Incident Breakdown by Type
@@ -2719,7 +2728,7 @@ export default function CountryReport() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="report-section">
+    <section className="report-section" data-pdf-keep-with-next="true">
       <h2
         style={{
           fontFamily: ROBOTO,

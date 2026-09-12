@@ -30,6 +30,8 @@ export interface TopicAiProse {
   /** Canonical report dataset this prose was generated/edited against. */
   datasetFingerprint?: string | null;
   stale?: boolean;
+  /** Set by the client when this payload is a retained analyst edit, never AI cache text. */
+  isAnalystEdited?: boolean;
   executiveSummary?: string | null;
   situation?: string | null;
   whatHappened?: string | null;

@@ -43,6 +43,7 @@ const SEV_COLOR: Record<string, string> = {
 // inline placements below are injected by this component between sections.
 export type CountryMapPlacement =
   | "none"
+  | "before-bluf"
   | "after-bluf"
   | "after-top3"
   | "after-incident-details"
@@ -71,7 +72,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="report-section">
+    <section className="report-section" data-pdf-keep-with-next="true">
       <h2
         style={{
           fontFamily: ROBOTO,
@@ -204,6 +205,7 @@ function ItemCard({
   return (
     <div
       data-pdf-row="true"
+      data-pdf-keep="true"
       style={{
         border: `1px solid ${POLAR}`,
         borderLeft: `4px solid ${color}`,
@@ -264,7 +266,7 @@ function StrandLabel({ children }: { children: React.ReactNode }) {
         fontSize: 11,
         letterSpacing: "0.12em",
         textTransform: "uppercase",
-        color: ELECTRIC,
+        color: NAVY,
         fontWeight: 700,
         margin: "16px 0 8px 0",
       }}
@@ -383,7 +385,9 @@ function WatchLine({ label, text }: { label: string; text: string }) {
 export default function PngCountryReportBody({
   dataset,
   incidentSummaries = {},
-  mapPlacement = "end",
+  // The incident map opens the first content page, immediately after the cover
+  // and before the written brief. Persisted analyst placements still win.
+  mapPlacement = "before-bluf",
   mapNode = null,
   photoPlacement = "none",
   photoNode = null,
@@ -493,6 +497,7 @@ export default function PngCountryReportBody({
     const { operatingPicture, crimeEscalationWatch, recommendedActions } = tactical;
     return (
       <IncidentSummaryContext.Provider value={incidentSummaries}>
+        {mapAt("before-bluf")}
         {hiddenStub("bottom-line")}
         {show("bottom-line") && (
           <Section title="Bottom Line Up Front" extras={chrome("bottom-line")}>
@@ -552,6 +557,7 @@ export default function PngCountryReportBody({
 
   return (
     <IncidentSummaryContext.Provider value={incidentSummaries}>
+      {mapAt("before-bluf")}
       {/* 1. Bottom Line Up Front */}
       {hiddenStub("bottom-line")}
       {show("bottom-line") && (

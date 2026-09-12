@@ -1544,21 +1544,19 @@ export async function exportTopicReportPdf(
     if (show("what-matters")) {
       renderProseSection("What Matters", fuelEffective?.whatMatters);
     }
-    // Render from the canonical fuel narrative payload (analyst edit -> AI ->
-    // deterministic top-up), identical to the on-screen preview, so screen ==
-    // in-app PDF for these two bullet sections.
+    // Render the exact final text checked by the publication gate.
     if (show("implications")) {
       drawBulletSection(
         ctx,
         "Implications for Business",
-        fuelData.narrativeData.implications ?? "",
+        fuelEffective?.implications ?? "",
       );
     }
     if (show("watch-next")) {
       drawBulletSection(
         ctx,
         "Watch Next",
-        fuelData.narrativeData.watchNext ?? "",
+        fuelEffective?.watchNext ?? "",
         8,
       );
     }

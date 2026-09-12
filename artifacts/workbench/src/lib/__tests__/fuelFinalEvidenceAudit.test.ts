@@ -2,6 +2,8 @@ import {
   auditFinalReportEvidence,
   type FinalReportEvidenceAuditInput,
 } from "../finalReportEvidenceAudit";
+import { resolveFuelEffectiveSections } from "../fuelReportConsistency";
+import { buildFuelWatchReportData } from "../fuelWatchReport";
 
 const ISSUE_DATE = "2026-09-11";
 
@@ -84,6 +86,45 @@ function fuelAudit(
 }
 
 describe("Fuel final evidence audit", () => {
+  it("repairs only the three exact legacy generated Fuel strings before final resolution", () => {
+    const fuelData = buildFuelWatchReportData(
+      { issueDate: ISSUE_DATE, hardNumbers: { prices: [] } },
+      [],
+    );
+    const generated = {
+      situation:
+        "Evidence confidence is moderate, so the trend is clear even where the duration and depth of disruption are not yet settled.",
+      whatHappened:
+        "Reports from India, Pakistan and Indonesia said ship fuel shortages were looming.",
+      watchNext: "Port and bunker-market notices in Pakistan, India and Indonesia",
+    };
+    const effective = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: generated,
+      fuelData,
+    });
+
+    expect(effective.situation).toBe("The duration and depth of disruption are not yet settled.");
+    expect(effective.whatHappened).toBe("Reports  said ship fuel shortages were looming.");
+    expect(effective.watchNext).toBe("Port and bunker-market notices");
+
+    const analystText = "Analyst-approved assessment.";
+    expect(
+      resolveFuelEffectiveSections({
+        report: { situation: analystText },
+        aiProse: { situation: generated.situation },
+        fuelData,
+      }).situation,
+    ).toBe(analystText);
+    expect(
+      resolveFuelEffectiveSections({
+        report: {},
+        aiProse: { situation: analystText, isAnalystEdited: true },
+        fuelData,
+      }).situation,
+    ).toBe(analystText);
+  });
+
   it("allows only the exact canonical Fuel evidence-confidence assessment", () => {
     const base = {
       topic: "fuel",

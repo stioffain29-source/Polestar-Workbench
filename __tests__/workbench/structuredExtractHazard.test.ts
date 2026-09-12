@@ -15,6 +15,17 @@ function categoryOf(title: string, summary = ""): string {
 }
 
 describe("structuredExtract accident/hazard reroute", () => {
+  it("keeps a passenger-vessel fire in maritime transport despite casualty cues", () => {
+    expect(
+      categoryOf(
+        "Coast guard rescues passengers after ferry fire; several missing and survivors evacuated",
+      ),
+    ).toBe("Maritime / port");
+    expect(categoryOf("Passenger ship caught fire during a storm, two killed")).toBe(
+      "Maritime / port",
+    );
+  });
+
   it("reroutes a snakebite death to Natural hazard, not violent crime", () => {
     expect(categoryOf("Snakebite kills three farmers in the highlands")).toBe(
       "Natural hazard",

@@ -222,6 +222,10 @@ export interface EngineSourceInput {
   source?: string | null;
   sourceUrl?: string | null;
   fatalities?: number | null;
+  // Upstream semantic consolidation provenance. The engine treats this as one
+  // event unit while retaining all source evidence for audit/narrative claims.
+  supportingSourceIds?: string[];
+  relatedEventIds?: string[];
 }
 
 // Analyst overrides applied on top of engine output (persisted server-side,

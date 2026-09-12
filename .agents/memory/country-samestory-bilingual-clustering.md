@@ -10,11 +10,12 @@ translation backfill that lags ~1 day, so the NEWEST copy of a story is the one 
 likely to be translated yet. A same-story cluster's representative is "highest severity,
 then NEWEST" → country surfaces led with the untranslated Bahasa copy.
 
-**Two same-story clustering surfaces behave differently — this is the crux:**
-- **Site 1 — `consolidateCountryStories` (countrySameStory.ts):** page-level, feeds the
-  Operational Map (`CountryReportMap`) and country Fast Facts. Clusters on the **RAW**
-  title (`displayTitle` is a separate field). Bilingual copies of one story share a
-  similar raw Bahasa title → they DO cluster naturally.
+**Two same-story clustering surfaces enter through different row shapes:**
+- **Site 1 — `consolidateCountryStories` (countrySameStory.ts):** page/export-level,
+  feeds the Operational Map and country Fast Facts. It must cluster on the resolved
+  `displayTitle || title` while also threading the original title as `rawTitle`.
+  Clustering raw-only misses translated-vs-English follow-ons; clustering resolved-only
+  misses bilingual copies.
 - **Site 2 — `clusterSameStory` (pngReportDataset.ts):** the structured brief builder
   (PNG / West Papua / Indonesia / Jakarta Top-3 + buckets). Clusters on the **RESOLVED**
   title (`PngReportItem.title = stripWireCruft(displayTitle || cleanTitle(title))`). So the
@@ -38,8 +39,7 @@ then NEWEST" → country surfaces led with the untranslated Bahasa copy.
 **Why additive, not a clustering-key swap:** countrySameStory PATH 2/3/4 and the fire/
 entity keys are ENGLISH-lexicon. Clustering the builder wholesale on raw Bahasa titles
 would REGRESS existing merges of two already-English copies. Additive raw paths only ADD
-members to clusters (break-on-match) — nothing already merged un-merges, and site 1 (never
-sets `rawTitle`) is byte-identical.
+members to clusters (break-on-match) — nothing already merged un-merges.
 
 **How to apply:** any new country same-story surface must decide which title it clusters
 on. If it clusters on the resolved/display title, it needs `rawTitle` threaded through +
@@ -49,3 +49,15 @@ the additive raw paths, or bilingual copies double-show and lead foreign. Keep
 worded raw Bahasa headlines from different outlets still won't cluster unless PATH 2/3/4
 fires; if the only English sibling is a lower severity tier, Bahasa still leads (honest,
 never up-rate).
+
+**Performance rule:** never consolidate a country's unbounded/90-day national pool when
+the consumer only needs current and previous reporting windows. Candidate retrieval must
+use selective indexes and monotonic aggregate keys; broad role/facility buckets recreate
+quadratic behaviour on high-volume countries.
+
+**Why:** Indonesia's national pool drove the headless exporter to sustained 100% CPU and
+multi-minute timeouts after semantic consolidation moved ahead of report calculations.
+
+**How to apply:** consolidate each bounded report window before counts/prose/map work.
+Preserve transitive follow-ons with per-cluster aggregate semantic anchors, publishing
+only newly added index keys rather than rescanning every cluster member on each merge.

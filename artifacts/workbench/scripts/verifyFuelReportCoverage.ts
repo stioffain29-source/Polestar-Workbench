@@ -108,6 +108,95 @@ function sha256Json(value: unknown): string {
   return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
+type EffectiveSections = Record<string, unknown>;
+
+const AUTHORIZED_GENERATED_REWRITES = [
+  {
+    section: "situation",
+    from:
+      "Evidence confidence is moderate, so the trend is clear even where the duration and depth of disruption are not yet settled.",
+    to: "The duration and depth of disruption are not yet settled.",
+  },
+  {
+    section: "whatHappened",
+    from: "from India, Pakistan and Indonesia",
+    to: "",
+  },
+  {
+    section: "watchNext",
+    from: "in Pakistan, India and Indonesia",
+    to: "",
+  },
+] as const;
+
+// Expected-output oracle only. The raw production AI payload is never passed
+// through this helper; ReportPreview/PDF invoke the app's own resolver. This
+// lets the proof distinguish the three authorized generated-only corrections
+// from any other effective-section mutation.
+function expectedAuthorizedGeneratedCorrections(
+  sections: EffectiveSections,
+): EffectiveSections {
+  const expected = { ...sections };
+  for (const rewrite of AUTHORIZED_GENERATED_REWRITES) {
+    const value = expected[rewrite.section];
+    if (typeof value !== "string") continue;
+    expected[rewrite.section] = value.replace(rewrite.from, rewrite.to);
+  }
+  return expected;
+}
+
+function effectiveSectionDiff(
+  before: EffectiveSections,
+  after: EffectiveSections,
+): string[] {
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
+  return keys.filter((key) => stableJson(before[key]) !== stableJson(after[key]));
+}
+
+function assertFuelBulletRenderersUseEffectiveSections() {
+  const previewSource = readFileSync(
+    resolve(SRC, "components", "ReportPreview.tsx"),
+    "utf8",
+  );
+  const pdfSource = readFileSync(
+    resolve(SRC, "lib", "exportTopicReportPdf.ts"),
+    "utf8",
+  );
+  const requiredPreview = [
+    'title="Implications for Business" text={fuelEffective?.implications}',
+    'title="Watch Next" text={fuelEffective?.watchNext}',
+  ];
+  const requiredPdf = [
+    '"Implications for Business",\n        fuelEffective?.implications ?? ""',
+    '"Watch Next",\n        fuelEffective?.watchNext ?? ""',
+  ];
+  const forbidden = [
+    "fuelData.narrativeData.implications",
+    "fuelData.narrativeData.watchNext",
+  ];
+  const missingPreview = requiredPreview.filter(
+    (needle) => !previewSource.includes(needle),
+  );
+  const missingPdf = requiredPdf.filter((needle) => !pdfSource.includes(needle));
+  const bypasses = forbidden.filter(
+    (needle) => previewSource.includes(needle) || pdfSource.includes(needle),
+  );
+  if (missingPreview.length || missingPdf.length || bypasses.length) {
+    throw new Error(
+      `Fuel bullet renderer source regression: ${JSON.stringify({
+        missingPreview,
+        missingPdf,
+        bypasses,
+      })}`,
+    );
+  }
+  return {
+    previewUsesFuelEffective: true,
+    pdfUsesFuelEffective: true,
+    noCanonicalBulletBypass: true,
+  };
+}
+
 function titlePresentInPdf(text: string, title: string): boolean {
   const haystack = normalized(text);
   const words = normalized(title)
@@ -435,22 +524,68 @@ async function main() {
     string,
     any
   >;
-  const baselineEffectiveJson = stableJson(baseline.effectiveSections);
-  const currentEffectiveJson = stableJson(
+  const expectedCorrectedSections = expectedAuthorizedGeneratedCorrections(
+    baseline.effectiveSections,
+  );
+  const changedSections = effectiveSectionDiff(
+    baseline.effectiveSections,
     currentPublication.effectiveSections,
   );
+  const expectedChangedSections = effectiveSectionDiff(
+    baseline.effectiveSections,
+    expectedCorrectedSections,
+  );
+  const unauthorizedChangedSections = effectiveSectionDiff(
+    expectedCorrectedSections,
+    currentPublication.effectiveSections,
+  );
+  const authorizedChanges = AUTHORIZED_GENERATED_REWRITES.map((rewrite) => ({
+    section: rewrite.section,
+    rawPhrasePresent:
+      typeof baseline.effectiveSections[rewrite.section] === "string" &&
+      baseline.effectiveSections[rewrite.section].includes(rewrite.from),
+    expectedPhraseRemoved:
+      typeof expectedCorrectedSections[rewrite.section] === "string" &&
+      !expectedCorrectedSections[rewrite.section].includes(rewrite.from),
+    currentMatchesExpected:
+      currentPublication.effectiveSections[rewrite.section] ===
+      expectedCorrectedSections[rewrite.section],
+    beforeSha256: sha256Json(baseline.effectiveSections[rewrite.section]),
+    expectedAfterSha256: sha256Json(
+      expectedCorrectedSections[rewrite.section],
+    ),
+    currentAfterSha256: sha256Json(
+      currentPublication.effectiveSections[rewrite.section],
+    ),
+  }));
   const effectiveSectionsParity = {
     baselineSha256: sha256Json(baseline.effectiveSections),
+    expectedCorrectedSha256: sha256Json(expectedCorrectedSections),
     currentSha256: sha256Json(currentPublication.effectiveSections),
-    byteIdentical: baselineEffectiveJson === currentEffectiveJson,
+    changedSections,
+    expectedChangedSections,
+    unauthorizedChangedSections,
+    authorizedChanges,
+    exactAuthorizedChanges:
+      expectedChangedSections.length === 3 &&
+      changedSections.length === 3 &&
+      unauthorizedChangedSections.length === 0 &&
+      authorizedChanges.every(
+        (change) =>
+          change.rawPhrasePresent &&
+          change.expectedPhraseRemoved &&
+          change.currentMatchesExpected,
+      ),
   };
-  if (!effectiveSectionsParity.byteIdentical) {
+  if (!effectiveSectionsParity.exactAuthorizedChanges) {
     throw new Error(
-      `Frozen HEAD/current effective Fuel sections differ; refusing issue comparison: ${JSON.stringify(
+      `Current effective Fuel sections differ beyond the three authorized generated corrections: ${JSON.stringify(
         effectiveSectionsParity,
       )}`,
     );
   }
+  const staticFuelBulletRendererAssertion =
+    assertFuelBulletRenderersUseEffectiveSections();
 
   mkdirSync(OUTPUT_DIR, { recursive: true });
   // Recheck validator-only changes cheaply after preview/export wiring has
@@ -460,6 +595,7 @@ async function main() {
       reportId: report.id,
       renderIssueDate,
       effectiveSectionsParity,
+      staticFuelBulletRendererAssertion,
       actualAiSha256: sha256Json(actualAiProse),
       baselineIssues: baseline.auditIssues,
       currentIssues: currentPublication.auditIssues,
@@ -594,6 +730,7 @@ async function main() {
       },
       sourceIncidentRows: incidents.length,
       effectiveSectionsParity,
+      staticFuelBulletRendererAssertion,
       baselineAuditIssues: baseline.auditIssues,
       currentAuditIssues: currentPublication.auditIssues,
       currentLiteralJudgementIssueCount:
