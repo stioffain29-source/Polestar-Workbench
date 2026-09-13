@@ -231,7 +231,7 @@ const NOT_POPULATED_HEADINGS = ["Bottom Line Up Front"];
 // "no heading directly followed by another heading" empty-section guard.
 const HEADING_VOCAB = [
   "Bottom Line Up Front",
-  "Top 3 Developments",
+  "Top Developments",
   "Current Situation",
   "Actions & Outlook",
   "Polestar View",
@@ -265,7 +265,7 @@ describe.each(THEATRES)(
 
     it("omits the Top 3 Developments section entirely when there are no developments", async () => {
       const text = await briefPdfText(name);
-      expect(text).not.toContain("TOP 3 DEVELOPMENTS");
+      expect(text).not.toContain("TOP DEVELOPMENTS");
     });
 
     it("omits the blanked prose sections instead of drawing them empty, and never retires a heading into view", async () => {

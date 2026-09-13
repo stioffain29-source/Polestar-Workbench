@@ -110,7 +110,7 @@ function textOf(html: string): string {
 // (The Disclaimer + analytics block are appended by the page, not this body.)
 const SECTION_ORDER = [
   "Bottom Line Up Front",
-  "Top 3 Developments",
+  "Top Developments",
   "Current Situation",
   "Operational Impact",
   "Recommended Actions",
@@ -149,7 +149,7 @@ describe("PngCountryReportBody — country brief render", () => {
     expect(hiddenHtml).not.toContain("Polestar View");
     expect(hiddenHtml).not.toContain("Outlook: Next Seven Days");
     expect(hiddenHtml).toContain("Bottom Line Up Front");
-    expect(hiddenHtml).toContain("Top 3 Developments");
+    expect(hiddenHtml).toContain("Top Developments");
     expect(hiddenHtml).toContain("Current Situation");
     // The unhidden default render still carries them, proving the gate is what
     // removed them (not a build/data issue).
@@ -196,7 +196,7 @@ describe("PngCountryReportBody — country brief render", () => {
   });
 
   it("renders Top 3 Developments tile cards carrying the window's localities", () => {
-    expect(html).toContain("Top 3 Developments");
+    expect(html).toContain("Top Developments");
     const text = textOf(html);
     expect(
       ["Manila", "Cebu", "Davao", "Quezon City"].some((l) => text.includes(l)),
@@ -244,7 +244,7 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
       html.indexOf(MAP_MARKER),
     );
     expect(html.indexOf(MAP_MARKER)).toBeLessThan(
-      html.indexOf("Top 3 Developments"),
+      html.indexOf("Top Developments"),
     );
     // inside-incident-details: the photo sits within the Current Situation section.
     expect(html.indexOf("Current Situation")).toBeLessThan(
@@ -280,7 +280,7 @@ describe("PngCountryReportBody — country brief render, quiet window", () => {
   // Polestar View) are OMITTED rather than padded with filler.
   const RETAINED = ["Bottom Line Up Front"];
   const OMITTED = [
-    "Top 3 Developments",
+    "Top Developments",
     "Current Situation",
     "Operational Impact",
     "Recommended Actions",

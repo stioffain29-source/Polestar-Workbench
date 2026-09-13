@@ -511,7 +511,7 @@ export default function PngCountryReportBody({
             headline section with nothing in it reads as a contradiction. */}
         {hiddenStub("top-3")}
         {show("top-3") && topThree.length > 0 && (
-          <Section title="Top 3 Developments" extras={chrome("top-3")}>
+          <Section title="Top Developments" extras={chrome("top-3")}>
             <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
           </Section>
         )}
@@ -572,7 +572,7 @@ export default function PngCountryReportBody({
           section is omitted entirely rather than rendered around a filler line. */}
       {hiddenStub("top-3")}
       {show("top-3") && (topThree.length > 0 || editUi?.top3Extras != null) && (
-        <Section title="Top 3 Developments" extras={chrome("top-3")}>
+        <Section title="Top Developments" extras={chrome("top-3")}>
           <div>
             {topThree.map((it) => (
               <div key={it.id}>

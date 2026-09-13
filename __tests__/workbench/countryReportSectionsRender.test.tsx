@@ -74,7 +74,7 @@ describe("structured brief render (producer/consumer drift guard)", () => {
   it("builds + renders the Indonesia structured brief without throwing", () => {
     const html = renderBrief(buildIndonesiaReportDataset(buildArgs(rows)));
     expect(html).toContain("Bottom Line Up Front");
-    expect(html).toContain("Top 3 Developments");
+    expect(html).toContain("Top Developments");
   });
 
   it("builds + renders the PNG structured brief without throwing", () => {

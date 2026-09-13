@@ -894,7 +894,7 @@ function renderJakartaWeeklyBrief(
   // — a headline section with nothing in it reads as a contradiction.
   const topThree = d.topThree;
   if (topThree.length > 0) {
-    drawSectionHeading(ctx, "Top 3 Developments");
+    drawSectionHeading(ctx, "Top Developments");
     for (const item of topThree) drawStructuredItemCard(ctx, item, true, true);
   }
 
@@ -952,7 +952,7 @@ function renderStructuredBrief(
   // No developments → omit the section entirely (matches the on-screen body).
   const topThree = d.topThree;
   if (topThree.length > 0) {
-    drawSectionHeading(ctx, "Top 3 Developments");
+    drawSectionHeading(ctx, "Top Developments");
     for (const it of topThree) drawStructuredItemCard(ctx, it, true);
     ctx.y += 4;
   }

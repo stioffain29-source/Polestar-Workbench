@@ -35,7 +35,7 @@ export type CountrySectionKey = (typeof COUNTRY_SECTION_KEYS)[number];
 
 export const COUNTRY_SECTION_LABELS: Record<CountrySectionKey, string> = {
   "bottom-line": "Bottom Line Up Front",
-  "top-3": "Top 3 Developments",
+  "top-3": "Top Developments",
   "current-situation": "Current Situation",
   "actions-outlook": "Actions & Outlook",
   "polestar-view": "Polestar View",
