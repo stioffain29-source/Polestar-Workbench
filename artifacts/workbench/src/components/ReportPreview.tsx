@@ -1048,21 +1048,6 @@ export default function ReportPreview({
       })
     : null;
   const fuelData = fuelBundle?.reportData ?? null;
-  // Fuel related rows use the canonical evidence-family representatives, not
-  // the broader raw incident feed. This keeps the coverage summary and the
-  // register on one qualifying current-period dataset while preserving the
-  // shared title/weak-row safeguards in selectRelatedIncidents.
-  const fuelRelatedRows =
-    isFuel && fuelBundle
-      ? selectRelatedIncidents(
-          fuelBundle.canonicalFacts.qualifyingIncidents.map((incident) => ({
-            ...incident.raw,
-            id: incident.raw.id ?? incident.id,
-            severity: incident.severity.toLowerCase(),
-          })),
-          "fuel",
-        )
-      : [];
   const periodLabel = report.topic && renderIssueDate
     ? resolveReportWindow(report.topic, renderIssueDate).label
     : "";
@@ -1420,11 +1405,6 @@ export default function ReportPreview({
             <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelEffective?.implications} />
             <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelEffective?.watchNext} max={8} />
             <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelEffective?.polestarView} />
-            {fuelRelatedRows.length > 0 && (
-              <Section hidden={!show("related-incidents")} title="Related Incidents">
-                <RelatedIncidentsTable rows={fuelRelatedRows} summaries={incidentSummaries} />
-              </Section>
-            )}
           </>
         ) : (
           <>

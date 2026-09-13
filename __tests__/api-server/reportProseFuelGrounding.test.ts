@@ -58,6 +58,25 @@ function parse(
 }
 
 describe("Fuel AI evidence grounding", () => {
+  it("retains valid analytical sections when What Happened evidence binding fails", () => {
+    const result = parse(
+      baseInput(),
+      [
+        {
+          text: "Unsupported paraphrase",
+          supportingEvidenceIds: ["observed-1"],
+          supportingClaim: "A different unsupported claim.",
+        },
+      ],
+      [],
+    );
+    expect(result).not.toBeNull();
+    expect(result?.executiveSummary).toBe("Summary");
+    expect(result?.whatMatters).toBe("What matters");
+    expect(result?.polestarView).toBe("Polestar");
+    expect(result?.whatHappened).toBe("");
+  });
+
   it("drops zero, unknown and semantically irrelevant cited IDs", () => {
     const result = parse(baseInput(), [
       { text: "ship-fuel shortage theme in India, Indonesia", supportingEvidenceIds: ["0"], supportingClaim: "Diesel deliveries are delayed at Port Alpha." },

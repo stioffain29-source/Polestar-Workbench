@@ -442,7 +442,11 @@ export function parseTopicSections(
     const watch = traceableItems(o.watchNext, "watchNext");
     sections.whatHappened = happened.join("\n\n");
     sections.watchNext = watch.join("\n");
-    if (!sections.whatHappened) return null;
+    // Do not discard an otherwise valid analytical narrative when the model's
+    // evidence binding for this one section is unusable. The publication
+    // resolver replaces a blank What Happened with the canonical deterministic
+    // section; retaining the other valid sections avoids collapsing the whole
+    // report into thin fallback prose.
   }
   // Require the core paragraphs; the bullet lists may legitimately be short. If
   // the model returned an unusable shell, treat it as bad-json so the caller
@@ -450,7 +454,7 @@ export function parseTopicSections(
   if (
     !sections.executiveSummary ||
     !sections.situation ||
-    !sections.whatHappened ||
+    (input?.topic !== "fuel" && !sections.whatHappened) ||
     !sections.whatMatters ||
     !sections.polestarView
   ) {

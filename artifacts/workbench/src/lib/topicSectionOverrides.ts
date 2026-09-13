@@ -486,7 +486,6 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "implications", label: "Implications for Business" },
     { key: "watch-next", label: "Watch Next" },
     { key: "polestar-view", label: "Polestar View" },
-    { key: "related-incidents", label: "Related Incidents" },
   ],
   conflict: [
     { key: "situation", label: "Situation" },
@@ -528,7 +527,6 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "implications", label: "Implications for Business" },
     { key: "watch-next", label: "Watch Next" },
     { key: "polestar-view", label: "Polestar View" },
-    { key: "related-incidents", label: "Related Incidents" },
   ],
   generic: [
     { key: "executive-summary", label: "Executive Summary" },

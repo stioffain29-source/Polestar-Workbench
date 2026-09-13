@@ -1070,20 +1070,6 @@ export async function exportTopicReportPdf(
       })
     : null;
   const fuelData = fuelBundle?.reportData ?? null;
-  // Render Fuel's related register from the same canonical evidence-family
-  // representatives used by the coverage summary. The shared selector still
-  // applies title dedupe, weak-row safeguards and the current report ceiling.
-  const fuelRelatedRows =
-    isFuel && fuelBundle
-      ? selectRelatedIncidents(
-          fuelBundle.canonicalFacts.qualifyingIncidents.map((incident) => ({
-            ...incident.raw,
-            id: incident.raw.id ?? incident.id,
-            severity: incident.severity.toLowerCase(),
-          })),
-          "fuel",
-        )
-      : [];
   // FINAL EFFECTIVE Fuel narrative — analyst edit -> AI -> canonical
   // deterministic, resolved by the ONE shared resolver the preview and the
   // editor prefill also call, so all three surfaces render byte-identical
@@ -1567,18 +1553,6 @@ export async function exportTopicReportPdf(
       if (polestarView.trim()) {
         drawSectionWithProse(ctx, "Polestar View", polestarView);
       }
-    }
-    // Fuel's register is the normal end-of-report detail section. It follows
-    // every narrative/analysis section and sits immediately before the legal
-    // disclaimer, matching the preview's document order.
-    if (show("related-incidents") && fuelRelatedRows.length > 0) {
-      drawRelatedIncidents(
-        ctx,
-        fuelRelatedRows,
-        data.topic,
-        topicLabels,
-        options.incidentSummaries ?? {},
-      );
     }
     drawDisclaimer(ctx);
   } else {
