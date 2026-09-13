@@ -38,6 +38,28 @@ function chronological(a: ProtestEvent, b: ProtestEvent): number {
   );
 }
 
+function analystOverrideKey(row: ProtestEvent): string {
+  return [
+    row.eventDate?.slice(0, 10) ?? "",
+    row.country.trim().toLowerCase(),
+    row.city?.trim().toLowerCase() ?? "",
+    row.eventType?.trim().toLowerCase() ?? "",
+  ].join("|");
+}
+
+function applyAnalystOverrides(rows: readonly ProtestEvent[]): ProtestEvent[] {
+  const analystKeys = new Set(
+    rows
+      .filter((row) => row.sourceName !== "google_news_protest_schedule")
+      .map(analystOverrideKey),
+  );
+  return rows.filter(
+    (row) =>
+      row.sourceName !== "google_news_protest_schedule" ||
+      !analystKeys.has(analystOverrideKey(row)),
+  );
+}
+
 /**
  * Builds the only forward-looking schedule representation consumed by the
  * editor, preview and PDF. Cancelled/postponed rows are filtered defensively
@@ -49,11 +71,13 @@ export function buildProtestScheduleModel(
   const searchCompleted =
     response?.searchCompletedAt != null &&
     Number.isFinite(Date.parse(response.searchCompletedAt));
-  const confirmedPlanned = (response?.confirmedPlanned ?? []).filter(
-    (row) => row.status === "Confirmed" || row.status === "Planned",
+  const confirmedPlanned = applyAnalystOverrides(
+    (response?.confirmedPlanned ?? []).filter(
+      (row) => row.status === "Confirmed" || row.status === "Planned",
+    ),
   );
-  const possible = (response?.possible ?? []).filter(
-    (row) => row.status === "Possible",
+  const possible = applyAnalystOverrides(
+    (response?.possible ?? []).filter((row) => row.status === "Possible"),
   );
   const schedule = [...confirmedPlanned].sort(chronological);
   const watchlist = [...possible].sort(chronological);

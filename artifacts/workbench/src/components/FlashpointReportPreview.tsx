@@ -255,10 +255,10 @@ function ProtestScheduleTable({
   if (rows.length === 0) return null;
   return (
     <div className="w-full overflow-x-auto border" style={{ borderColor: POLAR }}>
-      <table className="min-w-[1180px] w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 10 }}>
+      <table className="min-w-[760px] w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 10 }}>
         <thead>
           <tr style={{ background: NAVY, color: "#FFFFFF" }}>
-            {["Date", "Country", "City", "Venue", "Event type", "Issue", "Organiser", "Start time", "Attendance", "Disruption potential", "Confidence", "Source publication date", "Status", "Source link"].map((label) => (
+            {["Date", "Country", "Location", "Scheduled activity", "Assessment"].map((label) => (
               <th key={label} className="text-left px-2 py-2 whitespace-nowrap" style={{ fontWeight: 700, fontSize: 9 }}>{label}</th>
             ))}
           </tr>
@@ -268,18 +268,9 @@ function ProtestScheduleTable({
             <tr key={row.id} style={{ borderTop: `1px solid ${POLAR}` }}>
               <td className="px-2 py-2 align-top whitespace-nowrap">{row.eventDate?.slice(0, 10) ?? "—"}</td>
               <td className="px-2 py-2 align-top">{row.country}</td>
-              <td className="px-2 py-2 align-top">{row.city ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.venue ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.eventType ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.issue ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.organiser ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.startTime ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.attendance == null ? "Not confirmed" : row.attendance}</td>
-              <td className="px-2 py-2 align-top">{row.disruptionPotential ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.confidence}</td>
-              <td className="px-2 py-2 align-top whitespace-nowrap">{row.sourcePublishedAt?.slice(0, 10) ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.status}</td>
-              <td className="px-2 py-2 align-top max-w-[180px] truncate"><a href={row.sourceUrl} target="_blank" rel="noreferrer" style={{ color: ELECTRIC, textDecoration: "underline" }}>{row.sourceTitle || row.sourceUrl}</a></td>
+              <td className="px-2 py-2 align-top">{row.venue ?? row.city ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.description ?? ([row.eventType, row.issue].filter(Boolean).join(" — ") || "Planned protest activity")}</td>
+              <td className="px-2 py-2 align-top">{row.disruptionPotential ?? row.confidence}</td>
             </tr>
           ))}
         </tbody>

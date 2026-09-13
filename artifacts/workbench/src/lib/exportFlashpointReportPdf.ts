@@ -471,8 +471,8 @@ function drawProtestScheduleTable(
   if (heading) drawSubtitle(ctx, heading);
   if (rows.length === 0) return;
   const { pdf, MX, CW } = ctx;
-  const headers = ["DATE", "COUNTRY", "CITY", "VENUE", "EVENT TYPE", "ISSUE", "ORGANISER", "START", "ATTENDANCE", "DISRUPTION", "CONFIDENCE", "SOURCE DATE", "STATUS", "SOURCE LINK"];
-  const widths = headers.map(() => CW / headers.length);
+  const headers = ["DATE", "COUNTRY", "LOCATION", "SCHEDULED ACTIVITY", "ASSESSMENT"];
+  const widths = [CW * 0.1, CW * 0.13, CW * 0.2, CW * 0.43, CW * 0.14];
   const rowLines = (value: string, width: number) =>
     pdf.splitTextToSize(sanitize(value), Math.max(20, width - 6)) as string[];
   const drawHeader = () => {
@@ -480,7 +480,7 @@ function drawProtestScheduleTable(
     pdf.rect(MX, ctx.y, CW, 18, "F");
     setText(pdf, WHITE);
     setRoboto(pdf, "bold");
-    pdf.setFontSize(5.2);
+    pdf.setFontSize(7);
     let x = MX;
     headers.forEach((header, index) => {
       pdf.text(header, x + 3, ctx.y + 12);
@@ -494,18 +494,9 @@ function drawProtestScheduleTable(
     const values = [
       row.eventDate?.slice(0, 10) ?? "—",
       row.country,
-      row.city ?? "—",
-      row.venue ?? "—",
-      row.eventType ?? "—",
-      row.issue ?? "—",
-      row.organiser ?? "—",
-      row.startTime ?? "—",
-      row.attendance == null ? "Not confirmed" : String(row.attendance),
-      row.disruptionPotential ?? "—",
-      row.confidence,
-      row.sourcePublishedAt?.slice(0, 10) ?? "—",
-      row.status,
-      row.sourceTitle || row.sourceUrl,
+      row.venue ?? row.city ?? "—",
+      row.description ?? ([row.eventType, row.issue].filter(Boolean).join(" — ") || "Planned protest activity"),
+      row.disruptionPotential ?? row.confidence,
     ];
     const lines = values.map((value, index) => rowLines(value, widths[index] ?? 40));
     const rh = Math.max(19, Math.max(...lines.map((value) => value.length)) * 8 + 7);

@@ -87,4 +87,21 @@ describe("protest schedule model", () => {
     expect(watchNext).toMatch(/Possible mobilisation/);
     expect(watchNext).toMatch(/monitor for confirmation before changing plans/);
   });
+
+  it("lets an analyst row supersede an automated duplicate", () => {
+    const automated = {
+      ...event(1, "Planned", "2026-08-03T00:00:00Z"),
+      sourceName: "google_news_protest_schedule",
+    };
+    const analyst = {
+      ...event(2, "Planned", "2026-08-03T00:00:00Z"),
+      sourceName: "analyst_schedule_upload",
+    };
+    const model = buildProtestScheduleModel({
+      confirmedPlanned: [automated, analyst],
+      possible: [],
+      searchCompletedAt: "2026-08-01T00:00:00Z",
+    });
+    expect(model.schedule.map((row) => row.id)).toEqual([2]);
+  });
 });
