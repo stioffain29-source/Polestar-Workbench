@@ -30,6 +30,7 @@ import adminRouter from "./admin";
 import backfillRouter from "./backfill";
 import flashpointValidityAdminRouter from "./flashpointValidityAdmin";
 import cardsRouter from "./cards";
+import protestEventsRouter from "./protestEvents";
 import { requireOwner } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
@@ -75,5 +76,6 @@ router.use(maritimeSecurityEventsRouter);
 router.use(officialMilitaryMaritimeSourcesRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
+router.use(protestEventsRouter);
 
 export default router;

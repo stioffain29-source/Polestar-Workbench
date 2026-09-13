@@ -14,11 +14,39 @@ import {
   runTapaPromoteOnce,
   runFacebookOsintReclassifyOnce,
   runXSearchOnce,
+  runProtestScheduleOnce,
 } from "../lib/ingestRunner";
 import { runIngestProcess } from "../lib/ingestProcess";
 import { backfillRelevance, backfillSeverity } from "../lib/migrations";
 
 const router: IRouter = Router();
+
+// Standalone forward-looking protest schedule refresh. This follows the same
+// admin-token convention as the full ingest, but never enters the incident
+// pipeline.
+router.post("/admin/protest-events", async (req: Request, res: Response) => {
+  const expected = process.env["INGEST_ADMIN_TOKEN"];
+  if (!expected) {
+    res.status(503).json({ error: "ingestion_disabled", message: "INGEST_ADMIN_TOKEN is not configured on the server." });
+    return;
+  }
+  const presented = presentedToken(req);
+  if (!presented || !safeEqual(presented, expected)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  try {
+    const result = await runProtestScheduleOnce();
+    if (!result.ran) {
+      res.status(409).json({ error: "ingestion_in_progress" });
+      return;
+    }
+    res.json(result.protestSchedule);
+  } catch (err) {
+    req.log.error({ err }, "admin protest schedule ingest failed");
+    res.status(500).json({ error: "ingestion_failed", message: err instanceof Error ? err.message : String(err) });
+  }
+});
 
 // In-process guard so two concurrent /admin/relevance-backfill calls (or a
 // rapid double-click) can't both run the pool-bounded write pass at once and

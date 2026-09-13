@@ -466,7 +466,7 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "fast-facts", label: "Fast Facts" },
     { key: "activism", label: "Activism and Protest Read" },
     { key: "civil-unrest", label: "Civil Unrest and Public Order Read" },
-    { key: "forecast", label: "Forecast: Next 7\u201314 Days" },
+    { key: "forecast", label: "PROTEST FORECAST — NEXT 7 DAYS" },
     { key: "regional", label: "Regional and Country View" },
     { key: "what-matters", label: "What Matters" },
     { key: "implications", label: "Implications for Business" },

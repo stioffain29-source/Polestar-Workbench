@@ -26,6 +26,10 @@ import {
   validateFlashpointSemanticContract,
   type FlashpointSemanticGates,
 } from "@workspace/relevance";
+import {
+  buildProtestScheduleWatchNext,
+  type ProtestScheduleModel,
+} from "./protestScheduleModel";
 
 // Single source of truth for the Flashpoint report's analysed dataset.
 // Mirrors the shippingReportDataset pattern so the exporter and any
@@ -123,33 +127,6 @@ export interface ForecastFutureRow {
   // ("set for 13 August", "through 16 August"). Never inferred — when the
   // text states no date this stays null and the table renders "—".
   date: string | null;
-}
-
-/**
- * Analyst forecast rows are persisted inside forecastRead as pipe-delimited
- * lines so the existing report schema can carry both prose and structured
- * additions. Non-matching prose remains the narrative below the table.
- *
- * Country | Date | Signal | Operational meaning
- */
-export function parseAnalystForecastRows(
-  value: string | null | undefined,
-): ForecastFutureRow[] {
-  return (value ?? "")
-    .split(/\r?\n/)
-    .map((line, index) => {
-      const parts = line.split("|").map((part) => part.trim());
-      if (parts.length !== 4 || parts.some((part) => !part)) return null;
-      const [country, date, signal, meaning] = parts;
-      return {
-        sourceIncidentId: `analyst-forecast-${index}-${country.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-        country,
-        date,
-        signal,
-        meaning,
-      } satisfies ForecastFutureRow;
-    })
-    .filter((row): row is ForecastFutureRow => row !== null);
 }
 
 // Lift an explicitly stated future date out of the announcement text. Only a
@@ -467,8 +444,9 @@ export interface FlashpointResolvedAiInput extends FlashpointResolvedProseInput 
 
 export interface FlashpointRenderedModel {
   dataset: FlashpointReportDataset;
-  /** Canonical forecast rows plus live analyst additions from forecastRead. */
+  /** Canonical incident-derived signals only; protest schedule is separate. */
   forecastRows: readonly ForecastFutureRow[];
+  protestSchedule: ProtestScheduleModel;
   fingerprint: string;
   acceptedIds: readonly (number | string)[];
   fastFacts: readonly KpiCard[];
@@ -4035,6 +4013,7 @@ export function resolveFlashpointRenderedModel(args: {
   dataset: FlashpointReportDataset;
   report?: FlashpointResolvedProseInput | null;
   ai?: FlashpointResolvedAiInput | null;
+  protestSchedule?: ProtestScheduleModel | null;
 }): FlashpointRenderedModel {
   const { dataset: ds } = args;
   assertFlashpointReportDatasetValid(ds);
@@ -4048,24 +4027,31 @@ export function resolveFlashpointRenderedModel(args: {
     (report.executiveSummary ?? "").trim() ||
     (ai.executiveSummary ?? "").trim() ||
     ds.autoExecutiveSummary;
-  const analystForecastRows = parseAnalystForecastRows(report.forecastRead);
-  const forecastRows = [
-    ...new Map(
-      [...ds.forecastFuture, ...analystForecastRows].map((row) => [
-        `${row.country.toLowerCase()}|${row.signal.toLowerCase()}`,
-        row,
-      ]),
-    ).values(),
-  ].slice(0, 12);
+  const protestSchedule =
+    args.protestSchedule ?? {
+      schedule: [],
+      watchlist: [],
+      searchCompleted: false,
+      empty: false,
+    };
+  const forecastRows = [...ds.forecastFuture];
+  const scheduleWatchNext = buildProtestScheduleWatchNext(protestSchedule);
   const resolvedWatchNext = resolveFlashpointAnalystProse(
     report.watchNext,
     ai.watchNext,
-    ds.autoWatchNext,
+    scheduleWatchNext || ds.autoWatchNext,
   );
-  const forecastWatchLines = analystForecastRows.map(
-    (row) =>
-      `${row.country} — ${row.signal}: ${row.meaning}`,
-  );
+  const analystWatchText = (report.watchNext ?? "").trim();
+  const hasGenuineAnalystWatch =
+    analystWatchText.length >= 240 &&
+    flashpointAnalystProsePassesVoiceGate(analystWatchText);
+  const watchNextWithSchedule =
+    scheduleWatchNext && !hasGenuineAnalystWatch
+      ? [...new Set([
+          ...resolvedWatchNext.split(/\n+/).map((line) => line.trim()).filter(Boolean),
+          ...scheduleWatchNext.split(/\n+/).map((line) => line.trim()).filter(Boolean),
+        ])].join("\n")
+      : resolvedWatchNext;
   const prose = {
     executiveSummary,
     activismRead: pickFlashpointRead(report.activismRead, ds.activismRead),
@@ -4085,10 +4071,7 @@ export function resolveFlashpointRenderedModel(args: {
       ai.implications,
       ds.autoImplications,
     ),
-    watchNext: [...new Set([
-      ...resolvedWatchNext.split(/\n+/).map((line) => line.trim()).filter(Boolean),
-      ...forecastWatchLines,
-    ])].join("\n"),
+    watchNext: watchNextWithSchedule,
     polestarView: resolveFlashpointAnalystProse(
       report.polestarView,
       ai.polestarView,
@@ -4098,6 +4081,12 @@ export function resolveFlashpointRenderedModel(args: {
   const makeModel = (resolvedProse: typeof prose): FlashpointRenderedModel => ({
     dataset: ds,
     forecastRows: Object.freeze(forecastRows.map((row) => Object.freeze({ ...row }))),
+    protestSchedule: Object.freeze({
+      schedule: Object.freeze([...protestSchedule.schedule]),
+      watchlist: Object.freeze([...protestSchedule.watchlist]),
+      searchCompleted: protestSchedule.searchCompleted,
+      empty: protestSchedule.empty,
+    }),
     fingerprint: ds.canonical.fingerprint,
     acceptedIds: ds.canonical.acceptedIds,
     fastFacts: Object.freeze(ds.fastFacts.map((card) => Object.freeze({ ...card }))),
@@ -4341,6 +4330,10 @@ export function validateFlashpointRenderedModel(
       }
     }
     sentenceCountErrors(section, text);
+    // Watch Next may be grounded in the separate forward-looking protest
+    // schedule. Those countries/dates are not incident evidence and therefore
+    // must not be rejected by the canonical incident-country/date gate.
+    if (section === "watchNext") continue;
     for (const country of allowedCountries) {
       const escaped = country.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const allowedDates = new Set(

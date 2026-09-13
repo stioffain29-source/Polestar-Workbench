@@ -924,6 +924,184 @@ export const GetOfficialMilitaryMaritimeSourceResponse = zod.object({
 }).describe('An M1.5 official military or maritime source item (CENTCOM, UKMTO, partner product). NOT an incident — stored in its own table with analyst flags and dual-watch routing; never inflates any incident count.')
 
 
+/**
+ * Standalone protest schedule context. Confirmed and Planned events are returned separately from Possible events. Cancelled and Postponed events are excluded from this forward-looking response and never become incidents.
+ * @summary Forward-looking protest events in the next seven days
+ */
+export const listProtestEventsQueryLimitMax = 500;
+
+
+
+export const ListProtestEventsQueryParams = zod.object({
+  "country": zod.coerce.string().optional(),
+  "city": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listProtestEventsQueryLimitMax).optional()
+})
+
+export const ListProtestEventsResponse = zod.object({
+  "confirmedPlanned": zod.array(zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string(),
+  "sourceUrl": zod.string(),
+  "sourceTitle": zod.string(),
+  "sourcePublishedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "venue": zod.string().nullish(),
+  "eventType": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "organiser": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "attendance": zod.number().nullish(),
+  "disruptionPotential": zod.union([zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullish(),
+  "confidence": zod.enum(['High', 'Moderate', 'Low']),
+  "status": zod.enum(['Confirmed', 'Planned', 'Possible', 'Cancelled', 'Postponed']),
+  "collectedAt": zod.coerce.date(),
+  "searchCompletedAt": zod.coerce.date(),
+  "dedupKey": zod.string()
+}).describe('A forward-looking protest or mobilisation notice. This standalone context row is never inserted into or counted as an incident.')),
+  "possible": zod.array(zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string(),
+  "sourceUrl": zod.string(),
+  "sourceTitle": zod.string(),
+  "sourcePublishedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "venue": zod.string().nullish(),
+  "eventType": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "organiser": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "attendance": zod.number().nullish(),
+  "disruptionPotential": zod.union([zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullish(),
+  "confidence": zod.enum(['High', 'Moderate', 'Low']),
+  "status": zod.enum(['Confirmed', 'Planned', 'Possible', 'Cancelled', 'Postponed']),
+  "collectedAt": zod.coerce.date(),
+  "searchCompletedAt": zod.coerce.date(),
+  "dedupKey": zod.string()
+}).describe('A forward-looking protest or mobilisation notice. This standalone context row is never inserted into or counted as an incident.')),
+  "searchCompletedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Create an owner-authored forward-looking protest schedule row
+ */
+export const CreateProtestEventBody = zod.object({
+  "sourceName": zod.string().optional(),
+  "sourceUrl": zod.string().url(),
+  "sourceTitle": zod.string(),
+  "sourcePublishedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullable(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "venue": zod.string().nullish(),
+  "eventType": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "organiser": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "attendance": zod.number().nullish(),
+  "disruptionPotential": zod.union([zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullish(),
+  "confidence": zod.enum(['High', 'Moderate', 'Low']),
+  "status": zod.enum(['Confirmed', 'Planned', 'Possible', 'Cancelled', 'Postponed'])
+})
+
+
+/**
+ * @summary Update an owner-authored protest schedule row
+ */
+
+
+
+export const UpdateProtestEventParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+export const UpdateProtestEventBody = zod.object({
+  "sourceName": zod.string().optional(),
+  "sourceUrl": zod.string().url().optional(),
+  "sourceTitle": zod.string().optional(),
+  "sourcePublishedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "country": zod.string().optional(),
+  "city": zod.string().nullish(),
+  "venue": zod.string().nullish(),
+  "eventType": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "organiser": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "attendance": zod.number().nullish(),
+  "disruptionPotential": zod.union([zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullish(),
+  "confidence": zod.enum(['High', 'Moderate', 'Low']).optional(),
+  "status": zod.enum(['Confirmed', 'Planned', 'Possible', 'Cancelled', 'Postponed']).optional()
+})
+
+export const UpdateProtestEventResponse = zod.object({
+  "id": zod.number(),
+  "sourceName": zod.string(),
+  "sourceUrl": zod.string(),
+  "sourceTitle": zod.string(),
+  "sourcePublishedAt": zod.coerce.date().nullish(),
+  "eventDate": zod.coerce.date().nullish(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "venue": zod.string().nullish(),
+  "eventType": zod.string().nullish(),
+  "issue": zod.string().nullish(),
+  "organiser": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "startTime": zod.string().nullish(),
+  "attendance": zod.number().nullish(),
+  "disruptionPotential": zod.union([zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullish(),
+  "confidence": zod.enum(['High', 'Moderate', 'Low']),
+  "status": zod.enum(['Confirmed', 'Planned', 'Possible', 'Cancelled', 'Postponed']),
+  "collectedAt": zod.coerce.date(),
+  "searchCompletedAt": zod.coerce.date(),
+  "dedupKey": zod.string()
+}).describe('A forward-looking protest or mobilisation notice. This standalone context row is never inserted into or counted as an incident.')
+
+
+/**
+ * @summary Collect the forward-looking protest schedule
+ */
+export const CollectProtestEventsResponse = zod.object({
+  "mode": zod.enum(['commit', 'dry-run']),
+  "sourcesFetched": zod.number(),
+  "itemsConsidered": zod.number(),
+  "accepted": zod.number(),
+  "inserted": zod.number(),
+  "updated": zod.number(),
+  "rejected": zod.number(),
+  "errors": zod.array(zod.string()),
+  "countriesCovered": zod.array(zod.string()),
+  "logLines": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Admin-token-triggered protest schedule collection
+ */
+export const AdminCollectProtestEventsResponse = zod.object({
+  "mode": zod.enum(['commit', 'dry-run']),
+  "sourcesFetched": zod.number(),
+  "itemsConsidered": zod.number(),
+  "accepted": zod.number(),
+  "inserted": zod.number(),
+  "updated": zod.number(),
+  "rejected": zod.number(),
+  "errors": zod.array(zod.string()),
+  "countriesCovered": zod.array(zod.string()),
+  "logLines": zod.array(zod.string())
+})
+
+
 export const listIncidentsQueryDaysMax = 365;
 
 

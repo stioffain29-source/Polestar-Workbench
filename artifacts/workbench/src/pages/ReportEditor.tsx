@@ -9,6 +9,9 @@ import {
   useListLatestMaritimeMovement,
   useListMaritimeSecurityEvents,
   useListReliefWebReports,
+  useListProtestEvents,
+  useCollectProtestEvents,
+  getListProtestEventsQueryKey,
   useGenerateReportIncidentSummaries,
   useEditReportIncidentSummaries,
   useGenerateReportProse,
@@ -37,6 +40,7 @@ import ShippingReportPreview from "@/components/ShippingReportPreview";
 import FlashpointReportPreview from "@/components/FlashpointReportPreview";
 import ConflictReportPreview from "@/components/ConflictReportPreview";
 import CargoReportPreview from "@/components/CargoReportPreview";
+import ProtestScheduleEditor from "@/components/ProtestScheduleEditor";
 import {
   buildCargoPatternModel,
   type CargoPatternModelInput,
@@ -90,6 +94,10 @@ import {
   buildFlashpointReportDataset,
   resolveFlashpointRenderedModel,
 } from "@/lib/flashpointReportDataset";
+import {
+  buildProtestScheduleModel,
+  PROTEST_FORECAST_HEADING,
+} from "@/lib/protestScheduleModel";
 import { resolveFlashpointReadOverride } from "@/lib/pickRead";
 import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
@@ -452,6 +460,24 @@ export default function ReportEditor() {
   // unconditionally but only surfaced for the conflict topic; degrades to an
   // empty list (and a hidden section) when the feed is unconfigured/unapproved.
   const { data: situationalReports } = useListReliefWebReports({ limit: 40 });
+  // Forward-looking protest schedule is a standalone context source. It is
+  // deliberately not included in `incidents`, the Flashpoint dataset, or any
+  // incident count.
+  const protestEventsQuery = useListProtestEvents(undefined, {
+    query: {
+      enabled: form.topic === "flashpoint" || form.topic === "protests",
+      staleTime: 30_000,
+      queryKey: getListProtestEventsQueryKey(),
+    },
+  });
+  const collectProtestEvents = useCollectProtestEvents();
+  const protestSchedule = useMemo(
+    () =>
+      buildProtestScheduleModel(
+        protestEventsQuery.data,
+      ),
+    [protestEventsQuery.data],
+  );
   const seededForId = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   // Staleness check shared by the seeding effect and the live warning banner.
@@ -1247,6 +1273,7 @@ export default function ReportEditor() {
                 : report?.proseBasisFingerprint ?? undefined,
             },
             ai: aiProseSections,
+            protestSchedule,
           })
         : null,
     [
@@ -1256,6 +1283,7 @@ export default function ReportEditor() {
       flashpointProseDirty,
       flashpointEditBasisFingerprint,
       report?.proseBasisFingerprint,
+      protestSchedule,
     ],
   );
 
@@ -2935,7 +2963,18 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
               </Field>
-              <Field label={"Forecast: Next 7\u201314 Days"}>
+              <ProtestScheduleEditor
+                model={protestSchedule}
+                collecting={collectProtestEvents.isPending}
+                onCollect={() =>
+                  collectProtestEvents.mutate(undefined, {
+                    onSuccess: () => {
+                      void protestEventsQuery.refetch();
+                    },
+                  })
+                }
+              />
+              <Field label={PROTEST_FORECAST_HEADING}>
                 <Textarea
                   rows={5}
                   value={form.forecastRead}
@@ -2943,8 +2982,8 @@ export default function ReportEditor() {
                   className="rounded-sm"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Add a forecast protest on a new line as: Country | Date | Signal | Operational meaning.
-                  It will appear immediately in the preview table and Watch Next.
+                  Add narrative assessment here. Structured schedule rows are
+                  edited above and are never encoded in prose.
                 </p>
               </Field>
               <Field label="Regional & Country View">

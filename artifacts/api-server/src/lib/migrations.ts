@@ -422,6 +422,57 @@ export async function runDataMigrations(): Promise<void> {
       sql`ALTER TABLE reports ADD COLUMN IF NOT EXISTS risk_rating text`,
     );
 
+    // Standalone forward-looking protest schedule context. This table is
+    // intentionally independent from incidents: planned events are never
+    // inserted into, deduped against, or counted with incidents.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS protest_events (
+        id serial PRIMARY KEY,
+        source_name text NOT NULL DEFAULT 'protest_schedule',
+        source_url text NOT NULL,
+        source_title text NOT NULL,
+        source_published_at timestamptz,
+        event_date timestamptz,
+        country text NOT NULL,
+        city text,
+        venue text,
+        event_type text,
+        issue text,
+        organiser text,
+        description text,
+        start_time text,
+        attendance integer,
+        disruption_potential text,
+        confidence text NOT NULL DEFAULT 'Low',
+        status text NOT NULL DEFAULT 'Possible',
+        collected_at timestamptz NOT NULL DEFAULT now(),
+        search_completed_at timestamptz NOT NULL DEFAULT now(),
+        dedup_key text NOT NULL
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS protest_schedule_state (
+        key text PRIMARY KEY,
+        search_completed_at timestamptz
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS protest_events_dedup_unique
+        ON protest_events (dedup_key)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS protest_events_event_date_idx
+        ON protest_events (event_date)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS protest_events_country_city_idx
+        ON protest_events (country, city)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS protest_events_status_idx
+        ON protest_events (status)
+    `);
+
     // Schema: English translation of a non-English KAMMI social-watch caption.
     // Filled by the caption-translate pass; NULL until translated (UI falls back
     // to the original caption). drizzle push only reaches dev, so the writable

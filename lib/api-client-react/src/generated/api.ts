@@ -83,6 +83,7 @@ import type {
   ListMaritimeVesselsParams,
   ListMarketPricesParams,
   ListOfficialMilitaryMaritimeSourcesParams,
+  ListProtestEventsParams,
   ListReliefWebReportsParams,
   ListReportsParams,
   ListSocialRawItemsParams,
@@ -100,6 +101,11 @@ import type {
   MobileTokenExchangeRequest,
   MobileTokenExchangeSuccess,
   OfficialMilitaryMaritimeSource,
+  ProtestEvent,
+  ProtestEventInput,
+  ProtestEventUpdate,
+  ProtestEventsResponse,
+  ProtestScheduleSummary,
   ReliefWebReport,
   Report,
   ReportIncidentSummariesResult,
@@ -1414,6 +1420,374 @@ export function useGetOfficialMilitaryMaritimeSource<TData = Awaited<ReturnType<
 
 
 
+
+export const getListProtestEventsUrl = (params?: ListProtestEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/protest-events?${stringifiedParams}` : `/api/protest-events`
+}
+
+/**
+ * Standalone protest schedule context. Confirmed and Planned events are returned separately from Possible events. Cancelled and Postponed events are excluded from this forward-looking response and never become incidents.
+ * @summary Forward-looking protest events in the next seven days
+ */
+export const listProtestEvents = async (params?: ListProtestEventsParams, options?: RequestInit): Promise<ProtestEventsResponse> => {
+
+  return customFetch<ProtestEventsResponse>(getListProtestEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListProtestEventsQueryKey = (params?: ListProtestEventsParams,) => {
+    return [
+    `/api/protest-events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListProtestEventsQueryOptions = <TData = Awaited<ReturnType<typeof listProtestEvents>>, TError = ErrorType<unknown>>(params?: ListProtestEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProtestEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListProtestEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listProtestEvents>>> = ({ signal }) => listProtestEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listProtestEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListProtestEventsQueryResult = NonNullable<Awaited<ReturnType<typeof listProtestEvents>>>
+export type ListProtestEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Forward-looking protest events in the next seven days
+ */
+
+export function useListProtestEvents<TData = Awaited<ReturnType<typeof listProtestEvents>>, TError = ErrorType<unknown>>(
+ params?: ListProtestEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listProtestEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListProtestEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateProtestEventUrl = () => {
+
+
+
+
+  return `/api/protest-events`
+}
+
+/**
+ * @summary Create an owner-authored forward-looking protest schedule row
+ */
+export const createProtestEvent = async (protestEventInput: ProtestEventInput, options?: RequestInit): Promise<ProtestEvent> => {
+
+  return customFetch<ProtestEvent>(getCreateProtestEventUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      protestEventInput,)
+  }
+);}
+
+
+
+
+export const getCreateProtestEventMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProtestEvent>>, TError,{data: BodyType<ProtestEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createProtestEvent>>, TError,{data: BodyType<ProtestEventInput>}, TContext> => {
+
+const mutationKey = ['createProtestEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createProtestEvent>>, {data: BodyType<ProtestEventInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createProtestEvent(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateProtestEventMutationResult = NonNullable<Awaited<ReturnType<typeof createProtestEvent>>>
+    export type CreateProtestEventMutationBody = BodyType<ProtestEventInput>
+    export type CreateProtestEventMutationError = ErrorType<void>
+
+    /**
+ * @summary Create an owner-authored forward-looking protest schedule row
+ */
+export const useCreateProtestEvent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createProtestEvent>>, TError,{data: BodyType<ProtestEventInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createProtestEvent>>,
+        TError,
+        {data: BodyType<ProtestEventInput>},
+        TContext
+      > => {
+      return useMutation(getCreateProtestEventMutationOptions(options));
+    }
+
+export const getUpdateProtestEventUrl = (id: number,) => {
+
+
+
+
+  return `/api/protest-events/${id}`
+}
+
+/**
+ * @summary Update an owner-authored protest schedule row
+ */
+export const updateProtestEvent = async (id: number,
+    protestEventUpdate: ProtestEventUpdate, options?: RequestInit): Promise<ProtestEvent> => {
+
+  return customFetch<ProtestEvent>(getUpdateProtestEventUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      protestEventUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateProtestEventMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProtestEvent>>, TError,{id: number;data: BodyType<ProtestEventUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateProtestEvent>>, TError,{id: number;data: BodyType<ProtestEventUpdate>}, TContext> => {
+
+const mutationKey = ['updateProtestEvent'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateProtestEvent>>, {id: number;data: BodyType<ProtestEventUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateProtestEvent(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateProtestEventMutationResult = NonNullable<Awaited<ReturnType<typeof updateProtestEvent>>>
+    export type UpdateProtestEventMutationBody = BodyType<ProtestEventUpdate>
+    export type UpdateProtestEventMutationError = ErrorType<void>
+
+    /**
+ * @summary Update an owner-authored protest schedule row
+ */
+export const useUpdateProtestEvent = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateProtestEvent>>, TError,{id: number;data: BodyType<ProtestEventUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateProtestEvent>>,
+        TError,
+        {id: number;data: BodyType<ProtestEventUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateProtestEventMutationOptions(options));
+    }
+
+export const getCollectProtestEventsUrl = () => {
+
+
+
+
+  return `/api/protest-events/collect`
+}
+
+/**
+ * @summary Collect the forward-looking protest schedule
+ */
+export const collectProtestEvents = async ( options?: RequestInit): Promise<ProtestScheduleSummary> => {
+
+  return customFetch<ProtestScheduleSummary>(getCollectProtestEventsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCollectProtestEventsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectProtestEvents>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof collectProtestEvents>>, TError,void, TContext> => {
+
+const mutationKey = ['collectProtestEvents'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof collectProtestEvents>>, void> = () => {
+
+
+          return  collectProtestEvents(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CollectProtestEventsMutationResult = NonNullable<Awaited<ReturnType<typeof collectProtestEvents>>>
+
+    export type CollectProtestEventsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Collect the forward-looking protest schedule
+ */
+export const useCollectProtestEvents = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectProtestEvents>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof collectProtestEvents>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCollectProtestEventsMutationOptions(options));
+    }
+
+export const getAdminCollectProtestEventsUrl = () => {
+
+
+
+
+  return `/api/admin/protest-events`
+}
+
+/**
+ * @summary Admin-token-triggered protest schedule collection
+ */
+export const adminCollectProtestEvents = async ( options?: RequestInit): Promise<ProtestScheduleSummary> => {
+
+  return customFetch<ProtestScheduleSummary>(getAdminCollectProtestEventsUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getAdminCollectProtestEventsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCollectProtestEvents>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof adminCollectProtestEvents>>, TError,void, TContext> => {
+
+const mutationKey = ['adminCollectProtestEvents'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof adminCollectProtestEvents>>, void> = () => {
+
+
+          return  adminCollectProtestEvents(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AdminCollectProtestEventsMutationResult = NonNullable<Awaited<ReturnType<typeof adminCollectProtestEvents>>>
+
+    export type AdminCollectProtestEventsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Admin-token-triggered protest schedule collection
+ */
+export const useAdminCollectProtestEvents = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof adminCollectProtestEvents>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof adminCollectProtestEvents>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getAdminCollectProtestEventsMutationOptions(options));
+    }
 
 export const getListIncidentsUrl = (params?: ListIncidentsParams,) => {
   const normalizedParams = new URLSearchParams();

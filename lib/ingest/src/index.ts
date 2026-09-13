@@ -108,6 +108,15 @@ export type {
   KammiSourceConfig,
 } from "./kammiSource";
 export { runMarketPricesIngest } from "./marketPrices";
+export {
+  runProtestScheduleIngest,
+  emptyProtestScheduleSummary,
+  parseProtestItem,
+  makeProtestDedupeKey,
+  eventDateInWindow,
+  listForwardProtestEvents,
+} from "./protestSchedule";
+export type { ProtestScheduleSummary, ProtestStatus, ProtestConfidence } from "./protestSchedule";
 export type { MarketPriceSummary } from "./marketPrices";
 export { runMarketSnapshotIngest } from "./marketSnapshot";
 export type { MarketSnapshotSummary } from "./marketSnapshot";

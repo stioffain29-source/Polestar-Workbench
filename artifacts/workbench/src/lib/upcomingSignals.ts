@@ -4,7 +4,7 @@
 // ANNOUNCES a future protest / strike / march into a forward-looking "upcoming
 // activity" signal. It is consumed by three surfaces which must never drift:
 //   1. the live Protests & Civil Unrest monitor (Reported Upcoming Activity),
-//   2. the weekly Flashpoint report (Forecast: Next 7-14 Days + Watch Next),
+//   2. the weekly Flashpoint report (Protest Forecast — Next 7 Days + Watch Next),
 //   3. the Indonesia country brief (Outlook section).
 //
 // STRICT NO-FABRICATION:

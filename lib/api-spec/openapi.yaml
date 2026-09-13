@@ -21,6 +21,8 @@ tags:
   - name: liveuamap
   - name: integrations
   - name: gdelt-structured
+  - name: protest-events
+    description: Forward-looking protest schedule context, never incidents.
   - name: Auth
     description: Browser and mobile authentication endpoints.
 
@@ -463,6 +465,97 @@ paths:
               schema: { $ref: "#/components/schemas/OfficialMilitaryMaritimeSource" }
         "404":
           description: Not found
+
+  /protest-events:
+    get:
+      operationId: listProtestEvents
+      tags: [protest-events]
+      summary: Forward-looking protest events in the next seven days
+      description: >-
+        Standalone protest schedule context. Confirmed and Planned events are
+        returned separately from Possible events. Cancelled and Postponed events
+        are excluded from this forward-looking response and never become
+        incidents.
+      parameters:
+        - name: country
+          in: query
+          schema: { type: string }
+        - name: city
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Confirmed/Planned and Possible events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtestEventsResponse" }
+    post:
+      operationId: createProtestEvent
+      tags: [protest-events]
+      summary: Create an owner-authored forward-looking protest schedule row
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProtestEventInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtestEvent" }
+        "400":
+          description: Invalid protest event
+  /protest-events/{id}:
+    patch:
+      operationId: updateProtestEvent
+      tags: [protest-events]
+      summary: Update an owner-authored protest schedule row
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProtestEventUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtestEvent" }
+        "400":
+          description: Invalid protest event
+        "404":
+          description: Not found
+  /protest-events/collect:
+    post:
+      operationId: collectProtestEvents
+      tags: [protest-events]
+      summary: Collect the forward-looking protest schedule
+      responses:
+        "200":
+          description: Collection summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtestScheduleSummary" }
+  /admin/protest-events:
+    post:
+      operationId: adminCollectProtestEvents
+      tags: [protest-events]
+      summary: Admin-token-triggered protest schedule collection
+      responses:
+        "200":
+          description: Collection summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProtestScheduleSummary" }
 
   /incidents:
     get:
@@ -4577,6 +4670,110 @@ components:
         classification: { type: string }
         confidence: { type: string }
         tags:
+          type: array
+          items: { type: string }
+
+    ProtestEvent:
+      type: object
+      description: >-
+        A forward-looking protest or mobilisation notice. This standalone
+        context row is never inserted into or counted as an incident.
+      required: [id, sourceName, sourceUrl, sourceTitle, country, status, confidence, collectedAt, searchCompletedAt, dedupKey]
+      properties:
+        id: { type: integer }
+        sourceName: { type: string }
+        sourceUrl: { type: string }
+        sourceTitle: { type: string }
+        sourcePublishedAt: { type: ["string", "null"], format: date-time }
+        eventDate: { type: ["string", "null"], format: date-time }
+        country: { type: string }
+        city: { type: ["string", "null"] }
+        venue: { type: ["string", "null"] }
+        eventType: { type: ["string", "null"] }
+        issue: { type: ["string", "null"] }
+        organiser: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        startTime: { type: ["string", "null"] }
+        attendance: { type: ["integer", "null"] }
+        disruptionPotential: { type: ["string", "null"], enum: [Low, Moderate, High, Extreme, null] }
+        confidence: { type: string, enum: [High, Moderate, Low] }
+        status: { type: string, enum: [Confirmed, Planned, Possible, Cancelled, Postponed] }
+        collectedAt: { type: string, format: date-time }
+        searchCompletedAt: { type: string, format: date-time }
+        dedupKey: { type: string }
+
+    ProtestEventsResponse:
+      type: object
+      required: [confirmedPlanned, possible, searchCompletedAt]
+      properties:
+        confirmedPlanned:
+          type: array
+          items: { $ref: "#/components/schemas/ProtestEvent" }
+        possible:
+          type: array
+          items: { $ref: "#/components/schemas/ProtestEvent" }
+        searchCompletedAt: { type: ["string", "null"], format: date-time }
+
+    ProtestEventInput:
+      type: object
+      required: [sourceUrl, sourceTitle, country, eventDate, status, confidence]
+      properties:
+        sourceName: { type: string }
+        sourceUrl: { type: string, format: uri }
+        sourceTitle: { type: string }
+        sourcePublishedAt: { type: ["string", "null"], format: date-time }
+        eventDate: { type: ["string", "null"], format: date-time }
+        country: { type: string }
+        city: { type: ["string", "null"] }
+        venue: { type: ["string", "null"] }
+        eventType: { type: ["string", "null"] }
+        issue: { type: ["string", "null"] }
+        organiser: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        startTime: { type: ["string", "null"] }
+        attendance: { type: ["integer", "null"] }
+        disruptionPotential: { type: ["string", "null"], enum: [Low, Moderate, High, Extreme, null] }
+        confidence: { type: string, enum: [High, Moderate, Low] }
+        status: { type: string, enum: [Confirmed, Planned, Possible, Cancelled, Postponed] }
+
+    ProtestEventUpdate:
+      type: object
+      properties:
+        sourceName: { type: string }
+        sourceUrl: { type: string, format: uri }
+        sourceTitle: { type: string }
+        sourcePublishedAt: { type: ["string", "null"], format: date-time }
+        eventDate: { type: ["string", "null"], format: date-time }
+        country: { type: string }
+        city: { type: ["string", "null"] }
+        venue: { type: ["string", "null"] }
+        eventType: { type: ["string", "null"] }
+        issue: { type: ["string", "null"] }
+        organiser: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        startTime: { type: ["string", "null"] }
+        attendance: { type: ["integer", "null"] }
+        disruptionPotential: { type: ["string", "null"], enum: [Low, Moderate, High, Extreme, null] }
+        confidence: { type: string, enum: [High, Moderate, Low] }
+        status: { type: string, enum: [Confirmed, Planned, Possible, Cancelled, Postponed] }
+    ProtestScheduleSummary:
+      type: object
+      required: [mode, sourcesFetched, itemsConsidered, accepted, inserted, updated, rejected, errors, countriesCovered, logLines]
+      properties:
+        mode: { type: string, enum: [commit, dry-run] }
+        sourcesFetched: { type: integer }
+        itemsConsidered: { type: integer }
+        accepted: { type: integer }
+        inserted: { type: integer }
+        updated: { type: integer }
+        rejected: { type: integer }
+        errors:
+          type: array
+          items: { type: string }
+        countriesCovered:
+          type: array
+          items: { type: string }
+        logLines:
           type: array
           items: { type: string }
 

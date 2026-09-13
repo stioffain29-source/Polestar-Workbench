@@ -2677,6 +2677,233 @@ export interface ReliefWebReport {
 }
 
 /**
+ * @nullable
+ */
+export type ProtestEventDisruptionPotential = typeof ProtestEventDisruptionPotential[keyof typeof ProtestEventDisruptionPotential] | null;
+
+
+export const ProtestEventDisruptionPotential = {
+  Low: 'Low',
+  Moderate: 'Moderate',
+  High: 'High',
+  Extreme: 'Extreme',
+} as const;
+
+export type ProtestEventConfidence = typeof ProtestEventConfidence[keyof typeof ProtestEventConfidence];
+
+
+export const ProtestEventConfidence = {
+  High: 'High',
+  Moderate: 'Moderate',
+  Low: 'Low',
+} as const;
+
+export type ProtestEventStatus = typeof ProtestEventStatus[keyof typeof ProtestEventStatus];
+
+
+export const ProtestEventStatus = {
+  Confirmed: 'Confirmed',
+  Planned: 'Planned',
+  Possible: 'Possible',
+  Cancelled: 'Cancelled',
+  Postponed: 'Postponed',
+} as const;
+
+/**
+ * A forward-looking protest or mobilisation notice. This standalone context row is never inserted into or counted as an incident.
+ */
+export interface ProtestEvent {
+  id: number;
+  sourceName: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  /** @nullable */
+  sourcePublishedAt?: string | null;
+  /** @nullable */
+  eventDate?: string | null;
+  country: string;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  venue?: string | null;
+  /** @nullable */
+  eventType?: string | null;
+  /** @nullable */
+  issue?: string | null;
+  /** @nullable */
+  organiser?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  attendance?: number | null;
+  /** @nullable */
+  disruptionPotential?: ProtestEventDisruptionPotential;
+  confidence: ProtestEventConfidence;
+  status: ProtestEventStatus;
+  collectedAt: string;
+  searchCompletedAt: string;
+  dedupKey: string;
+}
+
+export interface ProtestEventsResponse {
+  confirmedPlanned: ProtestEvent[];
+  possible: ProtestEvent[];
+  /** @nullable */
+  searchCompletedAt: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type ProtestEventInputDisruptionPotential = typeof ProtestEventInputDisruptionPotential[keyof typeof ProtestEventInputDisruptionPotential] | null;
+
+
+export const ProtestEventInputDisruptionPotential = {
+  Low: 'Low',
+  Moderate: 'Moderate',
+  High: 'High',
+  Extreme: 'Extreme',
+} as const;
+
+export type ProtestEventInputConfidence = typeof ProtestEventInputConfidence[keyof typeof ProtestEventInputConfidence];
+
+
+export const ProtestEventInputConfidence = {
+  High: 'High',
+  Moderate: 'Moderate',
+  Low: 'Low',
+} as const;
+
+export type ProtestEventInputStatus = typeof ProtestEventInputStatus[keyof typeof ProtestEventInputStatus];
+
+
+export const ProtestEventInputStatus = {
+  Confirmed: 'Confirmed',
+  Planned: 'Planned',
+  Possible: 'Possible',
+  Cancelled: 'Cancelled',
+  Postponed: 'Postponed',
+} as const;
+
+export interface ProtestEventInput {
+  sourceName?: string;
+  sourceUrl: string;
+  sourceTitle: string;
+  /** @nullable */
+  sourcePublishedAt?: string | null;
+  /** @nullable */
+  eventDate: string | null;
+  country: string;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  venue?: string | null;
+  /** @nullable */
+  eventType?: string | null;
+  /** @nullable */
+  issue?: string | null;
+  /** @nullable */
+  organiser?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  attendance?: number | null;
+  /** @nullable */
+  disruptionPotential?: ProtestEventInputDisruptionPotential;
+  confidence: ProtestEventInputConfidence;
+  status: ProtestEventInputStatus;
+}
+
+/**
+ * @nullable
+ */
+export type ProtestEventUpdateDisruptionPotential = typeof ProtestEventUpdateDisruptionPotential[keyof typeof ProtestEventUpdateDisruptionPotential] | null;
+
+
+export const ProtestEventUpdateDisruptionPotential = {
+  Low: 'Low',
+  Moderate: 'Moderate',
+  High: 'High',
+  Extreme: 'Extreme',
+} as const;
+
+export type ProtestEventUpdateConfidence = typeof ProtestEventUpdateConfidence[keyof typeof ProtestEventUpdateConfidence];
+
+
+export const ProtestEventUpdateConfidence = {
+  High: 'High',
+  Moderate: 'Moderate',
+  Low: 'Low',
+} as const;
+
+export type ProtestEventUpdateStatus = typeof ProtestEventUpdateStatus[keyof typeof ProtestEventUpdateStatus];
+
+
+export const ProtestEventUpdateStatus = {
+  Confirmed: 'Confirmed',
+  Planned: 'Planned',
+  Possible: 'Possible',
+  Cancelled: 'Cancelled',
+  Postponed: 'Postponed',
+} as const;
+
+export interface ProtestEventUpdate {
+  sourceName?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  /** @nullable */
+  sourcePublishedAt?: string | null;
+  /** @nullable */
+  eventDate?: string | null;
+  country?: string;
+  /** @nullable */
+  city?: string | null;
+  /** @nullable */
+  venue?: string | null;
+  /** @nullable */
+  eventType?: string | null;
+  /** @nullable */
+  issue?: string | null;
+  /** @nullable */
+  organiser?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  attendance?: number | null;
+  /** @nullable */
+  disruptionPotential?: ProtestEventUpdateDisruptionPotential;
+  confidence?: ProtestEventUpdateConfidence;
+  status?: ProtestEventUpdateStatus;
+}
+
+export type ProtestScheduleSummaryMode = typeof ProtestScheduleSummaryMode[keyof typeof ProtestScheduleSummaryMode];
+
+
+export const ProtestScheduleSummaryMode = {
+  commit: 'commit',
+  'dry-run': 'dry-run',
+} as const;
+
+export interface ProtestScheduleSummary {
+  mode: ProtestScheduleSummaryMode;
+  sourcesFetched: number;
+  itemsConsidered: number;
+  accepted: number;
+  inserted: number;
+  updated: number;
+  rejected: number;
+  errors: string[];
+  countriesCovered: string[];
+  logLines: string[];
+}
+
+/**
  * Minimised public engagement counts (likes/comments/shares) when the provider returns them — context only, never PII.
  */
 export type SocialRawItemEngagement = {[key: string]: number | null} | null;
@@ -3251,6 +3478,16 @@ export const ListOfficialMilitaryMaritimeSourcesFlag = {
   evidence_available: 'evidence_available',
   possible_spot_report: 'possible_spot_report',
 } as const;
+
+export type ListProtestEventsParams = {
+country?: string;
+city?: string;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+};
 
 export type ListIncidentsParams = {
 topic?: Topic;

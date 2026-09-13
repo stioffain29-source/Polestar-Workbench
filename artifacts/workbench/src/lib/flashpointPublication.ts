@@ -22,6 +22,9 @@ import {
   type FlashpointResolvedAiInput,
 } from "./flashpointReportDataset";
 import { resolveReportWindow } from "./reportWindow";
+import {
+  type ProtestScheduleModel,
+} from "./protestScheduleModel";
 
 export interface FlashpointPublicationBundle {
   model: FlashpointRenderedModel;
@@ -65,6 +68,38 @@ export function flashpointEvidenceAuditInput(
         type: "forward-indicator" as const,
         text,
       })),
+    ...(model.protestSchedule?.schedule ?? []).map((row) => ({
+      id: `protest-${row.id}`,
+      type: "forward-indicator" as const,
+      text: [
+        row.country,
+        row.city,
+        row.venue,
+        row.eventType,
+        row.issue,
+        row.organiser,
+        row.eventDate,
+        row.status,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    })),
+    ...(model.protestSchedule?.watchlist ?? []).map((row) => ({
+      id: `protest-watch-${row.id}`,
+      type: "forward-indicator" as const,
+      text: [
+        row.country,
+        row.city,
+        row.venue,
+        row.eventType,
+        row.issue,
+        row.organiser,
+        row.eventDate,
+        row.status,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    })),
   ];
   return {
     topic: "flashpoint",
@@ -80,10 +115,60 @@ export function flashpointEvidenceAuditInput(
   };
 }
 
+function validateProtestSchedule(
+  schedule: ProtestScheduleModel,
+  issueDate: string,
+): FinalReportEvidenceAuditIssue[] {
+  const issues: FinalReportEvidenceAuditIssue[] = [];
+  const start = new Date(`${issueDate}T00:00:00Z`).getTime();
+  const end = start + 7 * 24 * 60 * 60 * 1000;
+  for (const row of [...schedule.schedule, ...schedule.watchlist]) {
+    if (row.status === "Cancelled" || row.status === "Postponed") {
+      issues.push({
+        code: "PROTEST_SCHEDULE_STATUS",
+        section: "protestSchedule",
+        message: `Cancelled or postponed event ${row.id} cannot appear in the active schedule.`,
+        level: "ERROR",
+      });
+    }
+    if (row.eventDate) {
+      const date = Date.parse(row.eventDate);
+      if (!Number.isFinite(date) || date < start || date > end) {
+        issues.push({
+          code: "PROTEST_SCHEDULE_DATE",
+          section: "protestSchedule",
+          message: `Event ${row.id} falls outside the report's next-seven-day schedule window.`,
+          level: "ERROR",
+        });
+      }
+    }
+    if (schedule.schedule.includes(row) && row.status !== "Confirmed" && row.status !== "Planned") {
+      issues.push({
+        code: "PROTEST_SCHEDULE_STATUS",
+        section: "protestSchedule",
+        message: `Main schedule event ${row.id} must be Confirmed or Planned.`,
+        level: "ERROR",
+      });
+    }
+    if (schedule.watchlist.includes(row) && row.status !== "Possible") {
+      issues.push({
+        code: "PROTEST_SCHEDULE_STATUS",
+        section: "protestSchedule",
+        message: `Watchlist event ${row.id} must be Possible.`,
+        level: "ERROR",
+      });
+    }
+  }
+  return issues;
+}
+
 export function validateFlashpointFinalEvidenceAudit(
   model: FlashpointRenderedModel,
 ): FinalReportEvidenceAuditIssue[] {
-  return auditFinalReportEvidence(flashpointEvidenceAuditInput(model));
+  return [
+    ...auditFinalReportEvidence(flashpointEvidenceAuditInput(model)),
+    ...validateProtestSchedule(model.protestSchedule, model.dataset.canonical.issueDate),
+  ];
 }
 
 export function finalizeFlashpointPublication(opts: {
@@ -92,6 +177,7 @@ export function finalizeFlashpointPublication(opts: {
   issueDate: string;
   report?: FlashpointResolvedProseInput | null;
   ai?: FlashpointResolvedAiInput | null;
+  protestSchedule?: ProtestScheduleModel | null;
   renderedModel?: FlashpointRenderedModel;
 }): FlashpointPublicationBundle {
   const topic = opts.topic ?? "flashpoint";
@@ -101,6 +187,7 @@ export function finalizeFlashpointPublication(opts: {
       dataset: buildFlashpointReportDataset(opts.incidents, topic, opts.issueDate),
       report: opts.report,
       ai: opts.ai,
+      protestSchedule: opts.protestSchedule,
     });
   return {
     model,

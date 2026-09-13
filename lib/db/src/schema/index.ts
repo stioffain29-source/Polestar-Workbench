@@ -26,5 +26,7 @@ export * from "./maritimeSecurityEvents";
 export * from "./officialMilitaryMaritimeSources";
 export * from "./socialWatchItems";
 export * from "./socialRaw";
+export * from "./protestEvents";
+export * from "./protestScheduleState";
 export * from "./auth";
 export * from "./ingestRunFence";

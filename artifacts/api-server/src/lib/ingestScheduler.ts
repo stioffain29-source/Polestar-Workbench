@@ -19,6 +19,7 @@ import {
   runMovementOnce,
   runStrikesOnce,
   runTitleTranslationOnce,
+  runProtestScheduleOnce,
 } from "./ingestRunner";
 import { runIngestProcess } from "./ingestProcess";
 import { runCountryEngineAll } from "./countryEngine";
@@ -585,6 +586,28 @@ async function priceTick(reason: string): Promise<void> {
   }
 }
 
+async function protestScheduleTick(reason: string): Promise<void> {
+  try {
+    const result = await runProtestScheduleOnce();
+    if (!result.ran) {
+      logger.info({ reason }, "protest schedule refresh skipped (already running)");
+      return;
+    }
+    logger.info(
+      {
+        reason,
+        inserted: result.protestSchedule.inserted,
+        updated: result.protestSchedule.updated,
+        accepted: result.protestSchedule.accepted,
+        errors: result.protestSchedule.errors.length,
+      },
+      "protest schedule refresh finished",
+    );
+  } catch (err) {
+    logger.error({ err, reason }, "protest schedule refresh failed");
+  }
+}
+
 /**
  * Start the automatic ingest scheduler. Safe to call once at server startup.
  * Returns immediately; all work happens in the background.
@@ -966,6 +989,14 @@ export function startIngestScheduler(): void {
   );
   bootTimer.unref();
 
+  // The schedule has its own cadence so a fresh incident table does not defer
+  // the forward-looking calendar until the next full incident scrape.
+  const protestBootTimer = setTimeout(
+    () => void protestScheduleTick("boot-protest-schedule"),
+    30_000,
+  );
+  protestBootTimer.unref();
+
   // Recurring refresh for warm/always-on processes. unref() so the timer never
   // blocks process shutdown (the server's listen handle keeps the process up).
   const timer = setInterval(
@@ -978,6 +1009,12 @@ export function startIngestScheduler(): void {
     hours * MS_PER_HOUR,
   );
   timer.unref();
+
+  const protestTimer = setInterval(
+    () => void protestScheduleTick("interval-protest-schedule"),
+    hours * MS_PER_HOUR,
+  );
+  protestTimer.unref();
 
   // HOURLY price-only refresh for warm processes. The full ingest above runs
   // every INGEST_INTERVAL_HOURS (default 12), which left the live Fuel Watch

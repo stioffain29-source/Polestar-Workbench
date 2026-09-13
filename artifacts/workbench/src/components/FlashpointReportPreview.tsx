@@ -17,6 +17,11 @@ import {
   FLASHPOINT_SEV_LABEL,
 } from "@/lib/flashpointReportDataset";
 import {
+  PROTEST_EMPTY_SENTENCE,
+  PROTEST_FORECAST_HEADING,
+  PROTEST_WATCHLIST_HEADING,
+} from "@/lib/protestScheduleModel";
+import {
   finalizeFlashpointPublication,
 } from "@/lib/flashpointPublication";
 import {
@@ -24,6 +29,7 @@ import {
   type FinalReportEvidenceAuditIssue,
 } from "@/lib/finalReportEvidenceAudit";
 import { SEV_COLOR, parseBullets } from "@/lib/pdfChrome";
+import type { ProtestEvent } from "@workspace/api-client-react";
 
 // Flashpoint on-screen preview. Renders the same sections, in the same
 // order, from the same dataset (buildFlashpointReportDataset) as
@@ -237,6 +243,77 @@ function IncidentTable({ rows, emptyMessage, rowLimit = 12 }: { rows: EnrichedIn
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ProtestScheduleTable({
+  rows,
+}: {
+  rows: readonly ProtestEvent[];
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className="w-full overflow-x-auto border" style={{ borderColor: POLAR }}>
+      <table className="min-w-[1180px] w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 10 }}>
+        <thead>
+          <tr style={{ background: NAVY, color: "#FFFFFF" }}>
+            {["Date", "Country", "City", "Venue", "Event type", "Issue", "Organiser", "Start time", "Attendance", "Disruption potential", "Confidence", "Source publication date", "Status", "Source link"].map((label) => (
+              <th key={label} className="text-left px-2 py-2 whitespace-nowrap" style={{ fontWeight: 700, fontSize: 9 }}>{label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} style={{ borderTop: `1px solid ${POLAR}` }}>
+              <td className="px-2 py-2 align-top whitespace-nowrap">{row.eventDate?.slice(0, 10) ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.country}</td>
+              <td className="px-2 py-2 align-top">{row.city ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.venue ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.eventType ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.issue ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.organiser ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.startTime ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.attendance == null ? "Not confirmed" : row.attendance}</td>
+              <td className="px-2 py-2 align-top">{row.disruptionPotential ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.confidence}</td>
+              <td className="px-2 py-2 align-top whitespace-nowrap">{row.sourcePublishedAt?.slice(0, 10) ?? "—"}</td>
+              <td className="px-2 py-2 align-top">{row.status}</td>
+              <td className="px-2 py-2 align-top max-w-[180px] truncate"><a href={row.sourceUrl} target="_blank" rel="noreferrer" style={{ color: ELECTRIC, textDecoration: "underline" }}>{row.sourceTitle || row.sourceUrl}</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProtestScheduleView({
+  model,
+}: {
+  model: FlashpointRenderedModel["protestSchedule"];
+}) {
+  return (
+    <div data-testid="protest-schedule-view">
+      {!model.searchCompleted && model.schedule.length === 0 && model.watchlist.length === 0 ? (
+        <p style={{ fontStyle: "italic", color: DUSK, fontSize: 13 }}>Automated protest search has not completed.</p>
+      ) : model.empty ? (
+        <p style={{ fontStyle: "italic", color: DUSK, fontSize: 13 }}>{PROTEST_EMPTY_SENTENCE}</p>
+      ) : (
+        <>
+          {!model.searchCompleted && <p style={{ fontStyle: "italic", color: DUSK, fontSize: 11, marginBottom: 8 }}>Automated protest search has not completed; displayed rows may be analyst-authored.</p>}
+          <ProtestScheduleTable rows={model.schedule} />
+        </>
+      )}
+      {model.watchlist.length > 0 && (
+        <div className="mt-5">
+          <h3 className="uppercase tracking-wide mb-3" style={{ color: NAVY, fontWeight: 700, fontSize: 13 }}>{PROTEST_WATCHLIST_HEADING}</h3>
+          <ProtestScheduleTable rows={model.watchlist} />
+        </div>
+      )}
+      {model.searchCompleted && !model.empty && model.schedule.length === 0 && model.watchlist.length > 0 && (
+        <p style={{ fontStyle: "italic", color: DUSK, fontSize: 13 }}>No confirmed or planned protest events are currently listed.</p>
+      )}
     </div>
   );
 }
@@ -553,31 +630,8 @@ export default function FlashpointReportPreview({
           </div>
         </Section>
 
-        <Section hidden={!show("forecast")} title={"Forecast: Next 7\u201314 Days"}>
-          {model.forecastRows.length > 0 && (
-            <div className="mb-4 border" style={{ border: `1px solid ${POLAR}` }}>
-              <table className="w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: NAVY, color: "#FFFFFF" }}>
-                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "12%" }}>DATE</th>
-                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "16%" }}>COUNTRY</th>
-                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em", width: "28%" }}>SIGNAL</th>
-                    <th className="text-left px-2 py-2" style={{ fontWeight: 700, fontSize: 10, letterSpacing: "0.08em" }}>OPERATIONAL MEANING</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {model.forecastRows.map((r, idx) => (
-                    <tr key={idx} style={{ borderTop: `1px solid ${POLAR}` }}>
-                      <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.date ?? "\u2014"}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: NAVY, fontWeight: 700, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.country}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: NAVY, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.signal}</td>
-                      <td className="px-2 py-2 align-top" style={{ color: DUSK, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.meaning}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <Section hidden={!show("forecast")} title={PROTEST_FORECAST_HEADING}>
+          <ProtestScheduleView model={model.protestSchedule} />
           <Paragraphs text={model.prose.forecastRead} />
         </Section>
 

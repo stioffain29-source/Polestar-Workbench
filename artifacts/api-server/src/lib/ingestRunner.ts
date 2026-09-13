@@ -1,4 +1,4 @@
-import { pool } from "@workspace/db";
+import { db, pool, protestScheduleStateTable } from "@workspace/db";
 import {
   runFlashpointIngest,
   runCargoWatchIngest,
@@ -48,6 +48,8 @@ import {
   socialPromoteWarnThreshold,
   runPngExtractBackfill,
   runWestPapuaExtractBackfill,
+  runProtestScheduleIngest,
+  emptyProtestScheduleSummary,
   type IngestSummary,
   type MarketPriceSummary,
   type MarketSnapshotSummary,
@@ -69,6 +71,7 @@ import {
   type FacebookOsintReclassifySummary,
   type XSearchSummary,
   type TitleTranslationSummary,
+  type ProtestScheduleSummary,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 import { terminateAfterIngestLockLoss } from "./ingestLockSafety";
@@ -89,6 +92,20 @@ import { fencePriorIngestSessions } from "./ingestSessionFence";
 // Arbitrary but stable advisory-lock key ("Pole" in hex). Must match across
 // every instance so they contend on the same lock.
 const INGEST_LOCK_KEY = 0x506f6c65;
+const PROTEST_SCHEDULE_STATE_KEY = "singleton";
+
+async function markProtestScheduleCompleted(): Promise<void> {
+  await db
+    .insert(protestScheduleStateTable)
+    .values({
+      key: PROTEST_SCHEDULE_STATE_KEY,
+      searchCompletedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: protestScheduleStateTable.key,
+      set: { searchCompletedAt: new Date() },
+    });
+}
 
 // The parent ingest-process supervisor receives stage updates over IPC so a
 // timeout names the exact stage it terminated. The lock holder itself has no
@@ -191,6 +208,7 @@ export type IngestRunResult =
       gdeltEnrich: GdeltEnrichSummary;
       gdeltStructured: GdeltStructuredSummary;
       gdeltPromote: GdeltPromoteSummary;
+      protestSchedule: ProtestScheduleSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -382,6 +400,16 @@ function emptyStrikes(err: unknown): StrikesIngestSummary {
     logLines: [
       `strikes ingest failed: ${err instanceof Error ? err.message : String(err)}`,
     ],
+  };
+}
+
+function emptyProtestSchedule(err: unknown): ProtestScheduleSummary {
+  const summary = emptyProtestScheduleSummary("commit");
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    ...summary,
+    errors: [message],
+    logLines: [`protest schedule ingest failed: ${message}`],
   };
 }
 
@@ -688,6 +716,27 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     } catch (err) {
       logger.error({ err }, "strikes ingest failed");
       strikes = emptyStrikes(err);
+    }
+    // Forward-looking protest schedule is an isolated context collector. It
+    // intentionally runs outside every incident ingest and never touches the
+    // incidents table.
+    let protestSchedule: ProtestScheduleSummary;
+    try {
+      markIngestStage("runProtestScheduleIngest");
+      protestSchedule = await runProtestScheduleIngest({ commit: true });
+      await markProtestScheduleCompleted();
+      logger.info(
+        {
+          inserted: protestSchedule.inserted,
+          updated: protestSchedule.updated,
+          accepted: protestSchedule.accepted,
+          errors: protestSchedule.errors.length,
+        },
+        "protest schedule pass complete",
+      );
+    } catch (err) {
+      logger.error({ err }, "protest schedule ingest failed");
+      protestSchedule = emptyProtestSchedule(err);
     }
     // ICC CCS / IMB maritime piracy & armed-robbery events. Like strikes it
     // writes its OWN isolated table (maritime_security_events) and shares NOTHING
@@ -1244,6 +1293,41 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       gdeltEnrich,
       gdeltStructured,
       gdeltPromote,
+      protestSchedule,
+    };
+  });
+  if (!res.ran) return res;
+  return { ran: true, ...res.value };
+}
+
+export type ProtestScheduleRunResult =
+  | {
+      ran: true;
+      startedAt: Date;
+      finishedAt: Date;
+      durationMs: number;
+      protestSchedule: ProtestScheduleSummary;
+    }
+  | { ran: false; reason: "locked" };
+
+/** Run only the standalone forward-looking protest schedule collector. */
+export async function runProtestScheduleOnce(): Promise<ProtestScheduleRunResult> {
+  const res = await withIngestLock(async () => {
+    const startedAt = new Date();
+    let protestSchedule: ProtestScheduleSummary;
+    try {
+      protestSchedule = await runProtestScheduleIngest({ commit: true });
+      await markProtestScheduleCompleted();
+    } catch (err) {
+      logger.error({ err }, "protest schedule ingest failed");
+      protestSchedule = emptyProtestSchedule(err);
+    }
+    const finishedAt = new Date();
+    return {
+      startedAt,
+      finishedAt,
+      durationMs: finishedAt.getTime() - startedAt.getTime(),
+      protestSchedule,
     };
   });
   if (!res.ran) return res;

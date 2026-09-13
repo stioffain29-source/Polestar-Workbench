@@ -1,0 +1,278 @@
+FLASHPOINT WEEKLY PROTEST SCHEDULE — BUILD REQUIREMENT
+
+Add a dedicated forward looking protest collection function to Flashpoint.
+
+This must be separate from the existing incident collection logic.
+
+OBJECTIVE
+
+Every weekly Flashpoint report must include a chronological schedule of planned protests, demonstrations, rallies, marches, strikes and other significant organised public actions expected during the NEXT 7 DAYS.
+
+The system must actively search for future events. It must not rely only on articles describing incidents that have already happened.
+
+OUTPUT HEADING
+
+PROTEST FORECAST — NEXT 7 DAYS
+
+The schedule must contain:
+
+Date
+Country
+City
+Location or venue
+Event type
+Issue or cause
+Organiser if known
+Start time if known
+Expected attendance if confirmed
+Disruption potential
+Confidence
+Source publication date
+
+Sort all events chronologically.
+
+SEARCH WINDOW
+
+Event date:
+Today through today + 7 calendar days
+
+Source publication date:
+Prefer sources published within the previous 30 days.
+
+Do not reject a valid future event simply because the source was published more than 7 days before the event.
+
+CRITICAL LOGIC CHANGE
+
+Do NOT apply the existing incident date filter to forward protest events.
+
+Current incident logic may require an event to have already happened inside the reporting window. That logic must not be used for the protest forecast.
+
+For this dataset:
+
+SOURCE DATE determines whether the information is reasonably current.
+
+EVENT DATE determines whether the protest belongs in the upcoming 7 day schedule.
+
+SEARCH TERMS
+
+Search for future tense and planning language including:
+
+will protest
+plans to protest
+planned protest
+protest planned
+demonstration planned
+demonstration scheduled
+rally planned
+rally scheduled
+march planned
+march on
+strike planned
+strike from
+strike begins
+workers will protest
+workers will gather
+students will protest
+student walkout
+farmers will protest
+farmers announce
+union calls protest
+union announces strike
+sit in
+dharnas
+mobilisation
+mass mobilisation
+public gathering
+protest action
+day of action
+nationwide protest
+statewide protest
+
+Also search appropriate local language equivalents where available.
+
+EVENT TYPES TO CAPTURE
+
+Protests
+Demonstrations
+Political rallies
+Marches
+Labour strikes
+Union actions
+Student protests
+Farmer protests
+Sit ins
+Walkouts
+Anti government rallies
+Issue based demonstrations
+Large activist gatherings
+Major organised public actions likely to cause security or operational disruption
+
+Do not include routine political meetings, concerts, festivals or ordinary public gatherings unless protest activity or significant disruption is a clear part of the event.
+
+GEOGRAPHY
+
+Run the search across every country included in the selected Flashpoint report geography.
+
+For APAC reporting, search both by country and by major city.
+
+Do not depend solely on the country name appearing in the headline.
+
+DEDUPLICATION
+
+Multiple sources may report the same event.
+
+Merge duplicate reporting into ONE event entry.
+
+Match duplicates using:
+
+Date
+City
+Venue
+Organiser
+Issue
+Event description
+
+Prefer the most authoritative and most recent source when multiple reports exist.
+
+STATUS
+
+Each event should have an internal status:
+
+Confirmed
+Planned
+Possible
+Cancelled
+Postponed
+
+Only Confirmed and Planned events should normally appear in the main schedule.
+
+Possible events should appear under:
+
+WATCHLIST — POSSIBLE MOBILISATION
+
+Cancelled or postponed events must either be excluded or clearly marked so stale information does not appear as an active protest.
+
+ATTENDANCE
+
+Never invent attendance figures.
+
+If attendance is explicitly reported, capture it.
+
+If not reported, use:
+
+Not confirmed
+
+Do not generate estimated crowd sizes unless a source provides an estimate.
+
+DISRUPTION POTENTIAL
+
+Assess operational disruption using:
+
+Low
+Moderate
+High
+Extreme
+
+Consider:
+
+Expected crowd size
+Previous mobilisation by the organiser
+Venue
+Proximity to government buildings
+Road closure potential
+Rail disruption potential
+Airport access
+Industrial action
+Port disruption
+History of violence
+Counter protests
+Police restrictions
+Likelihood of prolonged action
+
+Do not automatically rate every protest High.
+
+CONFIDENCE
+
+Use:
+
+High
+Moderate
+Low
+
+High:
+Specific date, location and organiser confirmed by credible sources.
+
+Moderate:
+Event clearly announced but some details remain incomplete.
+
+Low:
+Credible mobilisation indicators exist but date, location or organiser remains uncertain.
+
+Low confidence events should normally go into WATCHLIST — POSSIBLE MOBILISATION rather than the main schedule.
+
+SOURCE QUALITY
+
+Prioritise:
+
+Official organiser announcements
+Union announcements
+Government notices
+Police notices
+Major national media
+Established regional media
+Credible local media
+
+Social media may be used as an indicator but should not be treated as confirmed unless supported by a credible organiser account or additional sourcing.
+
+REPORT FORMAT
+
+Example:
+
+PROTEST FORECAST — NEXT 7 DAYS
+
+14 September | India | Chandigarh | Multiple locations
+Farmer demonstrations outside ministers' residences.
+Issue: Agricultural demands and debt relief.
+Organiser: [name if known]
+Start time: Not confirmed
+Attendance: Not confirmed
+Disruption potential: High
+Confidence: High
+
+17 September | Indonesia | Medan | [venue]
+Labour demonstration regarding employment legislation.
+Organiser: [name]
+Start time: [time if confirmed]
+Attendance: 1,000 reported
+Disruption potential: Moderate
+Confidence: High
+
+WATCHLIST — POSSIBLE MOBILISATION
+
+Include credible developing protest activity where mobilisation is likely but a firm date or location has not yet been confirmed.
+
+FAILURE CONDITION
+
+A weekly Flashpoint report must NOT return an empty protest forecast simply because the existing incident scraper found no completed protest incidents.
+
+The protest forecast requires its own forward looking search pass.
+
+If no events are identified after completing the dedicated search, state:
+
+No significant planned protest activity identified for the next seven days from currently available credible sources.
+
+Do not state this until the dedicated forward event search has actually been completed.
+
+IMPORTANT
+
+Do not remove or weaken the existing incident reporting function.
+
+This is an ADDITIONAL forward looking collection and reporting module.
+
+The final weekly Flashpoint output should therefore contain both:
+
+Recent protest and civil disorder incidents
+
+AND
+
+PROTEST FORECAST — NEXT 7 DAYS

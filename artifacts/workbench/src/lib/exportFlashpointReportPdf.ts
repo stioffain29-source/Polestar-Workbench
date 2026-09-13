@@ -48,6 +48,12 @@ import {
   type ForecastFutureRow,
   type FlashpointRenderedModel,
 } from "./flashpointReportDataset";
+import type { ProtestEvent } from "@workspace/api-client-react";
+import {
+  PROTEST_EMPTY_SENTENCE,
+  PROTEST_FORECAST_HEADING,
+  PROTEST_WATCHLIST_HEADING,
+} from "./protestScheduleModel";
 import {
   finalizeFlashpointPublication,
   assertFlashpointPublication,
@@ -57,7 +63,7 @@ import {
 //   Cover -> Executive Summary -> Fast Facts ->
 //   Activism and Protest Read (prose + activism table) ->
 //   Civil Unrest and Public Order Read (prose + unrest table) ->
-//   Forecast 7-14 Days (prose) ->
+//   Protest Forecast — Next 7 Days (schedule + prose) ->
 //   Regional and Country View (prose + country bar) ->
 //   What Matters -> Implications -> Watch Next -> Polestar View ->
 //   Related Incidents -> Disclaimer.
@@ -457,6 +463,72 @@ function drawForecastFutureTable(ctx: Ctx, rows: ForecastFutureRow[]) {
   ctx.y += 10;
 }
 
+function drawProtestScheduleTable(
+  ctx: Ctx,
+  heading: string | null,
+  rows: readonly ProtestEvent[],
+) {
+  if (heading) drawSubtitle(ctx, heading);
+  if (rows.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const headers = ["DATE", "COUNTRY", "CITY", "VENUE", "EVENT TYPE", "ISSUE", "ORGANISER", "START", "ATTENDANCE", "DISRUPTION", "CONFIDENCE", "SOURCE DATE", "STATUS", "SOURCE LINK"];
+  const widths = headers.map(() => CW / headers.length);
+  const rowLines = (value: string, width: number) =>
+    pdf.splitTextToSize(sanitize(value), Math.max(20, width - 6)) as string[];
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, 18, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(5.2);
+    let x = MX;
+    headers.forEach((header, index) => {
+      pdf.text(header, x + 3, ctx.y + 12);
+      x += widths[index] ?? 0;
+    });
+    ctx.y += 18;
+  };
+  ensureSpace(ctx, 44);
+  drawHeader();
+  for (const row of rows) {
+    const values = [
+      row.eventDate?.slice(0, 10) ?? "—",
+      row.country,
+      row.city ?? "—",
+      row.venue ?? "—",
+      row.eventType ?? "—",
+      row.issue ?? "—",
+      row.organiser ?? "—",
+      row.startTime ?? "—",
+      row.attendance == null ? "Not confirmed" : String(row.attendance),
+      row.disruptionPotential ?? "—",
+      row.confidence,
+      row.sourcePublishedAt?.slice(0, 10) ?? "—",
+      row.status,
+      row.sourceTitle || row.sourceUrl,
+    ];
+    const lines = values.map((value, index) => rowLines(value, widths[index] ?? 40));
+    const rh = Math.max(19, Math.max(...lines.map((value) => value.length)) * 8 + 7);
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.5);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    let x = MX;
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(6.3);
+    lines.forEach((value, index) => {
+      pdf.text(value.slice(0, 3), x + 3, ctx.y + 9, { lineHeightFactor: 1.15 });
+      x += widths[index] ?? 0;
+    });
+    ctx.y += rh;
+  }
+  ctx.y += 8;
+}
+
 // --- Related Incidents -----------------------------------------------------
 function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
   ensureSpace(ctx, 24 + 18 + 40);
@@ -660,13 +732,42 @@ export async function exportFlashpointReportPdf(
     );
   }
 
-  // Forecast — structured Country / Signal / Operational meaning table
-  // (when future-dated items are present) followed by analyst
-  // trajectory prose with cautious vocabulary.
+  // Protest schedule — the same standalone context model used by the preview.
+  // It never enters the canonical incident evidence set.
   if (show("forecast")) {
-    drawSectionHeading(ctx, "Forecast: Next 7\u201314 Days");
-    if (model.forecastRows.length > 0) {
-      drawForecastFutureTable(ctx, [...model.forecastRows]);
+    drawSectionHeading(ctx, PROTEST_FORECAST_HEADING);
+    if (
+      !model.protestSchedule.searchCompleted &&
+      model.protestSchedule.schedule.length === 0 &&
+      model.protestSchedule.watchlist.length === 0
+    ) {
+      setText(ctx.pdf, DUSK);
+      setRoboto(ctx.pdf, "italic");
+      ctx.pdf.setFontSize(9);
+      ctx.pdf.text("Protest schedule search is still in progress.", ctx.MX, ctx.y + 10);
+      ctx.y += 22;
+    } else if (model.protestSchedule.empty) {
+      setText(ctx.pdf, DUSK);
+      setRoboto(ctx.pdf, "italic");
+      ctx.pdf.setFontSize(9);
+      ctx.pdf.text(sanitize(PROTEST_EMPTY_SENTENCE), ctx.MX, ctx.y + 10);
+      ctx.y += 22;
+    } else {
+      if (!model.protestSchedule.searchCompleted) {
+        setText(ctx.pdf, DUSK);
+        setRoboto(ctx.pdf, "italic");
+        ctx.pdf.setFontSize(8);
+        ctx.pdf.text(
+          "Automated protest search has not completed; displayed rows may be analyst-authored.",
+          ctx.MX,
+          ctx.y + 9,
+        );
+        ctx.y += 18;
+      }
+      drawProtestScheduleTable(ctx, null, model.protestSchedule.schedule);
+      if (model.protestSchedule.watchlist.length > 0) {
+        drawProtestScheduleTable(ctx, PROTEST_WATCHLIST_HEADING, model.protestSchedule.watchlist);
+      }
     }
     renderProse(ctx, model.prose.forecastRead);
   }

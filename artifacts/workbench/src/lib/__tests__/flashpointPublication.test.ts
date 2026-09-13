@@ -6,6 +6,7 @@ import {
 import { resolveFlashpointRenderedModel } from "../flashpointReportDataset";
 import type { FlashpointReportIncident } from "../flashpointReportDataset";
 import { validFlashpointSemantic } from "../../../../../test-utils/flashpointTestFixtures";
+import { buildProtestScheduleModel } from "../protestScheduleModel";
 
 const ISSUE = "2026-08-05";
 let id = 1;
@@ -174,5 +175,46 @@ describe("Flashpoint shared publication architecture", () => {
         ],
       }),
     ).toThrow(/VAGUE_CHANGE/);
+  });
+
+  it("adds schedule context to Watch Next without adding it to canonical incidents", () => {
+    const incidentRows = [incident("Workers march in Delhi over wages")];
+    const schedule = buildProtestScheduleModel(
+      {
+        confirmedPlanned: [{
+          id: 900,
+          sourceName: "schedule",
+          sourceUrl: "https://example.test/protest",
+          sourceTitle: "Union notice",
+          sourcePublishedAt: "2026-08-05T00:00:00Z",
+          eventDate: "2026-08-06T00:00:00Z",
+          country: "Japan",
+          city: "Tokyo",
+          venue: "Station",
+          eventType: "rally",
+          issue: "wages",
+          organiser: "Union",
+          description: null,
+          startTime: null,
+          attendance: null,
+          disruptionPotential: "Low",
+          confidence: "Moderate",
+          status: "Confirmed",
+          collectedAt: "2026-08-05T00:00:00Z",
+          searchCompletedAt: "2026-08-05T00:00:00Z",
+          dedupKey: "900",
+        }],
+        possible: [],
+        searchCompletedAt: "2026-08-05T00:00:00Z",
+      },
+    );
+    const bundle = finalizeFlashpointPublication({
+      incidents: incidentRows,
+      issueDate: ISSUE,
+      protestSchedule: schedule,
+    });
+    expect(bundle.model.prose.watchNext).toMatch(/Tokyo, Japan/);
+    expect(bundle.model.dataset.canonical.periodRows).toHaveLength(1);
+    expect(bundle.model.dataset.fastFacts.find((card) => card.label === "Distinct Incidents")?.value).toBe("1");
   });
 });
