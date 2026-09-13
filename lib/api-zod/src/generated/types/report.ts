@@ -9,6 +9,7 @@ import type { CountryReportSectionOverrides } from './countryReportSectionOverri
 import type { FuelHardNumbers } from './fuelHardNumbers';
 import type { KpiCard } from './kpiCard';
 import type { ReportConflictAreaReads } from './reportConflictAreaReads';
+import type { ReportProseProvenance } from './reportProseProvenance';
 import type { ReportRiskRating } from './reportRiskRating';
 import type { ReportStatus } from './reportStatus';
 import type { Topic } from './topic';
@@ -40,6 +41,7 @@ export interface Report {
   watchNext?: string | null;
   /** @nullable */
   proseBasisFingerprint?: string | null;
+  proseProvenance?: ReportProseProvenance | null;
   /** @nullable */
   activismRead?: string | null;
   /** @nullable */

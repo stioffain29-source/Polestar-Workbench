@@ -30,6 +30,7 @@ export interface ReportUpdate {
   polestarView?: string;
   watchNext?: string;
   proseBasisFingerprint?: string;
+  proseDirtySections?: string[];
   activismRead?: string;
   civilUnrestRead?: string;
   forecastRead?: string;

@@ -2580,6 +2580,10 @@ components:
         polestarView: { type: ["string", "null"] }
         watchNext: { type: ["string", "null"] }
         proseBasisFingerprint: { type: ["string", "null"] }
+        proseProvenance:
+          oneOf:
+            - $ref: "#/components/schemas/ReportProseProvenance"
+            - type: "null"
         activismRead: { type: ["string", "null"] }
         civilUnrestRead: { type: ["string", "null"] }
         forecastRead: { type: ["string", "null"] }
@@ -2772,6 +2776,12 @@ components:
         polestarView: { type: string }
         watchNext: { type: string }
         proseBasisFingerprint: { type: string }
+        # UI-only dirty markers. The server only records ANALYST_EDITED for
+        # sections explicitly listed here; non-dirty prose is classified from
+        # the canonical/AI cache or as generated.
+        proseDirtySections:
+          type: array
+          items: { type: string }
         activismRead: { type: string }
         civilUnrestRead: { type: string }
         forecastRead: { type: string }
@@ -4271,6 +4281,10 @@ components:
         [available, fingerprint, generationBasisFingerprint, editedGenerationBasisFingerprint, model, generatedAt]
       properties:
         available: { type: boolean }
+        reason:
+          type: string
+          enum: [SERVICE_UNAVAILABLE, OUTPUT_REJECTED]
+          nullable: true
         fingerprint: { type: string }
         generationBasisFingerprint:
           type: [string, "null"]
@@ -4290,6 +4304,21 @@ components:
         stale: { type: boolean }
         model: { type: string }
         generatedAt: { type: string, format: date-time }
+
+    ReportProseProvenanceEntry:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [GENERATED, CACHED_AI, ANALYST_EDITED, GENERATED_UNKNOWN]
+        fingerprint: { type: ["string", "null"] }
+        generationBasisFingerprint: { type: ["string", "null"] }
+
+    ReportProseProvenance:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/ReportProseProvenanceEntry"
 
     DashboardTopicCard:
       type: object

@@ -153,6 +153,7 @@ describe("POST /reports/:id/prose — LLM unavailable", () => {
 
     expect(status).toBe(200);
     expect(json.available).toBe(false);
+    expect(json.reason).toBe("SERVICE_UNAVAILABLE");
     expect(json.model).toBe("unavailable");
     expect(json.fingerprint).toBe(FINGERPRINT);
     expect(json.fingerprint).not.toBe(BODY.generationBasisFingerprint);
@@ -179,6 +180,7 @@ describe("POST /reports/:id/prose — LLM unavailable", () => {
 
     expect(status).toBe(200);
     expect(json.available).toBe(false);
+    expect(json.reason).toBe("OUTPUT_REJECTED");
     expect(json.model).toBe("unavailable");
     expect(generateReportProse as jest.Mock).toHaveBeenCalledTimes(1);
     expect(insertSpy).not.toHaveBeenCalled();

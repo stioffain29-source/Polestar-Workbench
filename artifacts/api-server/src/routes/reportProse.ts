@@ -25,9 +25,11 @@ function reportIdOf(raw: string | string[] | undefined): number | null {
 function unavailableProse(
   fingerprint: string,
   generationBasisFingerprint: string | null,
+  reason: "SERVICE_UNAVAILABLE" | "OUTPUT_REJECTED",
 ) {
   return {
     available: false as const,
+    reason,
     fingerprint,
     generationBasisFingerprint,
     editedGenerationBasisFingerprint: null,
@@ -164,7 +166,13 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
   }
 
   if (!isLlmAvailable()) {
-    res.json(unavailableProse(fingerprint, generationBasisFingerprint));
+    res.json(
+      unavailableProse(
+        fingerprint,
+        generationBasisFingerprint,
+        "SERVICE_UNAVAILABLE",
+      ),
+    );
     return;
   }
 
@@ -182,7 +190,15 @@ router.post("/reports/:id/prose", async (req, res): Promise<void> => {
 
   if (!outcome.ok) {
     req.log.warn({ reportId, error: outcome.error }, "report prose generation failed");
-    res.json(unavailableProse(fingerprint, generationBasisFingerprint));
+    res.json(
+      unavailableProse(
+        fingerprint,
+        generationBasisFingerprint,
+        outcome.error === "llm-unavailable"
+          ? "SERVICE_UNAVAILABLE"
+          : "OUTPUT_REJECTED",
+      ),
+    );
     return;
   }
 

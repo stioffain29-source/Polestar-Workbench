@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   type Report,
@@ -36,17 +36,18 @@ export function TopicReportPanel({ topic }: { topic: string }) {
     { query: { enabled: reportable } } as never,
   );
   const create = useCreateReport();
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const createBusy = useRef(false);
+  useEffect(() => {
+    setArchiveOpen(false);
+  }, [topic]);
 
   if (!reportable) return null;
 
   const canonical = canonicalTopic(topic);
   const { current, older, completed } = splitReportsByLifecycle(reports);
-  const sorted = [...current, ...older, ...completed];
-  const visible = sorted.slice(0, 6);
-  const visibleCurrent = visible.filter((report) => current.includes(report));
-  const visibleOlder = visible.filter((report) => older.includes(report));
-  const visibleCompleted = visible.filter((report) => completed.includes(report));
-  const createBusy = useRef(false);
+  const archived = [...older, ...completed];
+  const allReports = [...current, ...archived];
 
   const handleNewDraft = () => {
     // Every click is a request for a new identity. The client-side guard
@@ -103,45 +104,75 @@ export function TopicReportPanel({ topic }: { topic: string }) {
 
       {isLoading && <div className="text-sm text-muted-foreground">Loading reports…</div>}
 
-      {!isLoading && visible.length === 0 && (
+      {!isLoading && allReports.length === 0 && (
         <div className="text-sm text-muted-foreground" data-testid="text-no-topic-reports">
           No reports yet for this topic.
         </div>
       )}
 
-      {visible.length > 0 && (
+      {allReports.length > 0 && (
         <>
-          {visibleCurrent.length > 0 && <ReportGroupHeading>Current in-progress</ReportGroupHeading>}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {visibleCurrent.map((r) => <ReportCard key={r.id} report={r} />)}
-          </div>
-          {visibleOlder.length > 0 && (
+          {current.length > 0 && (
             <>
-              <ReportGroupHeading>Older in-progress</ReportGroupHeading>
+              <ReportGroupHeading>Current in-progress</ReportGroupHeading>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {visibleOlder.map((r) => <ReportCard key={r.id} report={r} />)}
+                {current.map((r) => <ReportCard key={r.id} report={r} />)}
               </div>
             </>
           )}
-          {visibleCompleted.length > 0 && (
-            <>
-              <ReportGroupHeading>Completed reports</ReportGroupHeading>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {visibleCompleted.map((r) => <ReportCard key={r.id} report={r} />)}
-              </div>
-            </>
+          {archived.length > 0 && (
+            <details
+              className="mt-4 border-t border-border pt-3"
+              open={archiveOpen}
+              onToggle={(event) => setArchiveOpen(event.currentTarget.open)}
+              data-testid="details-topic-report-archive"
+            >
+              <summary
+                className="cursor-pointer select-none text-xs font-sans uppercase tracking-widest text-muted-foreground hover:text-primary"
+                onClick={(event) => {
+                  // Keep the card body out of the DOM until explicitly
+                  // expanded. Preventing the native toggle also keeps this
+                  // controlled state consistent in browsers and test DOMs.
+                  event.preventDefault();
+                  setArchiveOpen((open) => !open);
+                }}
+                data-testid="summary-topic-report-archive"
+              >
+                Archive · {archived.length} older reports
+              </summary>
+              {archiveOpen && (
+                <div className="mt-3">
+                  {older.length > 0 && (
+                    <>
+                      <ReportGroupHeading>Older in-progress</ReportGroupHeading>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {older.map((r) => <ReportCard key={r.id} report={r} />)}
+                      </div>
+                    </>
+                  )}
+                  {completed.length > 0 && (
+                    <>
+                      <ReportGroupHeading>Completed reports</ReportGroupHeading>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {completed.map((r) => <ReportCard key={r.id} report={r} />)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </details>
           )}
         </>
       )}
 
-      {sorted.length > visible.length && (
+      {allReports.length > 6 && (
         <div className="mt-3 text-right">
           <Link
             href="/reports"
             className="text-xs font-sans font-medium text-accent hover:underline uppercase tracking-wide"
             data-testid="link-view-all-topic-reports"
           >
-            View all {sorted.length} in Report Builder →
+            View all {allReports.length} in Report Builder →
           </Link>
         </div>
       )}

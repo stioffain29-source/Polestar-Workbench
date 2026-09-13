@@ -20,6 +20,32 @@ export interface ReportSectionOverrides {
   severityDemotions?: Record<string, string>;
 }
 
+/**
+ * Provenance for prose persisted on a report. This is deliberately section
+ * scoped: a report can contain an analyst edit in one section while all other
+ * sections continue to follow the generated/AI projection.
+ *
+ * GENERATED_UNKNOWN is the conservative interpretation for legacy rows whose
+ * provenance was never recorded. It must never be treated as an analyst edit.
+ */
+export type ReportProseProvenanceKind =
+  | "GENERATED"
+  | "CACHED_AI"
+  | "ANALYST_EDITED"
+  | "GENERATED_UNKNOWN";
+
+export interface ReportProseSectionProvenance {
+  kind: ReportProseProvenanceKind;
+  /** Cache identity or canonical basis against which this value was written. */
+  fingerprint?: string | null;
+  generationBasisFingerprint?: string | null;
+}
+
+export type ReportProseProvenance = Record<
+  string,
+  ReportProseSectionProvenance
+>;
+
 export type KpiCard = {
   label: string;
   value: string;
@@ -125,6 +151,9 @@ export const reportsTable = pgTable(
     // Canonical snapshot against which saved analyst narrative was written.
     // NULL legacy prose is intentionally stale for fail-closed report topics.
     proseBasisFingerprint: text("prose_basis_fingerprint"),
+    // Section-level provenance for persisted report prose. Nullable so legacy
+    // rows remain readable; null is interpreted as GENERATED_UNKNOWN.
+    proseProvenance: jsonb("prose_provenance").$type<ReportProseProvenance | null>(),
     // Flashpoint/protests data-driven "reads" — editable analyst overrides.
     // Blank/NULL falls back to the dataset-generated read so the on-screen
     // preview, the in-app PDF and the headless PDF stay identical and no prose

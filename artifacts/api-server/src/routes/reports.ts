@@ -1,13 +1,48 @@
 import { Router, type IRouter } from "express";
-import { db, reportsTable } from "@workspace/db";
-import type { FuelHardNumbers, InsertReport } from "@workspace/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { db, reportProseTable, reportsTable } from "@workspace/db";
+import type {
+  FuelHardNumbers,
+  InsertReport,
+  Report,
+  ReportProse,
+} from "@workspace/db";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   CreateReportBody,
   UpdateReportBody,
   ListReportsQueryParams,
 } from "@workspace/api-zod";
 import { requireAdminToken } from "../lib/adminAuth";
+import {
+  mergeReportProvenance,
+  REPORT_PROSE_KEYS,
+} from "../lib/reportProvenance";
+
+async function hydrateLegacyProvenance(
+  report: Report,
+  suppliedCache?: ReportProse,
+): Promise<Report> {
+  if (report.proseProvenance != null) return report;
+  const cache =
+    suppliedCache ??
+    (
+      await db
+        .select()
+        .from(reportProseTable)
+        .where(eq(reportProseTable.reportId, report.id))
+    )[0];
+  const reportSnapshot = { ...report } as Record<string, unknown>;
+  // Do not treat the legacy row's old basis column as an explicit generated
+  // save. Hydration is read-only and must remain GENERATED_UNKNOWN unless the
+  // cache proves an exact edited value.
+  delete reportSnapshot.proseBasisFingerprint;
+  const proseProvenance = mergeReportProvenance(
+    report,
+    reportSnapshot,
+    cache,
+  );
+  return { ...report, proseProvenance };
+}
 
 const router: IRouter = Router();
 
@@ -61,6 +96,24 @@ router.get("/reports", async (req, res): Promise<void> => {
       desc(reportsTable.issueDate),
       desc(reportsTable.id),
     );
+  if (rows.some((row) => row.proseProvenance == null)) {
+    const caches =
+      rows.length > 0
+        ? await db
+            .select()
+            .from(reportProseTable)
+            .where(inArray(reportProseTable.reportId, rows.map((row) => row.id)))
+        : [];
+    const byReportId = new Map(caches.map((cache) => [cache.reportId, cache]));
+    res.json(
+      await Promise.all(
+        rows.map((row) =>
+          hydrateLegacyProvenance(row, byReportId.get(row.id)),
+        ),
+      ),
+    );
+    return;
+  }
   res.json(rows);
 });
 
@@ -71,7 +124,7 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  res.json(row);
+  res.json(await hydrateLegacyProvenance(row));
 });
 
 router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
@@ -104,7 +157,42 @@ router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> 
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { issueDate, hardNumbers, ...rest } = parsed.data;
+  const { issueDate, hardNumbers, proseDirtySections, ...rest } = parsed.data;
+  const [existing] = await db
+    .select()
+    .from(reportsTable)
+    .where(eq(reportsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const [proseCache] = await db
+    .select()
+    .from(reportProseTable)
+    .where(eq(reportProseTable.reportId, id));
+  const legacySnapshot = { ...existing } as Record<string, unknown>;
+  delete legacySnapshot.proseBasisFingerprint;
+  const knownProvenance =
+    existing.proseProvenance ??
+    mergeReportProvenance(existing, legacySnapshot, proseCache);
+  const dirty = new Set(proseDirtySections ?? []);
+  const patchForProvenance = { ...parsed.data } as Record<string, unknown>;
+  // A stale analyst section is intentionally absent from the reseeded form.
+  // Do not interpret that UI blank as a user clear when the user has not
+  // explicitly dirtied the section; retain the old text for the recovery panel.
+  for (const key of REPORT_PROSE_KEYS) {
+    const provenance = knownProvenance[key];
+    if (
+      provenance?.kind === "ANALYST_EDITED" &&
+      !dirty.has(key) &&
+      key in rest &&
+      JSON.stringify((existing as Record<string, unknown>)[key]) !==
+        JSON.stringify((rest as Record<string, unknown>)[key])
+    ) {
+      delete (rest as Record<string, unknown>)[key];
+      delete patchForProvenance[key];
+    }
+  }
   const updateData: Partial<InsertReport> = { ...rest };
   // Every successful edit is activity, including edits that only change
   // metadata. Legacy rows remain nullable and fall back to createdAt.
@@ -115,15 +203,20 @@ router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> 
   if (hardNumbers !== undefined) {
     updateData.hardNumbers = normalizeHardNumbers(hardNumbers);
   }
+  const proseProvenance = mergeReportProvenance(
+    { ...existing, proseProvenance: knownProvenance },
+    patchForProvenance,
+    proseCache,
+    proseDirtySections ?? [],
+  );
+  if (Object.keys(proseProvenance).length > 0) {
+    updateData.proseProvenance = proseProvenance;
+  }
   const [row] = await db
     .update(reportsTable)
     .set(updateData)
     .where(eq(reportsTable.id, id))
     .returning();
-  if (!row) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
   res.json(row);
 });
 

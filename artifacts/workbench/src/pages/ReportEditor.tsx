@@ -207,6 +207,31 @@ interface FormState {
   author: string;
 }
 
+const REPORT_PROSE_EDIT_KEYS = new Set<keyof FormState>([
+  "executiveSummary",
+  "situation",
+  "whatHappened",
+  "whatMatters",
+  "implications",
+  "watchNext",
+  "polestarView",
+  "activismRead",
+  "civilUnrestRead",
+  "forecastRead",
+  "regionalCountryRead",
+  "chokepointRouteRead",
+  "vesselPiracyRead",
+  "commercialImpactRead",
+  "maritimeSecurityRead",
+  "cargoSecurityRead",
+  "logisticsHubRead",
+  "fuelMarketRead",
+  "fuelOperationalRead",
+  "fuelRegionalHighlights",
+  "conflictOtherWatchedRead",
+  "conflictAreaReads",
+]);
+
 const EMPTY: FormState = {
   title: "",
   topic: "fuel",
@@ -497,6 +522,10 @@ export default function ReportEditor() {
   const [sectionOverrides, setSectionOverrides] = useState<TopicSectionOverrides>(
     {},
   );
+  // Explicit editor provenance: this ref is changed only by textarea/select
+  // handlers, never by seed/prefill effects. The API refuses to infer
+  // ANALYST_EDITED from a non-empty report field.
+  const dirtyProseSections = useRef<Set<string>>(new Set());
 
   // Curation propagates through the SINGLE incident pool feeding every topic
   // dataset builder → both previews AND PDFs. Applying it here (exclude +
@@ -1085,7 +1114,9 @@ export default function ReportEditor() {
   const [staleSavedProse, setStaleSavedProse] = useState<
     Record<string, string>
   >({});
-  const [proseUnavailable, setProseUnavailable] = useState(false);
+  const [proseUnavailable, setProseUnavailable] = useState<
+    null | "SERVICE_UNAVAILABLE" | "OUTPUT_REJECTED" | "REQUEST_FAILED"
+  >(null);
   const lastProseKey = useRef<string>("");
   const generateProse = useGenerateReportProse();
 
@@ -1094,7 +1125,7 @@ export default function ReportEditor() {
       if (lastProseKey.current !== "") {
         lastProseKey.current = "";
         setProseRes(null);
-        setProseUnavailable(false);
+        setProseUnavailable(null);
       }
       return;
     }
@@ -1113,7 +1144,7 @@ export default function ReportEditor() {
     });
     if (key === lastProseKey.current) return;
     lastProseKey.current = key;
-    setProseUnavailable(false);
+    setProseUnavailable(null);
     generateProse.mutate(
       {
         id,
@@ -1145,18 +1176,22 @@ export default function ReportEditor() {
       },
       {
         onSuccess: (res) => {
-          // 200 {available:false} (engine unconfigured / upstream failed) ->
-          // degrade to the deterministic template and show the hint.
+          // A rejected/unavailable AI result never blocks the report. Keep the
+          // grounded deterministic narrative and state the actual category.
           if (!res.available) {
             setProseRes(null);
-            setProseUnavailable(true);
+            setProseUnavailable(
+              res.reason === "OUTPUT_REJECTED"
+                ? "OUTPUT_REJECTED"
+                : "SERVICE_UNAVAILABLE",
+            );
             return;
           }
           setProseRes(res);
         },
         onError: () => {
           setProseRes(null);
-          setProseUnavailable(true);
+          setProseUnavailable("REQUEST_FAILED");
         },
       },
     );
@@ -1581,7 +1616,12 @@ export default function ReportEditor() {
         (!seedFuelBasis ||
           report.proseBasisFingerprint !==
             seedFuelBasis));
-    if (proseIsStale && topic === "fuel") {
+    const proseProvenance =
+      (report.proseProvenance as
+        | Record<string, { kind?: string }>
+        | null
+        | undefined) ?? null;
+    if (proseIsStale) {
       const staleEntries = Object.entries({
         executiveSummary: report.executiveSummary,
         situation: report.situation,
@@ -1589,10 +1629,29 @@ export default function ReportEditor() {
         whatMatters: report.whatMatters,
         implications: report.implications,
         watchNext: report.watchNext,
-      }).filter(
-        (entry): entry is [string, string] =>
-          typeof entry[1] === "string" && entry[1].trim().length > 0,
-      );
+        polestarView: report.polestarView,
+        activismRead: report.activismRead,
+        civilUnrestRead: report.civilUnrestRead,
+        forecastRead: report.forecastRead,
+        regionalCountryRead: report.regionalCountryRead,
+        chokepointRouteRead: report.chokepointRouteRead,
+        vesselPiracyRead: report.vesselPiracyRead,
+        commercialImpactRead: report.commercialImpactRead,
+        maritimeSecurityRead: report.maritimeSecurityRead,
+        cargoSecurityRead: report.cargoSecurityRead,
+        logisticsHubRead: report.logisticsHubRead,
+        fuelMarketRead: report.fuelMarketRead,
+        fuelOperationalRead: report.fuelOperationalRead,
+        fuelRegionalHighlights: report.fuelRegionalHighlights,
+        conflictOtherWatchedRead: report.conflictOtherWatchedRead,
+      }).filter((entry): entry is [string, string] => {
+        const provenance = proseProvenance?.[entry[0]];
+        return (
+          provenance?.kind === "ANALYST_EDITED" &&
+          typeof entry[1] === "string" &&
+          entry[1].trim().length > 0
+        );
+      });
       setStaleSavedProse(Object.fromEntries(staleEntries));
     } else {
       setStaleSavedProse({});
@@ -1716,6 +1775,7 @@ export default function ReportEditor() {
     if (seededForId.current !== null && seededForId.current !== id) {
       seededForId.current = null;
       setSeededId(null);
+      dirtyProseSections.current.clear();
     }
     if (fuelPrefillForId.current !== null && fuelPrefillForId.current !== id) {
       fuelPrefillForId.current = null;
@@ -1785,6 +1845,9 @@ export default function ReportEditor() {
   }, [report]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+    if (REPORT_PROSE_EDIT_KEYS.has(k)) {
+      dirtyProseSections.current.add(String(k));
+    }
     if (
       [
         "executiveSummary",
@@ -1838,6 +1901,9 @@ export default function ReportEditor() {
     //   * Otherwise → assemble from the form. Empty form → clear
     //     payload with `hardNumbers: null`.
     const payload: Record<string, unknown> = { ...form };
+    // This is intentionally separate from prose values: a populated field is
+    // not evidence of an analyst edit (it may be generated or cached AI).
+    payload.proseDirtySections = Array.from(dirtyProseSections.current);
     // Conflict reports never persist the dropped narrative fields — they are
     // hidden from the form and rendered nowhere, so leaving them out of the
     // payload keeps the DB free of stale boilerplate written from form state.
@@ -2043,6 +2109,7 @@ export default function ReportEditor() {
             setFlashpointProseDirty(false);
             setFlashpointEditBasisFingerprint(null);
           }
+          dirtyProseSections.current.clear();
         },
       },
     );
@@ -2209,7 +2276,16 @@ export default function ReportEditor() {
         )
       : undefined;
   // Live freshness warning — recomputes as the author edits the issue date.
-  const staleProse = computeStale(form.topic, form.issueDate);
+  // Generated/unknown prose is invalidated silently and replaced by the
+  // current canonical projection. Only a proven analyst edit gets a warning;
+  // this keeps legacy/generated Fuel text from producing a false stale banner.
+  const staleProse =
+    Object.keys(staleSavedProse).length > 0
+      ? computeStale(form.topic, form.issueDate) ?? {
+          latest: "current",
+          issueDate: form.issueDate,
+        }
+      : null;
   // Option A enforcement on manual edits: a report must never be dated past
   // the latest real record for its data topic. The seed clamps the date; this
   // keeps it clamped when the author edits the Issue Date field by hand, so a
@@ -3671,9 +3747,15 @@ export default function ReportEditor() {
             className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
             style={{ borderColor: "#363636", background: "#f4f4f4", color: "#363636" }}
           >
-            <span style={{ fontWeight: 700 }}>AI narrative unavailable.</span>{" "}
-            Showing the deterministic template prose. Configure the OpenAI
-            integration to generate the analytical narrative.
+            <span style={{ fontWeight: 700 }}>
+              {proseUnavailable === "OUTPUT_REJECTED"
+                ? "AI draft did not pass evidence checks."
+                : proseUnavailable === "SERVICE_UNAVAILABLE"
+                  ? "AI generation service unavailable."
+                  : "AI narrative request failed."}
+            </span>{" "}
+            The grounded deterministic narrative remains active and the report
+            can still be saved or exported.
           </div>
         )}
 

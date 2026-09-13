@@ -32,6 +32,22 @@ fields) the prompt sends. Ground prose on the SAME related-incident set the
 preview/PDF renders, or the fingerprint bypasses cache (wallet-DoS) or goes
 stale. Mirrors the country-prose fingerprint rule.
 
+## Saved prose needs explicit provenance
+
+Report-field text is not evidence of analyst authorship. Track provenance per
+section as generated, cached AI, or analyst-edited; only an actual editor change
+may set analyst-edited. Legacy populated fields with no proof default to
+generated/unknown-generated. Exact text plus matching edit-cache fingerprints
+may establish a legacy analyst edit.
+
+**Why:** generated Fuel prose was historically saved into ordinary report
+columns, so treating every populated field as an analyst override produced false
+“stale analyst edit” recovery panels and froze obsolete machine output.
+
+**How to apply:** stale generated or cached prose is replaced automatically by
+the current grounded projection. Preserve and flag stale text only when explicit
+section provenance—or exact edited-cache proof—establishes a real analyst edit.
+
 ## No-count rule: defense-in-depth at the parse choke point
 
 HARD constraint (replit.md): report PROSE must never carry parenthetical record/

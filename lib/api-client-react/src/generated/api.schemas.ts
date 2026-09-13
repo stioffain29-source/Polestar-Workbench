@@ -747,6 +747,26 @@ export interface FuelHardNumbers {
   jetFuel?: JetFuelSnapshot;
 }
 
+export type ReportProseProvenanceEntryKind = typeof ReportProseProvenanceEntryKind[keyof typeof ReportProseProvenanceEntryKind];
+
+
+export const ReportProseProvenanceEntryKind = {
+  GENERATED: 'GENERATED',
+  CACHED_AI: 'CACHED_AI',
+  ANALYST_EDITED: 'ANALYST_EDITED',
+  GENERATED_UNKNOWN: 'GENERATED_UNKNOWN',
+} as const;
+
+export interface ReportProseProvenanceEntry {
+  kind: ReportProseProvenanceEntryKind;
+  /** @nullable */
+  fingerprint?: string | null;
+  /** @nullable */
+  generationBasisFingerprint?: string | null;
+}
+
+export interface ReportProseProvenance {[key: string]: ReportProseProvenanceEntry}
+
 export type CountryReportSectionOverridesSeverityDemotions = {[key: string]: string};
 
 export type CountryReportSectionOverridesSeverityOverrides = {[key: string]: string};
@@ -819,6 +839,7 @@ export interface Report {
   watchNext?: string | null;
   /** @nullable */
   proseBasisFingerprint?: string | null;
+  proseProvenance?: ReportProseProvenance | null;
   /** @nullable */
   activismRead?: string | null;
   /** @nullable */
@@ -941,6 +962,7 @@ export interface ReportUpdate {
   polestarView?: string;
   watchNext?: string;
   proseBasisFingerprint?: string;
+  proseDirtySections?: string[];
   activismRead?: string;
   civilUnrestRead?: string;
   forecastRead?: string;
@@ -2300,8 +2322,17 @@ export interface EditReportProseInput {
   sections: TopicProseSections;
 }
 
+export type ReportProseResultReason = typeof ReportProseResultReason[keyof typeof ReportProseResultReason] | null;
+
+
+export const ReportProseResultReason = {
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  OUTPUT_REJECTED: 'OUTPUT_REJECTED',
+} as const;
+
 export interface ReportProseResult {
   available: boolean;
+  reason?: ReportProseResultReason;
   fingerprint: string;
   /** @nullable */
   generationBasisFingerprint: string | null;

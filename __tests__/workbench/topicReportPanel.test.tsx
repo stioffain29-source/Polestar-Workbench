@@ -10,7 +10,7 @@
  *   - guard: renders nothing for topics the report API doesn't support yet
  *     (crime, maritime_security — see REPORT_TOPICS in lib/reportNaming.ts)
  *   - empty state for a reportable topic with no drafts
- *   - renders up to 6 most-recent report cards, sorted by issueDate desc
+ *   - renders current in-progress cards while keeping saved history collapsed
  *   - "View all N in Report Builder" link only appears above 6 reports
  *   - "New {Topic} Watch" button creates a draft, invalidates the report list
  *     + dashboard overview caches, and navigates to the new report's editor
@@ -56,8 +56,24 @@ jest.mock("@workspace/api-client-react", () => ({
 
 import { TopicReportPanel } from "@/components/TopicReportPanel";
 
-function makeReport(id: number, topic: string, issueDate: string, status = "draft"): Record<string, unknown> {
-  return { id, topic, issueDate, status, title: `${topic} report ${id}`, author: null };
+function makeReport(
+  id: number,
+  topic: string,
+  issueDate: string,
+  status = "draft",
+  activityDate?: string,
+): Record<string, unknown> {
+  return {
+    id,
+    topic,
+    issueDate,
+    status,
+    title: `${topic} report ${id}`,
+    author: null,
+    ...(activityDate
+      ? { createdAt: `${activityDate}T12:00:00Z`, updatedAt: `${activityDate}T12:00:00Z` }
+      : {}),
+  };
 }
 
 beforeEach(() => {
@@ -87,34 +103,34 @@ describe("TopicReportPanel", () => {
     expect(screen.queryByTestId("link-view-all-topic-reports")).toBeNull();
   });
 
-  it("renders report cards sorted by issue date, most recent first, capped at 6, with a view-all link above that", () => {
-    // Seed 8 shipping reports plus one unrelated-topic report that must be
-    // excluded entirely.
+  it("renders current report cards and keeps the full topic history reachable", () => {
+    // Seed 8 recent shipping reports plus one unrelated-topic report that must
+    // be excluded entirely. Activity, rather than issueDate, determines
+    // whether an in-progress report is current.
     mockReports = [
-      makeReport(1, "shipping", "2026-01-01"),
-      makeReport(2, "shipping", "2026-03-01"),
-      makeReport(3, "shipping", "2026-02-01"),
-      makeReport(4, "shipping", "2026-04-01"),
-      makeReport(5, "shipping", "2026-05-01"),
-      makeReport(6, "shipping", "2026-06-01"),
-      makeReport(7, "shipping", "2026-07-01"),
-      makeReport(8, "shipping", "2026-08-01"),
+      makeReport(1, "shipping", "2026-01-01", "draft", "2026-09-01"),
+      makeReport(2, "shipping", "2026-03-01", "draft", "2026-09-02"),
+      makeReport(3, "shipping", "2026-02-01", "draft", "2026-09-03"),
+      makeReport(4, "shipping", "2026-04-01", "draft", "2026-09-04"),
+      makeReport(5, "shipping", "2026-05-01", "draft", "2026-09-05"),
+      makeReport(6, "shipping", "2026-06-01", "draft", "2026-09-06"),
+      makeReport(7, "shipping", "2026-07-01", "draft", "2026-09-07"),
+      makeReport(8, "shipping", "2026-08-01", "draft", "2026-09-08"),
       makeReport(99, "fuel", "2026-08-02"),
     ];
 
     render(<TopicReportPanel topic="shipping" />);
 
-    // Sorted desc by issueDate: 8 (08-01), 7 (07-01), 6 (06-01), 5 (05-01),
-    // 4 (04-01), 2 (03-01) make the top-6 window; 3 (02-01) and 1 (01-01) are
-    // pushed out.
+    // All current reports remain visible; old cards are no longer pushed into
+    // the default view merely because there are more than six.
     expect(screen.getByTestId("link-topic-report-8")).not.toBeNull();
     expect(screen.getByTestId("link-topic-report-7")).not.toBeNull();
     expect(screen.getByTestId("link-topic-report-6")).not.toBeNull();
     expect(screen.getByTestId("link-topic-report-5")).not.toBeNull();
     expect(screen.getByTestId("link-topic-report-4")).not.toBeNull();
     expect(screen.getByTestId("link-topic-report-2")).not.toBeNull();
-    expect(screen.queryByTestId("link-topic-report-3")).toBeNull();
-    expect(screen.queryByTestId("link-topic-report-1")).toBeNull();
+    expect(screen.getByTestId("link-topic-report-3")).not.toBeNull();
+    expect(screen.getByTestId("link-topic-report-1")).not.toBeNull();
 
     // The other topic's report never renders here.
     expect(screen.queryByTestId("link-topic-report-99")).toBeNull();
@@ -124,6 +140,27 @@ describe("TopicReportPanel", () => {
     const viewAll = screen.getByTestId("link-view-all-topic-reports");
     expect(viewAll.textContent).toContain("View all 8 in Report Builder");
     expect(viewAll.getAttribute("href")).toBe("/reports");
+  });
+
+  it("hides June drafts from visible card content until the archive is expanded", () => {
+    mockReports = [
+      makeReport(1, "shipping", "2026-06-15", "draft", "2026-06-15"),
+      makeReport(2, "shipping", "2026-09-12", "draft", "2026-09-12"),
+    ];
+    const reportsBeforeRender = mockReports.map((report) => ({ ...report }));
+
+    render(<TopicReportPanel topic="shipping" />);
+
+    expect(screen.getByTestId("link-topic-report-2")).not.toBeNull();
+    expect(screen.queryByTestId("link-topic-report-1")).toBeNull();
+    expect(screen.queryByText("15 Jun 2026")).toBeNull();
+    expect(screen.getByTestId("summary-topic-report-archive").textContent).toContain("1");
+
+    fireEvent.click(screen.getByTestId("summary-topic-report-archive"));
+
+    expect(screen.getByTestId("link-topic-report-1")).not.toBeNull();
+    expect(screen.getByText("15 Jun 2026")).not.toBeNull();
+    expect(mockReports).toEqual(reportsBeforeRender);
   });
 
   it("does not show the view-all link when there are 6 or fewer reports", () => {

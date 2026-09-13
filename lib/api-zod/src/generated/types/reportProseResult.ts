@@ -5,10 +5,12 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReportProseResultReason } from './reportProseResultReason';
 import type { TopicProseSections } from './topicProseSections';
 
 export interface ReportProseResult {
   available: boolean;
+  reason?: ReportProseResultReason;
   fingerprint: string;
   /** @nullable */
   generationBasisFingerprint: string | null;
