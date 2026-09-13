@@ -53,6 +53,7 @@ import {
   PROTEST_EMPTY_SENTENCE,
   PROTEST_FORECAST_HEADING,
   PROTEST_WATCHLIST_HEADING,
+  protestScheduleActivity,
 } from "./protestScheduleModel";
 import {
   finalizeFlashpointPublication,
@@ -494,7 +495,7 @@ function drawProtestScheduleTable(
       row.eventDate?.slice(0, 10) ?? "—",
       row.country,
       row.venue ?? row.city ?? "—",
-      row.description ?? ([row.eventType, row.issue].filter(Boolean).join(" — ") || "Planned protest activity"),
+      protestScheduleActivity(row),
       row.disruptionPotential ?? row.confidence,
     ];
     const lines = values.map((value, index) => rowLines(value, widths[index] ?? 40));

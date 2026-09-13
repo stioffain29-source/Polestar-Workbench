@@ -20,6 +20,7 @@ import {
   PROTEST_EMPTY_SENTENCE,
   PROTEST_FORECAST_HEADING,
   PROTEST_WATCHLIST_HEADING,
+  protestScheduleActivity,
 } from "@/lib/protestScheduleModel";
 import {
   finalizeFlashpointPublication,
@@ -269,7 +270,7 @@ function ProtestScheduleTable({
               <td className="px-2 py-2 align-top whitespace-nowrap">{row.eventDate?.slice(0, 10) ?? "—"}</td>
               <td className="px-2 py-2 align-top">{row.country}</td>
               <td className="px-2 py-2 align-top">{row.venue ?? row.city ?? "—"}</td>
-              <td className="px-2 py-2 align-top">{row.description ?? ([row.eventType, row.issue].filter(Boolean).join(" — ") || "Planned protest activity")}</td>
+              <td className="px-2 py-2 align-top">{protestScheduleActivity(row)}</td>
               <td className="px-2 py-2 align-top">{row.disruptionPotential ?? row.confidence}</td>
             </tr>
           ))}

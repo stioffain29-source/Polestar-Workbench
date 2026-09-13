@@ -95,6 +95,35 @@ export function protestScheduleRows(
   return [...model.schedule, ...model.watchlist];
 }
 
+/** One clean activity label shared by the editor, preview and PDF. */
+export function protestScheduleActivity(row: ProtestEvent): string {
+  const raw =
+    row.description?.trim() ||
+    [row.eventType, row.issue].filter(Boolean).join(" — ").trim() ||
+    row.sourceTitle.trim() ||
+    "Planned protest activity";
+  // Collected headlines sometimes append a publisher label after a pipe.
+  // The source remains available through sourceTitle/sourceUrl; it does not
+  // belong in the report's Scheduled activity column.
+  return raw.replace(/\s*\|\s*[^|]+$/u, "").trim();
+}
+
+const EMPTY_FORECAST_PROSE_RE =
+  /\b(?:no unsupported forecast|no (?:significant )?(?:confirmed|planned|forecast)|no confirmed forward dates|does not (?:show|present) (?:a )?forecast)\b/i;
+
+/**
+ * A populated schedule must never be followed by prose saying that no
+ * forecast or planned activity exists. Genuine analyst assessment is kept.
+ */
+export function reconcileProtestForecastRead(
+  text: string,
+  model: ProtestScheduleModel,
+): string {
+  const value = text.trim();
+  const hasRows = model.schedule.length > 0 || model.watchlist.length > 0;
+  return hasRows && EMPTY_FORECAST_PROSE_RE.test(value) ? "" : value;
+}
+
 /** Conservative Watch Next lines derived only from schedule context. */
 export function buildProtestScheduleWatchNext(
   model: ProtestScheduleModel,

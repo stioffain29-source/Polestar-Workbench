@@ -28,6 +28,7 @@ import {
 } from "@workspace/relevance";
 import {
   buildProtestScheduleWatchNext,
+  reconcileProtestForecastRead,
   type ProtestScheduleModel,
 } from "./protestScheduleModel";
 
@@ -4056,7 +4057,10 @@ export function resolveFlashpointRenderedModel(args: {
     executiveSummary,
     activismRead: pickFlashpointRead(report.activismRead, ds.activismRead),
     civilUnrestRead: pickFlashpointRead(report.civilUnrestRead, ds.civilUnrestRead),
-    forecastRead: pickFlashpointRead(report.forecastRead, ds.forecastRead),
+    forecastRead: reconcileProtestForecastRead(
+      pickFlashpointRead(report.forecastRead, ds.forecastRead),
+      protestSchedule,
+    ),
     regionalCountryRead: pickFlashpointRead(
       report.regionalCountryRead,
       ds.regionalCountryRead,
@@ -4102,7 +4106,7 @@ export function resolveFlashpointRenderedModel(args: {
     executiveSummary: ds.autoExecutiveSummary,
     activismRead: ds.activismRead,
     civilUnrestRead: ds.civilUnrestRead,
-    forecastRead: ds.forecastRead,
+    forecastRead: reconcileProtestForecastRead(ds.forecastRead, protestSchedule),
     regionalCountryRead: ds.regionalCountryRead,
     whatMatters: ds.autoWhatMatters,
     implications: ds.autoImplications,
@@ -4133,7 +4137,10 @@ export function resolveFlashpointRenderedModel(args: {
     executiveSummary: `${activity} Maintain proportionate monitoring and verify changes against confirmed sources.`,
     activismRead: `${activity} Track mobilisation notices and access disruption without inferring activity beyond the accepted record.`,
     civilUnrestRead: "Monitor police statements, access controls and visible escalation indicators. Do not infer enforcement action without confirmation.",
-    forecastRead: "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
+    forecastRead: reconcileProtestForecastRead(
+      "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
+      protestSchedule,
+    ),
     regionalCountryRead: `${geography} Treat the accepted geography as the limit of the current assessment.`,
     whatMatters: "Use the accepted record to review staff movement, site access and communications readiness. Escalate only on confirmed changes.",
     implications: "Keep movement plans flexible, verify transport conditions close to departure and maintain practical communications contingencies.",

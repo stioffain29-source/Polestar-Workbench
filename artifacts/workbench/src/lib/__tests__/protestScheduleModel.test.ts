@@ -2,6 +2,8 @@ import {
   buildProtestScheduleModel,
   buildProtestScheduleWatchNext,
   PROTEST_EMPTY_SENTENCE,
+  protestScheduleActivity,
+  reconcileProtestForecastRead,
 } from "../protestScheduleModel";
 import type { ProtestEvent } from "@workspace/api-client-react";
 
@@ -103,5 +105,36 @@ describe("protest schedule model", () => {
       searchCompletedAt: "2026-08-01T00:00:00Z",
     });
     expect(model.schedule.map((row) => row.id)).toEqual([2]);
+  });
+
+  it("removes a publisher suffix from the displayed scheduled activity", () => {
+    const row = {
+      ...event(4, "Planned", "2026-09-15T00:00:00Z"),
+      description:
+        "Jarange-Patil to march to Mumbai from Sept 15, govt asks him to call off stir | Mumbai news Hindustan Times",
+    };
+    expect(protestScheduleActivity(row)).toBe(
+      "Jarange-Patil to march to Mumbai from Sept 15, govt asks him to call off stir",
+    );
+  });
+
+  it("drops empty-forecast boilerplate when the schedule has a row", () => {
+    const model = buildProtestScheduleModel({
+      confirmedPlanned: [event(5, "Planned", "2026-09-15T00:00:00Z")],
+      possible: [],
+      searchCompletedAt: "2026-09-13T00:00:00Z",
+    });
+    expect(
+      reconcileProtestForecastRead(
+        "No unsupported forecast is presented. Monitor confirmed announcements.",
+        model,
+      ),
+    ).toBe("");
+    expect(
+      reconcileProtestForecastRead(
+        "The planned march may affect access around the venue.",
+        model,
+      ),
+    ).toBe("The planned march may affect access around the venue.");
   });
 });
