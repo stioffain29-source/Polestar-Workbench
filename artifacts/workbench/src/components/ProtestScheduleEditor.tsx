@@ -107,7 +107,11 @@ function ScheduleTable({
               <td className="px-2 py-2">{protestScheduleActivity(row)}</td>
               <td className="px-2 py-2">{row.disruptionPotential ?? row.confidence}</td>
               <td className="px-2 py-2 max-w-[180px] truncate">
-                <a className="text-primary underline" href={row.sourceUrl} target="_blank" rel="noreferrer">{row.sourceTitle || row.sourceUrl}</a>
+                {row.sourceUrl ? (
+                  <a className="text-primary underline" href={row.sourceUrl} target="_blank" rel="noreferrer">{row.sourceTitle || row.sourceUrl}</a>
+                ) : (
+                  <span>Analyst supplied</span>
+                )}
               </td>
               <td className="px-2 py-2"><Button type="button" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => onEdit(row)}>Edit</Button></td>
             </tr>

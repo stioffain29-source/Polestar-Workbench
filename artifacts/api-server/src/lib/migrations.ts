@@ -1,4 +1,4 @@
-import { db, incidentsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable } from "@workspace/db";
+import { db, incidentsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable, protestEventsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
@@ -49,6 +49,7 @@ import {
 import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 import { APAC_FLASHPOINT_BACKFILL } from "./seed/apacFlashpointBackfill";
+import { SEPTEMBER_2026_PROTEST_SCHEDULE } from "./seed/september2026ProtestSchedule";
 
 // Catalogued Flashpoint regional sources that the audit identified as
 // missing. Inserted idempotently on startup; existing rows are not
@@ -472,6 +473,49 @@ export async function runDataMigrations(): Promise<void> {
       CREATE INDEX IF NOT EXISTS protest_events_status_idx
         ON protest_events (status)
     `);
+
+    // One-time import of the 13-row analyst schedule supplied for the
+    // 13 September 2026 Flashpoint report. The source file contained no URLs,
+    // so source_url remains blank rather than inventing provenance.
+    {
+      const markerKey = "flashpoint_protest_schedule_sep2026_v2";
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const inserted = await db.transaction(async (tx) => {
+          // Replace only the earlier upload of this exact supplied schedule.
+          // Owner-authored rows use source_name='analyst' and collector rows
+          // use their provider name, so neither can be removed here.
+          await tx.execute(sql`
+            DELETE FROM protest_events
+            WHERE source_name = 'analyst_schedule_upload'
+              AND event_date >= '2026-09-15T00:00:00Z'::timestamptz
+              AND event_date < '2026-09-21T00:00:00Z'::timestamptz
+          `);
+          const rows = await tx
+            .insert(protestEventsTable)
+            .values([...SEPTEMBER_2026_PROTEST_SCHEDULE])
+            .onConflictDoNothing({ target: protestEventsTable.dedupKey })
+            .returning({ id: protestEventsTable.id });
+          await tx.execute(sql`
+            INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+            ON CONFLICT (key) DO NOTHING
+          `);
+          return rows.length;
+        });
+        logger.info(
+          { inserted, expected: SEPTEMBER_2026_PROTEST_SCHEDULE.length, marker: markerKey },
+          "Imported analyst-supplied Flashpoint protest schedule",
+        );
+      }
+    }
 
     // Schema: English translation of a non-English KAMMI social-watch caption.
     // Filled by the caption-translate pass; NULL until translated (UI falls back
