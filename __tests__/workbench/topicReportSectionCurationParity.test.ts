@@ -223,6 +223,8 @@ describe("topic report — hidden sections & curated incidents disappear from th
 
     const base = await capture(() => run(incidents));
     expect(base.headings).toContain(SECTION_TITLE);
+    expect(base.headings).not.toContain("Related Incidents");
+    expect(base.text.join("\n")).not.toContain("Related Incidents");
     expect(base.text.join("\n")).toContain(EXCL_TOKEN);
 
     const hidden = await capture(() => run(incidents, ["fast-facts"]));

@@ -77,6 +77,7 @@ describe("topic report preview — hidden sections & curated incidents disappear
     const base = renderToStaticMarkup(el(incidents));
     expect(base).toContain("Fast Facts");
     expect(base).toContain(EXCL_TOKEN);
+    expect(base).not.toContain("Related Incidents");
     expect(renderToStaticMarkup(el(incidents, ["fast-facts"]))).not.toContain("Fast Facts");
     const curated = applyIncidentCurations(incidents as never, { excludedIncidentIds: ["f1"] });
     expect(renderToStaticMarkup(el(curated as never))).not.toContain(EXCL_TOKEN);

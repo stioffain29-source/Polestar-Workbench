@@ -5,7 +5,6 @@ import {
   DEFAULT_RELATED_ROW_CAP,
 } from "../../artifacts/workbench/src/lib/relatedIncidents";
 import { SHIPPING_RELATED_ROW_CAP } from "../../artifacts/workbench/src/lib/shippingReportDataset";
-import { FLASHPOINT_RELATED_ROW_CAP } from "../../artifacts/workbench/src/lib/flashpointReportDataset";
 
 // Lockstep guard between the rendered Related Incidents tables and the server's
 // per-incident AI summary generation cap.
@@ -15,7 +14,7 @@ import { FLASHPOINT_RELATED_ROW_CAP } from "../../artifacts/workbench/src/lib/fl
 // canonicalised set (see canonicalIncidents in countryProse.ts). Every report's
 // Related Incidents table renders the summary keyed by incident id, falling back
 // to a deterministic line when none exists. Today every table cap (topic/conflict
-// = 10, shipping/flashpoint = 6) sits far below 60, so no rendered row can ever
+// = 10, shipping = 6) sits far below 60, so no rendered row can ever
 // outrun a generated summary.
 //
 // The hazard is the FUTURE: if anyone raises a table cap above the generation
@@ -32,10 +31,6 @@ describe("Related Incidents row caps stay within the summary-generation cap", ()
 
   it("shipping report Related Incidents cap never exceeds the generation cap", () => {
     expect(SHIPPING_RELATED_ROW_CAP).toBeLessThanOrEqual(MAX_PROSE_INCIDENTS);
-  });
-
-  it("flashpoint report Related Incidents cap never exceeds the generation cap", () => {
-    expect(FLASHPOINT_RELATED_ROW_CAP).toBeLessThanOrEqual(MAX_PROSE_INCIDENTS);
   });
 
   it("each per-topic component cap also stays within the generation cap", () => {
