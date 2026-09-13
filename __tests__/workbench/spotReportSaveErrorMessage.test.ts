@@ -1,4 +1,7 @@
-import { spotReportSaveErrorMessage } from "@/lib/spotReport";
+import {
+  spotReportSaveErrorMessage,
+  withSpotReportSaveTimeout,
+} from "@/lib/spotReport";
 
 /** Minimal stand-in for the generated ApiError (status + parsed body). */
 function apiError(status: number, error?: string): unknown {
@@ -20,6 +23,14 @@ describe("spotReportSaveErrorMessage — actionable save-failure toasts", () => 
     const msg = spotReportSaveErrorMessage(apiError(413), "save");
     expect(msg.title).toBe("Attachments too large");
     expect(msg.description).toMatch(/photo/i);
+  });
+
+  it("maps a stalled save to a retryable timeout message", () => {
+    const error = new Error("timed out");
+    error.name = "SpotReportSaveTimeoutError";
+    const msg = spotReportSaveErrorMessage(error, "save");
+    expect(msg.title).toBe("Save timed out");
+    expect(msg.description).toMatch(/draft.*local.*retry/i);
   });
 
   it("maps 404 to a report-not-found hint", () => {
@@ -65,5 +76,23 @@ describe("spotReportSaveErrorMessage — actionable save-failure toasts", () => 
   it("ignores a non-string server error field", () => {
     const msg = spotReportSaveErrorMessage({ status: 400, data: { error: 42 } }, "save");
     expect(msg.description).toMatch(/invalid|required|photo/i);
+  });
+});
+
+describe("withSpotReportSaveTimeout", () => {
+  it("rejects a stalled request and aborts its signal", async () => {
+    let signal: AbortSignal | undefined;
+    const result = withSpotReportSaveTimeout(
+      (nextSignal) => {
+        signal = nextSignal;
+        return new Promise<never>(() => {});
+      },
+      5,
+    );
+
+    await expect(result).rejects.toMatchObject({
+      name: "SpotReportSaveTimeoutError",
+    });
+    expect(signal?.aborted).toBe(true);
   });
 });

@@ -1129,3 +1129,17 @@ mtime_ms = 1789274640791
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/8272baa7-33ab-431c-ac0b-fa769ddd3711/a3d6406c-b117-42a5-9964-bdba5de328d4"
 storage_version_token = "1789274647485442"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "R499fKHtYbAY1ifCUNHA6"
+uri = "file://screenshots/flashpoint-report-openable.pdf"
+type = "pdf"
+title = "Complete Flashpoint report — openable PDF"
+description = "Verified four-page Chromium PDF. Reopened and rendered successfully after creation; Related Incidents is removed."
+logical_id = "ba7c3d2a-1737-47b1-85d1-1f3f029ad152"
+content_hash = "sha256:9f43cf13860c26f4f31759bc8cc67eeb167adc1484be88b1ecc6b835a9c4fd7d"
+size = 2232116
+mtime_ms = 1789274731175
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/ba7c3d2a-1737-47b1-85d1-1f3f029ad152/842ca649-c7ba-415b-9f02-e0bd48633cd2"
+storage_version_token = "1789274743244837"
+content_type = "application/pdf"

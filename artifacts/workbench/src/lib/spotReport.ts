@@ -258,6 +258,10 @@ export function spotReportSaveErrorMessage(
   err: unknown,
   action: "create" | "save" | "delete",
 ): { title: string; description?: string } {
+  const errorName =
+    err && typeof err === "object" && typeof (err as { name?: unknown }).name === "string"
+      ? (err as { name: string }).name
+      : undefined;
   const status =
     err && typeof err === "object" && typeof (err as { status?: unknown }).status === "number"
       ? (err as { status: number }).status
@@ -275,6 +279,13 @@ export function spotReportSaveErrorMessage(
         ? "Failed to delete"
         : "Failed to save";
 
+  if (errorName === "SpotReportSaveTimeoutError") {
+    return {
+      title: "Save timed out",
+      description:
+        "The server did not respond in time. Your recovered draft is still saved locally; check your connection and retry.",
+    };
+  }
   if (status === 401 || status === 403) {
     return {
       title: "Session expired",
@@ -305,4 +316,33 @@ export function spotReportSaveErrorMessage(
       serverMsg ??
       "The server could not be reached or returned an error. Check your connection and try again.",
   };
+}
+
+export const SPOT_REPORT_SAVE_TIMEOUT_MS = 45_000;
+
+/**
+ * Bound Spot Report create/update requests so a stalled fetch cannot leave the
+ * editor permanently disabled on “Saving…”. The local recovered draft is only
+ * cleared by the caller after a successful server response.
+ */
+export async function withSpotReportSaveTimeout<T>(
+  request: (signal: AbortSignal) => Promise<T>,
+  timeoutMs = SPOT_REPORT_SAVE_TIMEOUT_MS,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      const error = new Error("Spot report save timed out.");
+      error.name = "SpotReportSaveTimeoutError";
+      reject(error);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([request(controller.signal), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

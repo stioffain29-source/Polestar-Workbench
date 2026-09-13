@@ -4,6 +4,8 @@ import {
   useGetSpotReport,
   useCreateSpotReport,
   useUpdateSpotReport,
+  createSpotReport as createSpotReportRequest,
+  updateSpotReport as updateSpotReportRequest,
   useDeleteSpotReport,
   useAppendSpotReportExport,
   useListIncidents,
@@ -44,6 +46,7 @@ import {
   checkSpotReportQuality,
   spotLocationLabel,
   spotReportSaveErrorMessage,
+  withSpotReportSaveTimeout,
   SPOT_STATUSES,
   type QualityResult,
 } from "@/lib/spotReport";
@@ -397,8 +400,22 @@ export default function SpotReportEditor() {
   } as never);
   const { data: allIncidents = [] } = useListIncidents({});
 
-  const create = useCreateSpotReport();
-  const update = useUpdateSpotReport();
+  const create = useCreateSpotReport({
+    mutation: {
+      mutationFn: ({ data }) =>
+        withSpotReportSaveTimeout((signal) =>
+          createSpotReportRequest(data, { signal }),
+        ),
+    },
+  });
+  const update = useUpdateSpotReport({
+    mutation: {
+      mutationFn: ({ id: reportId, data }) =>
+        withSpotReportSaveTimeout((signal) =>
+          updateSpotReportRequest(reportId, data, { signal }),
+        ),
+    },
+  });
   const del = useDeleteSpotReport();
   const appendExport = useAppendSpotReportExport();
 
