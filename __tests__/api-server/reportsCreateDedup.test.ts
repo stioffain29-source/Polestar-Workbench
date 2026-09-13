@@ -9,7 +9,6 @@ import type { Server } from "node:http";
 
 import { db } from "@workspace/db";
 import reportsRouter from "../../artifacts/api-server/src/routes/reports";
-import { adminAuthHeaders, installAdminTokenBeforeEach } from "./adminAuthTestHelpers";
 
 type Rows = Record<string, unknown>[];
 
@@ -22,7 +21,7 @@ function stubSelectQueue(queue: Rows[]): void {
   jest.spyOn(db, "select").mockImplementation(() => {
     const chain: Record<string, unknown> = {
       from: () => chain,
-      where: () => chain,
+      where: () => Promise.resolve(selectQueue.shift() ?? []),
       orderBy: () => chain,
       limit: () => Promise.resolve(selectQueue.shift() ?? []),
     };
@@ -47,8 +46,6 @@ function stubInsert(returnRows: Rows): void {
 let app: Express;
 let server: Server;
 let baseUrl: string;
-
-installAdminTokenBeforeEach();
 
 beforeAll((done) => {
   app = express();
@@ -82,7 +79,10 @@ beforeEach(() => {
 async function post(body: Record<string, unknown>) {
   const res = await fetch(`${baseUrl}/reports`, {
     method: "POST",
-    headers: adminAuthHeaders({ "content-type": "application/json" }),
+    // The production router is mounted below requireOwner. This direct-router
+    // test intentionally sends no ingestion token: browser report mutations
+    // must not require a secret the Workbench cannot possess.
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   // Express's default error handler renders an HTML page (not JSON) for an
@@ -100,7 +100,7 @@ async function post(body: Record<string, unknown>) {
 async function patch(id: number, body: Record<string, unknown>) {
   const res = await fetch(`${baseUrl}/reports/${id}`, {
     method: "PATCH",
-    headers: adminAuthHeaders({ "content-type": "application/json" }),
+    headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   return { status: res.status, json: (await res.json()) as Record<string, unknown> };
@@ -169,6 +169,10 @@ describe("POST /reports — fresh draft identity lifecycle", () => {
   });
 
   it("marks an explicit PATCH as activity with updatedAt", async () => {
+    stubSelectQueue([
+      [{ id: 44, ...draftBody, proseProvenance: null }],
+      [],
+    ]);
     let capturedUpdate: Record<string, unknown> | undefined;
     jest.spyOn(db, "update").mockImplementation(() => {
       const chain: Record<string, unknown> = {

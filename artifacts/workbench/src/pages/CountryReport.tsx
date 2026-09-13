@@ -231,6 +231,7 @@ export default function CountryReport() {
   }, [country]);
   const {
     data: incidentsData,
+    isLoading: incidentsLoading,
     isSuccess: incidentsSuccess,
     isError: incidentsError,
   } = useListIncidents(incidentFetchParams as never, {
@@ -1354,7 +1355,12 @@ export default function CountryReport() {
     setBaselineDirty(true);
   };
 
-  if (isLoading) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Loading...</div>;
+  // The quality gate and coverage assessment depend on both incident and source
+  // queries. Do not build the report from their transient empty defaults: that
+  // briefly labels every country "Not Assessed" and shows a critical gate failure
+  // before the real rows arrive.
+  if (isLoading || incidentsLoading || sourcesLoading)
+    return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Loading...</div>;
   if (!country || !effective) return <div style={{ fontFamily: ROBOTO, fontSize: 13, color: DUSK }}>Report not found.</div>;
 
   const windowIncidents = facts.windowIncidents;

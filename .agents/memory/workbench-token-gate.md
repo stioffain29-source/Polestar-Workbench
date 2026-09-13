@@ -1,6 +1,6 @@
 ---
 name: Workbench owner-only auth (Replit Auth) + admin-token contract
-description: The workbench is now PRIVATE to the owner via Replit Auth (OIDC); requireOwner gates all data routers; admin token still gates most mutations (sources/reports/incidents/etc.) but spot-reports are owner-session-only (token removed per user). Read order matters; session is cookie-first.
+description: The workbench is PRIVATE to the owner via Replit Auth; report and spot-report CRUD are owner-session-only, while ingestion/admin mutations retain token gates.
 ---
 
 CURRENT STATE (decision, supersedes the old "keep it public" note): the
@@ -27,10 +27,10 @@ decision. Shape:
 - `requireAdminToken` on `sources` mutations is UNCHANGED — those routes now sit
   behind BOTH `requireOwner` and the token, which is fine because the owner is
   always logged in when editing.
-- `spot-reports` mutations (POST/PATCH/DELETE + export-history) are
+- `reports` and `spot-reports` mutations (POST/PATCH/DELETE + export-history) are
   owner-session-only: `requireAdminToken` was REMOVED per explicit user request.
-  They are still protected by `requireOwner`. Do NOT re-add the admin-token gate
-  to spot reports; the rest of the data routers keep it.
+  They are still protected by `requireOwner`. Do NOT add the admin-token gate
+  to browser report CRUD; the browser cannot possess the ingestion secret.
 
 Do NOT re-open the app to the public without the user asking. This is also in
 `replit.md` user preferences.
@@ -59,12 +59,12 @@ irrelevant because the token teardown fired first.
 feature needs a live access token for a Replit API call, handle a stale token AT
 THE CALL SITE; do not log the owner out. Reaches prod only after a republish.
 
-**Two-layer gate + the spot-report exception (a DECISION, not a workaround):**
-most privileged mutations (sources, reports, incidents, strikes, countries,
+**Two-layer gate + browser-report exceptions (a DECISION, not a workaround):**
+most privileged mutations (sources, incidents, strikes, countries,
 cards, baselines, prose, social) sit behind `requireOwner` THEN
-`requireAdminToken`. SPOT-REPORTS are the deliberate EXCEPTION — owner-session-
-only; the admin-token gate was REMOVED per explicit user request ("I never asked
-for this"), documented in `replit.md` user preferences. Do NOT re-add it.
+`requireAdminToken`. REPORTS and SPOT-REPORTS are owner-session-only exceptions.
+Do NOT add a route-level ingestion-token requirement: it makes browser New/Save
+requests fail even for the authenticated owner.
 **Why:** the owner is the only caller (already behind `requireOwner`), so the
 second factor was friction the user rejected; owner auth still fully protects the
 route. **How to apply:** an automated reviewer lacking this context may read the

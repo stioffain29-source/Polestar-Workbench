@@ -12,7 +12,6 @@ import {
   UpdateReportBody,
   ListReportsQueryParams,
 } from "@workspace/api-zod";
-import { requireAdminToken } from "../lib/adminAuth";
 import {
   mergeReportProvenance,
   REPORT_PROSE_KEYS,
@@ -127,7 +126,11 @@ router.get("/reports/:id", async (req, res): Promise<void> => {
   res.json(await hydrateLegacyProvenance(row));
 });
 
-router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
+// This router is mounted below requireOwner in routes/index.ts. Browser report
+// mutations therefore use the authenticated owner session; requiring the
+// ingestion token here as a second gate makes every Workbench create/save fail
+// with 401 because that secret is never exposed to the browser.
+router.post("/reports", async (req, res): Promise<void> => {
   const parsed = CreateReportBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -150,7 +153,7 @@ router.post("/reports", requireAdminToken, async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.patch("/reports/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const parsed = UpdateReportBody.safeParse(req.body);
   if (!parsed.success) {
@@ -220,7 +223,7 @@ router.patch("/reports/:id", requireAdminToken, async (req, res): Promise<void> 
   res.json(row);
 });
 
-router.delete("/reports/:id", requireAdminToken, async (req, res): Promise<void> => {
+router.delete("/reports/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   await db.delete(reportsTable).where(eq(reportsTable.id, id));
   res.status(204).end();
