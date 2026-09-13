@@ -1115,3 +1115,17 @@ mtime_ms = 1789274584978
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/45900fe6-9a35-4513-9f39-d01d6f37a42d/6429279f-56ac-4ac8-91b1-ba850368ccf4"
 storage_version_token = "1789274594889853"
 content_type = "image/png"
+
+[[outputs]]
+id = "Za7yZ1HDEIpeuQw4-CvRq"
+uri = "file://screenshots/flashpoint-report-no-related-incidents.pdf"
+type = "pdf"
+title = "Complete Flashpoint report"
+description = "Full development Flashpoint PDF generated after removing Related Incidents."
+logical_id = "8272baa7-33ab-431c-ac0b-fa769ddd3711"
+content_hash = "sha256:b59b24f2a056324545ec330879669b6c223838afcd824d93788f9ce1c0b7863c"
+size = 2604536
+mtime_ms = 1789274640791
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/8272baa7-33ab-431c-ac0b-fa769ddd3711/a3d6406c-b117-42a5-9964-bdba5de328d4"
+storage_version_token = "1789274647485442"
+content_type = "application/pdf"
