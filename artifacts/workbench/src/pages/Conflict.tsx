@@ -52,8 +52,7 @@ function displayTitle(i: { displayTitle?: string | null; title: string }): strin
 
 export default function Conflict() {
   // The "Conflict Watch" monitor is fed by the live `conflict` data topic —
-  // war, armed conflict, insurgency and serious armed crime. This is a
-  // SEPARATE kinetic theatre from the flashpoint/protests civil-disorder feed.
+  // war, armed conflict and insurgency.
   const { data: raw = [], isLoading } = useListIncidents({ topic: "conflict" });
 
   // Date-range window. Defaults to 7 days — a 2-year default meant this page
@@ -270,7 +269,7 @@ export default function Conflict() {
           <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Topic Monitor</div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1">Conflict Watch</h1>
           <p className="text-sm text-muted-foreground font-sans mt-1 max-w-4xl">
-            Armed conflict, insurgency, war and serious armed crime monitor — a separate kinetic theatre from the Protests &amp; Civil Unrest feed.
+            War, armed conflict, insurgency and terrorism.
           </p>
         </div>
         <RangeToggle range={range} onChange={setRange} />

@@ -2047,25 +2047,24 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(gudang|pergudangan|truk|kargo|peti kemas|kontainer|logistik|ekspedisi)\b.{0,40}\b(pencurian|dicuri|mencuri|rampok|dirampok|perampok|perampokan|bobol|dibobol|jarah|penjarahan)\b/i,
     /\b(pencurian|dicuri|mencuri|rampok|dirampok|perampok|perampokan|bobol|dibobol|jarah|penjarahan)\b.{0,40}\b(gudang|pergudangan|truk|kargo|peti kemas|kontainer|logistik|ekspedisi)\b/i,
   ],
-  // War / armed conflict / insurgency / armed crime. DELIBERATELY excludes the
+  // War / armed conflict / insurgency. DELIBERATELY excludes the
   // protest/demonstration/strike/civil-disorder vocabulary — that is the
   // `flashpoint` topic's job and must not be duplicated here. These rules keep
   // KINETIC and armed events: organised armed groups, firefights, bombings,
-  // ambushes, named insurgencies, and serious armed crime (armed robbery,
-  // kidnapping). The global EXCLUDE_PHRASES already strip sports/finance/
+  // ambushes and named insurgencies. Ordinary crime, robbery, isolated
+  // shootings and criminal kidnapping do not belong here. The global EXCLUDE_PHRASES already strip sports/finance/
   // entertainment noise before this gate runs.
   conflict: [
-    /\b(armed (clash|clashes|conflict|attack|assault|group|gang|men|robbery|robbers|raid|raiders|fighters?|militants?))\b/,
+    /\b(terrorist|terror) (attack|attacks|assault|bombing|bombings|blast|incident|group|cell)\b/,
+    /\b(attack|attacks|assault|bombing|bombings|blast) .{0,30}\bterroris(m|t|ts)\b/,
+    /\b(armed (clash|clashes|conflict|attack|assault|group|raid|raiders|fighters?|militants?))\b/,
     /\b(gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|opened fire|hail of (gunfire|bullets))\b/,
     /\b(insurgen(t|ts|cy)|militan(t|ts|cy)|rebel(s|lion)?|separatis(t|ts|m)|guerrilla|paramilitar(y|ies)|militia(s|men)?|warlord|junta (forces|troops|airstrike|soldiers))\b/,
     /\b(ambush(ed|es)?|incursion|firefights?|skirmish(es)?)\b/,
     /\b(ied|improvised explosive|roadside bomb|land ?mines?|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
-    /\b(abduct(ed|ion|ions)?|kidnap(ped|ping|pings|pers)?|hostage(s)?|held hostage)\b/,
-    /\b(gunm[ae]n|armed assailant|shot dead|gunned down|mass shooting|gun rampage|massacre)\b/,
     /\b(tpnpb|opm|free papua|west papua (rebel|fighter|insurgen|liberation|armed)|npa|new people'?s army|abu sayyaf|biff|bifm|bangsamoro|moro (rebel|fighter|front)|ttp|tehrik[- ]?i[- ]?taliban|baloch(istan)? (liberation|insurgen|army|militant)|naxal(ite)?|maoist (rebel|insurgent|attack|guerrilla)|arakan army|ethnic armed (group|organisation|organization))\b/,
     /\b(troops|soldiers|security forces|police|army|navy|marines) .{0,30}(killed|kill|ambush(ed)?|attack(ed)?|clash(ed)?|wounded|gunned down|firefight)\b/,
     /\b(killed|wounded|injured|dead|casualt) .{0,30}(clash|fighting|gun ?battle|firefight|ambush|insurgen|militan|rebel|raid|shoot[- ]?out|armed attack)\b/,
-    /\b(armed robbery|armed heist|armed hold[- ]?up|at gunpoint|extortion racket|kidnap[- ]for[- ]ransom)\b/,
     // Myanmar / regional civil-war vocabulary. The patterns above are India/
     // Pakistan-centric (TTP, Naxal, Baloch) and were blind to the Myanmar
     // theatre, dropping genuine fighting ("junta counteroffensive", "fighting
@@ -2093,6 +2092,16 @@ const REQUIRED: Record<string, RegExp[]> = {
     // bare "military operation" with no civilian casualty, or an accident
     // ("civilians killed in road crash, army says") still fails.
     /\b(civilians?|villagers?|miners?|residents?|locals?|farmers?|townspeople|bystanders?)\b.{0,25}\b(kill(ed|ing|s)?|shot dead|gunned down|massacre[ds]?|slain)\b.{0,40}\b(military|army|troops|soldiers|junta|paramilitar(y|ies)|armed forces|navy|marines)\b.{0,20}\b(operation|operations|sweep|sweeping|raid|raids|offensive|assault|incursion|shelling)\b/,
+  ],
+  crime: [
+    /\b(organised|organized) crime\b/,
+    /\bcriminal (syndicate|network|gang|organisation|organization)\b/,
+    /\b(gang|gangland|cartel) (activity|attack|attacks|shooting|shootings|violence|war|warfare|killing|killings|murder|murders)\b/,
+    /\b(armed robbery|armed heist|armed hold[- ]?up|robbery at gunpoint|carjack(?:ing|ed)?|home invasion)\b/,
+    /\b(kidnap(?:ped|ping)?|abduct(?:ed|ion)?|hostage)\b.{0,40}\b(ransom|criminal|gang|cartel|syndicate)\b/,
+    /\b(ransom|criminal|gang|cartel|syndicate)\b.{0,40}\b(kidnap(?:ped|ping)?|abduct(?:ed|ion)?|hostage)\b/,
+    /\b(human trafficking|people smuggling|drug trafficking|narcotics trafficking|arms trafficking|wildlife trafficking)\b/,
+    /\b(extortion racket|protection racket|contract killing|gang-related murder|gang-related shooting)\b/,
   ],
   // Protests / Flashpoint use a two-tier match: an UNAMBIGUOUS phrase
   // alone is sufficient, but the ambiguous tokens "rally", "strike"

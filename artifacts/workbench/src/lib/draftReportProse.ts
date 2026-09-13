@@ -169,7 +169,7 @@ function topTypesText(rows: DraftableIncident[]): string {
 
 // Conflict Watch describes WHAT KIND of armed event happened using the same
 // four kinetic categories the Conflict monitor uses (Armed Clash, Insurgency,
-// Bombing & Airstrike, Abduction & Armed Crime). The generic classifier has no
+// Bombing & Airstrike, Abduction & Captivity). The generic classifier has no
 // conflict case and would fall back to protest/strike-style labels, so the
 // conflict report derives its "types" text from classifyConflictCategory to
 // keep the report and the monitor speaking the same vocabulary.

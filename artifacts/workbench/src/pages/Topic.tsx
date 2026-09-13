@@ -47,7 +47,7 @@ const TOPIC_SUBTITLE: Record<string, string> = {
   fertiliser: "Fertiliser supply, plant and input-cost disruption monitor.",
   fuel: "Fuel supply, refining and pricing disruption monitor.",
   flashpoint: "Cross-topic flashpoint and civil-disturbance monitor.",
-  crime: "Organised crime, gang activity and trafficking monitor. Maritime piracy and cargo theft are tracked separately under Shipping/Cargo Watch.",
+  crime: "Organised crime, gang activity, trafficking and serious violent crime.",
 };
 
 function darken(hex: string, amount = 0.18): string {
@@ -78,6 +78,17 @@ export default function Topic() {
   const subtitle = TOPIC_SUBTITLE[topic] ?? `${label} incident monitor.`;
 
   const { data: raw = [], isLoading } = useListIncidents({ topic: topic as never });
+  // Crime Watch also reads the regional incident feed, where crime reporting
+  // was historically stored. The shared crime relevance rule selects only
+  // genuine criminal incidents from that broader feed.
+  const { data: regionalCrimeCandidates = [], isLoading: isRegionalCrimeLoading } =
+    useListIncidents({ topic: "apac_local" as never });
+  const sourceRows = useMemo(
+    () => (topic === "crime" ? [...raw, ...regionalCrimeCandidates] : raw),
+    [topic, raw, regionalCrimeCandidates],
+  );
+  const pageLoading =
+    isLoading || (topic === "crime" && isRegionalCrimeLoading);
 
   // Date-range window. Defaults to 7 days — a 2-year default meant every topic
   // monitor opened buried under 1,000+ incidents before anyone could act on
@@ -87,7 +98,10 @@ export default function Topic() {
 
   // Reconcile to the same scoped, noise-filtered set the dashboard card and the
   // reports use, so every surface tallies.
-  const trueIncidents = useMemo(() => resolveTrueIncidents(topic, raw), [topic, raw]);
+  const trueIncidents = useMemo(
+    () => resolveTrueIncidents(topic, sourceRows),
+    [topic, sourceRows],
+  );
 
   const enriched = useMemo(
     () =>
@@ -626,7 +640,7 @@ export default function Topic() {
           )}
         </div>
         <div className="bg-white border border-border rounded-sm">
-          {isLoading ? (
+          {pageLoading ? (
             <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>
           ) : !visibleForTable.length ? (
             <div className="p-8 text-center text-sm text-muted-foreground">

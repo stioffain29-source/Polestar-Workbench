@@ -5,6 +5,18 @@ description: Why off-topic business/diplomacy stories leak into Conflict Watch a
 
 # Conflict relevance excludes
 
+**Product scope:** Conflict Watch means war, armed conflict, insurgency and
+terrorism. Ordinary armed crime, robbery, isolated shootings and criminal
+kidnapping belong in Crime Watch, not Conflict Watch.
+
+**Why:** The owner explicitly rejected both crime admission and explanatory
+cross-tracker straplines on Conflict Watch.
+
+**How to apply:** Crime-only terms must not independently satisfy the conflict
+relevance or ingest gates. Conflict-linked abduction may remain under
+"Abduction & Captivity" only when separate war, insurgent, terrorist or armed-
+group evidence admits the incident.
+
 The conflict REQUIRED gate keys off bare actor tokens (naxal/naxalite, maoist,
 militant, insurgent, rebel, separatist). So stories that merely NAME an insurgency
 as background — a "post-Naxal investment push", a "diplomacy to prevent a militant

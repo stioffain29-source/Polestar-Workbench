@@ -551,11 +551,12 @@ const DATA_CENTRE_CONFIG: NewsTopicConfig = {
 };
 
 // -------------------------------------------------------------- conflict ----
-// War / armed conflict / insurgency / armed crime. This is a SEPARATE topic
+// War / armed conflict / insurgency. This is a SEPARATE topic
 // from `flashpoint` (which stays strictly activism / protests / strikes / civil
 // disorder). Conflict feeds the COUNTRY and SPOT reports with kinetic, armed
 // events: insurgencies, firefights, bombings, ambushes, named armed groups and
-// serious armed crime. It must never write protest/demonstration rows.
+// conflict-linked captivity. It must never write protest/demonstration or
+// ordinary crime rows.
 //
 // Country attribution uses a Papua-first alias map so a Freeport / Grasberg /
 // Timika mine-security story resolves to "West Papua" (its own country report)
@@ -579,7 +580,7 @@ const CONFLICT_ALIASES: CountryAlias[] = [
 
 const CONFLICT_COUNTRIES = [...SOUTH_APAC, "Malaysia"];
 
-const CONFLICT_TERMS = `("armed clash" OR "gun battle" OR firefight OR shootout OR insurgent OR insurgency OR militant OR rebel OR separatist OR ambush OR "roadside bomb" OR "armed group" OR "armed attack" OR gunmen OR "armed robbery" OR kidnapping OR abduction OR "shot dead")`;
+const CONFLICT_TERMS = `("armed clash" OR "gun battle" OR firefight OR insurgent OR insurgency OR militant OR rebel OR separatist OR ambush OR "roadside bomb" OR "armed group" OR "armed attack" OR terrorism OR terrorist)`;
 
 export const CONFLICT_CONFIG: NewsTopicConfig = {
   topic: "conflict",
@@ -642,17 +643,9 @@ export const CONFLICT_CONFIG: NewsTopicConfig = {
     "drone strike",
     "airstrike",
     "air strike",
-    "abduction",
-    "abducted",
-    "kidnap",
-    "kidnapped",
-    "kidnapping",
-    "hostage",
-    "gunmen",
-    "gunman",
-    "shot dead",
-    "gunned down",
-    "mass shooting",
+    "terrorism",
+    "terrorist attack",
+    "terror attack",
     "massacre",
     "tpnpb",
     "free papua",

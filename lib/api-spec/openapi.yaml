@@ -2121,6 +2121,8 @@ components:
         - cargo_watch
         - conflict
         - data_centres
+        - apac_local
+        - crime
 
     Severity:
       type: string

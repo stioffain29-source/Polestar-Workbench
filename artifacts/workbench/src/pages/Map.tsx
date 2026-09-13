@@ -55,7 +55,7 @@ const MARITIME_CATEGORIES = ["Maritime Strike"] as const;
 const LAND_CATEGORIES = ["Land Strike"] as const;
 
 // Conservative terrorism detector used only within the `conflict` topic feed
-// (war / armed clash / insurgency / serious armed crime). Deliberately keyed
+// (war / armed clash / insurgency / terrorism). Deliberately keyed
 // on explicit terrorism vocabulary and a short list of globally recognized
 // proscribed terrorist organizations — NOT on weapon type (car bombs and
 // airstrikes are also used in state-vs-state and state-vs-insurgent combat),

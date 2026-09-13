@@ -172,7 +172,7 @@ function capitalize(s: string): string {
 const CATEGORY_ACTIVITY_ATOMS: Record<string, string[]> = {
   Insurgency: ["insurgent attacks"],
   "Bombings & Airstrikes": ["bombings", "airstrikes"],
-  "Abduction & Crime": ["abductions", "armed crime"],
+  "Abduction & Captivity": ["conflict-linked abductions", "hostage-taking"],
   "Armed Clashes": ["armed clashes"],
 };
 function activityList(topCategories: string[]): string {
@@ -251,8 +251,8 @@ export function describeConflictEvent(i: ConflictEnrichedIncident): string {
     kind = "an attack on a military or police base";
   } else if (cat === "Bombing & Airstrike") {
     kind = "a bombing or airstrike";
-  } else if (cat === "Abduction & Armed Crime") {
-    kind = "an abduction or armed crime";
+  } else if (cat === "Abduction & Captivity") {
+    kind = "a conflict-linked abduction or hostage-taking";
   } else if (cat === "Insurgency") {
     kind = "an insurgency attack";
   } else if (
@@ -1088,7 +1088,7 @@ function buildWatchNext(
   lines.push(
     `The clearest sign of escalation is spread: violence reaching neighbouring areas, or fresh checkpoints, road closures and curfews. That would mean the fighting is widening rather than easing.`,
   );
-  if (categoriesPresent.has("Abduction & Crime"))
+  if (categoriesPresent.has("Abduction & Captivity"))
     lines.push(
       "Watch closely for abductions or fresh casualty reports, particularly anything aimed at staff, contractors or convoys.",
     );

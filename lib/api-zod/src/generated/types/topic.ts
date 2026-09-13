@@ -19,4 +19,6 @@ export const Topic = {
   cargo_watch: 'cargo_watch',
   conflict: 'conflict',
   data_centres: 'data_centres',
+  apac_local: 'apac_local',
+  crime: 'crime',
 } as const;

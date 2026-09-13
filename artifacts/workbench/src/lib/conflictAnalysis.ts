@@ -1,7 +1,7 @@
 // Conflict Watch analysis helpers.
 //
 // The "Conflict Watch" monitor is fed by the live `conflict` data topic — war,
-// armed conflict, insurgency and serious armed crime. This is a SEPARATE
+// armed conflict and insurgency.
 // kinetic theatre from the `flashpoint`/`protests` feed (which owns the
 // protest / demonstration / strike / civil-disorder vocabulary). This module
 // is the single source of truth for:
@@ -16,7 +16,7 @@ export const CONFLICT_CATEGORIES = [
   "Armed Clash",
   "Insurgency",
   "Bombing & Airstrike",
-  "Abduction & Armed Crime",
+  "Abduction & Captivity",
 ] as const;
 
 export type ConflictCategory = (typeof CONFLICT_CATEGORIES)[number];
@@ -40,21 +40,21 @@ function text(i: ConflictTextLike): string {
 // the `conflict` relevance rule so the monitor and the ingest gate stay aligned.
 const BOMBING_AIRSTRIKE =
   /\b(ied|improvised explosive|roadside bomb|car bomb|truck bomb|suicide bomb|grenade|bomb blast|bombing|explosion|detonat|land ?mine|airstrike|air strike|air ?raid|drone strike|shelling|shelled|artillery|mortar|rocket (attack|strike)|missile)/;
-const ABDUCTION_CRIME =
-  /\b(abduct|kidnap|hostage|armed robbery|armed heist|armed hold-?up|at gunpoint|extortion|kidnap[- ]for[- ]ransom|ransom)/;
+const ABDUCTION_CAPTIVITY =
+  /\b(abduct|kidnap|hostage|kidnap[- ]for[- ]ransom|ransom)/;
 const INSURGENCY =
   /\b(insurgen|militan|rebel|separatis|guerrilla|paramilitar|militia|warlord|junta|tpnpb|opm|free papua|west papua (rebel|fighter|insurgen|liberation|armed)|\bnpa\b|new people'?s army|abu sayyaf|biff|bifm|bangsamoro|moro (rebel|fighter|front)|ttp|tehrik|baloch|naxal|maoist|arakan army|ethnic armed)/;
 
 // Precedence is intentional: the explosive / aerial weapon signal (Bombing &
 // Airstrike) is the most lethal and indiscriminate, so it leads even when an
-// insurgent actor is named. Abduction & Armed Crime is next (a specific,
-// identifiable event type), then Insurgency (actor-driven), then Armed Clash as
+// insurgent actor is named. Abduction & Captivity is next (a specific,
+// conflict-linked captivity event), then Insurgency (actor-driven), then Armed Clash as
 // the catch-all default for any other armed engagement (firefights, gun
 // battles, ambushes, skirmishes, shootings).
 export function classifyConflictCategory(i: ConflictTextLike): ConflictCategory {
   const t = text(i);
   if (BOMBING_AIRSTRIKE.test(t)) return "Bombing & Airstrike";
-  if (ABDUCTION_CRIME.test(t)) return "Abduction & Armed Crime";
+  if (ABDUCTION_CAPTIVITY.test(t)) return "Abduction & Captivity";
   if (INSURGENCY.test(t)) return "Insurgency";
   return "Armed Clash";
 }
@@ -68,7 +68,7 @@ export const CATEGORY_COLOR: Record<ConflictCategory, string> = {
   "Armed Clash": "#465bff", // Electric Blue
   Insurgency: "#0b0a3d", // Midnight Blue
   "Bombing & Airstrike": "#4D5C7A", // Steel Blue (muted Midnight tint)
-  "Abduction & Armed Crime": "#363636", // Dusk Gray
+  "Abduction & Captivity": "#363636", // Dusk Gray
 };
 
 // Plural / display labels for the category metric cards (the incident table
@@ -77,7 +77,7 @@ export const CATEGORY_CARD_LABEL: Record<ConflictCategory, string> = {
   "Armed Clash": "Armed Clashes",
   Insurgency: "Insurgency",
   "Bombing & Airstrike": "Bombings & Airstrikes",
-  "Abduction & Armed Crime": "Abduction & Crime",
+  "Abduction & Captivity": "Abduction & Captivity",
 };
 
 // ---------------------------------------------------------------------------
