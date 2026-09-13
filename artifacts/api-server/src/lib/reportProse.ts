@@ -34,7 +34,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
-export const REPORT_PROSE_PROMPT_VERSION = "v3";
+export const REPORT_PROSE_PROMPT_VERSION = "v4";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -58,6 +58,20 @@ export interface GenerateReportProseInput {
   facts?: string | null;
   generationBasisFingerprint?: string | null;
   canonicalEvidenceIds?: string[];
+}
+
+/** Machine-readable support retained alongside rendered Fuel strings. */
+export interface FuelAnalyticalProvenance {
+  supportingIncidentIds: string[];
+  supportingEvidenceFamilyIds: string[];
+  supportingClaim?: string;
+  /** Exact rendered item this binding was produced for. */
+  verifiedText?: string;
+}
+
+export interface FuelSectionsProvenance {
+  whatHappened?: FuelAnalyticalProvenance[];
+  watchNext?: FuelAnalyticalProvenance[];
 }
 
 export type ReportProseOutcome =
@@ -214,6 +228,21 @@ FUEL EVIDENCE TRACEABILITY — additional non-negotiable rules:
 - The parser renders the verified claim for whatHappened, so an unsupported paraphrase cannot survive. For watchNext, include the exact parent claim in the text plus explicit future/conditional modality. Potential evidence can support Watch Next only in that conditional form; it cannot support current whatHappened.
 `
       : "";
+  const conflictGuardrails =
+    label === "Conflict Watch"
+      ? `
+CONFLICT WATCH TRACEABILITY — additional non-negotiable rules:
+- The supplied current canonical incident IDs are the complete authority for
+  current conflict themes. Do not introduce a current event, location, actor,
+  casualty or escalation theme without citing a supplied ID.
+- Return watchNext as an array of objects, each containing text and
+  supportingIncidentIds. Every item must cite at least one supplied current
+  incident ID and must be explicitly forward-looking or conditional.
+- Context may frame the judgement only when clearly described as background; it
+  cannot change current incident counts, peak severity, latest incident or
+  geographic concentration.
+`
+      : "";
   const proseFormatRule =
     label === "Energy Watch"
       ? "- British English. Professional, neutral register. No hyperbole or emojis. Markdown level-two headings are permitted ONLY inside the energy `whatHappened` string, as required above; do not use Markdown elsewhere."
@@ -228,6 +257,7 @@ This report covers ${focus}.
 ${maritimeGuardrails}
 ${energyGuardrails}
 ${fuelGuardrails}
+${conflictGuardrails}
 
 GROUNDING — non-negotiable:
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
@@ -264,7 +294,7 @@ Return STRICT JSON with EXACTLY these keys and no others:
    "whatHappened": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : "string"},      // Only the window's actual developments, told concretely with the specific places, actors and event types from the incidents — synthesised into a narrative, not enumerated.
   "whatMatters": string,       // Why it matters for staff movement, site access, supply or continuity, and where to focus attention.
   "implications": string[],    // 4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash.
-   "watchNext": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : "string[]"},       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
+   "watchNext": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : label === "Conflict Watch" ? "object[] (each {text, supportingIncidentIds})" : "string[]"},       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
   "polestarView": string       // The bottom-line analyst judgement with useful advice: state the appropriate risk level, where disruption is most likely, and what to do. Do not repeat the incident summary.${
     polestarViewMinWords
       ? ` MUST be at least ${polestarViewMinWords} words (aim for ${polestarViewMinWords}-${polestarViewMinWords + 40}): cover the overall judgement, what the data does and does not support, reporting limitations, the near-term outlook and your confidence level, each as its own sentence.`
@@ -296,11 +326,13 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
       : []),
     "INCIDENTS (the ONLY source of this-window facts):",
     incidentBlock(input.incidents),
-    ...(input.topic === "fuel"
+    ...(input.topic === "fuel" || input.topic === "conflict"
       ? [
           "",
-          `CANONICAL CURRENT EVIDENCE IDS: ${(input.canonicalEvidenceIds ?? []).join(", ") || "none"}`,
-          "Fuel traceability contract: return whatHappened as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`; return watchNext as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`. supportingClaim MUST be copied exactly from a supported claim supplied for one cited canonical record. Every factual whatHappened paragraph and every watchNext item MUST carry at least one verified claim. Potential evidence may support Watch Next only when the text is explicitly future/conditional; it must not support current whatHappened.",
+          `CANONICAL CURRENT INCIDENT IDS: ${(input.canonicalEvidenceIds ?? []).join(", ") || "none"}`,
+          input.topic === "fuel"
+            ? "Fuel traceability contract: return whatHappened as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`; return watchNext as an array of objects with `text`, `supportingEvidenceIds`, and `supportingClaim`. supportingClaim MUST be copied exactly from a supported claim supplied for one cited canonical record. Every factual whatHappened paragraph and every watchNext item MUST carry at least one verified claim. Potential evidence may support Watch Next only when the text is explicitly future/conditional; it must not support current whatHappened."
+            : "Conflict traceability contract: return watchNext as an array of objects with `text` and `supportingIncidentIds`. Every item must cite at least one supplied canonical current incident ID and use future or conditional language.",
         ]
       : []),
   ].join("\n");
@@ -381,7 +413,7 @@ export function parseTopicSections(
     const traceableItems = (
       value: unknown,
       section: "whatHappened" | "watchNext",
-    ): string[] => {
+    ): { text: string; provenance: FuelAnalyticalProvenance }[] => {
       const items = Array.isArray(value) ? value : [value];
       return items.flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -418,11 +450,43 @@ export function parseTopicSections(
             : [];
         });
         if (!bindings.length) return [];
+        const provenance: FuelAnalyticalProvenance = {
+          supportingIncidentIds: [
+            ...new Set(
+              bindings.map(({ id }) => {
+                const incident = input.incidents.find(
+                  (candidate) => (candidate.evidenceId ?? candidate.id ?? "") === id,
+                );
+                return incident?.id ?? id;
+              }),
+            ),
+          ],
+          supportingEvidenceFamilyIds: [
+            ...new Set(
+              bindings
+                .map(({ id }) =>
+                  input.incidents.find(
+                    (candidate) => (candidate.evidenceId ?? candidate.id ?? "") === id,
+                  )?.evidenceFamilyId,
+                )
+                .filter((id): id is string => Boolean(id)),
+            ),
+          ],
+        };
         if (section === "whatHappened") {
           // Mixed citations are valid when one cited non-Potential record
           // verifies the claim; a Potential extra citation does not poison it.
           const current = bindings.find((binding) => binding.status !== "Potential");
-          return current ? [current.claim] : [];
+          return current
+            ? [{
+                text: current.claim,
+                provenance: {
+                  ...provenance,
+                  supportingClaim: current.claim,
+                  verifiedText: current.claim,
+                },
+              }]
+            : [];
         }
         if (
           !isExplicitlyConditional(text) ||
@@ -430,9 +494,15 @@ export function parseTopicSections(
         ) return [];
         // Rebuild from the verified claim rather than rendering the model's
         // free-form paraphrase. Novel entities/themes cannot survive.
-        return [
-          `Monitor whether ${bindings[0].claim.replace(/[.!?]+$/, "")}.`,
-        ];
+        const watchText = `Monitor whether ${bindings[0].claim.replace(/[.!?]+$/, "")}.`;
+        return [{
+          text: watchText,
+          provenance: {
+            ...provenance,
+            supportingClaim: bindings[0].claim,
+            verifiedText: watchText,
+          },
+        }];
       });
     };
     // A legacy string is deliberately not accepted for these two Fuel fields:
@@ -440,13 +510,82 @@ export function parseTopicSections(
     // existing string API and parser unchanged.
     const happened = traceableItems(o.whatHappened, "whatHappened");
     const watch = traceableItems(o.watchNext, "watchNext");
-    sections.whatHappened = happened.join("\n\n");
-    sections.watchNext = watch.join("\n");
+    sections.whatHappened = happened.map((item) => item.text).join("\n\n");
+    sections.watchNext = watch.map((item) => item.text).join("\n");
+    sections.provenance = {
+      whatHappened: happened.map((item) => item.provenance),
+      watchNext: watch.map((item) => item.provenance),
+    };
     // Do not discard an otherwise valid analytical narrative when the model's
     // evidence binding for this one section is unusable. The publication
     // resolver replaces a blank What Happened with the canonical deterministic
     // section; retaining the other valid sections avoids collapsing the whole
     // report into thin fallback prose.
+  }
+  if (input?.topic === "conflict") {
+    // Conflict Watch has no claim ledger like Fuel, so the binding is the
+    // canonical current incident ID set itself. A legacy/free-form string is
+    // rejected: without IDs it can carry stale locations or escalation themes
+    // across a changed report window.
+    const canonicalIds = new Set(
+      (input.canonicalEvidenceIds?.length
+        ? input.canonicalEvidenceIds
+        : input.incidents.map((incident) => incident.id ?? ""))
+        .map((id) => String(id))
+        .filter((id) => id.trim() && id !== "0"),
+    );
+    const traceableItems = Array.isArray(o.watchNext) ? o.watchNext : [];
+    const watch = traceableItems.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as Record<string, unknown>;
+      const text = typeof row.text === "string"
+        ? row.text.trim()
+        : typeof row.item === "string"
+          ? row.item.trim()
+          : "";
+      const rawIds =
+        Array.isArray(row.supportingIncidentIds)
+          ? row.supportingIncidentIds
+          : Array.isArray(row.incidentIds)
+            ? row.incidentIds
+            : Array.isArray(row.evidenceIds)
+              ? row.evidenceIds
+              : [];
+      const ids = rawIds
+        .filter(
+          (id): id is string | number =>
+            typeof id === "string" || typeof id === "number",
+        )
+        .map(String)
+        .filter((id) => canonicalIds.has(id));
+      if (!text || ids.length === 0 || !isExplicitlyConditional(text)) return [];
+      const supportingIncidentIds = [
+        ...new Set(
+          ids.flatMap((id) => {
+            const incident = input.incidents.find(
+              (candidate) =>
+                String(candidate.id ?? "") === id ||
+                String(candidate.evidenceId ?? "") === id,
+            );
+            return incident?.id != null ? [String(incident.id)] : [];
+          }),
+        ),
+      ];
+      if (!supportingIncidentIds.length) return [];
+      return [{
+        text,
+        provenance: {
+          supportingIncidentIds,
+          supportingEvidenceFamilyIds: [],
+          verifiedText: text,
+        },
+      }];
+    });
+    sections.watchNext = watch.map((item) => item.text).join("\n");
+    sections.provenance = {
+      ...(sections.provenance ?? {}),
+      watchNext: watch.map((item) => item.provenance),
+    };
   }
   // Require the core paragraphs; the bullet lists may legitimately be short. If
   // the model returned an unusable shell, treat it as bad-json so the caller

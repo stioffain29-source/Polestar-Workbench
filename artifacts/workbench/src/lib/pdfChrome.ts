@@ -674,7 +674,7 @@ export function drawSectionWithProseAndDisclaimer(
   drawDisclaimer(ctx);
 }
 
-export function drawDisclaimer(ctx: Ctx) {
+export function drawDisclaimer(ctx: Ctx, title = "Disclaimer") {
   const { pdf, MX } = ctx;
   const need = measureDisclaimerHeight(ctx);
   const startsOnNewPage = ctx.y + need > ctx.H - ctx.BOTTOM;
@@ -687,7 +687,7 @@ export function drawDisclaimer(ctx: Ctx) {
   // The full block was reserved above, so the heading and every wrapped body
   // line remain on one page. On a fresh page omit the lead-in that only exists
   // when the disclaimer follows preceding content.
-  drawSectionHeading(ctx, "Disclaimer", { skipEnsureSpace: true });
+  drawSectionHeading(ctx, title, { skipEnsureSpace: true });
 
   const wrapped = disclaimerLines(ctx);
   setText(pdf, DUSK);

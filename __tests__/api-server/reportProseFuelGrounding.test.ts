@@ -88,6 +88,12 @@ describe("Fuel AI evidence grounding", () => {
     ]);
     expect(result?.whatHappened).toBe("Diesel deliveries are delayed at Port Alpha.");
     expect(result?.watchNext).toBe("");
+    expect(result?.provenance?.whatHappened).toEqual([{
+      supportingIncidentIds: ["observed-1"],
+      supportingEvidenceFamilyIds: [],
+      supportingClaim: "Diesel deliveries are delayed at Port Alpha.",
+      verifiedText: "Diesel deliveries are delayed at Port Alpha.",
+    }]);
   });
 
   it("retains mixed citations when a non-Potential ID semantically supports the item", () => {

@@ -23,3 +23,11 @@ The Flashpoint prose builders live in `flashpointReportDataset.ts` (`buildAutoEx
 - Polestar View must state risk level + where disruption is likely + concrete actions, never just a verdict.
 - Same-event fold: response-angle vocab (troops/deploy/contain/security…) added to SAME_EVENT_GENERIC, plus a facility-class fold — same explicit country + 3d window + both titles anchored on prison/jail + no distinct subjects ⇒ one event (owner: "the same incident cannot be two different ratings"). Distinct named prisons still stay apart via the distinct-subject guard.
 - PDF `pickProse` now mirrors preview exactly (incl. `isGenericFlashpointProse` suppression) — keep them identical.
+
+## Count-claim validation must understand scope
+
+The fail-closed prose validator must assign counts to the section and qualifier they actually describe. An Activism count is not automatically the report total, and “3 incidents rated High” means the High-severity subset in that section. Exclude calendar dates and durations before binding nearby numerals to nouns: month abbreviations with periods and hyphenated durations are common in real titles.
+
+**Why:** unscoped numeral matching can mistake dates, durations and qualified subset counts for contradictory report totals, rejecting valid prose and triggering unnecessary recovery.
+
+**How to apply:** when extending count validation, preserve fail-closed comparison but add grammatical and section scope. A recovery warning with identical selected/canonical errors usually indicates the shared validator or canonical builder is wrong, not that recovery prose should be improved.

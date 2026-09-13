@@ -1,7 +1,7 @@
 import { format, parseISO, max as dateMax, differenceInCalendarDays } from "date-fns";
 import { resolveReportWindow, filterIncidentsToWindow } from "./reportWindow";
 import { classifyIncidentType } from "./incidentClassifier";
-import { displayIncidentTitle, stripWireCruft } from "./incidentTitle";
+import { cleanIncidentTitle, displayIncidentTitle, stripWireCruft } from "./incidentTitle";
 import { pickFlashpointRead } from "./pickRead";
 import {
   extractFutureSignals,
@@ -1186,58 +1186,11 @@ const COVERAGE_COUNTRIES = ["Australia", "Papua New Guinea", "Indonesia", "Phili
 const COVERAGE_CITY_RE = /\b(sydney|melbourne|canberra|brisbane|port moresby|jayapura|manila|quezon city|tokyo|osaka|kathmandu|pokhara)\b/i;
 
 // --- Dedupe helpers --------------------------------------------------------
-// Google-News / wire titles append the publisher after a final ASCII " - " and
-// some outlets inject " | Section | site.com" noise ("Indonesia Protest | Pro
-// Sports | bdtonline.com - Bluefield Daily Telegraph"). That suffix is per-
-// OUTLET, so the SAME wire syndicated across three outlets yields three
-// different dedup keys and survives as duplicate cards. Strip it before the
-// dedup signature so syndicated copies collapse. Used by the dedup helpers
-// only; em-dashes (—) are left intact (they separate real clauses).
-function stripMasthead(title: string): string {
-  let t = (title ?? "").trim();
-  // Blog-aggregator prefixes ("Business.Scoop » …").
-  t = t.replace(/^[\w.]+\s*scoops?\s*[\u00bb\u203a>]\s*/i, "").trim();
-  // Peel trailing outlet chains: "… - ABC News & Headlines - Australian Broadcasting Corporation".
-  const OUTLET_TAIL_RE =
-    /\s+[-\u2013|»\u203a]\s+(?:the\s+)?(?:[A-Z0-9][\w.'&-]*\s+){0,8}(?:news|times|post|herald|gazette|telegraph|tribune|journal|standard|observer|guardian|broadcast(?:ing)?|corporation|corp|scoops?|\.com|\.net|\.org|abc|bbc|reuters|afp)\b[^-]*$/i;
-  for (let i = 0; i < 8; i++) {
-    const next = t.replace(OUTLET_TAIL_RE, "").trim();
-    if (next === t) break;
-    t = next;
-  }
-  // Peel trailing " - <publisher>" / " | <publisher>" segments. Split on the
-  // LAST space-padded ASCII " - " / " | " and treat the tail as a masthead when
-  // it is short (<= 6 words); the tail may itself contain hyphens/dots
-  // ("Journal-News.com", "bdtonline.com"). Keep a >= 2-word head so a real
-  // clause is never consumed. em-dashes (—) are not delimiters here.
-  for (let i = 0; i < 5; i++) {
-    const m = t.match(/^(.*\S)\s+[-|»\u203a]\s+(.+)$/);
-    if (!m) break;
-    const head = m[1].trim();
-    if (m[2].trim().split(/\s+/).length > 6) break;
-    if (head.split(/\s+/).length < 2) break;
-    t = head;
-  }
-  // Collapse any residual " | Section" noise an outlet injects mid-title down
-  // to the lead headline segment.
-  const pipe = t.indexOf(" | ");
-  if (pipe > 0) {
-    const lead = t.slice(0, pipe).trim();
-    if (lead.split(/\s+/).length >= 2) t = lead;
-  }
-  const guillemet = t.indexOf(" » ");
-  if (guillemet > 0) {
-    const lead = t.slice(0, guillemet).trim();
-    if (lead.split(/\s+/).length >= 2) t = lead;
-  }
-  return t;
-}
-
-// Reader-facing title: publisher masthead + video cruft removed, original case
-// kept. Used at enrich time so every surface (preview tables, Related Incidents,
-// PDF) renders the SAME clean headline and preview/PDF parity holds.
+// Keep title cleaning in the shared presentation chokepoint. Flashpoint uses
+// this same function for rendered rows and for every title-derived key, so a
+// URL/CTA/source suffix cannot make one syndicated event look distinct.
 export function cleanDisplayTitle(title: string): string {
-  return stripWireCruft(stripMasthead(title ?? ""));
+  return cleanIncidentTitle(title ?? "");
 }
 
 function normaliseTitle(s: string): string {
@@ -1281,14 +1234,23 @@ function topicSignature(title: string, date: Date): string {
   return `${bucket}|${top.join(" ")}`;
 }
 
-// Shared "which of two syndicated copies survives" rule: higher severity
-// first, then the more recent record. Used by every dedupe pass so the
-// surviving row is consistent across title / signature / same-event collapse.
-function sevDateBetter<T extends { date: Date; severity: string }>(a: T, b: T): boolean {
-  return compareIncidentSignificance(
+// Shared "which of two syndicated copies survives" rule: the highest accepted
+// incident severity always wins, then the more recent record. This is
+// deliberately independent of title/source ordering: every report fact must
+// see the same severity when duplicate articles disagree.
+function sevDateBetter<T extends { title: string; date: Date; severity: string }>(a: T, b: T): boolean {
+  const aRank = incidentSeverityRank(a.severity);
+  const bRank = incidentSeverityRank(b.severity);
+  if (aRank !== bRank) return aRank > bRank;
+  const significance = compareIncidentSignificance(
     { severity: a.severity, occurredAt: a.date.toISOString() },
     { severity: b.severity, occurredAt: b.date.toISOString() },
-  ) <= 0;
+  );
+  if (significance !== 0) return significance < 0;
+  const aId = "id" in a ? String((a as T & { id?: number | string }).id ?? "") : "";
+  const bId = "id" in b ? String((b as T & { id?: number | string }).id ?? "") : "";
+  if (aId !== bId) return aId.localeCompare(bId) < 0;
+  return a.title.localeCompare(b.title) <= 0;
 }
 
 // Tokens that must NOT anchor a same-event match. Generic mobilisation words
@@ -1466,6 +1428,118 @@ function distinctSubjects(a: Set<string>, b: Set<string>): boolean {
 
 const SAME_EVENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
+type DedupeIncident = {
+  title: string;
+  displayTitle?: string | null;
+  date: Date;
+  severity: string;
+  country?: string | null;
+  location?: string | null;
+  semanticEventDate?: string | null;
+  validityGates?: FlashpointValidityGates | null;
+};
+
+function metadataText(value: string | null | undefined): string {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function metadataDate<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.semanticEventDate ?? row.validityGates?.eventDate);
+}
+
+function metadataLocation<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.validityGates?.physicalLocation ?? row.location);
+}
+
+function metadataCountry<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.validityGates?.country ?? row.country);
+}
+
+function metadataActor<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.validityGates?.actor);
+}
+
+function metadataActivity<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.validityGates?.activity);
+}
+
+function metadataEventType<T extends DedupeIncident>(row: T): string {
+  return metadataText(row.validityGates?.eventType);
+}
+
+function metadataTokens(value: string): Set<string> {
+  return new Set(value.split(" ").filter((token) => token.length >= 3));
+}
+
+function disjointMetadata(a: string, b: string): boolean {
+  if (!a || !b || a === b) return false;
+  const aTokens = metadataTokens(a);
+  const bTokens = metadataTokens(b);
+  if (aTokens.size === 0 || bTokens.size === 0) return true;
+  for (const token of aTokens) if (bTokens.has(token)) return false;
+  return true;
+}
+
+/**
+ * Persisted semantic fields are stronger evidence than a publication title.
+ * In particular, a repeated headline about a recurring event must not collapse
+ * merely because its first six title tokens are identical. Explicit
+ * date/location/country/type disagreements are hard vetoes. Actor and activity
+ * disagreements are also vetoes when both sides are specific and disjoint;
+ * otherwise the title anchors still have to establish the link.
+ */
+function persistedEventCompatibility<T extends DedupeIncident>(
+  a: T,
+  b: T,
+  opts: { allowEventTypeMismatch?: boolean } = {},
+): { compatible: boolean; agreements: number } {
+  const dateA = metadataDate(a);
+  const dateB = metadataDate(b);
+  const locationA = metadataLocation(a);
+  const locationB = metadataLocation(b);
+  const countryA = metadataCountry(a);
+  const countryB = metadataCountry(b);
+  const actorA = metadataActor(a);
+  const actorB = metadataActor(b);
+  const activityA = metadataActivity(a);
+  const activityB = metadataActivity(b);
+  const typeA = metadataEventType(a);
+  const typeB = metadataEventType(b);
+
+  if (dateA && dateB && dateA !== dateB) return { compatible: false, agreements: 0 };
+  if (locationA && locationB && locationA !== locationB) return { compatible: false, agreements: 0 };
+  if (countryA && countryB && countryA !== countryB) return { compatible: false, agreements: 0 };
+  if (
+    typeA &&
+    typeB &&
+    typeA !== typeB &&
+    !opts.allowEventTypeMismatch
+  ) {
+    return { compatible: false, agreements: 0 };
+  }
+  if (disjointMetadata(actorA, actorB) || disjointMetadata(activityA, activityB)) {
+    return { compatible: false, agreements: 0 };
+  }
+
+  let agreements = 0;
+  for (const [left, right] of [
+    [dateA, dateB],
+    [locationA, locationB],
+    [countryA, countryB],
+    [actorA, actorB],
+    [activityA, activityB],
+    [typeA, typeB],
+  ]) {
+    if (left && right && left === right) agreements++;
+  }
+  return { compatible: true, agreements };
+}
+
 // Tokens of the country NAME (e.g. "Sri Lanka" -> {sri, lanka}). A multi-word
 // country name alone would otherwise satisfy the >= 2 shared-anchor threshold,
 // letting two DIFFERENT same-country events merge on their shared nationality.
@@ -1499,9 +1573,7 @@ function sameCountryOrUnknown(a: string, b: string): boolean {
 // cities / actors stay apart). Transitivity via a bridging headline that names
 // both framings ("Negombo ... Sri Lanka Clash") closes the cluster; the best
 // row survives.
-function clusterSameEvent<
-  T extends { title: string; date: Date; severity: string; country?: string | null },
->(rows: T[]): T[] {
+function clusterSameEvent<T extends DedupeIncident>(rows: T[]): T[] {
   const n = rows.length;
   if (n < 2) return rows;
   const anchors = rows.map((r) => anchorTokens(r.title));
@@ -1514,15 +1586,32 @@ function clusterSameEvent<
   };
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      if (Math.abs(rows[i].date.getTime() - rows[j].date.getTime()) > SAME_EVENT_WINDOW_MS) continue;
+      const semanticDateI = metadataDate(rows[i]);
+      const semanticDateJ = metadataDate(rows[j]);
+      const dateI = semanticDateI ? parseISO(semanticDateI).getTime() : rows[i].date.getTime();
+      const dateJ = semanticDateJ ? parseISO(semanticDateJ).getTime() : rows[j].date.getTime();
+      if (Number.isFinite(dateI) && Number.isFinite(dateJ) &&
+        Math.abs(dateI - dateJ) > SAME_EVENT_WINDOW_MS) continue;
       if (!sameCountryOrUnknown(rows[i].country ?? "", rows[j].country ?? "")) continue;
-      const na = (rows[i].country ?? "").trim().toLowerCase();
-      const nb = (rows[j].country ?? "").trim().toLowerCase();
-      const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
       const facility = (s: Set<string>) =>
         s.has("prison") || s.has("jail") || s.has("airport");
       const namedVenue = (s: Set<string>) =>
         s.has("chabad") || s.has("synagogue");
+      // The same named facility can be described with different semantic
+      // event types by otherwise equivalent validators ("rally" vs
+      // "protest"). Let the explicit venue/date/location evidence carry that
+      // link, but only for facility pairs; recurring events still hit the
+      // persisted date/location vetoes above.
+      const allowFacilityTypeMismatch =
+        (facility(anchors[i]) && facility(anchors[j])) ||
+        (namedVenue(anchors[i]) && namedVenue(anchors[j]));
+      const metadata = persistedEventCompatibility(rows[i], rows[j], {
+        allowEventTypeMismatch: allowFacilityTypeMismatch,
+      });
+      if (!metadata.compatible) continue;
+      const na = (rows[i].country ?? "").trim().toLowerCase();
+      const nb = (rows[j].country ?? "").trim().toLowerCase();
+      const explicitSameCountry = !!na && !!nb && na !== "unknown" && na === nb;
       // Facility-class fold runs BEFORE the distinct-subject veto so
       // "Incheon Airport labour protest" and "Incheon Airport pay protest"
       // collapse even when the grievance wording differs.
@@ -1589,7 +1678,13 @@ function clusterSameEvent<
         if (countryToks[i].has(t) || countryToks[j].has(t)) continue;
         shared++;
       }
-      if (shared >= 2) { parent[find(i)] = find(j); continue; }
+      // Two persisted agreements can corroborate one concrete title anchor.
+      // Without that semantic support, retain the conservative two-anchor
+      // threshold so uncertain pairs are left separate.
+      if (shared >= 2 || (shared >= 1 && metadata.agreements >= 2)) {
+        parent[find(i)] = find(j);
+        continue;
+      }
     }
   }
   const best = new Map<number, T>();
@@ -1609,26 +1704,54 @@ function clusterSameEvent<
   return out;
 }
 
-export function dedupeByTitle<T extends { title: string; date: Date; severity: string; country?: string | null }>(rows: T[]): T[] {
-  const byTitle = new Map<string, T>();
+export function dedupeByTitle<T extends DedupeIncident>(rows: T[]): T[] {
+  // A title key is only a candidate bucket. Keep multiple representatives in
+  // one bucket when persisted event evidence says they are different dates,
+  // locations, actors, activities or event types.
+  // Materialise the presentation title before every pass. This prevents the
+  // fuzzy same-event pass from re-introducing URL/source noise after the exact
+  // title bucket has correctly collapsed it.
+  const preparedRows = rows.map((row) => {
+    const title = displayIncidentTitle(row.title, row.displayTitle);
+    return { ...row, title, displayTitle: title };
+  });
+  const byTitle = new Map<string, T[]>();
   let emptyKeyIndex = 0;
-  for (const r of rows) {
+  for (const r of preparedRows) {
     const k = titleKey(r.title);
     // Stable fallback: report construction and its audit fingerprint must never
     // depend on process randomness, even for a malformed punctuation-only title.
-    if (!k) { byTitle.set(`__empty_${emptyKeyIndex++}`, r); continue; }
-    const prev = byTitle.get(k);
-    if (!prev || sevDateBetter(r, prev)) byTitle.set(k, r);
+    const bucketKey = k || `__empty_${emptyKeyIndex++}`;
+    const bucket = byTitle.get(bucketKey) ?? [];
+    const matchIndex = bucket.findIndex((prev) =>
+      persistedEventCompatibility(r, prev).compatible,
+    );
+    if (matchIndex < 0) {
+      bucket.push(r);
+    } else if (sevDateBetter(r, bucket[matchIndex]!)) {
+      bucket[matchIndex] = r;
+    }
+    byTitle.set(bucketKey, bucket);
   }
-  const bySig = new Map<string, T>();
-  for (const r of byTitle.values()) {
-    const k = topicSignature(r.title, r.date);
-    const prev = bySig.get(k);
-    if (!prev || sevDateBetter(r, prev)) bySig.set(k, r);
+  const bySig = new Map<string, T[]>();
+  for (const bucket of byTitle.values()) {
+    for (const r of bucket) {
+      const k = topicSignature(r.title, r.date);
+      const signatureBucket = bySig.get(k) ?? [];
+      const matchIndex = signatureBucket.findIndex((prev) =>
+        persistedEventCompatibility(r, prev).compatible,
+      );
+      if (matchIndex < 0) {
+        signatureBucket.push(r);
+      } else if (sevDateBetter(r, signatureBucket[matchIndex]!)) {
+        signatureBucket[matchIndex] = r;
+      }
+      bySig.set(k, signatureBucket);
+    }
   }
   // Third pass: fuzzy same-event collapse for syndicated rewrites the exact
   // passes above cannot bridge (varying casualty counts / place-name framing).
-  return clusterSameEvent(Array.from(bySig.values()));
+  return clusterSameEvent(Array.from(bySig.values()).flat());
 }
 
 // --- Bucketing -------------------------------------------------------------
@@ -1716,6 +1839,7 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
       return {
         ...r,
         rawTitle: r.title,
+        displayTitle: displayTitle,
         title: displayTitle,
         location:
           semantic!.physicalLocation!.trim() || location,
@@ -4259,7 +4383,20 @@ export function validateFlashpointRenderedModel(
     /\b(incidents?|events?|reports?|protests?|demonstrations?|strikes?|blockades?|riots?)\b/gi;
   const cardinal = new RegExp(`\\b${countToken}\\b`, "gi");
   const sentenceCountErrors = (section: string, text: string) => {
-    for (const sentenceMatch of text.matchAll(/[^.!?\n]+[.!?]?/g)) {
+    const sectionRows =
+      section === "activismRead"
+        ? ds.activismRows
+        : section === "civilUnrestRead"
+          ? ds.unrestRows
+          : Array.from(ds.canonical.periodRows);
+    // Month abbreviations before a day are not sentence boundaries. Normalise
+    // only that narrow form so "Sept. 9 deadline" stays in one sentence and
+    // the day cannot be misread as the count nearest a later "strike" noun.
+    const countAuditText = text.replace(
+      /\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.\s+(?=\d{1,2}\b)/gi,
+      "$1 ",
+    );
+    for (const sentenceMatch of countAuditText.matchAll(/[^.!?\n]+[.!?]?/g)) {
       const sentence = sentenceMatch[0];
       const nouns = Array.from(sentence.matchAll(countNoun)).map((match) => ({
         noun: match[1].toLowerCase(),
@@ -4305,11 +4442,11 @@ export function validateFlashpointRenderedModel(
         const explicitDurationOrDate =
           /^\s*(?:%|percent(?:age)?\b)/i.test(after) ||
           new RegExp(
-            `^\\s*(?:days?|hours?|weeks?|months?|years?|minutes?)\\b(?:\\s+(?:ago|since|on|by))?`,
+            `^[\\s-]*(?:days?|hours?|weeks?|months?|years?|minutes?)\\b(?:\\s+(?:ago|since|on|by))?`,
             "i",
           ).test(after) ||
           new RegExp(`^\\s*(?:${monthNames})\\b`, "i").test(after) ||
-          new RegExp(`(?:${monthNames})\\s*$`, "i").test(before) ||
+          new RegExp(`(?:${monthNames})\\.?\\s*$`, "i").test(before) ||
           (index > nearestNoun.index &&
             /\b(?:on|by|since)\s*$/i.test(between));
         const value = parseCount(token);
@@ -4330,25 +4467,37 @@ export function validateFlashpointRenderedModel(
             ? nearestCountry.row
             : null;
         const category = categoryAliases[nearestNoun.noun];
-        const expected = category
-          ? country
-            ? ds.canonical.periodRows.filter((row) => {
+        const severityQualifier = sentence
+          .slice(nearestNoun.end, Math.min(sentence.length, nearestNoun.end + 40))
+          .match(/^\s*(?:were\s+)?rated\s+(Insignificant|Low|Moderate|High|Extreme)\b/i)?.[1];
+        const scopedRows = country
+          ? sectionRows.filter((row) => row.country === country.label)
+          : sectionRows;
+        const expected = severityQualifier
+          ? scopedRows.filter(
+              (row) => sevKey(row.severity) === severityQualifier.toLowerCase(),
+            ).length
+          : category
+            ? country
+              ? ds.canonical.periodRows.filter((row) => {
                 const semanticType = row.validityGates?.eventType ?? "";
                 const rowCategory = ["protest", "demonstration"].includes(semanticType)
                   ? "protest"
                   : semanticType;
                 return row.country === country.label && rowCategory === category;
               }).length
-            : categoryCounts.get(category) ?? 0
-          : country
-            ? country.value
-            : canonicalTotal;
-        if (value !== expected) {
-          const scope = category
-            ? `${country ? `${country.label} ` : ""}${category}`
+              : categoryCounts.get(category) ?? 0
             : country
-              ? country.label
-              : "canonical total";
+              ? country.value
+              : canonicalTotal;
+        if (value !== expected) {
+          const scope = severityQualifier
+            ? `${country ? `${country.label} ` : ""}${section} ${severityQualifier.toLowerCase()}-severity`
+            : category
+              ? `${country ? `${country.label} ` : ""}${category}`
+              : country
+                ? country.label
+                : "canonical total";
           errors.push(
             `${section} claims ${value} ${nearestNoun.noun} but ${scope} count is ${expected}`,
           );

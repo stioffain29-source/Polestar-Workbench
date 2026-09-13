@@ -7,6 +7,7 @@ import {
   type FuelCoverageSummary,
 } from "../../artifacts/workbench/src/lib/fuelCoverage";
 import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
+import { deriveFuelIncidentCountry } from "../../artifacts/workbench/src/lib/fuelCountry";
 
 const ISSUE_DATE = "2031-04-07";
 
@@ -58,6 +59,48 @@ function canonicalFacts(): FuelCanonicalFacts {
 }
 
 describe("Fuel Watch reporting-period coverage", () => {
+  it("does not force global marine-fuel or refining coverage into source geography", () => {
+    const globalStory: TopicFastFactsIncident = {
+      id: 899,
+      topic: "fuel",
+      title: "Global marine-fuel prices rise as refining margins tighten",
+      summary: "The market move was discussed by analysts in Pakistan.",
+      country: "Pakistan",
+      location: null,
+      severity: "moderate",
+      occurredAt: "2031-04-06T09:00:00.000Z",
+    };
+    expect(deriveFuelIncidentCountry(globalStory)).toBeNull();
+  });
+
+  it("does not treat regional ship-fuel market framing as an affected country", () => {
+    const regionalStory: TopicFastFactsIncident = {
+      id: 8991,
+      topic: "fuel",
+      title: "Regional ship-fuel shortage deepens as refining margins tighten",
+      summary: "The market report was filed from Pakistan by the publisher's desk.",
+      country: "Pakistan",
+      location: null,
+      severity: "moderate",
+      occurredAt: "2031-04-06T09:00:00.000Z",
+    };
+    expect(deriveFuelIncidentCountry(regionalStory)).toBeNull();
+  });
+
+  it("keeps a concrete local refinery event attributable", () => {
+    const localStory: TopicFastFactsIncident = {
+      id: 900,
+      topic: "fuel",
+      title: "Refinery fire disrupts diesel production in Pakistan",
+      summary: "The outage cut local fuel output.",
+      country: "Pakistan",
+      location: null,
+      severity: "high",
+      occurredAt: "2031-04-06T09:00:00.000Z",
+    };
+    expect(deriveFuelIncidentCountry(localStory)).toBe("Pakistan");
+  });
+
   it("does not let a null maritime semantic field erase Fuel geography", () => {
     const facts = buildFuelCanonicalFacts({
       issueDate: "2026-09-13",

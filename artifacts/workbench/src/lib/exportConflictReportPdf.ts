@@ -1,12 +1,11 @@
 import { format, parseISO } from "date-fns";
-import { resolveIncidentSummary } from "./incidentSummary";
 import {
   createCtx,
   newPage,
-  ensureSpace,
   drawSectionHeading,
   drawSubtitle,
   renderProse,
+  drawSectionKeepTogether,
   drawSectionWithProse,
   setRoboto,
   ensureRobotoLoaded,
@@ -19,17 +18,9 @@ import {
   prepareCoverImage,
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
-  setFill,
-  setStroke,
   setText,
   sanitize,
-  NAVY,
-  POLAR,
   DUSK,
-  WHITE,
-  SEV_COLOR,
-  SEV_LABEL,
-  sevKey,
   type Ctx,
 } from "./pdfChrome";
 import { TOPIC_COVER_URLS } from "./coverImages";
@@ -45,17 +36,15 @@ import {
   buildConflictReportDataset,
   isGenericConflictProse,
   type ConflictReportIncident,
-  type ConflictEnrichedIncident,
   type ConflictActivityArea,
 } from "./conflictReportDataset";
-import { buildSituationalContext } from "./situationalContext";
-import { drawSituationalContextPdf } from "./situationalContextPdf";
 import type { ReliefWebReport } from "@workspace/api-client-react";
+import { CONFLICT_CLIENT_SECTION_TITLES } from "./conflictReportStructure";
 
 // Conflict Watch PDF. Section order (LOCATION-LED, no Executive Summary):
-//   Cover -> Situation -> Fast Facts -> Top Activity Areas ->
+//   Cover -> Fast Facts -> BLUF -> Top Activity Areas ->
 //   Other Watched Theatres -> What Matters for Business -> Watch Next ->
-//   Polestar View -> Related Incidents -> Disclaimer -> Data as of.
+//   Polestar View -> Disclaimer.
 // Data and prose come from buildConflictReportDataset so the preview
 // (ConflictReportPreview) and this exporter cannot drift.
 
@@ -93,12 +82,13 @@ function drawTopActivityAreas(
   ctx: Ctx,
   areas: ConflictActivityArea[],
   reads?: Record<string, string> | null,
+  sectionTitle = CONFLICT_CLIENT_SECTION_TITLES.topActivityAreas,
 ) {
   const { pdf, MX, CW } = ctx;
   const resolveRead = (area: ConflictActivityArea): string =>
     pickRead(reads?.[area.theatre], area.paragraph);
   if (areas.length === 0) {
-    drawSectionHeading(ctx, "Top Activity Areas");
+    drawSectionHeading(ctx, sectionTitle);
     setText(pdf, DUSK);
     setRoboto(pdf, "italic");
     pdf.setFontSize(9);
@@ -125,7 +115,7 @@ function drawTopActivityAreas(
   const headingBlockH = 14 + 14 + 8 + 16;
   const firstNeed = headingBlockH + 16 + firstLines.length * 17 + 14;
   if (ctx.y + firstNeed > ctx.H - ctx.BOTTOM) newPage(ctx);
-  drawSectionHeading(ctx, "Top Activity Areas");
+  drawSectionHeading(ctx, sectionTitle);
 
   areas.forEach((area, idx) => {
     const body = resolveRead(area);
@@ -139,128 +129,6 @@ function drawTopActivityAreas(
     drawSubtitle(ctx, area.theatre);
     renderProse(ctx, body);
   });
-}
-
-// --- Related Incidents -----------------------------------------------------
-function drawRelatedIncidents(
-  ctx: Ctx,
-  rows: ConflictEnrichedIncident[],
-  summaries: Record<string, string>,
-) {
-  ensureSpace(ctx, 24 + 18 + 40);
-  drawSectionHeading(ctx, "Related Incidents");
-  if (rows.length === 0) {
-    const { pdf, MX } = ctx;
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    pdf.text(
-      sanitize(
-        "Little related activity was reported this period. Treat the quiet stretch as a gap in reporting rather than a lasting calm.",
-      ),
-      MX,
-      ctx.y + 10,
-    );
-    setRoboto(pdf, "regular");
-    ctx.y += 22;
-    return;
-  }
-
-  const { pdf, MX, CW } = ctx;
-  const colDateW = 86;
-  const colIssueW = 120;
-  const colSevW = 75;
-  const colTitleW = CW - colDateW - colIssueW - colSevW - 6;
-  const rowH = 20;
-
-  const drawHeader = () => {
-    setFill(pdf, NAVY);
-    pdf.rect(MX, ctx.y, CW, rowH, "F");
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.6);
-    pdf.line(MX, ctx.y, MX + CW, ctx.y);
-    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text("DATE", MX + 6, ctx.y + 13);
-    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 13);
-    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 13);
-    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 13);
-    ctx.y += rowH;
-  };
-  drawHeader();
-
-  for (const i of rows) {
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8.5);
-
-    const titleLines: string[] = pdf.splitTextToSize(
-      sanitize(i.displayTitle ?? i.title),
-      colTitleW - 8,
-    );
-    const issueLines: string[] = pdf.splitTextToSize(
-      sanitize(i.issue),
-      colIssueW - 8,
-    );
-    pdf.setFontSize(7);
-    const summaryLines: string[] = pdf.splitTextToSize(
-      sanitize(resolveIncidentSummary(i, summaries)),
-      colTitleW - 8,
-    );
-    pdf.setFontSize(8.5);
-    const titleBlockH = titleLines.length * 12 + summaryLines.length * 9 + 4;
-    const rh = Math.max(
-      rowH,
-      Math.max(titleBlockH, issueLines.length * 12) + 10,
-    );
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
-      newPage(ctx);
-      drawHeader();
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8.5);
-    }
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.6);
-    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
-    pdf.line(MX, ctx.y, MX, ctx.y + rh);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
-
-    setText(pdf, DUSK);
-    const textOpts = { lineHeightFactor: 1.4 };
-    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
-    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
-    setText(pdf, NAVY);
-    const titleX = MX + colDateW + colIssueW + 6;
-    pdf.text(titleLines, titleX, ctx.y + 14, textOpts);
-    if (summaryLines.length > 0) {
-      setText(pdf, DUSK);
-      pdf.setFontSize(7);
-      pdf.text(
-        summaryLines,
-        titleX,
-        ctx.y + 14 + titleLines.length * 12 + 2,
-        textOpts,
-      );
-      pdf.setFontSize(8.5);
-    }
-
-    const sk = sevKey(i.severity);
-    setFill(pdf, SEV_COLOR[sk] ?? "#999999");
-    const chipX = MX + colDateW + colIssueW + colTitleW + 6;
-    const sevText = sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase());
-    const isSmallText = sevText === "HIGH" || sevText === "LOW";
-    const chipW = isSmallText ? 40 : 50;
-    pdf.rect(chipX, ctx.y + 4, chipW, 12, "F");
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(6.5);
-    pdf.text(sevText, chipX + chipW / 2, ctx.y + 12.5, { align: "center" });
-
-    ctx.y += rh;
-  }
-  ctx.y += 8;
 }
 
 // --- Exporter --------------------------------------------------------------
@@ -328,34 +196,44 @@ export async function exportConflictReportPdf(
 
   const ds = buildConflictReportDataset(incidents, data.topic, data.issueDate);
 
-  // 1. Situation (leads — Executive Summary dropped).
-  if (show("situation")) {
-    drawSectionWithProse(
-      ctx,
-      "Situation",
-      pickProse(data.situation, aiOr(aiProse?.situation, ds.autoSituation)),
-    );
-  }
+  // Supporting context and related rows remain available to the Workbench
+  // editor, but are deliberately not part of the client-facing journey.
+  void situationalReports;
+  void incidentSummaries;
 
-  // 2. Fast Facts.
+  // 1. Fast Facts.
   if (show("fast-facts")) {
-    drawSectionHeading(ctx, "Fast Facts");
+    drawSectionHeading(ctx, CONFLICT_CLIENT_SECTION_TITLES.fastFacts);
     drawFastFactsKpiCards(
       ctx,
       applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides),
     );
   }
 
+  // 2. BLUF (the persisted `situation` field is the editor's BLUF read).
+  if (show("situation")) {
+    drawSectionWithProse(
+      ctx,
+      CONFLICT_CLIENT_SECTION_TITLES.bluf,
+      pickProse(data.situation, aiOr(aiProse?.situation, ds.autoSituation)),
+    );
+  }
+
   // 3. Top Activity Areas (dynamic top-3 theatres, country heading + para).
   if (show("top-activity-areas")) {
-    drawTopActivityAreas(ctx, ds.topActivityAreas, data.conflictAreaReads);
+    drawTopActivityAreas(
+      ctx,
+      ds.topActivityAreas,
+      data.conflictAreaReads,
+      CONFLICT_CLIENT_SECTION_TITLES.topActivityAreas,
+    );
   }
 
   // 4. Other Watched Theatres.
   if (show("other-watched")) {
     drawSectionWithProse(
       ctx,
-      "Other Watched Theatres",
+      CONFLICT_CLIENT_SECTION_TITLES.otherWatched,
       pickRead(data.conflictOtherWatchedRead, ds.autoOtherWatched),
     );
   }
@@ -364,7 +242,7 @@ export async function exportConflictReportPdf(
   if (show("what-matters")) {
     drawSectionWithProse(
       ctx,
-      "What Matters for Business",
+      CONFLICT_CLIENT_SECTION_TITLES.whatMatters,
       pickProse(data.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters)),
     );
   }
@@ -373,7 +251,7 @@ export async function exportConflictReportPdf(
   if (show("watch-next")) {
     drawBulletSection(
       ctx,
-      "Watch Next",
+      CONFLICT_CLIENT_SECTION_TITLES.watchNext,
       pickProse(data.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext)),
       8,
     );
@@ -381,20 +259,14 @@ export async function exportConflictReportPdf(
 
   // 7. Polestar View.
   if (show("polestar-view")) {
-    drawSectionWithProse(
+    drawSectionKeepTogether(
       ctx,
-      "Polestar View",
+      CONFLICT_CLIENT_SECTION_TITLES.polestarView,
       pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
     );
   }
 
-  drawSituationalContextPdf(ctx, buildSituationalContext(situationalReports, { max: 6 }));
-
-  if (show("related-incidents")) {
-    drawRelatedIncidents(ctx, ds.relatedIncidents, incidentSummaries);
-  }
-
-  drawDisclaimer(ctx);
+  drawDisclaimer(ctx, CONFLICT_CLIENT_SECTION_TITLES.disclaimer);
 
   drawFooters(ctx.pdf);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

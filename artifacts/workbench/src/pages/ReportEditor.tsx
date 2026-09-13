@@ -1076,6 +1076,21 @@ export default function ReportEditor() {
     );
   }, [form.topic, form.issueDate, incidentsForExport, incidentWindowReady]);
 
+  // Conflict prose must use the exact final current-window canonical set that
+  // drives Fast Facts, activity areas and deterministic sections. Never send
+  // the related-incidents selection (or raw topic bucket), either of which can
+  // contain rows excluded by conflict validation or deduplication.
+  const conflictProseDataset = useMemo(() => {
+    if (form.topic !== "conflict" || !form.issueDate || !incidentWindowReady) {
+      return null;
+    }
+    return buildConflictReportDataset(
+      incidentsForExport,
+      form.topic,
+      form.issueDate,
+    );
+  }, [form.topic, form.issueDate, incidentsForExport, incidentWindowReady]);
+
   // Fuel prose must be grounded on the same canonical, de-duplicated
   // current-period evidence set as FIXED FACTS and the final renderer. Never
   // send the raw fuel-topic bucket here: it may contain syndicated rows,
@@ -1099,8 +1114,9 @@ export default function ReportEditor() {
   ]);
 
   // Ground on the same set the report renders (parity with the cache
-  // fingerprint). Summaries-enabled topics (conflict/shipping/cargo_watch/
-  // energy/fertiliser) already build the EXACT rendered related set;
+  // fingerprint). Conflict uses its canonical final current-window set;
+  // summaries-enabled shipping/cargo_watch/energy/fertiliser use their
+  // EXACT rendered related set;
   // flashpoint/protests/fuel carry no related table, so ground them on the
   // windowed incident set the report actually renders.
   const proseGrounding = useMemo(() => {
@@ -1111,6 +1127,8 @@ export default function ReportEditor() {
           return [...flashpointProseDataset.canonical.periodRows, ...flashpointProseDataset.canonical.futureRows]
             .find((r) => `${typeof r.id}:${String(r.id)}` === k)!;
         })
+       : conflictProseDataset
+         ? conflictProseDataset.canonical.periodRows
        : fuelProseData
          ? fuelProseData.canonicalFacts.qualifyingIncidents.map((i) => ({
              id: i.id,
@@ -1180,6 +1198,7 @@ export default function ReportEditor() {
   }, [
     proseEnabled,
     flashpointProseDataset,
+    conflictProseDataset,
     fuelProseData,
     summariesEnabled,
     relatedForSummaries,
@@ -1277,6 +1296,13 @@ export default function ReportEditor() {
                      (incident) => incident.id,
                    ),
                }
+             : conflictProseDataset
+             ? {
+                 generationBasisFingerprint:
+                   conflictProseDataset.canonical.fingerprint,
+                 canonicalEvidenceIds:
+                   conflictProseDataset.canonical.acceptedIds.map(String),
+               }
              : flashpointProseDataset
             ? {
                 generationBasisFingerprint:
@@ -1316,20 +1342,20 @@ export default function ReportEditor() {
   const aiProseSections = proseRes
     ? (() => {
         const liveFuelBasis = fuelProseData?.generationBasisFingerprint ?? null;
+        const liveConflictBasis =
+          conflictProseDataset?.canonical.fingerprint ?? null;
+        const liveBasis = liveFuelBasis ?? liveConflictBasis;
         const editedIsCurrent =
           !!proseRes.edited &&
-          (!flashpointProseDataset && !fuelProseData ||
+          (!flashpointProseDataset && !fuelProseData && !conflictProseDataset ||
             (!proseRes.stale &&
-              (fuelProseData
-                ? proseRes.editedGenerationBasisFingerprint === liveFuelBasis
-                : proseRes.editedGenerationBasisFingerprint ===
-                  flashpointProseDataset?.canonical.fingerprint)));
+              proseRes.editedGenerationBasisFingerprint === liveBasis));
         const useEdited = !!proseRes.edited && editedIsCurrent;
         const generationBasisFingerprint = useEdited
           ? proseRes.editedGenerationBasisFingerprint
           : proseRes.generationBasisFingerprint;
         const basisCurrent =
-          !liveFuelBasis || generationBasisFingerprint === liveFuelBasis;
+          !liveBasis || generationBasisFingerprint === liveBasis;
         return {
           ...(basisCurrent
             ? useEdited
@@ -1339,11 +1365,9 @@ export default function ReportEditor() {
           datasetFingerprint: generationBasisFingerprint ?? undefined,
           isAnalystEdited: useEdited && basisCurrent,
           stale:
-            (liveFuelBasis
-              ? generationBasisFingerprint !== liveFuelBasis
-              : flashpointProseDataset
-                ? generationBasisFingerprint !== flashpointProseDataset.canonical.fingerprint
-                : false) || !!proseRes.stale,
+            (liveBasis
+              ? generationBasisFingerprint !== liveBasis
+              : false) || !!proseRes.stale,
         };
       })()
     : null;
@@ -2016,7 +2040,7 @@ export default function ReportEditor() {
     setOrphanSavePending(false);
     setSaveBlocked(null);
     // Conflict Watch is location-led: it drops the Executive Summary, What
-    // Happened and Implications sections. Only Situation / What Matters /
+    // Happened and Implications sections. Only BLUF / What Matters /
     // Watch Next / Polestar View are editable + persisted; the rest of the
     // spine (Top Activity Areas, Other Watched Theatres) is render-time
     // auto-prose. So never write those dropped fields for conflict.
@@ -3019,9 +3043,9 @@ export default function ReportEditor() {
             </div>
           )}
 
-          {/* Conflict Watch is location-led: Situation leads and the
-              Executive Summary section is dropped entirely. Shipping keeps
-              the stored executiveSummary field, but presents it as BLUF. */}
+          {/* Conflict Watch is location-led: its stored situation field is
+              presented as BLUF. Shipping keeps the stored executiveSummary
+              field, but presents it as BLUF too. */}
           {form.topic !== "conflict" && (
             <Field
               label={form.topic === "shipping" ? "BLUF" : "Executive Summary"}
@@ -3247,7 +3271,7 @@ export default function ReportEditor() {
             </>
           )}
           {form.topic !== "flashpoint" && form.topic !== "protests" && (
-            <Field label="Situation">
+            <Field label={form.topic === "conflict" ? "BLUF" : "Situation"}>
               <Textarea
                 rows={4}
                 value={form.situation}
@@ -3828,7 +3852,10 @@ export default function ReportEditor() {
                 ...staleSavedProse,
                 ...(proseRes?.edited ?? {}),
               })
-                .filter(([, value]) => typeof value === "string" && value.trim())
+                .filter(
+                  (entry): entry is [string, string] =>
+                    typeof entry[1] === "string" && entry[1].trim().length > 0,
+                )
                 .map(([key, value]) => (
                   <div key={key}>
                     <div className="font-bold">{key}</div>

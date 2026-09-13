@@ -6,6 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export interface FuelAnalyticalProvenance {
+  supportingIncidentIds: string[];
+  supportingEvidenceFamilyIds: string[];
+  supportingClaim?: string;
+  verifiedText?: string;
+}
+
+export interface FuelSectionsProvenance {
+  whatHappened?: FuelAnalyticalProvenance[];
+  watchNext?: FuelAnalyticalProvenance[];
+}
+
 export interface TopicProseSections {
   executiveSummary: string;
   situation: string;
@@ -14,4 +26,5 @@ export interface TopicProseSections {
   implications: string;
   watchNext: string;
   polestarView: string;
+  provenance?: FuelSectionsProvenance;
 }

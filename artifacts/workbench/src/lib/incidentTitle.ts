@@ -103,9 +103,130 @@ export function displayIncidentTitle(
   displayTitle?: string | null,
 ): string {
   const display = (displayTitle ?? "").trim();
-  if (display) return display;
+  if (display) return cleanIncidentTitle(display);
   const raw = (title ?? "").trim();
-  return isLikelyNonEnglish(raw) ? "" : raw;
+  return isLikelyNonEnglish(raw) ? "" : cleanIncidentTitle(raw);
+}
+
+// A title is the one piece of incident text that is rendered in every client
+// surface. Keep this deliberately mechanical: remove feed/social packaging,
+// not facts (actors, places, actions, dates, or numbers). `rawTitle` remains
+// the immutable source headline and `source`/`sourceUrl` remain the attribution
+// fields; this function only prepares the client-facing copy.
+export function cleanIncidentTitle(title: string): string {
+  let t = (title ?? "").trim();
+  if (!t) return "";
+
+  // Publisher / aggregator framing is navigation, not the event. Keep this
+  // source-shaped and conservative: known outlet tails and explicit menu
+  // prefixes are removed, while an ordinary "headline - clause" remains.
+  t = t.replace(/^[\w.]+\s*scoops?\s*[\u00bb\u203a>]\s*/i, "").trim();
+  const outletTail =
+    /\s+[-\u2013|»\u203a]\s+(?:the\s+)?(?:[A-Z0-9][\w.'&-]*\s+){0,8}(?:news|times|post|herald|gazette|telegraph|tribune|journal|standard|observer|guardian|broadcast(?:ing)?|corporation|corp|scoops?|\.com|\.net|\.org|abc|bbc|reuters|afp)\b[^-]*$/i;
+  for (let i = 0; i < 8; i++) {
+    const next = t.replace(outletTail, "").trim();
+    if (next === t) break;
+    t = next;
+  }
+
+  // A feed occasionally puts the article URL in the headline itself. Remove
+  // protocol/www links, including truncated links ending in an ellipsis. The
+  // URL's query string is therefore removed with it, while a normal sentence
+  // containing '?' is retained.
+  t = t
+    .replace(/(?:https?:\/\/|www\.)[^\s<>"'“”‘’]+/gi, "")
+    .replace(/(?:^|\s)[\w.-]+\.(?:com|net|org|io|co|ly)(?:[/?#]\S*)?/gi, " ")
+    .replace(
+      /[?&](?:utm_[a-z0-9_]+|fbclid|gclid|dclid|mc_cid|mc_eid|oc)=[^\s&#]+/gi,
+      "",
+    );
+
+  // Social captions append calls to action that are not part of the event
+  // headline. Keep this end-anchored so "comment", "follow", or "link" in a
+  // factual sentence cannot be mistaken for boilerplate.
+  t = t
+    .replace(
+      /\s*(?:[|:\u2013\u2014-]\s*)?(?:read\s+more|read|see|view|full\s+story|more\s+details?|details?|link)\s+(?:the\s+)?(?:link\s+)?in\s+(?:the\s+)?comments?\b[\s\S]*$/i,
+      "",
+    )
+    .replace(
+      /\s*(?:[|:\u2013\u2014-]\s*)?(?:link|full\s+story|more\s+details?)\s+in\s+(?:the\s+)?bio\b[\s\S]*$/i,
+      "",
+    )
+    .replace(
+      /\s*(?:[|:\u2013\u2014-]\s*)?(?:click|tap)\s+(?:the\s+)?link\b[\s\S]*$/i,
+      "",
+    )
+    .replace(
+      /\s*(?:[|:\u2013\u2014-]\s*)?(?:follow|subscribe)\s+(?:us\s+)?(?:for|to)\b[\s\S]*$/i,
+      "",
+    )
+    .replace(
+      /\s*(?:[|:\u2013\u2014-]\s*)?(?:share|retweet|repost)\s+(?:this|the\s+post)\b[\s\S]*$/i,
+      "",
+    );
+
+  // Leading social-post labels. Requiring a separator means factual copy such
+  // as "Watch groups protest" and "Update on the strike" is not rewritten.
+  t = t.replace(
+    /^\s*(?:breaking(?:\s+news)?|developing|just\s+in|update|latest|live|thread|rt|repost|fyi|icymi|must[- ]?watch|watch\s+now|watch|exclusive\s+video|video\s+exclusive|video)\s*[:|-\u2013\u2014]\s*/i,
+    "",
+  );
+
+  // Hashtags are distribution metadata, not incident facts. Remove the tag
+  // token rather than its word from ordinary prose.
+  t = t.replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, "$1");
+
+  // Navigation fragments commonly survive RSS extraction ("Home > News >"
+  // and "| Latest News"). Only remove known navigation labels; a real
+  // publisher, place, or event name is left alone.
+  t = t
+    .replace(
+      /^\s*(?:(?:home|homepage|news|latest|latest\s+news|world|world\s+news|politics|video|menu)\s*(?:[|>\/\u00bb\u203a]\s*)?){2,}/i,
+      "",
+    )
+    .replace(
+      /\s*(?:[|]\s*)(?:home|homepage|news|latest(?:\s+news)?|world(?:\s+news)?|politics|video|menu|subscribe|sign\s+in|search|account|contact|about|privacy|terms|comments?|share)(?:\s*[|]\s*(?:home|homepage|news|latest(?:\s+news)?|world(?:\s+news)?|politics|video|menu|subscribe|sign\s+in|search|account|contact|about|privacy|terms|comments?|share))*\s*$/i,
+      "",
+    );
+
+  // The final short segment of a Google-News style title is often the
+  // publisher name ("… | Example News" or "… - Example.com"). This mirrors
+  // the legacy Flashpoint masthead handling, now shared by every topic.
+  for (let i = 0; i < 5; i++) {
+    const m = t.match(/^(.*\S)\s+[-|»\u203a]\s+(.+)$/);
+    if (!m) break;
+    const head = m[1].trim();
+    const tail = m[2].trim();
+    if (tail.split(/\s+/).length > 6 || head.split(/\s+/).length < 2) break;
+    if (!/(?:news|times|post|herald|gazette|telegraph|tribune|journal|standard|observer|guardian|broadcast|corporation|corp|scoop|\.com\b|\.net\b|\.org\b|abc\b|bbc\b|reuters\b|afp\b)/i.test(tail)) break;
+    t = head;
+  }
+  const pipeParts = t.split(/\s+\|\s+/);
+  if (
+    pipeParts.length > 1 &&
+    pipeParts[0]!.split(/\s+/).length >= 2 &&
+    pipeParts.slice(1).every((part) =>
+      /^(?:home|news|latest(?:\s+news)?|world|politics|video|menu|section|opinion|sports?|pro\s+sports|business|subscribe|comments?|share|[\w.-]+\.(?:com|net|org|io|co|ly))$/i.test(part.trim()),
+    )
+  ) {
+    t = pipeParts[0]!.trim();
+  }
+
+  // A broken source adapter can prepend the same source twice. Drop the
+  // duplicated pair; attribution is retained in the separate source fields.
+  for (let i = 0; i < 3; i++) {
+    const duplicate = t.match(
+      /^\s*(.{2,60}?)\s*(?::|\||\s[-\u2013\u2014]\s)\s*\1\s*(?::|\||\s[-\u2013\u2014]\s)\s*/i,
+    );
+    if (!duplicate) break;
+    t = t.slice(duplicate[0].length).trim();
+  }
+
+  return stripWireCruft(t
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s|:;\-,\u2013\u2014]+|[\s|:;\-,\u2013\u2014]+$/g, "")
+    .trim());
 }
 
 // Wire / social headlines carry video call-to-action cruft that is meaningless
@@ -143,4 +264,34 @@ export function stripWireCruft(title: string): string {
     "",
   ).trim();
   return t;
+}
+
+/**
+ * Remove explicit source packaging when prose crosses into a client-facing
+ * section. This is intentionally much narrower than cleanIncidentTitle:
+ * narrative text may contain punctuation and publisher names as facts, so only
+ * labels/attribution wrappers are removed. Incident facts themselves are not
+ * rewritten here.
+ */
+export function cleanClientFacingProse(prose: string): string {
+  let text = (prose ?? "").trim();
+  if (!text) return "";
+  text = text
+    .replace(
+      /(^|[\n])\s*(?:source|raw|publisher|wire)\s+(?:headline|title)\s*:\s*["“]([^"”\n]+)["”]/gi,
+      "$1$2",
+    )
+    .replace(
+      /(^|[\n])\s*(?:source|raw|publisher|wire)\s+(?:headline|title)\s*:\s*/gi,
+      "$1",
+    )
+    .replace(
+      /(^|[\n])\s*(?:reuters|bloomberg|associated press|afp|ap)\s*:\s*/gi,
+      "$1",
+    )
+    .replace(
+      /["“]([^"\n“”]+)["”]\s*(?:[-–—|]\s*)?(?:reuters|bloomberg|associated press|afp|ap)\b/gi,
+      "$1",
+    );
+  return text.replace(/[ \t]{2,}/g, " ").trim();
 }

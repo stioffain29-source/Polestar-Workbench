@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
@@ -13,19 +12,17 @@ import {
   buildConflictReportDataset,
   isGenericConflictProse,
   type ConflictReportIncident,
-  type ConflictEnrichedIncident,
 } from "@/lib/conflictReportDataset";
 import { SEV_COLOR } from "@/lib/pdfChrome";
-import SituationalContextSection from "@/components/SituationalContextSection";
 import type { ReliefWebReport } from "@workspace/api-client-react";
-import { resolveIncidentSummary } from "@/lib/incidentSummary";
+import { CONFLICT_CLIENT_SECTION_TITLES } from "@/lib/conflictReportStructure";
 
 // Conflict Watch on-screen preview. Renders the same sections, in the same
 // order, from the same dataset (buildConflictReportDataset) as
 // exportConflictReportPdf so the editor preview and the export cannot
 // disagree. Mirrors the visual language of FlashpointReportPreview but is
-// LOCATION-LED: Situation -> Top Activity Areas -> Other Watched Theatres ->
-// What Matters -> Watch Next -> Polestar View (no Executive Summary).
+// LOCATION-LED: Fast Facts -> BLUF -> Top Activity Areas -> Other Watched
+// Theatres -> What Matters -> Watch Next -> Polestar View.
 
 const DISCLAIMER_TEXT =
   "Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. " +
@@ -39,14 +36,6 @@ const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 const BRAND_GRADIENT = "linear-gradient(-130deg, #0b0a3d 0%, #465bff 100%)";
-
-const SEV_LABEL_MAP: Record<string, string> = {
-  insignificant: "Insignificant",
-  low: "Low",
-  moderate: "Moderate",
-  high: "High",
-  extreme: "Extreme",
-};
 
 function sevKey(s: string | null | undefined): string {
   return (s ?? "").toLowerCase();
@@ -152,14 +141,19 @@ function Section({
   title,
   children,
   hidden,
+  keepTogether = false,
 }: {
   title: string;
   children: React.ReactNode;
   hidden?: boolean;
+  keepTogether?: boolean;
 }) {
   if (hidden) return null;
   return (
-    <div className="report-section mb-8">
+    <div
+      className="report-section mb-8"
+      data-pdf-keep={keepTogether ? "true" : undefined}
+    >
       <h2
         className="uppercase pb-2 mb-4 tracking-wide"
         data-pdf-keep-with-next="true"
@@ -252,33 +246,12 @@ function KpiGrid({
   );
 }
 
-function SeverityChip({ sevKey: k, label }: { sevKey: string; label: string }) {
-  if (!k) return <span style={{ color: DUSK, fontSize: 11 }}>—</span>;
-  const bg = SEV_COLOR[k] ?? "#999";
-  return (
-    <span
-      className="uppercase inline-block text-center"
-      style={{
-        background: bg,
-        color: "#fff",
-        fontFamily: "Roboto, sans-serif",
-        fontWeight: 700,
-        fontSize: 9,
-        letterSpacing: "0.06em",
-        padding: "3px 8px",
-        minWidth: 64,
-      }}
-    >
-      {label}
-    </span>
-  );
-}
-
 function AreaBlock({ area, read }: { area: ConflictEnrichedAreaLike; read: string }) {
   return (
     <div className="mb-5">
       <h3
         className="uppercase tracking-wide mb-1"
+        data-pdf-keep-with-next="true"
         style={{
           color: NAVY,
           fontFamily: "Roboto, sans-serif",
@@ -300,94 +273,6 @@ interface ConflictEnrichedAreaLike {
   paragraph: string;
 }
 
-function RelatedIncidentsTable({ rows, summaries }: { rows: ConflictEnrichedIncident[]; summaries: Record<string, string> }) {
-  if (rows.length === 0) {
-    return (
-      <p
-        style={{
-          fontStyle: "italic",
-          color: DUSK,
-          fontFamily: "Roboto, sans-serif",
-          fontSize: 13,
-        }}
-      >
-        Little related activity was reported this period. Treat the quiet stretch
-        as a gap in reporting rather than a lasting calm.
-      </p>
-    );
-  }
-  return (
-    <div className="w-full">
-      {rows.length < 4 && (
-        <p
-          style={{
-            fontStyle: "italic",
-            color: DUSK,
-            fontFamily: "Roboto, sans-serif",
-            fontSize: 13,
-            marginBottom: 8,
-          }}
-        >
-          Little related activity was reported this period, so the list below is
-          short. It is kept deliberately brief — minor items are left out rather
-          than used to fill space.
-        </p>
-      )}
-      <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
-        <div
-          className="grid uppercase tracking-widest"
-          style={{
-            gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
-            background: NAVY,
-            color: "#fff",
-            fontFamily: "Roboto, sans-serif",
-            fontWeight: 700,
-            fontSize: 10,
-            padding: "8px 10px",
-            gap: 10,
-          }}
-        >
-          <div>Date</div>
-          <div>Issue</div>
-          <div>Title</div>
-          <div>Severity</div>
-        </div>
-        {rows.map((r, i) => (
-          <div
-            key={String(r.id)}
-            className="grid"
-            style={{
-              gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr",
-              padding: "8px 10px",
-              gap: 10,
-              borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
-              fontFamily: "Roboto, sans-serif",
-              fontSize: 12,
-              color: DUSK,
-              alignItems: "flex-start",
-            }}
-          >
-            <div>{format(r.date, "dd MMM yyyy")}</div>
-            <div>{r.issue}</div>
-            <div style={{ color: NAVY }}>
-              {r.displayTitle ?? r.title}
-              <div style={{ fontSize: 11, color: DUSK, marginTop: 4, lineHeight: 1.4 }}>
-                {resolveIncidentSummary(r, summaries)}
-              </div>
-            </div>
-            <div>
-              <SeverityChip
-                sevKey={sevKey(r.severity)}
-                label={SEV_LABEL_MAP[sevKey(r.severity)] ?? r.severity}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function ConflictReportPreview({
   report,
   incidents,
@@ -405,6 +290,11 @@ export default function ConflictReportPreview({
   hiddenSections?: string[];
   sectionOverrides?: TopicSectionOverrides | null;
 }) {
+  // `situationalReports` and `incidentSummaries` are intentionally accepted
+  // for editor/workbench compatibility. ReliefWeb context and Related
+  // Incidents remain available to those surfaces, but neither is client copy.
+  void situationalReports;
+  void incidentSummaries;
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -530,15 +420,15 @@ export default function ConflictReportPreview({
       </div>
 
       <div className="px-10 py-10">
-        <Section hidden={!show("situation")} title="Situation">
-          <Paragraphs text={pickProse(report.situation, aiOr(aiProse?.situation, ds.autoSituation))} />
-        </Section>
-
-        <Section hidden={!show("fast-facts")} title="Fast Facts">
+        <Section hidden={!show("fast-facts")} title={CONFLICT_CLIENT_SECTION_TITLES.fastFacts}>
           <KpiGrid cards={applyFastFactOverrides(ds.fastFacts, sectionOverrides?.fastFactOverrides)} />
         </Section>
 
-        <Section hidden={!show("top-activity-areas")} title="Top Activity Areas">
+        <Section hidden={!show("situation")} title={CONFLICT_CLIENT_SECTION_TITLES.bluf}>
+          <Paragraphs text={pickProse(report.situation, aiOr(aiProse?.situation, ds.autoSituation))} />
+        </Section>
+
+        <Section hidden={!show("top-activity-areas")} title={CONFLICT_CLIENT_SECTION_TITLES.topActivityAreas}>
           {ds.topActivityAreas.length === 0 ? (
             <p
               style={{
@@ -558,29 +448,27 @@ export default function ConflictReportPreview({
           )}
         </Section>
 
-        <Section hidden={!show("other-watched")} title="Other Watched Theatres">
+        <Section hidden={!show("other-watched")} title={CONFLICT_CLIENT_SECTION_TITLES.otherWatched}>
           <Paragraphs text={pickRead(report.conflictOtherWatchedRead, ds.autoOtherWatched)} />
         </Section>
 
-        <Section hidden={!show("what-matters")} title="What Matters for Business">
+        <Section hidden={!show("what-matters")} title={CONFLICT_CLIENT_SECTION_TITLES.whatMatters}>
           <Paragraphs text={pickProse(report.whatMatters, aiOr(aiProse?.whatMatters, ds.autoWhatMatters))} />
         </Section>
 
-        <Section hidden={!show("watch-next")} title="Watch Next">
+        <Section hidden={!show("watch-next")} title={CONFLICT_CLIENT_SECTION_TITLES.watchNext}>
           <Bullets text={pickProse(report.watchNext, aiOr(aiProse?.watchNext, ds.autoWatchNext))} max={8} />
         </Section>
 
-        <Section hidden={!show("polestar-view")} title="Polestar View">
+        <Section
+          hidden={!show("polestar-view")}
+          title={CONFLICT_CLIENT_SECTION_TITLES.polestarView}
+          keepTogether
+        >
           <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
         </Section>
 
-        <SituationalContextSection reports={situationalReports} max={6} />
-
-        <Section hidden={!show("related-incidents")} title="Related Incidents">
-          <RelatedIncidentsTable rows={ds.relatedIncidents} summaries={incidentSummaries} />
-        </Section>
-
-        <Section title="Disclaimer">
+        <Section title={CONFLICT_CLIENT_SECTION_TITLES.disclaimer} keepTogether>
           <p
             className="leading-[1.7]"
             style={{ color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: "9pt" }}

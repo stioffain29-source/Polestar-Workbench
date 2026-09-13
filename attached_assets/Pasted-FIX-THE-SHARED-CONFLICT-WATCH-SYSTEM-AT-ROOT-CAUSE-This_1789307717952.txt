@@ -1,0 +1,526 @@
+FIX THE SHARED CONFLICT WATCH SYSTEM AT ROOT CAUSE.
+
+This is NOT a request to patch the current 7–13 September Conflict Watch only.
+
+Use the current report as the regression test, but apply the fix to ALL current and future Conflict Watch reports.
+
+Do NOT hardcode:
+
+current dates
+Myanmar
+Pakistan
+India
+Philippines
+Thailand
+Indonesia
+West Papua
+Arakan State
+Khyber Pakhtunkhwa
+Manipur
+Caraga
+specific current incident titles
+
+Do NOT manually edit the current PDF to make the problems disappear.
+
+Fix the shared Conflict Watch data-selection, classification, severity, narrative and rendering logic.
+
+
+==================================================
+1. ONLY CURRENT-WINDOW DISTINCT CONFLICT INCIDENTS MAY DRIVE SEVERITY
+==================================================
+
+The current report shows:
+
+HIGHEST SEVERITY
+EXTREME
+
+but the Extreme item is a Pakistan statement reporting 4,700 deaths linked to militant attacks over a wider historical period.
+
+The report itself correctly states that this is NOT a discrete incident in the current reporting window.
+
+Therefore it must NOT drive:
+
+Highest Severity
+incident counts
+current-period country counts
+Top Activity Areas
+weekly conflict posture
+
+Fix this globally.
+
+HIGHEST SEVERITY must be calculated from:
+
+DISTINCT
+VALIDATED
+CURRENT-WINDOW
+CONFLICT INCIDENTS
+
+only.
+
+
+==================================================
+2. DISTINGUISH INCIDENTS FROM CONTEXT
+==================================================
+
+Conflict Watch currently mixes genuine conflict incidents with:
+
+political statements
+historical casualty summaries
+political rhetoric
+official policy positions
+contextual threat reporting
+
+These may still be useful as CONTEXT.
+
+They must not be treated as incidents unless a discrete operational event occurred.
+
+Create or enforce a distinction between:
+
+CURRENT INCIDENT
+
+CONTEXT / BACKGROUND
+
+OFFICIAL STATEMENT
+
+POLITICAL / STRATEGIC DEVELOPMENT
+
+
+Only CURRENT INCIDENTS should drive:
+
+incident totals
+severity peak
+country incident counts
+event-type counts
+latest incident
+Top Activity Areas incident ranking
+
+
+==================================================
+3. FILTER NON-INCIDENT MATERIAL BEFORE THE INCIDENT SET
+==================================================
+
+Examples visible in the current report include:
+
+political rhetoric using “Naxal”
+
+an official ruling out talks with insurgents
+
+a cumulative statement about militant deaths
+
+These may be relevant context but are not necessarily operational conflict incidents.
+
+Do not allow keyword matches such as:
+
+Naxal
+insurgent
+militant
+terrorist
+conflict
+
+to automatically make a record a current incident.
+
+Classify the underlying real-world event first.
+
+
+==================================================
+4. DEDUPLICATE BEFORE ANALYSIS
+==================================================
+
+Conflict Watch must work from DISTINCT UNDERLYING EVENTS.
+
+Multiple reports of the same:
+
+airstrike
+clash
+outpost capture
+insurgent attack
+security-force operation
+
+must be merged into one canonical incident.
+
+Deduplicate BEFORE:
+
+severity calculation
+incident counts
+country totals
+event-type totals
+Top Activity Areas
+Watch Next
+Situation / BLUF
+What Matters
+Polestar View
+
+
+==================================================
+5. FAST FACTS FIRST
+==================================================
+
+Change the shared Conflict Watch layout hierarchy.
+
+The preferred opening order is:
+
+FAST FACTS
+
+BLUF
+
+TOP ACTIVITY AREAS
+
+
+Do not place Situation above Fast Facts.
+
+Convert the current Situation function into the BLUF role.
+
+BLUF should answer:
+
+What defined the reporting window?
+
+Where was the most kinetic activity?
+
+Was activity regional or localised?
+
+What is the main operational significance?
+
+
+==================================================
+6. FAST FACTS MUST USE THE SAME CANONICAL INCIDENT SET
+==================================================
+
+Fast Facts must be internally consistent.
+
+Use the same final current-window incident set for:
+
+TOTAL / DISTINCT INCIDENTS
+
+HIGHEST SEVERITY
+
+TOP EVENT TYPE
+
+MOST AFFECTED COUNTRY
+
+LATEST INCIDENT
+
+
+Do not calculate one field from raw records and another from filtered records.
+
+
+==================================================
+7. USE DISTINCT INCIDENTS, NOT RAW RECORDS
+==================================================
+
+Replace client-facing metrics based on raw article volume where necessary.
+
+If “TOTAL RECORDS” means source rows, it is not a useful operational metric unless explicitly labelled as source/report volume.
+
+Prefer:
+
+DISTINCT INCIDENTS
+
+for the client-facing report.
+
+Do not let multiple articles inflate:
+
+Myanmar count
+Pakistan count
+India count
+event-type count
+severity distribution
+latest incident
+trend statements
+
+
+==================================================
+8. TOP ACTIVITY AREAS
+==================================================
+
+Keep this section.
+
+It is one of the strongest parts of Conflict Watch.
+
+But build it from the final canonical incident set.
+
+Rank activity areas by:
+
+severity
+incident concentration
+kinetic intensity
+operational impact
+persistence
+geographic significance
+
+Do not use article count alone.
+
+Do not write:
+
+“the rest of the country is largely clear”
+
+unless the evidence genuinely supports that judgement.
+
+
+==================================================
+9. DO NOT ORPHAN SUBHEADINGS ACROSS PAGE BREAKS
+==================================================
+
+The current report places:
+
+INDIA
+
+at the bottom of one page while the India prose begins on the next page.
+
+Fix the shared PDF pagination.
+
+If a subsection heading and enough of its body cannot fit together, move the whole subsection to the next page.
+
+Do not allow orphan headings.
+
+Apply this to all Conflict Watch sections.
+
+
+==================================================
+10. WHAT MATTERS FOR BUSINESS
+==================================================
+
+Keep this section.
+
+It should synthesise operational consequences from current incidents only.
+
+Possible themes include:
+
+route closure
+site access
+staff movement
+field schedules
+local transport
+security-force operations
+active fronts
+communications
+contingency planning
+
+Do not infer broad national disruption from isolated provincial events.
+
+
+==================================================
+11. WATCH NEXT
+==================================================
+
+Keep Watch Next.
+
+Generate it from:
+
+current validated incidents
+current conflict trends
+supported escalation indicators
+
+Do not carry stale Watch Next items from prior reports.
+
+Do not generate generic conflict language without a current evidence basis.
+
+Each item should retain supporting incident IDs or equivalent provenance.
+
+
+==================================================
+12. POLESTAR VIEW
+==================================================
+
+Keep Polestar View as the final analytical judgement.
+
+It must use the same canonical incident set as:
+
+Fast Facts
+BLUF
+Top Activity Areas
+What Matters
+Watch Next
+
+It must not contradict peak severity or regional concentration.
+
+
+==================================================
+13. REMOVE RELATED INCIDENTS FROM THE CLIENT-FACING PDF
+==================================================
+
+Remove the RELATED INCIDENTS table entirely from the client-facing Conflict Watch PDF.
+
+Do not replace it with another appendix.
+
+Do not create an incident-register page.
+
+Keep all underlying incident records available in Workbench.
+
+The client-facing Conflict Watch should be an analytical product, not a database export.
+
+
+==================================================
+14. FINAL CLIENT-FACING STRUCTURE
+==================================================
+
+Use this information architecture:
+
+COVER
+
+FAST FACTS
+
+BLUF
+
+TOP ACTIVITY AREAS
+
+OTHER WATCHED THEATRES
+
+WHAT MATTERS FOR BUSINESS
+
+WATCH NEXT
+
+POLESTAR VIEW
+
+DISCLAIMER
+
+
+Do not hardcode physical page numbers.
+
+Use flexible pagination.
+
+
+==================================================
+15. FLEXIBLE PAGINATION
+==================================================
+
+Do not force Conflict Watch into a fixed number of pages.
+
+Allow report length to expand or contract based on substantive reporting.
+
+Keep sections together where practical.
+
+Do not:
+
+orphan headings
+split short analytical blocks unnecessarily
+split Polestar View
+create a separate disclaimer page unless genuinely unavoidable
+
+
+==================================================
+16. RELATED CONTEXT SHOULD REMAIN AVAILABLE WITHOUT DISTORTING INCIDENT METRICS
+==================================================
+
+Context such as:
+
+historical casualty totals
+official threat statements
+political positions
+security policy changes
+
+may still be used where analytically useful.
+
+But it must be clearly treated as context.
+
+It must not:
+
+inflate incident totals
+drive peak incident severity
+become Latest Incident
+be counted as a new conflict event
+
+
+==================================================
+17. ROOT-CAUSE PIPELINE ORDER
+==================================================
+
+Conflict Watch should operate in this order:
+
+INGEST SOURCES
+
+FILTER FOR CONFLICT RELEVANCE
+
+NORMALISE EVENT DATA
+
+SEPARATE CURRENT INCIDENTS FROM CONTEXT / STATEMENTS
+
+CLUSTER / DEDUPLICATE INCIDENT REPORTING
+
+MERGE FOLLOW-ON UPDATES
+
+CLASSIFY INCIDENT TYPE
+
+RECONCILE INCIDENT-LEVEL SEVERITY
+
+BUILD FINAL CURRENT-WINDOW INCIDENT SET
+
+CALCULATE FAST FACTS
+
+GENERATE BLUF
+
+GENERATE TOP ACTIVITY AREAS
+
+GENERATE BUSINESS IMPACT
+
+GENERATE WATCH NEXT
+
+GENERATE POLESTAR VIEW
+
+RENDER PDF
+
+
+Do not generate summary metrics from raw source rows.
+
+
+==================================================
+18. REGRESSION TEST THE CURRENT REPORT
+==================================================
+
+After fixing the shared Conflict Watch system, regenerate the current 7–13 September report.
+
+Verify:
+
+1. The Pakistan cumulative 4,700-deaths statement does NOT drive Highest Severity.
+
+2. If the highest valid current-window discrete incident is High, Fast Facts shows High.
+
+3. Political rhetoric does not appear as a conflict incident.
+
+4. Official policy statements do not inflate incident counts.
+
+5. Distinct incident counts use underlying events, not article rows.
+
+6. Top Activity Areas use validated current incidents only.
+
+7. BLUF replaces Situation at the top of the report.
+
+8. Fast Facts appear before BLUF.
+
+9. India or any other subsection heading is not orphaned across pages.
+
+10. Related Incidents is removed from the client-facing PDF.
+
+11. Underlying incident records remain available in Workbench.
+
+12. Polestar View remains consistent with the final canonical incident set.
+
+
+==================================================
+19. DO NOT CHANGE THE STRONG PARTS UNNECESSARILY
+==================================================
+
+Keep the existing:
+
+Conflict Watch cover
+Polestar header/footer
+Top Activity Areas concept
+Other Watched Theatres concept
+What Matters for Business
+Watch Next
+Polestar View
+Roboto / Roboto Light
+Polestar brand colours
+severity colours
+
+
+==================================================
+20. APPLY TO ALL FUTURE CONFLICT WATCH REPORTS
+==================================================
+
+This is a SHARED CONFLICT WATCH PIPELINE FIX.
+
+Do not create special-case logic for this week's countries or incidents.
+
+The current report is only the regression test.
+
+Fix the underlying Conflict Watch incident classification, severity calculation, narrative generation and PDF renderer so future reports inherit the correction automatically.

@@ -6457,7 +6457,21 @@ export const GenerateReportProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.string(),
   "watchNext": zod.string(),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "provenance": zod.object({
+    "whatHappened": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional(),
+    "watchNext": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional()
+  }).optional()
 }),zod.null()]).optional(),
   "edited": zod.union([zod.object({
   "executiveSummary": zod.string(),
@@ -6466,7 +6480,21 @@ export const GenerateReportProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.string(),
   "watchNext": zod.string(),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "provenance": zod.object({
+    "whatHappened": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional(),
+    "watchNext": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional()
+  }).optional()
 }),zod.null()]).optional(),
   "stale": zod.boolean().optional(),
   "model": zod.string(),
@@ -6488,7 +6516,21 @@ export const EditReportProseBody = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.string(),
   "watchNext": zod.string(),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "provenance": zod.object({
+    "whatHappened": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional(),
+    "watchNext": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional()
+  }).optional()
 })
 })
 
@@ -6505,7 +6547,21 @@ export const EditReportProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.string(),
   "watchNext": zod.string(),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "provenance": zod.object({
+    "whatHappened": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional(),
+    "watchNext": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional()
+  }).optional()
 }),zod.null()]).optional(),
   "edited": zod.union([zod.object({
   "executiveSummary": zod.string(),
@@ -6514,7 +6570,21 @@ export const EditReportProseResponse = zod.object({
   "whatMatters": zod.string(),
   "implications": zod.string(),
   "watchNext": zod.string(),
-  "polestarView": zod.string()
+  "polestarView": zod.string(),
+  "provenance": zod.object({
+    "whatHappened": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional(),
+    "watchNext": zod.array(zod.object({
+      "supportingIncidentIds": zod.array(zod.string()),
+      "supportingEvidenceFamilyIds": zod.array(zod.string()),
+      "supportingClaim": zod.string().optional(),
+      "verifiedText": zod.string().optional()
+    })).optional()
+  }).optional()
 }),zod.null()]).optional(),
   "stale": zod.boolean().optional(),
   "model": zod.string(),

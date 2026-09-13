@@ -615,7 +615,8 @@ export function auditFinalReportEvidence(
   const typedReferences: FinalReportTypedReference[] = [
     ...(input.typedReferences ?? []).filter((reference) =>
       reference.evidenceId === undefined
-      || currentEvidence.some((record) => record.id === reference.evidenceId)),
+      || currentEvidence.some((record) =>
+        String(record.id ?? "") === String(reference.evidenceId ?? ""))),
     ...input.validatedForwardIndicators.map((item, index) => typeof item === "string"
       ? { id: `forward-${index}`, type: "forward-indicator" as const, text: item }
       : item),
@@ -703,8 +704,21 @@ export function auditFinalReportEvidence(
 
     if (section.toLowerCase() === "watchnext") {
       for (const item of text.split(/\n+|(?<=[.;!?])\s+/).filter((s) => words(s).length)) {
+        // A canonical generator may carry an exact evidence binding even when
+        // the shared lexical watch heuristic cannot infer the theme from the
+        // rendered sentence. Treat that binding as verified only when its
+        // referenced record is still in the current evidence set; unsupported
+        // generated items never receive this bypass.
+        const explicitlyBound = input.topic === "fuel"
+          && typedReferences.some((reference) =>
+            reference.type === "forward-indicator"
+            && reference.evidenceId !== undefined
+            && currentEvidence.some((record) =>
+              String(record.id ?? "") === String(reference.evidenceId ?? ""))
+            && referenceGrounds(item, reference),
+          );
         const fuelFailure = input.topic === "fuel"
-          ? fuelForwardGroundingFailure(item, currentEvidence)
+          ? explicitlyBound ? null : fuelForwardGroundingFailure(item, currentEvidence)
           : null;
         const explicitlyValidated = input.topic === "fuel"
           ? fuelFailure === null

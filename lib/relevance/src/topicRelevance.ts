@@ -328,6 +328,10 @@ const FUEL_OPERATIONAL_CONSEQUENCE: RegExp[] = [
   // explicit. This preserves producer events without whitelisting an entity.
   /\b(?:production|output|refining capacity)\b[^.!?]{0,35}\b(?:increas(?:e|ed)|rais(?:e|ed)|cut|cuts|halt(?:ed)?|resum(?:e|ed)|offline)\b[^.!?]{0,60}\bsupply\b/i,
   /\bsupply\b[^.!?]{0,60}\b(?:production|output|refining capacity)\b[^.!?]{0,35}\b(?:increas(?:e|ed)|rais(?:e|ed)|cut|cuts|halt(?:ed)?|resum(?:e|ed)|offline)\b/i,
+  // Generator demand can be the fuel consequence even when no outage word is
+  // used: require the text to say that diesel availability/supply tightened.
+  /\bgenerator demand\b[^.!?]{0,80}\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply|shortage|scarcity|tighten\w*|shortfall)\b/i,
+  /\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply)\b[^.!?]{0,80}\bgenerator demand\b/i,
   // Regulator wording commonly places the action before "the price of".
   new RegExp(
     String.raw`\b(?:hik(?:e|es|ed|ing)|rais(?:e|es|ed|ing)|increas(?:e|es|ed|ing)|cut(?:s|ting)?|slash(?:es|ed|ing)|lower(?:s|ed|ing))\b[^.!?]{0,25}\b(?:the )?price[s]? of\b[^.!?]{0,25}\b${FUEL_MATERIAL_RE}\b`,
@@ -416,6 +420,24 @@ const FUEL_OPERATIONAL_CONSEQUENCE: RegExp[] = [
   /\b(?:petroleum dealers?|oil transporters?|tanker drivers?)\b[^.!?]{0,80}\b(?:strike|shutdown|blockade|boycott|closure|closed|halt)\b/i,
   /\b(?:strike|shutdown|blockade|boycott|closure|closed|halt)\b[^.!?]{0,80}\b(?:petroleum dealers?|oil transporters?|tanker drivers?)\b/i,
 ];
+// Fuel-native analytical signals that are valid without the cross-topic
+// consequence grammar: a named producer's executed statement/action,
+// OPEC/IEA outlook disagreement, aviation-cost transmission and forward fuel
+// pricing. Keep these narrower than REQUIRED.fuel so bare subject cues such
+// as "oil tankers transit Hormuz" do not re-enter the native feed.
+const FUEL_NATIVE_ANALYTICAL_SIGNAL: RegExp[] = [
+  /\b(?:saudi aramco|aramco|adnoc|qatarenergy)\b[^.!?]{0,90}\b(?:announce\w*|issues? statement|statement clarif\w*|plans?|raises?|cuts?|increases?|reduces?|output|production|supply|export|capacity|quota)\b/i,
+  /\b(?:opec\+?|iea)\b[^.!?]{0,100}\b(?:forecast|outlook|disagre\w*|demand outlook|demand forecast|demand estimate|supply outlook)\b|\b(?:forecast|outlook|demand (?:forecast|outlook|estimate)|disagre\w*)\b[^.!?]{0,80}\b(?:opec\+?|iea)\b/i,
+  /\b(?:air india|indigo|emirates|airline|airlines|airways|carrier|carriers|aviation operators?)\b[^.!?]{0,80}\b(?:fuel (?:cost|costs|price|prices)|jet fuel)\b|\b(?:fuel (?:cost|costs)|jet fuel)\b[^.!?]{0,80}\b(?:air india|airline|airlines|airways|flight|flights|aviation)\b/i,
+  /\b(?:fuel|petrol|diesel|jet fuel|aviation fuel) prices?\b[^.!?]{0,55}\b(?:expected|forecast|likely|may|might|could|rise|rises|climb|increase|increas(?:e|es|ed)|surge|jump|fall|drop|cut|lower)\b/i,
+];
+// Power-sector vocabulary is not, by itself, a fuel consequence.  This
+// separate guard prevents a record such as "load-shedding hits factories" or
+// "power cuts disrupt the oil sector" from qualifying merely because an
+// energy noun happens to occur nearby.  The fuel relationship must be stated
+// (shortage, rationing, supply failure, or a fuel/gas cause for the outage).
+const FUEL_DIRECT_POWER_CONSEQUENCE_RE =
+  /\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng|generator fuel)\b[^.!?]{0,90}\b(?:shortage|scarcity|ration(?:ing|ed)?|supply (?:cut|failure|disruption|shortfall)|unavailable|runs? out|cut[- ]?off|crisis)\b[^.!?]{0,90}\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b|\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b[^.!?]{0,90}\b(?:because of|due to|from|after|amid|as)\b[^.!?]{0,45}\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng|generator fuel)\b|\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b[^.!?]{0,90}\b(?:stop|stops|stopped|interrupts?|shut(?:s|ting)?|halt(?:s|ed|ing)?|disrupt(?:s|ed|ing)?)\b[^.!?]{0,70}\b(?:fuel (?:pumping|terminal|distribution|operations?)|refin(?:ery|ing)(?: production)?|depot operations?|fuel supply)\b/i;
 
 // Shipping-specific exclusions. Food-price commentary, airline fuel cost
 // stories and food-security analysis must never lead a Shipping report,
@@ -1943,6 +1965,10 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(forecast|outlook|demand (forecast|outlook|estimate)|disagre\w*)\b.{0,80}\b(opec\+?|iea)\b/,
     /\b(air india|indigo|emirates|airline|airways|carrier)\b.{0,80}\b(fuel (cost|costs|price|prices)|jet fuel)\b/,
     /\b(fuel (cost|costs)|jet fuel)\b.{0,80}\b(air india|airline|airways|flight|flights|aviation)\b/,
+    // Fuel-native market pricing can be a forward-looking signal ("fuel
+    // prices expected to climb") without asserting a current outage. It is
+    // admitted for Fuel Watch, while bare oil-price commentary remains out.
+    /\b(fuel|petrol|diesel|jet fuel|aviation fuel) prices?\b.{0,55}\b(expected|forecast|likely|may|might|could|rise|rises|rise further|climb|increase|increas(?:e|es|ed)|surge|jump|fall|drop|cut|lower)\b/,
   ],
   fertiliser: [
     /\bfertili[sz]er (shortage|price|prices|supply|export|import|stockout|subsidy)/,
@@ -1962,6 +1988,11 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(generation|capacity|supply) shortfall/,
     /\b(transmission|pipeline) (attack|sabotage|disruption|outage|failure)/,
     /\b(gas|diesel|coal) .{0,20}power\b/,
+    // Generator-demand stories belong in Energy Watch, and may be
+    // cross-read into Fuel Watch only when diesel/fuel availability or
+    // supply is explicitly affected.
+    /\bgenerator demand\b[^.!?]{0,80}\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply|shortage|scarcity|tighten\w*|shortfall)\b/,
+    /\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply)\b[^.!?]{0,80}\bgenerator demand\b/,
     /\b(electricity|power|energy) (price|prices|tariff|tariffs) (hike|hiked|rise|rises|increase|increases|surge|jump|jumps)/,
     /\b(tariff|price) (hike|hiked|increase|surge) .{0,25}(electricity|power|energy)/,
     /\benergy (crisis|shortage|tariff|emergency|rationing)/,
@@ -2059,9 +2090,10 @@ const REQUIRED: Record<string, RegExp[]> = {
     /\b(attack|attacks|assault|bombing|bombings|blast) .{0,30}\bterroris(m|t|ts)\b/,
     /\b(armed (clash|clashes|conflict|attack|assault|group|raid|raiders|fighters?|militants?))\b/,
     /\b(gun ?battle|gun ?fight|firefight|shoot[- ]?out|cross[- ]?fire|exchange of fire|opened fire|hail of (gunfire|bullets))\b/,
+    /\b(gunm[ae]n|armed assailants?|militants?|insurgents?|rebels?|soldiers?|troops?|security forces)\s+open(?:s|ed|ing)?\s+fire\b/,
     /\b(insurgen(t|ts|cy)|militan(t|ts|cy)|rebel(s|lion)?|separatis(t|ts|m)|guerrilla|paramilitar(y|ies)|militia(s|men)?|warlord|junta (forces|troops|airstrike|soldiers))\b/,
     /\b(ambush(ed|es)?|incursion|firefights?|skirmish(es)?)\b/,
-    /\b(ied|improvised explosive|roadside bomb|land ?mines?|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
+    /\b(ied|improvised explosive|roadside bomb|land ?mines?|car bomb|truck bomb|grenade attack|bomb blast|suicide bomb(er|ing)?|drone strike|missile strike|rocket strike|air ?strike (kill|hit|target|hits|kills|on))\b/,
     /\b(tpnpb|opm|free papua|west papua (rebel|fighter|insurgen|liberation|armed)|npa|new people'?s army|abu sayyaf|biff|bifm|bangsamoro|moro (rebel|fighter|front)|ttp|tehrik[- ]?i[- ]?taliban|baloch(istan)? (liberation|insurgen|army|militant)|naxal(ite)?|maoist (rebel|insurgent|attack|guerrilla)|arakan army|ethnic armed (group|organisation|organization))\b/,
     /\b(troops|soldiers|security forces|police|army|navy|marines) .{0,30}(killed|kill|ambush(ed)?|attack(ed)?|clash(ed)?|wounded|gunned down|firefight)\b/,
     /\b(killed|wounded|injured|dead|casualt) .{0,30}(clash|fighting|gun ?battle|firefight|ambush|insurgen|militan|rebel|raid|shoot[- ]?out|armed attack)\b/,
@@ -2576,8 +2608,31 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     const fuelEvidence = mastheadStrippedGeoText(i);
     const m = firstMatch(fuelEvidence, FUEL_EXCLUDE);
     if (m) return { relevant: false, reason: `excluded: fuel off-topic (/${m.source}/)` };
-    const consequence = firstMatch(fuelEvidence, FUEL_OPERATIONAL_CONSEQUENCE);
-    if (!consequence) {
+    // A power-sector word can sit next to an oil/energy noun without saying
+    // that fuel caused the outage.  Do not let the broad consequence matcher
+    // turn generic load-shedding or grid-failure coverage into Fuel Watch.
+    const hasPowerFailure = /\b(load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b/i.test(
+      fuelEvidence,
+    );
+    if (hasPowerFailure && !FUEL_DIRECT_POWER_CONSEQUENCE_RE.test(fuelEvidence)) {
+      return {
+        relevant: false,
+        reason: "dropped: power/load-shedding mention without direct fuel consequence",
+      };
+    }
+    // Fuel-topic rows are already native to this report. Their qualification
+    // may come from a producer action, regulatory/outlook signal or a
+    // fuel-market price/aviation-cost development rather than the
+    // cross-topic consequence grammar below. Keep the explicit consequence
+    // requirement for generic fuel-sector mentions, but do not apply it as a
+    // blanket gate to the native REQUIRED fuel signals.
+    const nativeFuelSignal = firstMatch(fuelEvidence, FUEL_NATIVE_ANALYTICAL_SIGNAL);
+    const consequence =
+      firstMatch(fuelEvidence, FUEL_OPERATIONAL_CONSEQUENCE) ??
+      (FUEL_DIRECT_POWER_CONSEQUENCE_RE.test(fuelEvidence)
+        ? FUEL_DIRECT_POWER_CONSEQUENCE_RE
+        : null);
+    if (!consequence && !nativeFuelSignal) {
       return {
         relevant: false,
         reason: "dropped: fuel subject mention without demonstrable operational fuel consequence",
@@ -2585,7 +2640,9 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     }
     return {
       relevant: true,
-      reason: `kept: demonstrable operational fuel consequence (/${consequence.source}/)`,
+      reason: consequence
+        ? `kept: demonstrable operational fuel consequence (/${consequence.source}/)`
+        : `kept: native fuel signal (/${nativeFuelSignal?.source}/)`,
     };
   }
   if (topic === "cargo_watch") {

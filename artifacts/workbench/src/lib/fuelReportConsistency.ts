@@ -71,24 +71,55 @@ export interface FuelEffectiveSections {
   regionalHighlights?: string | null;
   implications?: string | null;
   watchNext?: string | null;
+  provenance?: FuelSectionsProvenance;
+  analystEditReviewRequired?: boolean;
 }
 
 function fuelForwardReferences(
   facts: FuelReportFacts,
   indicators: string[],
+  provenance?: FuelSectionsProvenance,
+  renderedWatchNext?: string | null,
 ): FinalReportTypedReference[] {
-  const lead = facts.highestPriorityIncident;
-  const anchor = lead
-    ? [lead.title, lead.summary ?? "", lead.country ?? "", lead.location ?? ""].join(" ")
-    : "";
-  return indicators.map((text, index) => ({
+  const renderedItems = (renderedWatchNext ?? "")
+    .split(/\n+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const count = Math.max(
+    indicators.length,
+    renderedItems.length,
+    provenance?.watchNext?.length ?? 0,
+  );
+  return Array.from({ length: count }, (_, index) => {
+    const indicator = indicators[index] ?? renderedItems[index] ?? "";
+    return ({
     id: `fuel-forward-${index}`,
     type: "forward-indicator" as const,
-    // A forward signal remains forward-looking, but retains the one current
-    // evidence entity that justifies it. This prevents cross-country word bags.
-    text: [text, anchor].filter(Boolean).join(" "),
-    evidenceId: lead?.id,
-  }));
+    // Retain only the evidence explicitly attached to this generated watch
+    // item. Do not manufacture support from the lead incident.
+    text: (() => {
+      const support = provenance?.watchNext?.[index]?.supportingIncidentIds ?? [];
+      const anchors = facts.incidents
+        .filter((incident) => support.includes(String(incident.id)))
+        .flatMap((incident) => [
+          incident.title,
+          incident.summary ?? "",
+          incident.country ?? "",
+          incident.location ?? "",
+        ]);
+      return [
+        provenance?.watchNext?.[index]?.verifiedText
+          ?? renderedItems[index]
+          ?? indicator,
+        ...anchors,
+      ].filter(Boolean).join(" ");
+    })(),
+    evidenceId: (() => {
+      const support = provenance?.watchNext?.[index]?.supportingIncidentIds ?? [];
+      return facts.incidents.find((incident) => support.includes(String(incident.id)))?.id;
+    })(),
+    });
+  });
 }
 
 /** Thin Fuel adapter for the shared, topic-independent final evidence audit. */
@@ -97,6 +128,9 @@ export function validateFuelFinalEvidenceAudit(
   sections: FuelEffectiveSections,
   validatedForwardIndicators: string[],
 ): FinalReportEvidenceAuditIssue[] {
+  const proseSections = Object.fromEntries(
+    Object.entries(sections).filter(([, value]) => typeof value === "string"),
+  ) as Record<string, string | null | undefined>;
   return auditFinalReportEvidence({
     topic: "fuel",
     issueDate: facts.issueDate,
@@ -131,8 +165,13 @@ export function validateFuelFinalEvidenceAudit(
           },
         })),
     ],
-    sections: { ...sections },
-    validatedForwardIndicators: fuelForwardReferences(facts, validatedForwardIndicators),
+    sections: proseSections,
+    validatedForwardIndicators: fuelForwardReferences(
+      facts,
+      validatedForwardIndicators,
+      sections.provenance,
+      sections.watchNext,
+    ),
     typedReferences: [
       ...facts.incidents.map((r) => ({
         id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
@@ -154,6 +193,9 @@ export function assertFuelFinalEvidenceAudit(
   sections: FuelEffectiveSections,
   validatedForwardIndicators: string[],
 ): void {
+  const proseSections = Object.fromEntries(
+    Object.entries(sections).filter(([, value]) => typeof value === "string"),
+  ) as Record<string, string | null | undefined>;
   assertFinalReportEvidence({
     topic: "fuel",
     issueDate: facts.issueDate,
@@ -186,8 +228,13 @@ export function assertFuelFinalEvidenceAudit(
         },
       })),
     ],
-    sections: { ...sections },
-    validatedForwardIndicators: fuelForwardReferences(facts, validatedForwardIndicators),
+    sections: proseSections,
+    validatedForwardIndicators: fuelForwardReferences(
+      facts,
+      validatedForwardIndicators,
+      sections.provenance,
+      sections.watchNext,
+    ),
     typedReferences: [
       ...facts.incidents.map((r) => ({
         id: r.evidenceFamilyId ?? `incident-${r.id ?? r.occurredAt}`,
@@ -374,7 +421,8 @@ export function validateFuelReportConsistency(
   const dirByKey = dirByKeyFromFacts(facts);
 
   for (const [section, raw] of Object.entries(sections)) {
-    const text = (raw ?? "").trim();
+    if (typeof raw !== "string") continue;
+    const text = raw.trim();
     if (!text) continue;
 
     const sentences = text.split(SENTENCE_SPLIT_RE);
@@ -647,7 +695,10 @@ export function validateFuelJudgementConsistency(
   sections: FuelEffectiveSections,
   facts?: FuelReportFacts,
 ): FuelConsistencyIssue[] {
-  const requirements: Array<keyof FuelEffectiveSections> = [
+  const requirements: Array<Exclude<
+    keyof FuelEffectiveSections,
+    "provenance" | "analystEditReviewRequired"
+  >> = [
     "executiveSummary",
     "whatMatters",
     "polestarView",
@@ -682,7 +733,11 @@ function escapeRe(s: string): string {
 // renders — including analyst overrides (spec: validate the FINAL text).
 // ---------------------------------------------------------------------------
 
-import type { TopicAiProse } from "./topicProseResolution";
+import type {
+  FuelSectionsProvenance,
+  TopicAiProse,
+} from "./topicProseResolution";
+import { resolveFuelAnalyticalText } from "./topicProseResolution";
 import type { FuelWatchReportData } from "./fuelWatchReport";
 
 export interface FuelGateReportFields {
@@ -738,13 +793,18 @@ export function resolveFuelEffectiveSections(opts: {
   // basis remain compatible, but an explicitly stale payload is never allowed
   // to outrank current deterministic prose. Deliberate analyst edits retain
   // their existing precedence and are still validated below.
+  const generatedBasisFingerprint =
+    aiProse?.datasetFingerprint ?? aiProse?.generationBasisFingerprint ?? null;
   const generatedFuelIsCurrent =
     !aiProse ||
     aiProse.isAnalystEdited === true ||
     (!aiProse.stale &&
-      (!aiProse.datasetFingerprint ||
-        aiProse.datasetFingerprint === fuelData.generationBasisFingerprint));
+      (!generatedBasisFingerprint ||
+        generatedBasisFingerprint === fuelData.generationBasisFingerprint));
   const generated = generatedFuelIsCurrent ? aiProse : null;
+  const currentEvidenceIds = new Set(
+    fuelData.canonicalFacts.currentConditions.map((incident) => incident.id),
+  );
   // Preserve the final text verbatim. Contradictory generated or analyst prose
   // must be reported by validation, never silently replaced by a fallback.
   const resolveText = (
@@ -764,17 +824,55 @@ export function resolveFuelEffectiveSections(opts: {
     if (e && (!rawGenerated || e !== rawGenerated)) return e;
     return repairedGenerated || deterministic;
   };
+  const resolveAnalytical = (
+    field: "whatHappened" | "watchNext",
+    editor: string | null | undefined,
+    generatedText: string | null | undefined,
+    deterministic: string,
+  ): string => {
+    const resolved = resolveText(editor, generatedText, deterministic);
+    // Direct analyst edits are intentionally preserved verbatim. Only
+    // generated items with explicit provenance are filtered.
+    const editorText = (editor ?? "").trim();
+    if (editorText && (!generatedText || editorText !== generatedText)) return resolved;
+    if (generated?.isAnalystEdited === true) return resolved;
+    if (!generated?.provenance?.[field]) return resolved;
+    return resolveFuelAnalyticalText(
+      resolved,
+      generated.provenance[field],
+      currentEvidenceIds,
+      field === "whatHappened" ? "\n\n" : "\n",
+    ) || deterministic;
+  };
+  const reportHasOverride = [
+    report.executiveSummary,
+    report.situation,
+    report.whatHappened,
+    report.whatMatters,
+    report.implications,
+    report.polestarView,
+    report.watchNext,
+  ].some((value) => Boolean(value?.trim()));
+  const basisMoved =
+    aiProse?.stale === true ||
+    (generatedBasisFingerprint !== null &&
+      generatedBasisFingerprint !== fuelData.generationBasisFingerprint);
+  const analystEditReviewRequired = Boolean(
+    basisMoved && (aiProse?.isAnalystEdited === true || reportHasOverride),
+  );
   return {
     executiveSummary: resolveText(report.executiveSummary, generated?.executiveSummary, canonical.executiveSummary),
     situation: resolveText(report.situation, generated?.situation, canonical.situation),
-    whatHappened: resolveText(report.whatHappened, generated?.whatHappened, canonical.whatHappened),
+    whatHappened: resolveAnalytical("whatHappened", report.whatHappened, generated?.whatHappened, canonical.whatHappened),
     whatMatters: resolveText(report.whatMatters, generated?.whatMatters, canonical.whatMatters),
     polestarView: resolveText(report.polestarView, generated?.polestarView, canonical.polestarView),
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
     implications: resolveText(report.implications, generated?.implications, canonical.implications),
-    watchNext: resolveText(report.watchNext, generated?.watchNext, canonical.watchNext),
+    watchNext: resolveAnalytical("watchNext", report.watchNext, generated?.watchNext, canonical.watchNext),
+    provenance: generated?.provenance ?? canonical.provenance,
+    analystEditReviewRequired,
   };
 }
 

@@ -116,7 +116,6 @@ describe("Fuel Watch consequence and physical-geography gate", () => {
     "Oil tankers transit the Strait of Hormuz",
     "Refinery sector update from industry leaders",
     "Energy company issues statement on regional tensions",
-    "OPEC and IEA disagree over the oil demand outlook",
     "ADNOC issues a statement about its facilities",
   ])("drops a bare fuel-sector subject cue: %s", (title) => {
     const v = verdict(title);
@@ -150,6 +149,11 @@ describe("Fuel Watch consequence and physical-geography gate", () => {
     expect(v.relevant).toBe(false);
   });
 
+  it("keeps an explicit OPEC/IEA outlook disagreement as a Fuel-native market signal", () => {
+    const v = verdict("OPEC and IEA disagree over the oil demand outlook");
+    expect(v.relevant).toBe(true);
+  });
+
   it.each([
     "Storm damage halted diesel deliveries to regional fuel stations",
     "Pipeline outage cut crude supply and forced refinery output lower",
@@ -166,6 +170,10 @@ describe("Fuel Watch consequence and physical-geography gate", () => {
     "Oil exports stall after a blockade closes the loading channel",
     "Oil exports surge after the blockade is lifted",
     "Refining bottlenecks push diesel prices higher",
+    "Power failure shuts a fuel terminal",
+    "Electricity outage interrupts refinery production",
+    "Load shedding stops fuel pumping at the depot",
+    "Generator demand tightens diesel availability",
   ])("keeps generalized operational consequences without named geographies: %s", (title) => {
     expect(verdict(title).relevant).toBe(true);
   });
@@ -175,12 +183,14 @@ describe("Fuel Watch consequence and physical-geography gate", () => {
     "Sustainable aviation fuel may reach cost parity by 2036, report says",
     "Petrol and diesel prices today: check rates in major cities",
     "Oil exports fall under threat as regional tensions rise",
+    "Load shedding expands across the region as the grid comes under strain",
+    "Generic power plant outage leaves thousands without electricity",
   ])("keeps non-operational future/ticker noise out: %s", (title) => {
     expect(verdict(title).relevant).toBe(false);
   });
 
   it("bumps the persisted fuel relevance rules for backfill", () => {
-    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-10.2");
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-13.2");
   });
 });
 

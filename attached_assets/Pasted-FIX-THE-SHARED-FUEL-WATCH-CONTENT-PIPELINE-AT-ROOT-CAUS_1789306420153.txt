@@ -1,0 +1,570 @@
+FIX THE SHARED FUEL WATCH CONTENT PIPELINE AT ROOT CAUSE.
+
+This is NOT a request to manually clean the current 5–11 September Fuel Watch.
+
+The current PDF is the regression test.
+
+Apply the fix to ALL current and future Fuel Watch reports.
+
+Do NOT change the current Fuel Watch visual layout unless required to prevent bad content rendering.
+
+The layout, market cards, reporting-period dashboard, jet-fuel chart and overall report architecture are now broadly good.
+
+The remaining problem is EVIDENCE SELECTION, ATTRIBUTION AND NARRATIVE GENERATION.
+
+
+==================================================
+1. FUEL WATCH MUST ONLY ADMIT FUEL-RELEVANT DEVELOPMENTS
+==================================================
+
+Fuel Watch should cover developments with a direct and material relationship to:
+
+fuel production
+refining
+fuel distribution
+fuel shortages
+fuel pricing
+fuel transport
+aviation fuel
+marine fuel / bunkering
+road fuel
+fuel storage
+fuel terminals
+fuel supply chains
+fuel-related strikes / unrest
+fuel-related regulatory or subsidy changes
+fuel continuity
+
+Do NOT admit an event merely because it concerns:
+
+power
+electricity
+shipping
+war
+ports
+transport
+energy infrastructure
+
+unless there is a clear and evidenced FUEL consequence.
+
+
+==================================================
+2. FIX ENERGY-WATCH LEAKAGE
+==================================================
+
+The current report includes generic power-plant shutdown and load-shedding items in WHAT HAPPENED.
+
+Those belong in Energy Watch unless the selected evidence establishes a direct fuel consequence.
+
+Examples of a valid Fuel Watch link:
+
+power failure shuts a fuel terminal
+electricity outage interrupts refinery production
+load shedding stops fuel pumping or depot operations
+generator demand materially tightens diesel availability
+
+Examples that should NOT enter Fuel Watch by themselves:
+
+generic power plant outage
+ordinary grid failure
+load shedding with no fuel consequence
+electricity shortage with no demonstrated effect on fuel supply
+
+Fix this in the shared Fuel relevance/admission logic.
+
+Do not manually remove the two current rows only.
+
+
+==================================================
+3. CROSS-READ EVIDENCE MUST HAVE AN EXPLICIT FUEL LINK
+==================================================
+
+Fuel Watch may use bounded cross-read evidence from Shipping, Energy, Conflict or other streams.
+
+But cross-read evidence must pass an explicit Fuel relevance test.
+
+A maritime attack does not automatically become Fuel Watch material.
+
+A conflict incident does not automatically become Fuel Watch material.
+
+A shipping disruption does not automatically become Fuel Watch material.
+
+The accepted cross-read item must establish a credible connection to:
+
+fuel production
+fuel availability
+fuel transit
+fuel prices
+fuel distribution
+fuel logistics
+or fuel continuity
+
+Retain the supporting evidence IDs when cross-read evidence is admitted.
+
+
+==================================================
+4. DO NOT MISATTRIBUTE GLOBAL STORIES TO COUNTRIES
+==================================================
+
+The current report turns a global marine-fuel/refining story into a Pakistan country pressure point.
+
+Do not assign a global or regional story to a country merely because:
+
+the source originated there
+the article mentions the country
+the publication is based there
+the article was ingested under that geography
+
+Country attribution must represent the geography of the underlying fuel development.
+
+Before creating:
+
+REGIONAL HIGHLIGHTS
+MOST AFFECTED COUNTRY
+COUNTRY COUNTS
+COUNTRY-SPECIFIC WHAT MATTERS
+COUNTRY-SPECIFIC IMPLICATIONS
+
+verify that the underlying development actually occurred in or materially affected that country.
+
+
+==================================================
+5. COUNTRY ATTRIBUTION MUST BE INCIDENT-LEVEL
+==================================================
+
+Each Fuel development should carry a validated geography such as:
+
+incident country
+affected country
+regional / global
+maritime chokepoint
+multi-country
+
+Do not force a country value where the development is actually regional or global.
+
+If a development concerns a global marine-fuel shortage, represent it as regional/global unless evidence supports a specific affected country.
+
+
+==================================================
+6. FIX WHAT HAPPENED
+==================================================
+
+WHAT HAPPENED must NOT be a raw feed dump.
+
+The current section contains scraped-style titles, inconsistent capitalisation and source wording passed directly into the report.
+
+Generate clean incident summaries from the accepted distinct Fuel developments.
+
+Each entry should contain:
+
+DATE
+LOCATION where known and relevant
+WHAT ACTUALLY HAPPENED
+DIRECT FUEL SIGNIFICANCE
+
+Do not simply prepend:
+
+"On [date]..."
+
+to a scraped headline.
+
+
+==================================================
+7. NORMALISE CLIENT-FACING TITLES AND PROSE
+==================================================
+
+Remove from client-facing narrative:
+
+raw headline capitalisation
+headline fragments
+URL residue
+publisher boilerplate
+"analysis" labels
+"again" / "breaking" style headline language
+social-media formatting
+source-specific promotional wording
+
+Do not alter the underlying factual meaning.
+
+The finished report should read as Polestar analysis, not as copied headlines.
+
+
+==================================================
+8. DEDUPLICATE BEFORE NARRATIVE GENERATION
+==================================================
+
+Multiple articles about one underlying Fuel event must become one development.
+
+Deduplicate BEFORE:
+
+distinct development counts
+country counts
+severity distribution
+What Happened
+Regional Highlights
+What Matters
+Implications
+Watch Next
+Polestar View
+
+Follow-on reporting should update an existing Fuel development unless a genuinely new event occurred.
+
+
+==================================================
+9. OPERATIONAL CONSEQUENCES MUST BE EVIDENCE-LED
+==================================================
+
+Do not automatically turn any fuel-related story into generic consequences such as:
+
+forecourt shortages
+staff movement disruption
+generator runtime problems
+airport refuelling disruption
+marine bunkering shortages
+convoy management
+rationing
+
+Only state those consequences where:
+
+the selected evidence directly supports them
+
+OR
+
+they are a clearly supported analytical consequence of the validated development.
+
+
+Do not jump from:
+
+"refiners prioritising diesel over marine fuel"
+
+to:
+
+"forecourt shortages in Pakistan"
+
+unless selected evidence supports that Pakistan-specific consequence.
+
+
+==================================================
+10. REGIONAL HIGHLIGHTS MUST USE THE CANONICAL EVIDENCE SET
+==================================================
+
+Regional Highlights should identify the genuinely important fuel pressure points from the final accepted evidence set.
+
+Do not create a regional highlight merely because a country has one ingested article.
+
+Rank pressure points using:
+
+severity
+fuel relevance
+supply impact
+market impact
+persistence
+business continuity implications
+confidence
+geographic significance
+
+Do not use article count alone.
+
+
+==================================================
+11. WHAT MATTERS
+==================================================
+
+WHAT MATTERS should synthesise the validated Fuel picture.
+
+It may discuss:
+
+procurement pressure
+price pressure
+refinery disruption
+fuel availability
+distribution problems
+aviation refuelling
+marine bunkering
+road fuel
+fuel logistics
+chokepoint exposure
+
+but only when supported by the current accepted evidence.
+
+Do not import themes merely because they are common Fuel Watch concerns.
+
+
+==================================================
+12. IMPLICATIONS FOR BUSINESS
+==================================================
+
+Generate business implications only from supported current themes.
+
+Examples may include:
+
+reviewing inventory
+locking uplift
+checking alternate suppliers
+reviewing bunker procurement
+checking airport refuelling
+adjusting delivered-cost assumptions
+
+But the recommendation must be traceable to the current evidence.
+
+Do not generate Russia-specific aviation advice unless current selected evidence supports aviation refuelling constraints in Russia.
+
+Do not generate South Asia bunker advice unless current selected evidence supports South Asia bunker exposure.
+
+
+==================================================
+13. WATCH NEXT MUST BE NATURAL, SPECIFIC AND GROUNDED
+==================================================
+
+The current Watch Next includes awkward machine-generated wording such as:
+
+"A confirmed change in transit availability for road fuel distribution in Saudi Arabia."
+
+This is not acceptable client-facing analysis.
+
+Watch Next should describe a clear forward indicator in natural language.
+
+Good structure:
+
+WHAT TO WATCH
+WHERE
+WHY IT MATTERS
+
+
+Example:
+
+"Further disruption to Saudi refinery output or product distribution that could tighten regional supply."
+
+Not:
+
+"A confirmed change in transit availability for road fuel distribution in Saudi Arabia."
+
+
+==================================================
+14. WATCH NEXT MUST RETAIN SUPPORTING EVIDENCE
+==================================================
+
+Each Watch Next item must retain:
+
+supportingIncidentIds
+supportingEvidenceFamilyIds
+or equivalent provenance
+
+If a Watch Next item has zero valid current support, exclude it before rendering.
+
+Do not rely on the validator to discover unsupported Watch Next prose after generation.
+
+
+==================================================
+15. DO NOT INSERT SOURCE HEADLINES INTO WATCH NEXT
+==================================================
+
+The current report contains:
+
+"Monitor for verified operational follow-through from Second wave of fuel crisis hits Russia with long lines and tighter sales limits - NV analysis."
+
+That is not acceptable.
+
+Watch Next should use Polestar analytical wording.
+
+For example:
+
+"Further tightening of Russian retail fuel sales limits or evidence that refinery disruption is affecting aviation or commercial supply."
+
+ONLY if supported by the current evidence.
+
+
+==================================================
+16. PRESERVE EVIDENCE PROVENANCE THROUGH GENERATION
+==================================================
+
+The Fuel pipeline must not reduce evidence-backed analytical objects to plain strings too early.
+
+Maintain provenance through:
+
+canonical facts
+themes
+What Happened items
+Regional Highlights
+What Matters
+Implications
+Watch Next
+Polestar View
+
+Generated content should know which current evidence supports it.
+
+
+==================================================
+17. CURRENT SELECTED EVIDENCE MUST HAVE PRIORITY
+==================================================
+
+The generation order must be:
+
+CURRENT SELECTED EVIDENCE
+
+→ DEDUPLICATED CANONICAL FUEL DEVELOPMENTS
+
+→ SUPPORTED THEMES
+
+→ ANALYTICAL SECTIONS
+
+
+It must NOT be:
+
+OLD PROSE / CACHE / PREVIOUS THEMES
+
+→ CURRENT REPORT
+
+
+Do not allow:
+
+previous report prose
+old Watch Next items
+stale AI cache
+old generated text
+
+to re-enter a current Fuel report unless the current evidence still supports it.
+
+
+==================================================
+18. ANALYST EDITS VS GENERATED PROSE
+==================================================
+
+Maintain the provenance distinction already being fixed:
+
+GENERATED
+CACHED AI
+ANALYST EDITED
+
+Do not assume saved prose means analyst edited.
+
+Stale generated prose may be invalidated automatically.
+
+Genuine analyst edits should be preserved and flagged for review when the evidence basis changes.
+
+
+==================================================
+19. MARKET DATA AND INCIDENT DATA MUST REMAIN DISTINCT
+==================================================
+
+Keep market-price evidence separate from incident evidence.
+
+Market movement may inform:
+
+Market Read
+What Matters
+Implications
+Polestar View
+
+but a price rise must not automatically prove:
+
+physical shortage
+distribution disruption
+refinery outage
+bunkering restriction
+
+Likewise, one physical incident does not automatically explain the entire market move.
+
+
+==================================================
+20. DO NOT CHANGE THE GOOD VISUAL ELEMENTS
+==================================================
+
+Keep the current:
+
+Fuel Watch cover
+Fast Facts market cards
+reporting-period coverage dashboard
+severity distribution
+daily incident trend
+affected-country table
+jet fuel chart
+Market Read layout
+overall Polestar styling
+
+Do not redesign these sections as part of this fix.
+
+
+==================================================
+21. FLEXIBLE PAGINATION
+==================================================
+
+Do not hardcode page numbers.
+
+Keep the existing section hierarchy and allow pagination to respond to substantive content.
+
+Do not shorten analysis merely to hit a fixed page count.
+
+
+==================================================
+22. REQUIRED ROOT-CAUSE TRACE
+==================================================
+
+Identify the shared Fuel Watch functions responsible for:
+
+Fuel incident admission
+cross-read admission
+country attribution
+evidence-family deduplication
+What Happened generation
+Regional Highlights
+What Matters
+Implications
+Watch Next
+Polestar View
+
+Confirm that each receives the SAME final canonical Fuel evidence set.
+
+
+==================================================
+23. REGRESSION TEST USING CURRENT REPORT
+==================================================
+
+Regenerate the current 5–11 September Fuel Watch after the shared fix.
+
+Verify:
+
+1. Generic power/load-shedding items do not appear unless there is a direct Fuel consequence.
+
+2. Global or regional marine-fuel stories are not incorrectly attributed to Pakistan or another country.
+
+3. WHAT HAPPENED contains clean Polestar summaries rather than raw source headlines.
+
+4. Country highlights reflect validated affected geography.
+
+5. Operational consequences are supported by current evidence.
+
+6. Watch Next uses natural analytical wording.
+
+7. No Watch Next item contains a copied source headline.
+
+8. Every generated Watch Next item retains current supporting evidence IDs.
+
+9. Zero-support generated items are excluded before rendering.
+
+10. Previous/cached prose cannot override the current evidence basis.
+
+11. Market-price analysis remains intact.
+
+12. The validator does not need to compensate for unsupported material introduced by the generator.
+
+
+==================================================
+24. APPLY GLOBALLY TO FUEL WATCH
+==================================================
+
+This is a shared Fuel Watch pipeline fix.
+
+Do not:
+
+hardcode the current reporting period
+hardcode Saudi Arabia
+hardcode Russia
+hardcode Pakistan
+hardcode Oman
+hardcode the Red Sea
+manually delete current report lines
+
+The current PDF is only the regression test.
+
+Fix the Fuel Watch evidence-selection, attribution and narrative-generation pipeline so all future Fuel Watch reports inherit the correction.

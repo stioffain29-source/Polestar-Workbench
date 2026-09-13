@@ -339,7 +339,11 @@ export function buildFuelReportFacts(opts: {
   };
   let highestSeverity: SeverityTier | null = null;
   let overallSeverity: SeverityTier | null = null;
-  for (const r of currentRecords) {
+  // Raw severity describes the qualifying evidence set, including
+  // prequalified prospective market records. The overall call also retains
+  // that prequalified record, but uses its capped effective tier so market
+  // commentary cannot headline as high/extreme.
+  for (const r of records) {
     const raw = tierOf(r.severity);
     if (raw) {
       severityDistribution[raw] += 1;
@@ -347,6 +351,8 @@ export function buildFuelReportFacts(opts: {
         highestSeverity = raw;
       }
     }
+  }
+  for (const r of records) {
     const eff = tierOf(r.effectiveSeverity);
     if (eff && (!overallSeverity || SEV_RANK[eff] > SEV_RANK[overallSeverity])) {
       overallSeverity = eff;

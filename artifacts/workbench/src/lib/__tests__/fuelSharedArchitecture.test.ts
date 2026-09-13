@@ -38,6 +38,70 @@ describe("Fuel shared publication architecture", () => {
     expect(ledger[0].weight).toBeLessThanOrEqual(1.75);
   });
 
+  it("clusters same-day global market rewrites despite polluted country metadata", () => {
+    const first = incident(4, "Shipping fuel shortage looms as refiners prioritize diesel", {
+      country: "Pakistan",
+      location: null,
+      summary: "Shipping fuel shortage looms as refiners prioritize diesel | Commodity News",
+      occurredAt: "2026-08-05T05:50:00Z",
+    });
+    const syndicated = incident(5, "Global ship fuel shortage looms as war disruptions squeeze refinery output", {
+      country: "Singapore",
+      location: null,
+      summary: "Global ship fuel shortage looms as war disruptions squeeze refinery output | Business Desk",
+      occurredAt: "2026-08-05T08:33:00Z",
+    });
+    const regionalRewrite = incident(6, "Ship fuel shortage looms as refiners strained by war favour other products", {
+      country: "India",
+      location: null,
+      summary: "Ship fuel shortage looms as refiners strained by war favour other products | Maritime Trade",
+      occurredAt: "2026-08-06T03:17:00Z",
+    });
+    const ledger = buildFuelEvidenceLedger([first, syndicated, regionalRewrite]);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]?.members).toHaveLength(3);
+    const facts = buildFuelCanonicalFacts({
+      issueDate: "2026-08-06",
+      qualifyingIncidents: [first, syndicated, regionalRewrite],
+      incidents: [],
+      marketCards: [],
+    });
+    expect(facts.incidentCount).toBe(1);
+    expect(facts.countries).toEqual([]);
+  });
+
+  it("merges partial evidence families when a later rewrite bridges both", () => {
+    const first = incident(7, "Shipping fuel shortage looms as refiners prioritize diesel", {
+      country: "Pakistan",
+      occurredAt: "2026-08-05T05:50:00Z",
+    });
+    const second = incident(8, "Global ship fuel shortage looms as war disruptions squeeze refinery output", {
+      country: "Singapore",
+      occurredAt: "2026-08-05T08:33:00Z",
+    });
+    const bridge = incident(9, "Ship fuel shortage looms as refiners strained by war favour other products", {
+      country: "India",
+      occurredAt: "2026-08-06T03:17:00Z",
+    });
+    const earlierFirstFamily = incident(10, "Shipping fuel shortage looms as diesel supply tightens", {
+      country: "Pakistan",
+      occurredAt: "2026-08-04T23:00:00Z",
+    });
+    const earlierSecondFamily = incident(11, "Global ship fuel shortage looms as refinery output falls", {
+      country: "Singapore",
+      occurredAt: "2026-08-05T01:00:00Z",
+    });
+    const ledger = buildFuelEvidenceLedger([
+      earlierFirstFamily,
+      earlierSecondFamily,
+      first,
+      second,
+      bridge,
+    ]);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]?.members).toHaveLength(5);
+  });
+
   it("chooses a non-Potential family representative over a higher-scoring Potential row", () => {
     const reported = incident(11, "Port Alpha depot outage interrupts diesel deliveries", {
       severity: "low",
@@ -166,6 +230,35 @@ describe("Fuel shared publication architecture", () => {
     expect(result.effectiveSections.whatHappened).not.toMatch(/India|ship-fuel shortage/i);
     expect(result.effectiveSections.watchNext).not.toMatch(/India|ship-fuel shortage/i);
     expect(result.canonicalFacts.generationBasisFingerprint).toBeTruthy();
+  });
+
+  it("builds client-facing Fuel prose from distinct facts, not source headline copy", () => {
+    const sourceHeadline = "BREAKING: Example Wire | Depot outage at Port Alpha — Example News";
+    const facts = buildFuelCanonicalFacts({
+      issueDate: ISSUE,
+      incidents: [
+        incident(21, sourceHeadline, {
+          summary: "A confirmed depot outage interrupted diesel deliveries in Port Alpha.",
+          location: "Port Alpha",
+          country: "Exampleland",
+        }),
+      ],
+      marketCards: [],
+    });
+    const sections = buildFuelCanonicalSections(facts);
+
+    expect(sections.whatHappened).toContain("On 3 August 2026");
+    expect(sections.whatHappened).toContain("Port Alpha");
+    expect(sections.whatHappened).not.toContain(sourceHeadline);
+    for (const section of [
+      sections.regionalHighlights,
+      sections.whatMatters,
+      sections.implications,
+      sections.watchNext,
+    ]) {
+      expect(section).not.toContain(sourceHeadline);
+    }
+    expect(sections.watchNext).toMatch(/Watch for/i);
   });
 
   it("changes Fuel generation basis when the canonical selected evidence changes", () => {

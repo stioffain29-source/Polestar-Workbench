@@ -1,8 +1,11 @@
 import {
   buildConflictReportDataset,
+  classifyConflictIncident,
   isGenericConflictProse,
   type ConflictReportIncident,
 } from "../../artifacts/workbench/src/lib/conflictReportDataset";
+import { CONFLICT_INCIDENT_CLASSES } from "../../artifacts/workbench/src/lib/conflictIncidentClassification";
+import { isTrueIncident } from "../../artifacts/workbench/src/lib/trueIncidents";
 import {
   reportCadence,
   reportWindowDefaultDays,
@@ -96,6 +99,253 @@ describe("buildConflictReportDataset — dynamic ranking", () => {
     );
     // Mali has two records vs Yemen's one — at equal severity/casualty it leads.
     expect(theatres(ds.topActivityAreas)).toEqual(["Mali", "Yemen"]);
+  });
+});
+
+describe("Conflict current-incident canonicalization", () => {
+  it("classifies current incidents separately from context and non-incident developments", () => {
+    expect(
+      classifyConflictIncident({
+        title: "Militants attack an army checkpoint and kill five soldiers",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CURRENT);
+    expect(
+      classifyConflictIncident({
+        title: "Death toll from the earlier shooting rises to 12",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CONTEXT);
+    expect(
+      classifyConflictIncident({
+        title: "Government warns against further encroachment",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.OFFICIAL);
+    expect(
+      classifyConflictIncident({
+        title: "Militant group threatens attacks on government targets",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CONTEXT);
+    expect(
+      classifyConflictIncident({
+        title: "Militants killed over 4,700 people in three years",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CONTEXT);
+    expect(
+      classifyConflictIncident({
+        title:
+          "Pakistan says 4,700 citizens killed in militant attacks linked to Afghanistan",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CONTEXT);
+    expect(
+      classifyConflictIncident({
+        title:
+          "Opposition responds to 'Dimagi Naxal attack' label and accuses PM of silencing critics",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.POLITICAL);
+    expect(
+      classifyConflictIncident({
+        title:
+          "Opposition responds to 'Dimagi Naxal' attack and accuses PM of silencing critics",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.POLITICAL);
+    expect(
+      classifyConflictIncident({
+        title: "Army says militants attacked a checkpoint, killing five soldiers",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CURRENT);
+    expect(
+      isTrueIncident("conflict", {
+        topic: "conflict",
+        title: "Army says militants attacked a checkpoint, killing five soldiers",
+      }),
+    ).toBe(true);
+    expect(
+      classifyConflictIncident({
+        title: "Senior insurgent leaders surrender and lay down arms",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CONTEXT);
+    expect(
+      classifyConflictIncident({
+        title: "Senior insurgent leaders surrender after an attack killed three soldiers",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.CURRENT);
+    expect(
+      classifyConflictIncident({
+        title: "Government approves a new counter-insurgency strategy",
+      }),
+    ).toBe(CONFLICT_INCIDENT_CLASSES.POLITICAL);
+  });
+
+  it("uses only deduplicated current incidents for every report metric", () => {
+    const ds = buildConflictReportDataset(
+      [
+        // This is useful context but must not become a current incident.
+        inc({
+          id: "context",
+          country: "Myanmar",
+          severity: "extreme",
+          title: "Army says death toll from militant attacks rises to 40",
+        }),
+        // Two copies of the same current attack: the higher valid severity
+        // survives the collapse, but the context row above does not drive it.
+        inc({
+          id: "copy-a",
+          country: "Myanmar",
+          severity: "moderate",
+          title: "Militants attack a village in Manipur",
+        }),
+        inc({
+          id: "copy-b",
+          country: "Myanmar",
+          severity: "high",
+          title: "Militants attack a village in Manipur",
+        }),
+        inc({
+          id: "official",
+          country: "India",
+          severity: "extreme",
+          title: "Government warns against further encroachment",
+        }),
+        inc({
+          id: "cumulative",
+          country: "Myanmar",
+          severity: "extreme",
+          title: "Militants killed over 4,700 people in three years",
+        }),
+        inc({
+          id: "surrender",
+          country: "Myanmar",
+          severity: "high",
+          title: "Senior insurgent leaders surrender and lay down arms",
+        }),
+        inc({
+          id: "aggregate",
+          country: "Pakistan",
+          severity: "extreme",
+          title:
+            "Pakistan says 4,700 citizens killed in militant attacks linked to Afghanistan",
+        }),
+        inc({
+          id: "rhetoric",
+          country: "India",
+          severity: "extreme",
+          title:
+            "Opposition responds to 'Dimagi Naxal attack' label and accuses PM of silencing critics",
+        }),
+        inc({
+          id: "split-quote-rhetoric",
+          country: "India",
+          severity: "extreme",
+          title:
+            "Opposition responds to 'Dimagi Naxal' attack and accuses PM of silencing critics",
+        }),
+      ],
+      "conflict",
+      ISSUE_DATE,
+    );
+
+    expect(ds.windowIncidents).toHaveLength(1);
+    expect(ds.contextIncidents.length).toBeGreaterThanOrEqual(1);
+    expect(
+      ds.contextIncidents.every(
+        (i) => i.classification !== CONFLICT_INCIDENT_CLASSES.CURRENT,
+      ),
+    ).toBe(true);
+    expect(ds.windowIncidents[0]!.classification).toBe(
+      CONFLICT_INCIDENT_CLASSES.CURRENT,
+    );
+    expect(ds.windowIncidents[0]!.severity).toBe("high");
+    expect(ds.fastFacts.find((f) => f.label === "Distinct Incidents")?.value).toBe(
+      "1",
+    );
+    expect(ds.fastFacts.find((f) => f.label === "Highest Severity")?.value).toBe(
+      "High",
+    );
+    expect(ds.topActivityAreas.map((a) => a.theatre)).toEqual(["Myanmar"]);
+    expect(ds.fastFacts.find((f) => f.label === "Most Affected Country")?.value).toBe(
+      "Myanmar",
+    );
+    expect(ds.canonical.provenance).toBe("conflict-canonical-final-set-v1");
+    expect(ds.canonical.acceptedIds).toEqual(["copy-b"]);
+    expect(ds.canonical.periodRows).toEqual(ds.windowIncidents);
+    expect(ds.canonical.fingerprint).toMatch(/^fp1-[0-9a-f]{8}$/);
+    expect(ds.contextIncidents.map((row) => row.id)).toEqual(
+      expect.arrayContaining(["context", "official"]),
+    );
+    expect(ds.contextIncidents.map((row) => row.id)).toEqual(
+      expect.arrayContaining([
+        "cumulative",
+        "surrender",
+        "aggregate",
+        "rhetoric",
+        "split-quote-rhetoric",
+      ]),
+    );
+  });
+
+  it.each([
+    "Drone strike hits military base",
+    "Missile strike damages an army base",
+    "Artillery shells rebel positions",
+    "IED detonates near army convoy",
+    "Gunmen open fire on checkpoint",
+  ])("admits a bounded kinetic construction: %s", (title) => {
+    expect(classifyConflictIncident({ title })).toBe(
+      CONFLICT_INCIDENT_CLASSES.CURRENT,
+    );
+    const ds = buildConflictReportDataset(
+      [inc({ id: title, title, severity: "high" })],
+      "conflict",
+      ISSUE_DATE,
+    );
+    expect(ds.canonical.acceptedIds).toEqual([title]);
+    expect(ds.fastFacts.find((f) => f.label === "Distinct Incidents")?.value).toBe(
+      "1",
+    );
+    expect(ds.fastFacts.find((f) => f.label === "Highest Severity")?.value).toBe(
+      "High",
+    );
+  });
+
+  it("binds deterministic Watch Next items to the final current incident IDs", () => {
+    const ds = buildConflictReportDataset(
+      [
+        inc({ id: "current", country: "Myanmar", severity: "high", title: NO_CASUALTY }),
+        inc({
+          id: "background",
+          country: "Myanmar",
+          severity: "extreme",
+          title: "Death toll from the earlier attack rises to 40",
+        }),
+      ],
+      "conflict",
+      ISSUE_DATE,
+    );
+    expect(ds.watchNextItems.length).toBeGreaterThan(0);
+    for (const item of ds.watchNextItems) {
+      expect(item.supportingIncidentIds).toEqual(["current"]);
+      expect(item.canonicalFingerprint).toBe(ds.canonical.fingerprint);
+      expect(ds.canonical.acceptedIds).toContain(item.supportingIncidentIds[0]);
+    }
+    expect(ds.autoWatchNext).toBe(ds.watchNextItems.map((item) => item.text).join("\n"));
+  });
+
+  it("does not turn a pre-window pull-in into a current Watch Next basis", () => {
+    const ds = buildConflictReportDataset(
+      [{
+        ...inc({
+          id: "lookback",
+          country: "Thailand",
+          severity: "high",
+          title: NO_CASUALTY,
+        }),
+        occurredAt: "2026-06-07T08:00:00+00:00",
+      }],
+      "conflict",
+      ISSUE_DATE,
+    );
+    expect(ds.canonical.periodRows).toHaveLength(0);
+    expect(ds.watchNextItems).toHaveLength(0);
+    expect(ds.autoWatchNext).toBe("");
   });
 });
 

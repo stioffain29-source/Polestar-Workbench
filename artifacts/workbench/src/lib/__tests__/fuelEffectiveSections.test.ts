@@ -120,6 +120,24 @@ describe("resolveFuelEffectiveSections precedence", () => {
     expect(retainedEdit.situation).toBe("Retained analyst reconciliation text");
   });
 
+  it("does not render a generated Watch Next item with zero current support", () => {
+    const staleWatch = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: {
+        watchNext: "Monitor whether a potential shortage may affect bunkering.",
+        provenance: {
+          watchNext: [{
+            supportingIncidentIds: ["potential-only"],
+            supportingEvidenceFamilyIds: ["family-potential"],
+            supportingClaim: "A potential shortage may affect bunkering.",
+          }],
+        },
+      },
+      fuelData,
+    });
+    expect(staleWatch.watchNext).toBe(fuelData.narrativeData.canonicalSections.watchNext);
+  });
+
   it("analyst row field beats AI; blank/whitespace row falls through (blank = auto)", () => {
     const eff = resolveFuelEffectiveSections({
       report: { executiveSummary: "Analyst exec.", situation: "   " },
@@ -526,7 +544,9 @@ describe("AI jet-direction headlines retain the original report text", () => {
     })];
     const data = buildFuelWatchReportData(report, incidents);
     expect(data.canonicalFacts.judgement).toMatchObject({
-      mainRisk: "Oil Surges Past $99 After Saudi Refinery Attack",
+      // Canonical risk labels are evidence-grounded analytical categories,
+      // never copied source headlines.
+      mainRisk: "physical fuel availability and distribution",
       exposure: { sector: "road fuel distribution" },
       direction: "upward",
       trigger: "a confirmed change in transit availability",

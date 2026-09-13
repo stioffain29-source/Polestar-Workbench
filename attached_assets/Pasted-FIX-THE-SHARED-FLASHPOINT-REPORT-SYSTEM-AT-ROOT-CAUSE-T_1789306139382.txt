@@ -1,0 +1,555 @@
+FIX THE SHARED FLASHPOINT REPORT SYSTEM AT ROOT CAUSE.
+
+This is NOT a request to patch the current 7–13 September Flashpoint report.
+
+The current report is a regression test demonstrating defects in the shared Flashpoint pipeline.
+
+Apply the fixes to ALL current and future Flashpoint reports.
+
+Do NOT hardcode:
+
+current dates
+South Korea
+Thailand
+Nepal
+Philippines
+Mumbai
+Sydney
+specific incident titles
+specific protest events
+
+Do NOT manually edit the current PDF to make the problems disappear.
+
+Fix the shared Flashpoint data-selection, severity, deduplication, forecast, Watch Next and rendering logic.
+
+
+==================================================
+1. FIX SEVERITY CONSISTENCY
+==================================================
+
+The current Flashpoint report contains a hard contradiction:
+
+The Executive Summary says the severity ceiling is HIGH.
+
+The Civil Unrest and Public Order section contains a HIGH incident.
+
+But Fast Facts says:
+
+HIGHEST SEVERITY
+LOW
+
+This must never happen.
+
+Trace the exact shared functions responsible for:
+
+Fast Facts highest severity
+Executive Summary severity ceiling
+weekly posture
+Activism / Protest severity
+Civil Unrest severity
+Polestar View severity references
+
+All severity calculations must derive from the SAME final accepted distinct incident set for the reporting window.
+
+Do not calculate Fast Facts from one subset and narrative sections from another unless the metric is explicitly labelled as subset-specific.
+
+If Fast Facts says:
+
+HIGHEST INCIDENT SEVERITY
+
+then it must reflect the highest severity across ALL accepted distinct incidents included in Flashpoint.
+
+Keep separate:
+
+PEAK INCIDENT SEVERITY
+
+from:
+
+WEEKLY POSTURE
+
+These are different metrics.
+
+For example:
+
+Peak incident severity = High
+Weekly posture = Moderate
+
+is valid.
+
+Peak incident severity = Low while the report contains a High accepted incident is not valid.
+
+
+==================================================
+2. DEDUPLICATE BEFORE REPORT GENERATION
+==================================================
+
+Flashpoint must work from DISTINCT UNDERLYING EVENTS, not raw article rows.
+
+Deduplication must happen BEFORE:
+
+incident counts
+severity calculation
+country totals
+issue totals
+Activism and Protest tables
+Civil Unrest tables
+forecast ranking
+Watch Next
+Executive Summary
+What Matters
+Polestar View
+
+Use semantic/event clustering based on:
+
+date
+location
+organiser
+event purpose
+route
+venue
+named organisations
+incident description
+scheduled time
+event type
+source-title similarity
+
+Do not rely on exact headline matching.
+
+
+==================================================
+3. FIX PROTEST FORECAST DUPLICATION
+==================================================
+
+The current forecast contains overlapping entries that appear to describe the same underlying mobilisation.
+
+Flashpoint must not present one scheduled activity as multiple forecast events simply because several sources describe:
+
+the mobilisation
+the march
+the arrival point
+the hunger strike
+or different stages of the same planned action
+
+Cluster scheduled activity into one underlying planned event where appropriate.
+
+A multi-stage mobilisation can still contain:
+
+start date
+route
+staging points
+main gathering
+follow-on activity
+
+but should remain one coherent forecast item unless the stages genuinely represent separate operational events.
+
+
+==================================================
+4. WATCH NEXT MUST ALSO BE DEDUPLICATED
+==================================================
+
+The current Watch Next repeats the same Mumbai event twice.
+
+That must not be possible.
+
+Before rendering Watch Next:
+
+deduplicate selected forward indicators by underlying event/theme.
+
+Do not allow:
+
+same city
+same date
+same mobilisation
+same operational implication
+
+to appear twice with slightly different source records or wording.
+
+
+==================================================
+5. WATCH NEXT MUST BE PRIORITY-LED, NOT JUST DATE-LED
+==================================================
+
+Current Watch Next appears to be selecting the earliest forecast entries rather than the most operationally significant ones.
+
+Fix the shared ranking logic.
+
+Watch Next should rank candidate items using factors such as:
+
+assessment severity
+expected turnout
+likelihood of disruption
+route / location significance
+government or commercial district exposure
+transport impact
+duration
+escalation potential
+regional significance
+confidence / evidence quality
+
+Recency / scheduled date may be a factor, but must not be the sole ranking mechanism.
+
+A HIGH-assessed event should normally outrank a routine MODERATE event unless there is a clear reason otherwise.
+
+Do not simply take the first four chronological forecast rows.
+
+
+==================================================
+6. WATCH NEXT MUST REMAIN GROUNDED
+==================================================
+
+Every Watch Next item must derive from:
+
+a validated scheduled event
+a current accepted incident
+or a supported escalation indicator
+
+Do not carry stale Watch Next items from previous reports.
+
+Do not create generic forward-looking items unrelated to the current evidence.
+
+Retain supporting incident / forecast IDs through generation where possible.
+
+
+==================================================
+7. CLEAN SOURCE TITLES BEFORE CLIENT-FACING RENDERING
+==================================================
+
+The current Flashpoint report contains raw source artefacts inside client-facing table titles, including truncated URLs and social-post residue.
+
+Fix the shared display-title normalisation.
+
+Client-facing titles must remove:
+
+raw URLs
+truncated URLs
+"link in comments"
+social-media boilerplate
+publisher navigation text
+tracking parameters
+unnecessary hashtags
+duplicated source prefixes
+
+Do not rewrite the factual meaning of the headline.
+
+Keep source attribution separately if required.
+
+The final table must look like an intelligence report, not a scraped feed.
+
+
+==================================================
+8. DISTINCT INCIDENT COUNT MUST ACTUALLY MEAN DISTINCT
+==================================================
+
+The Fast Fact:
+
+DISTINCT INCIDENTS
+
+must use deduplicated underlying incidents only.
+
+Do not count:
+
+duplicate articles
+follow-on articles
+the same protest reported by multiple outlets
+multiple headlines about the same arrest
+multiple articles covering one strike
+
+as separate incidents.
+
+
+==================================================
+9. COUNTRY COUNTS MUST USE DISTINCT EVENTS
+==================================================
+
+The Regional and Country View must count distinct accepted incidents per country.
+
+Do not allow media volume to inflate country concentration.
+
+If South Korea has eight articles but only four distinct accepted events, the chart must show four, not eight.
+
+Country concentration should describe EVENT concentration, not ARTICLE concentration.
+
+
+==================================================
+10. ISSUE COUNTS MUST ALSO USE DISTINCT EVENTS
+==================================================
+
+TOP ISSUE TYPE and section counts such as:
+
+Protest — 18 incidents
+
+must represent distinct accepted events.
+
+Do not use raw report count.
+
+Use one underlying protest = one incident.
+
+
+==================================================
+11. EXECUTIVE SUMMARY MUST USE THE FINAL CANONICAL SET
+==================================================
+
+Generate the Executive Summary only AFTER:
+
+relevance filtering
+deduplication
+classification
+severity reconciliation
+accepted-incident selection
+
+The summary must not use a different incident universe from Fast Facts or the analytical sections.
+
+It should accurately state:
+
+where reporting pressure sits
+peak severity
+weekly posture
+main operational concern
+
+
+==================================================
+12. ACTIVISM AND PROTEST READ
+==================================================
+
+Keep the current section concept.
+
+But make sure the table contains:
+
+distinct accepted incidents only
+
+Clean the displayed titles.
+
+Do not let multiple reports of one protest occupy separate rows unless they represent genuinely separate events.
+
+
+==================================================
+13. CIVIL UNREST AND PUBLIC ORDER READ
+==================================================
+
+Keep this as a separate analytical section where material civil disorder exists.
+
+Severity here must reconcile with Fast Facts and the overall canonical event set.
+
+Do not classify ordinary peaceful protest as civil disorder merely because police were present.
+
+Use the underlying event characteristics:
+
+violence
+riot
+damage
+crowd dispersal
+serious arrests
+road blockades
+clashes
+property attack
+
+to determine whether the incident belongs here.
+
+
+==================================================
+14. FORECAST IS NOT CONFIRMED INCIDENT DATA
+==================================================
+
+Keep scheduled protest activity separate from confirmed historical incidents.
+
+Forecast events must NOT inflate:
+
+distinct incident totals
+historical country counts
+weekly severity
+current-event issue totals
+
+unless the event has already occurred inside the reporting window.
+
+Clearly maintain separate data objects for:
+
+CONFIRMED INCIDENTS
+
+and
+
+SCHEDULED FUTURE ACTIVITY
+
+
+==================================================
+15. REGIONAL AND COUNTRY VIEW
+==================================================
+
+The current chart concept is good.
+
+Keep:
+
+incident count by country
+severity colour
+the warning that volume alone does not establish nationwide disruption
+
+But ensure:
+
+bar length = deduplicated accepted incident count
+
+colour = highest reconciled incident severity in that country
+
+Do not use raw article volume.
+
+
+==================================================
+16. WHAT MATTERS
+==================================================
+
+Keep the section.
+
+Generate it from the final deduplicated regional picture.
+
+It should synthesize:
+
+where disruption is concentrated
+whether risk is localised or widening
+whether movement, access or operations are being affected
+
+Do not merely repeat country counts.
+
+
+==================================================
+17. IMPLICATIONS FOR BUSINESS
+==================================================
+
+Keep the existing operational focus.
+
+Recommendations must derive from the actual weekly picture.
+
+Do not introduce generic boilerplate unsupported by the current events.
+
+Typical areas may include:
+
+staff movement
+route planning
+site access
+communications
+government/commercial districts
+short-notice public-order restrictions
+
+Only include what the evidence justifies.
+
+
+==================================================
+18. POLESTAR VIEW
+==================================================
+
+Polestar View must use the same final canonical incident set as Fast Facts and Executive Summary.
+
+It must not contradict:
+
+peak severity
+weekly posture
+country concentration
+What Matters
+
+It should remain a concise closing judgement.
+
+
+==================================================
+19. FIX THE SHARED PIPELINE, NOT THE CURRENT REPORT
+==================================================
+
+Trace the shared Flashpoint code responsible for:
+
+source admission
+relevance filtering
+event normalisation
+deduplication
+classification
+severity assessment
+Fast Facts
+Executive Summary
+Activism and Protest Read
+Civil Unrest and Public Order Read
+Protest Forecast
+Regional and Country View
+Watch Next
+Polestar View
+table-title rendering
+
+Identify exact functions/files before patching symptoms.
+
+
+==================================================
+20. REQUIRED PROCESS ORDER
+==================================================
+
+Flashpoint should operate in this order:
+
+INGEST SOURCES
+
+FILTER FOR RELEVANCE
+
+NORMALISE EVENTS
+
+CLUSTER / DEDUPLICATE CURRENT INCIDENTS
+
+RECONCILE INCIDENT-LEVEL SEVERITY
+
+SELECT ACCEPTED DISTINCT INCIDENTS
+
+CALCULATE FAST FACTS
+
+GENERATE CURRENT-PERIOD ANALYSIS
+
+INGEST / NORMALISE FUTURE SCHEDULED ACTIVITY
+
+DEDUPLICATE FORECAST EVENTS
+
+ASSESS FORECAST EVENTS
+
+RANK WATCH NEXT BY OPERATIONAL PRIORITY
+
+RENDER REPORT
+
+
+Do not calculate summary metrics from raw source rows.
+
+
+==================================================
+21. REGRESSION TEST THE CURRENT REPORT
+==================================================
+
+After fixing the shared Flashpoint pipeline, regenerate the current 7–13 September report as a test.
+
+Verify:
+
+1. Highest Severity is HIGH if the High civil-unrest event remains accepted.
+
+2. Weekly Posture may remain Moderate if that is the calculated overall posture.
+
+3. The same Mumbai mobilisation does not appear twice in Watch Next.
+
+4. Overlapping forecast entries are clustered where they describe one underlying planned event.
+
+5. Watch Next selects the most operationally significant upcoming events rather than simply the earliest rows.
+
+6. Raw/truncated URLs do not appear inside client-facing incident titles.
+
+7. Distinct incident totals use underlying events, not source articles.
+
+8. Country counts use distinct incidents.
+
+9. Issue counts use distinct incidents.
+
+10. Executive Summary, Fast Facts, What Matters and Polestar View use the same reconciled canonical event set.
+
+
+==================================================
+22. APPLY TO ALL FUTURE FLASHPOINT REPORTS
+==================================================
+
+This fix must apply automatically to every future Flashpoint issue.
+
+Do not hardcode this week's events.
+
+Do not hardcode APAC countries.
+
+Do not manually fix current table rows.
+
+Do not create special-case conditions for Mumbai, South Korea, Thailand, Nepal or Philippines.
+
+The current report is only the regression testcase.
+
+Fix the shared Flashpoint system.

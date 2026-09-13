@@ -22,7 +22,19 @@ import {
   type TopicReportProse,
 } from "./draftReportProse";
 import type { FuelGulfChokepointWatch } from "./fuelNarratives";
-import { displayIncidentTitle } from "./incidentTitle";
+import { cleanClientFacingProse, displayIncidentTitle } from "./incidentTitle";
+
+export interface FuelAnalyticalProvenance {
+  supportingIncidentIds: string[];
+  supportingEvidenceFamilyIds: string[];
+  supportingClaim?: string;
+  verifiedText?: string;
+}
+
+export interface FuelSectionsProvenance {
+  whatHappened?: FuelAnalyticalProvenance[];
+  watchNext?: FuelAnalyticalProvenance[];
+}
 
 // Cached AI narrative sections. Mirrors the server TopicProseSections shape;
 // every field optional/nullable so a partial or absent payload degrades safely.
@@ -32,6 +44,8 @@ export interface TopicAiProse {
   stale?: boolean;
   /** Set by the client when this payload is a retained analyst edit, never AI cache text. */
   isAnalystEdited?: boolean;
+  generationBasisFingerprint?: string | null;
+  provenance?: FuelSectionsProvenance;
   executiveSummary?: string | null;
   situation?: string | null;
   whatHappened?: string | null;
@@ -45,7 +59,7 @@ export interface TopicAiProse {
 // empty string in place of a real fallback.
 export function aiOr(ai: string | null | undefined, det: string): string {
   const t = (ai ?? "").trim();
-  return t ? t : det;
+  return cleanClientFacingProse(t ? t : det);
 }
 
 // Full precedence for SAVED-ONLY-seeded topics: analyst edit -> AI -> det.
@@ -55,8 +69,30 @@ export function resolveSimpleProse(
   det: string,
 ): string {
   const e = (editor ?? "").trim();
-  if (e) return e;
+  if (e) return cleanClientFacingProse(e);
   return aiOr(ai, det);
+}
+
+/**
+ * Generated Fuel analytical text is renderable only when its retained
+ * evidence still intersects the current canonical set. Validators verify the
+ * resulting text; they must not silently repair unsupported generator output.
+ */
+export function resolveFuelAnalyticalText(
+  text: string | null | undefined,
+  provenance: FuelAnalyticalProvenance[] | undefined,
+  currentEvidenceIds: ReadonlySet<string>,
+  separator: "\n" | "\n\n" = "\n",
+): string {
+  const value = (text ?? "").trim();
+  if (!value || !provenance?.length) return value;
+  const items = value.split(separator).map((item) => item.trim()).filter(Boolean);
+  if (items.length !== provenance.length) return value;
+  return items
+    .filter((_, index) =>
+      provenance[index].supportingIncidentIds.some((id) => currentEvidenceIds.has(id)),
+    )
+    .join(separator);
 }
 
 // Permissive structural input for mapping app incident rows (which carry many
@@ -116,10 +152,28 @@ export function stableDraftTopicReportProse(opts: {
     const bi = b.id == null ? "" : String(b.id);
     return ai < bi ? -1 : ai > bi ? 1 : 0;
   });
-  return draftTopicReportProse({
+  const draft = draftTopicReportProse({
     topic: opts.topic,
     issueDate: opts.issueDate,
     incidents,
     fuelGulf: opts.fuelGulf ?? null,
   });
+  // Fuel has a canonical report-level narrative builder. This legacy draft is
+  // still used while a report is being assembled, so do not let its older
+  // Gulf branch reintroduce a quoted source headline on the client.
+  if (opts.topic.toLowerCase() !== "fuel") return draft;
+  const cleanFuelDraft = (value: string): string =>
+    cleanClientFacingProse(value)
+      .replace(/\s*headed by the report that\s+["“][^"”\n]+["”]\.?\s*/gi, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  return {
+    executiveSummary: cleanFuelDraft(draft.executiveSummary),
+    situation: cleanFuelDraft(draft.situation),
+    whatHappened: cleanFuelDraft(draft.whatHappened),
+    whatMatters: cleanFuelDraft(draft.whatMatters),
+    implications: cleanFuelDraft(draft.implications),
+    watchNext: cleanFuelDraft(draft.watchNext),
+    polestarView: cleanFuelDraft(draft.polestarView),
+  };
 }

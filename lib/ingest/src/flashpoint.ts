@@ -800,9 +800,20 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const seenUrls = new Set<string>();
   const uniqueAccepted: Accepted[] = [];
   let pngRejectedDuplicates = 0;
-  for (const a of accepted) {
+  // Feed fetches complete concurrently, so insertion order is not a stable
+  // duplicate winner. Sort the source articles before applying either
+  // in-batch key; this makes dry-runs and commits deterministic.
+  const orderedAccepted = [...accepted].sort((a, b) =>
+    dedupeKey(a.title, a.occurredAt, a.country).localeCompare(
+      dedupeKey(b.title, b.occurredAt, b.country),
+    ) ||
+    a.sourceUrl.localeCompare(b.sourceUrl) ||
+    a.title.localeCompare(b.title) ||
+    a.source.localeCompare(b.source),
+  );
+  for (const a of orderedAccepted) {
     const k = dedupeKey(a.title, a.occurredAt, a.country);
-    if (seenUrls.has(a.sourceUrl)) {
+    if (seenKeys.has(k) || seenUrls.has(a.sourceUrl)) {
       if (a.isPng) pngRejectedDuplicates++;
       continue;
     }

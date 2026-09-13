@@ -1,5 +1,9 @@
 import { format, parseISO, subDays, max as dateMax } from "date-fns";
-import { resolveReportWindow, reportWindowMaxDays } from "./reportWindow";
+import {
+  resolveReportWindow,
+  reportWindowMaxDays,
+  filterIncidentsToWindow,
+} from "./reportWindow";
 import {
   filterTopicReportIncidents,
   type TopicFastFactCard,
@@ -14,6 +18,17 @@ import { selectRelatedIncidents } from "./relatedIncidents";
 import { dedupeMonitorRows } from "./monitorDedupe";
 import { collapseConflictOperations } from "./conflictOperationCollapse";
 import { collapseConflictSameEvent, collapseByEventClusterKey } from "./conflictSameEventCollapse";
+import {
+  classifyConflictIncident,
+  isConflictContextCandidate,
+  isCurrentConflictIncident,
+  type ConflictIncidentClass,
+} from "./conflictIncidentClassification";
+export {
+  classifyConflictIncident,
+  isConflictContextCandidate,
+  isCurrentConflictIncident,
+} from "./conflictIncidentClassification";
 
 // Single source of truth for the Conflict Watch report's analysed dataset.
 // Mirrors the flashpointReportDataset pattern so the on-screen preview
@@ -52,6 +67,8 @@ export interface ConflictEnrichedIncident extends ConflictReportIncident {
   date: Date;
   /** Conflict category card label, e.g. "Armed Clashes". */
   issue: string;
+  /** Deterministic admission class used before deduplication and metrics. */
+  classification: ConflictIncidentClass;
 }
 
 export interface ConflictActivityArea {
@@ -84,7 +101,12 @@ export interface ConflictActivityArea {
 export interface ConflictReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
+  /** Immutable post-validation/post-deduplication incident universe. */
+  canonical: ConflictCanonicalIncidentSet;
+  /** Compatibility alias for the canonical current-window set. */
   windowIncidents: ConflictEnrichedIncident[];
+  /** Relevant non-incident material retained for Workbench/context use only. */
+  contextIncidents: ConflictEnrichedIncident[];
   fastFacts: TopicFastFactCard[];
   topActivityAreas: ConflictActivityArea[];
   otherWatchedTheatres: ConflictActivityArea[];
@@ -96,6 +118,27 @@ export interface ConflictReportDataset {
   autoWhatMatters: string;
   autoWatchNext: string;
   autoPolestarView: string;
+  /** Machine-readable support for deterministic analytical sections. */
+  sectionProvenance: ConflictSectionProvenance;
+  /** Text remains the rendering API; these bindings retain support per item. */
+  watchNextItems: ConflictWatchNextItem[];
+}
+
+export interface ConflictCanonicalIncidentSet {
+  readonly provenance: "conflict-canonical-final-set-v1";
+  readonly issueDate: string;
+  readonly periodRows: readonly ConflictEnrichedIncident[];
+  readonly acceptedIds: readonly (number | string)[];
+  readonly fingerprint: string;
+}
+
+export interface ConflictSectionProvenance {
+  readonly supportingIncidentIds: readonly (number | string)[];
+  readonly canonicalFingerprint: string;
+}
+
+export interface ConflictWatchNextItem extends ConflictSectionProvenance {
+  readonly text: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +178,59 @@ function toDate(s: string): Date {
   } catch {
     return new Date(0);
   }
+}
+
+function incidentIdentity(id: number | string): string {
+  return `${typeof id}:${String(id)}`;
+}
+
+function stableJson(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${JSON.stringify(k)}:${stableJson(v)}`)
+    .join(",")}}`;
+}
+
+/** Browser/server-stable fingerprint; intentionally avoids Node crypto. */
+function stableFingerprint(parts: string[]): string {
+  let hash = 0x811c9dc5;
+  for (const ch of parts.join("\u001f")) {
+    hash ^= ch.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fp1-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+function conflictCanonicalFingerprint(
+  rows: readonly ConflictEnrichedIncident[],
+  issueDate: string,
+): string {
+  return stableFingerprint([
+    "conflict-canonical-final-set-v1",
+    issueDate,
+    ...rows
+      .map((row) =>
+        stableJson({
+          id: incidentIdentity(row.id),
+          topic: row.topic,
+          title: row.title,
+          displayTitle: row.displayTitle ?? null,
+          summary: row.summary ?? null,
+          severity: sevKey(row.severity),
+          occurredAt: row.occurredAt,
+          country: row.country ?? null,
+          location: row.location ?? null,
+          source: row.source ?? null,
+          sourceUrl: row.sourceUrl ?? null,
+          eventClusterKey: row.eventClusterKey ?? null,
+          issue: row.issue,
+          classification: row.classification,
+        }),
+      )
+      .sort(),
+  ]);
 }
 
 function textOf(i: ConflictReportIncident) {
@@ -904,7 +1000,7 @@ function buildFastFacts(
   return [
     { label: "Reporting Period", value: reportingPeriod },
     {
-      label: "Total Records",
+      label: "Distinct Incidents",
       value: String(total),
       note: "Conflict incidents this period",
     },
@@ -946,7 +1042,7 @@ const ZERO_OTHER =
 const ZERO_WHAT_MATTERS =
   "With nothing new to act on, the priorities stay the same: keeping people safe, securing fixed sites and keeping an evacuation plan ready across the watched theatres.";
 const ZERO_WATCH_NEXT =
-  "Any renewed armed activity in the watched theatres.\nSecurity operations or lockdowns that close roads, checkpoints and districts at short notice.\nAny spread toward energy, transport or port infrastructure that turns a security event into a business-continuity one.";
+  "";
 const ZERO_POLESTAR =
   "Nothing actionable came through on conflict this period. The standing risks in the watched theatres remain, so keep travel limits, site security and a rehearsed evacuation plan in place until reporting resumes.";
 
@@ -1098,6 +1194,29 @@ function buildWatchNext(
   return lines.join("\n");
 }
 
+function buildWatchNextItems(
+  areas: ConflictActivityArea[],
+  categoriesPresent: Set<string>,
+  canonicalFingerprint: string,
+): ConflictWatchNextItem[] {
+  const text = buildWatchNext(areas, categoriesPresent);
+  if (!text) return [];
+  const allIds = [
+    ...new Set(
+      areas.flatMap((area) => area.incidents.map((incident) => incident.id)),
+    ),
+  ];
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => ({
+      text: line,
+      supportingIncidentIds: allIds,
+      canonicalFingerprint,
+    }));
+}
+
 function buildPolestarView(
   areas: ConflictActivityArea[],
   pulledInAreas: ConflictActivityArea[],
@@ -1204,6 +1323,13 @@ export function buildConflictReportDataset(
 ): ConflictReportDataset {
   const win = resolveReportWindow(topic, issueDate);
   const windowRaw = filterTopicReportIncidents(incidents, topic, issueDate);
+  // Keep a second, date/topic-scoped view for Workbench context. The normal
+  // relevance gate is intentionally strict and can reject a statement-only
+  // headline that is nevertheless explicitly about conflict; such a row may
+  // remain context, but never enters the canonical incident set.
+  const windowScoped = filterIncidentsToWindow(incidents, topic, issueDate, {
+    byTopic: true,
+  });
 
   // The report path (filterTopicReportIncidents) applies window + relevance
   // only — no syndication or running-tally collapse — so without this the
@@ -1213,14 +1339,33 @@ export function buildConflictReportDataset(
   // collapseConflictOperations (running-tally). This keeps the on-screen preview
   // and the PDF (both read this dataset) deflated in step with the monitor —
   // the same three transforms in the same order.
-  const enrichedRaw: ConflictEnrichedIncident[] = windowRaw.map((i) => ({
+  const enrich = (i: ConflictReportIncident): ConflictEnrichedIncident => ({
     ...i,
     date: toDate(i.occurredAt),
     issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
-  }));
+    classification: classifyConflictIncident(textOf(i)),
+  });
+  const enrichedRaw: ConflictEnrichedIncident[] = windowRaw.map(enrich);
+  // Relevance admits useful context (historical/cumulative reporting, official
+  // positions and strategic developments), but only CURRENT INCIDENT rows are
+  // allowed into the canonical event set. This filter is deliberately before
+  // every dedupe pass: context must not win a cluster, contribute severity, or
+  // move latest/activity metrics.
+  const currentWindowRaw = enrichedRaw.filter(isCurrentConflictIncident);
+  const contextIncidents = [
+    ...enrichedRaw.filter((i) => !isCurrentConflictIncident(i)),
+    ...windowScoped
+      .filter((i) => !windowRaw.includes(i))
+      .map(enrich)
+      .filter(
+        (i) =>
+          !isCurrentConflictIncident(i) &&
+          isConflictContextCandidate(textOf(i)),
+      ),
+  ];
   const enriched: ConflictEnrichedIncident[] = collapseConflictOperations(
     collapseConflictSameEvent(
-      collapseByEventClusterKey(dedupeSyndicationByCountry(enrichedRaw)),
+      collapseByEventClusterKey(dedupeSyndicationByCountry(currentWindowRaw)),
     ),
   );
 
@@ -1266,7 +1411,9 @@ export function buildConflictReportDataset(
       ...i,
       date: toDate(i.occurredAt),
       issue: CATEGORY_CARD_LABEL[classifyConflictCategory(textOf(i))],
-    }));
+      classification: classifyConflictIncident(textOf(i)),
+    }))
+    .filter(isCurrentConflictIncident);
   const preWindow: ConflictEnrichedIncident[] = collapseConflictOperations(
     collapseConflictSameEvent(
       collapseByEventClusterKey(dedupeSyndicationByCountry(preWindowRaw)),
@@ -1325,10 +1472,10 @@ export function buildConflictReportDataset(
   const otherInWindow = rankedInWindow.filter(
     (a) => !topActivityAreas.includes(a),
   );
-  // What Matters / Watch Next speak to the live week — lead on an in-window
-  // theatre whenever one exists, falling back to the pulled-in set only when
-  // the week is otherwise empty.
-  const leadAreas = rankedInWindow.length ? rankedInWindow : areas;
+  // What Matters / Watch Next are current-window products. A pulled-in
+  // lookback theatre may inform Situation/Polestar as standing context, but it
+  // cannot manufacture a current trend or escalation indicator.
+  const leadAreas = rankedInWindow;
 
   let worstKey = "";
   let worstRank = 0;
@@ -1346,11 +1493,32 @@ export function buildConflictReportDataset(
   const allImpacts = enriched.flatMap((i) => detectOperationalImpacts(textOf(i)));
 
   const relatedIncidents = selectRelatedIncidents(enriched, topic);
+  const acceptedIds = enriched.map((row) => row.id);
+  const canonicalFingerprint = conflictCanonicalFingerprint(enriched, issueDate);
+  const canonical: ConflictCanonicalIncidentSet = Object.freeze({
+    provenance: "conflict-canonical-final-set-v1",
+    issueDate,
+    periodRows: Object.freeze(enriched),
+    acceptedIds: Object.freeze(acceptedIds),
+    fingerprint: canonicalFingerprint,
+  });
+  const supportingIncidentIds = Object.freeze([...acceptedIds]);
+  const sectionProvenance = {
+    supportingIncidentIds,
+    canonicalFingerprint,
+  } as const;
+  const watchNextItems = buildWatchNextItems(
+    leadAreas,
+    categoriesPresent,
+    canonicalFingerprint,
+  );
 
   return {
     reportingPeriodShort: win.shortLabel,
     reportingPeriodLong: `Reporting period: ${win.label}`,
+    canonical,
     windowIncidents: enriched,
+    contextIncidents,
     fastFacts: buildFastFacts(enriched, win.shortLabel),
     topActivityAreas,
     otherWatchedTheatres,
@@ -1365,8 +1533,10 @@ export function buildConflictReportDataset(
     ),
     autoOtherWatched: buildOtherWatched(otherInWindow, rankedPulledIn),
     autoWhatMatters: buildWhatMatters(leadAreas, allImpacts),
-    autoWatchNext: buildWatchNext(leadAreas, categoriesPresent),
+    autoWatchNext: watchNextItems.map((item) => item.text).join("\n"),
     autoPolestarView: buildPolestarView(rankedInWindow, rankedPulledIn, worstKey),
+    sectionProvenance,
+    watchNextItems,
   };
 }
 

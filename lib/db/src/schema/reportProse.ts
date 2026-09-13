@@ -8,6 +8,18 @@ import { pgTable, serial, integer, text, jsonb, timestamp } from "drizzle-orm/pg
 // watchNext are newline-joined bullet text, the rest are paragraphs. This is the
 // SAME shape as TopicReportProse (the deterministic draft) so the AI narrative
 // and the deterministic fallback are interchangeable in the editor and renderer.
+export interface FuelAnalyticalProvenance {
+  supportingIncidentIds: string[];
+  supportingEvidenceFamilyIds: string[];
+  supportingClaim?: string;
+  verifiedText?: string;
+}
+
+export interface FuelSectionsProvenance {
+  whatHappened?: FuelAnalyticalProvenance[];
+  watchNext?: FuelAnalyticalProvenance[];
+}
+
 export interface TopicProseSections {
   executiveSummary: string;
   situation: string;
@@ -16,6 +28,8 @@ export interface TopicProseSections {
   implications: string;
   watchNext: string;
   polestarView: string;
+  /** Retained machine-readable support for Fuel analytical arrays. */
+  provenance?: FuelSectionsProvenance;
 }
 
 // Cache of AI-generated topic-report prose, keyed one-row-per-report.

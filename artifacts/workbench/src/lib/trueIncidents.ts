@@ -15,10 +15,12 @@
 //                  count DISTINCT events, not the number of outlets that re-ran
 //                  the same wire (the report's deeper window-bound kinetic/court
 //                  dedup is separate and stays in the report builder)
-//   everything   → topic relevance gate (fuel / energy / fertiliser /
-//                  conflict, and the cargo dashboard card), then the same
-//                  conservative same-title syndication collapse so every
-//                  monitor counts DISTINCT events
+//   conflict     → topic relevance gate plus current-incident classification,
+//                  then the same conservative event collapse
+//   everything   → topic relevance gate (fuel / energy / fertiliser and the
+//                  cargo dashboard card), then the same conservative
+//                  same-title syndication collapse so every monitor counts
+//                  DISTINCT events
 import { parseISO } from "date-fns";
 import { isTopicRelevant } from "./topicRelevance";
 import { dedupeByTitle } from "./flashpointReportDataset";
@@ -35,6 +37,7 @@ import {
   type ShippingReportIncident,
 } from "./shippingReportDataset";
 import { isCargoInScope } from "./cargoAnalysis";
+import { isCurrentConflictIncident } from "./conflictIncidentClassification";
 
 export interface TrueIncidentLike {
   topic: string;
@@ -84,6 +87,14 @@ export function isTrueIncident(topic: string, i: TrueIncidentLike): boolean {
     case "flashpoint":
     case "protests":
       return isTopicRelevant("flashpoint", relevanceInput(i));
+    case "conflict":
+      return (
+        isTopicRelevant("conflict", relevanceInput(i)) &&
+        isCurrentConflictIncident({
+          title: i.title,
+          summary: i.summary ?? null,
+        })
+      );
     default:
       return isTopicRelevant(topic, relevanceInput(i));
   }

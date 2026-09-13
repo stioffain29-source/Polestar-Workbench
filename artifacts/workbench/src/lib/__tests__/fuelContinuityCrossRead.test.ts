@@ -27,9 +27,9 @@ function inc(over: Partial<TopicFastFactsIncident> & { title: string; topic: str
 }
 
 describe("filterFuelContinuityCrossRead", () => {
-  it("admits a kinetic chokepoint shipping event and a load-shedding energy event", () => {
+  it("admits fuel-linked chokepoint transit and a fuel-to-power continuity event", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Houthi missile attack strikes container ship in Gulf of Oman off Pakistan", country: "Pakistan" }),
+      inc({ topic: "shipping", title: "Houthi missile attack strikes oil tanker carrying fuel in Gulf of Oman off Pakistan", country: "Pakistan" }),
       inc({ topic: "energy", title: "Gas shortage intensifies load shedding in Chittagong", country: "Bangladesh", severity: "moderate" }),
     ];
     const out = filterFuelContinuityCrossRead(rows, ISSUE, []);
@@ -48,23 +48,33 @@ describe("filterFuelContinuityCrossRead", () => {
     const rows = [
       inc({ topic: "energy", title: "Storm damage causes power cuts across the region" }),
       inc({ topic: "energy", title: "High EB bill? Power cut? Here's your complete guide to TNPDCL services and load-shedding" }),
+      inc({ topic: "energy", title: "Load-shedding expands across the capital as the grid comes under strain" }),
     ];
     expect(filterFuelContinuityCrossRead(rows, ISSUE, [])).toHaveLength(0);
   });
 
+  it("requires an explicit fuel consequence for conflict cross-reads", () => {
+    const rows = [
+      inc({ topic: "conflict", title: "Missile strike damages refinery and cuts diesel production" }),
+      inc({ topic: "conflict", title: "Missile strike kills civilians near an oil-producing region" }),
+    ];
+    const out = filterFuelContinuityCrossRead(rows, ISSUE, []);
+    expect(out.map((i) => i.id)).toEqual([rows[0]?.id]);
+  });
+
   it("collapses syndicated rewrites of the same chokepoint strike to one row", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Three Killed in Houthi Missile Strike Near Bab al-Mandab" }),
-      inc({ topic: "shipping", title: "Houthi missile strike near Bab el-Mandeb kills three crew" }),
-      inc({ topic: "shipping", title: "Death toll rises after Houthi missile attack in Bab el-Mandeb strait" }),
+      inc({ topic: "shipping", title: "Three Killed in Houthi Missile Strike on Oil Tanker Near Bab al-Mandab" }),
+      inc({ topic: "shipping", title: "Houthi missile strike hits oil tanker near Bab el-Mandeb and kills three crew" }),
+      inc({ topic: "shipping", title: "Death toll rises after Houthi missile attack on fuel tanker in Bab el-Mandeb strait" }),
     ];
     expect(filterFuelContinuityCrossRead(rows, ISSUE, [])).toHaveLength(1);
   });
 
   it("does not double-count a story the fuel window already carries", () => {
-    const fuelRow = inc({ topic: "fuel", title: "Houthi missile strike on tanker near Bab el-Mandeb disrupts fuel shipments" });
+    const fuelRow = inc({ topic: "fuel", title: "Houthi missile strike on oil tanker near Bab el-Mandeb disrupts fuel shipments" });
     const rows = [
-      inc({ topic: "shipping", title: "Houthi missile strike hits tanker near Bab el-Mandeb" }),
+      inc({ topic: "shipping", title: "Houthi missile strike hits oil tanker near Bab el-Mandeb" }),
     ];
     expect(filterFuelContinuityCrossRead(rows, ISSUE, [fuelRow])).toHaveLength(0);
   });
@@ -73,7 +83,7 @@ describe("filterFuelContinuityCrossRead", () => {
 describe("cross-read rows keep the consistency gate green", () => {
   it("a report whose only window events are cross-read admits validates cleanly", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Houthi missile attack strikes container ship in Gulf of Oman off Pakistan", country: "Pakistan" }),
+      inc({ topic: "shipping", title: "Houthi missile attack strikes oil tanker carrying fuel in Gulf of Oman off Pakistan", country: "Pakistan" }),
       inc({ topic: "energy", title: "Gas shortage intensifies load shedding in Chittagong", country: "Bangladesh", severity: "moderate", occurredAt: "2026-08-11T08:00:00+00:00" }),
     ];
     const data = buildFuelWatchReportData(

@@ -7,8 +7,8 @@
 // instead of padding it.
 
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
-import { reportWindowDefaultDays } from "./reportWindow";
-import { stripWireCruft } from "./incidentTitle";
+import { filterIncidentsToWindow, reportWindowDefaultDays } from "./reportWindow";
+import { cleanIncidentTitle, stripWireCruft } from "./incidentTitle";
 import {
   aggregateIncidentSignificance,
   compareIncidentSignificance,
@@ -250,10 +250,35 @@ function regionalSignalPhrase(
   if (fam?.key === "policy") {
     return "Government fuel-policy moves are resetting local price and pass-through assumptions.";
   }
-  const development = stripWireCruft(items[0]?.title ?? "").trim();
-  return development
-    ? `${titleCase(country)} was linked to ${development.replace(/[.!?]+$/, "")}.`
-    : `A material fuel-market development was reported in ${titleCase(country)}.`;
+  // Regional Highlights is an analytical section, not a headline list.  A
+  // cleaned title is still source packaging (and often contains an
+  // unqualified causal claim), so use only the evidence-family cue here.
+  if (fam?.key === "refinery") {
+    return "A refinery-side supply disruption was reported there.";
+  }
+  if (fam?.key === "chokepoint") {
+    // Keep the operational consequence specific to the corridor actually
+    // named by the evidence. A generic route-pressure sentence loses the
+    // distinction between Hormuz and the southern Red Sea corridor, while a
+    // cleaned headline would simply repackage the source.
+    if (/\b(red sea|bab[- ]el[- ]mandeb|bab al[- ]mandab|houthi|yemen)\b/i.test(evidenceText)) {
+      return "Bab-el-Mandeb and southern corridor risk is keeping war-risk premium and voyage delay elevated.";
+    }
+    if (/\b(hormuz|persian gulf)\b/i.test(evidenceText)) {
+      return "War-risk premium and voyage delay remain the direct operational concern around Hormuz.";
+    }
+    return "Fuel-route and chokepoint pressure was reported there.";
+  }
+  if (fam?.key === "tanker") {
+    return "Tanker or inland fuel-distribution disruption was reported there.";
+  }
+  if (fam?.key === "pricing") {
+    return "A fuel-pricing move was reported there, with pass-through still dependent on follow-through.";
+  }
+  if (fam?.key === "crude") {
+    return "A crude-side supply or sanctions development was reported there.";
+  }
+  return "A material fuel-market development was reported there.";
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +427,7 @@ export function buildFuelGulfChokepointWatch(opts: {
     const kept: Kept[] = [];
     const keptTokens: Set<string>[] = [];
     for (const { i, key } of ranked) {
-      const title = stripWireCruft(i.title ?? "").trim();
+      const title = cleanIncidentTitle(i.title ?? "").trim();
       if (!title) continue;
       const tok = sigTokens(title);
       if (keptTokens.some((k) => nearDuplicate(tok, k))) continue;
@@ -508,7 +533,7 @@ export function buildFuelGulfChokepointWatch(opts: {
       const locationClause = anchorCountry ? ` near ${anchorCountry}` : "";
       const article = /^[aeiou]/i.test(anchorSevLabel) ? "an" : "a";
       p1.push(
-        `Pressure peaked on ${gulfFmtDay(anchor.key)} with ${article} ${anchorSevLabel.toLowerCase()}-severity incident${locationClause}, the period's most serious chokepoint event: ${anchor.title}.`,
+           `Pressure peaked on ${gulfFmtDay(anchor.key)} with ${article} ${anchorSevLabel.toLowerCase()}-severity incident${locationClause}, the period's most serious chokepoint event.`,
       );
     }
     const reopenAfterAnchor = currentMatched.some(
@@ -1049,16 +1074,34 @@ const EXPLAINER_NOISE_RE =
   /\bguide\b|here'?s (?:your|what|how)|\bhow to\b|\bexplained\b|\bexplainer\b|\bwhat to know\b|\bfaq\b/i;
 
 const FUEL_POWER_CONTINUITY_RE =
-  // Load-shedding is inherently a supply-rationing signal; every other
-  // branch requires an explicit fuel/gas anchor so an ordinary grid fault or
-  // storm blackout (an energy story with no fuel dimension) can never enter
-  // Fuel Watch.
-  /\bload[\s-]?shedding\b|\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng)\b[^.]{0,60}\b(?:shortage|rationing|crisis|scarcity|cut-?offs?|cuts?)\b|\b(?:shortage|rationing)s?\b[^.]{0,40}\b(?:fuel|gas|diesel|petrol|gasoline)\b/i;
+  // Load-shedding is not itself fuel evidence.  Require the text to connect
+  // it to a fuel/gas shortage, rationing, supply failure or explicit cause so
+  // ordinary grid faults and storm blackouts cannot enter Fuel Watch.
+  /\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng|generator fuel)\b[^.!?]{0,90}\b(?:shortage|scarcity|ration(?:ing|ed)?|supply (?:cut|failure|disruption|shortfall)|unavailable|runs? out|cut[- ]?off|crisis)\b[^.!?]{0,90}\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b|\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b[^.!?]{0,90}\b(?:because of|due to|from|after|amid|as)\b[^.!?]{0,45}\b(?:fuel|gas|diesel|petrol|gasoline|kerosene|lpg|lng|generator fuel)\b|\b(?:load[\s-]?shedding|power cuts?|power failures?|electricity (?:outage|shortage|failure)|blackouts?|brownouts?)\b[^.!?]{0,90}\b(?:stop|stops|stopped|interrupts?|shut(?:s|ting)?|halt(?:s|ed|ing)?|disrupt(?:s|ed|ing)?)\b[^.!?]{0,70}\b(?:fuel (?:pumping|terminal|distribution|operations?)|refin(?:ery|ing)(?: production)?|depot operations?|fuel supply)\b|\bgenerator demand\b[^.!?]{0,80}\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply|shortage|scarcity|tighten\w*|shortfall)\b|\b(?:diesel|fuel|gasoil)\b[^.!?]{0,45}\b(?:availability|supply)\b[^.!?]{0,80}\bgenerator demand\b/i;
+
+// Cross-topic admission is evidence-led, not route-led.  A shipping attack
+// at Hormuz, an energy blackout, or a conflict headline is not a Fuel record
+// unless its own text establishes a fuel production, availability, transit,
+// price, distribution, logistics or continuity consequence.  In particular,
+// a bare container-ship strike and a bare load-shedding report must not pass.
+const FUEL_CROSS_READ_EVIDENCE_RE =
+  /\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|(?:oil|fuel|crude|product) tanker)\b[^.!?]{0,100}\b(?:production|output|refin(?:e|ing)|supply|shortage|scarcity|availability|unavailable|ration(?:ing|ed)?|price[s]?|cost[s]?|transit|shipment|cargo|flow[s]?|delivery|distribution|logistics|loading|export[s]?|import[s]?|route[s]?|traffic|continuity|outage|shutdown|closure|attack|struck|damaged|halt(?:ed)?|disrupt(?:ed|ion)?|block(?:ed|ade)?|rerout(?:ed|ing)?|reroute)\b|\b(?:production|output|refin(?:e|ing)|supply|shortage|scarcity|availability|unavailable|ration(?:ing|ed)?|price[s]?|cost[s]?|transit|shipment|cargo|flow[s]?|delivery|distribution|logistics|loading|export[s]?|import[s]?|route[s]?|traffic|continuity|outage|shutdown|closure|attack|struck|damaged|halt(?:ed)?|disrupt(?:ed|ion)?|block(?:ed|ade)?|rerout(?:ed|ing)?|reroute)\b[^.!?]{0,100}\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|(?:oil|fuel|crude|product) tanker)\b/i;
+
+// Conflict rows are normally pre-filtered by the conflict topic relevance
+// gate. Cross-read candidates need to be evaluated before that gate, though:
+// a concise but genuine fuel consequence ("missile strike damages refinery")
+// can lack the actor vocabulary required by the generic conflict classifier.
+// Keep that broader read safe by requiring an unmistakable kinetic event here;
+// a generic conflict story that merely mentions oil-producing geography still
+// fails even when it is present in the raw topic feed.
+const CONFLICT_CROSS_READ_KINETIC_RE =
+  /\b(?:missile|drone|air\s*strike|airstrike|attack(?:ed|s)?|struck|strike|bomb(?:ed|ing)?|shell(?:ed|ing)?|explosion|blast|ambush(?:ed|es)?|clash(?:es|ed)?|firefight(?:s|ing)?|fighting|battle|raid(?:ed|s)?|sabotage|destroy(?:ed|s)?|damag(?:ed|es)?|hit|hits)\b/i;
 
 /**
  * Cross-read additions to the fuel QUALIFYING set. Returns in-window rows
- * from the shipping topic (kinetic chokepoint events) and the energy topic
- * (fuel-to-power continuity failures), syndication-collapsed to one
+ * from the shipping topic (fuel-linked kinetic chokepoint events), the energy
+ * topic (fuel-to-power continuity failures), and the conflict topic (fuel
+ * infrastructure/flow events), syndication-collapsed to one
  * representative per event and de-duplicated against the fuel window the
  * caller already holds. Capped so a heavy syndication week cannot swamp the
  * fuel-topic core of the report.
@@ -1085,6 +1128,10 @@ export function filterFuelContinuityCrossRead(
     const hay = `${haystack(i)} ${(i.location ?? "").toLowerCase()}`;
     if (!CHOKEPOINT_NAME_RE.test(hay)) continue;
     if (!CHOKEPOINT_KINETIC_RE.test(hay)) continue;
+    // A chokepoint and a kinetic verb establish shipping risk, not fuel
+    // relevance.  Require an explicit fuel cargo/flow/price/infrastructure
+    // consequence in the article itself.
+    if (!FUEL_CROSS_READ_EVIDENCE_RE.test(hay)) continue;
     shippingCandidates.push(i);
   }
   const energyCandidates: TopicFastFactsIncident[] = [];
@@ -1097,6 +1144,21 @@ export function filterFuelContinuityCrossRead(
     // a real load-shedding report needs.
     if (EXPLAINER_NOISE_RE.test(stripWireCruft(i.title ?? ""))) continue;
     energyCandidates.push(i);
+  }
+  const conflictCandidates: TopicFastFactsIncident[] = [];
+  // Do not use filterTopicReportIncidents here. Its generic conflict REQUIRED
+  // tier intentionally expects actor vocabulary, while a fuel-side
+  // infrastructure consequence is itself the stronger evidence for this
+  // cross-read. The local kinetic gate above preserves precision.
+  for (const i of filterIncidentsToWindow(incidents, "conflict", issueDate, { byTopic: true })) {
+    const hay = haystack(i);
+    if (!CONFLICT_CROSS_READ_KINETIC_RE.test(hay)) continue;
+    // Conflict is only a Fuel cross-read when the conflict text names a
+    // concrete fuel-side consequence (refinery/terminal damage, fuel-flow
+    // disruption, shortage, price or continuity), not merely an oil-producing
+    // country or a generic war/attack.
+    if (!FUEL_CROSS_READ_EVIDENCE_RE.test(hay)) continue;
+    conflictCandidates.push(i);
   }
 
   // Most significant first, then syndication-collapse. Chokepoint strikes
@@ -1147,9 +1209,12 @@ export function filterFuelContinuityCrossRead(
     return `${name}:${dayOf(i)}`;
   };
   const shippingCap = Math.min(4, maxAdds);
+  const remaining = Math.max(0, maxAdds - shippingCap);
+  const energyCap = Math.ceil(remaining / 2);
   const kept = [
     ...collapse(shippingCandidates, shippingCap, chokepointDayKey),
-    ...collapse(energyCandidates, Math.max(0, maxAdds - shippingCap)),
+    ...collapse(energyCandidates, energyCap),
+    ...collapse(conflictCandidates, Math.max(0, remaining - energyCap)),
   ];
   return kept;
 }
@@ -1178,6 +1243,8 @@ const CROSS_READ_ACTION_CATEGORIES = new Set<FuelActionCategory>([
   "Government / policy action",
   "Infrastructure / routing action",
 ]);
+const FUEL_COMPANY_LOGISTICS_RE =
+  /\b(?:aramco|adnoc|pertamina|petrobras|rosneft|gazprom|qatarenergy|petronas|cnpc|sinopec|cnooc|ongc|reliance industries)\b[^.!?]{0,90}\b(?:tanker|vessel|pipeline|terminal|facility|production|output|supply|export|import|route|transit|cargo|shipment)\b/i;
 
 /**
  * Incident set for the Market and Operator Responses table. It merges the
@@ -1218,6 +1285,15 @@ export function filterFuelActionIncidents(
   for (const i of shippingWindow) {
     const t = haystack(i);
     if (!FUEL_ACTION_TOPICAL_RE.test(t)) continue;
+    // A fuel noun or company name alone is not enough for a cross-read.  Keep
+    // the action table bounded to explicit fuel-side operations, while
+    // retaining producer/company logistics actions such as a named oil
+    // producer moving a tanker through a chokepoint.
+    const explicitFuelEvidence =
+      FUEL_CROSS_READ_EVIDENCE_RE.test(t) ||
+      FUEL_COMPANY_LOGISTICS_RE.test(t) ||
+      OPEC_IEA_FORECAST_RE.test(t);
+    if (!explicitFuelEvidence) continue;
     const cat = classifyCategory(t);
     if (cat === null) continue;
     const admitMarketOutlook =
@@ -1449,7 +1525,9 @@ export function buildFuelOperationalRead(opts: {
     .map(([c]) => titleCase(c));
   const where =
     sigCountries.length > 0
-      ? ` The reported operational themes are most visible in ${joinWithAnd(sigCountries)}.`
+      ? lead.fam.key === "shortage"
+        ? ` Physical restrictions are most visible in ${joinWithAnd(sigCountries)}.`
+        : ` The reported operational themes are most visible in ${joinWithAnd(sigCountries)}.`
       : "";
 
   const closingPara = `${watchLines.join(" ")}${where}`.trim();
@@ -1698,7 +1776,7 @@ function businessContinuityParagraph(facts: FuelCanonicalFacts): string {
 }
 
 function normalizeFuelHeadline(title: string): string {
-  return stripWireCruft(title)
+  return cleanIncidentTitle(title)
     .replace(/\s*\|\s*(Videos?|Photos?|Live updates?|Breaking news?)\s*$/i, "")
     .replace(/\s*[—–-]\s*(Reuters|Bloomberg|AFP|AP|BBC|CNN|Al Jazeera|World in Brief).*$/i, "")
     .replace(/:\s*Inside .+?(?:crisis|shortage|rationing).+$/i, "")
@@ -1726,23 +1804,6 @@ function capitalizeFirst(text: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function lowercaseLeadClause(text: string): string {
-  const s = text.trim();
-  if (!s) return s;
-  const m = s.match(/^([A-Za-z0-9][A-Za-z0-9'’-]*)([\s\S]*)$/);
-  if (!m) return s;
-  const lead = m[1];
-  if (/^[A-Z0-9]{2,}$/.test(lead)) return `${lead}${m[2]}`;
-  return `${lead.charAt(0).toLowerCase()}${lead.slice(1)}${m[2]}`;
-}
-
-function declarativeFromHeadline(cleanTitle: string): string {
-  let text = cleanTitle.replace(/\.$/, "").replace(/['"].*?['"]/g, "").replace(/\s+/g, " ").trim();
-  if (!text) return "a confirmed fuel-market development was reported";
-  text = sentenceCaseHeadline(text).replace(/:\s*Inside .+$/i, "").trim();
-  return lowercaseLeadClause(text);
-}
-
 function headlineNamesGeography(title: string): boolean {
   const words = sentenceCaseHeadline(normalizeFuelHeadline(title)).split(/\s+/);
   return words.some((w, idx) => {
@@ -1768,13 +1829,19 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   }
   if (/\b(russia|russian)\b/.test(t) && PIVOT_PRODUCT_RE.test(t)
       && (/\b(india|indian)\b/.test(t) || /\bseek(?:s|ing)?\b/.test(t) || /\bturn(?:s|ed|ing)? to\b/.test(t))) {
-    return "Russia pivoted to Indian gasoline imports as domestic refinery damage tightened supply";
+    return /\b(refinery|damage|outage|shutdown|strike)\w*/.test(t)
+      ? "Russia pivoted to Indian gasoline imports as domestic refinery damage tightened supply"
+      : "Russia pivoted to Indian gasoline imports in response to reported domestic product pressure";
   }
   if (/\b(pakistan)\b/.test(t) && /\b(kuwait)\b/.test(t) && PIVOT_PRODUCT_RE.test(t)) {
-    return "Pakistan pivoted to Kuwaiti diesel imports as domestic supply tightened";
+    return /\b(shortage|tight|tighten|disrupt|outage|curtail)\w*/.test(t)
+      ? "Pakistan pivoted to Kuwaiti diesel imports as domestic supply tightened"
+      : "Pakistan pivoted to Kuwaiti diesel imports as an alternative refined-product source";
   }
   if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)) {
-    return "Indian gasoline shipments to Russia continued as Moscow's domestic shortage persisted";
+    return /\b(shortage|tight|ration|forecourt|supply pressure)\b/.test(t)
+      ? "Indian gasoline shipments to Russia continued as Moscow's domestic shortage persisted"
+      : "Indian gasoline shipments to Russia were reported, shifting the source of refined-product supply";
   }
   if (SUPPLIER_PIVOT_RES.some((re) => re.test(t))
       || (/\bturn(?:s|ed|ing)? to\b/.test(t) && PIVOT_PRODUCT_RE.test(t))) {
@@ -1782,7 +1849,9 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   }
   if (/\bexport ban\b/.test(t)) {
     const product = /\bdiesel\b/.test(t) ? "diesel" : /\b(petrol|gasoline)\b/.test(t) ? "petrol" : "fuel";
-    return `authorities ordered a ${product} export ban${optionalCountryHint(opts)} amid tightening domestic supply`;
+    return /\b(shortage|tight|tighten|domestic supply|availability)\b/.test(t)
+      ? `authorities ordered a ${product} export ban${optionalCountryHint(opts)} amid tightening domestic supply`
+      : `authorities ordered a ${product} export ban${optionalCountryHint(opts)}, changing available cross-border supply`;
   }
   if (/\b(red sea|houthi)\b/.test(t) && /\b(missile|attack|killed|seafarer|crew|bodies)\b/.test(t)
       && !/\bexit(ing)?\s+(the\s+)?strait of hormuz\b/.test(t)) {
@@ -1800,13 +1869,17 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   }
   if (/\b(aramco|saudi aramco)\b/.test(t) && /\b(resume|resumed|loading|load|export)\b/.test(t)
       && !/\b(attack|drone|strike|destroyed|claim)\b/.test(t)) {
-    return "Saudi Aramco resumed crude loading and export activity after earlier Gulf-route disruption";
+    return /\b(disrupt|closure|blockade|rerout|attack|delay)\w*/.test(t)
+      ? "Saudi Aramco resumed crude loading and export activity after earlier Gulf-route disruption"
+      : "Saudi Aramco resumed crude loading and export activity, adding supply to the reported market";
   }
   if (/\b(aramco|saudi aramco)\b/.test(t) && /\b(attack|drone|strike|destroyed|claim)\b/.test(t)) {
     return "reporting described a claimed drone strike on Saudi Aramco infrastructure, with operational impact still being assessed";
   }
   if (/\b(moscow|ration|rationing)\b/.test(t) && /\b(petrol|gasoline|fuel|forecourt|purchase limit)\b/.test(t)) {
-    return "Moscow tightened petrol purchase limits and rationing as forecourt shortages spread";
+    return /\b(shortage|shortages|forecourt|queue|queues)\b/.test(t)
+      ? "Moscow tightened petrol purchase limits and rationing as forecourt shortages spread"
+      : "Moscow tightened petrol purchase limits and rationing, restricting local fuel access";
   }
   if (/\b(russia)\b/.test(t) && /\b(shortage|fuel crisis)\b/.test(t)
       && /\b(region|spread|nationwide|33)\b/.test(t)) {
@@ -1818,11 +1891,31 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   }
   if (/\b(india|indian)\b/.test(t) && /\b(windfall tax|export duty|export tax|excise|levy)\b/.test(t)
       && /\b(petrol|diesel|aviation|jet)\b/.test(t)) {
-    return "India cut windfall taxes on petrol, diesel and aviation-fuel exports, resetting refiner export economics";
+    const direction = /\b(cut|reduce|lower|remove|scrap)\w*/.test(t) ? "cut" : "changed";
+    return `India ${direction} windfall taxes on petrol, diesel and aviation-fuel exports, resetting refiner export economics`;
   }
-  if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|surge|costs?|prices?)\b/.test(t)) {
-    // Preserve the reported development, not an inferred fare/surcharge effect.
-    return declarativeFromHeadline(normalizeFuelHeadline(opts.title));
+  if (OPEC_IEA_FORECAST_RE.test(t)) {
+    return "OPEC and IEA disagree over demand outlook, shaping crude and product pricing expectations";
+  }
+  if (/\b(jet fuel|aviation fuel)\b/.test(t) && /\b(airline|airfare|carrier|air india|aviation operators?|surge|costs?|prices?)\b/.test(t)) {
+    // Preserve the observed price direction and its bounded consequence. The
+    // wording is an evidence-led sentence, not a pasted source headline.
+    if (/\bfall\b/.test(t)) {
+      return "jet-fuel prices fall alongside softer airline demand, easing near-term aviation operating-cost pressure";
+    }
+    if (/\bfell\b/.test(t)) {
+      return "jet-fuel prices fell alongside softer airline demand, easing near-term aviation operating-cost pressure";
+    }
+    if (/\b(drop|dropped|declin\w*|slid|slide|lower|soften\w*)\b/.test(t)) {
+      return "jet-fuel prices declined alongside softer airline demand, easing near-term aviation operating-cost pressure";
+    }
+    if (/\b(ris(e|en)|rose|surge|surged|jump|jumped|climb|climbed|higher|increase|increas\w*)\b/.test(t)) {
+      return "jet-fuel prices rose alongside firmer aviation demand, increasing near-term airline operating-cost pressure";
+    }
+    if (/\b(cost|costs|pressure)\b/.test(t)) {
+      return "jet-fuel cost pressure is feeding into airline operating economics";
+    }
+    return "an aviation-fuel cost or demand development was reported, with direct significance for airline operating economics";
   }
   if (/\b(trump|sanction|blockade)\b/.test(t) && /\b(hormuz|iran)\b/.test(t)) {
     return "reporting flagged potential Iran sanctions and continued naval pressure in the Strait of Hormuz without a confirmed closure";
@@ -1860,7 +1953,28 @@ export function summarizeFuelDevelopmentClause(opts: FuelDevelopmentInput): stri
   if (/\b(hormuz|red sea|bab[- ]el)\b/.test(t) && /\b(attack|disrupt|closure|blockade)\b/.test(t)) {
     return "chokepoint disruption raised war-risk premium and transit delay on affected fuel routes";
   }
-  return declarativeFromHeadline(normalizeFuelHeadline(opts.title));
+  // Do not fall back to a paraphrased headline. Even after feed cleanup a
+  // headline can contain publisher framing, an unverified causal assertion or
+  // market colour that is not a canonical fact. What Happened is a
+  // distinct-development summary, so an unclassified record gets a bounded
+  // evidence statement with direct fuel significance instead of source copy.
+  if (/\b(refinery|terminal|pipeline|depot|facility|facilities)\b/.test(t)
+      && /\b(disrupt|outage|fire|attack|shutdown|halt|maintenance|damage)\w*/.test(t)) {
+    return "a fuel-infrastructure disruption was reported, with possible implications for refined-product availability";
+  }
+  if (/\b(shortage|ration|rationing|forecourt|allocation|queue|queues)\b/.test(t)) {
+    return "fuel-availability pressure was reported, with direct significance for local access and commercial offtake";
+  }
+  if (/\b(price|pricing|cost|margin|crack spread|surcharge)\b/.test(t)) {
+    return "a fuel-cost or pricing development was reported, with direct significance for procurement and pass-through";
+  }
+  if (/\b(export|import|shipment|cargo|loading|supply|output|production)\b/.test(t)) {
+    return "a fuel-supply development was reported, with possible significance for regional availability and delivered cost";
+  }
+  if (opts.routeOrChokepoint || /\b(route|routing|transit|corridor|strait|sea|gulf)\b/.test(t)) {
+    return "a fuel-route development was reported, with possible significance for transit time and delivered cost";
+  }
+  return "a confirmed fuel-market development was reported, with its direct effect on availability, routing or cost still being assessed";
 }
 
 function eventLocationForProse(i: CanonicalFuelIncident): string | null {
@@ -1920,10 +2034,14 @@ function businessImpactForDevelopment(i: CanonicalFuelIncident): string {
     return "Duty changes reset export economics for Indian refiners and any contract indexed to sub-continent product benchmarks.";
   }
   if (/\b(india|indian)\b/.test(t) && /\b(gasoline|petrol)\b/.test(t) && /\b(russia|russian)\b/.test(t)) {
-    return "Cross-border gasoline flows shift who supplies Russia's shortage, affecting landed cost for buyers still lifting Russian product.";
+    return /\b(shortage|tight|ration|forecourt|supply pressure)\b/.test(t)
+      ? "Cross-border gasoline flows shift who supplies Russia's shortage, affecting landed cost for buyers still lifting Russian product."
+      : "Cross-border gasoline flows shift the source of refined-product supply for buyers lifting the reported cargo.";
   }
   if (/\b(aramco|saudi)\b/.test(t) && /\b(resume|loading|export)\b/.test(t)) {
-    return "Resumed Saudi loading eases immediate crude availability but leaves Gulf route risk priced into differentials.";
+    return /\b(gulf|hormuz|route|transit|disrupt|attack|delay)\b/.test(t)
+      ? "Resumed Saudi loading eases immediate crude availability but leaves Gulf route risk priced into differentials."
+      : "Resumed Saudi loading adds near-term crude availability to the reported market.";
   }
   if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) {
     return "Product output risk at a Saudi refinery feeds straight into regional gasoline and jet balances.";
@@ -1935,11 +2053,17 @@ function businessImpactForDevelopment(i: CanonicalFuelIncident): string {
     return "Hormuz transit pressure lifts war-risk premium and delays tanker movement even when barrels remain available elsewhere.";
   }
   if (/\b(jet fuel|aviation fuel|airline)\b/.test(t)) {
+    if (/\b(fall|fell|drop|dropped|declin\w*|slid|slide|lower|soften\w*)\b/.test(t)) {
+      return "Falling jet-fuel prices ease near-term aviation operating-cost pressure, although pass-through depends on airline pricing and fuel contracts.";
+    }
+    if (/\b(ris(e|en)|rose|surge|surged|jump|jumped|climb|climbed|higher|increase|increas\w*)\b/.test(t)) {
+      return "Rising jet-fuel prices increase near-term aviation operating-cost pressure, although pass-through depends on airline pricing and fuel contracts.";
+    }
     return "Changes in jet-fuel prices could affect aviation surcharges and route profitability; timing depends on airline pricing and fuel contracts.";
   }
   const fam = ISSUE_FAMILIES.find((f) => f.test.some((re) => re.test(t)));
   return fam?.opMeaning
-    ?? "This feeds into landed cost, delivery timing or local availability for dependent operations.";
+    ?? "No specific operational consequence is established by this development alone; watch for confirmed effects on fuel availability, routing or cost.";
 }
 
 function normalizeDevelopmentText(title: string): string {
@@ -2033,7 +2157,12 @@ function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncid
   const sorted = facts.qualifyingIncidents
     .filter((i) => i.evidenceStatus !== "Potential")
     .slice()
-    .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
+    .sort((a, b) =>
+      materialDevelopmentScore(b) - materialDevelopmentScore(a)
+      || b.date.localeCompare(a.date)
+      || a.id.localeCompare(b.id)
+      || a.title.localeCompare(b.title),
+    );
   const kept: CanonicalFuelIncident[] = [];
   const keptTokens: Set<string>[] = [];
   const themePriority: DevelopmentTheme[] = [
@@ -2060,7 +2189,12 @@ function rankBusinessSignificantDevelopments(facts: FuelCanonicalFacts): Canonic
   const sorted = facts.qualifyingIncidents
     .filter((i) => i.evidenceStatus !== "Potential")
     .slice()
-    .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a));
+    .sort((a, b) =>
+      materialDevelopmentScore(b) - materialDevelopmentScore(a)
+      || b.date.localeCompare(a.date)
+      || a.id.localeCompare(b.id)
+      || a.title.localeCompare(b.title),
+    );
   const kept: CanonicalFuelIncident[] = [];
   const keptTokens: Set<string>[] = [];
   const usedThemes = new Set<DevelopmentTheme>();
@@ -2192,7 +2326,10 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
   });
   const j = facts.judgement;
   const judgement = `The main risk is ${j.mainRisk}. The principal exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}; the near-term direction is ${j.direction}. The assessment changes if ${j.trigger}.`;
-  return [judgement, ...paras].join("\n\n");
+  // Lead with the ranked, evidence-specific developments. The canonical
+  // judgement remains in What Matters, but must not bury a directly evidenced
+  // forecourt or policy development behind generic risk framing.
+  return [...paras, judgement].join("\n\n");
 }
 
 function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
@@ -2226,21 +2363,39 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   const items: Array<{ text: string; supportingEvidenceIds: string[] }> = [];
-  const triggerIds = facts.judgement.evidenceIds ?? [];
+  const potentialIndicator = facts.watchIndicators.find((indicator) => {
+    const needle = indicator.trim().toLowerCase();
+    return needle.length > 0 && facts.qualifyingIncidents.some((incident) =>
+      incident.evidenceStatus === "Potential"
+      && `${incident.title} ${incident.raw.summary ?? ""}`.toLowerCase().includes(needle),
+    );
+  });
+  const potentialIds = potentialIndicator
+    ? facts.qualifyingIncidents
+      .filter((incident) =>
+        incident.evidenceStatus === "Potential"
+        && `${incident.title} ${incident.raw.summary ?? ""}`.toLowerCase()
+          .includes(potentialIndicator.trim().toLowerCase()),
+      )
+      .map((incident) => incident.id)
+    : [];
+  const triggerIds = [
+    ...(facts.judgement.evidenceIds ?? []),
+    ...potentialIds,
+  ].filter((id, index, ids) => ids.indexOf(id) === index);
   if (triggerIds.length > 0) {
-    const trigger = facts.judgement.trigger.replace(/^./, (ch) => ch.toUpperCase());
+    const trigger = (potentialIndicator ?? facts.judgement.trigger).replace(/^./, (ch) => ch.toLowerCase());
     items.push({
-      text: `${trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
+      text: `Watch for ${trigger} affecting ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
       supportingEvidenceIds: triggerIds,
     });
   }
   for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
     if (!incident.id || incident.evidenceStatus === "Potential") continue;
     const family = familyFor([incident.raw]);
-    const cleanTitle = stripWireCruft(incident.title).replace(/[.!?]+$/, "");
     items.push({
       text: family?.watch
-        ?? `Monitor for verified operational follow-through from ${cleanTitle}.`,
+        ?? "Watch for verified operational follow-through affecting fuel availability, routing or cost.",
       supportingEvidenceIds: [incident.id],
     });
   }
@@ -2312,7 +2467,26 @@ export function buildFuelAnalyticalSections(
   const whatHappenedItems = buildFuelWhatHappenedItems(facts);
   const watchNextItems = (() => {
     const out: string[][] = [];
-    const triggerIds = facts.judgement.evidenceIds ?? [];
+    const potentialIndicator = facts.watchIndicators.find((indicator) => {
+      const needle = indicator.trim().toLowerCase();
+      return needle.length > 0 && facts.qualifyingIncidents.some((incident) =>
+        incident.evidenceStatus === "Potential"
+        && `${incident.title} ${incident.raw.summary ?? ""}`.toLowerCase().includes(needle),
+      );
+    });
+    const potentialIds = potentialIndicator
+      ? facts.qualifyingIncidents
+        .filter((incident) =>
+          incident.evidenceStatus === "Potential"
+          && `${incident.title} ${incident.raw.summary ?? ""}`.toLowerCase()
+            .includes(potentialIndicator.trim().toLowerCase()),
+        )
+        .map((incident) => incident.id)
+      : [];
+    const triggerIds = [
+      ...(facts.judgement.evidenceIds ?? []),
+      ...potentialIds,
+    ].filter((id, index, ids) => ids.indexOf(id) === index);
     if (triggerIds.length) out.push(triggerIds);
     for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
       if (incident.id && incident.evidenceStatus !== "Potential") out.push([incident.id]);

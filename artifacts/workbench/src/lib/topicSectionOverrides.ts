@@ -488,8 +488,8 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "polestar-view", label: "Polestar View" },
   ],
   conflict: [
-    { key: "situation", label: "Situation" },
     { key: "fast-facts", label: "Fast Facts" },
+    { key: "situation", label: "BLUF" },
     { key: "top-activity-areas", label: "Top Activity Areas" },
     { key: "other-watched", label: "Other Watched Theatres" },
     { key: "what-matters", label: "What Matters for Business" },

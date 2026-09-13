@@ -156,6 +156,57 @@ describe("canonical Flashpoint incident set", () => {
     );
   });
 
+  test("duplicate articles are removed before period facts and the highest severity survives", () => {
+    const base = row("Workers stage wage protest at the harbour gate", {
+      severity: "low",
+      sourceUrl: "https://example.test/low-copy",
+      source: "Outlet A",
+    });
+    const duplicate = row("Workers stage wage protest at the harbour gate - Outlet B", {
+      severity: "high",
+      sourceUrl: "https://example.test/high-copy",
+      source: "Outlet B",
+    });
+    const ds = buildFlashpointReportDataset([base, duplicate], "flashpoint", ISSUE);
+    expect(ds.canonical.periodRows).toHaveLength(1);
+    expect(ds.canonical.periodRows[0]?.severity).toBe("high");
+    expect(ds.fastFacts.find((card) => card.label === "Distinct Incidents")?.value).toBe("1");
+    expect(ds.fastFacts.find((card) => card.label === "Highest Severity")?.value).toBe("High");
+    expect(ds.fastFacts.find((card) => card.label === "Weekly Posture")?.value).toBe("Moderate");
+    expect(ds.activismRows).toHaveLength(1);
+    expect(ds.countryRows).toEqual([expect.objectContaining({ label: "India", value: 1 })]);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
+  test("exact-title dedupe keeps recurring events with different semantic dates or locations", () => {
+    const first = row("Annual workers protest at the central depot", {
+      occurredAt: "2026-08-10T08:00:00Z",
+      location: "Delhi",
+      validityGates: {
+        ...row("basis").validityGates!,
+        physicalLocation: "Delhi",
+        eventDate: "2026-08-10",
+      },
+    });
+    const recurring = row("Annual workers protest at the central depot", {
+      occurredAt: "2026-08-11T08:00:00Z",
+      location: "Mumbai",
+      validityGates: {
+        ...row("basis").validityGates!,
+        physicalLocation: "Mumbai",
+        eventDate: "2026-08-11",
+      },
+    });
+    const ds = buildFlashpointReportDataset([first, recurring], "flashpoint", ISSUE);
+    expect(ds.canonical.periodRows).toHaveLength(2);
+    expect(new Set(ds.canonical.periodRows.map((incident) => incident.location))).toEqual(
+      new Set(["Delhi", "Mumbai"]),
+    );
+    expect(ds.fastFacts.find((card) => card.label === "Distinct Incidents")?.value).toBe("2");
+    expect(ds.countryRows).toEqual([expect.objectContaining({ label: "India", value: 2 })]);
+    expect(validateFlashpointReportDataset(ds)).toEqual([]);
+  });
+
   test("same inputs and issue date have stable canonical IDs, fingerprint and core facts", () => {
     const rows = [
       row("Police use tear gas during student protest in Delhi", {
@@ -416,6 +467,46 @@ describe("canonical Flashpoint incident set", () => {
       },
     });
     expect(model.prose.executiveSummary).toContain("21 August");
+    expect(validateFlashpointRenderedModel(model)).toEqual([]);
+  });
+
+  test("deadline dates, hyphenated durations and rated-severity subsets are not misread as total counts", () => {
+    const rows = [
+      row("Union sets Sept. 9 deadline and threatens 48-hour strike", {
+        country: "South Korea",
+        location: "Seoul",
+        severity: "low",
+        occurredAt: "2026-09-10T08:00:00Z",
+        validityGates: {
+          ...row("basis").validityGates!,
+          physicalLocation: "Seoul",
+          country: "South Korea",
+          eventDate: "2026-09-10",
+        },
+      }),
+      row("Police disperse protest at central square", {
+        severity: "high",
+        occurredAt: "2026-09-11T08:00:00Z",
+        summary: "Police used tear gas after demonstrators blocked the road.",
+        validityGates: {
+          ...row("basis").validityGates!,
+          eventType: "riot_public_disorder",
+          eventDate: "2026-09-11",
+        },
+      }),
+    ];
+    const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-09-13");
+    const base = resolveFlashpointRenderedModel({ dataset: ds });
+    const model = {
+      ...base,
+      prose: {
+        ...base.prose,
+        activismRead:
+          "The main protest event was a union notice that set a Sept. 9 deadline and threatened a 48-hour strike.",
+        civilUnrestRead:
+          "The most serious civil-unrest event was 1 incident rated High.",
+      },
+    };
     expect(validateFlashpointRenderedModel(model)).toEqual([]);
   });
 
