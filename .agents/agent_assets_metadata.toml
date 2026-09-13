@@ -1101,3 +1101,17 @@ mtime_ms = 1789138749967
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/4b2f938b-da6b-467a-aa31-7cd86f33cd68/01a61f44-7c39-41f7-acbb-9d33462a81ab"
 storage_version_token = "1789138832755893"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Ol_EVS1EeJZM182T16tvJ"
+uri = "file://screenshots/flashpoint-final-page-no-related-incidents.png"
+type = "image"
+title = "Flashpoint PDF — final page"
+description = "Generated Flashpoint PDF page showing Polestar View followed directly by Disclaimer, with no Related Incidents section."
+logical_id = "45900fe6-9a35-4513-9f39-d01d6f37a42d"
+content_hash = "sha256:c098a642350192d20790479ad83f1bf8817e3316ef5a1d6b4fc2452797402a53"
+size = 123555
+mtime_ms = 1789274584978
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/45900fe6-9a35-4513-9f39-d01d6f37a42d/6429279f-56ac-4ac8-91b1-ba850368ccf4"
+storage_version_token = "1789274594889853"
+content_type = "image/png"
