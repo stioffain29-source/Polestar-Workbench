@@ -1722,7 +1722,10 @@ export default function ReportEditor() {
       whatMatters: pickNarrative(report.whatMatters, draft.whatMatters),
       implications: pickNarrative(report.implications, draft.implications),
       polestarView: pickNarrative(report.polestarView, draft.polestarView),
-      watchNext: pickNarrative(report.watchNext, draft.watchNext),
+      watchNext: pickNarrative(
+        report.watchNext,
+        fpReads?.autoWatchNext || draft.watchNext,
+      ),
       activismRead: fpReads
         ? proseIsStale
           ? fpReads.activismRead
@@ -2939,6 +2942,10 @@ export default function ReportEditor() {
                   onChange={(e) => set("forecastRead", e.target.value)}
                   className="rounded-sm"
                 />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Add a forecast protest on a new line as: Country | Date | Signal | Operational meaning.
+                  It will appear immediately in the preview table and Watch Next.
+                </p>
               </Field>
               <Field label="Regional & Country View">
                 <Textarea

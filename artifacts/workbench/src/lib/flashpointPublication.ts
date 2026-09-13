@@ -50,7 +50,7 @@ export function flashpointEvidenceAuditInput(
     evidenceId: row.id,
   }));
   const forward: FinalReportTypedReference[] = [
-    ...ds.forecastFuture.map((row) => ({
+    ...model.forecastRows.map((row) => ({
       id: `forecast-${row.sourceIncidentId}`,
       type: "forward-indicator" as const,
       text: [row.country, row.signal, row.meaning, row.date].filter(Boolean).join(" "),

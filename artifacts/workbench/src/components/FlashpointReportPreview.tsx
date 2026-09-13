@@ -554,7 +554,7 @@ export default function FlashpointReportPreview({
         </Section>
 
         <Section hidden={!show("forecast")} title={"Forecast: Next 7\u201314 Days"}>
-          {ds.forecastFuture.length > 0 && (
+          {model.forecastRows.length > 0 && (
             <div className="mb-4 border" style={{ border: `1px solid ${POLAR}` }}>
               <table className="w-full border-collapse" style={{ fontFamily: "Roboto, sans-serif", fontSize: 12 }}>
                 <thead>
@@ -566,7 +566,7 @@ export default function FlashpointReportPreview({
                   </tr>
                 </thead>
                 <tbody>
-                  {ds.forecastFuture.map((r, idx) => (
+                  {model.forecastRows.map((r, idx) => (
                     <tr key={idx} style={{ borderTop: `1px solid ${POLAR}` }}>
                       <td className="px-2 py-2 align-top" style={{ color: NAVY }}>{r.date ?? "\u2014"}</td>
                       <td className="px-2 py-2 align-top" style={{ color: NAVY, fontWeight: 700, wordBreak: "break-word", overflowWrap: "anywhere" }}>{r.country}</td>

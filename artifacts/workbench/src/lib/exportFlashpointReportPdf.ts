@@ -665,8 +665,8 @@ export async function exportFlashpointReportPdf(
   // trajectory prose with cautious vocabulary.
   if (show("forecast")) {
     drawSectionHeading(ctx, "Forecast: Next 7\u201314 Days");
-    if (ds.forecastFuture.length > 0) {
-      drawForecastFutureTable(ctx, ds.forecastFuture);
+    if (model.forecastRows.length > 0) {
+      drawForecastFutureTable(ctx, [...model.forecastRows]);
     }
     renderProse(ctx, model.prose.forecastRead);
   }

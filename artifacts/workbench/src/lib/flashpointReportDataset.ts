@@ -125,6 +125,33 @@ export interface ForecastFutureRow {
   date: string | null;
 }
 
+/**
+ * Analyst forecast rows are persisted inside forecastRead as pipe-delimited
+ * lines so the existing report schema can carry both prose and structured
+ * additions. Non-matching prose remains the narrative below the table.
+ *
+ * Country | Date | Signal | Operational meaning
+ */
+export function parseAnalystForecastRows(
+  value: string | null | undefined,
+): ForecastFutureRow[] {
+  return (value ?? "")
+    .split(/\r?\n/)
+    .map((line, index) => {
+      const parts = line.split("|").map((part) => part.trim());
+      if (parts.length !== 4 || parts.some((part) => !part)) return null;
+      const [country, date, signal, meaning] = parts;
+      return {
+        sourceIncidentId: `analyst-forecast-${index}-${country.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+        country,
+        date,
+        signal,
+        meaning,
+      } satisfies ForecastFutureRow;
+    })
+    .filter((row): row is ForecastFutureRow => row !== null);
+}
+
 // Lift an explicitly stated future date out of the announcement text. Only a
 // literal "on/set for/until/through/by/from <day> <month>" (or "<month> <day>")
 // qualifies — no guessing, per the no-fabrication rule in upcomingSignals.ts.
@@ -440,6 +467,8 @@ export interface FlashpointResolvedAiInput extends FlashpointResolvedProseInput 
 
 export interface FlashpointRenderedModel {
   dataset: FlashpointReportDataset;
+  /** Canonical forecast rows plus live analyst additions from forecastRead. */
+  forecastRows: readonly ForecastFutureRow[];
   fingerprint: string;
   acceptedIds: readonly (number | string)[];
   fastFacts: readonly KpiCard[];
@@ -4019,6 +4048,24 @@ export function resolveFlashpointRenderedModel(args: {
     (report.executiveSummary ?? "").trim() ||
     (ai.executiveSummary ?? "").trim() ||
     ds.autoExecutiveSummary;
+  const analystForecastRows = parseAnalystForecastRows(report.forecastRead);
+  const forecastRows = [
+    ...new Map(
+      [...ds.forecastFuture, ...analystForecastRows].map((row) => [
+        `${row.country.toLowerCase()}|${row.signal.toLowerCase()}`,
+        row,
+      ]),
+    ).values(),
+  ].slice(0, 12);
+  const resolvedWatchNext = resolveFlashpointAnalystProse(
+    report.watchNext,
+    ai.watchNext,
+    ds.autoWatchNext,
+  );
+  const forecastWatchLines = analystForecastRows.map(
+    (row) =>
+      `${row.country} — ${row.signal}: ${row.meaning}`,
+  );
   const prose = {
     executiveSummary,
     activismRead: pickFlashpointRead(report.activismRead, ds.activismRead),
@@ -4038,11 +4085,10 @@ export function resolveFlashpointRenderedModel(args: {
       ai.implications,
       ds.autoImplications,
     ),
-    watchNext: resolveFlashpointAnalystProse(
-      report.watchNext,
-      ai.watchNext,
-      ds.autoWatchNext,
-    ),
+    watchNext: [...new Set([
+      ...resolvedWatchNext.split(/\n+/).map((line) => line.trim()).filter(Boolean),
+      ...forecastWatchLines,
+    ])].join("\n"),
     polestarView: resolveFlashpointAnalystProse(
       report.polestarView,
       ai.polestarView,
@@ -4051,6 +4097,7 @@ export function resolveFlashpointRenderedModel(args: {
   };
   const makeModel = (resolvedProse: typeof prose): FlashpointRenderedModel => ({
     dataset: ds,
+    forecastRows: Object.freeze(forecastRows.map((row) => Object.freeze({ ...row }))),
     fingerprint: ds.canonical.fingerprint,
     acceptedIds: ds.canonical.acceptedIds,
     fastFacts: Object.freeze(ds.fastFacts.map((card) => Object.freeze({ ...card }))),
