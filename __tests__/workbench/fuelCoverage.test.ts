@@ -60,6 +60,36 @@ function canonicalFacts(): FuelCanonicalFacts {
 }
 
 describe("Fuel Watch reporting-period coverage", () => {
+  it("does not let a null maritime semantic field erase Fuel geography", () => {
+    const facts = buildFuelCanonicalFacts({
+      issueDate: "2026-09-13",
+      incidents: [],
+      qualifyingIncidents: [
+        {
+          id: 901,
+          topic: "fuel",
+          title: "Russia restricts aircraft refuelling at 26 airports",
+          summary: "Fuel access restrictions remain in force in Russia.",
+          country: "Russia",
+          location: null,
+          maritimeSemantic: null,
+          severity: "moderate",
+          occurredAt: "2026-09-11T09:18:00.000Z",
+        },
+      ],
+      marketCards: [],
+      window: { start: "2026-09-07", end: "2026-09-13" },
+    });
+
+    const coverage = buildFuelCoverageSummary(facts);
+    expect(coverage.affectedCountries).toEqual([
+      expect.objectContaining({ country: "Russia", count: 1 }),
+    ]);
+    expect(
+      coverage.affectedCountries.some((row) => row.country === "Unattributed"),
+    ).toBe(false);
+  });
+
   it("registers Related Incidents in Fuel editor controls and honors its hide gate", () => {
     expect(topicSectionKeys("fuel")).toEqual(
       expect.arrayContaining([{ key: "related-incidents", label: "Related Incidents" }]),

@@ -32,7 +32,7 @@ import {
 import { parseFuelHardNumbers, type FuelDataCard } from "./jetFuelTrajectory";
 import { capFuelMarketSeverity } from "./fuelNarratives";
 import { aggregateIncidentSignificance } from "@workspace/country-engine";
-import { deriveIncidentCountry } from "./shippingCountry";
+import { deriveFuelIncidentCountry } from "./fuelCountry";
 import {
   deriveFuelMarketIndicator,
   fuelDirectionForPct,
@@ -275,7 +275,7 @@ export function buildFuelReportFacts(opts: {
     id: i.id ?? null,
     title: i.title,
     summary: i.summary ?? null,
-    country: deriveIncidentCountry(i),
+    country: deriveFuelIncidentCountry(i),
     location: i.location ?? null,
     severity: (i.severity ?? "").toLowerCase(),
     effectiveSeverity: (

@@ -7,7 +7,7 @@
  * the same facts before publication.
  */
 import { filterTopicReportIncidents, type TopicFastFactsIncident } from "./topicFastFacts";
-import { deriveIncidentCountry } from "./shippingCountry";
+import { deriveFuelIncidentCountry } from "./fuelCountry";
 import { isSocialPostTitle } from "./fuelReportFacts";
 import { capFuelMarketSeverity, buildFuelAnalyticalSections } from "./fuelNarratives";
 import {
@@ -215,8 +215,8 @@ function sameEvidenceFamily(a: TopicFastFactsIncident, b: TopicFastFactsIncident
   const titleA = new Set(familyTokens({ ...a, summary: "" }));
   const titleB = new Set(familyTokens({ ...b, summary: "" }));
   const titleOverlap = [...titleA].filter((token) => titleB.has(token)).length;
-  const geographyA = (deriveIncidentCountry(a) ?? a.location ?? "").toLowerCase();
-  const geographyB = (deriveIncidentCountry(b) ?? b.location ?? "").toLowerCase();
+  const geographyA = (deriveFuelIncidentCountry(a) ?? a.location ?? "").toLowerCase();
+  const geographyB = (deriveFuelIncidentCountry(b) ?? b.location ?? "").toLowerCase();
   const geographyCompatible = !geographyA || !geographyB || geographyA === geographyB;
   return geographyCompatible && titleOverlap >= 2 && overlap >= 3 && union > 0 && overlap / union >= 0.42;
 }
@@ -465,7 +465,7 @@ export function buildFuelCanonicalFacts(opts: {
   const evidenceFamilies = buildFuelEvidenceLedger(filtered);
   const qualifyingIncidents = evidenceFamilies.map((family): CanonicalFuelIncident => {
     const raw = family.canonicalRecord;
-    const country = deriveIncidentCountry(raw);
+    const country = deriveFuelIncidentCountry(raw);
     const physicalLocation = text(raw.location) ?? null;
     const severity = effectiveSeverityFor(raw);
     return {

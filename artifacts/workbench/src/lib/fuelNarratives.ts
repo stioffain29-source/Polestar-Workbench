@@ -14,7 +14,8 @@ import {
   compareIncidentSignificance,
   incidentSeverityRank,
 } from "@workspace/country-engine";
-import { deriveIncidentCountry, deriveFlagState } from "./shippingCountry";
+import { deriveFlagState } from "./shippingCountry";
+import { deriveFuelIncidentCountry } from "./fuelCountry";
 import { joinWithAnd } from "./proseLists";
 import { matchesTopicIncident } from "./topicIncidentMatching";
 import type {
@@ -58,7 +59,7 @@ function haystack(i: TopicFastFactsIncident): string {
 // more severe, still-live incidents.
 /** The single incident-country rule used in Fuel Watch. */
 function incidentCountry(i: TopicFastFactsIncident): string | null {
-  return deriveIncidentCountry(i);
+  return deriveFuelIncidentCountry(i);
 }
 
 // Operational issue families, in priority order. Each family carries:
