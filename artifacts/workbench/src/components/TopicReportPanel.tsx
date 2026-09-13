@@ -5,11 +5,12 @@ import {
   type Report,
   useListReports,
   useCreateReport,
+  useDeleteReport,
   getListReportsQueryKey,
   getGetDashboardOverviewQueryKey,
 } from "@workspace/api-client-react";
 import { format, parseISO } from "date-fns";
-import { Plus, ArrowRight } from "lucide-react";
+import { Plus, ArrowRight, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { reportStatusClass } from "@/lib/topics";
 import { canonicalTopic, isReportableTopic } from "@/lib/reportNaming";
@@ -36,6 +37,7 @@ export function TopicReportPanel({ topic }: { topic: string }) {
     { query: { enabled: reportable } } as never,
   );
   const create = useCreateReport();
+  const del = useDeleteReport();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const createBusy = useRef(false);
   useEffect(() => {
@@ -146,7 +148,29 @@ export function TopicReportPanel({ topic }: { topic: string }) {
                     <>
                       <ReportGroupHeading>Older in-progress</ReportGroupHeading>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {older.map((r) => <ReportCard key={r.id} report={r} />)}
+                        {older.map((r) => (
+                          <ReportCard
+                            key={r.id}
+                            report={r}
+                            onDelete={
+                              r.status === "draft"
+                                ? () => {
+                                    if (!confirm(`Delete old draft "${r.title}"? This cannot be undone.`)) return;
+                                    del.mutate(
+                                      { id: r.id },
+                                      {
+                                        onSuccess: () => {
+                                          qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
+                                          qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+                                        },
+                                      },
+                                    );
+                                  }
+                                : undefined
+                            }
+                            deletePending={del.isPending}
+                          />
+                        ))}
                       </div>
                     </>
                   )}
@@ -188,36 +212,58 @@ function ReportGroupHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ReportCard({ report: r }: { report: Report }) {
+function ReportCard({
+  report: r,
+  onDelete,
+  deletePending = false,
+}: {
+  report: Report;
+  onDelete?: () => void;
+  deletePending?: boolean;
+}) {
   return (
-    <Link
-      href={`/reports/${r.id}`}
-      className="block bg-background border border-border rounded-sm p-3 hover:border-accent transition-colors group"
-      data-testid={`link-topic-report-${r.id}`}
-    >
-      <div className="flex items-center justify-between">
-        <span
-          className={cn(
-            "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
-            reportStatusClass(r.status),
-          )}
+    <div className="relative bg-background border border-border rounded-sm hover:border-accent transition-colors group">
+      <Link
+        href={`/reports/${r.id}`}
+        className="block p-3"
+        data-testid={`link-topic-report-${r.id}`}
+      >
+        <div className="flex items-center justify-between">
+          <span
+            className={cn(
+              "px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm",
+              reportStatusClass(r.status),
+            )}
+          >
+            {r.status}
+          </span>
+          <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+        </div>
+        <div className={cn("text-sm font-sans font-medium text-primary mt-2 truncate", onDelete && "pr-8")}>{r.title}</div>
+        <div className={cn("text-xs text-muted-foreground font-mono mt-1", onDelete && "pr-8")}>
+          <span>Issue date: </span>
+          {(() => {
+            try {
+              return format(parseISO((r.issueDate ?? "").slice(0, 10)), "d MMM yyyy");
+            } catch {
+              return r.issueDate ?? "—";
+            }
+          })()}
+          {r.author ? ` · ${r.author}` : ""}
+        </div>
+      </Link>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deletePending}
+          aria-label={`Delete old draft ${r.title}`}
+          title="Delete old draft"
+          className="absolute bottom-2.5 right-2.5 p-1.5 text-muted-foreground hover:text-destructive disabled:opacity-50 transition-colors"
         >
-          {r.status}
-        </span>
-        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
-      </div>
-      <div className="text-sm font-sans font-medium text-primary mt-2 truncate">{r.title}</div>
-      <div className="text-xs text-muted-foreground font-mono mt-1">
-        <span>Issue date: </span>
-        {(() => {
-          try {
-            return format(parseISO((r.issueDate ?? "").slice(0, 10)), "d MMM yyyy");
-          } catch {
-            return r.issueDate ?? "—";
-          }
-        })()}
-        {r.author ? ` · ${r.author}` : ""}
-      </div>
-    </Link>
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 }

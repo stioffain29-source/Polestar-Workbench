@@ -22,6 +22,8 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 let mockReports: Array<Record<string, unknown>> = [];
 let mockCreateMutate: jest.Mock;
 let mockCreatePending = false;
+let mockDeleteMutate: jest.Mock;
+let mockDeletePending = false;
 let mockInvalidateQueries: jest.Mock;
 let mockSetLocation: jest.Mock;
 
@@ -49,6 +51,10 @@ jest.mock("@workspace/api-client-react", () => ({
   useCreateReport: () => ({
     mutate: mockCreateMutate,
     isPending: mockCreatePending,
+  }),
+  useDeleteReport: () => ({
+    mutate: mockDeleteMutate,
+    isPending: mockDeletePending,
   }),
   getListReportsQueryKey: () => ["reports"],
   getGetDashboardOverviewQueryKey: () => ["dashboard-overview"],
@@ -80,6 +86,8 @@ beforeEach(() => {
   mockReports = [];
   mockCreateMutate = jest.fn();
   mockCreatePending = false;
+  mockDeleteMutate = jest.fn();
+  mockDeletePending = false;
   mockInvalidateQueries = jest.fn();
   mockSetLocation = jest.fn();
 });
@@ -161,6 +169,27 @@ describe("TopicReportPanel", () => {
     expect(screen.getByTestId("link-topic-report-1")).not.toBeNull();
     expect(screen.getByText("15 Jun 2026")).not.toBeNull();
     expect(mockReports).toEqual(reportsBeforeRender);
+  });
+
+  it("deletes an older draft from the expanded archive and refreshes both lists", async () => {
+    mockReports = [
+      makeReport(1, "flashpoint", "2026-06-15", "draft", "2026-06-15"),
+      makeReport(2, "flashpoint", "2026-09-12", "draft", "2026-09-12"),
+    ];
+    mockDeleteMutate = jest.fn((_body, opts) => opts.onSuccess());
+    jest.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(<TopicReportPanel topic="flashpoint" />);
+    fireEvent.click(screen.getByTestId("summary-topic-report-archive"));
+    fireEvent.click(screen.getByRole("button", { name: /delete old draft flashpoint report 1/i }));
+
+    expect(mockDeleteMutate).toHaveBeenCalledWith(
+      { id: 1 },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    await waitFor(() => expect(mockInvalidateQueries).toHaveBeenCalledTimes(2));
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["reports"] });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["dashboard-overview"] });
   });
 
   it("does not show the view-all link when there are 6 or fewer reports", () => {
