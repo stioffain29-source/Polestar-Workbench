@@ -600,8 +600,10 @@ function marketSentence(facts: FuelCanonicalFacts): string {
     if (i.comparisonScope === "reporting-period") {
       return `${i.label} is ${i.direction} within the reporting period`;
     }
-    const reference = i.referenceDate ? ` dated ${i.referenceDate}` : " with no date";
-    return `${i.label} is ${i.direction} against a ${i.comparisonScope === "lagged-reference" ? "lagged" : "undated"} reference${reference}`;
+    if (!i.referenceDate) {
+      return `${i.label} is ${i.direction} based on the supplied comparison, but no dated reference was provided`;
+    }
+    return `${i.label} is ${i.direction} against a ${i.comparisonScope === "lagged-reference" ? "lagged" : "prior"} reference dated ${i.referenceDate}`;
   }).join("; ") + ".";
 }
 function list(values: string[]): string {

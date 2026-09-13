@@ -1,5 +1,6 @@
 import {
   buildFuelCanonicalFacts,
+  buildFuelCanonicalSections,
   buildFuelEvidenceLedger,
 } from "../fuelCanonicalFacts";
 import { auditFinalReportEvidence } from "../finalReportEvidenceAudit";
@@ -72,6 +73,23 @@ describe("Fuel shared publication architecture", () => {
       comparisonScope: "undated-reference",
       referenceDate: null,
     });
+    const currentUndatedFacts = buildFuelCanonicalFacts({
+      issueDate: ISSUE,
+      incidents: [incident(1, "Current depot outage")],
+      marketCards: [{
+        label: "Brent crude",
+        value: 104.61,
+        unit: "USD/bbl",
+        asOf: "2026-08-05",
+        change: "+8.7% 7d",
+      }],
+    });
+    expect(buildFuelCanonicalSections(currentUndatedFacts).marketRead).toContain(
+      "no dated reference was provided",
+    );
+    expect(buildFuelCanonicalSections(currentUndatedFacts).marketRead).not.toContain(
+      "a undated reference with no date",
+    );
   });
 
   it("rejects taxonomy leakage, untyped watches and unsupported deterministic causation", () => {
@@ -127,6 +145,10 @@ describe("Fuel shared publication architecture", () => {
     expect(result.effectiveSections.watchNext).not.toMatch(
       /subsidy or levy decisions|refinery outages or force-majeure|tanker and route disruption/i,
     );
+    expect(result.effectiveSections.watchNext).not.toMatch(
+      /Follow-up confirmation for/i,
+    );
+    expect(result.effectiveSections.watchNext).toMatch(/^[A-Z]/);
   });
 
   it("keeps potential-only themes out of current deterministic sections", () => {

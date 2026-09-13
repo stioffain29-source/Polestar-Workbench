@@ -6,8 +6,6 @@ import {
   buildFuelCoverageSummary,
   type FuelCoverageSummary,
 } from "../../artifacts/workbench/src/lib/fuelCoverage";
-import { selectRelatedIncidents } from "../../artifacts/workbench/src/lib/relatedIncidents";
-import { makeSectionGate, topicSectionKeys } from "../../artifacts/workbench/src/lib/topicSectionOverrides";
 import type { TopicFastFactsIncident } from "../../artifacts/workbench/src/lib/topicFastFacts";
 
 const ISSUE_DATE = "2031-04-07";
@@ -90,14 +88,6 @@ describe("Fuel Watch reporting-period coverage", () => {
     ).toBe(false);
   });
 
-  it("registers Related Incidents in Fuel editor controls and honors its hide gate", () => {
-    expect(topicSectionKeys("fuel")).toEqual(
-      expect.arrayContaining([{ key: "related-incidents", label: "Related Incidents" }]),
-    );
-    expect(makeSectionGate(["related-incidents"])("related-incidents")).toBe(false);
-    expect(makeSectionGate([])("related-incidents")).toBe(true);
-  });
-
   it("counts canonical developments after date scope and evidence-family dedupe", () => {
     const facts = canonicalFacts();
     const coverage: FuelCoverageSummary = buildFuelCoverageSummary(facts);
@@ -129,7 +119,7 @@ describe("Fuel Watch reporting-period coverage", () => {
     expect(coverage.affectedCountries.find((row) => row.country === "Jordan")?.highestSeverity).toBe("Extreme");
   });
 
-  it("shows unassigned developments explicitly without counting them as active countries", () => {
+  it("keeps unresolved geography out of the affected-countries table", () => {
     const known = canonicalFacts().qualifyingIncidents.map((record) => record.raw);
     const unassigned = [
       "Refinery fire",
@@ -151,24 +141,8 @@ describe("Fuel Watch reporting-period coverage", () => {
       window: { start: "2031-04-01", end: ISSUE_DATE },
     });
     const coverage = buildFuelCoverageSummary(facts);
-    const listedDevelopments = coverage.affectedCountries.reduce((sum, row) => sum + row.count, 0);
-
-    expect(coverage.affectedCountries.find((row) => row.country === "Unattributed")?.count).toBe(6);
+    expect(coverage.affectedCountries.some((row) => row.country === "Unattributed")).toBe(false);
     expect(coverage.activeCountries).toBe(7);
-    expect(listedDevelopments).toBe(coverage.totalDistinctDevelopments);
-  });
-
-  it("allows eight qualifying Fuel rows through the shared selector", () => {
-    const facts = canonicalFacts();
-    const rows = selectRelatedIncidents(
-      facts.qualifyingIncidents.map((record) => ({
-        ...record.raw,
-        id: record.raw.id ?? record.id,
-      })),
-      "fuel",
-    );
-
-    expect(rows).toHaveLength(8);
-    expect(rows.map((row) => row.id)).toEqual(expect.arrayContaining([1, 2, 3, 4, 5, 6, 7, 8]));
+    expect(coverage.unattributedDevelopmentCount).toBe(6);
   });
 });

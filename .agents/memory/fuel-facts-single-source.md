@@ -19,3 +19,6 @@ description: One facts object drives Fuel Watch; factual and semantic validation
 - Fuel's effective report date is market-anchored (latest market close ?? issue date) — preview, AI facts/cache key and PDF must all use it or the gate diverges across surfaces.
 - Do not confuse AI-prompt facts with the final rendered evidence. Fingerprint-stale AI and legacy saved prose are not valid stand-ins for the editor's current effective payload when verifying an unblock.
 - Deterministic builders that still rank internally (Regional Highlights helper, kept for other callers) must take the facts pressure decision and switch to spread phrasing when distributed.
+- An affected-countries table contains countries only: first recover blank geography from event location/title/summary, then omit unresolved rows and disclose the excluded count in the coverage note. Never manufacture an “Unattributed” country to reconcile table and overall totals.
+  **Why:** that bucket exposed an internal data-quality gap as if it were a geographic result.
+  **How to apply:** overall and severity totals may include the full qualifying set; country rows and active-country counts use only developments with verified country attribution.

@@ -4097,7 +4097,8 @@ export function resolveFlashpointRenderedModel(args: {
     prose: Object.freeze(resolvedProse),
   });
   const model = makeModel(prose);
-  if (validateFlashpointRenderedModel(model).length === 0) {
+  const modelErrors = validateFlashpointRenderedModel(model);
+  if (modelErrors.length === 0) {
     return Object.freeze(model);
   }
   // Persisted prose is untrusted display input. Contradictory/stale prose must
@@ -4113,42 +4114,68 @@ export function resolveFlashpointRenderedModel(args: {
     watchNext: ds.autoWatchNext,
     polestarView: ds.autoPolestarView,
   });
-  if (validateFlashpointRenderedModel(safe).length === 0) {
+  const safeErrors = validateFlashpointRenderedModel(safe);
+  if (safeErrors.length === 0) {
     return Object.freeze(safe);
   }
-  // Last-resort canonical prose deliberately contains no numeric claims. It is
-  // derived only from accepted-row geography/severity plus standard operational
-  // guidance, so a prose-detector regression cannot take down preview/PDF.
-  // Structural dataset/chart/ID problems were already hard-failed above.
-  const countries = Array.from(
-    new Set(
-      ds.canonical.periodRows
-        .map((row) => row.country)
-        .filter((country): country is string => Boolean(country)),
-    ),
-  );
-  const geography = countries.length
-    ? `Accepted reporting names ${joinList(countries)}.`
-    : "Accepted reporting does not establish a country concentration.";
-  const activity = ds.canonical.periodRows.length
-    ? "Confirmed public-order activity is present in the accepted reporting."
-    : "No confirmed public-order activity is present in the accepted reporting.";
-  const countFree = makeModel({
-    executiveSummary: `${activity} Maintain proportionate monitoring and verify changes against confirmed sources.`,
-    activismRead: `${activity} Track mobilisation notices and access disruption without inferring activity beyond the accepted record.`,
-    civilUnrestRead: "Monitor police statements, access controls and visible escalation indicators. Do not infer enforcement action without confirmation.",
+  console.warn("[flashpoint-rendered-model] canonical prose rejected; using grounded recovery", {
+    fingerprint: ds.canonical.fingerprint,
+    selectedErrors: modelErrors,
+    canonicalErrors: safeErrors,
+  });
+  // Last-resort prose stays count-free so a count-parser regression cannot take
+  // down preview/PDF, but it must still be an analytical report. Every named
+  // place and severity below comes from the canonical period rows; Watch Next
+  // prefers the separately validated protest schedule.
+  const topCountries = ds.countryRows.slice(0, 4).map((row) => row.label);
+  const leadCountry = topCountries[0] ?? null;
+  const supportingCountries = topCountries.slice(1);
+  const severityCeiling = highestSeverity(
+    Array.from(ds.canonical.periodRows),
+  ).label;
+  const activityPresent = ds.canonical.periodRows.length > 0;
+  const regionalConcentration = leadCountry
+    ? `Reporting is concentrated in ${leadCountry}${supportingCountries.length ? `, with additional activity in ${joinList(supportingCountries)}` : ""}.`
+    : "The accepted reporting does not establish a defensible geographic concentration.";
+  const fallbackWatchNext =
+    scheduleWatchNext ||
+    topCountries
+      .slice(0, 3)
+      .map(
+        (country) =>
+          `Monitor official notices, transport disruption and changes to access restrictions in ${country}.`,
+      )
+      .join("\n") ||
+    "Monitor verified mobilisation notices, transport disruption and changes to official access restrictions.";
+  const groundedRecovery = makeModel({
+    executiveSummary: activityPresent
+      ? `${regionalConcentration} The severity ceiling is ${severityCeiling}. The immediate operating concern is short-notice disruption to movement, site access and staff communications where public gatherings or enforcement activity affect key routes.`
+      : "No confirmed public-order activity was established for the reporting period. Maintain routine monitoring of verified mobilisation notices and official access restrictions.",
+    activismRead: activityPresent
+      ? `${regionalConcentration} Mobilisation reporting should be treated as an indicator of possible access and transport disruption, not as evidence of escalation unless later reporting confirms a material change.`
+      : "No confirmed mobilisation activity was established for the reporting period.",
+    civilUnrestRead: activityPresent
+      ? `The severity ceiling is ${severityCeiling}. Review the accepted incidents for evidence of road closures, crowd dispersal, arrests, violence or damage before changing operating posture; country volume alone does not establish impact.`
+      : "No confirmed civil-unrest activity was established for the reporting period.",
     forecastRead: reconcileProtestForecastRead(
       "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
       protestSchedule,
     ),
-    regionalCountryRead: `${geography} Treat the accepted geography as the limit of the current assessment.`,
-    whatMatters: "Use the accepted record to review staff movement, site access and communications readiness. Escalate only on confirmed changes.",
-    implications: "Keep movement plans flexible, verify transport conditions close to departure and maintain practical communications contingencies.",
-    watchNext: "",
-    polestarView: "Maintain proportionate precautions based on the accepted record and refresh plans when confirmed reporting changes.",
+    regionalCountryRead: `${regionalConcentration} This distribution identifies where reporting is concentrated, while the severity colour identifies the highest assessed incident in each country; neither measure by itself establishes nationwide disruption.`,
+    whatMatters: leadCountry
+      ? `${leadCountry} is the main reporting concentration, while ${supportingCountries.length ? joinList(supportingCountries) : "other monitored markets"} broaden the exposure picture. The operational question is whether activity remains locally contained or begins to affect transport corridors, commercial districts, government facilities or staff movement. Decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.`
+      : "The accepted record does not support a geographic lead. Operational decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.",
+    implications: [
+      "Check staff travel, site access and transport routes against current local advisories before movement.",
+      "Maintain alternate routing and communications arrangements where gatherings could affect commercial or government districts.",
+      "Use confirmed closures, enforcement measures, violence or damage as escalation triggers; do not change posture on report volume alone.",
+      "Revalidate conditions close to departure because public-order restrictions can change with limited notice.",
+    ].join("\n"),
+    watchNext: fallbackWatchNext,
+    polestarView: `Maintain a proportionate posture focused on verified access and movement effects. The current severity ceiling is ${severityCeiling}; escalation should depend on confirmed widening, sustained disruption or direct effects on personnel and facilities. Keep local routing, communications and decision triggers under active review in ${leadCountry ?? "the reported markets"}.`,
   });
-  assertFlashpointRenderedModelValid(countFree);
-  return Object.freeze(countFree);
+  assertFlashpointRenderedModelValid(groundedRecovery);
+  return Object.freeze(groundedRecovery);
 }
 
 export function validateFlashpointRenderedModel(

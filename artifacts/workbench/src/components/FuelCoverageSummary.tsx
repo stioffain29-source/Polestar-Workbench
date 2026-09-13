@@ -296,8 +296,12 @@ function CoverageBody({
           Coverage is limited to current-period Fuel-relevant records that passed
           the relevance and evidence-family gates; syndicated, commentary and
           follow-on coverage is not counted as a separate development. Country
-          rows are ordered by development count, not ranked for impact, and this
-          is not a full raw-ingest total.
+          rows include only developments with a resolved country and are ordered
+          by development count, not ranked for impact.{" "}
+          {model.unattributedDevelopmentCount > 0
+            ? `${model.unattributedDevelopmentCount} development${model.unattributedDevelopmentCount === 1 ? " was" : "s were"} excluded from this country table because the location could not be verified. `
+            : ""}
+          This is not a full raw-ingest total.
         </div>
       )}
     </div>

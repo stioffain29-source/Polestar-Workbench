@@ -238,7 +238,13 @@ function regionalSignalPhrase(
   items: TopicFastFactsIncident[],
   fam: IssueFamily | null,
 ): string {
-  if (fam?.key === "shortage") {
+  const evidenceText = items
+    .map((item) => `${item.title ?? ""} ${item.summary ?? ""}`)
+    .join(" ");
+  if (
+    fam?.key === "shortage" &&
+    /\b(forecourts?|petrol stations?|fuel stations?|pumps?|queues?|ration(?:ing|ed)?|allocation cuts?|sales limits?|depot shortage|local fuel shortage)\b/i.test(evidenceText)
+  ) {
     return "Forecourt and allocation pressure is the confirmed operational signal there.";
   }
   if (fam?.key === "policy") {
@@ -2222,15 +2228,19 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   const items: Array<{ text: string; supportingEvidenceIds: string[] }> = [];
   const triggerIds = facts.judgement.evidenceIds ?? [];
   if (triggerIds.length > 0) {
+    const trigger = facts.judgement.trigger.replace(/^./, (ch) => ch.toUpperCase());
     items.push({
-      text: `${facts.judgement.trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
+      text: `${trigger} for ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
       supportingEvidenceIds: triggerIds,
     });
   }
   for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
     if (!incident.id || incident.evidenceStatus === "Potential") continue;
+    const family = familyFor([incident.raw]);
+    const cleanTitle = stripWireCruft(incident.title).replace(/[.!?]+$/, "");
     items.push({
-      text: `Follow-up confirmation for ${stripWireCruft(incident.title).replace(/[.!?]+$/, "")}.`,
+      text: family?.watch
+        ?? `Monitor for verified operational follow-through from ${cleanTitle}.`,
       supportingEvidenceIds: [incident.id],
     });
   }

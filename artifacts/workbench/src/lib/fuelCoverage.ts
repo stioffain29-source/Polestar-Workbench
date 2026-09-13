@@ -3,6 +3,7 @@ import type {
   FuelCanonicalFacts,
   FuelSeverity,
 } from "./fuelCanonicalFacts";
+import { deriveIncidentCountry } from "./shippingCountry";
 
 export interface FuelCoverageSeverityCounts {
   Insignificant: number;
@@ -35,6 +36,8 @@ export interface FuelCoverageSummary {
   dailyTrend: FuelCoverageDay[];
   /** Sorted by distinct-development count, not by impact. */
   affectedCountries: FuelCoverageCountry[];
+  /** Developments omitted from the country table because geography is unresolved. */
+  unattributedDevelopmentCount: number;
   /** Canonical report window, retained for a visible coverage note. */
   reportingPeriod: { start: string; end: string };
 }
@@ -54,8 +57,6 @@ const SEVERITY_RANK: Record<FuelSeverity, number> = {
   High: 4,
   Extreme: 5,
 };
-const UNATTRIBUTED_COUNTRY = "Unattributed";
-
 function emptySeverityCounts(): FuelCoverageSeverityCounts {
   return {
     Insignificant: 0,
@@ -119,7 +120,15 @@ export function buildFuelCoverageSummary(
     const date = dateOnly(incident.occurredAt) ?? incident.date;
     if (date) daily.set(date, (daily.get(date) ?? 0) + 1);
 
-    const country = incident.country?.trim() || UNATTRIBUTED_COUNTRY;
+    const country =
+      incident.country?.trim() ||
+      deriveIncidentCountry({
+        country: incident.raw.country,
+        location: incident.raw.location,
+        title: incident.raw.title,
+        summary: incident.raw.summary,
+      });
+    if (!country) continue;
     const row =
       countries.get(country) ??
       {
@@ -148,24 +157,24 @@ export function buildFuelCoverageSummary(
     : [...daily.entries()].sort(([a], [b]) => a.localeCompare(b))
   ).map(([date, count]) => ({ date, label: dateLabel(date), count }));
 
-  // Derive every row from qualifying incidents rather than relying on any
-  // ranked/top-country projection in canonical facts. An explicit Unattributed
-  // row keeps the displayed sum honest without counting missing geography as
-  // an active country.
-  const unattributed = countries.get(UNATTRIBUTED_COUNTRY);
+  // A country table contains countries only. Try the shared text/location
+  // resolver above, then omit still-unresolved geography instead of presenting
+  // "Unattributed" as though it were a country.
   const attributedCountries = [...countries.values()]
-    .filter((row) => row.country !== UNATTRIBUTED_COUNTRY)
     .sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
-  const affectedCountries = unattributed
-    ? [...attributedCountries, unattributed]
-    : attributedCountries;
+  const attributedDevelopmentCount = attributedCountries.reduce(
+    (sum, row) => sum + row.count,
+    0,
+  );
 
   return {
     totalDistinctDevelopments: canonicalFacts.evidenceFamilies.length,
     activeCountries: attributedCountries.length,
     severityDistribution,
     dailyTrend,
-    affectedCountries,
+    affectedCountries: attributedCountries,
+    unattributedDevelopmentCount:
+      canonicalFacts.evidenceFamilies.length - attributedDevelopmentCount,
     reportingPeriod: {
       start: canonicalFacts.reportingPeriod.start,
       end: canonicalFacts.reportingPeriod.end,
