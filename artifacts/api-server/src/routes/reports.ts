@@ -1,5 +1,10 @@
 import { Router, type IRouter } from "express";
-import { db, reportProseTable, reportsTable } from "@workspace/db";
+import {
+  db,
+  marketPricesTable,
+  reportProseTable,
+  reportsTable,
+} from "@workspace/db";
 import type {
   FuelHardNumbers,
   InsertReport,
@@ -75,6 +80,71 @@ function normalizeHardNumbers(value: unknown): FuelHardNumbers | undefined {
   return JSON.parse(JSON.stringify(value)) as FuelHardNumbers;
 }
 
+async function fuelHardNumbersAsOf(
+  issueDate: string,
+): Promise<FuelHardNumbers | undefined> {
+  const rows = await db
+    .select()
+    .from(marketPricesTable)
+    .where(eq(marketPricesTable.group, "fuel"));
+  const selected = ["brent", "wti", "jet"].map((key) => {
+    const row = rows.find((candidate) => candidate.key === key);
+    if (!row) return null;
+    const eligible = (row.trajectory ?? [])
+      .filter(
+        (point) =>
+          point.date <= issueDate &&
+          Number.isFinite(point.value),
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const point =
+      eligible.at(-1) ??
+      (row.asOf <= issueDate
+        ? { date: row.asOf, value: row.value }
+        : null);
+    return point ? { key, row, point } : null;
+  });
+  if (selected.some((entry) => entry === null)) return undefined;
+  const labels: Record<string, string> = {
+    brent: "Brent crude",
+    wti: "WTI crude",
+    jet: "Jet fuel",
+  };
+  const prices = selected.map((entry) => {
+    const { key, row, point } = entry!;
+    return {
+      label: labels[key],
+      ...(row.benchmark ? { benchmark: row.benchmark } : {}),
+      value: point.value,
+      unit: row.unit,
+      ...(point.date === row.asOf && row.change ? { change: row.change } : {}),
+      asOf: point.date,
+      source: row.source,
+    };
+  });
+  const jet = selected.find((entry) => entry?.key === "jet")!;
+  const jetPoints = (jet!.row.trajectory ?? [])
+    .filter((point) => point.date <= issueDate && Number.isFinite(point.value))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-6);
+  return normalizeHardNumbers({
+    fastFacts: { prices },
+    ...(jetPoints.length >= 2
+      ? {
+          jetFuelTrajectory: {
+            benchmark:
+              jet!.row.benchmark ??
+              "U.S. Gulf Coast kerosene-type jet fuel",
+            source: jet!.row.source,
+            unit: jet!.row.unit,
+            period: "recent weeks",
+            points: jetPoints,
+          },
+        }
+      : {}),
+  });
+}
+
 router.get("/reports", async (req, res): Promise<void> => {
   const parsed = ListReportsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -145,6 +215,8 @@ router.post("/reports", async (req, res): Promise<void> => {
   };
   if (hardNumbers !== undefined) {
     insertValues.hardNumbers = normalizeHardNumbers(hardNumbers);
+  } else if (rest.topic === "fuel") {
+    insertValues.hardNumbers = await fuelHardNumbersAsOf(normalizedIssueDate);
   }
   // A POST explicitly means "new report". Double-submit prevention belongs
   // to the client button; same-day topic/title matching must never reuse an

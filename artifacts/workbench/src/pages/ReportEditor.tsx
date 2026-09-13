@@ -134,6 +134,87 @@ const legacyExecSummaryStorageKey = (id: number) =>
 // refresh updates status/datasets without overwriting analyst edits.
 const REPORT_INCIDENTS_REFETCH_MS = 60_000;
 
+type FuelSnapshotRow = {
+  key: string;
+  value: number;
+  unit: string;
+  change?: string | null;
+  asOf: string;
+  source: string;
+  benchmark?: string | null;
+  trajectory?: Array<{ date: string; value: number }> | null;
+};
+
+/**
+ * Hydrate a fuel report that predates the report-specific price writer from
+ * the live market snapshot. Values are selected on or before the report date,
+ * so opening an older draft never backfills it with a later market close.
+ */
+function fuelHardNumbersFromMarketRows(
+  rows: readonly FuelSnapshotRow[],
+  issueDate: string,
+): Record<string, unknown> | null {
+  const required = ["brent", "wti", "jet"] as const;
+  const selected = required.map((key) => {
+    const row = rows.find((candidate) => candidate.key === key);
+    if (!row) return null;
+    const eligible = (row.trajectory ?? [])
+      .filter(
+        (point) =>
+          point.date <= issueDate &&
+          Number.isFinite(point.value),
+      )
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const point =
+      eligible.at(-1) ??
+      (row.asOf <= issueDate
+        ? { date: row.asOf, value: row.value }
+        : null);
+    return point ? { key, row, point } : null;
+  });
+  if (selected.some((entry) => entry === null)) return null;
+
+  const labels = {
+    brent: "Brent crude",
+    wti: "WTI crude",
+    jet: "Jet fuel",
+  } as const;
+  const prices = selected.map((entry) => {
+    const { key, row, point } = entry!;
+    return {
+      label: labels[key],
+      ...(row.benchmark ? { benchmark: row.benchmark } : {}),
+      value: point.value,
+      unit: row.unit,
+      ...(point.date === row.asOf && row.change ? { change: row.change } : {}),
+      asOf: point.date,
+      source: row.source,
+    };
+  });
+  const jet = selected.find((entry) => entry?.key === "jet")!;
+  const jetPoints = (jet!.row.trajectory ?? [])
+    .filter((point) => point.date <= issueDate && Number.isFinite(point.value))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-6);
+
+  return {
+    fastFacts: { prices },
+    ...(jetPoints.length >= 2
+      ? {
+          jetFuelTrajectory: {
+            benchmark:
+              jet!.row.benchmark ??
+              "U.S. Gulf Coast kerosene-type jet fuel",
+            source: jet!.row.source,
+            unit: jet!.row.unit,
+            period: "recent weeks",
+            points: jetPoints,
+          },
+        }
+      : {}),
+  };
+}
+
 function readLegacyExecSummary(id: number): string {
   try {
     return typeof window !== "undefined" && window.localStorage
@@ -395,14 +476,19 @@ export default function ReportEditor() {
     ];
   }, [primaryTopic, secondaryTopic, tertiaryTopic, primaryIncidents, secondaryIncidents, tertiaryIncidents]);
 
-  // Market Prices rows render on energy AND fertiliser reports; fetch the
-  // matching commodity group so the override UI and preview/PDF share rows.
+  // Market Prices rows render on energy/fertiliser reports and provide the
+  // real-data recovery path for fuel drafts missing report-specific prices.
   const marketPriceGroup =
-    activeTopic === "energy" || activeTopic === "fertiliser"
+    activeTopic === "fuel" ||
+    activeTopic === "energy" ||
+    activeTopic === "fertiliser"
       ? activeTopic
       : undefined;
   const marketPriceParams = { group: marketPriceGroup ?? "energy" };
-  const { data: marketPriceRows = [] } = useListMarketPrices(marketPriceParams, {
+  const {
+    data: marketPriceRows = [],
+    isFetched: marketPricesFetched,
+  } = useListMarketPrices(marketPriceParams, {
     query: {
       enabled: !!marketPriceGroup,
       queryKey: getListMarketPricesQueryKey(marketPriceParams),
@@ -1848,19 +1934,29 @@ export default function ReportEditor() {
   useEffect(() => {
     if (!report) return;
     if (hardNumbersSeededForId.current === report.id) return;
-    hardNumbersSeededForId.current = report.id;
     const hasPersisted = report.hardNumbers != null;
+    if (report.topic === "fuel" && !hasPersisted && !marketPricesFetched) return;
+    const recovered =
+      report.topic === "fuel" && !hasPersisted
+        ? fuelHardNumbersFromMarketRows(
+            marketPriceRows as FuelSnapshotRow[],
+            report.issueDate ?? new Date().toISOString().slice(0, 10),
+          )
+        : null;
+    hardNumbersSeededForId.current = report.id;
     // Honesty rule: never auto-inject fabricated placeholder prices into the
     // preview/PDF. Live prices are written into report.hardNumbers by the
     // FRED market-price ingest (lib/ingest/marketPrices). A report with no
     // saved data renders empty market fields rather than fake numbers; the
     // author can still click "Load sample" to populate a template explicitly.
-    const effectiveHardNumbers = hasPersisted ? report.hardNumbers : null;
+    const effectiveHardNumbers = hasPersisted
+      ? report.hardNumbers
+      : recovered;
     setHardNumbersText(
       effectiveHardNumbers ? JSON.stringify(effectiveHardNumbers, null, 2) : "",
     );
     setHardNumbersError(null);
-    setHardNumbersEdited(undefined);
+    setHardNumbersEdited(recovered ?? undefined);
     const seeded = buildFuelWatchReportData(
       {
         issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
@@ -1873,7 +1969,7 @@ export default function ReportEditor() {
     setAllowMissingExport(false);
     setExportError(null);
     setSampleAutoSeeded(false);
-  }, [report]);
+  }, [report, marketPriceRows, marketPricesFetched]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     if (REPORT_PROSE_EDIT_KEYS.has(k)) {
