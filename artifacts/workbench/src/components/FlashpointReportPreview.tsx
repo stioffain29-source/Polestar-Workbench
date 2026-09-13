@@ -372,61 +372,6 @@ function HorizontalBarChart({ rows, labelW = 160, emptyMessage }: { rows: BarRow
   );
 }
 
-function RelatedIncidentsTable({ rows }: { rows: EnrichedIncident[] }) {
-  if (rows.length === 0) {
-    return (
-      <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13 }}>
-        Little related activity was reported this week. Treat the quiet stretch as a gap in reporting rather than a lasting calm.
-      </p>
-    );
-  }
-  return (
-    <div className="w-full">
-      {rows.length < 4 && (
-        <p style={{ fontStyle: "italic", color: DUSK, fontFamily: "Roboto, sans-serif", fontSize: 13, marginBottom: 8 }}>
-          Little related activity was reported this week, so the list below is short. It is kept deliberately brief — minor items are left out rather than used to fill space.
-        </p>
-      )}
-      <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
-      <div
-        className="grid uppercase tracking-widest"
-        style={{
-          gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr", background: NAVY, color: "#fff",
-          fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10,
-          padding: "8px 10px", gap: 10,
-        }}
-      >
-        <div>Date</div>
-        <div>Issue</div>
-        <div>Title</div>
-        <div>Severity</div>
-      </div>
-      {rows.map((r, i) => (
-        <div
-          key={String(r.id)}
-          className="grid"
-          style={{
-            gridTemplateColumns: "0.7fr 1.0fr 2.2fr 0.7fr", padding: "8px 10px", gap: 10,
-            borderTop: i === 0 ? "none" : `1px solid ${POLAR}`,
-            fontFamily: "Roboto, sans-serif", fontSize: 12, color: DUSK, alignItems: "center",
-          }}
-        >
-          <div>{format(r.date, "dd MMM yyyy")}</div>
-          <div>{r.issue}</div>
-          <div style={{ color: NAVY }}>{r.title}</div>
-          <div>
-            <SeverityChip
-              sevKey={sevKey(r.severity)}
-              label={FLASHPOINT_SEV_LABEL[sevKey(r.severity)] ?? r.severity}
-            />
-          </div>
-        </div>
-      ))}
-      </div>
-    </div>
-  );
-}
-
 function FlashpointPublicationIssues({
   issues,
 }: {
@@ -658,10 +603,6 @@ export default function FlashpointReportPreview({
         </Section>
         <Section hidden={!show("polestar-view")} title="Polestar View">
           <Paragraphs text={model.prose.polestarView} />
-        </Section>
-
-        <Section hidden={!show("related-incidents")} title="Related Incidents">
-          <RelatedIncidentsTable rows={ds.relatedIncidents} />
         </Section>
 
         {/* Source Notes / Data Notes removed per editorial direction —

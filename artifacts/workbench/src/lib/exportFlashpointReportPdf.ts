@@ -65,8 +65,7 @@ import {
 //   Civil Unrest and Public Order Read (prose + unrest table) ->
 //   Protest Forecast — Next 7 Days (schedule + prose) ->
 //   Regional and Country View (prose + country bar) ->
-//   What Matters -> Implications -> Watch Next -> Polestar View ->
-//   Related Incidents -> Disclaimer.
+//   What Matters -> Implications -> Watch Next -> Polestar View -> Disclaimer.
 // Data and prose come from flashpointReportDataset so the preview and
 // exporter cannot drift.
 
@@ -520,107 +519,6 @@ function drawProtestScheduleTable(
   ctx.y += 8;
 }
 
-// --- Related Incidents -----------------------------------------------------
-function drawRelatedIncidents(ctx: Ctx, rows: EnrichedIncident[]) {
-  ensureSpace(ctx, 24 + 18 + 40);
-  // Must match FlashpointReportPreview's "Related Incidents" heading — the
-  // in-app PDF rasterises the preview, so the headless heading must agree.
-  drawSectionHeading(ctx, "Related Incidents");
-  if (rows.length === 0) {
-    const { pdf, MX } = ctx;
-    setText(pdf, DUSK);
-    setRoboto(pdf, "italic");
-    pdf.setFontSize(9);
-    pdf.text(
-      sanitize(
-        "No related incidents reported this week. Treat the quiet week as a gap in reporting rather than a sustained easing.",
-      ),
-      MX,
-      ctx.y + 10,
-    );
-    setRoboto(pdf, "regular");
-    ctx.y += 22;
-    return;
-  }
-
-  const { pdf, MX, CW } = ctx;
-  const colDateW = 86;
-  const colIssueW = 120;
-  const colSevW = 75;
-  const colTitleW = CW - colDateW - colIssueW - colSevW - 6;
-  const rowH = 20;
-
-  const drawHeader = () => {
-    setFill(pdf, NAVY);
-    pdf.rect(MX, ctx.y, CW, rowH, "F");
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.6);
-    pdf.line(MX, ctx.y, MX + CW, ctx.y);
-    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(7);
-    pdf.text("DATE", MX + 6, ctx.y + 13);
-    pdf.text("ISSUE", MX + colDateW + 6, ctx.y + 13);
-    pdf.text("TITLE", MX + colDateW + colIssueW + 6, ctx.y + 13);
-    pdf.text("SEVERITY", MX + colDateW + colIssueW + colTitleW + 6, ctx.y + 13);
-    ctx.y += rowH;
-  };
-  drawHeader();
-
-  for (const i of rows) {
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(8.5);
-
-    const titleLines: string[] = pdf.splitTextToSize(
-      sanitize(i.title),
-      colTitleW - 8,
-    );
-    const issueLines: string[] = pdf.splitTextToSize(
-      sanitize(i.issue),
-      colIssueW - 8,
-    );
-    const rh = Math.max(
-      rowH,
-      Math.max(titleLines.length, issueLines.length) * 12 + 10,
-    );
-    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
-      newPage(ctx);
-      drawHeader();
-      setRoboto(pdf, "regular");
-      pdf.setFontSize(8.5);
-    }
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.6);
-    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
-    pdf.line(MX, ctx.y, MX, ctx.y + rh);
-    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
-
-    setText(pdf, DUSK);
-    const textOpts = { lineHeightFactor: 1.4 };
-    pdf.text(format(i.date, "dd MMM yyyy"), MX + 6, ctx.y + 14, textOpts);
-    pdf.text(issueLines, MX + colDateW + 6, ctx.y + 14, textOpts);
-    setText(pdf, NAVY);
-    pdf.text(titleLines, MX + colDateW + colIssueW + 6, ctx.y + 14, textOpts);
-
-    const sk = sevKey(i.severity);
-    setFill(pdf, SEV_COLOR[sk] ?? "#999999");
-    const chipX = MX + colDateW + colIssueW + colTitleW + 6;
-    const sevText = sanitize((SEV_LABEL[sk] ?? i.severity ?? "").toUpperCase());
-    const isSmallText = sevText === "HIGH" || sevText === "LOW";
-    const chipW = isSmallText ? 40 : 50;
-    pdf.rect(chipX, ctx.y + 4, chipW, 12, "F");
-    setText(pdf, WHITE);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(6.5);
-    pdf.text(sevText, chipX + chipW / 2, ctx.y + 12.5, { align: "center" });
-
-    ctx.y += rh;
-  }
-  ctx.y += 8;
-}
-
 // --- Exporter --------------------------------------------------------------
 export async function exportFlashpointReportPdf(
   data: FlashpointReportData,
@@ -816,10 +714,6 @@ export async function exportFlashpointReportPdf(
       "Polestar View",
       model.prose.polestarView,
     );
-  }
-
-  if (show("related-incidents")) {
-    drawRelatedIncidents(ctx, ds.relatedIncidents);
   }
 
   // Source Notes / Data Notes removed per editorial direction — internal

@@ -472,7 +472,6 @@ export const TOPIC_SECTION_KEYS: Record<
     { key: "implications", label: "Implications for Business" },
     { key: "watch-next", label: "Watch Next" },
     { key: "polestar-view", label: "Polestar View" },
-    { key: "related-incidents", label: "Related Incidents" },
   ],
   shipping: [
     { key: "maritime-intelligence", label: "Maritime Intelligence" },
