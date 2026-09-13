@@ -92,6 +92,10 @@ import { fencePriorIngestSessions } from "./ingestSessionFence";
 // Arbitrary but stable advisory-lock key ("Pole" in hex). Must match across
 // every instance so they contend on the same lock.
 const INGEST_LOCK_KEY = 0x506f6c65;
+// Separate cross-instance lock for the forward protest schedule. The schedule
+// must not wait behind the multi-minute incident ingest, but two schedule
+// collectors must still never write concurrently.
+const PROTEST_SCHEDULE_LOCK_KEY = 0x50726f74;
 const PROTEST_SCHEDULE_STATE_KEY = "singleton";
 
 async function markProtestScheduleCompleted(): Promise<void> {
@@ -638,6 +642,8 @@ function emptyMarketSnapshot(err: unknown): MarketSnapshotSummary {
  */
 async function withIngestLock<T>(
   fn: () => Promise<T>,
+  lockKey = INGEST_LOCK_KEY,
+  fencePriorSessions = lockKey === INGEST_LOCK_KEY,
 ): Promise<{ ran: true; value: T } | { ran: false; reason: "locked" }> {
   const client = await pool.connect();
   let locked = false;
@@ -657,24 +663,26 @@ async function withIngestLock<T>(
   try {
     const lockRes = await client.query<{ locked: boolean }>(
       "SELECT pg_try_advisory_lock($1) AS locked",
-      [INGEST_LOCK_KEY],
+      [lockKey],
     );
     locked = lockRes.rows[0]?.locked === true;
     if (!locked) return { ran: false, reason: "locked" };
-    markIngestStage("(run start)");
-    markIngestStage("(fencing prior ingest sessions)");
-    const fencedSessions = await fencePriorIngestSessions(client);
-    if (fencedSessions > 0) {
-      logger.warn(
-        { fencedSessions },
-        "terminated prior ingest worker database sessions before successor run",
-      );
+    if (fencePriorSessions) {
+      markIngestStage("(run start)");
+      markIngestStage("(fencing prior ingest sessions)");
+      const fencedSessions = await fencePriorIngestSessions(client);
+      if (fencedSessions > 0) {
+        logger.warn(
+          { fencedSessions },
+          "terminated prior ingest worker database sessions before successor run",
+        );
+      }
     }
     return { ran: true, value: await fn() };
   } finally {
     if (locked && !clientBroken) {
       try {
-        await client.query("SELECT pg_advisory_unlock($1)", [INGEST_LOCK_KEY]);
+        await client.query("SELECT pg_advisory_unlock($1)", [lockKey]);
       } catch (unlockErr) {
         // Unlock failing usually means the connection broke between the run and
         // here — treat it as broken so we destroy rather than recycle it.
@@ -689,6 +697,10 @@ async function withIngestLock<T>(
     // pool, so a poisoned client is never handed to the next caller.
     client.release(clientBroken ? true : undefined);
   }
+}
+
+function withProtestScheduleLock<T>(fn: () => Promise<T>) {
+  return withIngestLock(fn, PROTEST_SCHEDULE_LOCK_KEY, false);
 }
 
 /**
@@ -723,17 +735,28 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     let protestSchedule: ProtestScheduleSummary;
     try {
       markIngestStage("runProtestScheduleIngest");
-      protestSchedule = await runProtestScheduleIngest({ commit: true });
-      await markProtestScheduleCompleted();
-      logger.info(
-        {
-          inserted: protestSchedule.inserted,
-          updated: protestSchedule.updated,
-          accepted: protestSchedule.accepted,
-          errors: protestSchedule.errors.length,
-        },
-        "protest schedule pass complete",
-      );
+      const scheduleRun = await withProtestScheduleLock(async () => {
+        const summary = await runProtestScheduleIngest({ commit: true });
+        if (summary.errors.length === 0 && summary.sourcesFetched > 0) {
+          await markProtestScheduleCompleted();
+        }
+        return summary;
+      });
+      if (!scheduleRun.ran) {
+        protestSchedule = emptyProtestSchedule("protest schedule already running");
+        logger.info("protest schedule pass skipped (dedicated collector already running)");
+      } else {
+        protestSchedule = scheduleRun.value;
+        logger.info(
+          {
+            inserted: protestSchedule.inserted,
+            updated: protestSchedule.updated,
+            accepted: protestSchedule.accepted,
+            errors: protestSchedule.errors.length,
+          },
+          "protest schedule pass complete",
+        );
+      }
     } catch (err) {
       logger.error({ err }, "protest schedule ingest failed");
       protestSchedule = emptyProtestSchedule(err);
@@ -1312,12 +1335,14 @@ export type ProtestScheduleRunResult =
 
 /** Run only the standalone forward-looking protest schedule collector. */
 export async function runProtestScheduleOnce(): Promise<ProtestScheduleRunResult> {
-  const res = await withIngestLock(async () => {
+  const res = await withProtestScheduleLock(async () => {
     const startedAt = new Date();
     let protestSchedule: ProtestScheduleSummary;
     try {
       protestSchedule = await runProtestScheduleIngest({ commit: true });
-      await markProtestScheduleCompleted();
+      if (protestSchedule.errors.length === 0 && protestSchedule.sourcesFetched > 0) {
+        await markProtestScheduleCompleted();
+      }
     } catch (err) {
       logger.error({ err }, "protest schedule ingest failed");
       protestSchedule = emptyProtestSchedule(err);

@@ -56,6 +56,10 @@ const PLANNING_TERMS = [
 const CANCELLED_RE = /\b(cancel(?:led|ed)?|called off|scrapped|dibatalkan|batal)\b/i;
 const POSTPONED_RE = /\b(postpon(?:ed|e)|rescheduled|ditunda|ditangguhkan)\b/i;
 const CONFIRMED_RE = /\b(confirmed|scheduled|officially announced|will hold|set to hold)\b/i;
+const PROTEST_HOMONYM_RE =
+  /\b(rally championship|rally new zealand|strike capacity|carrier strike group|air strike|missile strike|drone strike|winning receipt|march[-– ]april|inflation (?:dips|rose|falls?) in march|scheduled for march 20\d{2}|mobilisation of capital)\b/i;
+const STRONG_UNDATED_PLANNING_RE =
+  /\b(?:plans? to|planned|scheduled|will)\s+(?:protest|demonstrate|rally|march|strike|walk out|gather|hold a (?:protest|demonstration|rally|march|strike))\b|\b(?:protest|demonstration|rally|march|strike|walkout)\s+(?:planned|scheduled)\b|\bunion (?:calls|announces)\b|\b(?:tomorrow|next week|upcoming)\b/i;
 const DATE_MONTHS: Record<string, number> = {
   january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2, april: 3, apr: 3,
   may: 4, june: 5, jun: 5, july: 6, jul: 6, august: 7, aug: 7, september: 8,
@@ -114,9 +118,9 @@ function parseExplicitAttendance(text: string): number | null {
   return Number.isSafeInteger(n) && n > 0 ? n : null;
 }
 
-export function makeProtestDedupeKey(input: Pick<InsertProtestEvent, "eventDate" | "country" | "city" | "venue" | "organiser" | "issue" | "description">): string {
+export function makeProtestDedupeKey(input: Pick<InsertProtestEvent, "eventDate" | "country" | "city" | "eventType">): string {
   const date = input.eventDate instanceof Date ? input.eventDate.toISOString().slice(0, 10) : "";
-  const basis = [date, input.country, input.city, input.venue, input.organiser, input.issue, input.description]
+  const basis = [date, input.country, input.city, input.eventType]
     .map((v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9\u00c0-\uffff]+/g, " ").trim())
     .join("|");
   return createHash("sha256").update(basis).digest("hex");
@@ -130,10 +134,23 @@ export function parseProtestItem(
   const title = clean(item.title) ?? "";
   const description = clean(item.contentSnippet ?? item.content ?? item.summary) ?? "";
   const text = `${title} ${description}`;
+  if (PROTEST_HOMONYM_RE.test(text)) return null;
   if (!PROTEST_TERMS.some((term) => text.toLocaleLowerCase().includes(term.toLocaleLowerCase()))) return null;
   const eventDate = parseDate(text, now);
   const planning = PLANNING_TERMS.some((term) => text.toLocaleLowerCase().includes(term.toLocaleLowerCase()));
   if (!eventDate && !planning) return null;
+  const sourcePublishedAt = item.pubDate ? new Date(item.pubDate) : null;
+  const sourceDate = sourcePublishedAt && !Number.isNaN(sourcePublishedAt.getTime()) ? sourcePublishedAt : null;
+  if (!eventDate) {
+    const sourceAgeMs = sourceDate ? now.getTime() - sourceDate.getTime() : Number.POSITIVE_INFINITY;
+    if (
+      sourceAgeMs < 0 ||
+      sourceAgeMs > 30 * 24 * 60 * 60 * 1000 ||
+      !STRONG_UNDATED_PLANNING_RE.test(text)
+    ) {
+      return null;
+    }
+  }
   const status: ProtestStatus = CANCELLED_RE.test(text)
     ? "Cancelled"
     : POSTPONED_RE.test(text)
@@ -147,10 +164,19 @@ export function parseProtestItem(
   const venueMatch = text.match(/\b(?:at|outside|near|in front of)\s+([^.;,]{3,90})/i);
   const organiserMatch = text.match(/\b(?:organ(?:is|iz)(?:ed|er|ation)|by|from)\s*:?\s+([^.;,]{3,100})/i);
   const issueMatch = text.match(/\b(?:over|about|against|for|demanding)\s+([^.;]{3,180})/i);
-  const sourcePublishedAt = item.pubDate ? new Date(item.pubDate) : null;
-  const sourceDate = sourcePublishedAt && !Number.isNaN(sourcePublishedAt.getTime()) ? sourcePublishedAt : null;
   const sourceUrl = item.link ?? item.guid;
   if (!sourceUrl) return null;
+  const eventType = /\bstrike|mogok|walkout/i.test(text)
+    ? "strike"
+    : /\bmarch|pawai|hikoi/i.test(text)
+      ? "march"
+      : /\brally|himpunan/i.test(text)
+        ? "rally"
+        : /\bdemonstration|demonstrasi|unjuk rasa/i.test(text)
+          ? "demonstration"
+          : /\bsit[- ]in/i.test(text)
+            ? "sit-in"
+            : "protest";
   const row: InsertProtestEvent = {
     sourceName: "google_news_protest_schedule",
     sourceUrl,
@@ -160,17 +186,7 @@ export function parseProtestItem(
     country: feed.country,
     city,
     venue: clean(venueMatch?.[1]),
-    eventType: /\bstrike|mogok|walkout/i.test(text)
-      ? "strike"
-      : /\bmarch|pawai|hikoi/i.test(text)
-        ? "march"
-        : /\brally|himpunan/i.test(text)
-          ? "rally"
-          : /\bdemonstration|demonstrasi|unjuk rasa/i.test(text)
-            ? "demonstration"
-            : /\bsit[- ]in/i.test(text)
-              ? "sit-in"
-              : "protest",
+    eventType,
     issue: clean(issueMatch?.[1]),
     organiser: clean(organiserMatch?.[1]),
     description: description || null,
@@ -189,7 +205,12 @@ export function parseProtestItem(
     status,
     collectedAt: now,
     searchCompletedAt: now,
-    dedupKey: makeProtestDedupeKey({ eventDate, country: feed.country, city, venue: clean(venueMatch?.[1]), organiser: clean(organiserMatch?.[1]), issue: clean(issueMatch?.[1]), description: description || null }),
+    dedupKey: makeProtestDedupeKey({
+      eventDate,
+      country: feed.country,
+      city,
+      eventType,
+    }),
   };
   return row;
 }
@@ -227,6 +248,7 @@ export async function runProtestScheduleIngest(opts: { commit?: boolean; now?: D
   const summary = emptyProtestScheduleSummary(commit ? "commit" : "dry-run");
   const parser = new Parser();
   const countries = new Set<string>();
+  const candidates = new Map<string, InsertProtestEvent>();
   for (const feed of SEARCH_FEEDS) {
     try {
       const parsed = await fetchFeed(parser, feedUrl(feed), { stagger: true });
@@ -247,24 +269,35 @@ export async function runProtestScheduleIngest(opts: { commit?: boolean; now?: D
           continue;
         }
         summary.accepted++;
-        if (!commit) continue;
-        const existing = await db.select().from(protestEventsTable).where(eq(protestEventsTable.dedupKey, candidate.dedupKey)).limit(1);
-        if (!existing[0]) {
-          await db.insert(protestEventsTable).values(candidate);
-          summary.inserted++;
-          continue;
-        }
-        // A source with an explicit official/organiser URL wins; otherwise use
-        // the most recent publication. Never replace a newer, richer record.
+        // Collapse syndicated wording before any write. A higher-confidence,
+        // more recently published source wins for the same event identity.
         const candidateScore = (candidate.confidence === "High" ? 2 : candidate.confidence === "Moderate" ? 1 : 0) * 1_000_000_000_000 + (candidate.sourcePublishedAt?.getTime() ?? 0);
-        const oldScore = (existing[0].confidence === "High" ? 2 : existing[0].confidence === "Moderate" ? 1 : 0) * 1_000_000_000_000 + (existing[0].sourcePublishedAt?.getTime() ?? 0);
-        if (candidateScore > oldScore) {
-          await db.update(protestEventsTable).set(candidate as never).where(eq(protestEventsTable.id, existing[0].id));
-          summary.updated++;
+        const existing = candidates.get(candidate.dedupKey);
+        const existingScore = existing
+          ? (existing.confidence === "High" ? 2 : existing.confidence === "Moderate" ? 1 : 0) * 1_000_000_000_000 + (existing.sourcePublishedAt?.getTime() ?? 0)
+          : -1;
+        if (!existing || candidateScore > existingScore) {
+          candidates.set(candidate.dedupKey, candidate);
         }
       }
     } catch (err) {
       summary.errors.push(`${feed.country}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  // Replace only the machine-generated schedule, and only after every feed
+  // completed. Analyst-created rows use a different sourceName and survive.
+  // A partial provider failure preserves the previous complete schedule.
+  if (commit && summary.sourcesFetched > 0 && summary.errors.length === 0) {
+    await db
+      .delete(protestEventsTable)
+      .where(eq(protestEventsTable.sourceName, "google_news_protest_schedule"));
+    for (const candidate of candidates.values()) {
+      const inserted = await db
+        .insert(protestEventsTable)
+        .values(candidate)
+        .onConflictDoNothing()
+        .returning({ id: protestEventsTable.id });
+      if (inserted.length > 0) summary.inserted++;
     }
   }
   summary.countriesCovered = [...countries];

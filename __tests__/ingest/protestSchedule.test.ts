@@ -37,6 +37,7 @@ describe("forward-looking protest schedule parsing", () => {
       {
         title: "Union calls for upcoming protest in Jakarta",
         contentSnippet: "Organisers say details will be announced soon.",
+        pubDate: "2026-03-30T08:00:00Z",
         link: "https://example.test/notice",
       },
       feed,
@@ -54,20 +55,46 @@ describe("forward-looking protest schedule parsing", () => {
       eventDate: new Date("2026-04-04T00:00:00Z"),
       country: "Indonesia",
       city: "Jakarta",
-      venue: "City Hall",
-      organiser: "Union",
-      issue: "fuel prices",
-      description: "A rally",
+      eventType: "rally",
     });
     const b = makeProtestDedupeKey({
       eventDate: new Date("2026-04-04T00:00:00Z"),
       country: "Indonesia",
       city: "Jakarta",
-      venue: "City Hall",
-      organiser: "Union",
-      issue: "fuel prices",
-      description: "A different rally",
+      eventType: "rally",
     });
-    expect(a).not.toBe(b);
+    expect(a).toBe(b);
+    const otherCity = makeProtestDedupeKey({
+      eventDate: new Date("2026-04-04T00:00:00Z"),
+      country: "Indonesia",
+      city: "Surabaya",
+      eventType: "rally",
+    });
+    expect(a).not.toBe(otherCity);
+  });
+
+  test("rejects stale undated notices and protest homonyms", () => {
+    expect(
+      parseProtestItem(
+        {
+          title: "Union plans to strike next week",
+          pubDate: "2025-12-01T08:00:00Z",
+          link: "https://example.test/stale",
+        },
+        feed,
+        now,
+      ),
+    ).toBeNull();
+    expect(
+      parseProtestItem(
+        {
+          title: "Rally championship scheduled in Jakarta",
+          pubDate: "2026-03-31T08:00:00Z",
+          link: "https://example.test/sport",
+        },
+        feed,
+        now,
+      ),
+    ).toBeNull();
   });
 });
