@@ -1509,6 +1509,11 @@ export default function ReportEditor() {
   };
 
   const downloadPdf = async (opts?: { forceAllowMissing?: boolean }) => {
+    if (form.topic === "fuel") {
+      console.info("[FUEL_PDF_TRACE] HANDLER CALLED", {
+        reportId: report?.id ?? null,
+      });
+    }
     setExporting(true);
     setExportError(null);
     // System-error guard: if the form clearly has values but the builder
@@ -1639,7 +1644,15 @@ export default function ReportEditor() {
         );
       }
       setAllowMissingExport(false);
+      if (form.topic === "fuel") {
+        console.info("[FUEL_PDF_TRACE] HANDLER COMPLETE", {
+          reportId: report?.id ?? null,
+        });
+      }
     } catch (err) {
+      if (form.topic === "fuel") {
+        console.error("[FUEL_PDF_TRACE] HANDLER FAILED", err);
+      }
       setExportError(err instanceof Error ? err.message : "PDF export failed.");
     } finally {
       setExporting(false);
@@ -2514,6 +2527,11 @@ export default function ReportEditor() {
           <Button
             variant="outline"
             onClick={() => {
+              if (form.topic === "fuel") {
+                console.info("[FUEL_PDF_TRACE] UI CLICK", {
+                  reportId: report.id,
+                });
+              }
               void downloadPdf();
             }}
             disabled={

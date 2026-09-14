@@ -988,6 +988,9 @@ export async function exportTopicReportPdf(
   filename: string,
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
+  if (data.topic === "fuel") {
+    console.info("[FUEL_PDF_TRACE] EXPORT FUNCTION CALLED");
+  }
   const show = makeSectionGate(options.hiddenSections);
   const ffOverrides = options.sectionOverrides?.fastFactOverrides;
   const topicLabel = topicLabels[data.topic] ?? data.topic;
@@ -1843,5 +1846,33 @@ export async function exportTopicReportPdf(
     drawDisclaimer(ctx);
   }
   drawFooters(ctx.pdf);
+  if (data.topic === "fuel") {
+    const bytes = ctx.pdf.output("arraybuffer") as ArrayBuffer;
+    console.info("[FUEL_PDF_TRACE] PDF BYTES CREATED", {
+      byteCount: bytes.byteLength,
+    });
+    const blob = new Blob([bytes], { type: "application/pdf" });
+    console.info("[FUEL_PDF_TRACE] BLOB CREATED", {
+      byteCount: blob.size,
+      type: blob.type,
+    });
+    const downloadName = filename.endsWith(".pdf")
+      ? filename
+      : `${filename}.pdf`;
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = downloadName;
+    anchor.style.display = "none";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    console.info("[FUEL_PDF_TRACE] DOWNLOAD TRIGGERED", {
+      filename: downloadName,
+      byteCount: blob.size,
+    });
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    return;
+  }
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
