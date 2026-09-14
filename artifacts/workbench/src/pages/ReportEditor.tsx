@@ -55,6 +55,7 @@ import {
 import { exportFlashpointReportPdf } from "@/lib/exportFlashpointReportPdf";
 import { exportShippingReportPdf } from "@/lib/exportShippingReportPdf";
 import { exportConflictReportPdf } from "@/lib/exportConflictReportPdf";
+import { exportTopicReportPdf } from "@/lib/exportTopicReportPdf";
 import {
   draftTopicReportProse,
   type DraftableIncident,
@@ -1618,7 +1619,6 @@ export default function ReportEditor() {
           sectionOverrides,
         );
       } else {
-        const { exportTopicReportPdf } = await import("@/lib/exportTopicReportPdf");
         await exportTopicReportPdf(
           {
             ...pdfPayload,
