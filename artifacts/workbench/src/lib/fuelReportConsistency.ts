@@ -781,7 +781,7 @@ function repairLegacyFuelGeneratedText(value: string | null | undefined): string
 // corrected canonical builder forever. Treat only that generated signature as
 // stale canonical text; genuinely divergent analyst wording remains verbatim.
 const LEGACY_REPEATED_FUEL_IMPLICATION_RE =
-  /^Prioritise .+; reassess if (?:a |an |the )?confirmed change in .+\.$/i;
+  /^(?:Prioritise .+; reassess if (?:a |an |the )?confirmed change in .+|Reprice .+ against current delivered-cost and availability assumptions)\.$/i;
 
 export function resolveFuelEffectiveSections(opts: {
   report: FuelGateReportFields;

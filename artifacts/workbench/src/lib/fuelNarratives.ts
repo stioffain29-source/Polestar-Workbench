@@ -2350,7 +2350,9 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
     return `${opener}: ${developmentSentence(i)} ${impact}`;
   });
   const j = facts.judgement;
-  const judgement = `The main risk is ${j.mainRisk}. The principal exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}; the near-term direction is ${j.direction}. The assessment changes if ${j.trigger}.`;
+  // What Matters owns the assessed risk, exposure and direction. The
+  // conditional indicator belongs only in Watch Next.
+  const judgement = `The main risk is ${j.mainRisk}. The principal exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}; the near-term direction is ${j.direction}.`;
   // Lead with the ranked, evidence-specific developments. The canonical
   // judgement remains in What Matters, but must not bury a directly evidenced
   // forecourt or policy development behind generic risk framing.
@@ -2386,7 +2388,7 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   // exposure. The conditional trigger belongs only in Watch Next; repeating it
   // here turns two sections into the same sentence with different lead verbs.
   bullets.unshift(
-    `Reprice ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""} against current delivered-cost and availability assumptions.`,
+    "Review delivered-cost assumptions, supplier terms and contingency volumes for exposed fuel-dependent operations.",
   );
   return bullets.slice(0, 5).join("\n");
 }
@@ -2416,7 +2418,7 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   if (triggerIds.length > 0) {
     const trigger = (potentialIndicator ?? facts.judgement.trigger).replace(/^./, (ch) => ch.toLowerCase());
     items.push({
-      text: `Watch for ${trigger} affecting ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}.`,
+      text: `Watch for ${trigger}.`,
       supportingEvidenceIds: triggerIds,
     });
   }
@@ -2443,14 +2445,11 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
     return "Do not rely on this assessment yet. Several reports still lack a confirmed location or outcome. Check those reports before making decisions about fuel supply or cost.";
   }
   const j = facts.judgement;
-  const place = j.exposure.geography
-    ? `${j.exposure.geography} needs the closest attention.`
-    : "No single market accounts for the current pressure.";
   const action = j.exposure.sector === "road fuel distribution"
-    ? "Check fuel stocks and delivery schedules for critical sites."
+    ? "Protect critical-site stocks and delivery schedules."
     : j.exposure.sector === "routing and fuel delivery"
-      ? "Confirm delivery routes and allow extra time for fuel shipments."
-      : "Confirm supply contracts and review fuel budgets.";
+      ? "Protect delivery continuity and allow extra time for fuel shipments."
+      : "Protect supply continuity and budget headroom.";
   const outlook = j.direction === "upward"
     ? "Prices are rising."
     : j.direction === "downward"
@@ -2458,7 +2457,7 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
       : j.direction === "stable"
         ? "Prices are broadly stable."
         : "The price direction is unclear.";
-  return `Fuel risk is ${facts.overallSeverity}. ${j.mainRisk}. ${place} ${outlook} ${action}`;
+  return `Fuel risk is ${facts.overallSeverity}. ${outlook} ${action}`;
 }
 
 /** Build count-free analytical sections from canonical facts. */

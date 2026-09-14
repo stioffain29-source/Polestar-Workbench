@@ -541,6 +541,7 @@ describe("AI jet-direction headlines retain the original report text", () => {
       country: "Saudi Arabia",
       location: "Strait of Hormuz",
       severity: "high",
+      sourceUrl: "https://example.com/saudi-refinery-report",
     })];
     const data = buildFuelWatchReportData(report, incidents);
     expect(data.canonicalFacts.judgement).toMatchObject({
@@ -593,14 +594,18 @@ describe("AI jet-direction headlines retain the original report text", () => {
       severity: "high",
     })];
     const finalised = finalizeFuelPublication({ report, incidents, aiProse: null });
-    const { implications, watchNext, polestarView } = finalised.effectiveSections;
+    const { whatMatters, implications, watchNext, polestarView } = finalised.effectiveSections;
     const closing = `${implications}\n${watchNext}\n${polestarView}`;
+    const fourSections = `${whatMatters}\n${closing}`;
 
-    expect(implications).toContain("Reprice road fuel distribution in Saudi Arabia");
-    expect(implications).not.toMatch(/reassess if|watch for|delivery schedules/i);
-    expect(watchNext).toMatch(/watch for .*transit availability/i);
-    expect(polestarView).not.toMatch(/transit availability|reprice road fuel distribution/i);
-    expect(closing.match(/transit availability/gi)).toHaveLength(1);
+    expect(implications).toContain("Review delivered-cost assumptions");
+    expect(implications).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|watch for|delivery schedules/i);
+    expect(watchNext).toMatch(/^Watch for .*transit availability\.$/im);
+    expect(watchNext).not.toMatch(/Saudi Arabia|road fuel distribution/i);
+    expect(polestarView).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|fuel-route disruption/i);
+    expect(fourSections.match(/transit availability/gi)).toHaveLength(1);
+    expect(fourSections.match(/Saudi Arabia/gi)).toHaveLength(1);
+    expect(fourSections.match(/road fuel distribution/gi)).toHaveLength(1);
   });
 
   it("replaces the persisted legacy repeated Implications template", () => {
@@ -618,6 +623,23 @@ describe("AI jet-direction headlines retain the original report text", () => {
       data.narrativeData.canonicalSections.implications,
     );
     expect(effective.implications).not.toMatch(/prioritise .+reassess if/i);
+  });
+
+  it("replaces the persisted rephrased Implications template shown in the report", () => {
+    const data = risingJetData();
+    const effective = resolveFuelEffectiveSections({
+      report: {
+        implications:
+          "Reprice road fuel distribution in Saudi Arabia against current delivered-cost and availability assumptions.",
+      },
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(effective.implications).toBe(
+      data.narrativeData.canonicalSections.implications,
+    );
+    expect(effective.implications).not.toMatch(/Saudi Arabia|road fuel distribution/i);
   });
 
   it("preserves genuinely edited analyst Implications text", () => {
