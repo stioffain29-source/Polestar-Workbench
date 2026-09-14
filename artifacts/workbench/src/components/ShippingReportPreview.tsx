@@ -33,9 +33,6 @@ import {
 } from "@/lib/maritimeIntelligence";
 import {
   finalizeShippingPublication,
-  shippingPublicationIssueAction,
-  shippingPublicationIssueSection,
-  type ShippingPublicationIssue,
 } from "@/lib/shippingPublication";
 import type { ShippingSevenPageRegisterRow } from "@/lib/shippingSevenPagePresentation";
 import {
@@ -169,62 +166,6 @@ function Section({ title, children, hidden }: { title: string; children: React.R
       </h2>
       {children}
     </div>
-  );
-}
-
-function ShippingPublicationWarnings({
-  issues,
-}: {
-  issues: ShippingPublicationIssue[];
-}) {
-  if (issues.length === 0) return null;
-  const hasBlockingErrors = issues.some((issue) => issue.level === "ERROR");
-  return (
-    <aside
-      aria-label="Shipping Watch draft validation warnings"
-      data-testid="shipping-publication-warnings"
-      className="mb-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950"
-    >
-      <h2 className="font-semibold">
-        {hasBlockingErrors
-          ? "Draft preview — PDF export is blocked until these errors are resolved"
-          : "Draft preview — review these warnings before export"}
-      </h2>
-      <p className="mt-1 leading-6">
-        The report below is still your live draft. Saved edits and all report
-        sections remain visible while you address the warnings.
-      </p>
-      <ul className="mt-3 space-y-3">
-        {issues.map((item, index) => {
-          const section = shippingPublicationIssueSection(item);
-          const action = shippingPublicationIssueAction(item);
-          return (
-            <li
-              key={`${item.code}-${item.section ?? "report"}-${index}`}
-              data-testid="shipping-publication-warning"
-              className="border-l-2 border-amber-500 pl-3 leading-6"
-            >
-              <div>
-                <strong>{section}</strong>
-                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
-                  {item.level}
-                </span>
-                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide">
-                  {item.code}
-                </span>
-              </div>
-              <div>{item.message}</div>
-              <div>
-                <strong>Action:</strong> {action}
-                {item.incidentIds && item.incidentIds.length > 0
-                  ? ` Incident ${item.incidentIds.join(", ")}.`
-                  : ""}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </aside>
   );
 }
 
@@ -873,8 +814,6 @@ export default function ShippingReportPreview({
           .shipping-page { margin: 0; box-shadow: none; border: none; height: 297mm; overflow: visible; }
         }
       `}</style>
-      <ShippingPublicationWarnings issues={publication.auditIssues} />
-
       {/* PAGE 1: COVER */}
       <div className="shipping-page p-0 relative overflow-hidden" data-shipping-page="1">
          <div className="absolute inset-0 bg-[#0b0a3d]" />

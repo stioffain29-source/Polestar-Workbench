@@ -1081,25 +1081,6 @@ export default function ReportPreview({
         proseDraft.executiveSummary,
       );
 
-  // Validation never replaces a draft preview. Analysts need the rendered
-  // report in view while resolving findings. Canonical and consistency issues
-  // are errors; the shared evidence audit carries its own ERROR/WARNING/INFO
-  // level. Only ERROR findings block the final PDF boundary.
-  const fuelConsistencyErrors = fuelBundle?.auditIssues.canonical ?? [];
-  const fuelEffectiveIssues = fuelBundle?.auditIssues.consistency ?? [];
-  const fuelEvidenceAuditIssues = fuelBundle?.auditIssues.evidence ?? [];
-  const fuelEvidenceErrors = fuelEvidenceAuditIssues.filter(
-    (issue) => issue.level === "ERROR",
-  );
-  const fuelValidationIssueCount =
-    fuelConsistencyErrors.length +
-    fuelEffectiveIssues.length +
-    fuelEvidenceAuditIssues.length;
-  const fuelBlockingIssueCount =
-    fuelConsistencyErrors.length +
-    fuelEffectiveIssues.length +
-    fuelEvidenceErrors.length;
-
   if (isEnergy) {
     return (
       <div
@@ -1154,60 +1135,6 @@ export default function ReportPreview({
 
   return (
     <div className="print-report bg-white" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-      {isFuel && fuelValidationIssueCount > 0 && (
-        <details
-          open={fuelBlockingIssueCount > 0}
-          className="no-print"
-          data-report-validation-findings="true"
-          data-fuel-validation-blocked={fuelBlockingIssueCount > 0 ? "true" : "false"}
-          aria-label="Fuel Watch validation findings"
-          style={{
-            margin: 24,
-            padding: 12,
-            border: `1px solid ${fuelBlockingIssueCount > 0 ? "#A33232" : "#D6B45B"}`,
-            background: fuelBlockingIssueCount > 0 ? "#FFF7F7" : "#FFFBEB",
-          }}
-        >
-          <summary
-            style={{
-              fontFamily: "'Roboto Condensed', sans-serif",
-              fontWeight: 700,
-              fontSize: 14,
-              color: fuelBlockingIssueCount > 0 ? "#A33232" : "#8A5A00",
-              cursor: "pointer",
-            }}
-          >
-            {fuelBlockingIssueCount > 0
-              ? "Fuel Watch validation errors — final export blocked"
-              : `${fuelValidationIssueCount} review findings — warnings only; export available`}
-          </summary>
-          <p style={{ fontSize: 13, marginBottom: 12 }}>
-            The complete draft remains visible and editable. Warnings do not
-            block saving or PDF export.
-          </p>
-          <ul className="list-disc pl-5 space-y-2" style={{ fontSize: 13 }}>
-            {fuelConsistencyErrors.map((issue, i) => (
-              <li key={`canonical-${i}`}>
-                <strong>ERROR — {issue.section}:</strong>{" "}
-                {issue.conflictingStatement} — canonical value{" "}
-                {issue.canonicalValue} ({issue.sourceField})
-              </li>
-            ))}
-            {fuelEffectiveIssues.map((issue, i) => (
-              <li key={`eff-${i}`}>
-                <strong>ERROR — {issue.section}:</strong>{" "}
-                [{issue.code}] {issue.message}
-              </li>
-            ))}
-            {fuelEvidenceAuditIssues.map((issue, i) => (
-              <li key={`audit-${i}`} data-level={issue.level}>
-                <strong>{issue.level} — {issue.section}:</strong>{" "}
-                [{issue.code}] {issue.message}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
       <div className="pdf-cover-page">
       {/* 1. Top gradient band — full width, logo left, no margins. */}
       <div

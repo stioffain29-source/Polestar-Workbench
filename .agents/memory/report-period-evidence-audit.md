@@ -20,3 +20,9 @@ description: How report metrics and final client prose distinguish current-perio
 **Why:** Fixing one Fuel template only rephrased the same Saudi exposure across What Matters, Implications, Watch Next and Polestar View; persisted and AI-resolved text can also bypass a generator-only fix.
 
 **How to apply:** Run the shared repetition audit after analyst/AI/canonical precedence is resolved. Topic PDF exports and Spot/Special section authorities fail closed; domain validators for Country/Cities, Cargo, Flashpoint and Shipping remain complementary.
+
+**Rule:** Validation diagnostics never render inside a report preview or exported report. Keep rule codes, evidence warnings and audit details internal; enforce blocking checks at the export boundary.
+
+**Why:** Owner explicitly rejected the large Fuel/Flashpoint/Shipping validation panels as report content. They exposed engine internals and displaced the actual report.
+
+**How to apply:** Do not add validation asides to report components. Surface a concise export failure in editor chrome only when the user attempts export; never print or embed the diagnostic payload.

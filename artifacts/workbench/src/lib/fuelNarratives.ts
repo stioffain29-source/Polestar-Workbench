@@ -2339,16 +2339,17 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
   }
   const paras = lead.map((i, idx) => {
     const impact = businessImpactForDevelopment(i);
-    const place = i.physicalLocation ?? i.country ?? "the lead market";
-    const opener = idx === 0
-      ? "The development with the greatest business significance"
-      : idx === 1
-        ? "A second material line"
-        : "Also worth weighting";
+    const place = i.physicalLocation ?? i.country;
     // What Happened owns chronology and event description. What Matters names
     // only the ranked exposure and consequence so the same development is not
     // retold in two adjacent sections.
-    return `${opener} is the exposure centred on ${place}. ${impact}`;
+    if (idx === 0) {
+      return `${place ? `${place} carries` : "The lead development carries"} the greatest business exposure. ${impact}`;
+    }
+    if (idx === 1) {
+      return `${place ? `A second material issue is developing around ${place}` : "A second material issue remains unresolved"}. ${impact}`;
+    }
+    return `${place ? `${place} is also relevant` : "The remaining material issue is regional"}. ${impact}`;
   });
   const j = facts.judgement;
   // What Matters owns the assessed risk, exposure and direction. The
