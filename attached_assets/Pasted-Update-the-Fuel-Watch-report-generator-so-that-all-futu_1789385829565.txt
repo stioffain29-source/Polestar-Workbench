@@ -1,0 +1,34 @@
+Update the Fuel Watch report generator so that all future Fuel Watch reports automatically produce substantive analytical prose rather than thin placeholder text.
+
+Make this change in the core Fuel Watch prompt/template used for report generation. Do not manually edit individual reports.
+
+For every Fuel Watch report:
+
+Main risk / overview
+Write a proper analytical paragraph of roughly 60 to 100 words. Explain what is happening, where the exposure sits, what is driving it, and the near term direction. Do not simply restate a risk rating.
+
+Implications for Business
+Write 70 to 120 words focused on practical commercial and operational consequences. Cover relevant effects such as delivered fuel cost, transport cost, supplier pricing, stock levels, replenishment cycles, production continuity, logistics exposure and contingency requirements. Only include factors supported by the underlying reporting.
+
+Polestar View
+Write 70 to 120 words of genuine assessment. Explain why the risk matters, whether the issue is availability, distribution, price, infrastructure, policy or a combination, and identify the principal exposure. State what businesses should be protecting or preparing for. Do not repeat the Incident Details or Implications for Business.
+
+Watch Next
+Write 50 to 90 words identifying specific indicators that would change the assessment. These should include relevant signals such as transit availability, distributor allocation, inventory levels, delivery lead times, refinery or terminal disruption, government intervention, price movements or localised shortages.
+
+The writing must be concise but analytical. It must not produce one or two generic sentences such as “prices are rising” or “watch for changes in transit availability”.
+
+Every paragraph must answer at least two of these questions:
+What is changing?
+Why does it matter?
+Where is the exposure?
+What could happen next?
+What should a business do about it?
+
+Do not invent facts to make paragraphs longer. Depth must come from analysis of the available evidence, not padding.
+
+Retain the existing Fuel Watch format, styling, risk terminology and section order.
+
+Add a quality check before final generation. If Implications for Business, Polestar View or Watch Next contains fewer than two substantive sentences, regenerate that section before producing the report.
+
+Apply this rule to every Fuel Watch report generated from now on, including manually generated reports and scheduled reports.

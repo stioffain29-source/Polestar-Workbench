@@ -219,16 +219,15 @@ export function auditFinalReportSectionRepetition(
     const left = units[leftIndex];
     for (let rightIndex = leftIndex + 1; rightIndex < units.length; rightIndex += 1) {
       const right = units[rightIndex];
-      if (left.section === right.section) continue;
       const exact =
         left.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
         === right.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
       if (REPEATABLE_STATUS_RE.test(left.text) || REPEATABLE_STATUS_RE.test(right.text)) continue;
       const similarity = crossSectionSimilarity(left.text, right.text);
-      if (!exact && similarity < 0.62) continue;
+      if (!exact && similarity < 0.72) continue;
       issues.push({
         code: "CROSS_SECTION_REPETITION",
-        section: "cross-section",
+        section: left.section === right.section ? left.section : "cross-section",
         message: `${left.section} and ${right.section} repeat the same conclusion: "${right.text.slice(0, 150)}"`,
       });
     }

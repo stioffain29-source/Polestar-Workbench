@@ -35,6 +35,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v5";
+export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v1";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -177,6 +178,8 @@ export function computeReportProseFingerprint(input: {
     v:
       input.topic === "energy"
         ? ENERGY_REPORT_PROSE_PROMPT_VERSION
+        : input.topic === "fuel"
+          ? FUEL_REPORT_PROSE_PROMPT_VERSION
         : REPORT_PROSE_PROMPT_VERSION,
     kind: "topic-prose",
     reportId: input.reportId,
@@ -226,7 +229,12 @@ FUEL EVIDENCE TRACEABILITY — additional non-negotiable rules:
 - The supplied canonical current-period evidence IDs are the complete authority for current Fuel themes. Do not introduce a country, shortage, refinery behaviour, transport disruption, aviation restriction, bunker-fuel or strike theme without a supporting supplied ID.
 - Return whatHappened as an array of objects, each containing text, supportingEvidenceIds and supportingClaim. Return watchNext in the same shape. supportingClaim must be copied exactly from a supported claim shown for one cited record; do not invent or paraphrase claims.
 - The parser renders the verified claim for whatHappened, so an unsupported paraphrase cannot survive. For watchNext, include the exact parent claim in the text plus explicit future/conditional modality. Potential evidence can support Watch Next only in that conditional form; it cannot support current whatHappened.
-- Write the Polestar View in plain English. Use short sentences that say: the risk, the place that needs attention, the price direction, and one concrete action.
+- Write whatMatters as a 60-100 word analytical overview. Explain what is changing, where the exposure sits, what drives it and the near-term direction. Do not merely restate the risk rating.
+- Write implications as 70-120 words of practical commercial and operational consequences supported by the evidence. Cover only relevant effects on delivered fuel cost, transport cost, supplier pricing, stock, replenishment, production continuity, logistics and contingency requirements.
+- Write polestarView as a 70-120 word assessment. Explain why the risk matters, whether the issue is availability, distribution, price, infrastructure, policy or a supported combination, identify the principal exposure, and state what needs protection or preparation. Do not repeat whatHappened or implications.
+- Write watchNext as 50-90 words of specific evidence-led indicators that could change the assessment, such as transit availability, distributor allocation, inventory, lead times, refinery or terminal status, government intervention, price movement or localised shortage.
+- Every one of those four sections must answer at least two of: what is changing, why it matters, where exposure sits, what could happen next, and what action is required. Do not pad or invent facts to reach the requested length.
+- implications, polestarView and watchNext must each contain at least two substantive sentences. One-line placeholders such as "prices are rising" or "watch for changes in transit availability" are invalid.
 - Never use "concentrated around", "practical aviation and distribution constraint", "route flexibility", "operational posture", "pressure point", "fuel assurance", or "cost controls".
 `
       : "";
@@ -373,6 +381,18 @@ function normalizeSupportedClaim(value: string): string {
 function isExplicitlyConditional(text: string): boolean {
   return /\b(?:if|may|might|could|possible|possibly|potential|risk|uncertain|monitor|watch|subject to|contingent|would)\b/i
     .test(text);
+}
+
+function substantiveSentenceCount(text: string): number {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.split(/\s+/).filter(Boolean).length >= 6)
+    .length;
+}
+
+function proseWordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 export function parseTopicSections(
@@ -600,6 +620,20 @@ export function parseTopicSections(
     !sections.polestarView
   ) {
     return null;
+  }
+  if (input?.topic === "fuel") {
+    const fuelQuality = [
+      { text: sections.whatMatters, minWords: 60, maxWords: 100, minSentences: 2 },
+      { text: sections.implications, minWords: 70, maxWords: 120, minSentences: 2 },
+      { text: sections.polestarView, minWords: 70, maxWords: 120, minSentences: 2 },
+      { text: sections.watchNext, minWords: 50, maxWords: 90, minSentences: 2 },
+    ];
+    if (fuelQuality.some(({ text, minWords, maxWords, minSentences }) => {
+      const words = proseWordCount(text);
+      return words < minWords || words > maxWords || substantiveSentenceCount(text) < minSentences;
+    })) {
+      return null;
+    }
   }
   return sections;
 }

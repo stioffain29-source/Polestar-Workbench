@@ -159,8 +159,8 @@ function familyFor(items: TopicFastFactsIncident[]): IssueFamily | null {
 
 /**
  * Country-level Fuel Watch highlights as proper analyst paragraphs.
- * Each country answers three questions: what is the signal, why does
- * it matter, what should the reader watch. Records without a usable
+ * Each country answers two questions: what is the signal and why does
+ * it matter. Forward indicators belong only in Watch Next. Records without a usable
  * country attribution are dropped and "Unknown" is never emitted.
  * Returns null when there is nothing usable to say.
  */
@@ -206,8 +206,6 @@ export function buildFuelRegionalHighlights(opts: {
       why = `${why} The near-term watch is on operational follow-through rather than headline volume.`;
     }
     usedWhy.add(why.split(".")[0] ?? why);
-    const watch = fam?.watch
-      ?? "Watch the coming weeks to confirm whether the pattern persists or eases.";
     const signal = regionalSignalPhrase(country, items, fam);
     let opener: string;
     if (idx === 0) {
@@ -228,7 +226,7 @@ export function buildFuelRegionalHighlights(opts: {
     } else {
       opener = `${titleCase(country)} adds further weight to the picture.`;
     }
-    paragraphs.push(`${opener} ${signal} ${why} ${watch}`);
+    paragraphs.push(`${opener} ${signal} ${why}`);
   }
   return paragraphs.join("\n\n");
 }
@@ -1534,9 +1532,6 @@ export function buildFuelOperationalRead(opts: {
   // adjacent sections.
   const driverPara = `The main themes right now are ${themeLine}. ${lead.fam.opMeaning}`;
 
-  const watchLines: string[] = [];
-  for (const { fam } of ordered.slice(0, 2)) watchLines.push(fam.watch);
-
   // Name geographies only when significance is material — never rank by
   // raw record volume ("carries N records" / "most activity this week").
   const sigCountries = Array.from(byCountry.entries())
@@ -1551,9 +1546,7 @@ export function buildFuelOperationalRead(opts: {
         : ` The reported operational themes are most visible in ${joinWithAnd(sigCountries)}.`
       : "";
 
-  const closingPara = `${watchLines.join(" ")}${where}`.trim();
-
-  return `${driverPara}\n\n${closingPara}`;
+  return where ? `${driverPara}\n\n${where.trim()}` : driverPara;
 }
 
 function bulletNormKey(s: string): string {
@@ -1788,7 +1781,7 @@ function businessContinuityParagraph(facts: FuelCanonicalFacts): string {
       : "Cost exposure is broadly stable for now, but physical or routing shocks can reprice contracts with little notice.";
   const opsBit = physical
     ? hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)
-      ? `Road transport, backup power and commercial allocation could be exposed where ${observedAccessCondition(hay)} persists.`
+      ? `Road transport, backup power and commercial allocation could be exposed where reporting of ${observedAccessCondition(hay)} persists.`
       : "Road transport, backup power and commercial allocation could be exposed if the reported refinery disruption curtails output."
     : route
       ? "Transport and bunker-dependent operations could face rerouting, delay or war-risk exposure if affected corridors become constrained."
@@ -2267,9 +2260,7 @@ function developmentSentence(i: CanonicalFuelIncident): string {
 function buildFuelExecutiveSummary(facts: FuelCanonicalFacts): string {
   return [
     marketPriceParagraph(facts),
-    physicalSupplyParagraph(facts),
     responseParagraph(facts),
-    businessContinuityParagraph(facts),
   ].join("\n\n");
 }
 
@@ -2337,7 +2328,7 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
   if (!lead.length) {
     return businessContinuityParagraph(facts);
   }
-  const paras = lead.map((i, idx) => {
+  const paras = lead.slice(0, 2).map((i, idx) => {
     const impact = businessImpactForDevelopment(i);
     const place = i.physicalLocation ?? i.country;
     // What Happened owns chronology and event description. What Matters names
@@ -2371,7 +2362,7 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
     bullets.push("Revisit bulk-fuel and aviation surcharge pass-through clauses now — elevated Brent, WTI or jet observations typically reach invoices on the next billing cycle, not the current one.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    bullets.push(`Where ${observedAccessCondition(hay)} persists, keep road-transport and commercial-allocation conversations live with suppliers.`);
+    bullets.push(`Where reporting of ${observedAccessCondition(hay)} persists, keep road-transport and commercial-allocation conversations live with suppliers.`);
   }
   if (/\b(diesel|generator|lpg|backup power)\b/.test(hay)
       && hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
@@ -2392,6 +2383,14 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   bullets.unshift(
     "Review delivered-cost assumptions, supplier terms and contingency volumes for exposed fuel-dependent operations.",
   );
+  bullets.push(
+    "Set stock thresholds, reorder points and replenishment lead times against the disruption pattern in the current evidence, rather than relying on normal-cycle assumptions.",
+  );
+  if (facts.marketIndicators.length > 0) {
+    bullets.push(
+      `Use the reported ${facts.judgement.direction} price direction as the near-term planning baseline, while retaining enough budget and stock flexibility for a change in market or supply conditions.`,
+    );
+  }
   return bullets.slice(0, 5).join("\n");
 }
 
@@ -2435,11 +2434,32 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   }
   // Caller-provided indicators have no evidence identity in the canonical
   // record, so they are intentionally not promoted into rendered Watch Next.
-  return [...new Map(
+  const unique = [...new Map(
     items
       .filter((item) => item.supportingEvidenceIds.length > 0)
       .map((item) => [item.text, item]),
-  ).values()].slice(0, 6).map((item) => item.text).join("\n");
+  ).values()];
+  const refineryEvidence = facts.currentConditions.filter((incident) =>
+    hasPattern(
+      haystack(incident.raw),
+      ISSUE_FAMILIES.find((family) => family.key === "refinery")!.test,
+    ),
+  );
+  const refineryIds = refineryEvidence.map((incident) => incident.id).filter(Boolean);
+  if (refineryIds.length > 0) {
+    unique.push({
+      text: "Monitor confirmed refinery restart dates, terminal throughput and any extension of the outage, because prolonged output loss would tighten product availability and lengthen replenishment cycles.",
+      supportingEvidenceIds: refineryIds,
+    });
+  }
+  const selected = unique.slice(0, 6);
+  while (
+    selected.length > 2
+    && selected.map((item) => item.text).join(" ").split(/\s+/).filter(Boolean).length > 90
+  ) {
+    selected.pop();
+  }
+  return selected.map((item) => item.text).join("\n");
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
@@ -2448,10 +2468,10 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   }
   const j = facts.judgement;
   const action = j.exposure.sector === "road fuel distribution"
-    ? "Protect critical-site stocks and delivery schedules."
+    ? "Protect critical-site stocks, replenishment cycles and delivery schedules."
     : j.exposure.sector === "routing and fuel delivery"
-      ? "Protect delivery continuity and allow extra time for fuel shipments."
-      : "Protect supply continuity and budget headroom.";
+      ? "Protect delivery continuity, test alternative routing and allow additional time for fuel shipments."
+      : "Protect supply continuity, contingency volumes and budget headroom.";
   const outlook = j.direction === "upward"
     ? "Prices are rising."
     : j.direction === "downward"
@@ -2459,7 +2479,10 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
       : j.direction === "stable"
         ? "Prices are broadly stable."
         : "The price direction is unclear.";
-  return `Fuel risk is ${facts.overallSeverity}. ${outlook} ${action}`;
+  const exposure = "Exposure sits with fuel-dependent transport, critical-site replenishment and contracts that pass delivered-cost changes through quickly.";
+  const driver = "The current evidence combines market-price pressure with physical supply and routing constraints, so the assessment is not based on price movement alone.";
+  const next = "Tighter allocation, longer delivery times or a clear easing in physical constraints would justify revising the near-term view.";
+  return `Fuel risk is ${facts.overallSeverity}. ${outlook} ${exposure} ${driver} ${action} ${next}`;
 }
 
 /** Build count-free analytical sections from canonical facts. */
