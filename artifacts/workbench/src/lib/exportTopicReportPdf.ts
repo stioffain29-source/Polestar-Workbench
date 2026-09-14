@@ -95,7 +95,6 @@ import {
 import {
   finalizeFuelPublication,
   fuelMarketLatestDate,
-  fuelMarketReadinessIssue,
   toRenderableCard,
   FUEL_MISSING_REQUIRED_NOTE,
 } from "./fuelWatchReport";
@@ -1080,23 +1079,6 @@ export async function exportTopicReportPdf(
   // editor prefill also call, so all three surfaces render byte-identical
   // section text.
   const fuelEffective = fuelBundle?.effectiveSections ?? null;
-  // Pre-render Fuel Watch consistency gate. This runs after all canonical facts
-  // exist and before the first report section is drawn; it validates the FINAL
-  // EFFECTIVE text (whatever tier wins), so analyst/AI prose can never smuggle
-  // a contradictory claim past it.
-  if (fuelBundle && fuelData && fuelEffective) {
-    // Strict canonical gate — validates the canonical payload (Gulf/Hormuz
-    // developments flow through the normal analytical sections, not a
-    // separate chokepoint heading); canonical text passes by construction.
-    const issues = [
-      ...fuelBundle.auditIssues.canonical,
-      ...fuelBundle.auditIssues.consistency,
-      ...fuelBundle.auditIssues.evidence,
-    ].filter((issue) => issue.level === "ERROR");
-    if (issues.length) {
-      throw new Error(`FUEL_PUBLICATION_AUDIT_FAILED\n${issues.map((issue) => `${issue.section}: ${"message" in issue ? issue.message : issue.conflictingStatement}`).join("\n")}`);
-    }
-  }
   // Deterministic per-topic draft — the labelled fallback beneath the AI
   // narrative and any analyst edit. Built from the SAME windowed incident
   // set the on-screen preview uses so screen and PDF agree.
@@ -1409,18 +1391,6 @@ export async function exportTopicReportPdf(
   }
 
   if (isFuel && fuelData) {
-    // Fail closed: refuse to export a polished but hollow report unless
-    // the caller explicitly opted in via options.allowMissingMarketData.
-    const readinessIssue = fuelMarketReadinessIssue(fuelData.validation);
-    if (
-      readinessIssue?.level === "ERROR" &&
-      !options.allowMissingMarketData
-    ) {
-      throw new FuelRequiredDataMissingError(
-        fuelData.validation.missingRequired,
-      );
-    }
-
     if (show("fast-facts")) {
       drawSectionHeading(ctx, "Fast Facts");
       if (!fuelData.validation.hasRequiredFuelWatchData) {

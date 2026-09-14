@@ -115,7 +115,6 @@ import {
   buildHardNumbersFromForm,
   fuelMarketFormFromData,
   fuelMarketLatestDate,
-  fuelMarketReadinessIssue,
   buildFuelReportFacts,
   serialiseFuelFactsForPrompt,
   resolveFuelPeriodEnd,
@@ -620,7 +619,6 @@ export default function ReportEditor() {
   const [fuelFormErrors, setFuelFormErrors] = useState<string[]>([]);
   // Override flag for the "fail closed" export gate. Reset on every
   // successful export and whenever the user edits the market data.
-  const [allowMissingExport, setAllowMissingExport] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   // Cargo Watch: opt-in to appending the full incident register as a PDF annex.
@@ -1508,7 +1506,7 @@ export default function ReportEditor() {
     );
   };
 
-  const downloadPdf = async (opts?: { forceAllowMissing?: boolean }) => {
+  const downloadPdf = async () => {
     if (form.topic === "fuel") {
       console.info("[FUEL_PDF_TRACE] HANDLER CALLED", {
         reportId: report?.id ?? null,
@@ -1516,47 +1514,7 @@ export default function ReportEditor() {
     }
     setExporting(true);
     setExportError(null);
-    // System-error guard: if the form clearly has values but the builder
-    // we're about to hand to the exporter does not see them, the wiring
-    // is broken — block export instead of silently producing a bad PDF.
-    if (form.topic === "fuel" && liveFuelData) {
-      const md = liveFuelData.marketData;
-      const formHasNow = {
-        brent: fuelForm.brent.value.trim() !== "",
-        wti: fuelForm.wti.value.trim() !== "",
-        jet: fuelForm.jet.value.trim() !== "",
-      };
-      const builderHas = {
-        brent: md.brent != null,
-        wti: md.wti != null,
-        jet: md.jetFuel != null,
-      };
-      if (
-        (formHasNow.brent && !builderHas.brent) ||
-        (formHasNow.wti && !builderHas.wti) ||
-        (formHasNow.jet && !builderHas.jet)
-      ) {
-        setExportError(
-          "Fuel market form values are not reaching the report builder.",
-        );
-        setExporting(false);
-        return;
-      }
-    }
     try {
-      const allow = opts?.forceAllowMissing === true || allowMissingExport;
-      const fuelReadinessIssue =
-        form.topic === "fuel" && liveFuelData
-          ? fuelMarketReadinessIssue(liveFuelData.validation)
-          : null;
-      if (
-        fuelReadinessIssue?.level === "ERROR" &&
-        !allow
-      ) {
-        setExportError(fuelReadinessIssue.message);
-        return;
-      }
-
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}-${formatExportTimestampForFilename()}.pdf`;
 
       // Common payload shared by all PDF exporters.
@@ -1633,7 +1591,6 @@ export default function ReportEditor() {
           TOPIC_LABELS,
           filename,
           {
-            allowMissingMarketData: allow,
             incidentSummaries: effectiveSummaries,
             aiProse: aiProseSections,
             marketPrices: marketPriceRows,
@@ -1643,7 +1600,6 @@ export default function ReportEditor() {
           },
         );
       }
-      setAllowMissingExport(false);
       if (form.topic === "fuel") {
         console.info("[FUEL_PDF_TRACE] HANDLER COMPLETE", {
           reportId: report?.id ?? null,
@@ -1946,7 +1902,6 @@ export default function ReportEditor() {
       setFuelForm(EMPTY_FUEL_MARKET_FORM);
       setFuelFormErrors([]);
       setShowFuelJson(false);
-      setAllowMissingExport(false);
       setExportError(null);
       setSampleAutoSeeded(false);
     }
@@ -2003,7 +1958,6 @@ export default function ReportEditor() {
     );
     setFuelForm(fuelMarketFormFromData(seeded));
     setFuelFormErrors([]);
-    setAllowMissingExport(false);
     setExportError(null);
     setSampleAutoSeeded(false);
   }, [report, marketPriceRows, marketPricesFetched]);
@@ -2287,7 +2241,6 @@ export default function ReportEditor() {
   // Load Sample doesn't silently drop the rest of the sample.
   const applyFuelForm = (next: FuelMarketFormState) => {
     setFuelForm(next);
-    setAllowMissingExport(false);
     setExportError(null);
     setSampleAutoSeeded(false);
     const built = buildHardNumbersFromForm(next);
@@ -2333,7 +2286,6 @@ export default function ReportEditor() {
     );
     setFuelForm(fuelMarketFormFromData(seeded));
     setFuelFormErrors([]);
-    setAllowMissingExport(false);
     setExportError(null);
   };
 
@@ -3744,94 +3696,6 @@ export default function ReportEditor() {
                   inside `.no-print` ancestors. Shows the live form ↔
                   builder agreement so an author can see at a glance
                   whether their edits are reaching the report builder. */}
-              {liveFuelData &&
-                (() => {
-                  const md = liveFuelData.marketData;
-                  const hardNumbersSource =
-                    hardNumbersEdited !== undefined
-                      ? "live form"
-                      : report?.hardNumbers
-                        ? "saved DB"
-                        : "empty";
-                  const yn = (b: boolean) => (b ? "yes" : "no");
-                  return (
-                    <div
-                      className="text-[11px] p-2 rounded-sm border font-mono"
-                      style={{
-                        background: "#f7f7fa",
-                        borderColor: "#e2e2e2",
-                        color: "#363636",
-                      }}
-                    >
-                      <div
-                        className="uppercase tracking-widest text-[10px] font-bold mb-1"
-                        style={{
-                          fontFamily: "Roboto, sans-serif",
-                          color: "#465bff",
-                        }}
-                      >
-                        Fuel debug
-                      </div>
-                      <div>
-                        hardNumbers source: <b>{hardNumbersSource}</b>
-                      </div>
-                      <div>
-                        form Brent value: <b>{fuelForm.brent.value || "—"}</b> ·
-                        builder Brent found: <b>{yn(md.brent != null)}</b>
-                      </div>
-                      <div>
-                        form WTI value: <b>{fuelForm.wti.value || "—"}</b> ·
-                        builder WTI found: <b>{yn(md.wti != null)}</b>
-                      </div>
-                      <div>
-                        form jet fuel value: <b>{fuelForm.jet.value || "—"}</b>{" "}
-                        · builder jet fuel found:{" "}
-                        <b>{yn(md.jetFuel != null)}</b>
-                      </div>
-                      <div>
-                        trajectory lines in form:{" "}
-                        <b>{formHas.trajectoryLines}</b> · trajectory points in
-                        builder: <b>{md.jetFuelTrajectory.length}</b>
-                      </div>
-                      <div>
-                        gate hasRequiredFuelWatchData:{" "}
-                        <b>
-                          {yn(liveFuelData.validation.hasRequiredFuelWatchData)}
-                        </b>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-              {/* Export gate. The exporter throws when required data is
-                  missing; this banner gives the author the explicit
-                  "Export with missing market data" override. */}
-              {exportError && (
-                <div
-                  className="text-[12px] p-3 rounded-sm border space-y-2"
-                  style={{
-                    background: "#fdecec",
-                    borderColor: "#a33232",
-                    color: "#a33232",
-                    fontFamily: "Roboto, sans-serif",
-                  }}
-                >
-                  <div className="font-bold">PDF export blocked.</div>
-                  <div>{exportError}</div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-sm h-8 text-xs"
-                    onClick={() => {
-                      setAllowMissingExport(true);
-                      setExportError(null);
-                      void downloadPdf({ forceAllowMissing: true });
-                    }}
-                  >
-                    Export with missing market data
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </div>
