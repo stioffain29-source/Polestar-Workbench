@@ -11,8 +11,62 @@ declare global {
   interface Window {
     __FUEL_COVERAGE_VERIFY_DATA__: any;
     __runFuelCoverageVerify__: () => Promise<string>;
+    __runFuelPdfExportVerify__: () => Promise<string>;
   }
 }
+
+window.__runFuelPdfExportVerify__ = async () => {
+  const data = window.__FUEL_COVERAGE_VERIFY_DATA__;
+  let captured: ArrayBuffer | null = null;
+  let saveCalls = 0;
+  const capture = function (this: jsPDF) {
+    saveCalls++;
+    captured = this.output("arraybuffer") as ArrayBuffer;
+    return this;
+  };
+  (jsPDF.prototype as unknown as { save: (fileName: string) => jsPDF }).save =
+    capture;
+  (
+    jsPDF as unknown as { API: { save: (fileName: string) => jsPDF } }
+  ).API.save = capture;
+
+  let exportError: string | null = null;
+  try {
+    await exportTopicReportPdf(
+      data.report,
+      data.incidents,
+      TOPIC_LABELS,
+      `fuel-report-${data.report.id}-export-verify.pdf`,
+      {
+        aiProse: data.actualAiProse,
+        hiddenSections: data.hiddenSections,
+        sectionOverrides: data.sectionOverrides,
+      },
+    );
+  } catch (error) {
+    exportError =
+      error instanceof Error
+        ? `${error.message}\n${error.stack ?? ""}`
+        : String(error);
+  }
+
+  let base64 = "";
+  if (captured) {
+    const bytes = new Uint8Array(captured);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    base64 = btoa(binary);
+  }
+
+  return JSON.stringify({
+    saveCalls,
+    exportError,
+    pdfBytes: captured?.byteLength ?? 0,
+    base64,
+  });
+};
 
 function normalized(value: string): string {
   return value.replace(/\s+/g, " ").trim().toLowerCase();

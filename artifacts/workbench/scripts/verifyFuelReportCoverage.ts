@@ -322,8 +322,13 @@ async function main() {
   if (!isRecord(snapshot.report) || !Array.isArray(snapshot.incidents)) {
     throw new Error(`Invalid Fuel production snapshot: ${SNAPSHOT_PATH}`);
   }
-  if (snapshot.report.id !== 23 || snapshot.report.topic !== "fuel") {
-    throw new Error("Snapshot must contain production Fuel report 23.");
+  const exportOnly = process.env.FUEL_EXPORT_ONLY === "1";
+  if ((!exportOnly && snapshot.report.id !== 23) || snapshot.report.topic !== "fuel") {
+    throw new Error(
+      exportOnly
+        ? "Snapshot must contain a production Fuel report."
+        : "Snapshot must contain production Fuel report 23.",
+    );
   }
 
   const renderIssueDate =
@@ -358,27 +363,98 @@ async function main() {
   );
   const proseCache = snapshot.proseCache;
   if (
-    !isRecord(proseCache) ||
-    !isRecord(proseCache.sections) ||
-    Object.keys(proseCache.sections).length !== 7
+    !exportOnly &&
+    (!isRecord(proseCache) ||
+      !isRecord(proseCache.sections) ||
+      Object.keys(proseCache.sections).length !== 7)
   ) {
     throw new Error(
       "Production snapshot must contain the exact cached seven-section Fuel payload.",
     );
   }
   const cachedSections =
-    isRecord(proseCache.edited) && Object.keys(proseCache.edited).length > 0
+    isRecord(proseCache) &&
+    isRecord(proseCache.edited) &&
+    Object.keys(proseCache.edited).length > 0
       ? proseCache.edited
-      : proseCache.sections;
-  const actualAiProse = {
-    ...cachedSections,
-    datasetFingerprint: proseCache.fingerprint ?? null,
-    stale: false,
-    origin:
-      isRecord(proseCache.edited) && Object.keys(proseCache.edited).length > 0
-        ? "analyst"
-        : "generated",
-  };
+      : isRecord(proseCache) && isRecord(proseCache.sections)
+        ? proseCache.sections
+        : null;
+  const actualAiProse = cachedSections
+    ? {
+        ...cachedSections,
+        datasetFingerprint: proseCache.fingerprint ?? null,
+        stale: false,
+        origin:
+          isRecord(proseCache.edited) &&
+          Object.keys(proseCache.edited).length > 0
+            ? "analyst"
+            : "generated",
+      }
+    : null;
+  if (exportOnly) {
+    const bundle = await bundleBrowser();
+    const browser = await chromium.launch({
+      executablePath:
+        process.env.REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE ||
+        process.env.CHROMIUM_BIN ||
+        undefined,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+    try {
+      const page = await browser.newPage({
+        viewport: { width: 1440, height: 1200 },
+        deviceScaleFactor: 1,
+      });
+      await page.goto("about:blank");
+      await page.addScriptTag({ content: bundle });
+      const resultJson = await page.evaluate(
+        async (data) => {
+          window.__FUEL_COVERAGE_VERIFY_DATA__ = data;
+          return window.__runFuelPdfExportVerify__();
+        },
+        {
+          report,
+          incidents,
+          actualAiProse,
+          hiddenSections: Array.isArray(snapshot.report.hiddenSections)
+            ? snapshot.report.hiddenSections
+            : [],
+          sectionOverrides: isRecord(snapshot.report.sectionOverrides)
+            ? snapshot.report.sectionOverrides
+            : {},
+        },
+      );
+      const result = JSON.parse(resultJson) as {
+        saveCalls: number;
+        exportError: string | null;
+        pdfBytes: number;
+        base64: string;
+      };
+      const pdfPath = resolve(
+        OUTPUT_DIR,
+        `FuelWatch_report${report.id}_browser.pdf`,
+      );
+      if (result.base64) {
+        writeFileSync(pdfPath, Buffer.from(result.base64, "base64"));
+      }
+      console.log(
+        JSON.stringify({
+          reportId: report.id,
+          saveCalls: result.saveCalls,
+          exportError: result.exportError,
+          pdfBytes: result.pdfBytes,
+          pdfPath: result.base64 ? pdfPath : null,
+        }),
+      );
+      if (result.exportError || result.saveCalls < 1 || result.pdfBytes < 1) {
+        process.exitCode = 1;
+      }
+    } finally {
+      await browser.close();
+    }
+    return;
+  }
   const frozenPath = "/tmp/fuel-report-23-frozen-effective-input.json";
   const frozen = JSON.parse(readFileSync(frozenPath, "utf8")) as Record<
     string,
