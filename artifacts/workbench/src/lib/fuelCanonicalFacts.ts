@@ -689,19 +689,22 @@ function pressureSentence(facts: FuelCanonicalFacts): string {
 function marketSentence(facts: FuelCanonicalFacts): string {
   const indicators = facts.marketIndicators.slice(0, 3);
   if (!indicators.length) return "No market indicators were supplied for this period.";
-  return indicators.map((i) => {
+  const rendered = indicators.flatMap((i) => {
+    const value = `${i.currentValue}${i.unit ? ` ${i.unit}` : ""}`;
     if (i.temporalStatus !== "current-period") {
-      return `${i.label} is a contextual observation${i.currentDate ? ` dated ${i.currentDate}` : " with no date"} and does not establish reporting-period movement`;
+      return i.currentDate ? [`${i.label} stood at ${value} on ${i.currentDate}.`] : [];
     }
-    if (!i.direction) return `${i.label} has no comparable movement`;
-    if (i.comparisonScope === "reporting-period") {
-      return `${i.label} is ${i.direction} within the reporting period`;
-    }
-    if (!i.referenceDate) {
-      return `${i.label} is ${i.direction} based on the supplied comparison, but no dated reference was provided`;
-    }
-    return `${i.label} is ${i.direction} against a ${i.comparisonScope === "lagged-reference" ? "lagged" : "prior"} reference dated ${i.referenceDate}`;
-  }).join("; ") + ".";
+    const movement = i.direction && i.comparisonScope === "reporting-period"
+      ? ` and was ${i.direction} over the reporting period`
+      : "";
+    const implication = i.direction === "rising"
+      ? " This increases near-term procurement and surcharge pressure."
+      : i.direction === "falling"
+        ? " This eases near-term procurement pressure, subject to physical supply conditions."
+        : " Physical supply and route conditions remain the main business variables.";
+    return [`${i.label} stood at ${value}${movement}.${implication}`];
+  });
+  return rendered.join(" ") || "Current benchmark levels are shown in the reporting-period dashboard.";
 }
 function list(values: string[]): string {
   if (!values.length) return "none";

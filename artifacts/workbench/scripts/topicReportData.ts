@@ -33,25 +33,33 @@ function asJson<T>(rows: unknown): T {
 
 type IncidentRow = typeof incidentsTable.$inferSelect;
 
+function chunks<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 // Mirror of withCorroborations() in routes/incidents.ts: batch-load each
 // incident's official corroborating references and group them in memory.
 async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const links = await db
-    .select({
-      incidentId: incidentCorroborationsTable.incidentId,
-      id: incidentCorroborationsTable.id,
-      provider: incidentCorroborationsTable.provider,
-      reportTitle: incidentCorroborationsTable.reportTitle,
-      sourceAgency: incidentCorroborationsTable.sourceAgency,
-      reportDate: incidentCorroborationsTable.reportDate,
-      url: incidentCorroborationsTable.url,
-      matchScore: incidentCorroborationsTable.matchScore,
-    })
-    .from(incidentCorroborationsTable)
-    .where(inArray(incidentCorroborationsTable.incidentId, ids))
-    .orderBy(desc(incidentCorroborationsTable.matchScore));
+  const links = (await Promise.all(chunks(ids, 2_000).map((batch) =>
+    db
+      .select({
+        incidentId: incidentCorroborationsTable.incidentId,
+        id: incidentCorroborationsTable.id,
+        provider: incidentCorroborationsTable.provider,
+        reportTitle: incidentCorroborationsTable.reportTitle,
+        sourceAgency: incidentCorroborationsTable.sourceAgency,
+        reportDate: incidentCorroborationsTable.reportDate,
+        url: incidentCorroborationsTable.url,
+        matchScore: incidentCorroborationsTable.matchScore,
+      })
+      .from(incidentCorroborationsTable)
+      .where(inArray(incidentCorroborationsTable.incidentId, batch))
+      .orderBy(desc(incidentCorroborationsTable.matchScore)),
+  ))).flat();
   const byIncident = new Map<
     number,
     Omit<(typeof links)[number], "incidentId">[]
@@ -61,20 +69,22 @@ async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
     if (bucket) bucket.push(rest);
     else byIncident.set(incidentId, [rest]);
   }
-  const semantics = await db
-    .select({ semantic: maritimeSemanticEvidenceTable })
-    .from(maritimeSemanticEvidenceTable)
-    .innerJoin(
-      incidentsTable,
-      eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
-    )
-    .where(
-      and(
-        inArray(maritimeSemanticEvidenceTable.incidentId, ids),
-        currentMaritimeSemanticProjectionCondition(),
-      ),
-    )
-    .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt));
+  const semantics = (await Promise.all(chunks(ids, 2_000).map((batch) =>
+    db
+      .select({ semantic: maritimeSemanticEvidenceTable })
+      .from(maritimeSemanticEvidenceTable)
+      .innerJoin(
+        incidentsTable,
+        eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
+      )
+      .where(
+        and(
+          inArray(maritimeSemanticEvidenceTable.incidentId, batch),
+          currentMaritimeSemanticProjectionCondition(),
+        ),
+      )
+      .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt)),
+  ))).flat();
   const semanticByIncident = new Map<
     number,
     (typeof semantics)[number]["semantic"]

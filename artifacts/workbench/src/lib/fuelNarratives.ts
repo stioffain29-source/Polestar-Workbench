@@ -977,6 +977,17 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
   return "—";
 }
 
+function hasVerifiedActorAction(
+  text: string,
+  actor: string,
+  category: FuelActionCategory,
+): boolean {
+  if (category === "Market / supply signal") return false;
+  if (/^(Market|Buyer|Producer|Government|Infrastructure operator|—)$/i.test(actor.trim())) return false;
+  const action = /\b(announc\w*|approv\w*|adopt\w*|implement\w*|introduc\w*|impos\w*|lift\w*|rais\w*|reduc\w*|cut\w*|increas\w*|boost\w*|restart\w*|resum\w*|restor\w*|halt\w*|shut\w*|suspend\w*|cancel\w*|rerout\w*|bypass\w*|open\w*|clos\w*|clear\w*|sign\w*|award\w*|launch\w*|buy\w*|sell\w*|import\w*|export\w*|tender\w*|ration\w*|releas\w*|draw\w*|stockpil\w*|hedg\w*|mov\w*|pivot\w*|turn\w+\s+to|complet\w*|expand\w*)\b/;
+  return action.test(text);
+}
+
 export interface ProducerBuyerActionRow {
   actor: string;
   category: FuelActionCategory;
@@ -1386,6 +1397,7 @@ export function buildFuelProducerBuyerActions(opts: {
     // never lists the same action twice.
     const tokens = sigTokens(action);
     const actor = pickActor(i, category);
+    if (!hasVerifiedActorAction(t, actor, category)) continue;
     if (raw.some((r) => r.category === category && r.actor === actor && nearDuplicate(tokens, r.tokens))) {
       continue;
     }
@@ -2165,6 +2177,7 @@ function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncid
     );
   const kept: CanonicalFuelIncident[] = [];
   const keptTokens: Set<string>[] = [];
+  const keptFamilies = new Set<string>();
   const themePriority: DevelopmentTheme[] = [
     "shortage",
     "policy",
@@ -2175,12 +2188,15 @@ function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncid
   ];
   for (const theme of themePriority) {
     const pick = sorted.find((i) => developmentTheme(i) === theme && !kept.includes(i));
-    if (pick) keepMaterialDevelopment(pick, kept, keptTokens);
+    if (pick && !keptFamilies.has(pick.evidenceFamilyId) && keepMaterialDevelopment(pick, kept, keptTokens)) {
+      keptFamilies.add(pick.evidenceFamilyId);
+    }
   }
   for (const i of sorted) {
     if (kept.length >= 10) break;
     if (kept.includes(i)) continue;
-    keepMaterialDevelopment(i, kept, keptTokens);
+    if (keptFamilies.has(i.evidenceFamilyId)) continue;
+    if (keepMaterialDevelopment(i, kept, keptTokens)) keptFamilies.add(i.evidenceFamilyId);
   }
   return kept;
 }
@@ -2395,7 +2411,7 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
     const family = familyFor([incident.raw]);
     items.push({
       text: family?.watch
-        ?? "Watch for verified operational follow-through affecting fuel availability, routing or cost.",
+        ?? `Watch for confirmed operational follow-through to ${developmentSentence(incident).replace(/^On [^,]+,\s*/i, "").replace(/\.$/, "")}, including any reported change in fuel availability, routing or cost.`,
       supportingEvidenceIds: [incident.id],
     });
   }

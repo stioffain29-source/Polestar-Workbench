@@ -1,0 +1,449 @@
+FIX THE SHARED FUEL WATCH OUTPUT QUALITY AT ROOT CAUSE.
+
+This is NOT a request to manually patch the current 8–14 September Fuel Watch.
+
+Use the current report as the regression test, but apply the fixes to ALL current and future Fuel Watch reports.
+
+Do NOT hardcode:
+
+current dates
+Saudi Arabia
+Russia
+Ukraine
+Strait of Hormuz
+specific incident titles
+specific Watch Next wording
+
+Do NOT redesign the Fuel Watch product.
+
+The current visual architecture is broadly good.
+
+Keep:
+
+cover
+Fast Facts
+reporting-period coverage dashboard
+severity distribution
+daily incident trend
+affected-country table
+jet fuel chart
+Market Read
+Situation
+Operational Read
+Regional Highlights
+What Matters
+Implications for Business
+Polestar View
+
+The remaining problems are:
+
+1. weak event differentiation / apparent duplication in WHAT HAPPENED
+2. MARKET AND OPERATOR RESPONSES is not actually selecting responses
+3. WATCH NEXT is too generic and machine-written
+4. disclaimer pagination is poor
+5. client-facing Market Read still contains debug/validation-style wording
+
+
+==================================================
+1. FIX WHAT HAPPENED EVENT DIFFERENTIATION
+==================================================
+
+The current report repeatedly renders generic lines such as:
+
+"refinery or terminal disruption curtailed regional product output"
+
+for multiple dates.
+
+This makes distinct source events look duplicated.
+
+For every WHAT HAPPENED entry, render enough incident-specific detail to distinguish the underlying event.
+
+Use, where available:
+
+date
+country / location
+facility / route / chokepoint
+event type
+specific operational effect
+direct fuel significance
+
+Do not reduce several different events to the same generic sentence.
+
+If several records are actually the same underlying event or follow-on reporting, cluster them into one canonical development instead of rendering duplicates.
+
+
+==================================================
+2. DEDUPLICATE BEFORE WHAT HAPPENED
+==================================================
+
+Before rendering WHAT HAPPENED:
+
+cluster same-event reporting
+merge follow-on updates
+remove duplicate source rows
+retain one canonical event record
+
+Do not allow multiple articles about the same refinery disruption, route incident or shortage event to appear as separate developments.
+
+One underlying event = one client-facing development unless there is a genuinely new operational change.
+
+
+==================================================
+3. KEEP DISTINCT EVENTS DISTINCT
+==================================================
+
+Do not over-deduplicate genuinely separate events.
+
+If Saudi refinery events occurred on different dates at different facilities, keep them separate.
+
+But make the rendered wording specific enough that the reader can see why they are separate.
+
+
+==================================================
+4. FIX MARKET AND OPERATOR RESPONSES
+==================================================
+
+The current MARKET AND OPERATOR RESPONSES section is misclassifying incidents and market conditions as actions.
+
+Examples of things that are NOT automatically "responses":
+
+a domestic fuel shortage
+a refinery disruption
+a generic market signal
+an attack
+a price move
+
+This section should only contain an item if an identifiable actor actually DID something in response to fuel conditions.
+
+
+Valid response types may include:
+
+rerouting
+changing uplift arrangements
+changing bunker procurement
+fuel rationing
+allocation controls
+stock releases
+price / surcharge changes
+procurement shifts
+supplier changes
+capacity reductions
+schedule changes
+refinery restart action
+import substitution
+government intervention
+carrier restrictions
+airport refuelling restrictions
+inventory drawdown
+commercial contingency action
+
+
+==================================================
+5. RESPONSE SECTION REQUIRES ACTOR + ACTION
+==================================================
+
+Each MARKET AND OPERATOR RESPONSES row must have:
+
+ACTOR
+
+CATEGORY
+
+ACTUAL ACTION
+
+OPERATIONAL READ
+
+
+The ACTION field must describe a verified action taken by that actor.
+
+If no actual response is supported by evidence, do not include the row.
+
+Do not create this section merely to fill space.
+
+If there are no material responses during the reporting period, either:
+
+omit the section
+
+or
+
+show a short statement that no material operator or market response was confirmed.
+
+Do not populate it with ordinary incidents.
+
+
+==================================================
+6. DO NOT INFER RESPONSE FROM INCIDENT
+==================================================
+
+Do not infer that:
+
+a refinery outage = operator rerouting
+
+a shortage = buyer action
+
+a vessel attack = market response
+
+a price rise = procurement change
+
+unless the selected evidence supports that action.
+
+
+==================================================
+7. WATCH NEXT MUST BE SPECIFIC
+==================================================
+
+The current Watch Next contains weak generic wording such as:
+
+"Watch for verified operational follow-through affecting fuel availability, routing or cost."
+
+This is too vague.
+
+Each Watch Next item must identify an observable indicator.
+
+A useful structure is:
+
+LOCATION / THEME
+
+SPECIFIC INDICATOR
+
+WHY IT MATTERS
+
+
+Examples of the required style:
+
+Further Saudi refinery shutdowns or delayed restart timelines that reduce export product availability.
+
+Verified restrictions or delays affecting fuel cargo transit through the Strait of Hormuz.
+
+Expansion of Russian airport refuelling restrictions to additional airports or carriers.
+
+New rationing or allocation controls affecting commercial diesel or jet-fuel users.
+
+
+These are style examples only.
+
+Do not hardcode them.
+
+
+==================================================
+8. WATCH NEXT MUST BE PRIORITY-LED
+==================================================
+
+Rank Watch Next items by:
+
+potential operational impact
+severity
+likelihood
+regional significance
+business relevance
+evidence confidence
+
+Do not simply output generic statements or the first available themes.
+
+
+==================================================
+9. WATCH NEXT MUST RETAIN PROVENANCE
+==================================================
+
+Each Watch Next item must retain:
+
+supportingIncidentIds
+supportingEvidenceFamilyIds
+or equivalent provenance
+
+If there is no current supporting evidence, exclude the item before rendering.
+
+The validator should not have to discover unsupported Watch Next content after generation.
+
+
+==================================================
+10. CLEAN CLIENT-FACING LANGUAGE
+==================================================
+
+Remove debug or validation-style language from the client report.
+
+The current Market Read contains wording such as:
+
+"no dated reference was provided"
+
+That is internal-quality-control language and should not appear in the client-facing PDF.
+
+If a market comparison lacks a clean reference basis:
+
+either
+
+rewrite the sentence using only supported market information
+
+or
+
+omit the unsupported comparative statement.
+
+Do not expose internal pipeline limitations in the finished report.
+
+
+==================================================
+11. MARKET READ MUST SOUND LIKE ANALYSIS
+==================================================
+
+Market Read should describe:
+
+current benchmark direction
+current price level
+reporting-period movement
+relevant business implications
+
+It should not describe:
+
+missing metadata
+missing reference dates
+validation state
+source-ingestion problems
+internal calculation caveats
+
+unless a caveat is genuinely necessary for client interpretation.
+
+
+==================================================
+12. DISCLAIMER PAGINATION
+==================================================
+
+The current report creates an almost empty final page containing only the disclaimer.
+
+Fix this in the shared Fuel Watch PDF renderer.
+
+The disclaimer should sit immediately beneath Polestar View where practical.
+
+Use:
+
+smaller Roboto text
+normal white background
+
+Do NOT use:
+
+grey panel
+coloured panel
+box
+shaded background
+
+
+Do not force a separate disclaimer page when sufficient space exists on the preceding page.
+
+
+==================================================
+13. FLEXIBLE PAGINATION
+==================================================
+
+Do NOT hardcode a fixed page count.
+
+If the report genuinely requires another page because substantive content is longer, allow it.
+
+But do not create an extra page merely because of excessive spacing before the disclaimer.
+
+When content is close to overflowing, adjust in this order:
+
+reduce excess section spacing
+
+reduce excess paragraph spacing
+
+reduce unnecessary card/table padding
+
+move a complete section if necessary
+
+only then create another page
+
+
+Do not shrink normal body text to an unreadable size.
+
+
+==================================================
+14. KEEP POLESTAR VIEW TOGETHER WITH DISCLAIMER WHERE PRACTICAL
+==================================================
+
+Do not split Polestar View unnecessarily.
+
+If Polestar View and the disclaimer can fit together on the same final page, keep them together.
+
+Do not move the disclaimer alone onto a separate page unless genuinely unavoidable.
+
+
+==================================================
+15. DO NOT CHANGE THE STRONG VISUAL ELEMENTS
+==================================================
+
+Keep the current:
+
+Fast Facts cards
+coverage dashboard
+severity distribution
+daily trend graphic
+affected-country table
+jet fuel chart
+page header/footer
+Polestar branding
+colour system
+Roboto / Roboto Light
+
+
+==================================================
+16. KEEP CURRENT EVIDENCE DISCIPLINE
+==================================================
+
+Do not regress the provenance fixes already made.
+
+Continue to require that generated sections derive from the final current canonical Fuel evidence set.
+
+Do not reintroduce:
+
+stale generated prose
+old Watch Next items
+unsupported country themes
+cross-stream events without a direct Fuel link
+
+
+==================================================
+17. REGRESSION TEST THE CURRENT REPORT
+==================================================
+
+After fixing the shared Fuel Watch system, regenerate the current 8–14 September report and verify:
+
+1. WHAT HAPPENED does not contain repeated generic Saudi lines that are impossible to distinguish.
+
+2. If repeated rows describe the same underlying incident, they are clustered.
+
+3. If they are separate incidents, the rendered wording clearly differentiates them.
+
+4. MARKET AND OPERATOR RESPONSES contains only actual verified responses.
+
+5. No incident or generic market condition is mislabeled as a buyer/operator action.
+
+6. WATCH NEXT contains specific observable indicators rather than generic phrases.
+
+7. Every Watch Next item retains current supporting evidence IDs.
+
+8. Market Read contains no internal debug/validation wording such as "no dated reference was provided."
+
+9. Polestar View remains unchanged in function.
+
+10. The disclaimer does not occupy a mostly empty standalone page when it can fit beneath Polestar View.
+
+11. The report remains flexible in length and does not force a fixed page count.
+
+
+==================================================
+18. APPLY TO ALL FUTURE FUEL WATCH REPORTS
+==================================================
+
+This is a SHARED FUEL WATCH FIX.
+
+Do not manually clean only this current report.
+
+Do not hardcode current countries, dates or incidents.
+
+Fix the shared:
+
+event summarisation
+response selection
+Watch Next generation
+client-facing prose cleanup
+PDF pagination
+
+so every future Fuel Watch inherits the correction automatically.

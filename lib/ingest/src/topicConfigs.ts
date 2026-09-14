@@ -30,6 +30,8 @@ export const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "surabaya"] },
   { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "luzon", "mindanao", "cebu", "meralco", "napocor", "visayas", "davao", "iloilo", "quezon", "taguig", "cavite", "pampanga"] },
   { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
+  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "phnom penh", "siem reap", "sihanoukville"] },
+  { canonical: "Hong Kong", aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "koh larn", "phuket", "chiang mai", "pattaya"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur"] },
   { canonical: "China", aliases: ["china", "chinese", "beijing", "shanghai", "guangdong"] },
@@ -103,6 +105,8 @@ const EDITIONS: Record<string, { gl: string; hl: string; ceid: string }> = {
   Indonesia: { gl: "ID", hl: "en-ID", ceid: "ID:en" },
   Philippines: { gl: "PH", hl: "en-PH", ceid: "PH:en" },
   Vietnam: { gl: "VN", hl: "en-VN", ceid: "VN:en" },
+  Cambodia: { gl: "KH", hl: "en", ceid: "KH:en" },
+  "Hong Kong": { gl: "HK", hl: "en-HK", ceid: "HK:en" },
   Thailand: { gl: "TH", hl: "en-TH", ceid: "TH:en" },
   Malaysia: { gl: "MY", hl: "en-MY", ceid: "MY:en" },
   Japan: { gl: "JP", hl: "en-JP", ceid: "JP:en" },
@@ -166,8 +170,12 @@ const SOUTH_APAC = [
   "Indonesia",
   "Philippines",
   "Vietnam",
+  "Cambodia",
+  "Hong Kong",
   "Thailand",
 ];
+
+const BROAD_APAC = [...SOUTH_APAC, "Australia", "China"];
 
 // ---------------------------------------------------------------- energy ----
 // Grid-stress footprint: South/SE Asia + East Asia + the Gulf + Oceania. The
@@ -315,7 +323,7 @@ const FERT_TERMS = `("fertiliser shortage" OR "fertilizer shortage" OR "fertilis
 export const FERTILISER_CONFIG: NewsTopicConfig = {
   topic: "fertiliser",
   feeds: [
-    ...countryFeeds(SOUTH_APAC, FERT_TERMS),
+    ...countryFeeds(BROAD_APAC, FERT_TERMS),
     { label: "Urea supply (region)", q: `("urea" OR "DAP" OR "potash" OR "ammonia") (shortage OR "supply crisis" OR "export ban" OR "import") (India OR Pakistan OR Bangladesh OR "Sri Lanka" OR Nepal)`, defaultCountry: "Unknown" },
   ],
   allow: [
@@ -367,7 +375,7 @@ const FUEL_TERMS = `("fuel shortage" OR "fuel crisis" OR "fuel rationing" OR "fu
 export const FUEL_CONFIG: NewsTopicConfig = {
   topic: "fuel",
   feeds: [
-    ...countryFeeds(SOUTH_APAC, FUEL_TERMS),
+    ...countryFeeds(BROAD_APAC, FUEL_TERMS),
     { label: "Refinery disruption (region)", q: `(refinery OR "fuel depot" OR pipeline) (fire OR outage OR shutdown OR attack OR explosion OR blast OR maintenance OR halt) (India OR Pakistan OR Iran OR Iraq OR "Saudi Arabia" OR UAE)`, defaultCountry: "Unknown" },
     // Crude EXPORT disruption — loading terminals, blockades, floating
     // storage. The refinery feed above never fetched stories like the Kharg
@@ -564,6 +572,7 @@ const DATA_CENTRE_CONFIG: NewsTopicConfig = {
 const CONFLICT_ALIASES: CountryAlias[] = [
   { canonical: "West Papua", aliases: ["west papua", "papua barat", "tembagapura", "grasberg", "freeport", "pt freeport", "timika", "mimika", "kuala kencana", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa", "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam", "wamena", "nabire", "jayapura", "merauke", "manokwari", "sorong", "biak", "tpnpb"] },
   { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "bougainville", "enga", "hela", "mount hagen", "goroka", "wewak", "raskol"] },
+  { canonical: "Australia", aliases: ["australia", "australian", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
   { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kashmir", "jammu", "srinagar", "manipur", "imphal", "chhattisgarh", "jharkhand", "bastar", "naxal", "maoist", "assam", "nagaland"] },
   { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "balochistan", "quetta", "waziristan", "khyber", "peshawar", "karachi", "lahore", "islamabad"] },
   { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram"] },
@@ -573,12 +582,14 @@ const CONFLICT_ALIASES: CountryAlias[] = [
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "sulawesi", "poso", "aceh"] },
   { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "mindanao", "sulu", "jolo", "basilan", "maguindanao", "cotabato", "marawi", "zamboanga", "abu sayyaf", "bangsamoro"] },
   { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
+  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "phnom penh", "siem reap", "sihanoukville"] },
+  { canonical: "Hong Kong", aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "pattani", "yala", "narathiwat", "songkhla"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak"] },
   { canonical: "China", aliases: ["china", "chinese", "xinjiang", "beijing"] },
 ];
 
-const CONFLICT_COUNTRIES = [...SOUTH_APAC, "Malaysia"];
+const CONFLICT_COUNTRIES = [...BROAD_APAC, "Malaysia"];
 
 const CONFLICT_TERMS = `("armed clash" OR "gun battle" OR firefight OR insurgent OR insurgency OR militant OR rebel OR separatist OR ambush OR "roadside bomb" OR "armed group" OR "armed attack" OR terrorism OR terrorist)`;
 

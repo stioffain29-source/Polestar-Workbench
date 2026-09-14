@@ -111,16 +111,15 @@ describe("Buyer supplier-pivot classification and story-key collapse", () => {
   });
 });
 
-describe("Market / supply signal wording variants", () => {
-  it("classifies 'refiner margins' wire styling as a Market signal", () => {
+describe("Market / supply signals are not operator responses", () => {
+  it("excludes refiner-margin wires from the response table", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
         mk(20, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
       ],
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].category).toBe("Market / supply signal");
+    expect(rows).toHaveLength(0);
   });
 
   it("excludes an involuntary refinery fire — not a market or operator RESPONSE", () => {
@@ -131,16 +130,14 @@ describe("Market / supply signal wording variants", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("gives margin rows a supporting-indicator read, never a driver claim", () => {
+  it("does not convert a supporting indicator into an action row", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
         mk(23, "fuel", "US refiner margins spiked to record highs this week as fuel shortage concerns grow"),
       ],
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].operationalRead).toMatch(/supporting market indicator/i);
-    expect(rows[0].operationalRead).toMatch(/not an operational driver/i);
+    expect(rows).toHaveLength(0);
   });
 
   it("still refuses market signals via the shipping cross-read", () => {
@@ -169,7 +166,7 @@ describe("Market and Operator Responses rework", () => {
     expect(rows[0].action).toMatch(/Asian refineries reroute/);
   });
 
-  it("keeps reroutes on DIFFERENT corridors as separate rows", () => {
+  it("excludes reroutes with no identifiable operator", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
@@ -177,7 +174,7 @@ describe("Market and Operator Responses rework", () => {
         mk(33, "shipping", "Crude carriers rerouting in the Red Sea toward the Suez Canal"),
       ],
     });
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(0);
   });
 
   it("summarizes reroute headlines into concise operational actions", () => {
@@ -203,9 +200,8 @@ describe("Market and Operator Responses rework", () => {
       incidents: [withPlace, carriesOwnCue],
     });
     const ban = rows.find((r) => /export ban/i.test(r.action));
-    const margins = rows.find((r) => /refiner margins/i.test(r.action));
     expect(ban?.action).toMatch(/export ban in Sri Lanka/i);
-    expect(margins?.action).not.toMatch(/Pakistan/);
+    expect(rows.some((r) => /refiner margins/i.test(r.action))).toBe(false);
   });
 
   it("never claims price follow-through ('usually firms within days' is gone)", () => {
@@ -240,32 +236,27 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     const adnoc = rows.find((r) => r.actor === "ADNOC");
     expect(aramco).toBeDefined();
     expect(aramco?.category).toBe("Producer action");
-    expect(adnoc).toBeDefined();
-    expect(adnoc?.category).toBe("Producer action");
+    expect(adnoc).toBeUndefined();
   });
 
-  it("keeps an OPEC/IEA demand-outlook disagreement as a market signal", () => {
+  it("excludes an OPEC/IEA outlook with no verified action", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
         mk(42, "fuel", "OPEC and IEA disagree over 2026 oil demand outlook"),
       ],
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].category).toBe("Market / supply signal");
-    expect(rows[0].action).toMatch(/OPEC and IEA disagree/i);
+    expect(rows).toHaveLength(0);
   });
 
-  it("keeps Air India fuel-cost operational impact as a Buyer action", () => {
+  it("excludes an Air India warning with no verified action", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
         mk(43, "fuel", "Air India warns of operational impact as fuel costs rise"),
       ],
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].actor).toBe("Air India");
-    expect(rows[0].category).toBe("Buyer action");
+    expect(rows).toHaveLength(0);
   });
 
   it("still excludes a bare oil-price jump that is not an OPEC/IEA outlook", () => {
@@ -323,16 +314,14 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     expect(rows[0].operationalRead).not.toMatch(/aviation demand response/i);
   });
 
-  it("reads a failed shortage-ease headline as persistent tightness", () => {
+  it("excludes a shortage condition that is not an actor response", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
         mk(47, "fuel", "Indian gasoline fails to ease Russia's fuel shortage"),
       ],
     });
-    expect(rows).toHaveLength(1);
-    expect(rows[0].operationalRead).toMatch(/did not materialise|persists/i);
-    expect(rows[0].operationalRead).not.toMatch(/supply resuming eases/i);
+    expect(rows).toHaveLength(0);
   });
 
   it("drops generic policy rows when the headline lacks a specific policy signal", () => {
@@ -369,7 +358,7 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     expect(rows.some((r) => /^Government policy on fuel duties/i.test(r.action))).toBe(false);
   });
 
-  it("collapses duplicate aviation action prose across categories", () => {
+  it("does not convert aviation cost pressure into a response", () => {
     const rows = buildFuelProducerBuyerActions({
       issueDate: ISSUE_DATE,
       incidents: [
@@ -378,6 +367,6 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
       ],
     });
     const aviationRows = rows.filter((r) => /jet-fuel cost pressure/i.test(r.action));
-    expect(aviationRows).toHaveLength(1);
+    expect(aviationRows).toHaveLength(0);
   });
 });

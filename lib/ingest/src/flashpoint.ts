@@ -265,7 +265,8 @@ const PNG_OPERATIONAL: RegExp =
 const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Australia",         aliases: ["australia", "australian", "australians", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
   { canonical: "Bangladesh",        aliases: ["bangladesh", "bangladeshi", "bangladeshis", "dhaka", "chittagong", "chattogram", "comilla", "cumilla", "rangpur", "sylhet", "khulna", "rajshahi", "barisal", "barishal", "mymensingh", "gazipur", "narayanganj"] },
-  { canonical: "China",             aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "hong kong", "wuhan", "chengdu"] },
+  { canonical: "Hong Kong",         aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
+  { canonical: "China",             aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "wuhan", "chengdu"] },
   { canonical: "India",             aliases: ["india", "indian", "indians", "delhi", "mumbai", "chennai", "bengaluru", "kolkata", "hyderabad", "imphal", "guwahati", "lucknow", "patna", "manipur"] },
   { canonical: "Indonesia",         aliases: ["indonesia", "indonesian", "indonesians", "jakarta", "java", "sumatra", "bali", "sulawesi", "surabaya", "bandung", "medan", "makassar", "yogyakarta", "semarang", "aceh"] },
   { canonical: "Japan",             aliases: ["japan", "japanese", "tokyo", "osaka", "kyoto", "yokohama", "nagoya", "fukuoka"] },
@@ -282,6 +283,7 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Sri Lanka",         aliases: ["sri lanka", "sri lankan", "sri lankans", "colombo", "kandy", "jaffna", "galle", "negombo"] },
   { canonical: "Thailand",          aliases: ["thailand", "thai", "thais", "bangkok", "chiang mai", "phuket"] },
   { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "haiphong"] },
+  { canonical: "Cambodia",          aliases: ["cambodia", "cambodian", "cambodians", "phnom penh", "siem reap", "sihanoukville"] },
 ];
 
 // Papua / PNG disambiguation. The Indonesian province of Papua / West Papua

@@ -26,6 +26,7 @@ const COUNTRY_CENTROIDS: Record<string, [number, number]> = {
   Australia: [-25.27, 133.78],
   Bangladesh: [23.68, 90.36],
   China: [35.86, 104.2],
+  "Hong Kong": [22.32, 114.17],
   India: [22.59, 78.96],
   Indonesia: [-2.55, 118.01],
   Japan: [36.2, 138.25],

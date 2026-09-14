@@ -27,6 +27,7 @@ import {
   drawSubtitle,
   renderProse,
   drawSectionWithProse,
+  drawSectionWithProseAndDisclaimer,
   drawFastFactsKpiCards,
   drawBulletSection,
   drawDisclaimer,
@@ -1551,10 +1552,13 @@ export async function exportTopicReportPdf(
     if (show("polestar-view")) {
       const polestarView = fuelEffective?.polestarView ?? "";
       if (polestarView.trim()) {
-        drawSectionWithProse(ctx, "Polestar View", polestarView);
+        drawSectionWithProseAndDisclaimer(ctx, "Polestar View", polestarView);
+      } else {
+        drawDisclaimer(ctx);
       }
+    } else {
+      drawDisclaimer(ctx);
     }
-    drawDisclaimer(ctx);
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
     // read the model's deterministic executive summary.

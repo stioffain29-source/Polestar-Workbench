@@ -542,7 +542,10 @@ function sevKey(s: string | null | undefined): string {
   return k === "medium" ? "moderate" : k;
 }
 
-function highestSeverity(rows: FlashpointReportIncident[]): { key: string; label: string } {
+/** One report-wide peak derived only from accepted, deduplicated current rows. */
+export function flashpointPeakSeverity(
+  rows: readonly FlashpointReportIncident[],
+): { key: string; label: string } {
   let key = "", rank = 0;
   for (const r of rows) {
     const k = sevKey(r.severity);
@@ -568,7 +571,10 @@ function rankIncidentsForTable(a: EnrichedIncident, b: EnrichedIncident): number
 }
 
 function topSeverityIncident(rows: EnrichedIncident[]): EnrichedIncident | null {
-  return [...rows].sort(rankIncidentsForTable)[0] ?? null;
+  return [...rows].sort((a, b) =>
+    incidentSeverityRank(b.severity) - incidentSeverityRank(a.severity)
+    || rankIncidentsForTable(a, b),
+  )[0] ?? null;
 }
 
 // Signature phrases lifted from the legacy generic prose templates
@@ -2295,9 +2301,7 @@ export function buildFlashpointReportDataset(
   // Forecast, Watch Next) so the Fast Facts card and the narrative can never
   // disagree about what "the most serious" event was.
   const topSeverity = topSeverityIncident(enriched);
-  const hs = topSeverity
-    ? { key: sevKey(topSeverity.severity), label: SEV_LABEL[sevKey(topSeverity.severity)] ?? topSeverity.severity }
-    : { key: "", label: "—" };
+  const hs = flashpointPeakSeverity(enriched);
   const countryCount = countriesOf(enriched);
   const countrySignificance = new Map<string, number>();
   for (const [country, rows] of Object.entries(
@@ -2882,7 +2886,7 @@ function buildForecastRead(opts: {
   const sevInc = opts.topSeverity !== undefined ? opts.topSeverity : topSeverityIncident(allRows);
   const sevHs = sevInc
     ? { key: sevKey(sevInc.severity), label: SEV_LABEL[sevKey(sevInc.severity)] ?? sevInc.severity }
-    : highestSeverity(allRows);
+    : flashpointPeakSeverity(allRows);
   const sevCountry = (sevInc?.country ?? "").trim();
   // A severity lead is only worth calling out when it is genuinely
   // elevated (Moderate or higher). A "highest" that is still Low is not
@@ -3664,7 +3668,7 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   const spread = subregionSpread(ctx.countryRows);
   const allRows = [...ctx.activismRows, ...ctx.unrestRows];
   const hasEnforcement = hasEnforcementSignal(allRows);
-  const hs = highestSeverity(ctx.enriched);
+  const hs = flashpointPeakSeverity(ctx.enriched);
   const sevInc = ctx.topSeverity;
   const sevCountry = (sevInc?.country ?? "").trim();
   const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
@@ -4254,7 +4258,7 @@ export function resolveFlashpointRenderedModel(args: {
   const topCountries = ds.countryRows.slice(0, 4).map((row) => row.label);
   const leadCountry = topCountries[0] ?? null;
   const supportingCountries = topCountries.slice(1);
-  const severityCeiling = highestSeverity(
+  const severityCeiling = flashpointPeakSeverity(
     Array.from(ds.canonical.periodRows),
   ).label;
   const activityPresent = ds.canonical.periodRows.length > 0;
@@ -4318,7 +4322,7 @@ export function validateFlashpointRenderedModel(
       .map((r) => normalizeFlashpointCountry((r.country ?? "").trim()))
       .filter((c) => c && c !== LOCATION_NOT_IDENTIFIED),
   );
-  const highest = highestSeverity(Array.from(ds.canonical.periodRows)).label;
+  const highest = flashpointPeakSeverity(ds.canonical.periodRows).label;
   const canonicalTotal = ds.canonical.periodRows.length;
   const categoryCounts = new Map<string, number>();
   for (const row of ds.canonical.periodRows) {

@@ -1,0 +1,289 @@
+FIX THE SHARED FLASHPOINT SEVERITY LOGIC ONLY.
+
+Do NOT change the Flashpoint structure.
+Do NOT change the layout.
+Do NOT move sections.
+Do NOT redesign Fast Facts.
+Do NOT rewrite the report generally.
+
+The current Flashpoint demonstrates a shared severity-calculation defect.
+
+The report currently says:
+
+EXECUTIVE SUMMARY:
+"The severity ceiling is High."
+
+CIVIL UNREST AND PUBLIC ORDER READ:
+contains a HIGH accepted incident.
+
+FAST FACTS:
+"HIGHEST SEVERITY: Low"
+
+Those three outputs cannot all be correct.
+
+Fix the shared Flashpoint severity logic so ALL current and future Flashpoint reports use one canonical severity basis.
+
+
+==================================================
+1. DEFINE HIGHEST SEVERITY CORRECTLY
+==================================================
+
+HIGHEST SEVERITY must mean:
+
+THE HIGHEST SEVERITY RATING AMONG ALL DISTINCT, ACCEPTED, CURRENT-WINDOW INCIDENTS INCLUDED IN THE FLASHPOINT REPORT.
+
+Use the Polestar severity scale:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+The severity order is:
+
+INSIGNIFICANT < LOW < MODERATE < HIGH < EXTREME
+
+
+==================================================
+2. USE ONE CANONICAL INCIDENT SET
+==================================================
+
+Calculate Highest Severity only AFTER:
+
+relevance filtering
+incident validation
+deduplication
+event classification
+incident acceptance
+severity reconciliation
+
+Create one final canonical current-period incident set.
+
+The following must all use that SAME set:
+
+Fast Facts — Highest Severity
+Executive Summary — severity ceiling
+Activism and Protest Read
+Civil Unrest and Public Order Read
+Regional and Country View severity colours
+What Matters
+Polestar View
+
+Do not allow separate sections to calculate peak severity from different subsets unless the metric is explicitly section-specific.
+
+
+==================================================
+3. DO NOT CONFUSE HIGHEST SEVERITY WITH WEEKLY POSTURE
+==================================================
+
+Keep these as separate metrics.
+
+HIGHEST SEVERITY
+=
+highest-rated accepted incident in the reporting window.
+
+WEEKLY POSTURE
+=
+overall assessment of the week's operating environment.
+
+Therefore this is valid:
+
+HIGHEST SEVERITY: HIGH
+WEEKLY POSTURE: MODERATE
+
+A single High incident does not automatically make the overall weekly posture High.
+
+But this is NOT valid:
+
+HIGHEST SEVERITY: LOW
+
+when an accepted High incident appears elsewhere in the report.
+
+
+==================================================
+4. DO NOT USE ONLY PROTEST/ACTIVISM INCIDENTS FOR HIGHEST SEVERITY
+==================================================
+
+The current defect appears consistent with Fast Facts possibly using the protest/activism subset while the Executive Summary is seeing the wider accepted Flashpoint set.
+
+Check this explicitly.
+
+Highest Severity must consider ALL accepted current-window Flashpoint incidents, including:
+
+protest
+strike / labour action
+riot / public disorder
+civil unrest
+other accepted Flashpoint incident types
+
+If the High incident sits in Civil Unrest, it still counts toward the report-wide Highest Severity.
+
+
+==================================================
+5. FORECAST EVENTS MUST NOT DRIVE CURRENT HIGHEST SEVERITY
+==================================================
+
+PROTEST FORECAST — NEXT 7 DAYS is forward-looking.
+
+Scheduled future activity must not affect:
+
+current Highest Severity
+current incident count
+current severity ceiling
+current weekly posture inputs
+
+unless the event has already occurred and has become a validated current-window incident.
+
+Forecast assessment and current incident severity must remain separate.
+
+
+==================================================
+6. DUPLICATES MUST NOT DISTORT SEVERITY
+==================================================
+
+Severity must be assessed at the underlying incident level.
+
+If several sources describe the same incident:
+
+cluster them first
+reconcile severity once
+count one incident
+
+Do not allow multiple source rows to produce conflicting severity outputs for one underlying event.
+
+
+==================================================
+7. COUNTRY CHART COLOUR MUST ALSO USE RECONCILED INCIDENT SEVERITY
+==================================================
+
+In Regional and Country View:
+
+bar length = distinct accepted incident count
+
+bar colour = highest reconciled severity among accepted incidents in that country
+
+This country-level severity must come from the same canonical incident records used by the report-wide severity calculation.
+
+
+==================================================
+8. EXECUTIVE SUMMARY SEVERITY CEILING
+==================================================
+
+Do not generate the phrase:
+
+"severity ceiling is High"
+
+independently from prose-generation logic.
+
+It must receive the calculated canonical peak severity value.
+
+Example:
+
+canonicalPeakSeverity = HIGH
+
+Then:
+
+Fast Facts:
+HIGHEST SEVERITY
+High
+
+Executive Summary:
+The severity ceiling is High.
+
+Polestar View may reference the same High ceiling where analytically relevant.
+
+
+==================================================
+9. NO TEXT PARSING TO DETERMINE SEVERITY
+==================================================
+
+Do not infer Highest Severity from rendered narrative or table text.
+
+Use the structured canonical incident severity field.
+
+The calculation must happen before prose rendering.
+
+
+==================================================
+10. ADD A SINGLE SHARED SEVERITY FUNCTION
+==================================================
+
+If Flashpoint currently has multiple peak-severity calculations, consolidate them.
+
+Use one shared function or canonical calculated field equivalent to:
+
+flashpointPeakSeverity
+
+derived from:
+
+finalAcceptedCurrentIncidents
+
+All report sections requiring the overall peak severity should consume that value.
+
+Do not recalculate it independently in each renderer/generator.
+
+
+==================================================
+11. REGRESSION TEST CURRENT FLASHPOINT
+==================================================
+
+Use the current 8–14 September 2026 Flashpoint as the regression test.
+
+The report contains a HIGH accepted Civil Unrest / Public Order incident.
+
+If that incident remains accepted after filtering and deduplication:
+
+HIGHEST SEVERITY must display:
+
+HIGH
+
+The Executive Summary severity ceiling must also be:
+
+HIGH
+
+WEEKLY POSTURE may remain:
+
+MODERATE
+
+if the separate weekly-posture calculation supports that result.
+
+
+==================================================
+12. ADD AUTOMATED CONSISTENCY CHECKS
+==================================================
+
+Add a Flashpoint regression assertion so this defect cannot return.
+
+Required rule:
+
+If any accepted current-window incident has severity HIGH,
+report-wide Highest Severity cannot be LOW or MODERATE.
+
+If any accepted current-window incident has severity EXTREME,
+report-wide Highest Severity must be EXTREME.
+
+Also assert:
+
+Fast Facts peak severity
+=
+Executive Summary severity ceiling
+=
+canonical peak severity value
+
+
+==================================================
+13. APPLY GLOBALLY
+==================================================
+
+This is a SHARED FLASHPOINT LOGIC FIX.
+
+Do not patch the current report manually.
+
+Do not hardcode High.
+
+Do not hardcode current countries or incidents.
+
+Fix the severity calculation at source so every future Flashpoint inherits the same logic.
+
+Do not make any layout or structural changes while implementing this fix.
