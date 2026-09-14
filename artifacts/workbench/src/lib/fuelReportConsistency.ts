@@ -776,6 +776,13 @@ function repairLegacyFuelGeneratedText(value: string | null | undefined): string
     );
 }
 
+// Previous deterministic Fuel reports persisted this exact template into the
+// implications field. Once stored, normal editor precedence made it outrank a
+// corrected canonical builder forever. Treat only that generated signature as
+// stale canonical text; genuinely divergent analyst wording remains verbatim.
+const LEGACY_REPEATED_FUEL_IMPLICATION_RE =
+  /^Prioritise .+; reassess if (?:a |an |the )?confirmed change in .+\.$/i;
+
 export function resolveFuelEffectiveSections(opts: {
   report: FuelGateReportFields;
   aiProse: TopicAiProse | null | undefined;
@@ -845,6 +852,7 @@ export function resolveFuelEffectiveSections(opts: {
     ) || deterministic;
   };
   const resolveCanonicalAnalysis = (
+    field: "whatMatters" | "polestarView" | "implications" | "watchNext",
     editor: string | null | undefined,
     ai: string | null | undefined,
     deterministic: string,
@@ -852,6 +860,9 @@ export function resolveFuelEffectiveSections(opts: {
     const e = (editor ?? "").trim();
     const a = (ai ?? "").trim();
     if (generated?.isAnalystEdited === true) return e || a || deterministic;
+    if (field === "implications" && LEGACY_REPEATED_FUEL_IMPLICATION_RE.test(e)) {
+      return deterministic;
+    }
     if (e && (!a || e !== a)) return e;
     return deterministic;
   };
@@ -875,13 +886,13 @@ export function resolveFuelEffectiveSections(opts: {
     executiveSummary: resolveText(report.executiveSummary, generated?.executiveSummary, canonical.executiveSummary),
     situation: resolveText(report.situation, generated?.situation, canonical.situation),
     whatHappened: resolveAnalytical("whatHappened", report.whatHappened, generated?.whatHappened, canonical.whatHappened),
-    whatMatters: resolveCanonicalAnalysis(report.whatMatters, generated?.whatMatters, canonical.whatMatters),
-    polestarView: resolveCanonicalAnalysis(report.polestarView, generated?.polestarView, canonical.polestarView),
+    whatMatters: resolveCanonicalAnalysis("whatMatters", report.whatMatters, generated?.whatMatters, canonical.whatMatters),
+    polestarView: resolveCanonicalAnalysis("polestarView", report.polestarView, generated?.polestarView, canonical.polestarView),
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
-    implications: resolveCanonicalAnalysis(report.implications, generated?.implications, canonical.implications),
-    watchNext: resolveCanonicalAnalysis(report.watchNext, generated?.watchNext, canonical.watchNext),
+    implications: resolveCanonicalAnalysis("implications", report.implications, generated?.implications, canonical.implications),
+    watchNext: resolveCanonicalAnalysis("watchNext", report.watchNext, generated?.watchNext, canonical.watchNext),
     provenance: generated?.provenance ?? canonical.provenance,
     analystEditReviewRequired,
   };

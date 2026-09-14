@@ -14,3 +14,9 @@ Companion (Aug 2026): `buildFuelWatchReportData` also exposes `reportFacts`, REC
 Companion lesson (owner answer "my edits don't show up in the preview/PDF"): a **blocked or failed Save must surface next to the Save button**. Previously fuel validation errors rendered far down the page and the PATCH mutation surfaced nothing — a silent no-op Save reads as "edits don't show up" after reload discards the form. Editor now shows Saving…/Saved./Save failed + a saveBlocked notice at the button.
 
 **How to apply:** one-shot prefill effect per report id in ReportEditor (after main seed AND after the AI narrative settles), baselines kept in a ref; on Save a box still trim-equal to its baseline persists `""` so unedited sections keep following live AI/auto text (never freeze today's AI copy into the DB). Extending this to another topic = same pattern: prefill from that topic's exact render resolution + baseline-compare on save.
+
+Persisted deterministic prose can outlive a corrected canonical builder because a nonblank report field has editor precedence. When retiring generated wording, recognise only its exact template signature at the final resolver and replace it with current canonical text; never rewrite divergent analyst prose.
+
+**Why:** a repeated Fuel implications template remained in existing previews/PDFs after the builder was corrected because the old generated sentence had already been saved into the report row.
+
+**How to apply:** pair every canonical wording retirement with an exact-signature compatibility repair in the shared final resolver and regression coverage for both stale generated text and preserved analyst edits.

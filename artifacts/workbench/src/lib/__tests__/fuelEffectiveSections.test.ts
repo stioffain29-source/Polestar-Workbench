@@ -603,6 +603,36 @@ describe("AI jet-direction headlines retain the original report text", () => {
     expect(closing.match(/transit availability/gi)).toHaveLength(1);
   });
 
+  it("replaces the persisted legacy repeated Implications template", () => {
+    const data = risingJetData();
+    const effective = resolveFuelEffectiveSections({
+      report: {
+        implications:
+          "Prioritise road fuel distribution in Saudi Arabia; reassess if a confirmed change in transit availability.",
+      },
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(effective.implications).toBe(
+      data.narrativeData.canonicalSections.implications,
+    );
+    expect(effective.implications).not.toMatch(/prioritise .+reassess if/i);
+  });
+
+  it("preserves genuinely edited analyst Implications text", () => {
+    const data = risingJetData();
+    const analystText =
+      "Hold additional contracted volume at the eastern depot until the weekly allocation is confirmed.";
+    const effective = resolveFuelEffectiveSections({
+      report: { implications: analystText },
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(effective.implications).toBe(analystText);
+  });
+
   it("keeps an invalid direct analyst edit visible and publication-blocking", () => {
     const data = risingJetData();
     const finalised = finalizeFuelPublication({
