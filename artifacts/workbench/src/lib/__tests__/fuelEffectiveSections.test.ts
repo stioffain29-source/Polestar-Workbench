@@ -575,6 +575,34 @@ describe("AI jet-direction headlines retain the original report text", () => {
     expect(finalised.auditIssues.evidence.some((issue) => issue.code === "WATCH_NEXT_UNGROUNDED")).toBe(false);
   });
 
+  it("keeps Implications, Watch Next and Polestar View analytically distinct", () => {
+    const report = {
+      issueDate: ISSUE,
+      hardNumbers: {
+        prices: [
+          { label: "Brent crude", value: 99.4, unit: "USD/bbl", change: "+5.0% 7d", asOf: ISSUE },
+          { label: "WTI crude", value: 96.1, unit: "USD/bbl", change: "+4.0% 7d", asOf: ISSUE },
+        ],
+      },
+    };
+    const incidents = [inc({
+      title: "Oil Surges Past $99 After Saudi Refinery Attack",
+      summary: "The Saudi refinery attack disrupted a fuel depot and road fuel distribution, with transit availability through the Strait of Hormuz affected.",
+      country: "Saudi Arabia",
+      location: "Strait of Hormuz",
+      severity: "high",
+    })];
+    const finalised = finalizeFuelPublication({ report, incidents, aiProse: null });
+    const { implications, watchNext, polestarView } = finalised.effectiveSections;
+    const closing = `${implications}\n${watchNext}\n${polestarView}`;
+
+    expect(implications).toContain("Reprice road fuel distribution in Saudi Arabia");
+    expect(implications).not.toMatch(/reassess if|watch for|delivery schedules/i);
+    expect(watchNext).toMatch(/watch for .*transit availability/i);
+    expect(polestarView).not.toMatch(/transit availability|reprice road fuel distribution/i);
+    expect(closing.match(/transit availability/gi)).toHaveLength(1);
+  });
+
   it("keeps an invalid direct analyst edit visible and publication-blocking", () => {
     const data = risingJetData();
     const finalised = finalizeFuelPublication({

@@ -2382,7 +2382,12 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   if (/\b(jet fuel|aviation fuel|airline|airways)\b/.test(hay)) {
     bullets.push("Test how any aviation fuel-cost change would affect route economics and surcharge discussions before schedule or capacity decisions harden.");
   }
-  bullets.unshift(`Prioritise ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}; reassess if ${facts.judgement.trigger}.`);
+  // Implications states the business decision required by the assessed
+  // exposure. The conditional trigger belongs only in Watch Next; repeating it
+  // here turns two sections into the same sentence with different lead verbs.
+  bullets.unshift(
+    `Reprice ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""} against current delivered-cost and availability assumptions.`,
+  );
   return bullets.slice(0, 5).join("\n");
 }
 
