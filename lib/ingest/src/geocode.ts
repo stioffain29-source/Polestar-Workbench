@@ -108,6 +108,8 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   wellington: { lat: -41.29, lng: 174.78 },
   christchurch: { lat: -43.53, lng: 172.64 },
   dunedin: { lat: -45.87, lng: 170.5 },
+  hamilton: { lat: -37.79, lng: 175.28 },
+  tauranga: { lat: -37.69, lng: 176.17 },
   // Bangladesh
   dhaka: { lat: 23.81, lng: 90.41 },
   chittagong: { lat: 22.36, lng: 91.78 },
@@ -117,6 +119,12 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   guangzhou: { lat: 23.13, lng: 113.26 },
   shenzhen: { lat: 22.54, lng: 114.06 },
   "hong kong": { lat: 22.32, lng: 114.17 },
+  wuhan: { lat: 30.59, lng: 114.31 },
+  chengdu: { lat: 30.57, lng: 104.07 },
+  chongqing: { lat: 29.56, lng: 106.55 },
+  tianjin: { lat: 39.08, lng: 117.2 },
+  nanjing: { lat: 32.06, lng: 118.8 },
+  hangzhou: { lat: 30.27, lng: 120.15 },
   // India
   delhi: { lat: 28.61, lng: 77.21 },
   mumbai: { lat: 19.08, lng: 72.88 },
@@ -202,7 +210,23 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   hanoi: { lat: 21.03, lng: 105.85 },
   "ho chi minh": { lat: 10.82, lng: 106.63, name: "Ho Chi Minh City" },
   haiphong: { lat: 20.84, lng: 106.69 },
+  "hai phong": { lat: 20.84, lng: 106.69, name: "Hai Phong" },
+  "da nang": { lat: 16.05, lng: 108.2, name: "Da Nang" },
+  "can tho": { lat: 10.05, lng: 105.75, name: "Can Tho" },
+  hue: { lat: 16.46, lng: 107.59, name: "Hue" },
+  "dong nai": { lat: 10.95, lng: 106.82, name: "Dong Nai" },
   "cai mep": { lat: 10.52, lng: 107.02, name: "Cai Mep" },
+  // Cambodia
+  "phnom penh": { lat: 11.56, lng: 104.93, name: "Phnom Penh" },
+  "siem reap": { lat: 13.36, lng: 103.86, name: "Siem Reap" },
+  sihanoukville: { lat: 10.63, lng: 103.51 },
+  battambang: { lat: 13.1, lng: 103.2 },
+  poipet: { lat: 13.66, lng: 102.57 },
+  // Laos
+  vientiane: { lat: 17.98, lng: 102.63 },
+  "luang prabang": { lat: 19.89, lng: 102.14, name: "Luang Prabang" },
+  savannakhet: { lat: 16.56, lng: 104.75 },
+  pakse: { lat: 15.12, lng: 105.8 },
   // West Papua — mine-security + highland conflict districts FIRST so a
   // Freeport / Grasberg / Tembagapura story resolves to the mine area rather
   // than the provincial capital Jayapura (first in-range key wins).

@@ -284,6 +284,7 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Thailand",          aliases: ["thailand", "thai", "thais", "bangkok", "chiang mai", "phuket"] },
   { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "haiphong"] },
   { canonical: "Cambodia",          aliases: ["cambodia", "cambodian", "cambodians", "phnom penh", "siem reap", "sihanoukville"] },
+  { canonical: "Laos",              aliases: ["laos", "lao", "laotians", "vientiane", "luang prabang", "savannakhet", "pakse"] },
 ];
 
 // Papua / PNG disambiguation. The Indonesian province of Papua / West Papua

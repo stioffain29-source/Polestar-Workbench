@@ -106,6 +106,7 @@ const EDITIONS: Record<string, { gl: string; hl: string; ceid: string }> = {
   Philippines: { gl: "PH", hl: "en-PH", ceid: "PH:en" },
   Vietnam: { gl: "VN", hl: "en-VN", ceid: "VN:en" },
   Cambodia: { gl: "KH", hl: "en", ceid: "KH:en" },
+  Laos: { gl: "LA", hl: "en", ceid: "LA:en" },
   "Hong Kong": { gl: "HK", hl: "en-HK", ceid: "HK:en" },
   Thailand: { gl: "TH", hl: "en-TH", ceid: "TH:en" },
   Malaysia: { gl: "MY", hl: "en-MY", ceid: "MY:en" },
@@ -171,11 +172,12 @@ const SOUTH_APAC = [
   "Philippines",
   "Vietnam",
   "Cambodia",
+  "Laos",
   "Hong Kong",
   "Thailand",
 ];
 
-const BROAD_APAC = [...SOUTH_APAC, "Australia", "China"];
+const BROAD_APAC = [...SOUTH_APAC, "Australia", "China", "New Zealand"];
 
 // ---------------------------------------------------------------- energy ----
 // Grid-stress footprint: South/SE Asia + East Asia + the Gulf + Oceania. The
@@ -583,6 +585,7 @@ const CONFLICT_ALIASES: CountryAlias[] = [
   { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "mindanao", "sulu", "jolo", "basilan", "maguindanao", "cotabato", "marawi", "zamboanga", "abu sayyaf", "bangsamoro"] },
   { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
   { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "phnom penh", "siem reap", "sihanoukville"] },
+  { canonical: "Laos", aliases: ["laos", "lao", "vientiane", "luang prabang", "savannakhet", "pakse"] },
   { canonical: "Hong Kong", aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "pattani", "yala", "narathiwat", "songkhla"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak"] },

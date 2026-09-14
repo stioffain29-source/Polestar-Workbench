@@ -86,6 +86,7 @@ const FLASHPOINT_REGIONAL_SOURCES: Array<{
   { name: "Google News — China (Civil Unrest)",         url: "https://news.google.com/rss/search?q=(China+OR+Beijing+OR+Shanghai+OR+Guangzhou+OR+Shenzhen)+(protest+OR+demonstration+OR+strike+OR+labour+OR+unrest+OR+clash)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss", reliability: 3, notes: "Owner: NE Asia desk. Mainland China protest, labour and public-order aggregator. Last 14 days." },
   { name: "Google News — Vietnam (Civil Unrest)",       url: "https://news.google.com/rss/search?q=(Vietnam+OR+Hanoi+OR+%22Ho+Chi+Minh%22)+(protest+OR+demonstration+OR+strike+OR+labour+OR+unrest)+when:14d&hl=en-VN&gl=VN&ceid=VN:en", sourceType: "rss", reliability: 3, notes: "Owner: SE Asia desk. Vietnam protest, labour and public-order aggregator. Last 14 days." },
   { name: "Google News — Cambodia (Civil Unrest)",      url: "https://news.google.com/rss/search?q=(Cambodia+OR+%22Phnom+Penh%22+OR+%22Siem+Reap%22)+(protest+OR+demonstration+OR+strike+OR+labour+OR+unrest)+when:14d&hl=en&gl=KH&ceid=KH:en", sourceType: "rss", reliability: 3, notes: "Owner: SE Asia desk. Cambodia protest, labour and public-order aggregator. Last 14 days." },
+  { name: "Google News — Laos (Civil Unrest)",          url: "https://news.google.com/rss/search?q=(Laos+OR+Lao+OR+Vientiane+OR+%22Luang+Prabang%22+OR+Savannakhet+OR+Pakse)+(protest+OR+demonstration+OR+strike+OR+labour+OR+unrest+OR+clash)+when:14d&hl=en&gl=LA&ceid=LA:en", sourceType: "rss", reliability: 3, notes: "Owner: SE Asia desk. Laos protest, labour and public-order aggregator, anchored on major cities so local reporting that omits the country name is captured. Last 14 days." },
   { name: "Google News — Hong Kong (Civil Unrest)",     url: "https://news.google.com/rss/search?q=(%22Hong+Kong%22+OR+Kowloon)+(protest+OR+demonstration+OR+strike+OR+labour+OR+unrest+OR+rally)+when:14d&hl=en-HK&gl=HK&ceid=HK:en", sourceType: "rss", reliability: 3, notes: "Owner: NE Asia desk. Hong Kong protest, labour and public-order aggregator. Last 14 days." },
   { name: "Google News — South Korea (Civil Unrest)",   url: "https://news.google.com/rss/search?q=(%22South+Korea%22+OR+%22Seoul%22+OR+%22Busan%22+OR+%22Incheon%22)+(protest+OR+rally+OR+demonstration+OR+unrest+OR+strike+OR+walkout+OR+union+OR+march)+when:14d&hl=en-US&gl=US&ceid=US:en", sourceType: "rss", reliability: 3, notes: "Owner: NE Asia desk. Country-wide civil unrest & labour aggregator, anchored on Seoul, Busan and Incheon. Uses the global-English Google News edition (en-US/US) because Korea has no English edition — the localised en-KR feed returns empty. Last 14 days." },
   { name: "Google News — New Zealand (Civil Unrest)",   url: "https://news.google.com/rss/search?q=(%22New+Zealand%22+OR+%22Auckland%22+OR+%22Wellington%22+OR+%22Christchurch%22)+(protest+OR+rally+OR+demonstration+OR+strike+OR+march+OR+hikoi+OR+picket+OR+walkout)+when:14d&hl=en-NZ&gl=NZ&ceid=NZ:en", sourceType: "rss", reliability: 3, notes: "Owner: ANZ desk. Country-wide civil unrest aggregator, anchored on Auckland, Wellington and Christchurch plus the te-reo term 'hikoi' (protest march) so events that omit the country name are still captured. Last 14 days." },
@@ -4026,6 +4027,65 @@ export async function runDataMigrations(): Promise<void> {
       await repairSourceHealthDashboardNoise();
     } catch (srcErr) {
       logger.error({ err: srcErr }, "Flashpoint regional source seed failed");
+    }
+
+    // 6a) Re-resolve legacy country-centroid rows now that the shared
+    // gazetteer covers the major cities in the previously sparse countries.
+    // Only a city explicitly named in the stored title/summary can replace the
+    // unresolved centroid; country-only rows remain unplotted.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "sparse_country_city_geocode_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if (existingMarker.rowCount === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            country: incidentsTable.country,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+          })
+          .from(incidentsTable)
+          .where(and(
+            isNull(incidentsTable.location),
+            inArray(incidentsTable.country, [
+              "Australia",
+              "Cambodia",
+              "China",
+              "Laos",
+              "New Zealand",
+              "Vietnam",
+            ]),
+          ));
+        let updated = 0;
+        for (const row of candidates) {
+          const geo = geocode(row.country, `${row.title} ${row.summary ?? ""}`);
+          if (!geo?.location) continue;
+          await db
+            .update(incidentsTable)
+            .set({
+              location: geo.location,
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+            })
+            .where(eq(incidentsTable.id, row.id));
+          updated++;
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info({ rows: updated }, "sparse-country city geocode backfill complete");
+      }
+    } catch (geoErr) {
+      logger.error({ err: geoErr }, "sparse-country city geocode backfill failed");
     }
 
     // 6b) Retire two genuinely-defunct flashpoint outlets. Prachatai's English
