@@ -96,6 +96,10 @@ const incidents = [{
   severity: "high",
   occurredAt: "2026-06-14T08:00:00.000Z",
   maritimeSemantic: semantic,
+  maritimeValidation: {
+    status: "validated",
+    version: MARITIME_SEMANTIC_VERSION,
+  },
 }];
 
 const report = {
@@ -117,7 +121,7 @@ describe("Shipping publication surface integration", () => {
 
     expect(html).toContain("Maritime Situation");
     expect(html).toContain("Shipping Watch");
-    expect(html).toContain("PENDING");
+    expect(html).not.toContain("PENDING");
     expect(html).not.toContain("cannot be rendered");
     expect((html.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBeGreaterThanOrEqual(2);
     expect(html).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
@@ -163,8 +167,8 @@ describe("Shipping publication surface integration", () => {
 
     expect(text).not.toContain("BOTTOM LINE UP FRONT");
     expect(text).toContain("overall maritime risk");
-    expect(text).toContain("Assessment pending");
-    expect((text.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(3);
+    expect(text).not.toContain("Assessment pending");
+    expect((text.match(/Tanker attacked at Bab el-Mandeb/g) ?? []).length).toBe(2);
     expect(text).not.toMatch(/\b(canonical|source[- ]grounded|semantic evidence|AIS movement|movement as evidence|validated incident|validated maritime|newly validated|route context|incident totals|shown separately|operational tables)\b/i);
   });
 
@@ -194,7 +198,7 @@ describe("Shipping publication surface integration", () => {
     );
     const text = chrome.__textCalls.join("\n");
     expect(text).not.toContain("EXECUTIVE SUMMARY");
-    expect(text).toContain("Assessment pending");
+    expect(text).not.toContain("Assessment pending");
   });
 
   it("omits empty maritime cards and subheadings on both surfaces", async () => {

@@ -1622,6 +1622,7 @@ const GENERIC_CONFLICT_PHRASES = [
   "The main issue is uncertainty rather than a confirmed multi-country escalation",
   "poor traceability, not a confirmed broadening of conflict",
   "Risk level:",
+  "The main disruption risk sits",
 ];
 
 export function isGenericConflictProse(text: string): boolean {

@@ -209,7 +209,7 @@ function CoverageBody({
                 {model.totalDistinctDevelopments}
               </div>
               <div style={{ fontSize: 8, marginTop: 3, color: DUSK }}>
-                Evidence-family-deduplicated
+                Separate reported developments
               </div>
             </div>
             <div style={{ ...metricStyle, borderLeftColor: DUSK }}>
@@ -289,19 +289,6 @@ function CoverageBody({
       ) : (
         <div style={{ fontSize: 9, color: DUSK, fontStyle: "italic" }}>
           No attributed countries in the qualifying set.
-        </div>
-      )}
-      {!continued && (
-        <div style={{ fontSize: 8, lineHeight: 1.3, color: DUSK, marginTop: 6 }}>
-          Coverage is limited to current-period Fuel-relevant records that passed
-          the relevance and evidence-family gates; syndicated, commentary and
-          follow-on coverage is not counted as a separate development. Country
-          rows include only developments with a resolved country and are ordered
-          by development count, not ranked for impact.{" "}
-          {model.unattributedDevelopmentCount > 0
-            ? `${model.unattributedDevelopmentCount} development${model.unattributedDevelopmentCount === 1 ? " was" : "s were"} excluded from this country table because the location could not be verified. `
-            : ""}
-          This is not a full raw-ingest total.
         </div>
       )}
     </div>

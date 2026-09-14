@@ -52,7 +52,9 @@ it("renders the shared preview/PDF coverage labels and canonical totals", () => 
   expect(markup).toContain("Severity distribution");
   expect(markup).toContain("Daily incident trend");
   expect(markup).toContain("Affected countries");
-  expect(markup).toContain("not ranked for impact");
+  expect(markup).not.toMatch(
+    /relevance|evidence-family|syndicated|raw-ingest|not ranked for impact/i,
+  );
   expect(markup).toContain(String(model.totalDistinctDevelopments));
   expect(markup).toContain(String(model.activeCountries));
   expect(markup).toContain("#1B6B7A");

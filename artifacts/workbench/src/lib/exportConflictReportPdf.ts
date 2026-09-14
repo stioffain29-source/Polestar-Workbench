@@ -19,6 +19,14 @@ import {
   COVER_TOP_BAND_H,
   COVER_BOTTOM_BLOCK_H,
   setText,
+  setFill,
+  setStroke,
+  ensureSpace,
+  NAVY,
+  POLAR,
+  WHITE,
+  SEV_COLOR,
+  SEV_LABEL,
   sanitize,
   DUSK,
   type Ctx,
@@ -37,14 +45,16 @@ import {
   isGenericConflictProse,
   type ConflictReportIncident,
   type ConflictActivityArea,
+  type ConflictEnrichedIncident,
 } from "./conflictReportDataset";
+import { resolveIncidentSummary } from "./incidentSummary";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 import { CONFLICT_CLIENT_SECTION_TITLES } from "./conflictReportStructure";
 
 // Conflict Watch PDF. Section order (LOCATION-LED, no Executive Summary):
 //   Cover -> Fast Facts -> BLUF -> Top Activity Areas ->
 //   Other Watched Theatres -> What Matters for Business -> Watch Next ->
-//   Polestar View -> Disclaimer.
+//   Polestar View -> Incident List -> Disclaimer.
 // Data and prose come from buildConflictReportDataset so the preview
 // (ConflictReportPreview) and this exporter cannot drift.
 
@@ -131,6 +141,77 @@ function drawTopActivityAreas(
   });
 }
 
+function drawIncidentList(
+  ctx: Ctx,
+  rows: readonly ConflictEnrichedIncident[],
+  summaries: Record<string, string>,
+) {
+  ensureSpace(ctx, 80);
+  drawSectionHeading(ctx, CONFLICT_CLIENT_SECTION_TITLES.incidentList);
+  if (rows.length === 0) {
+    renderProse(ctx, "No accepted incidents this period.");
+    return;
+  }
+  const { pdf, MX, CW } = ctx;
+  const dateW = 72;
+  const countryW = 88;
+  const severityW = 58;
+  const incidentW = CW - dateW - countryW - severityW;
+  const headerH = 20;
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, headerH, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7);
+    pdf.text("DATE", MX + 5, ctx.y + 13);
+    pdf.text("COUNTRY", MX + dateW + 5, ctx.y + 13);
+    pdf.text("INCIDENT", MX + dateW + countryW + 5, ctx.y + 13);
+    pdf.text("SEVERITY", MX + dateW + countryW + incidentW + 5, ctx.y + 13);
+    ctx.y += headerH;
+  };
+  drawHeader();
+  for (const row of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(8);
+    const countryLines: string[] = pdf.splitTextToSize(sanitize(row.country || "—"), countryW - 8);
+    const titleLines: string[] = pdf.splitTextToSize(sanitize(row.displayTitle ?? row.title), incidentW - 8);
+    pdf.setFontSize(7);
+    const summaryLines: string[] = pdf.splitTextToSize(
+      sanitize(resolveIncidentSummary(row, summaries)),
+      incidentW - 8,
+    );
+    const rowH = Math.max(28, titleLines.length * 11 + summaryLines.length * 9 + 9, countryLines.length * 11 + 9);
+    if (ctx.y + rowH > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+    }
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.5);
+    pdf.line(MX, ctx.y + rowH, MX + CW, ctx.y + rowH);
+    setText(pdf, DUSK);
+    pdf.setFontSize(8);
+    pdf.text(format(row.date, "dd MMM yyyy"), MX + 5, ctx.y + 13);
+    pdf.text(countryLines, MX + dateW + 5, ctx.y + 13, { lineHeightFactor: 1.3 });
+    const titleX = MX + dateW + countryW + 5;
+    setText(pdf, NAVY);
+    pdf.text(titleLines, titleX, ctx.y + 13, { lineHeightFactor: 1.3 });
+    setText(pdf, DUSK);
+    pdf.setFontSize(7);
+    pdf.text(summaryLines, titleX, ctx.y + 13 + titleLines.length * 11 + 2, { lineHeightFactor: 1.3 });
+    const severity = (row.severity ?? "").toLowerCase();
+    setFill(pdf, SEV_COLOR[severity] ?? "#777777");
+    const chipX = MX + dateW + countryW + incidentW + 5;
+    pdf.rect(chipX, ctx.y + 5, 46, 12, "F");
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6.5);
+    pdf.text((SEV_LABEL[severity] ?? row.severity).toUpperCase(), chipX + 23, ctx.y + 13.5, { align: "center" });
+    ctx.y += rowH;
+  }
+  ctx.y += 8;
+}
+
 // --- Exporter --------------------------------------------------------------
 // AI-generated narrative for the four sections the conflict report renders.
 // Mirrors ConflictReportPreview.ConflictAiProse so preview and PDF resolve prose
@@ -157,7 +238,7 @@ export async function exportConflictReportPdf(
   // analyst edit (via pickProse) still wins over both.
   const aiOr = (ai: string | null | undefined, det: string): string => {
     const t = (ai ?? "").trim();
-    return t ? t : det;
+    return t && !isGenericConflictProse(t) ? t : det;
   };
   const resolvedTitle = resolveReportTitle(data.topic, data.title);
   const canon = canonicalTopic(data.topic);
@@ -196,10 +277,8 @@ export async function exportConflictReportPdf(
 
   const ds = buildConflictReportDataset(incidents, data.topic, data.issueDate);
 
-  // Supporting context and related rows remain available to the Workbench
-  // editor, but are deliberately not part of the client-facing journey.
+  // Supporting context remains available to the Workbench editor only.
   void situationalReports;
-  void incidentSummaries;
 
   // 1. Fast Facts.
   if (show("fast-facts")) {
@@ -264,6 +343,11 @@ export async function exportConflictReportPdf(
       CONFLICT_CLIENT_SECTION_TITLES.polestarView,
       pickProse(data.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView)),
     );
+  }
+
+  // 8. The exact canonical incident set used by Fast Facts and prose.
+  if (show("related-incidents")) {
+    drawIncidentList(ctx, ds.canonical.periodRows, incidentSummaries);
   }
 
   drawDisclaimer(ctx, CONFLICT_CLIENT_SECTION_TITLES.disclaimer);

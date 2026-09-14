@@ -1157,3 +1157,17 @@ mtime_ms = 1789345048426
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/67b307ac-def7-4636-b529-86e97f87c8a3/d21d4712-842b-43a2-b4e0-1a6e20ffbc4c"
 storage_version_token = "1789345059957245"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "zL4nLvYaYEpFq9EpUik8p"
+uri = "file://.agents/outputs/conflict-fixed-20260914.pdf"
+type = "pdf"
+title = "Corrected Conflict Watch PDF"
+description = "Verification export with the canonical incident list restored and stale risk wording removed."
+logical_id = "41c2afa7-e105-4e73-a8c7-ce4afa603e7f"
+content_hash = "sha256:8a009b3e936f301d12c912a5fa46c5e5a4e193f64a122b4c7abc729b0165a424"
+size = 2031700
+mtime_ms = 1789349829303
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/41c2afa7-e105-4e73-a8c7-ce4afa603e7f/00713d85-02ca-49bb-b878-4498241009d4"
+storage_version_token = "1789349985889514"
+content_type = "application/pdf"

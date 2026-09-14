@@ -14,6 +14,7 @@ export const CONFLICT_CLIENT_SECTION_ORDER = [
   "what-matters",
   "watch-next",
   "polestar-view",
+  "related-incidents",
   "disclaimer",
 ] as const;
 
@@ -27,5 +28,6 @@ export const CONFLICT_CLIENT_SECTION_TITLES = {
   whatMatters: "What Matters for Business",
   watchNext: "Watch Next",
   polestarView: "Polestar View",
+  incidentList: "Incident List",
   disclaimer: "Disclaimer",
 } as const;

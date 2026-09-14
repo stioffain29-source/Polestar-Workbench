@@ -59,3 +59,13 @@ The maritime risk-color scale follows the strict cardTemplates rule, NOT the
 app-wide severity palette: level-4 High = `#D35400` (burnt orange), level-5
 Extreme = `#A33232`. No red of any family below Extreme. (The app-wide palette
 uses `#C0392B` red for High — do not copy it onto brand-strict surfaces.)
+
+## Unresolved validation rows do not freeze a confirmed report
+**Rule:** Exclude pending/needs-review Shipping candidates from the canonical
+set, but calculate report risk whenever at least one validated incident exists.
+Only hold the assessment when raw candidates exist and none are validated.
+**Why:** `needs_review` is often a terminal semantic result, not a worker
+backlog. Requiring the pending count to reach zero permanently blocked reports
+that already had hundreds of confirmed incidents.
+**How to apply:** Show unresolved counts as a plain exclusion notice. All
+metrics, risk and prose continue to use only the validated canonical set.

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { format } from "date-fns";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import {
@@ -11,8 +12,10 @@ import { TOPIC_COVER_URLS } from "@/lib/coverImages";
 import {
   buildConflictReportDataset,
   isGenericConflictProse,
+  type ConflictEnrichedIncident,
   type ConflictReportIncident,
 } from "@/lib/conflictReportDataset";
+import { resolveIncidentSummary } from "@/lib/incidentSummary";
 import { SEV_COLOR } from "@/lib/pdfChrome";
 import type { ReliefWebReport } from "@workspace/api-client-react";
 import { CONFLICT_CLIENT_SECTION_TITLES } from "@/lib/conflictReportStructure";
@@ -273,6 +276,61 @@ interface ConflictEnrichedAreaLike {
   paragraph: string;
 }
 
+function IncidentList({
+  rows,
+  summaries,
+}: {
+  rows: readonly ConflictEnrichedIncident[];
+  summaries: Record<string, string>;
+}) {
+  if (rows.length === 0) {
+    return <p style={{ color: DUSK, fontSize: 13 }}>No accepted incidents this period.</p>;
+  }
+  return (
+    <div className="w-full overflow-hidden border" style={{ borderColor: POLAR }}>
+      <div
+        className="grid uppercase tracking-widest"
+        style={{
+          gridTemplateColumns: "0.7fr 0.9fr 2.7fr 0.7fr",
+          background: NAVY,
+          color: "#fff",
+          fontWeight: 700,
+          fontSize: 10,
+          padding: "8px 10px",
+          gap: 10,
+        }}
+      >
+        <div>Date</div><div>Country</div><div>Incident</div><div>Severity</div>
+      </div>
+      {rows.map((row, index) => (
+        <div
+          key={String(row.id)}
+          className="grid"
+          style={{
+            gridTemplateColumns: "0.7fr 0.9fr 2.7fr 0.7fr",
+            padding: "8px 10px",
+            gap: 10,
+            borderTop: index === 0 ? "none" : `1px solid ${POLAR}`,
+            fontSize: 12,
+            color: DUSK,
+            alignItems: "flex-start",
+          }}
+        >
+          <div>{format(row.date, "dd MMM yyyy")}</div>
+          <div>{row.country || "—"}</div>
+          <div style={{ color: NAVY }}>
+            {row.displayTitle ?? row.title}
+            <div style={{ color: DUSK, fontSize: 11, lineHeight: 1.4, marginTop: 4 }}>
+              {resolveIncidentSummary(row, summaries)}
+            </div>
+          </div>
+          <div>{row.severity}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ConflictReportPreview({
   report,
   incidents,
@@ -290,11 +348,9 @@ export default function ConflictReportPreview({
   hiddenSections?: string[];
   sectionOverrides?: TopicSectionOverrides | null;
 }) {
-  // `situationalReports` and `incidentSummaries` are intentionally accepted
-  // for editor/workbench compatibility. ReliefWeb context and Related
-  // Incidents remain available to those surfaces, but neither is client copy.
+  // ReliefWeb material remains Workbench-only. Incident summaries support the
+  // client incident list drawn from the canonical accepted set.
   void situationalReports;
-  void incidentSummaries;
   const show = makeSectionGate(hiddenSections);
   const topic = report.topic ?? "conflict";
   const issueDate = report.issueDate ?? new Date().toISOString().slice(0, 10);
@@ -305,7 +361,7 @@ export default function ConflictReportPreview({
   // analyst edit (via pickProse) still wins over both.
   const aiOr = (ai: string | null | undefined, det: string) => {
     const t = (ai ?? "").trim();
-    return t ? t : det;
+    return t && !isGenericConflictProse(t) ? t : det;
   };
   const ds = useMemo(
     () => buildConflictReportDataset(incidents, topic, issueDate),
@@ -466,6 +522,13 @@ export default function ConflictReportPreview({
           keepTogether
         >
           <Paragraphs text={pickProse(report.polestarView, aiOr(aiProse?.polestarView, ds.autoPolestarView))} />
+        </Section>
+
+        <Section
+          hidden={!show("related-incidents")}
+          title={CONFLICT_CLIENT_SECTION_TITLES.incidentList}
+        >
+          <IncidentList rows={ds.canonical.periodRows} summaries={incidentSummaries} />
         </Section>
 
         <Section title={CONFLICT_CLIENT_SECTION_TITLES.disclaimer} keepTogether>

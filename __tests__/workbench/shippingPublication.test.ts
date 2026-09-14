@@ -230,20 +230,20 @@ describe("Shipping publication final boundary", () => {
       ISSUE_DATE,
     );
     expect(coverage).toMatchObject({
-      status: "incomplete",
-      complete: false,
+      status: "complete",
+      complete: true,
       sourceRows: 4,
       validated: 1,
       rejected: 1,
       pending: 2,
-      assessmentLabel: "Assessment pending",
+      assessmentLabel: "Assessed",
     });
     expect(coverage.disclosure).toBe(
-      "Coverage is incomplete: 2 of 4 source reports are still under review. Overall maritime risk assessment is pending.",
+      "2 unverified source reports were excluded. This assessment uses 1 confirmed incident.",
     );
   });
 
-  it("holds overall risk at Assessment pending while retaining confirmed severity", () => {
+  it("assesses confirmed incidents while excluding unresolved candidates", () => {
     const publication = finalizeShippingPublication(validOptions({
       incidents: [
         incident(1, {
@@ -264,17 +264,16 @@ describe("Shipping publication final boundary", () => {
     }));
 
     expect(publication.completeness).toMatchObject({
-      status: "incomplete",
+      status: "complete",
       validated: 1,
       pending: 1,
       rejected: 0,
     });
-    expect(publication.maritimeBoard.risk.label).toBe("Assessment pending");
-    expect(publication.maritimeBoard.overallRisk.label).toBe("Assessment pending");
+    expect(publication.maritimeBoard.risk.label).not.toBe("Assessment pending");
+    expect(publication.maritimeBoard.overallRisk.label).not.toBe("Assessment pending");
     expect(publication.maritimeBoard.highestIndividualSeverity).toBe("high");
-    expect(publication.prose.executiveSummary).toContain("coverage is incomplete");
+    expect(publication.prose.executiveSummary).not.toContain("coverage is incomplete");
     expect(publication.prose.executiveSummary).toContain("highest individual incident severity is High");
-    expect(publication.prose.executiveSummary).not.toMatch(/overall maritime risk as High/i);
   });
 
   it("preserves an analyst risk edit and flags its contradiction with pending coverage", () => {

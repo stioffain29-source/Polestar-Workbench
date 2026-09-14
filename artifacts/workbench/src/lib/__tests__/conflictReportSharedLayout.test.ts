@@ -18,6 +18,7 @@ describe("shared Conflict Watch client layout", () => {
       "whatMatters",
       "watchNext",
       "polestarView",
+      "incidentList",
       "disclaimer",
     ];
 
@@ -31,15 +32,18 @@ describe("shared Conflict Watch client layout", () => {
     );
     const pdfBody = pdf.slice(pdf.indexOf("// 1. Fast Facts."));
     const pdfPositions = labels.map((label) =>
-      pdfBody.indexOf(`CONFLICT_CLIENT_SECTION_TITLES.${label}`),
+      label === "incidentList"
+        ? pdfBody.indexOf("drawIncidentList(")
+        : pdfBody.indexOf(`CONFLICT_CLIENT_SECTION_TITLES.${label}`),
     );
     expect(previewPositions).toEqual([...previewPositions].sort((a, b) => a - b));
     expect(pdfPositions).toEqual([...pdfPositions].sort((a, b) => a - b));
 
-    // Related rows remain in the dataset/editor pipeline, not the client
-    // surface. Supporting ReliefWeb context is likewise not client prose.
-    expect(preview).not.toContain('title="Related Incidents"');
-    expect(pdf).not.toContain('drawRelatedIncidents');
+    // The client list uses the exact accepted canonical incident set. Supporting
+    // ReliefWeb context remains Workbench-only.
+    expect(preview).toContain("ds.canonical.periodRows");
+    expect(pdf).toContain("ds.canonical.periodRows");
+    expect(pdf).toContain("drawIncidentList");
     expect(pdf).not.toContain("drawSituationalContextPdf");
   });
 
@@ -53,6 +57,6 @@ describe("shared Conflict Watch client layout", () => {
     expect(pdf).toContain("Math.min(lines.length, 3)");
     expect(pdf).toContain("drawSectionKeepTogether(");
     expect(pdf).toContain("firstNeed");
-    expect(pdf).not.toContain("Related Incidents");
+    expect(pdf).toContain("CONFLICT_CLIENT_SECTION_TITLES.incidentList");
   });
 });

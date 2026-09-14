@@ -2404,9 +2404,8 @@ export default function ReportEditor() {
   const maritimeRiskBlocked =
     form.topic === "shipping" &&
     maritimeValidationSummary !== null &&
-    (maritimeValidationSummary.pending > 0 ||
-      (maritimeValidationSummary.sourceRows > 0 &&
-        maritimeValidationSummary.validated === 0));
+    maritimeValidationSummary.sourceRows > 0 &&
+    maritimeValidationSummary.validated === 0;
   const computedRating =
     report != null && !maritimeRiskBlocked
       ? autoReportRating(
@@ -3882,13 +3881,13 @@ export default function ReportEditor() {
               aria-live="polite"
             >
               <span style={{ fontWeight: 700 }}>
-                Maritime validation pending.
+                {maritimeValidationSummary.validated > 0
+                  ? "Unverified Shipping records excluded."
+                  : "Maritime validation pending."}
               </span>{" "}
-              {maritimeValidationSummary.pending} in-window{" "}
-              {maritimeValidationSummary.pending === 1 ? "record is" : "records are"}{" "}
-              awaiting current source-backed validation and are excluded from
-              confirmed incidents. The report is not a confirmed zero, and auto
-              risk is held until validation completes.
+              {maritimeValidationSummary.validated > 0
+                ? `${maritimeValidationSummary.pending} ${maritimeValidationSummary.pending === 1 ? "record is" : "records are"} excluded because the event could not be confirmed. The report and auto risk use ${maritimeValidationSummary.validated} confirmed ${maritimeValidationSummary.validated === 1 ? "incident" : "incidents"} only.`
+                : `${maritimeValidationSummary.pending} ${maritimeValidationSummary.pending === 1 ? "record is" : "records are"} still under review. Auto risk will remain blank until at least one maritime incident is confirmed.`}
             </div>
           )}
         {maritimeValidationSummary &&

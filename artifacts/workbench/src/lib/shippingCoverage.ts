@@ -104,7 +104,10 @@ export function buildShippingCoverage(
     else pending += 1;
   }
 
-  const complete = pending === 0;
+  // Unresolved candidates are excluded from the canonical report. They should
+  // block an assessment only when no confirmed incident is available at all;
+  // otherwise a permanent needs_review queue would hold every report forever.
+  const complete = pending === 0 || validated > 0;
   const status: ShippingCoverageStatus = complete ? "complete" : "incomplete";
   const sourceRows = windowed.length;
   // The helper above already applies the inclusive end-of-day rule.  Reuse
@@ -114,9 +117,12 @@ export function buildShippingCoverage(
   const windowEnd = new Date(
     reportWindow.end.getTime() + 24 * 60 * 60 * 1000 - 1,
   ).toISOString();
-  const disclosure = complete
-    ? ""
-    : `Coverage is incomplete: ${pending} of ${sourceRows} source reports are still under review. Overall maritime risk assessment is pending.`;
+  const disclosure =
+    pending === 0
+      ? ""
+      : validated > 0
+        ? `${pending} unverified source ${pending === 1 ? "report was" : "reports were"} excluded. This assessment uses ${validated} confirmed ${validated === 1 ? "incident" : "incidents"}.`
+        : `No maritime incident can be confirmed yet. ${pending} source ${pending === 1 ? "report remains" : "reports remain"} under review.`;
 
   return {
     status,
