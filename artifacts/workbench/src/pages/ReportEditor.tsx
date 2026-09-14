@@ -2516,7 +2516,11 @@ export default function ReportEditor() {
             onClick={() => {
               void downloadPdf();
             }}
-            disabled={exporting || reportDetailsLoading}
+            disabled={
+              exporting ||
+              !incidentWindowReady ||
+              seededId !== report.id
+            }
             className="rounded-sm"
           >
             {exporting ? (
