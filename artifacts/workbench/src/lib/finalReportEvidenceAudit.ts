@@ -70,7 +70,8 @@ export type FinalReportEvidenceAuditCode =
   | "RANKING_TIE"
   | "SEVERITY_PARITY"
   | "PROTEST_SCHEDULE_DATE"
-  | "PROTEST_SCHEDULE_STATUS";
+  | "PROTEST_SCHEDULE_STATUS"
+  | "CROSS_SECTION_REPETITION";
 
 export type ReportValidationLevel = "ERROR" | "WARNING" | "INFO";
 
@@ -97,6 +98,7 @@ const FINAL_REPORT_ISSUE_LEVELS: Record<
   SEVERITY_PARITY: "ERROR",
   PROTEST_SCHEDULE_DATE: "ERROR",
   PROTEST_SCHEDULE_STATUS: "ERROR",
+  CROSS_SECTION_REPETITION: "ERROR",
 };
 
 export function finalReportIssueLevel(
@@ -176,6 +178,72 @@ function words(text: string): string[] {
   return (text.toLowerCase().match(/[a-z][a-z0-9-]{2,}/g) ?? [])
     .flatMap((word) => word.split("-"))
     .filter((w) => !STOP.has(w));
+}
+
+function repetitionUnits(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((unit) => unit.replace(/^[\s•*-]+/, "").trim())
+    .filter((unit) => words(unit).length >= 5);
+}
+
+const REPEATABLE_STATUS_RE =
+  /^(?:(?:no|not enough|insufficient)\s+(?:current\s+)?(?:market\s+)?(?:data|evidence|indicators?|reporting|records?)\b|(?:market-?price|price)\s+direction\s+is\s+unclear\b)/i;
+
+function repetitionTokens(text: string): Set<string> {
+  return new Set(words(text).filter((word) => word.length >= 4));
+}
+
+function crossSectionSimilarity(a: string, b: string): number {
+  const left = repetitionTokens(a);
+  const right = repetitionTokens(b);
+  if (left.size < 5 || right.size < 5) return 0;
+  const common = [...left].filter((token) => right.has(token)).length;
+  return common / Math.min(left.size, right.size);
+}
+
+/**
+ * Conservative final-text repetition audit shared by every report adapter.
+ * It compares display-ready prose, never drafts. Exact repetitions always
+ * fail; near-duplicates require substantial shared vocabulary so ordinary
+ * recurrence of a country, topic or product name remains valid.
+ */
+export function auditFinalReportSectionRepetition(
+  sections: Record<string, string | null | undefined>,
+): Array<Omit<FinalReportEvidenceAuditIssue, "level">> {
+  const units = Object.entries(sections).flatMap(([section, raw]) =>
+    repetitionUnits((raw ?? "").trim()).map((text) => ({ section, text })),
+  );
+  const issues: Array<Omit<FinalReportEvidenceAuditIssue, "level">> = [];
+  for (let leftIndex = 0; leftIndex < units.length; leftIndex += 1) {
+    const left = units[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < units.length; rightIndex += 1) {
+      const right = units[rightIndex];
+      if (left.section === right.section) continue;
+      const exact =
+        left.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+        === right.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (REPEATABLE_STATUS_RE.test(left.text) || REPEATABLE_STATUS_RE.test(right.text)) continue;
+      const similarity = crossSectionSimilarity(left.text, right.text);
+      if (!exact && similarity < 0.62) continue;
+      issues.push({
+        code: "CROSS_SECTION_REPETITION",
+        section: "cross-section",
+        message: `${left.section} and ${right.section} repeat the same conclusion: "${right.text.slice(0, 150)}"`,
+      });
+    }
+  }
+  return issues;
+}
+
+export function assertFinalReportSectionsDistinct(
+  sections: Record<string, string | null | undefined>,
+): void {
+  const issues = auditFinalReportSectionRepetition(sections).map((issue) => ({
+    ...issue,
+    level: finalReportIssueLevel(issue.code),
+  }));
+  if (issues.length) throw new FinalReportEvidenceAuditError(issues);
 }
 
 function corpusOf(records: FinalReportEvidenceRecord[], forward: Array<string | FinalReportTypedReference>): string {
@@ -621,6 +689,7 @@ export function auditFinalReportEvidence(
       ? { id: `forward-${index}`, type: "forward-indicator" as const, text: item }
       : item),
   ];
+  issues.push(...auditFinalReportSectionRepetition(input.sections));
 
   for (const [section, raw] of Object.entries(input.sections)) {
     const text = (raw ?? "").trim();

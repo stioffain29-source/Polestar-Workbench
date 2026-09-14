@@ -52,6 +52,48 @@ describe("shared final report evidence audit", () => {
     ).toEqual([]);
   });
 
+  it("blocks the same conclusion repeated across final report sections", () => {
+    const codes = auditFinalReportEvidence(
+      input({
+        whatMatters:
+          "The principal exposure is road fuel distribution in Saudi Arabia if transit availability changes.",
+        watchNext:
+          "Watch for a confirmed change in transit availability affecting road fuel distribution in Saudi Arabia.",
+      }),
+    ).map((issue) => issue.code);
+
+    expect(codes).toContain("CROSS_SECTION_REPETITION");
+    expect(() =>
+      assertFinalReportEvidence(
+        input({
+          whatMatters:
+            "The principal exposure is road fuel distribution in Saudi Arabia if transit availability changes.",
+          watchNext:
+            "Watch for a confirmed change in transit availability affecting road fuel distribution in Saudi Arabia.",
+        }),
+      ),
+    ).toThrow();
+  });
+
+  it("allows distinct analysis that names the same geography", () => {
+    const issues = auditFinalReportEvidence(
+      input({
+        whatMatters:
+          "Saudi Arabia carries the largest current refinery-output exposure.",
+        implications:
+          "Review supplier terms and contingency volumes for fuel-dependent operations.",
+        watchNext:
+          "Watch for a confirmed change in transit availability.",
+        polestarView:
+          "Fuel risk is High. Protect critical-site stocks and delivery schedules.",
+      }),
+    );
+
+    expect(issues.map((issue) => issue.code)).not.toContain(
+      "CROSS_SECTION_REPETITION",
+    );
+  });
+
   it("fails closed on a weekly claim backed only by a lagged comparison", () => {
     const i = input(
       { whatMatters: "The Composite freight index rose this week." },

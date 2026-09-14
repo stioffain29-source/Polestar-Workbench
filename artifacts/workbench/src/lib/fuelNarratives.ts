@@ -2339,15 +2339,16 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
   }
   const paras = lead.map((i, idx) => {
     const impact = businessImpactForDevelopment(i);
+    const place = i.physicalLocation ?? i.country ?? "the lead market";
     const opener = idx === 0
       ? "The development with the greatest business significance"
       : idx === 1
         ? "A second material line"
         : "Also worth weighting";
-    // Name the underlying event rather than referring vaguely to "the
-    // confirmed change". developmentSentence uses the normalised evidence
-    // clause, so malformed feed-title language is not copied into the report.
-    return `${opener}: ${developmentSentence(i)} ${impact}`;
+    // What Happened owns chronology and event description. What Matters names
+    // only the ranked exposure and consequence so the same development is not
+    // retold in two adjacent sections.
+    return `${opener} is the exposure centred on ${place}. ${impact}`;
   });
   const j = facts.judgement;
   // What Matters owns the assessed risk, exposure and direction. The
@@ -2427,7 +2428,7 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
     const family = familyFor([incident.raw]);
     items.push({
       text: family?.watch
-        ?? `Watch for confirmed operational follow-through to ${developmentSentence(incident).replace(/^On [^,]+,\s*/i, "").replace(/\.$/, "")}, including any reported change in fuel availability, routing or cost.`,
+        ?? `Watch for confirmed operational follow-through at ${incident.routeOrChokepoint ?? incident.physicalLocation ?? incident.country ?? "the affected market"}, especially any reported change in fuel availability, routing or cost.`,
       supportingEvidenceIds: [incident.id],
     });
   }

@@ -66,6 +66,7 @@ import { classifyIncidentType } from "./incidentClassifier";
 import { resolveIncidentSummary } from "./incidentSummary";
 import { displayIncidentTitle } from "./incidentTitle";
 import { selectRelatedIncidents } from "./relatedIncidents";
+import { assertFinalReportSectionsDistinct } from "./finalReportEvidenceAudit";
 // Per-topic cover photography is registered in coverImages.ts so the
 // on-screen ReportPreview and this exporter share one source of truth.
 import { TOPIC_COVER_URLS } from "./coverImages";
@@ -1104,6 +1105,17 @@ export async function exportTopicReportPdf(
     ),
     fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
+  if (!isFuel) {
+    assertFinalReportSectionsDistinct({
+      executiveSummary: resolveSimpleProse(data.executiveSummary, aiProse?.executiveSummary, proseDraft.executiveSummary),
+      situation: resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
+      whatHappened: resolveSimpleProse(data.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened),
+      whatMatters: resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters),
+      implications: resolveSimpleProse(data.implications, aiProse?.implications, proseDraft.implications),
+      watchNext: resolveSimpleProse(data.watchNext, aiProse?.watchNext, proseDraft.watchNext),
+      polestarView: resolveSimpleProse(data.polestarView, aiProse?.polestarView, proseDraft.polestarView),
+    });
+  }
 
   const isCargo = data.topic === "cargo_watch";
   // Hoisted narrative-incident list shared by buildCargoPatternModel and the

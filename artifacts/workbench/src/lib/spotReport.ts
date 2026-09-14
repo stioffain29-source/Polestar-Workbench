@@ -1,3 +1,4 @@
+import { assertFinalReportSectionsDistinct } from "./finalReportEvidenceAudit";
 import type { Incident, SpotReport } from "@workspace/api-client-react";
 
 // Brand palette — mirrors the values used by the other report previews so a
@@ -156,9 +157,13 @@ export function spotReportSections(report: SpotReport): SpotSection[] {
     { heading: "Outlook (24\u201372h)", body: report.outlook },
     { heading: "Recommended Actions", body: report.recommendedActions, bullets: true },
   ];
-  return defs
+  const sections = defs
     .filter((d) => (d.body ?? "").trim().length > 0)
     .map((d) => ({ heading: d.heading, body: (d.body ?? "").trim(), bullets: d.bullets }));
+  assertFinalReportSectionsDistinct(
+    Object.fromEntries(sections.map((section) => [section.heading, section.body])),
+  );
+  return sections;
 }
 
 /** Split free text into bullet items (mirrors the report preview helpers). */

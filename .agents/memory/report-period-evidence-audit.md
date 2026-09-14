@@ -14,3 +14,9 @@ description: How report metrics and final client prose distinguish current-perio
 **Why:** Backend confidence or classifier state describes the pipeline, not the operating environment, and can be mistaken for an analytical conclusion.
 
 **How to apply:** Hold or reject ambiguous evidence before rendering. The final audit receives only accepted evidence and validated forward indicators.
+
+**Rule:** Cross-section repetition is a final-publication error for every report family, not a topic-specific prose defect. Compare resolved display text conservatively: block exact or strongly overlapping substantive conclusions, while ignoring short repeated no-data/status statements.
+
+**Why:** Fixing one Fuel template only rephrased the same Saudi exposure across What Matters, Implications, Watch Next and Polestar View; persisted and AI-resolved text can also bypass a generator-only fix.
+
+**How to apply:** Run the shared repetition audit after analyst/AI/canonical precedence is resolved. Topic PDF exports and Spot/Special section authorities fail closed; domain validators for Country/Cities, Cargo, Flashpoint and Shipping remain complementary.

@@ -1,3 +1,4 @@
+import { assertFinalReportSectionsDistinct } from "./finalReportEvidenceAudit";
 import type {
   Incident,
   SpecialReport,
@@ -110,9 +111,13 @@ export function specialReportSections(report: SpecialReport): SpecialSection[] {
     { heading: "Outlook (24\u201372h)", body: report.outlook },
     { heading: "Recommended Actions", body: report.recommendedActions, bullets: true },
   ];
-  return defs
+  const sections = defs
     .filter((d) => (d.body ?? "").trim().length > 0)
     .map((d) => ({ heading: d.heading, body: (d.body ?? "").trim(), bullets: d.bullets }));
+  assertFinalReportSectionsDistinct(
+    Object.fromEntries(sections.map((section) => [section.heading, section.body])),
+  );
+  return sections;
 }
 
 /**
@@ -128,7 +133,16 @@ export function resolveSpecialReportBlocks(
   report: SpecialReport,
 ): SpecialReportBlock[] {
   const saved = report.blocks ?? [];
-  if (saved.length > 0) return saved;
+  if (saved.length > 0) {
+    assertFinalReportSectionsDistinct(
+      Object.fromEntries(
+        saved
+          .filter((block) => block.type === "text" || block.type === "bullets")
+          .map((block) => [block.id, block.body ?? block.text ?? ""]),
+      ),
+    );
+    return saved;
+  }
 
   const blocks: SpecialReportBlock[] = [];
   const sections = specialReportSections(report);
