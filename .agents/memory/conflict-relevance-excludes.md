@@ -78,6 +78,18 @@ rows. Lock both the drops and the protected keeps into
   `includeIrrelevant` and are NOT affected — do not add a speculative
   country-report guard unless that surface is flagged.
 
+## APAC feed defaults never prove an incident's geography
+- Country-edition feeds can syndicate US local crime, court and sports stories.
+  If an APAC place is absent, a default country/centroid must not turn that row
+  into an APAC conflict incident.
+- Add unambiguous foreign cities/regions to the positive off-region gate; keep
+  court-only outcomes and sports fixtures ahead of the violence/actor rescues.
+- **Why:** isolated words such as "ambush" and team names such as "Rebels" can
+  satisfy conflict vocabulary while the event is plainly in Chicago, Charlotte
+  or another foreign locality.
+- **How to apply:** bump the relevance version and complete the stored-row
+  backfill immediately; changing ingest rules alone leaves false map markers.
+
 ## Exam-name excludes must be verb/context-bound, never the bare exam name
 - A bare exam-name exclude (e.g. "neet") meant to kill exam-logistics human-
   interest ("what's it like getting to a NEET centre") ALSO eats genuine exam-

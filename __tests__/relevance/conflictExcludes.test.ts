@@ -49,6 +49,9 @@ const DROP_FIXTURES: Array<[string, string]> = [
   ["golf senior shootout", "Entries open for 2025 South Point Senior Shootout, Super Senior Shootout"],
   ["mass-shooting trial", "Sacramento mass shooting trial begins. Jurors to decide, shootout or self-defense?"],
   ["campus threat charge", "FGCU student charged with threat to conduct mass shooting or act of terrorism"],
+  ["Chicago rapper murder", "6 gunmen kill Chicago rapper BloodHound Q50 in a Fuller Park gas station ambush"],
+  ["US sports rebels", "Gridiron Gallery: Rebels shine under the lights in 41-9 win over Charlotte"],
+  ["federal murder acquittal", "Rapper Lil Durk acquitted of federal murder charges in deadly ambush near Beverly Center"],
   // ---- CONFLICT_HARD_EXCLUDE: factbox / encyclopedia facet list ----
   ["encyclopedia factbox", "March 23 Movement | Leader, Ideology, Peace Talks, Peace Agreements, Funding, Rebels, AFC, & Congo"],
   // ---- CONFLICT_HARD_EXCLUDE: animal shelter / arts review ----
