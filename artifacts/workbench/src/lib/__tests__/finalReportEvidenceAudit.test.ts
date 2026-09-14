@@ -56,9 +56,9 @@ describe("shared final report evidence audit", () => {
     const codes = auditFinalReportEvidence(
       input({
         whatMatters:
-          "The principal exposure is road fuel distribution in Saudi Arabia if transit availability changes.",
+          "The principal exposure is road fuel distribution in Saudi Arabia if confirmed transit availability changes.",
         watchNext:
-          "Watch for a confirmed change in transit availability affecting road fuel distribution in Saudi Arabia.",
+          "Watch for confirmed transit availability changes affecting the principal road fuel distribution exposure in Saudi Arabia.",
       }),
     ).map((issue) => issue.code);
 
@@ -67,9 +67,9 @@ describe("shared final report evidence audit", () => {
       assertFinalReportEvidence(
         input({
           whatMatters:
-            "The principal exposure is road fuel distribution in Saudi Arabia if transit availability changes.",
+            "The principal exposure is road fuel distribution in Saudi Arabia if confirmed transit availability changes.",
           watchNext:
-            "Watch for a confirmed change in transit availability affecting road fuel distribution in Saudi Arabia.",
+            "Watch for confirmed transit availability changes affecting the principal road fuel distribution exposure in Saudi Arabia.",
         }),
       ),
     ).toThrow();

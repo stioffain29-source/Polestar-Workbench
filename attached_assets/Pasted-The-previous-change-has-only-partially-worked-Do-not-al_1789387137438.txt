@@ -1,0 +1,59 @@
+The previous change has only partially worked. Do not alter the wording of this single report. Fix the Fuel Watch generation system.
+
+In the current output:
+
+WHAT MATTERS contains adequate analytical prose.
+
+IMPLICATIONS FOR BUSINESS is still a single thin generic bullet.
+
+WATCH NEXT is still a single thin generic bullet.
+
+POLESTAR VIEW now contains adequate prose.
+
+The section order is also wrong. WATCH NEXT is still appearing before POLESTAR VIEW.
+
+I need you to trace the complete Fuel Watch generation pipeline and identify where each of these four sections is actually created, normalised, stored and rendered.
+
+Do not assume they all use the same prompt. Inspect the code.
+
+Fix the underlying generator so every Fuel Watch uses:
+
+WHAT MATTERS
+2 to 4 short analytical paragraphs identifying the principal developments, exposure and direction of travel.
+
+IMPLICATIONS FOR BUSINESS
+1 substantive analytical paragraph of approximately 70 to 120 words. Explain the operational and commercial consequences for businesses. Do not output a single recommendation bullet as a substitute for analysis.
+
+POLESTAR VIEW
+1 substantive assessment of approximately 70 to 120 words. Explain what the evidence means, the principal risk, direction of travel and where business exposure sits.
+
+WATCH NEXT
+1 substantive paragraph of approximately 50 to 90 words identifying several specific indicators that would materially alter the assessment. Do not output a generic sentence such as “watch for changes in transit availability.”
+
+Required rendering order:
+
+WHAT MATTERS
+IMPLICATIONS FOR BUSINESS
+POLESTAR VIEW
+WATCH NEXT
+DISCLAIMER
+
+Remove or replace any existing fallback text, hard coded default text, schema defaults, truncation rules or post processing that can reduce IMPLICATIONS FOR BUSINESS or WATCH NEXT to one generic sentence or bullet.
+
+Add validation before the report is rendered:
+
+IMPLICATIONS FOR BUSINESS must contain at least 60 words.
+
+POLESTAR VIEW must contain at least 60 words.
+
+WATCH NEXT must contain at least 40 words.
+
+If a generated section fails validation, regenerate that section rather than inserting fallback copy.
+
+Do not pad sections by inventing facts. Analysis must be based on the Fuel Watch source data already available to the generator.
+
+This must apply to all Fuel Watch reports, including scheduled generation, manual generation, regeneration and PDF export.
+
+Do not change branding, typography, report styling or unrelated report types.
+
+After making the change, generate a Fuel Watch and show me the resulting text for all four sections so I can verify the fix.

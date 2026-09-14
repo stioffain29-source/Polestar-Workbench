@@ -533,7 +533,8 @@ export function parseTopicSections(
     const happened = traceableItems(o.whatHappened, "whatHappened");
     const watch = traceableItems(o.watchNext, "watchNext");
     sections.whatHappened = happened.map((item) => item.text).join("\n\n");
-    sections.watchNext = watch.map((item) => item.text).join("\n");
+    sections.implications = sections.implications.replace(/\n+/g, " ").replace(/\s+/g, " ").trim();
+    sections.watchNext = watch.map((item) => item.text).join(" ");
     sections.provenance = {
       whatHappened: happened.map((item) => item.provenance),
       watchNext: watch.map((item) => item.provenance),

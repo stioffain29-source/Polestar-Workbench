@@ -1329,9 +1329,9 @@ export default function ReportPreview({
               ) : null;
             })()}
             <NarrativeSection hidden={!show("what-matters")} title="What Matters" text={fuelEffective?.whatMatters} />
-            <BulletsSection hidden={!show("implications")} title="Implications for Business" text={fuelEffective?.implications} />
-            <BulletsSection hidden={!show("watch-next")} title="Watch Next" text={fuelEffective?.watchNext} max={8} />
+            <NarrativeSection hidden={!show("implications")} title="Implications for Business" text={fuelEffective?.implications} />
             <NarrativeSection hidden={!show("polestar-view")} title="Polestar View" text={fuelEffective?.polestarView} />
+            <NarrativeSection hidden={!show("watch-next")} title="Watch Next" text={fuelEffective?.watchNext} />
           </>
         ) : (
           <>

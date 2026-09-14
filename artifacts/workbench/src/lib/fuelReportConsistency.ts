@@ -783,6 +783,19 @@ function repairLegacyFuelGeneratedText(value: string | null | undefined): string
 const LEGACY_REPEATED_FUEL_IMPLICATION_RE =
   /^(?:Prioritise .+; reassess if (?:a |an |the )?confirmed change in .+|Reprice .+ against current delivered-cost and availability assumptions)\.$/i;
 
+const FUEL_SECTION_MIN_WORDS = {
+  implications: 60,
+  polestarView: 60,
+  watchNext: 40,
+} as const;
+
+function meetsFuelSectionMinimum(
+  field: keyof typeof FUEL_SECTION_MIN_WORDS,
+  value: string | null | undefined,
+): boolean {
+  return (value ?? "").trim().split(/\s+/).filter(Boolean).length >= FUEL_SECTION_MIN_WORDS[field];
+}
+
 export function resolveFuelEffectiveSections(opts: {
   report: FuelGateReportFields;
   aiProse: TopicAiProse | null | undefined;
@@ -859,11 +872,20 @@ export function resolveFuelEffectiveSections(opts: {
   ): string => {
     const e = (editor ?? "").trim();
     const a = (ai ?? "").trim();
-    if (generated?.isAnalystEdited === true) return e || a || deterministic;
+    if (field === "whatMatters") {
+      if (generated?.isAnalystEdited === true) return e || a || deterministic;
+      if (e && (!a || e !== a)) return e;
+      return deterministic;
+    }
+    if (generated?.isAnalystEdited === true) {
+      if (meetsFuelSectionMinimum(field, e)) return e;
+      if (meetsFuelSectionMinimum(field, a)) return a;
+      return deterministic;
+    }
     if (field === "implications" && LEGACY_REPEATED_FUEL_IMPLICATION_RE.test(e)) {
       return deterministic;
     }
-    if (e && (!a || e !== a)) return e;
+    if (e && (!a || e !== a) && meetsFuelSectionMinimum(field, e)) return e;
     return deterministic;
   };
   const reportHasOverride = [

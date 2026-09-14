@@ -219,6 +219,7 @@ export function auditFinalReportSectionRepetition(
     const left = units[leftIndex];
     for (let rightIndex = leftIndex + 1; rightIndex < units.length; rightIndex += 1) {
       const right = units[rightIndex];
+      if (left.section === right.section) continue;
       const exact =
         left.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
         === right.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();

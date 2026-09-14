@@ -600,7 +600,7 @@ describe("AI jet-direction headlines retain the original report text", () => {
 
     expect(implications).toContain("Review delivered-cost assumptions");
     expect(implications).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|watch for|delivery schedules/i);
-    expect(watchNext).toMatch(/^Watch for .*transit availability\.$/im);
+    expect(watchNext).toContain("Watch for a confirmed change in transit availability.");
     expect(watchNext).not.toMatch(/Saudi Arabia|road fuel distribution/i);
     expect(polestarView).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|fuel-route disruption/i);
     expect(fourSections.match(/transit availability/gi)).toHaveLength(1);
@@ -642,7 +642,7 @@ describe("AI jet-direction headlines retain the original report text", () => {
     expect(effective.implications).not.toMatch(/Saudi Arabia|road fuel distribution/i);
   });
 
-  it("preserves genuinely edited analyst Implications text", () => {
+  it("rejects an undersized persisted analyst Implications override", () => {
     const data = risingJetData();
     const analystText =
       "Hold additional contracted volume at the eastern depot until the weekly allocation is confirmed.";
@@ -652,7 +652,31 @@ describe("AI jet-direction headlines retain the original report text", () => {
       fuelData: data,
     });
 
-    expect(effective.implications).toBe(analystText);
+    expect(effective.implications).toBe(
+      data.narrativeData.canonicalSections.implications,
+    );
+    expect(effective.implications.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(60);
+  });
+
+  it("rejects undersized persisted Polestar View and Watch Next overrides", () => {
+    const data = risingJetData();
+    const effective = resolveFuelEffectiveSections({
+      report: {
+        polestarView: "Fuel risk is High. Prices are rising.",
+        watchNext: "Watch for a confirmed change in transit availability.",
+      },
+      aiProse: null,
+      fuelData: data,
+    });
+
+    expect(effective.polestarView).toBe(
+      data.narrativeData.canonicalSections.polestarView,
+    );
+    expect(effective.watchNext).toBe(
+      data.narrativeData.canonicalSections.watchNext,
+    );
+    expect(effective.polestarView.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(60);
+    expect(effective.watchNext.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(40);
   });
 
   it("keeps an invalid direct analyst edit visible and publication-blocking", () => {

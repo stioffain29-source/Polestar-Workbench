@@ -1680,26 +1680,26 @@ function pctClause(pct: number | null, suffix: string): string {
 }
 
 function marketPriceParagraph(facts: FuelCanonicalFacts): string {
-  const lines = facts.marketIndicators.slice(0, 3).map((i) => {
-    const dir = directionPhrase(i.direction);
-    const current = i.currentDate ? ` as at ${proseDay(i.currentDate)}` : " (current date unavailable)";
-    if (i.comparisonScope === "reporting-period") {
-      return `${i.label} ${dir}${pctClause(i.percentageChange, "within the reporting period")}${current}` +
-        (i.referenceDate ? ` from the ${proseDay(i.referenceDate)} reference` : "");
-    }
-    if (i.comparisonScope === "lagged-reference") {
-      return `${i.label} ${dir}${pctClause(i.percentageChange, "against a lagged reference")}${current}` +
-        (i.referenceDate ? ` versus ${proseDay(i.referenceDate)}` : "");
-    }
-    if (i.comparisonScope === "undated-reference") {
-      return `${i.label} ${dir}${pctClause(i.percentageChange, "against an undated reference")}${current}`;
-    }
-    return `${i.label} is reported${current}, without a comparable reference`;
-  });
-  if (!lines.length) {
+  const indicators = facts.marketIndicators.slice(0, 3);
+  if (!indicators.length) {
     return "Market price observations were not supplied for this period; treat cost exposure from the prior week as unchanged until fresh quotes land.";
   }
-  return `The principal market move is on crude and aviation fuel: ${lines.join("; ")}.`;
+  const crude = indicators.filter((indicator) => /\b(?:brent|wti|crude)\b/i.test(indicator.label));
+  const aviation = indicators.filter((indicator) => /\b(?:jet|aviation)\b/i.test(indicator.label));
+  const directionSummary = (group: typeof indicators, label: string): string | null => {
+    if (!group.length) return null;
+    const directions = [...new Set(group.map((indicator) => indicator.direction))];
+    const direction = directions.length === 1
+      ? directionPhrase(directions[0])
+      : "moved in different directions";
+    const reportingPeriod = group.some((indicator) => indicator.comparisonScope === "reporting-period");
+    return `${label} ${direction}${reportingPeriod ? " within the reporting period" : " against the supplied references"}`;
+  };
+  const clauses = [
+    directionSummary(crude, "Crude benchmarks"),
+    directionSummary(aviation, "Aviation fuel"),
+  ].filter((clause): clause is string => Boolean(clause));
+  return `The principal market move is upward pressure across crude and aviation fuel. ${clauses.join("; ")}.`;
 }
 
 function incidentsHaystack(incidents: CanonicalFuelIncident[]): string {
@@ -2391,7 +2391,7 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
       `Use the reported ${facts.judgement.direction} price direction as the near-term planning baseline, while retaining enough budget and stock flexibility for a change in market or supply conditions.`,
     );
   }
-  return bullets.slice(0, 5).join("\n");
+  return bullets.slice(0, 5).join(" ");
 }
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
@@ -2452,6 +2452,44 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
       supportingEvidenceIds: refineryIds,
     });
   }
+  const familyIndicator: Partial<Record<IssueFamily["key"], string>> = {
+    shortage:
+      "Monitor distributor allocation notices, depot inventory and delivery lead times; deterioration in those indicators would show whether the reported shortage is moving into wider commercial supply.",
+    chokepoint:
+      "Monitor confirmed passage restrictions, vessel rerouting and war-risk advisories; a sustained change in those indicators would show whether route pressure is becoming a material fuel-delivery constraint.",
+    tanker:
+      "Monitor tanker availability, convoy delays and depot delivery schedules; a sustained deterioration would show whether the reported distribution disruption is reducing practical fuel access.",
+    policy:
+      "Monitor effective dates for duties, subsidies, rationing or price controls; implementation details would show whether the policy change is moving into supplier pricing or allocation.",
+    pricing:
+      "Monitor subsequent benchmark observations and supplier pass-through notices; a sustained move would show whether the reported price pressure is reaching transport, aviation or delivered-fuel contracts.",
+    crude:
+      "Monitor export availability, loading programmes and sanctions enforcement; a confirmed change would show whether crude-side pressure is moving into physical supply or downstream product pricing.",
+  };
+  for (const family of ISSUE_FAMILIES) {
+    if (unique.map((item) => item.text).join(" ").split(/\s+/).filter(Boolean).length >= 40) break;
+    const text = familyIndicator[family.key];
+    if (!text) continue;
+    const supporting = facts.currentConditions.filter((incident) =>
+      hasPattern(haystack(incident.raw), family.test),
+    );
+    const supportingEvidenceIds = supporting.map((incident) => incident.id).filter(Boolean);
+    if (!supportingEvidenceIds.length) continue;
+    unique.push({ text, supportingEvidenceIds });
+  }
+  if (unique.map((item) => item.text).join(" ").split(/\s+/).filter(Boolean).length < 40) {
+    const supplyDisruption = facts.currentConditions.filter((incident) =>
+      /\b(?:fuel|diesel|petrol|kerosene|lpg)\b.{0,50}\b(?:supply halted|supply disruption|depot attack|depot outage)\b/i
+        .test(haystack(incident.raw)),
+    );
+    const supportingEvidenceIds = supplyDisruption.map((incident) => incident.id).filter(Boolean);
+    if (supportingEvidenceIds.length > 0) {
+      unique.push({
+        text: "Monitor depot operating status, fuel dispatches and delivery lead times; continued supply interruption would show whether the reported disruption is affecting downstream availability rather than remaining contained.",
+        supportingEvidenceIds,
+      });
+    }
+  }
   const selected = unique.slice(0, 6);
   while (
     selected.length > 2
@@ -2459,12 +2497,12 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   ) {
     selected.pop();
   }
-  return selected.map((item) => item.text).join("\n");
+  return selected.map((item) => item.text).join(" ");
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   if (facts.analystReviewRequired) {
-    return "Do not rely on this assessment yet. Several reports still lack a confirmed location or outcome. Check those reports before making decisions about fuel supply or cost.";
+    return "Do not rely on this assessment yet. The available reports do not establish enough confirmed location or outcome detail to identify the principal Fuel exposure with confidence. That uncertainty matters because price, availability, distribution and infrastructure disruption require different commercial responses. Verify the unresolved reports before changing supply, stock or routing decisions. Until those facts are confirmed, protect existing continuity arrangements, avoid assuming that reported disruption is widespread, and retain the current planning baseline.";
   }
   const j = facts.judgement;
   const action = j.exposure.sector === "road fuel distribution"

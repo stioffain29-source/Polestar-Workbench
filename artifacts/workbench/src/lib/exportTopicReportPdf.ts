@@ -1547,24 +1547,18 @@ export async function exportTopicReportPdf(
     }
     // Render the exact final text checked by the publication gate.
     if (show("implications")) {
-      drawBulletSection(
-        ctx,
-        "Implications for Business",
-        fuelEffective?.implications ?? "",
-      );
-    }
-    if (show("watch-next")) {
-      drawBulletSection(
-        ctx,
-        "Watch Next",
-        fuelEffective?.watchNext ?? "",
-        8,
-      );
+      renderProseSection("Implications for Business", fuelEffective?.implications);
     }
     if (show("polestar-view")) {
       const polestarView = fuelEffective?.polestarView ?? "";
       if (polestarView.trim()) {
-        drawSectionWithProseAndDisclaimer(ctx, "Polestar View", polestarView);
+        renderProseSection("Polestar View", polestarView);
+      }
+    }
+    if (show("watch-next")) {
+      const watchNext = fuelEffective?.watchNext ?? "";
+      if (watchNext.trim()) {
+        drawSectionWithProseAndDisclaimer(ctx, "Watch Next", watchNext);
       } else {
         drawDisclaimer(ctx);
       }
