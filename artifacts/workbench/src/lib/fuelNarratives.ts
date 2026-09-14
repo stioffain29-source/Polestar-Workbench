@@ -1729,7 +1729,7 @@ function physicalSupplyParagraph(facts: FuelCanonicalFacts): string {
   const label = facts.primaryPressurePoint.kind === "distributed"
     ? "several theatres"
     : facts.primaryPressurePoint.label;
-  return `Operational developments are concentrated around ${label}; any effect on availability or delivery cost remains conditional on operational follow-through.`;
+  return `The main development is in ${label}. It may affect fuel availability or delivery costs if the disruption continues.`;
 }
 
 function responseParagraph(facts: FuelCanonicalFacts): string {
@@ -2410,10 +2410,25 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   if (facts.analystReviewRequired) {
-    return "Hold wider circulation until sourcing is firm enough for operational claims. Several developments in the window still lack confirmed location or outcome, so cost and continuity judgements should stay provisional.";
+    return "Do not rely on this assessment yet. Several reports still lack a confirmed location or outcome. Check those reports before making decisions about fuel supply or cost.";
   }
   const j = facts.judgement;
-  return `The main risk is ${j.mainRisk}. ${j.exposure.sector} is most exposed${j.exposure.geography ? ` in ${j.exposure.geography}` : " across the reported markets"}. The near-term direction is ${j.direction}; the assessment changes if ${j.trigger}.`;
+  const place = j.exposure.geography
+    ? `${j.exposure.geography} needs the closest attention.`
+    : "No single market accounts for the current pressure.";
+  const action = j.exposure.sector === "road fuel distribution"
+    ? "Check fuel stocks and delivery schedules for critical sites."
+    : j.exposure.sector === "routing and fuel delivery"
+      ? "Confirm delivery routes and allow extra time for fuel shipments."
+      : "Confirm supply contracts and review fuel budgets.";
+  const outlook = j.direction === "upward"
+    ? "Prices are rising."
+    : j.direction === "downward"
+      ? "Prices are falling."
+      : j.direction === "stable"
+        ? "Prices are broadly stable."
+        : "The price direction is unclear.";
+  return `Fuel risk is ${facts.overallSeverity}. ${j.mainRisk}. ${place} ${outlook} ${action}`;
 }
 
 /** Build count-free analytical sections from canonical facts. */

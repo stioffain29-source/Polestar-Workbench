@@ -2420,10 +2420,10 @@ export default function ReportEditor() {
             whatHappened: form.whatHappened,
           },
           form.topic === "shipping"
-            ? (incidents ?? []).filter(
+            ? incidentsForExport.filter(
                 (i) => i.maritimeValidation?.status === "validated",
               )
-            : incidents ?? [],
+            : incidentsForExport,
         )
       : undefined;
   // Live freshness warning — recomputes as the author edits the issue date.
@@ -2681,10 +2681,11 @@ export default function ReportEditor() {
           </Field>
           <Field label="Risk Rating">
             <Select
-              value={form.riskRating || "__auto__"}
+              value={(computedRating ?? form.riskRating) || "__auto__"}
               onValueChange={(v) =>
                 set("riskRating", v === "__auto__" ? "" : v)
               }
+              disabled={computedRating != null}
             >
               <SelectTrigger className="rounded-sm">
                 <SelectValue />
@@ -2704,12 +2705,14 @@ export default function ReportEditor() {
             </Select>
             <p className="text-[11px] text-muted-foreground mt-1">
               {form.riskRating
-                ? "Overrides the rating computed from incidents when this report is pulled into a card."
+                ? computedRating
+                  ? `Canonical evidence rates this report ${CARD_RATING_LABELS[computedRating]}; the saved ${CARD_RATING_LABELS[form.riskRating as keyof typeof CARD_RATING_LABELS] ?? form.riskRating} override is ignored.`
+                  : "No canonical evidence rating is available, so this explicit analyst rating is used."
                 : maritimeRiskBlocked
                   ? "Left on Auto: rating is held until every in-window maritime row has current semantic validation."
                 : computedRating
-                  ? `Left on Auto: this report rates ${CARD_RATING_LABELS[computedRating]} from its incidents.`
-                  : "Left on Auto: rating is computed from incidents when pulled into a card."}
+                  ? `Locked to ${CARD_RATING_LABELS[computedRating]} from the report's canonical evidence.`
+                  : "No evidence-backed rating is available. The report will not infer one from prose."}
             </p>
           </Field>
 

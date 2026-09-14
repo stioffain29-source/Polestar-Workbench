@@ -131,6 +131,18 @@ async function main() {
       hiddenSections,
       sectionOverrides,
     );
+  } else if (TOPIC === "conflict") {
+    const { exportConflictReportPdf } = await import("../src/lib/exportConflictReportPdf");
+    await exportConflictReportPdf(
+      data as Parameters<typeof exportConflictReportPdf>[0],
+      incidents as Parameters<typeof exportConflictReportPdf>[1],
+      OUT,
+      undefined,
+      {},
+      undefined,
+      hiddenSections,
+      sectionOverrides,
+    );
   } else if (TOPIC === "flashpoint" || TOPIC === "protests") {
     const { exportFlashpointReportPdf } = await import("../src/lib/exportFlashpointReportPdf");
     await exportFlashpointReportPdf(

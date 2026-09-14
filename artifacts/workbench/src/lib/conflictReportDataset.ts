@@ -1613,6 +1613,15 @@ const GENERIC_CONFLICT_PHRASES = [
   "Recent cases include",
   "Notable incidents include",
   "The most notable was",
+  // Superseded traceability/recovery prose from the pre-canonical Conflict
+  // pipeline. It is generated boilerplate, not an analyst judgement, and can
+  // contradict the live accepted-ID set and severity rollup.
+  "traceability standard for current conflict themes is not met",
+  "no canonical current incident IDs",
+  "That leaves the operating picture incomplete",
+  "The main issue is uncertainty rather than a confirmed multi-country escalation",
+  "poor traceability, not a confirmed broadening of conflict",
+  "Risk level:",
 ];
 
 export function isGenericConflictProse(text: string): boolean {

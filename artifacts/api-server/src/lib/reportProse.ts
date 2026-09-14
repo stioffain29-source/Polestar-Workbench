@@ -34,7 +34,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
-export const REPORT_PROSE_PROMPT_VERSION = "v4";
+export const REPORT_PROSE_PROMPT_VERSION = "v5";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -226,6 +226,8 @@ FUEL EVIDENCE TRACEABILITY — additional non-negotiable rules:
 - The supplied canonical current-period evidence IDs are the complete authority for current Fuel themes. Do not introduce a country, shortage, refinery behaviour, transport disruption, aviation restriction, bunker-fuel or strike theme without a supporting supplied ID.
 - Return whatHappened as an array of objects, each containing text, supportingEvidenceIds and supportingClaim. Return watchNext in the same shape. supportingClaim must be copied exactly from a supported claim shown for one cited record; do not invent or paraphrase claims.
 - The parser renders the verified claim for whatHappened, so an unsupported paraphrase cannot survive. For watchNext, include the exact parent claim in the text plus explicit future/conditional modality. Potential evidence can support Watch Next only in that conditional form; it cannot support current whatHappened.
+- Write the Polestar View in plain English. Use short sentences that say: the risk, the place that needs attention, the price direction, and one concrete action.
+- Never use "concentrated around", "practical aviation and distribution constraint", "route flexibility", "operational posture", "pressure point", "fuel assurance", or "cost controls".
 `
       : "";
   const conflictGuardrails =

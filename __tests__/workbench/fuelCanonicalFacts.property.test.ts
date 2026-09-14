@@ -67,6 +67,9 @@ describe("Fuel Watch canonical facts parameterized properties", () => {
     expect(model.primaryPressurePoint.label).toBe(leader);
     expect(sections.regionalHighlights).toContain(leader);
     expect(sections.polestarView).toContain(leader);
+    expect(sections.polestarView).not.toMatch(
+      /concentrated around|practical aviation and distribution constraint|route flexibility|operational posture|pressure point|fuel assurance|cost controls/i,
+    );
     expect(sections.executiveSummary).not.toMatch(/\d+\s+incidents?/i);
     expect(validateFuelReportConsistency(model, sections)).toEqual([]);
   });

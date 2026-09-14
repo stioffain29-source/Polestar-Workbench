@@ -620,6 +620,19 @@ describe("isGenericConflictProse", () => {
     expect(isGenericConflictProse(ds.autoPolestarView)).toBe(false);
   });
 
+  it("replaces the stale traceability and risk-level prose in the attached regression report", () => {
+    expect(
+      isGenericConflictProse(
+        "The traceability standard for current conflict themes is not met because no canonical current incident IDs were supplied.",
+      ),
+    ).toBe(true);
+    expect(
+      isGenericConflictProse(
+        "Risk level: Moderate. The constraint this week is poor traceability, not a confirmed broadening of conflict.",
+      ),
+    ).toBe(true);
+  });
+
   it("treats empty text as non-generic", () => {
     expect(isGenericConflictProse("")).toBe(false);
   });

@@ -13,6 +13,11 @@ window"/"in the window", "coverage gap", "operational signal", "the read",
 plain equivalents ("gap in reporting", "activity", "the picture", "a rough
 guide", "came through", "recent weeks").
 
+Plain English means short subject-verb sentences that name the place, the
+change, and the action. Avoid stacked analyst nouns and indirect phrases such
+as "disruption remains concentrated around", "practical constraint", "route
+flexibility", "fuel assurance", "operational posture", and "pressure point".
+
 **Why:** the user (terse, distrustful) explicitly demanded reports read like
 business briefs, not pipeline logs, across ALL report topics.
 

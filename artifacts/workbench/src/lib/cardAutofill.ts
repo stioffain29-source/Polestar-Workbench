@@ -17,6 +17,11 @@ import {
   type ShippingReportIncident,
 } from "./shippingReportDataset";
 import { buildMaritimeIntelligence } from "./maritimeIntelligence";
+import { buildConflictReportDataset } from "./conflictReportDataset";
+import { buildFlashpointReportDataset } from "./flashpointReportDataset";
+import { buildFuelWatchReportData } from "./fuelWatchReport";
+import { filterTopicReportIncidents } from "./topicFastFacts";
+import { applyIncidentCurations } from "./topicSectionOverrides";
 
 // Sources an analyst can pull card content from.
 export type CardSourceKind = "country" | "incident" | "spot" | "report";
@@ -62,25 +67,6 @@ function normaliseRating(severity?: string | null): string | undefined {
   return (CARD_RATINGS as readonly string[]).includes(s) ? s : undefined;
 }
 
-// Reports carry no explicit severity field, so infer the card rating from the
-// five-tier risk vocabulary used in the prose, taking the highest tier present.
-const RATING_TIERS: readonly string[] = [
-  "extreme",
-  "high",
-  "moderate",
-  "low",
-  "insignificant",
-];
-
-function inferRatingFromProse(...parts: Array<string | null | undefined>): string | undefined {
-  const text = parts.filter(Boolean).join(" ").toLowerCase();
-  if (!text) return undefined;
-  for (const tier of RATING_TIERS) {
-    if (new RegExp(`\\b${tier}\\b`).test(text)) return tier;
-  }
-  return undefined;
-}
-
 // CARD_RATINGS ordered weakest→strongest, so a tier's index is its rank.
 const RATING_RANK: Record<string, number> = Object.fromEntries(
   CARD_RATINGS.map((r, i) => [r, i]),
@@ -110,11 +96,68 @@ export function ratingFromScopedIncidents(
   incidents: Incident[],
 ): string | undefined {
   if (!incidents.length) return undefined;
+  const curated = applyIncidentCurations(
+    incidents,
+    rep.sectionOverrides,
+  );
+
+  // Fuel's canonical universe deliberately includes bounded Shipping/Energy
+  // continuity cross-reads, so it must receive the full curated pool before
+  // any topic-only scoping.
+  if (rep.topic === "fuel") {
+    return normaliseRating(
+      buildFuelWatchReportData(
+        {
+          title: rep.title,
+          issueDate: rep.issueDate,
+          author: rep.author,
+          executiveSummary: rep.executiveSummary,
+          situation: rep.situation,
+          whatHappened: rep.whatHappened,
+          whatMatters: rep.whatMatters,
+          implications: rep.implications,
+          polestarView: rep.polestarView,
+          watchNext: rep.watchNext,
+          hardNumbers: rep.hardNumbers,
+        },
+        curated as never,
+      ).canonicalFacts.overallSeverity,
+    );
+  }
+
   const topics = reportDataTopics(rep.topic);
-  const scoped = incidents.filter((i) => i.topic != null && topics.has(i.topic));
+  const scoped = curated.filter((i) => i.topic != null && topics.has(i.topic));
   if (!scoped.length) return undefined;
   const issueDate = clampIssueDateToLatestRecord(rep.issueDate, scoped);
-  const windowed = filterIncidentsToWindow(scoped, rep.topic, issueDate);
+
+  // Specialized reports must use the same final canonical incident set as
+  // their Fast Facts and narrative. Raw relevance-filtered rows are not enough:
+  // Conflict separates statements/context from incidents, Flashpoint performs
+  // event clustering, and Fuel applies its market-severity caps.
+  if (rep.topic === "conflict") {
+    return normaliseRating(
+      buildConflictReportDataset(scoped as never, rep.topic, issueDate)
+        .worstSeverity,
+    );
+  }
+  if (rep.topic === "flashpoint" || rep.topic === "protests") {
+    const rows = buildFlashpointReportDataset(
+      scoped as never,
+      rep.topic,
+      issueDate,
+    ).canonical.periodRows;
+    let bestRank = -1;
+    for (const row of rows) {
+      const tier = normaliseRating(row.severity);
+      if (tier && RATING_RANK[tier] > bestRank) bestRank = RATING_RANK[tier];
+    }
+    return bestRank >= 0 ? CARD_RATINGS[bestRank] : undefined;
+  }
+  const windowed = filterTopicReportIncidents(
+    scoped as never,
+    rep.topic,
+    issueDate,
+  );
   let bestRank = -1;
   for (const inc of windowed) {
     const tier = inc.severity?.toLowerCase();
@@ -125,10 +168,8 @@ export function ratingFromScopedIncidents(
   return bestRank >= 0 ? CARD_RATINGS[bestRank] : undefined;
 }
 
-// The auto-derived report rating: the worst credible tier among the report's
-// scoped incidents, falling back to the five-tier vocabulary inferred from the
-// prose when no scoped incident carries a usable rating. This is the value the
-// stored `riskRating` defaults to when an analyst leaves the override blank.
+// The auto-derived report rating comes from canonical evidence only. Narrative
+// prose is an output and must never be used as an input to risk calculation.
 export function autoReportRating(
   rep: Report,
   incidents: Incident[] = [],
@@ -137,7 +178,10 @@ export function autoReportRating(
   // article severity. The status gate is intentionally strict: an object
   // without maritimeValidation is not trusted as a validated source row.
   if (rep.topic === "shipping") {
-    const maritimeRows = incidents.filter((incident) => incident.topic === "shipping");
+    const maritimeRows = applyIncidentCurations(
+      incidents,
+      rep.sectionOverrides,
+    ).filter((incident) => incident.topic === "shipping");
     const statusRows = filterIncidentsToWindow(
       maritimeRows,
       rep.topic,
@@ -173,15 +217,7 @@ export function autoReportRating(
     });
     return CARD_RATINGS[board.overallRisk.level - 1];
   }
-  return (
-    ratingFromScopedIncidents(rep, incidents) ??
-    inferRatingFromProse(
-      rep.situation,
-      rep.whatMatters,
-      rep.implications,
-      rep.whatHappened,
-    )
-  );
+  return ratingFromScopedIncidents(rep, incidents);
 }
 
 // Split prose into clean sentences for key-point derivation.
@@ -293,12 +329,13 @@ export function reportToCard(
   return {
     topic: canonicalTopic(rep.topic).topicLine,
     country,
-    // Prefer the analyst's stored override, then the rating computed from the
-    // report's scoped incidents, then the prose heuristic, then a safe default.
+    // Canonical evidence wins whenever it exists. A stored override is used
+    // only when the report has no computable evidence-backed rating; stale
+    // overrides and narrative tier words can no longer contradict Fast Facts.
     rating:
-      normaliseRating(rep.riskRating) ??
       autoReportRating(rep, incidents) ??
-      "moderate",
+      normaliseRating(rep.riskRating) ??
+      "insignificant",
     headline: resolveReportTitle(rep.topic, rep.title),
     bluf:
       situation.slice(0, 2).join(" ") ||
