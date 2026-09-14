@@ -844,6 +844,17 @@ export function resolveFuelEffectiveSections(opts: {
       field === "whatHappened" ? "\n\n" : "\n",
     ) || deterministic;
   };
+  const resolveCanonicalAnalysis = (
+    editor: string | null | undefined,
+    ai: string | null | undefined,
+    deterministic: string,
+  ): string => {
+    const e = (editor ?? "").trim();
+    const a = (ai ?? "").trim();
+    if (generated?.isAnalystEdited === true) return e || a || deterministic;
+    if (e && (!a || e !== a)) return e;
+    return deterministic;
+  };
   const reportHasOverride = [
     report.executiveSummary,
     report.situation,
@@ -864,13 +875,13 @@ export function resolveFuelEffectiveSections(opts: {
     executiveSummary: resolveText(report.executiveSummary, generated?.executiveSummary, canonical.executiveSummary),
     situation: resolveText(report.situation, generated?.situation, canonical.situation),
     whatHappened: resolveAnalytical("whatHappened", report.whatHappened, generated?.whatHappened, canonical.whatHappened),
-    whatMatters: resolveText(report.whatMatters, generated?.whatMatters, canonical.whatMatters),
-    polestarView: resolveText(report.polestarView, generated?.polestarView, canonical.polestarView),
+    whatMatters: resolveCanonicalAnalysis(report.whatMatters, generated?.whatMatters, canonical.whatMatters),
+    polestarView: resolveCanonicalAnalysis(report.polestarView, generated?.polestarView, canonical.polestarView),
     marketRead: canonical.marketRead,
     operationalRead: canonical.operationalRead,
     regionalHighlights: canonical.regionalHighlights,
-    implications: resolveText(report.implications, generated?.implications, canonical.implications),
-    watchNext: resolveAnalytical("watchNext", report.watchNext, generated?.watchNext, canonical.watchNext),
+    implications: resolveCanonicalAnalysis(report.implications, generated?.implications, canonical.implications),
+    watchNext: resolveCanonicalAnalysis(report.watchNext, generated?.watchNext, canonical.watchNext),
     provenance: generated?.provenance ?? canonical.provenance,
     analystEditReviewRequired,
   };

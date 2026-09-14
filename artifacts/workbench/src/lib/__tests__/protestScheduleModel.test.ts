@@ -85,9 +85,9 @@ describe("protest schedule model", () => {
       { confirmedPlanned: [event(1, "Confirmed", "2026-08-03T00:00:00Z")], possible: [event(2, "Possible", "2026-08-04T00:00:00Z")], searchCompletedAt: "2026-08-01T00:00:00Z" },
     );
     const watchNext = buildProtestScheduleWatchNext(model);
-    expect(watchNext).toMatch(/Monitor confirmed protest activity/);
-    expect(watchNext).toMatch(/Possible mobilisation/);
-    expect(watchNext).toMatch(/monitor for confirmation before changing plans/);
+    expect(watchNext).toMatch(/rally — wages.*is scheduled/i);
+    expect(watchNext).toMatch(/remains possible/i);
+    expect(watchNext).toMatch(/confirm the organiser, venue and route/i);
   });
 
   it("lets an analyst row supersede an automated duplicate", () => {

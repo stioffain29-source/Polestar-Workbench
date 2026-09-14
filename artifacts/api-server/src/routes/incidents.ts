@@ -27,6 +27,21 @@ import {
 
 const router: IRouter = Router();
 
+// Incident reads are live operational views. Express's generated ETag can make
+// an authenticated browser reuse a pre-backfill response because relevance
+// updates change which rows qualify without necessarily changing the response
+// validator the client already holds. Ignore conditional validators and forbid
+// storage so a relevance cleanup is visible on the next poll/reload.
+router.use((req, res, next) => {
+  if (req.method === "GET") {
+    delete req.headers["if-none-match"];
+    delete req.headers["if-modified-since"];
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    res.setHeader("Pragma", "no-cache");
+  }
+  next();
+});
+
 function parseId(raw: string | string[] | undefined): number {
   const v = Array.isArray(raw) ? raw[0] : raw;
   const n = parseInt(v ?? "", 10);

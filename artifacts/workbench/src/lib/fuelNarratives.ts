@@ -631,6 +631,8 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: "Buyer action",
     test: [
+      /\bairports?\b.{0,80}\b(?:restrict\w*|limit\w*|ration\w*|suspend\w*|halt\w*)\b.{0,60}\b(?:aircraft )?refuelling\b/,
+      /\b(?:aircraft )?refuelling\b.{0,60}\b(?:restrict\w*|limit\w*|ration\w*|suspend\w*|halt\w*)\b/,
       /\b(airline|carrier) .{0,30}(surcharge|fuel hedge|hedging|capacity (cut|reduction))/,
       // Aviation demand response: a named carrier (or the generic words
       // airline/carrier/airways) suspending, cancelling, cutting, grounding
@@ -944,6 +946,10 @@ function pickActor(i: TopicFastFactsIncident, category: FuelActionCategory): str
     return "Government";
   }
   if (category === "Buyer action") {
+    if (/\bairports?\b.{0,80}\b(?:restrict\w*|limit\w*|ration\w*|suspend\w*|halt\w*)\b.{0,60}\b(?:aircraft )?refuelling\b|\b(?:aircraft )?refuelling\b.{0,60}\b(?:restrict\w*|limit\w*|ration\w*|suspend\w*|halt\w*)\b/.test(t)) {
+      const c = incidentCountry(i);
+      return c ? `${c} airport operators` : "Airport operators";
+    }
     if (/\b(airline|aviation|jet fuel|carrier|flight|airways|airlines)\b/.test(t)) return "Aviation sector";
     const c = incidentCountry(i);
     if (c) return c;
@@ -984,7 +990,7 @@ function hasVerifiedActorAction(
 ): boolean {
   if (category === "Market / supply signal") return false;
   if (/^(Market|Buyer|Producer|Government|Infrastructure operator|—)$/i.test(actor.trim())) return false;
-  const action = /\b(announc\w*|approv\w*|adopt\w*|implement\w*|introduc\w*|impos\w*|lift\w*|rais\w*|reduc\w*|cut\w*|increas\w*|boost\w*|restart\w*|resum\w*|restor\w*|halt\w*|shut\w*|suspend\w*|cancel\w*|rerout\w*|bypass\w*|open\w*|clos\w*|clear\w*|sign\w*|award\w*|launch\w*|buy\w*|sell\w*|import\w*|export\w*|tender\w*|ration\w*|releas\w*|draw\w*|stockpil\w*|hedg\w*|mov\w*|pivot\w*|turn\w+\s+to|complet\w*|expand\w*)\b/;
+  const action = /\b(announc\w*|approv\w*|adopt\w*|implement\w*|introduc\w*|impos\w*|lift\w*|rais\w*|reduc\w*|cut\w*|increas\w*|boost\w*|restart\w*|resum\w*|restor\w*|restrict\w*|limit\w*|halt\w*|shut\w*|suspend\w*|cancel\w*|rerout\w*|bypass\w*|open\w*|clos\w*|clear\w*|sign\w*|award\w*|launch\w*|buy\w*|sell\w*|import\w*|export\w*|tender\w*|ration\w*|releas\w*|draw\w*|stockpil\w*|hedg\w*|mov\w*|pivot\w*|turn\w+\s+to|complet\w*|expand\w*)\b/;
   return action.test(text);
 }
 
@@ -1344,7 +1350,7 @@ export function buildFuelProducerBuyerActions(opts: {
     // appended from the incident's country stamp when the text itself
     // does not carry it. WHEN is the date line under the cell.
     const headline = normalizeFuelHeadline(i.title.trim().replace(/\.$/, ""));
-    const action = capitalizeFirst(
+    let action = capitalizeFirst(
       summarizeFuelDevelopmentClause({
         title: headline,
         summary: i.summary,
@@ -1352,6 +1358,9 @@ export function buildFuelProducerBuyerActions(opts: {
         location: i.location,
       }),
     );
+    if (/\bairports?\b.{0,80}\b(?:restrict\w*|limit\w*|ration\w*|suspend\w*|halt\w*)\b.{0,60}\b(?:aircraft )?refuelling\b/.test(t)) {
+      action = sentenceCaseHeadline(headline);
+    }
     if (isGenericPolicyAction(action)) continue;
     const dedupeKey = headline.toLowerCase();
     if (seen.has(dedupeKey)) continue;

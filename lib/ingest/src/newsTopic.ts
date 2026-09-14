@@ -227,6 +227,20 @@ const OUT_OF_REGION: { token: string; canonical: string }[] = [
   { token: "mexico", canonical: "Mexico" },
   { token: "texas", canonical: "United States" },
   { token: "american", canonical: "United States" },
+  // US local stories often omit the country name. These positive place/source
+  // matches must beat an unrelated APAC country-edition feed default.
+  { token: "chicago", canonical: "United States" },
+  { token: "charlotte", canonical: "United States" },
+  { token: "maryland", canonical: "United States" },
+  { token: "baltimore", canonical: "United States" },
+  { token: "los angeles", canonical: "United States" },
+  { token: "beverly center", canonical: "United States" },
+  { token: "new york", canonical: "United States" },
+  { token: "california", canonical: "United States" },
+  { token: "florida", canonical: "United States" },
+  { token: "ohio", canonical: "United States" },
+  { token: "michigan", canonical: "United States" },
+  { token: "illinois", canonical: "United States" },
   // Europe
   { token: "france", canonical: "France" },
   { token: "germany", canonical: "Germany" },

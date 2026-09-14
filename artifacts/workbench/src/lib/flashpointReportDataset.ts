@@ -4262,6 +4262,17 @@ export function resolveFlashpointRenderedModel(args: {
     Array.from(ds.canonical.periodRows),
   ).label;
   const activityPresent = ds.canonical.periodRows.length > 0;
+  const recoveryLeads = ds.relatedIncidents.slice(0, 3);
+  const leadLines = recoveryLeads.map((row) => {
+    const title = displayIncidentTitle(row.title, row.displayTitle).replace(/\.$/, "");
+    const place = [row.location, row.country].filter(Boolean).join(", ");
+    return `${place || "The reported location"}: ${title}.`;
+  });
+  const eventSpecificImplications = recoveryLeads.map((row) => {
+    const title = displayIncidentTitle(row.title, row.displayTitle).replace(/\.$/, "");
+    const place = [row.location, row.country].filter(Boolean).join(", ");
+    return `For activity linked to “${title}”${place ? ` in ${place}` : ""}, check the reported venue or route for a confirmed closure, dispersal measure or transport effect before changing staff movement.`;
+  });
   const regionalConcentration = leadCountry
     ? `Reporting is concentrated in ${leadCountry}${supportingCountries.length ? `, with additional activity in ${joinList(supportingCountries)}` : ""}.`
     : "The accepted reporting does not establish a defensible geographic concentration.";
@@ -4290,17 +4301,14 @@ export function resolveFlashpointRenderedModel(args: {
       protestSchedule,
     ),
     regionalCountryRead: `${regionalConcentration} This distribution identifies where reporting is concentrated, while the severity colour identifies the highest assessed incident in each country; neither measure by itself establishes nationwide disruption.`,
-    whatMatters: leadCountry
-      ? `${leadCountry} is the main reporting concentration, while ${supportingCountries.length ? joinList(supportingCountries) : "other monitored markets"} broaden the exposure picture. The operational question is whether activity remains locally contained or begins to affect transport corridors, commercial districts, government facilities or staff movement. Decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.`
+    whatMatters: leadLines.length
+      ? `${leadLines.join(" ")} These are the developments that matter this period; each should change operating posture only where its reporting identifies a specific access, transport, facility or personnel effect.`
       : "The accepted record does not support a geographic lead. Operational decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.",
-    implications: [
-      "Check staff travel, site access and transport routes against current local advisories before movement.",
-      "Maintain alternate routing and communications arrangements where gatherings could affect commercial or government districts.",
-      "Use confirmed closures, enforcement measures, violence or damage as escalation triggers; do not change posture on report volume alone.",
-      "Revalidate conditions close to departure because public-order restrictions can change with limited notice.",
-    ].join("\n"),
+    implications: eventSpecificImplications.join("\n"),
     watchNext: fallbackWatchNext,
-    polestarView: `Maintain a proportionate posture focused on verified access and movement effects. The current severity ceiling is ${severityCeiling}; escalation should depend on confirmed widening, sustained disruption or direct effects on personnel and facilities. Keep local routing, communications and decision triggers under active review in ${leadCountry ?? "the reported markets"}.`,
+    polestarView: leadLines.length
+      ? `The current severity ceiling is ${severityCeiling}. The assessment is led by ${leadLines.map((line) => line.replace(/\.$/, "")).join("; ")} Escalate only where follow-on reporting confirms a wider footprint, sustained disruption or direct effects on personnel, routes or facilities.`
+      : `The current severity ceiling is ${severityCeiling}, but the accepted record does not establish a specific operational exposure.`,
   });
   assertFlashpointRenderedModelValid(groundedRecovery);
   return Object.freeze(groundedRecovery);

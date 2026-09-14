@@ -31,3 +31,6 @@ The fail-closed prose validator must assign counts to the section and qualifier 
 **Why:** unscoped numeral matching can mistake dates, durations and qualified subset counts for contradictory report totals, rejecting valid prose and triggering unnecessary recovery.
 
 **How to apply:** when extending count validation, preserve fail-closed comparison but add grammatical and section scope. A recovery warning with identical selected/canonical errors usually indicates the shared validator or canonical builder is wrong, not that recovery prose should be improved.
+
+Recovery prose must name accepted incidents and their locations; it may not fall back to generic travel, routing or posture advice.
+**Why:** a canonical validation failure exposed generic recovery copy as the published What Matters, Implications and Polestar View.

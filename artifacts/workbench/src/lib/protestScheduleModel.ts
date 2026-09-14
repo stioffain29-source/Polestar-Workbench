@@ -532,7 +532,11 @@ export function buildProtestScheduleWatchNext(
   model: ProtestScheduleModel,
 ): string {
   const lines = rankedWatchNextRows(model).slice(0, 8).map((row) => {
-    const place = [row.city, row.country].filter(Boolean).join(", ");
+    const activity = protestScheduleActivity(row).replace(/\.$/u, "");
+    const activityLower = activity.toLowerCase();
+    const place = [row.city, row.country]
+      .filter((part): part is string => Boolean(part && !activityLower.includes(part.toLowerCase())))
+      .join(", ");
     const date = row.eventDate
       ? new Intl.DateTimeFormat("en-GB", {
           day: "2-digit",
@@ -542,8 +546,8 @@ export function buildProtestScheduleWatchNext(
         }).format(new Date(row.eventDate))
       : "the next seven days";
     return row.status === "Possible"
-      ? `Possible mobilisation${place ? ` in ${place}` : ""} may affect access; monitor for confirmation before changing plans.`
-      : `Monitor ${row.status.toLowerCase()} protest activity${place ? ` in ${place}` : ""} on ${date}; verify route and access conditions close to the event.`;
+      ? `${activity}${place ? ` in ${place}` : ""} remains possible; confirm the organiser, venue and route before changing movement plans.`
+      : `${activity}${place ? ` in ${place}` : ""} is scheduled for ${date}; track any named assembly point, march route or transport disruption in the source reporting.`;
   });
   return lines.join("\n");
 }

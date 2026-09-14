@@ -1,4 +1,4 @@
-import { APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG, classifyNewsItem } from "@workspace/ingest";
+import { APAC_LOCAL_CONFIG, CONFLICT_CONFIG, INDONESIA_LOCAL_CONFIG, classifyNewsItem } from "@workspace/ingest";
 
 // Regression lock for the cross-country contamination bug: a foreign wire
 // story that names NO tracked in-region country used to fall through to the
@@ -54,6 +54,20 @@ describe("out-of-region country detection (cross-country contamination fix)", ()
     const c = classifyNewsItem(APAC_LOCAL_CONFIG, title, "", {
       sourceName: "Philippine Daily Inquirer",
       defaultCountry: "Philippines",
+    });
+    expect(c.kept).toBe(false);
+    expect(c.country).toBeNull();
+    expect(c.reason).toMatch(/^out-of-region:/i);
+  });
+
+  it.each([
+    ["Chicago", "6 gunmen kill Chicago rapper in a Fuller Park gas station ambush"],
+    ["Charlotte", "Gridiron Gallery: Rebels shine in 41-9 win over Charlotte"],
+    ["Los Angeles", "Rapper acquitted after a deadly ambush near Beverly Center"],
+  ])("rejects a syndicated US %s story before Conflict can apply an APAC feed default", (_label, title) => {
+    const c = classifyNewsItem(CONFLICT_CONFIG, title, "", {
+      sourceName: "Syndicated local outlet",
+      defaultCountry: "Sri Lanka",
     });
     expect(c.kept).toBe(false);
     expect(c.country).toBeNull();

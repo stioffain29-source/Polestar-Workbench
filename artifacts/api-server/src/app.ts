@@ -9,6 +9,11 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Operational API responses must reflect relevance backfills immediately.
+// Express ETags allowed browsers to keep pre-cleanup incident payloads and
+// receive 304 after the underlying rows had been marked irrelevant.
+app.disable("etag");
+
 app.use(
   pinoHttp({
     logger,

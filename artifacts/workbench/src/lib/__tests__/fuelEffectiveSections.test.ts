@@ -76,7 +76,7 @@ describe("resolveFuelEffectiveSections precedence", () => {
     expect(eff.regionalHighlights).toBe(canon.regionalHighlights);
   });
 
-  it("AI tier beats canonical for the five prose sections", () => {
+  it("AI may draft factual chronology but cannot replace canonical analytical sections", () => {
     const eff = resolveFuelEffectiveSections({
       report: {},
       aiProse: {
@@ -91,8 +91,8 @@ describe("resolveFuelEffectiveSections precedence", () => {
     expect(eff.executiveSummary).toBe("AI exec.");
     expect(eff.situation).toBe("AI situation.");
     expect(eff.whatHappened).toBe("AI what happened.");
-    expect(eff.whatMatters).toBe("AI what matters.");
-    expect(eff.polestarView).toBe("AI polestar.");
+    expect(eff.whatMatters).toBe(fuelData.narrativeData.canonicalSections.whatMatters);
+    expect(eff.polestarView).toBe(fuelData.narrativeData.canonicalSections.polestarView);
   });
 
   it("drops stale generated prose while retaining an explicit stale analyst edit", () => {
@@ -567,12 +567,12 @@ describe("AI jet-direction headlines retain the original report text", () => {
       aiProse: invalidGenerated,
     });
     expect(finalised.effectiveSections.whatMatters).toBe(
-      "Generic cost pressure is now affecting the market.",
+      data.narrativeData.canonicalSections.whatMatters,
     );
-    expect(finalised.auditIssues.consistency.some(
-      (issue) => issue.code === "CURRENT_CONDITION",
-    )).toBe(true);
-    expect(finalised.auditIssues.evidence.some((issue) => issue.code === "WATCH_NEXT_UNGROUNDED")).toBe(true);
+    expect(finalised.effectiveSections.watchNext).toBe(
+      data.narrativeData.canonicalSections.watchNext,
+    );
+    expect(finalised.auditIssues.evidence.some((issue) => issue.code === "WATCH_NEXT_UNGROUNDED")).toBe(false);
   });
 
   it("keeps an invalid direct analyst edit visible and publication-blocking", () => {

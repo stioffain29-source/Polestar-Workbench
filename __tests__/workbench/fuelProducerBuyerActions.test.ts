@@ -369,4 +369,17 @@ describe("Fuel Watch keeps producer-central, OPEC outlook and aviation-cost item
     const aviationRows = rows.filter((r) => /jet-fuel cost pressure/i.test(r.action));
     expect(aviationRows).toHaveLength(0);
   });
+
+  it("keeps airport operators that actively restrict aircraft refuelling", () => {
+    const rows = buildFuelProducerBuyerActions({
+      issueDate: ISSUE_DATE,
+      incidents: [{
+        ...mk(53, "fuel", "Russia’s fuel crisis deepens as 26 airports restrict aircraft refuelling"),
+        country: "Russia",
+      }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.actor).toBe("Russia airport operators");
+    expect(rows[0]?.action).toMatch(/restrict aircraft refuelling/i);
+  });
 });

@@ -22,3 +22,5 @@ description: One facts object drives Fuel Watch; factual and semantic validation
 - An affected-countries table contains countries only: first recover blank geography from event location/title/summary, then omit unresolved rows and disclose the excluded count in the coverage note. Never manufacture an “Unattributed” country to reconcile table and overall totals.
   **Why:** that bucket exposed an internal data-quality gap as if it were a geographic result.
   **How to apply:** overall and severity totals may include the full qualifying set; country rows and active-country counts use only developments with verified country attribution.
+- Generated prose may draft chronology, but it must not outrank canonical What Matters, Implications, Watch Next or Polestar View unless it is an explicit analyst edit.
+  **Why:** generic generated text displaced evidence-led sections while the operator table changed independently, leaving a sparse table beside stale prose.
