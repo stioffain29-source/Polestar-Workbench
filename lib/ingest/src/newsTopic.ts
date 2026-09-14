@@ -99,7 +99,12 @@ export function gnews(
 
 type Feed = TopicFeed & { url: string };
 
-export type Classified = { kept: boolean; reason: string; country: string | null };
+export type Classified = {
+  kept: boolean;
+  reason: string;
+  country: string | null;
+  countrySource?: "text" | "feed-fallback";
+};
 
 export function detectCountry(hay: string, aliases: CountryAlias[]): string | null {
   const match = aliases.find((c) => c.aliases.some((a) => hasWord(hay, a)));
@@ -200,6 +205,9 @@ const OUT_OF_REGION: { token: string; canonical: string }[] = [
   { token: "libya", canonical: "Libya" },
   { token: "egypt", canonical: "Egypt" },
   { token: "nigeria", canonical: "Nigeria" },
+  { token: "borno", canonical: "Nigeria" },
+  { token: "maiduguri", canonical: "Nigeria" },
+  { token: "zulum", canonical: "Nigeria" },
   { token: "niger", canonical: "Niger" },
   { token: "sudan", canonical: "Sudan" },
   { token: "algeria", canonical: "Algeria" },
@@ -471,7 +479,12 @@ function classify(
 
   const country = detected ?? feed.defaultCountry;
 
-  return { kept: true, reason: `allow:${allowHit}`, country };
+  return {
+    kept: true,
+    reason: `allow:${allowHit}`,
+    country,
+    countrySource: detected ? "text" : "feed-fallback",
+  };
 }
 
 /**
@@ -514,6 +527,7 @@ type Accepted = {
   sourceUrl: string;
   feedLabel: string;
   reason: string;
+  countrySource: "text" | "feed-fallback";
 };
 
 type Rejected = { title: string; reason: string; feedLabel: string };
@@ -645,6 +659,7 @@ export async function runNewsTopicIngest(
           sourceUrl: link,
           feedLabel: feed.label,
           reason: c.reason,
+          countrySource: c.countrySource ?? "feed-fallback",
         });
         perFeed[feed.label].accepted++;
       }
@@ -799,7 +814,12 @@ export async function runNewsTopicIngest(
   let geocoded = 0;
   const ungeocoded: string[] = [];
   const rows: (typeof incidentsTable.$inferInsert)[] = toInsert.map((a) => {
-    const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
+    // A country-edition feed is discovery context, not geographic evidence.
+    // Never turn a blind feed fallback into a plotted country-centroid incident.
+    const geo =
+      a.countrySource === "text"
+        ? geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`))
+        : null;
     if (geo) geocoded++;
     else ungeocoded.push(`${a.country} — ${a.title.slice(0, 80)}`);
     const rel = evaluateIncidentRelevance(topic, {

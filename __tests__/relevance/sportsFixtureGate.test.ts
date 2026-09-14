@@ -40,6 +40,10 @@ const SPORTS_DROPS: Array<[string, string]> = [
   ["Keeper saves last-minute shot as Malaysia edge past Laos in Suzuki Cup semi-final", ""],
   ["Sydney Swans fans threaten SCG walkout over hotel scandal", ""],
   ["Club supporters threaten boycott after membership dispute", ""],
+  [
+    "Rebel Storm: Rivercrest moves to 3-0 for first time since 2024 after instant classic against Chisum Mustangs",
+    "",
+  ],
 ];
 
 const SECURITY_KEEPS: Array<[string, string]> = [
@@ -109,5 +113,25 @@ describe("global sports-fixture gate", () => {
     // drop it for lacking a public-order signal — that is a different rule).
     expect(hitsSlopExclude("flashpoint", i).reason).not.toMatch(/sports-fixture/);
     expect(isCountryRelevant(i)).toBe(true);
+  });
+
+  it("drops a scripted TV firefight despite the security override vocabulary", () => {
+    const i = input("In new 'Lioness' episode: Firefight on a Fort Worth soccer field and more");
+    expect(explainRelevance("conflict", i)).toMatchObject({
+      relevant: false,
+      reason: expect.stringMatching(/entertainment/),
+    });
+    expect(hitsSlopExclude("conflict", i).relevant).toBe(false);
+    expect(isCountryRelevant(i)).toBe(false);
+  });
+
+  it("drops professional-wrestling backstage news despite the word Rebel", () => {
+    const i = input(
+      "Backstage News On Willow Nightingale, Steven Borden And AEW Rebel Heart Dynamite",
+    );
+    expect(explainRelevance("conflict", i)).toMatchObject({
+      relevant: false,
+      reason: expect.stringMatching(/entertainment/),
+    });
   });
 });

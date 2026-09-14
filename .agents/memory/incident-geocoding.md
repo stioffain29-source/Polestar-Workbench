@@ -9,14 +9,16 @@ Incidents are geocoded from a curated, dependency-free lookup table in
 `lib/ingest/src/geocode.ts` (`geocode(country, text)`), NOT an external
 geocoding service — the pipeline has no API for it.
 
-Resolution order: city match in title+summary (finer marker + sets `location`)
-→ country centroid → null. Combined country tags like "West Papua; Papua New
-Guinea" resolve on their first `;`-separated component.
+Resolution order inside the geocoder is city match → country centroid → null,
+but feed-country fallback is discovery metadata, not geographic evidence.
+Generic news ingest must not call the geocoder for fallback-only attribution,
+and the map must never plot a row with a null resolved location even if a
+legacy row still carries centroid coordinates.
 
-**Why:** the Map showed "0 geocoded" because ingest inserted rows with null
-lat/long. Both `runFlashpointIngest` and `runCargoWatchIngest` now call
-`geocode()` when building insert rows, and log a WARNING listing any rows that
-could not be geocoded (they still insert, just without coordinates).
+**Why:** Country-edition feeds repeatedly syndicated foreign sports,
+entertainment and Nigerian stories, then stamped them with Pakistan or Sri
+Lanka and plotted them at those centroids. A country default must not become a
+fabricated incident location.
 
 **How to apply:**
 - The country-centroid keys MUST stay in sync with the canonical names emitted

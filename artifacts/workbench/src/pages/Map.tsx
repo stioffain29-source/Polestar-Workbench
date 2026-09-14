@@ -320,8 +320,21 @@ export default function MapPage() {
 
   const allPoints = useMemo<Point[]>(() => {
     if (view === "incidents") {
+      const seenIncidentTitles = new Set<string>();
       const incidentPoints = incidents
-        .filter((i) => i.latitude != null && i.longitude != null)
+        // A country centroid is not an incident location. Legacy feed-fallback
+        // rows can carry centroid coordinates while location remains null; do
+        // not plot them or manufacture a country-level incident cluster.
+        .filter((i) => {
+          if (i.location == null || i.latitude == null || i.longitude == null) return false;
+          const titleKey = `${i.topic}|${i.country}|${(i.displayTitle ?? i.title)
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim()}`;
+          if (seenIncidentTitles.has(titleKey)) return false;
+          seenIncidentTitles.add(titleKey);
+          return true;
+        })
         .map<Point>((i) => ({
           id: `i-${i.id}`,
           lat: i.latitude!,

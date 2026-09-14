@@ -17,6 +17,20 @@ import { APAC_LOCAL_CONFIG, CONFLICT_CONFIG, INDONESIA_LOCAL_CONFIG, classifyNew
 // reactive one-by-one patch. These tests lock the exact two reported cases
 // plus a broader sample so this class of bug cannot silently regress.
 describe("out-of-region country detection (cross-country contamination fix)", () => {
+  it("rejects Nigerian local-place coverage before a Pakistan feed fallback", () => {
+    const c = classifyNewsItem(
+      CONFLICT_CONFIG,
+      "Zulum: Insurgency destroyed over 5,000 schools in Borno",
+      "",
+      { sourceName: "TheCable", defaultCountry: "Pakistan" },
+    );
+    expect(c).toMatchObject({
+      kept: false,
+      reason: "out-of-region:Nigeria",
+      country: null,
+    });
+  });
+
   it("rejects a Philippines-feed story naming Greece, not the feed default", () => {
     const c = classifyNewsItem(
       APAC_LOCAL_CONFIG,

@@ -68,6 +68,15 @@ const EXCLUDE_PHRASES: RegExp[] = [
   /\bviewport-wrapper\b/,
 ];
 
+// Scripted television and professional-wrestling coverage can contain conflict
+// homonyms ("firefight", "rebel", "dynamite") but is not a real-world incident.
+const NON_INCIDENT_ENTERTAINMENT_RE =
+  /\b(?:in new .{0,40} episode|season \d+ episode \d+|\bs\d{1,2}e\d{1,2}\b|episode:\s|full episode|tv series|docuseries|reality show|podcast|backstage news|professional wrestling|pro wrestling|\baew\b|\bwwe\b|\bimpact wrestling\b)\b/i;
+
+export function isNonIncidentEntertainment(title: string | null | undefined): boolean {
+  return NON_INCIDENT_ENTERTAINMENT_RE.test(title ?? "");
+}
+
 // ---------------------------------------------------------------------------
 // GLOBAL sports-fixture gate (owner ruling: NO sport in ANY report).
 //
@@ -103,9 +112,14 @@ const SPORTS_FIXTURE_RE = new RegExp(
     // "moves to 3-0", "wins 2-1", "first loss since 2024".
     String.raw`\b(?:football|soccer)\b[^.!?]{0,100}\b(?:moves? to |improves? to |falls? to |wins? |won |loses? |lost |defeats? |beat(?:s)? |draws? |drew |after )\d{1,2}[-–]\d{1,2}\b`,
     String.raw`\b(?:moves? to |improves? to |falls? to |wins? |won |loses? |lost |defeats? |beat(?:s)? |draws? |drew |after )\d{1,2}[-–]\d{1,2}\b[^.!?]{0,100}\b(?:football|soccer)\b`,
+    // Win-loss record phrasing is itself a sports standings construction.
+    String.raw`\b(?:moves?|improves?|falls?) to \d{1,2}[-–]\d{1,2}\b`,
     // Entertainment recaps and human-interest copy explicitly centred on play
     // on a football/soccer field are sports coverage even without a scoreline.
     String.raw`\b(?:football|soccer) (?:field|pitch|match|game|team|player|club|season)\b`,
+    // A named sport in the headline is fixture coverage unless the real-world
+    // casualty/disorder override below proves an incident happened at it.
+    String.raw`\b(?:football|soccer|rugby(?: league| union)?|cricket|basketball|volleyball|netball|futsal|hockey|baseball)\b`,
     // Fan grievance / club-colour stories that borrow industrial-action terms.
     // "Sydney Swans fans threaten SCG walkout over hotel scandal" is sports
     // coverage, not civil unrest. Genuine disorder still survives through the
@@ -1276,6 +1290,10 @@ const FP_APAC_ANCHOR_RE =
 // Jakarta").
 const FP_OFFSHORE_THEATRE_RE =
   /\b(?:bolivia|bolivian|bolivians|la paz|venezuela|venezuelan|venezuelans|caracas|maduro|peru|peruvian|peruvians|lima|brazil|brasil|brazilian|brazilians|brasilia|argentina|argentine|argentinian|argentinians|buenos aires|mexico|mexican|mexicans|chile|chilean|chileans|santiago|colombia|colombian|colombians|bogota|ecuador|ecuadorian|ecuadorians|quito|nicaragua|nicaraguan|nicaraguans|honduras|honduran|hondurans|guatemala|guatemalan|guatemalans|panama|panamanian|panamanians|uruguay|paraguay|haiti|haitian|haitians|chicago|charlotte|maryland|baltimore|los angeles|beverly center|new york|california|florida|ohio|michigan|illinois|iran|iranian|iranians|tehran|iraq|iraqi|iraqis|baghdad|idf|hezbollah|hizbollah|hizbullah|hezballah|hamas|israel|israeli|israelis|gaza|palestine|palestinian|palestinians|lebanon|lebanese|beirut|syria|syrian|syrians|damascus|yemen|yemeni|yemenis|houthi|houthis|saudi|saudis|riyadh|jordan|jordanian|jordanians|amman|qatar|qatari|doha|bahrain|bahraini|kuwait|kuwaiti|oman|omani|dubai|abu dhabi|egypt|egyptian|egyptians|cairo|kenya|kenyan|kenyans|nairobi|nigeria|nigerian|nigerians|niger|lagos|abuja|ethiopia|ethiopian|ethiopians|addis ababa|sudan|sudanese|khartoum|somalia|somali|somalis|mogadishu|south africa|south african|johannesburg|pretoria|congo|congolese|kinshasa|ghana|ghanaian|ghanaians|accra|uganda|ugandan|ugandans|kampala|zimbabwe|zimbabwean|zimbabweans|harare|tanzania|tanzanian|tanzanians|morocco|moroccan|moroccans|algeria|algerian|algerians|tunisia|tunisian|tunisians|libya|libyan|libyans|tripoli|senegal|senegalese|cameroon|cameroonian|cameroonians|zambia|zambian|zambians|malawi|malawian|malawians|mozambique|mozambican|mozambicans|rwanda|rwandan|rwandans|ivory coast|turkey|turkish|ankara|istanbul|albania|albanian|albanians|tirana|greece|greek|athens|serbia|serbian|serbians|belgrade|ukraine|ukrainian|ukrainians|kyiv|kiev|russia|russian|russians|moscow|belarus|belarusian|belarusians|minsk|poland|warsaw|hungary|hungarian|hungarians|budapest|romania|romanian|romanians|bucharest|bulgaria|bulgarian|bulgarians|czech|slovakia|slovak|croatia|croatian|croatians|bosnia|bosnian|bosnians|kosovo|kosovar|moldova|moldovan|moldovans|armenia|armenian|armenians|yerevan|azerbaijan|azerbaijani|azerbaijanis|baku|trump|maga|washington|g7|g-7|g20|g-20|davos)\b/i;
+
+// Local Nigerian place/official names commonly appear without the country name
+// in domestic coverage syndicated into APAC country-edition feeds.
+const NIGERIA_LOCAL_THEATRE_RE = /\b(?:borno|maiduguri|zulum)\b/i;
 
 // In-region anchor for the `indonesia_local` broad-coverage feed — Indonesia
 // (country, demonyms, islands, provinces, major cities), the West Papua
@@ -2477,6 +2495,9 @@ function firstMatch(text: string, patterns: RegExp[]): RegExp | null {
  */
 export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResult {
   const text = haystack(i);
+  if (isNonIncidentEntertainment(i.title)) {
+    return { relevant: false, reason: "slop: entertainment coverage, not a real-world incident" };
+  }
   // GLOBAL sports gate — mirrors explainRelevance; must run before any
   // topic-specific title-rescue so a fixture headline is never lane-vouched.
   if (isSportsFixtureNoise(text)) {
@@ -2552,6 +2573,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
 
   const general = firstMatch(text, EXCLUDE_PHRASES);
   if (general) return { relevant: false, reason: `excluded: general-news noise (/${general.source}/)` };
+
+  if (isNonIncidentEntertainment(i.title)) {
+    return { relevant: false, reason: "excluded: entertainment coverage, not a real-world incident" };
+  }
 
   // GLOBAL sports gate — a match report is never an incident for ANY topic,
   // and its body text ("stoppage time", "shootout") trips keep tiers.
@@ -2698,7 +2723,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     // only geo cue is a local entity is left untouched, and a cross-border story
     // that also names an APAC country ("Pakistan-Iran border clash") is kept.
     const geo = mastheadStrippedGeoText(i);
-    if (FP_OFFSHORE_THEATRE_RE.test(geo) && !FP_APAC_ANCHOR_RE.test(geo)) {
+    if (
+      (FP_OFFSHORE_THEATRE_RE.test(geo) || NIGERIA_LOCAL_THEATRE_RE.test(geo)) &&
+      !FP_APAC_ANCHOR_RE.test(geo)
+    ) {
       return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC anchor)" };
     }
   }
@@ -3465,6 +3493,7 @@ const COUNTRY_THEMATIC_ESSAY_RE =
  */
 export function isCountryRelevant(i: RelevanceInput): boolean {
   const text = haystack(i);
+  if (isNonIncidentEntertainment(i.title)) return false;
   for (const re of EXCLUDE_PHRASES) {
     if (re.test(text)) return false;
   }
