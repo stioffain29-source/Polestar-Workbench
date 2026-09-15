@@ -554,7 +554,17 @@ export async function exportFlashpointReportPdf(
   const ds = model.dataset;
 
   const ctx = createCtx({ kind: resolvedTitle, issueDate: headerDate });
-  await ensureRobotoLoaded(ctx.pdf);
+  try {
+    await ensureRobotoLoaded(ctx.pdf);
+  } catch (error) {
+    // Asset requests can be blocked or abandoned by the browser. jsPDF safely
+    // falls back to a built-in font; completing the download is preferable to
+    // leaving the editor permanently stuck on "Generating PDF...".
+    console.warn(
+      "[exportFlashpointReportPdf] Roboto load failed, using PDF fallback font",
+      error,
+    );
+  }
 
   const win = resolveReportWindow(data.topic, data.issueDate);
   let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;

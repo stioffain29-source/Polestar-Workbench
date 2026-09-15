@@ -20,11 +20,29 @@ interface RobotoBytes {
 
 let cache: RobotoBytes | null = null;
 let loading: Promise<RobotoBytes> | null = null;
+const PDF_ASSET_FETCH_TIMEOUT_MS = 12_000;
 
 async function fetchAsBase64(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`pdfFonts: failed to fetch ${url} (${res.status})`);
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(
+    () => controller.abort(),
+    PDF_ASSET_FETCH_TIMEOUT_MS,
+  );
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`pdfFonts: failed to fetch ${url} (${res.status})`);
+    }
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(
+        `pdfFonts: timed out fetching ${url} after ${PDF_ASSET_FETCH_TIMEOUT_MS}ms`,
+      );
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
   }
   const buf = new Uint8Array(await res.arrayBuffer());
   // btoa needs a binary string; build it in chunks to avoid call-stack limits
@@ -43,7 +61,7 @@ async function fetchAsBase64(url: string): Promise<string> {
 async function loadRobotoBytes(): Promise<RobotoBytes> {
   if (cache) return cache;
   if (loading) return loading;
-  loading = (async () => {
+  const request = (async () => {
     const [regular, light, medium, bold, italic] = await Promise.all([
       fetchAsBase64(RobotoRegularUrl),
       fetchAsBase64(RobotoLightUrl),
@@ -54,7 +72,15 @@ async function loadRobotoBytes(): Promise<RobotoBytes> {
     cache = { regular, light, medium, bold, italic };
     return cache;
   })();
-  return loading;
+  loading = request;
+  try {
+    return await request;
+  } catch (error) {
+    // A failed/aborted request must not poison every later PDF attempt with the
+    // same rejected promise. A subsequent click gets a fresh asset request.
+    if (loading === request) loading = null;
+    throw error;
+  }
 }
 
 const registered = new WeakSet<jsPDF>();

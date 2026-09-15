@@ -1055,7 +1055,19 @@ export async function prepareCoverImage(
   // reject same-origin asset loads, which then silently tainted every PDF
   // cover and forced the gradient fallback. Object URLs are always same-
   // origin and never taint the canvas, so toDataURL is safe afterwards.
-  const res = await fetch(src);
+  const controller = new AbortController();
+  const fetchTimeout = globalThis.setTimeout(() => controller.abort(), 12_000);
+  let res: Response;
+  try {
+    res = await fetch(src, { signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`prepareCoverImage: fetch timed out for ${src}`);
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(fetchTimeout);
+  }
   if (!res.ok) {
     throw new Error(`prepareCoverImage: fetch ${res.status} for ${src}`);
   }
@@ -1081,9 +1093,18 @@ export async function prepareCoverImage(
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () =>
+      const decodeTimeout = globalThis.setTimeout(
+        () => reject(new Error(`prepareCoverImage: decode timed out for ${src}`)),
+        8_000,
+      );
+      i.onload = () => {
+        globalThis.clearTimeout(decodeTimeout);
+        resolve(i);
+      };
+      i.onerror = () => {
+        globalThis.clearTimeout(decodeTimeout);
         reject(new Error(`prepareCoverImage: decode failed for ${src}`));
+      };
       i.src = blobUrl;
     });
     // Render at 2x for crisp print output.

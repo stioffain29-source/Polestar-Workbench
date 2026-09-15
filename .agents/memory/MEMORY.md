@@ -146,3 +146,4 @@
 - [Incident read cache invalidation](incident-read-cache-invalidation.md) — incident APIs must never 304 across relevance backfills; stale payloads can preserve rows already rejected in the database.
 - [Nested route scroll restoration](nested-route-scroll-restoration.md) — Workbench pages scroll inside Layout main, not window; reset that container on route changes or long reports can make the next page look blank.
 - [Flashpoint numeric-claim audit](flashpoint-numeric-claim-audit.md) — “24/7” labels and context-bound compact clock times are not incident counts; exclude narrowly without weakening real count checks.
+- [PDF asset waits](pdf-asset-waits.md) — font and cover-image requests must be time-bounded; Flashpoint falls back rather than leaving Download stuck indefinitely.
