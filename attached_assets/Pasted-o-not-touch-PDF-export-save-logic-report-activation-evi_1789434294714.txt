@@ -1,0 +1,122 @@
+o not touch PDF export, save logic, report activation, evidence gating, section order, styling, or rendering.
+
+The remaining issue is prose quality only.
+
+Fix the Fuel Watch generation prompt for these three sections:
+
+IMPLICATIONS FOR BUSINESS
+
+Current problem:
+The section is still written as recommendations using verbs such as:
+
+Review
+Revisit
+Check
+Test
+
+That is not an implications section.
+
+Required behaviour:
+Write one analytical paragraph of approximately 70 to 120 words explaining the business consequences of the reported developments.
+
+It should explain relevant effects on:
+
+delivered fuel cost
+transport and logistics cost
+aviation surcharges
+supplier pricing
+stock resilience
+replenishment cycles
+operational continuity
+routing
+landed cost
+
+Do not give instructions.
+
+Do not begin sentences with:
+
+Review
+Check
+Consider
+Revisit
+Test
+Protect
+Monitor
+
+Explain what the developments mean for businesses.
+
+POLESTAR VIEW
+
+Current problem:
+The section is partly analytical but still drifts into recommendations such as:
+
+Protect critical-site stocks, replenishment cycles and delivery schedules.
+
+Required behaviour:
+Write one analytical assessment of approximately 70 to 120 words.
+
+It must:
+
+state the current Polestar risk level
+explain why that level is justified
+distinguish between price pressure, physical supply disruption, refinery or terminal disruption, distribution constraints and routing exposure where relevant
+identify the principal business exposure
+state the near-term direction
+explain what would materially change the assessment
+
+Do not give operational instructions.
+
+Do not use recommendation language.
+
+WATCH NEXT
+
+Current problem:
+The section repeatedly says:
+
+Watch for...
+
+which makes it sound mechanical and stitched together.
+
+Required behaviour:
+Write one coherent forward-looking paragraph of approximately 50 to 90 words.
+
+Identify the most important indicators that could change the assessment, for example:
+
+refinery restart dates
+terminal throughput
+fuel allocation changes
+confirmed shortages
+delivery lead times
+vessel rerouting
+chokepoint restrictions
+government intervention
+significant benchmark movements
+
+Explain what those indicators would mean for the risk outlook.
+
+Use varied natural prose.
+
+Do not repeat Watch for.
+
+QUALITY RULES
+
+All three sections must:
+
+use concise professional prose
+avoid generic filler
+avoid repeated sentence structures
+avoid duplicating each other
+remain grounded in the report evidence
+avoid inventing facts
+
+Before accepting the generated narrative, validate:
+
+Implications for Business contains consequences, not recommendations.
+
+Polestar View contains assessment, not operational advice.
+
+Watch Next contains forward indicators without repetitive Watch for wording.
+
+Apply this to all future Fuel Watch reports.
+
+Test it against the current Fuel Watch and show me the newly generated text for these three sections before changing anything else.

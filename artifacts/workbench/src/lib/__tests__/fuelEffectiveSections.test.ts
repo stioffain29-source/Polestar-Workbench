@@ -598,14 +598,13 @@ describe("AI jet-direction headlines retain the original report text", () => {
     const closing = `${implications}\n${watchNext}\n${polestarView}`;
     const fourSections = `${whatMatters}\n${closing}`;
 
-    expect(implications).toContain("Review delivered-cost assumptions");
-    expect(implications).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|watch for|delivery schedules/i);
-    expect(watchNext).toContain("Watch for a confirmed change in transit availability.");
-    expect(watchNext).not.toMatch(/Saudi Arabia|road fuel distribution/i);
-    expect(polestarView).not.toMatch(/Saudi Arabia|road fuel distribution|transit availability|fuel-route disruption/i);
-    expect(fourSections.match(/transit availability/gi)).toHaveLength(1);
-    expect(fourSections.match(/Saudi Arabia/gi)).toHaveLength(1);
-    expect(fourSections.match(/road fuel distribution/gi)).toHaveLength(1);
+    expect(implications).not.toMatch(/(?:^|[.!?]\s+)(?:Review|Check|Consider|Revisit|Test)\b/i);
+    expect(implications.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(70);
+    expect(watchNext).not.toMatch(/\bWatch for\b/i);
+    expect(watchNext.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(50);
+    expect(polestarView).toMatch(/^Fuel risk is (?:Insignificant|Low|Moderate|High|Extreme)\./);
+    expect(polestarView).toMatch(/(?:principal business exposure|principal exposure)/i);
+    expect(fourSections).not.toMatch(/Review delivered-cost assumptions|Protect critical-site stocks/i);
   });
 
   it("replaces the persisted legacy repeated Implications template", () => {
@@ -639,7 +638,8 @@ describe("AI jet-direction headlines retain the original report text", () => {
     expect(effective.implications).toBe(
       data.narrativeData.canonicalSections.implications,
     );
-    expect(effective.implications).not.toMatch(/Saudi Arabia|road fuel distribution/i);
+    expect(effective.implications).not.toMatch(/Reprice road fuel distribution in Saudi Arabia/i);
+    expect(effective.implications).not.toMatch(/(?:^|[.!?]\s+)(?:Review|Check|Consider|Revisit|Test)\b/i);
   });
 
   it("rejects an undersized persisted analyst Implications override", () => {

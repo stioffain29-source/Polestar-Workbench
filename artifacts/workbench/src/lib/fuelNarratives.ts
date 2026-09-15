@@ -2354,44 +2354,36 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
 
 function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
   const hay = incidentsHaystack(facts.qualifyingIncidents);
-  const bullets: string[] = [];
+  const consequences: string[] = [];
   const rising = facts.marketIndicators.some(
     (i) => i.comparisonScope === "reporting-period" && i.direction === "rising",
   );
   if (rising) {
-    bullets.push("Revisit bulk-fuel and aviation surcharge pass-through clauses now — elevated Brent, WTI or jet observations typically reach invoices on the next billing cycle, not the current one.");
+    consequences.push("Higher reporting-period benchmarks increase the prospect of rising supplier prices, aviation surcharges and transport costs as contract and invoice cycles reset.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    bullets.push(`Where reporting of ${observedAccessCondition(hay)} persists, keep road-transport and commercial-allocation conversations live with suppliers.`);
+    consequences.push(`Reported ${observedAccessCondition(hay)} can extend replenishment times, tighten commercial allocation and weaken stock resilience for fuel-dependent operations.`);
   }
-  if (/\b(diesel|generator|lpg|backup power)\b/.test(hay)
-      && hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    bullets.push(`Check on-site diesel or LPG stock and generator runtime assumptions in markets reporting ${observedAccessCondition(hay)}.`);
+  if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test)) {
+    consequences.push("Refinery or terminal disruption can reduce regional product availability and lengthen downstream delivery cycles while output remains constrained.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "policy")!.test)) {
-    bullets.push("Align contract indexation and surcharge formulas to the gazette or policy effective dates flagged this period — today's economics may not survive the next duty or subsidy move.");
+    consequences.push("Reported duty, subsidy or price-control changes can alter supplier pricing and contract economics when their effective dates take hold.");
   }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
-    bullets.push("Where Gulf, Hormuz or Red Sea routing matters, test war-risk, transit-time and landed-cost assumptions against potential route changes.");
+    consequences.push("Chokepoint insecurity adds potential war-risk, transit-time and landed-cost pressure even where passage has not been confirmed as closed.");
   }
   if (/\b(jet fuel|aviation fuel|airline|airways)\b/.test(hay)) {
-    bullets.push("Test how any aviation fuel-cost change would affect route economics and surcharge discussions before schedule or capacity decisions harden.");
+    consequences.push("Aviation exposure is concentrated in fuel expense, surcharge pass-through and route economics where jet-fuel costs move faster than pricing cycles.");
   }
-  // Implications states the business decision required by the assessed
-  // exposure. The conditional trigger belongs only in Watch Next; repeating it
-  // here turns two sections into the same sentence with different lead verbs.
-  bullets.unshift(
-    "Review delivered-cost assumptions, supplier terms and contingency volumes for exposed fuel-dependent operations.",
-  );
-  bullets.push(
-    "Set stock thresholds, reorder points and replenishment lead times against the disruption pattern in the current evidence, rather than relying on normal-cycle assumptions.",
-  );
-  if (facts.marketIndicators.length > 0) {
-    bullets.push(
-      `Use the reported ${facts.judgement.direction} price direction as the near-term planning baseline, while retaining enough budget and stock flexibility for a change in market or supply conditions.`,
+  if (consequences.length < 3) {
+    consequences.push(
+      `The principal exposure remains ${facts.judgement.exposure.sector}${facts.judgement.exposure.geography ? ` in ${facts.judgement.exposure.geography}` : ""}, where cost or availability pressure could affect operational continuity.`,
+      "The combined effect is greater uncertainty around delivered cost, replenishment timing and the resilience of normal supply arrangements.",
+      "That uncertainty can reach transport schedules, supplier quotations and continuity planning before physical availability is fully restored.",
     );
   }
-  return bullets.slice(0, 5).join(" ");
+  return consequences.slice(0, 5).join(" ");
 }
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
@@ -2419,17 +2411,8 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   if (triggerIds.length > 0) {
     const trigger = (potentialIndicator ?? facts.judgement.trigger).replace(/^./, (ch) => ch.toLowerCase());
     items.push({
-      text: `Watch for ${trigger}.`,
+      text: `A material change in the assessment would follow from ${trigger}.`,
       supportingEvidenceIds: triggerIds,
-    });
-  }
-  for (const incident of rankMaterialDevelopments(facts).slice(0, 3)) {
-    if (!incident.id || incident.evidenceStatus === "Potential") continue;
-    const family = familyFor([incident.raw]);
-    items.push({
-      text: family?.watch
-        ?? `Watch for confirmed operational follow-through at ${incident.routeOrChokepoint ?? incident.physicalLocation ?? incident.country ?? "the affected market"}, especially any reported change in fuel availability, routing or cost.`,
-      supportingEvidenceIds: [incident.id],
     });
   }
   // Caller-provided indicators have no evidence identity in the canonical
@@ -2448,21 +2431,21 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   const refineryIds = refineryEvidence.map((incident) => incident.id).filter(Boolean);
   if (refineryIds.length > 0) {
     unique.push({
-      text: "Monitor confirmed refinery restart dates, terminal throughput and any extension of the outage, because prolonged output loss would tighten product availability and lengthen replenishment cycles.",
+      text: "Confirmed refinery restart dates and restored terminal throughput would indicate whether output constraints are easing; prolonged disruption would tighten product availability and lengthen replenishment cycles.",
       supportingEvidenceIds: refineryIds,
     });
   }
   const familyIndicator: Partial<Record<IssueFamily["key"], string>> = {
     shortage:
-      "Monitor distributor allocation notices, depot inventory and delivery lead times; deterioration in those indicators would show whether the reported shortage is moving into wider commercial supply.",
+      "Distributor allocation notices, depot inventory and delivery lead times would show whether reported shortages are easing or spreading into wider commercial supply.",
     chokepoint:
-      "Monitor confirmed passage restrictions, vessel rerouting and war-risk advisories; a sustained change in those indicators would show whether route pressure is becoming a material fuel-delivery constraint.",
+      "Confirmed passage restrictions, vessel rerouting and war-risk advisories would show whether route pressure is becoming a material fuel-delivery constraint.",
     tanker:
-      "Monitor tanker availability, convoy delays and depot delivery schedules; a sustained deterioration would show whether the reported distribution disruption is reducing practical fuel access.",
+      "Tanker availability, convoy delays and depot delivery schedules would show whether distribution disruption is reducing practical fuel access.",
     policy:
-      "Monitor effective dates for duties, subsidies, rationing or price controls; implementation details would show whether the policy change is moving into supplier pricing or allocation.",
+      "Effective dates for duties, subsidies, rationing or price controls would show whether government action is moving into supplier pricing or allocation.",
     pricing:
-      "Monitor subsequent benchmark observations and supplier pass-through notices; a sustained move would show whether the reported price pressure is reaching transport, aviation or delivered-fuel contracts.",
+      "Subsequent benchmark observations and supplier pass-through notices would show whether price pressure is reaching transport, aviation or delivered-fuel contracts.",
     crude:
       "Monitor export availability, loading programmes and sanctions enforcement; a confirmed change would show whether crude-side pressure is moving into physical supply or downstream product pricing.",
   };
@@ -2497,30 +2480,34 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
   ) {
     selected.pop();
   }
+  if (
+    selected.map((item) => item.text).join(" ").split(/\s+/).filter(Boolean).length < 50
+    && triggerIds.length > 0
+  ) {
+    selected.push({
+      text: "Improved fuel availability and shorter delivery times would support a lower near-term assessment; further deterioration would confirm that current constraints are persisting.",
+      supportingEvidenceIds: triggerIds,
+    });
+  }
   return selected.map((item) => item.text).join(" ");
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   if (facts.analystReviewRequired) {
-    return "Do not rely on this assessment yet. The available reports do not establish enough confirmed location or outcome detail to identify the principal Fuel exposure with confidence. That uncertainty matters because price, availability, distribution and infrastructure disruption require different commercial responses. Verify the unresolved reports before changing supply, stock or routing decisions. Until those facts are confirmed, protect existing continuity arrangements, avoid assuming that reported disruption is widespread, and retain the current planning baseline.";
+    return `Fuel risk is ${facts.overallSeverity}, with low confidence in the principal exposure. The available reports do not establish enough confirmed location or outcome detail to distinguish whether price, availability, distribution, infrastructure or routing pressure is dominant. The business exposure therefore remains uncertain rather than absent, particularly for fuel-dependent transport and replenishment. The near-term direction cannot be assessed reliably until unresolved reports establish where disruption occurred and whether it affected supply, distribution or delivered cost.`;
   }
   const j = facts.judgement;
-  const action = j.exposure.sector === "road fuel distribution"
-    ? "Protect critical-site stocks, replenishment cycles and delivery schedules."
-    : j.exposure.sector === "routing and fuel delivery"
-      ? "Protect delivery continuity, test alternative routing and allow additional time for fuel shipments."
-      : "Protect supply continuity, contingency volumes and budget headroom.";
   const outlook = j.direction === "upward"
-    ? "Prices are rising."
+    ? "The near-term direction is upward."
     : j.direction === "downward"
-      ? "Prices are falling."
+      ? "The near-term direction is downward."
       : j.direction === "stable"
-        ? "Prices are broadly stable."
-        : "The price direction is unclear.";
-  const exposure = "Exposure sits with fuel-dependent transport, critical-site replenishment and contracts that pass delivered-cost changes through quickly.";
-  const driver = "The current evidence combines market-price pressure with physical supply and routing constraints, so the assessment is not based on price movement alone.";
-  const next = "Tighter allocation, longer delivery times or a clear easing in physical constraints would justify revising the near-term view.";
-  return `Fuel risk is ${facts.overallSeverity}. ${outlook} ${exposure} ${driver} ${action} ${next}`;
+        ? "The near-term direction is broadly stable."
+        : "The near-term direction remains unclear.";
+  const exposure = `The principal business exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}, alongside fuel-dependent transport, critical-site replenishment and contracts that pass delivered-cost changes through quickly.`;
+  const driver = "The assessment distinguishes benchmark price pressure from physical supply, refinery or terminal, distribution and routing constraints, and reflects only the combination supported by current evidence.";
+  const next = "Tighter allocation or longer delivery times would strengthen the risk assessment, while restored output, improved availability and sustained benchmark easing would support a lower view.";
+  return `Fuel risk is ${facts.overallSeverity}. ${driver} ${exposure} ${outlook} ${next}`;
 }
 
 /** Build count-free analytical sections from canonical facts. */

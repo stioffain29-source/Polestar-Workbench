@@ -35,7 +35,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v5";
-export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v1";
+export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v2";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -229,10 +229,10 @@ FUEL EVIDENCE TRACEABILITY — additional non-negotiable rules:
 - The supplied canonical current-period evidence IDs are the complete authority for current Fuel themes. Do not introduce a country, shortage, refinery behaviour, transport disruption, aviation restriction, bunker-fuel or strike theme without a supporting supplied ID.
 - Return whatHappened as an array of objects, each containing text, supportingEvidenceIds and supportingClaim. Return watchNext in the same shape. supportingClaim must be copied exactly from a supported claim shown for one cited record; do not invent or paraphrase claims.
 - The parser renders the verified claim for whatHappened, so an unsupported paraphrase cannot survive. For watchNext, include the exact parent claim in the text plus explicit future/conditional modality. Potential evidence can support Watch Next only in that conditional form; it cannot support current whatHappened.
-- Write whatMatters as a 60-100 word analytical overview. Explain what is changing, where the exposure sits, what drives it and the near-term direction. Do not merely restate the risk rating.
-- Write implications as 70-120 words of practical commercial and operational consequences supported by the evidence. Cover only relevant effects on delivered fuel cost, transport cost, supplier pricing, stock, replenishment, production continuity, logistics and contingency requirements.
-- Write polestarView as a 70-120 word assessment. Explain why the risk matters, whether the issue is availability, distribution, price, infrastructure, policy or a supported combination, identify the principal exposure, and state what needs protection or preparation. Do not repeat whatHappened or implications.
-- Write watchNext as 50-90 words of specific evidence-led indicators that could change the assessment, such as transit availability, distributor allocation, inventory, lead times, refinery or terminal status, government intervention, price movement or localised shortage.
+- Write whatMatters as 2-4 concise analytical paragraphs. Prioritise the most material developments, explain where exposure sits and state the near-term direction; do not summarise every incident or merely restate the risk rating.
+- Write implications as one coherent 70-120 word paragraph describing commercial and operational consequences supported by the evidence. Cover only relevant effects on delivered fuel cost, transport and logistics cost, aviation surcharges, supplier pricing, replenishment times, stock resilience, operational continuity, routing and landed cost. This is analysis, not advice: never begin a sentence with Review, Check, Consider, Revisit or Test, and do not disguise recommendations as implications.
+- Write polestarView as a 70-120 word assessment, not a summary. State the Polestar risk level and distinguish the evidenced mix of price pressure, physical supply constraint, refinery or terminal disruption, distribution constraint and routing or chokepoint exposure. Identify the principal business exposure and near-term direction. Do not repeat whatMatters or implications.
+- Write watchNext as one forward-looking 50-90 word analytical paragraph. Identify multiple specific evidence-led indicators that would materially change the assessment and explain what they would mean. Relevant indicators can include refinery restart dates, terminal throughput, allocation changes, shortages, delivery times, vessel rerouting, chokepoint restrictions, government action and significant benchmark movements. Do not use repetitive "Watch for" sentence openings.
 - Every one of those four sections must answer at least two of: what is changing, why it matters, where exposure sits, what could happen next, and what action is required. Do not pad or invent facts to reach the requested length.
 - implications, polestarView and watchNext must each contain at least two substantive sentences. One-line placeholders such as "prices are rising" or "watch for changes in transit availability" are invalid.
 - Never use "concentrated around", "practical aviation and distribution constraint", "route flexibility", "operational posture", "pressure point", "fuel assurance", or "cost controls".
@@ -624,7 +624,7 @@ export function parseTopicSections(
   }
   if (input?.topic === "fuel") {
     const fuelQuality = [
-      { text: sections.whatMatters, minWords: 60, maxWords: 100, minSentences: 2 },
+      { text: sections.whatMatters, minWords: 60, maxWords: 160, minSentences: 2 },
       { text: sections.implications, minWords: 70, maxWords: 120, minSentences: 2 },
       { text: sections.polestarView, minWords: 70, maxWords: 120, minSentences: 2 },
       { text: sections.watchNext, minWords: 50, maxWords: 90, minSentences: 2 },
@@ -633,6 +633,18 @@ export function parseTopicSections(
       const words = proseWordCount(text);
       return words < minWords || words > maxWords || substantiveSentenceCount(text) < minSentences;
     })) {
+      return null;
+    }
+    const whatMattersParagraphs = sections.whatMatters
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+    if (
+      whatMattersParagraphs.length < 2 ||
+      whatMattersParagraphs.length > 4 ||
+      /(?:^|[.!?]\s+)(?:Review|Check|Consider|Revisit|Test)\b/i.test(sections.implications) ||
+      (sections.watchNext.match(/\bWatch for\b/gi)?.length ?? 0) > 0
+    ) {
       return null;
     }
   }
