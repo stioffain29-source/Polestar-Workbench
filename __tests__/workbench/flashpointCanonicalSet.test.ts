@@ -157,6 +157,28 @@ describe("canonical Flashpoint incident set", () => {
     expect(validateFlashpointRenderedModel(model)).toEqual([]);
   });
 
+  test("forward-schedule clock times are not treated as incident-count claims", () => {
+    const protest = row("Residents hold a protest rally in Delhi");
+    const strike = row("Students begin a strike in Delhi", {
+      validityGates: {
+        ...row("basis").validityGates!,
+        eventType: "labour_strike",
+      },
+    });
+    const ds = buildFlashpointReportDataset([protest, strike], "protests", ISSUE);
+    const base = resolveFlashpointRenderedModel({ dataset: ds });
+    const model = {
+      ...base,
+      prose: {
+        ...base.prose,
+        watchNext:
+          "“Protest the chaotic politics” street action, 1500–1630 in the pedestrian zone. Student strike, scheduled from 1300. Anti war peace demonstration, beginning 1800.",
+      },
+    };
+
+    expect(validateFlashpointRenderedModel(model)).toEqual([]);
+  });
+
   test("validation precedes dedupe so a weak high-severity copy cannot erase a valid duplicate", () => {
     const weak = row("Workers rally at central depot over delayed pay", {
       summary: "Founder responds to a viral post about the rally.",

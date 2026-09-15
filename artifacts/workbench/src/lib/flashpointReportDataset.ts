@@ -4452,9 +4452,24 @@ export function validateFlashpointRenderedModel(
           index > nearestNoun.index
             ? sentence.slice(nearestNoun.end, index)
             : sentence.slice(end, nearestNoun.index);
+        const compactClock = (() => {
+          if (!/^\d{3,4}$/.test(token)) return false;
+          const padded = token.padStart(4, "0");
+          const hours = Number(padded.slice(0, 2));
+          const minutes = Number(padded.slice(2));
+          if (hours > 23 || minutes > 59) return false;
+          return (
+            /\b(?:at|from|until|about|around|for|beginning|gathering)\s*$/i.test(
+              before,
+            ) ||
+            /\b\d{3,4}\s*[–—-]\s*$/.test(before) ||
+            /^\s*[–—-]\s*\d{3,4}\b/.test(after)
+          );
+        })();
         const explicitDurationOrDate =
           /^\s*\/\s*\d+\b/.test(after) ||
           /\b\d+\s*\/\s*$/.test(before) ||
+          compactClock ||
           /^\s*(?:%|percent(?:age)?\b)/i.test(after) ||
           new RegExp(
             `^[\\s-]*(?:days?|hours?|weeks?|months?|years?|minutes?)\\b(?:\\s+(?:ago|since|on|by))?`,
