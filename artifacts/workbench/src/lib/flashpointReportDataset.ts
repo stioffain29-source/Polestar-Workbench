@@ -1801,20 +1801,25 @@ function bucketFor(issue: string): "activism" | "unrest" | "other" {
 }
 
 function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
-  return rows
-    .map((r) => {
+  return rows.flatMap((r) => {
       const semantic = r.validityGates;
-      const eventDateText = semantic!.eventDate!.trim();
-      let date: Date;
-      try { date = parseISO(eventDateText); } catch { date = new Date(NaN); }
+      const eventDateText =
+        typeof semantic?.eventDate === "string" ? semantic.eventDate.trim() : "";
+      const semanticCountry =
+        typeof semantic?.country === "string" ? semantic.country.trim() : "";
+      const physicalLocation =
+        typeof semantic?.physicalLocation === "string"
+          ? semantic.physicalLocation.trim()
+          : "";
+      const eventType =
+        typeof semantic?.eventType === "string" ? semantic.eventType : "";
+      const date = eventDateText ? parseISO(eventDateText) : new Date(NaN);
+      if (!eventDateText || Number.isNaN(date.getTime())) return [];
       // Resolve physical incident location from title, summary and location
       // text. The raw country tag can be source attribution and is not trusted
       // without corroboration.
       const country = normalizeFlashpointCountry(
-        (
-          semantic!.country!.trim() ||
-          LOCATION_NOT_IDENTIFIED
-        ),
+        semanticCountry || LOCATION_NOT_IDENTIFIED,
       );
       const semanticIssue: Record<string, string> = {
         protest: "Protest",
@@ -1825,7 +1830,8 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
         political_mobilisation: "Political unrest",
         other_public_order: "Political unrest",
       };
-      const issue = semanticIssue[semantic!.eventType!]!;
+      const issue = semanticIssue[eventType];
+      if (!issue) return [];
       // Keep classification above on the raw source title, then cross the
       // presentation boundary once: previews, tables and PDF exporters all
       // receive the English advisory title where the ingest translator supplied
@@ -1834,29 +1840,24 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
         displayIncidentTitle(r.title, r.displayTitle),
       );
       const displayTitle = normalizeWestPapuaRegionInTitle(cleanedTitle, country);
-      const location = (() => {
-        const authoritativeLocation =
-          semantic!.physicalLocation!.trim();
-        const loc = (authoritativeLocation ?? "").trim();
-        return /^west papua$/i.test(loc) ? "West Papua, Indonesia" : authoritativeLocation;
-      })();
+      const location = /^west papua$/i.test(physicalLocation)
+        ? "West Papua, Indonesia"
+        : physicalLocation;
       // Clean the rendered title (drop publisher masthead + "Watch:" / "VIDEO
       // BY" video cruft). Classification above runs on the ORIGINAL title.
-      return {
+      return [{
         ...r,
         rawTitle: r.title,
         displayTitle: displayTitle,
         title: displayTitle,
-        location:
-          semantic!.physicalLocation!.trim() || location,
+        location,
         country,
         date,
         semanticEventDate: eventDateText,
         issue,
         bucket: bucketFor(issue),
-      };
-    })
-    .filter((r) => !isNaN(r.date.getTime()));
+      }];
+    });
 }
 
 function sortByDateDesc<T extends { date: Date }>(rows: T[]): T[] {
@@ -4452,6 +4453,8 @@ export function validateFlashpointRenderedModel(
             ? sentence.slice(nearestNoun.end, index)
             : sentence.slice(end, nearestNoun.index);
         const explicitDurationOrDate =
+          /^\s*\/\s*\d+\b/.test(after) ||
+          /\b\d+\s*\/\s*$/.test(before) ||
           /^\s*(?:%|percent(?:age)?\b)/i.test(after) ||
           new RegExp(
             `^[\\s-]*(?:days?|hours?|weeks?|months?|years?|minutes?)\\b(?:\\s+(?:ago|since|on|by))?`,

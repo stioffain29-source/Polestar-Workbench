@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useParams } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Toaster } from "@/components/ui/toaster";
@@ -36,6 +36,7 @@ import PublicationCalendar from "./pages/PublicationCalendar";
 import Cards from "./pages/Cards";
 import CardBuilder from "./pages/CardBuilder";
 import BrandSettings from "./pages/BrandSettings";
+import ReportRouteErrorBoundary from "./components/ReportRouteErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -193,6 +194,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ReportEditorRoute() {
+  const { id = "unknown" } = useParams<{ id: string }>();
+  return (
+    <ReportRouteErrorBoundary key={id} reportId={id}>
+      <ReportEditor />
+    </ReportRouteErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <Layout>
@@ -219,7 +229,7 @@ function Router() {
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />
         <Route path="/reports" component={Reports} />
-        <Route path="/reports/:id" component={ReportEditor} />
+        <Route path="/reports/:id" component={ReportEditorRoute} />
         <Route path="/spot-reports" component={SpotReports} />
         <Route path="/spot-reports/:id" component={SpotReportEditor} />
         <Route path="/special-reports" component={SpecialReports} />

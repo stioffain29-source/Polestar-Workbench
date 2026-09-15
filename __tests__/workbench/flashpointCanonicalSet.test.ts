@@ -97,7 +97,10 @@ describe("canonical Flashpoint incident set", () => {
     ["zero confidence", { validityGates: { ...row("seed").validityGates!, confidence: { event: 0, classification: 1, geography: 1, date: 1 } } }],
     ["missing actor", { validityGates: { ...row("seed").validityGates!, actor: null } }],
     ["missing activity", { validityGates: { ...row("seed").validityGates!, activity: null } }],
+    ["missing country", { validityGates: { ...row("seed").validityGates!, country: null } }],
+    ["missing physical location", { validityGates: { ...row("seed").validityGates!, physicalLocation: null } }],
     ["null date", { validityGates: { ...row("seed").validityGates!, eventDate: null } }],
+    ["invalid calendar date", { validityGates: { ...row("seed").validityGates!, eventDate: "2026-02-31" } }],
     ["unknown type", { validityGates: { ...row("seed").validityGates!, eventType: "unknown" } }],
     ["provider needs_review", { validityGates: { ...row("seed").validityGates!, verdict: "needs_review" } }],
     ["stale version", { validityVersion: "2025.semantic.1" }],
@@ -112,6 +115,46 @@ describe("canonical Flashpoint incident set", () => {
     expect(selection.rejected[0]).toEqual(
       expect.objectContaining({ id: candidate.id, stage: "semantic-validity" }),
     );
+  });
+
+  test("broadcaster slash numbers are not treated as protest-count claims", () => {
+    const philippines = row(
+      "Save Bangsamoro Movement held a protest rally via ANC 24/7 Link",
+      {
+        country: "Philippines",
+        location: "Manila",
+        validityGates: {
+          ...row("basis").validityGates!,
+          country: "Philippines",
+          physicalLocation: "Manila",
+        },
+      },
+    );
+    const thailand = row("Thailand Protest rally outside embassy", {
+      country: "Thailand",
+      location: "Bangkok",
+      validityGates: {
+        ...row("basis").validityGates!,
+        country: "Thailand",
+        physicalLocation: "Bangkok",
+      },
+    });
+    const ds = buildFlashpointReportDataset(
+      [philippines, thailand],
+      "protests",
+      ISSUE,
+    );
+    const base = resolveFlashpointRenderedModel({ dataset: ds });
+    const model = {
+      ...base,
+      prose: {
+        ...base.prose,
+        polestarView:
+          "The assessment is led by Philippines: ANC 24/7 Link to the; Thailand: Thailand Protest rally remained peaceful.",
+      },
+    };
+
+    expect(validateFlashpointRenderedModel(model)).toEqual([]);
   });
 
   test("validation precedes dedupe so a weak high-severity copy cannot erase a valid duplicate", () => {
