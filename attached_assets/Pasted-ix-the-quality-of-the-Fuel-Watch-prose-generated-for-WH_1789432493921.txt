@@ -1,0 +1,101 @@
+ix the quality of the Fuel Watch prose generated for:
+
+WHAT MATTERS
+IMPLICATIONS FOR BUSINESS
+POLESTAR VIEW
+WATCH NEXT
+
+Apply this to every future Fuel Watch.
+
+WHAT MATTERS
+
+Produce 2 to 4 concise analytical paragraphs. Identify the most important developments, where the exposure sits, and the direction of travel. Prioritise material developments rather than summarising every incident.
+
+IMPLICATIONS FOR BUSINESS
+
+This section must describe business consequences, not issue instructions.
+
+Do not write:
+
+Review...
+Check...
+Consider...
+Revisit...
+Test...
+
+Explain what the developments mean for:
+
+delivered fuel cost
+transport and logistics cost
+aviation surcharges where relevant
+supplier pricing
+replenishment times
+stock resilience
+operational continuity
+routing and landed cost
+
+Write one coherent analytical paragraph of approximately 70 to 120 words.
+
+POLESTAR VIEW
+
+Provide the assessment, not a summary.
+
+State the current risk level using Polestar terminology and explain why.
+
+Distinguish between:
+
+price pressure
+physical supply constraint
+refinery or terminal disruption
+distribution constraint
+routing or chokepoint exposure
+
+Identify the principal business exposure and near term direction.
+
+Do not simply repeat What Matters or Implications for Business.
+
+Approximately 70 to 120 words.
+
+WATCH NEXT
+
+Write a forward looking analytical paragraph, not a list of generic monitoring instructions.
+
+Do not repeatedly use:
+
+Watch for...
+
+Identify the specific indicators that would materially change the assessment, such as refinery restart dates, terminal throughput, allocation changes, shortages, delivery times, vessel rerouting, chokepoint restrictions, government action or significant benchmark movements.
+
+Explain what those indicators would mean.
+
+Approximately 50 to 90 words.
+
+STYLE
+
+Concise professional prose.
+
+No filler.
+
+No generic risk language.
+
+No repetitive sentence structures.
+
+No recommendations disguised as implications.
+
+No invented facts.
+
+Every factual statement must remain grounded in the Fuel Watch evidence set.
+
+Analytical conclusions may be derived from validated evidence, but must not introduce new factual claims.
+
+Before accepting the AI narrative, check that:
+
+Implications for Business explains consequences rather than actions.
+
+Polestar View contains a genuine assessment.
+
+Watch Next identifies multiple meaningful indicators without repetitive Watch for phrasing.
+
+None of the three sections substantially duplicates another.
+
+Test this against the current Fuel Watch and show me the generated text for those four sections before making any further changes.
