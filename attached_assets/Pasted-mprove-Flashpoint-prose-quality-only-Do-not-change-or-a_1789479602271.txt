@@ -1,0 +1,143 @@
+mprove Flashpoint prose quality only.
+
+Do not change or add any blocking validation, evidence gates, save conditions, export conditions, PDF logic, source filtering, forecast extraction or report activation logic.
+
+Do not make prose quality a condition for saving or exporting.
+
+Do not reject a report because the prose is imperfect.
+
+Only change the Flashpoint narrative generation instructions for:
+
+WHAT MATTERS
+
+IMPLICATIONS FOR BUSINESS
+
+POLESTAR VIEW
+
+WATCH NEXT
+
+WHAT MATTERS
+
+Summarise the most important developments in analytical prose.
+
+Do not concatenate raw headlines, locations or source snippets.
+
+Explain:
+
+which developments matter most
+
+where the main exposure sits
+
+whether disruption is localised or broader
+
+whether activity is routine, increasing or materially different from the normal pattern
+
+Use the accepted incident data already available to the report.
+
+IMPLICATIONS FOR BUSINESS
+
+Explain the likely business consequences of the reported protest and unrest environment.
+
+Focus where relevant on:
+
+staff movement
+
+site access
+
+transport disruption
+
+delivery schedules
+
+public transport
+
+workforce attendance
+
+supplier or client movement
+
+business continuity
+
+Do not write this section as instructions.
+
+Avoid repeatedly using:
+
+Review
+
+Confirm
+
+Check
+
+Monitor
+
+Track
+
+Explain what the developments mean for businesses rather than telling the reader what to do.
+
+POLESTAR VIEW
+
+Provide a genuine assessment.
+
+State the overall Flashpoint posture using existing Polestar risk terminology.
+
+Distinguish the overall weekly posture from the highest single incident rating.
+
+Explain:
+
+the principal geographic exposure
+
+the principal operational exposure
+
+whether activity is concentrated or broadening
+
+the near term direction
+
+what developments would materially strengthen or weaken the assessment
+
+Do not turn this section into recommendations.
+
+WATCH NEXT
+
+Use the existing 7 day protest forecast as the evidence base.
+
+Do not simply repeat every forecast entry.
+
+Prioritise the events most likely to affect:
+
+transport
+
+site access
+
+staff movement
+
+significant public spaces
+
+major government or commercial areas
+
+Explain which scheduled events matter most and why.
+
+Identify the indicators that would suggest escalation, wider mobilisation or greater operational disruption.
+
+Avoid repetitive phrasing such as:
+
+Watch for
+
+Track
+
+Monitor
+
+STYLE
+
+Keep the prose concise, analytical and grounded in accepted Flashpoint data.
+
+Avoid raw scraped wording and obvious headline fragments where possible.
+
+Avoid repeating the same conclusion across multiple sections.
+
+Do not invent facts.
+
+Do not change report structure.
+
+Do not add any new pass/fail checks.
+
+Do not block save or export based on prose quality.
+
+Apply these instructions to all future Flashpoint reports

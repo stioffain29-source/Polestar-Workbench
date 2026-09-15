@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   computeReportProseFingerprint,
   ENERGY_REPORT_PROSE_PROMPT_VERSION,
+  FLASHPOINT_REPORT_PROSE_PROMPT_VERSION,
   generateReportProse,
   REPORT_PROSE_PROMPT_VERSION,
   type GenerateReportProseInput,
@@ -191,6 +192,31 @@ describe("generateReportProse — request assembly", () => {
     expect(shippingSystem.content).toMatch(/no hyperbole, no emojis, no markdown\./i);
   });
 
+  it("uses analytical, non-instructional narrative directions only for Flashpoint", async () => {
+    mockModelReply(topicReply());
+
+    await generateReportProse(
+      input({ topic: "flashpoint", title: "Protests & Civil Unrest" }),
+      0,
+    );
+
+    const [flashpointSystem] = calls[0].body.messages;
+    expect(flashpointSystem.content).toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+    expect(flashpointSystem.content).toMatch(/WHAT MATTERS: Summarise the most important developments/i);
+    expect(flashpointSystem.content).toMatch(/IMPLICATIONS FOR BUSINESS: Explain the likely business consequences/i);
+    expect(flashpointSystem.content).toMatch(/This is analysis, not advice/i);
+    expect(flashpointSystem.content).toMatch(/Distinguish the overall weekly posture from the highest single incident rating/i);
+    expect(flashpointSystem.content).toMatch(/Use the supplied seven-day protest forecast as the evidence base/i);
+    expect(flashpointSystem.content).not.toMatch(/4-7 distinct concrete actions to take/i);
+    expect(flashpointSystem.content).not.toMatch(/bottom-line analyst judgement with useful advice/i);
+
+    calls = [];
+    mockModelReply(topicReply());
+    await generateReportProse(input(), 0);
+    const [shippingSystem] = calls[0].body.messages;
+    expect(shippingSystem.content).not.toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+  });
+
   it("threads a numbered incident block, most-recent-first, and invents no third item", async () => {
     mockModelReply(topicReply());
 
@@ -263,6 +289,7 @@ describe("computeReportProseFingerprint — Energy-only prompt version", () => {
           facts: value.facts ?? "",
           generationBasisFingerprint:
             value.generationBasisFingerprint ?? "",
+          canonicalEvidenceIds: [...(value.canonicalEvidenceIds ?? [])].sort(),
           ids,
         }),
       )
@@ -278,7 +305,7 @@ describe("computeReportProseFingerprint — Energy-only prompt version", () => {
       basisDays: 7,
       incidents: INCIDENTS,
     };
-    expect(REPORT_PROSE_PROMPT_VERSION).toBe("v3");
+    expect(REPORT_PROSE_PROMPT_VERSION).toBe("v5");
     expect(computeReportProseFingerprint(value)).toBe(
       fingerprintWithVersion(value, REPORT_PROSE_PROMPT_VERSION),
     );
@@ -298,6 +325,23 @@ describe("computeReportProseFingerprint — Energy-only prompt version", () => {
     );
     expect(computeReportProseFingerprint(value)).not.toBe(
       fingerprintWithVersion(value, REPORT_PROSE_PROMPT_VERSION),
+    );
+  });
+
+  it("invalidates Flashpoint prose without changing other topic caches", () => {
+    const value = {
+      reportId: 42,
+      topic: "flashpoint",
+      title: "Protests & Civil Unrest",
+      issueDate: "2026-06-13",
+      basisDays: 7,
+      incidents: INCIDENTS,
+    };
+    expect(FLASHPOINT_REPORT_PROSE_PROMPT_VERSION).not.toBe(
+      REPORT_PROSE_PROMPT_VERSION,
+    );
+    expect(computeReportProseFingerprint(value)).toBe(
+      fingerprintWithVersion(value, FLASHPOINT_REPORT_PROSE_PROMPT_VERSION),
     );
   });
 });

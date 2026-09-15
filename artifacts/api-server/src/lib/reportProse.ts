@@ -36,6 +36,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v5";
 export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v2";
+export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v1";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -180,6 +181,8 @@ export function computeReportProseFingerprint(input: {
         ? ENERGY_REPORT_PROSE_PROMPT_VERSION
         : input.topic === "fuel"
           ? FUEL_REPORT_PROSE_PROMPT_VERSION
+          : input.topic === "flashpoint" || input.topic === "protests"
+            ? FLASHPOINT_REPORT_PROSE_PROMPT_VERSION
         : REPORT_PROSE_PROMPT_VERSION,
     kind: "topic-prose",
     reportId: input.reportId,
@@ -199,6 +202,7 @@ export function computeReportProseFingerprint(input: {
 }
 
 function systemPrompt(label: string, focus: string, polestarViewMinWords?: number): string {
+  const isFlashpoint = label === "Protests & Civil Unrest";
   const maritimeGuardrails =
     label === "Shipping & Maritime Security"
       ? `
@@ -253,6 +257,17 @@ CONFLICT WATCH TRACEABILITY — additional non-negotiable rules:
   geographic concentration.
 `
       : "";
+  const flashpointGuardrails =
+    isFlashpoint
+      ? `
+FLASHPOINT NARRATIVE — section-specific instructions:
+- WHAT MATTERS: Summarise the most important developments in analytical prose. Do not concatenate raw headlines, locations or source snippets. Explain which developments matter most, where the main exposure sits, whether disruption is localised or broader, and whether activity is routine, increasing or materially different from the normal pattern. Use only the accepted incident data supplied to the report.
+- IMPLICATIONS FOR BUSINESS: Explain the likely business consequences of the reported protest and unrest environment. Where supported, cover staff movement, site access, transport disruption, delivery schedules, public transport, workforce attendance, supplier or client movement, and business continuity. This is analysis, not advice. Do not write instructions and avoid sentence openings such as Review, Confirm, Check, Monitor or Track.
+- POLESTAR VIEW: Provide a genuine assessment using existing Polestar risk terminology. Distinguish the overall weekly posture from the highest single incident rating. Explain the principal geographic and operational exposures, whether activity is concentrated or broadening, the near-term direction, and what evidence would materially strengthen or weaken the assessment. Do not turn this section into recommendations.
+- WATCH NEXT: Use the supplied seven-day protest forecast as the evidence base where forecast entries are present. Prioritise, rather than repeat, the scheduled events most likely to affect transport, site access, staff movement, significant public spaces, and major government or commercial areas. Explain why the priority events matter and identify indicators of escalation, wider mobilisation or greater operational disruption. Avoid repetitive Watch for, Track or Monitor openings.
+- Keep these four sections concise, analytical and grounded in accepted Flashpoint data. Avoid raw scraped wording, obvious headline fragments and repetition of the same conclusion across sections. Do not invent facts.
+`
+      : "";
   const proseFormatRule =
     label === "Energy Watch"
       ? "- British English. Professional, neutral register. No hyperbole or emojis. Markdown level-two headings are permitted ONLY inside the energy `whatHappened` string, as required above; do not use Markdown elsewhere."
@@ -268,6 +283,7 @@ ${maritimeGuardrails}
 ${energyGuardrails}
 ${fuelGuardrails}
 ${conflictGuardrails}
+${flashpointGuardrails}
 
 GROUNDING — non-negotiable:
 - Every statement about what happened during the window must come ONLY from the supplied INCIDENTS. Do not invent or infer events, casualty figures, numbers, dates, place names, group names or attributions that are not present in the incident records.
@@ -288,7 +304,9 @@ ${proseFormatRule}
 
 PLAIN-ENGLISH RULES — mandatory:
 - Use plain, easy-to-read English. Short, direct sentences with a clear subject. Every sentence must be understandable on first reading by a non-specialist.
-- For each significant development: explain the event, its likely business impact, and the action required.
+${isFlashpoint
+  ? "- For each significant development used in these four narrative sections, explain its operational meaning without turning the analysis into instructions."
+  : "- For each significant development: explain the event, its likely business impact, and the action required."}
 - BANNED phrasings — never use these or close variants: "the week reads as", "reads as", "the practical weight sits", "the picture is led by", "the picture", "activity is being driven by", "driven by protest activity", "mostly protests and organised action", "two different readings sit side by side", "on the reported record", "weighted towards", "operating posture", "Overall protest posture this week", "Risk level:", "the sharper case", "where events fall on the areas the business uses", "sections follow", "the practical risk this week was", "posture weighs volume".
 - Never copy an article headline into a sentence. Rewrite the information as normal prose.
 - Never confuse the number of events with their severity. If one country has more events but another has a more serious incident, state both plainly.
@@ -302,10 +320,10 @@ Return STRICT JSON with EXACTLY these keys and no others:
   "executiveSummary": string,  // 2-4 sentences: the headline judgement for this window — the dominant theme and what it means for operations now.
   "situation": string,         // The current operating picture for this topic: the standing backdrop framed against what this window actually shows.
    "whatHappened": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : "string"},      // Only the window's actual developments, told concretely with the specific places, actors and event types from the incidents — synthesised into a narrative, not enumerated.
-  "whatMatters": string,       // Why it matters for staff movement, site access, supply or continuity, and where to focus attention.
-  "implications": string[],    // 4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash.
-   "watchNext": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : label === "Conflict Watch" ? "object[] (each {text, supportingIncidentIds})" : "string[]"},       // 4-7 specific forward indicators to monitor. Each short and specific. No "Watch for" prefix.
-  "polestarView": string       // The bottom-line analyst judgement with useful advice: state the appropriate risk level, where disruption is most likely, and what to do. Do not repeat the incident summary.${
+  "whatMatters": string,       // ${isFlashpoint ? "Analytical synthesis of the most important developments, main exposure, disruption breadth and direction; never a headline list." : "Why it matters for staff movement, site access, supply or continuity, and where to focus attention."}
+  "implications": string[],    // ${isFlashpoint ? "2-4 concise analytical statements explaining likely business consequences. Not instructions; no imperative sentence openings." : "4-7 distinct concrete actions to take. Each a short imperative sentence. No numbering, no leading dash."}
+   "watchNext": ${label === "Fuel Watch" ? "object[] (each {text, supportingEvidenceIds, supportingClaim})" : label === "Conflict Watch" ? "object[] (each {text, supportingIncidentIds})" : "string[]"},       // ${isFlashpoint ? "Prioritised seven-day forecast developments and escalation indicators, with why they matter. Do not repeat every entry or use repetitive command openings." : "4-7 specific forward indicators to monitor. Each short and specific. No \"Watch for\" prefix."}
+  "polestarView": string       // ${isFlashpoint ? "The overall weekly Polestar assessment, distinct from the highest single incident rating, covering exposure, concentration, direction and evidence that would change the assessment. No recommendations." : "The bottom-line analyst judgement with useful advice: state the appropriate risk level, where disruption is most likely, and what to do. Do not repeat the incident summary."}${
     polestarViewMinWords
       ? ` MUST be at least ${polestarViewMinWords} words (aim for ${polestarViewMinWords}-${polestarViewMinWords + 40}): cover the overall judgement, what the data does and does not support, reporting limitations, the near-term outlook and your confidence level, each as its own sentence.`
       : ""

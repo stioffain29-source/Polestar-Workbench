@@ -57,3 +57,11 @@ displaying stale prose. Leave them untouched even when rewriting the live prose 
 Empty-state messages must match between the on-screen preview component and its
 jsPDF builder (e.g. `ShippingReportPreview` ↔ `exportShippingReportPdf` —
 "No piracy or armed-robbery reports this week."). Change both together.
+
+## Flashpoint analytical section roles
+
+**Rule:** Flashpoint What Matters synthesises priority, exposure, breadth and direction. Implications explains business consequences without instructions. Polestar View assesses weekly posture separately from peak incident severity. Watch Next prioritises the seven-day forecast and escalation indicators rather than repeating entries.
+
+**Why:** The generic topic prompt produced headline concatenation, command-style implications, recommendations in the closing assessment and repetitive forecast lists.
+
+**How to apply:** Keep these as Flashpoint-only generation instructions. Use accepted incidents and supplied forecast evidence, avoid raw scraped wording and repeated conclusions, and do not add prose-quality save/export gates.
