@@ -11,6 +11,7 @@ import { isForeignSubjectNoHomeAnchor } from "../../artifacts/workbench/src/lib/
 
 // Foreign-subject records that were filed under Thailand only by a stray tag.
 const THAI_DROP = [
+  "Teen rescued after spending days on capsized boat off Alaska",
   "US launches new Iran strikes, reimposes naval blockade",
   "UK announces social media curfew for under-16s",
   "Russia advances in eastern Ukraine",

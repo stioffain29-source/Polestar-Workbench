@@ -144,3 +144,4 @@
 - [Canonical report risk](canonical-report-risk.md) — scheduled-report risk comes only from the final curated evidence set; prose and stale saved ratings never outrank canonical data.
 - [Cross-topic APAC country coverage](cross-topic-apac-country-coverage.md) — AU/CN/VN/KH/HK coverage is a registry+feed contract across topics; Hong Kong stays independently attributed.
 - [Incident read cache invalidation](incident-read-cache-invalidation.md) — incident APIs must never 304 across relevance backfills; stale payloads can preserve rows already rejected in the database.
+- [Nested route scroll restoration](nested-route-scroll-restoration.md) — Workbench pages scroll inside Layout main, not window; reset that container on route changes or long reports can make the next page look blank.

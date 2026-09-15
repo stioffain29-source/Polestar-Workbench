@@ -51,6 +51,11 @@ jest.mock("@workspace/api-client-react", () => ({
   useListMaritimeMovement: () => ({ data: [] }),
   useListMaritimeSecurityEvents: () => ({ data: [] }),
   useListReliefWebReports: () => ({ data: [] }),
+  useListProtestEvents: () => ({ data: [] }),
+  useCollectProtestEvents: () => ({ mutate: jest.fn(), isPending: false }),
+  useCreateProtestEvent: () => ({ mutate: jest.fn(), isPending: false }),
+  useUpdateProtestEvent: () => ({ mutate: jest.fn(), isPending: false }),
+  getListProtestEventsQueryKey: () => ["protest-events"],
   useGenerateReportIncidentSummaries: () => ({
     mutate: jest.fn(),
     isPending: false,

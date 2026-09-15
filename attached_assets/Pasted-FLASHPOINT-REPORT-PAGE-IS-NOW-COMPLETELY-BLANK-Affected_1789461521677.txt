@@ -1,0 +1,69 @@
+FLASHPOINT REPORT PAGE IS NOW COMPLETELY BLANK
+
+Affected example:
+https://document-asset-manager-stioffain29.replit.app/reports/76
+
+Current behaviour:
+- Browser reaches /reports/76
+- Page remains completely white
+- No report editor/interface appears
+- No visible loading indicator or error message
+- This is occurring specifically when opening the Flashpoint report
+
+DO NOT change:
+- Flashpoint prompts
+- Intelligence collection
+- Source logic
+- Generated report prose
+- Report schema unless an actual compatibility bug is identified
+- Fuel Watch or Shipping Watch working code
+
+TASK:
+
+1. Reproduce opening report 76 directly.
+
+2. Check browser/runtime console for the FIRST React/JavaScript exception generated while rendering /reports/76.
+
+3. Check the API request used to load report 76:
+   - confirm HTTP status
+   - confirm valid JSON is returned
+   - confirm the report object exists
+   - confirm topic/type is Flashpoint
+   - identify any null, undefined, malformed or unexpected fields
+
+4. Trace the render path:
+   /reports/:id
+   -> report loader
+   -> Report Editor
+   -> Flashpoint-specific renderer/components
+
+5. Identify the exact component/field causing the blank-screen crash.
+
+6. Fix the renderer defensively so a missing optional Flashpoint field CANNOT crash the entire page.
+
+Use safe defaults where appropriate, for example:
+   const value = report?.field ?? "";
+   const items = Array.isArray(report?.items) ? report.items : [];
+
+Do NOT hide the underlying bug with a global blank catch.
+
+7. Add an error state so that if report loading fails, the application displays an actual message rather than a completely white screen.
+
+8. Verify:
+   - report 76 opens normally
+   - Flashpoint prose is populated
+   - existing saved Flashpoint reports still open
+   - Fuel Watch still opens
+   - Shipping Watch still opens
+   - no console runtime errors
+   - refreshing /reports/76 directly still works
+
+IMPORTANT:
+Find and report the actual root cause before changing code.
+
+Give me:
+A. Exact runtime error
+B. File/component causing it
+C. Root cause
+D. Files changed
+E. Confirmation that report 76 renders successfully

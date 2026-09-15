@@ -11,7 +11,6 @@ import {
   useListReliefWebReports,
   useListProtestEvents,
   useCollectProtestEvents,
-  getListProtestEventsQueryKey,
   useGenerateReportIncidentSummaries,
   useEditReportIncidentSummaries,
   useGenerateReportProse,
@@ -388,7 +387,12 @@ export default function ReportEditor() {
   const qc = useQueryClient();
   const [, params] = useRoute("/reports/:id");
   const id = parseInt(params?.id ?? "0", 10);
-  const { data: report, isLoading } = useGetReport(id);
+  const {
+    data: report,
+    isLoading,
+    isError: reportLoadFailed,
+    error: reportLoadError,
+  } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [flashpointProseDirty, setFlashpointProseDirty] = useState(false);
@@ -552,7 +556,7 @@ export default function ReportEditor() {
     query: {
       enabled: form.topic === "flashpoint" || form.topic === "protests",
       staleTime: 30_000,
-      queryKey: getListProtestEventsQueryKey(),
+      queryKey: ["protest-events"],
     },
   });
   const collectProtestEvents = useCollectProtestEvents();
@@ -2363,6 +2367,24 @@ export default function ReportEditor() {
       </div>
     );
   }
+  if (reportLoadFailed) {
+    return (
+      <div
+        role="alert"
+        className="max-w-3xl mx-auto border border-destructive/40 bg-destructive/5 p-6 text-sm"
+      >
+        <h1 className="font-semibold text-destructive">Report could not be loaded</h1>
+        <p className="mt-2 text-muted-foreground">
+          {reportLoadError instanceof Error && reportLoadError.message
+            ? reportLoadError.message
+            : "The report service returned an error. Refresh the page or return to the report list."}
+        </p>
+        <Link href="/reports" className="mt-4 inline-block text-accent hover:underline">
+          Return to reports
+        </Link>
+      </div>
+    );
+  }
   if (!report)
     return (
       <div className="text-sm text-muted-foreground">Report not found.</div>
@@ -3762,7 +3784,8 @@ export default function ReportEditor() {
         )}
 
         {maritimeValidationSummary &&
-          maritimeValidationSummary.pending > 0 && (
+          maritimeValidationSummary.pending > 0 &&
+          maritimeValidationSummary.validated === 0 && (
             <div
               className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
               style={{
@@ -3774,13 +3797,9 @@ export default function ReportEditor() {
               aria-live="polite"
             >
               <span style={{ fontWeight: 700 }}>
-                {maritimeValidationSummary.validated > 0
-                  ? "Unverified Shipping records excluded."
-                  : "Maritime validation pending."}
+                Maritime validation pending.
               </span>{" "}
-              {maritimeValidationSummary.validated > 0
-                ? `${maritimeValidationSummary.pending} ${maritimeValidationSummary.pending === 1 ? "record is" : "records are"} excluded because the event could not be confirmed. The report and auto risk use ${maritimeValidationSummary.validated} confirmed ${maritimeValidationSummary.validated === 1 ? "incident" : "incidents"} only.`
-                : `${maritimeValidationSummary.pending} ${maritimeValidationSummary.pending === 1 ? "record is" : "records are"} still under review. Auto risk will remain blank until at least one maritime incident is confirmed.`}
+              {`${maritimeValidationSummary.pending} ${maritimeValidationSummary.pending === 1 ? "record is" : "records are"} still under review. Auto risk will remain blank until at least one maritime incident is confirmed.`}
             </div>
           )}
         {maritimeValidationSummary &&

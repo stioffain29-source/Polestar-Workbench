@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Server, AlertTriangle, Layers, Crosshair
@@ -13,6 +13,13 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main) return;
+    main.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location]);
 
   const navGroups = [
     {
@@ -183,7 +190,10 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-background p-6 custom-scrollbar print:p-0 print:bg-white">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto bg-background p-6 custom-scrollbar print:p-0 print:bg-white"
+        >
           {children}
         </main>
       </div>
