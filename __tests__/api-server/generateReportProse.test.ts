@@ -202,6 +202,10 @@ describe("generateReportProse — request assembly", () => {
 
     const [flashpointSystem] = calls[0].body.messages;
     expect(flashpointSystem.content).toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+    expect(flashpointSystem.content).toMatch(/WRITING STYLE FOR ALL SEVEN SECTIONS/i);
+    expect(flashpointSystem.content).toMatch(/Lead with the point, then explain why it matters/i);
+    expect(flashpointSystem.content).toMatch(/senior business reader/i);
+    expect(flashpointSystem.content).toMatch(/people, movement, access, transport, facilities or continuity/i);
     expect(flashpointSystem.content).toMatch(/RAW EVIDENCE CLEANING/i);
     expect(flashpointSystem.content).toMatch(/EXECUTIVE SUMMARY: Write a substantive overview/i);
     expect(flashpointSystem.content).toMatch(/ACTIVISM AND PROTEST READ/i);
@@ -219,6 +223,7 @@ describe("generateReportProse — request assembly", () => {
     await generateReportProse(input(), 0);
     const [shippingSystem] = calls[0].body.messages;
     expect(shippingSystem.content).not.toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+    expect(shippingSystem.content).not.toMatch(/WRITING STYLE FOR ALL SEVEN SECTIONS/i);
   });
 
   it("cleans Flashpoint feed artefacts before adding evidence to the prompt", async () => {

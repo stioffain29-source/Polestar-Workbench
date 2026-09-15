@@ -36,7 +36,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v5";
 export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v2";
-export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v2";
+export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v3";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -261,6 +261,7 @@ CONFLICT WATCH TRACEABILITY — additional non-negotiable rules:
     isFlashpoint
       ? `
 FLASHPOINT NARRATIVE — section-specific instructions:
+- WRITING STYLE FOR ALL SEVEN SECTIONS: Write clear, natural English for a senior business reader. Lead with the point, then explain why it matters. Use direct sentences, concrete language and short paragraphs. Each paragraph should answer the practical questions relevant to it: what happened, why it matters, who or what is affected, what could happen next. Name the country, city, type of disruption and likely business effect when the accepted evidence supports them. Turn incident data into explanation rather than restating it. When comparing countries or incidents, say clearly which matters more and why. Describe risk through actual effects on people, movement, access, transport, facilities or continuity. Sound confident, informed and practical without overstating the evidence.
 - RAW EVIDENCE CLEANING: Incident titles and summaries are evidence, not publication copy. Rewrite them into complete grammatical sentences. Remove publisher names, duplicated source names, URL remnants, "Full story", "Link to", "Read more" and similar feed artefacts. Correct obvious headline capitalisation. Never publish a sentence that begins in lower case, ends mid-word or ends as an incomplete phrase. If a broken fragment cannot be reconstructed unambiguously from the supplied accepted evidence, omit it. Never change the underlying factual meaning.
 - EXECUTIVE SUMMARY: Write a substantive overview of the reporting period. Explain where activity is concentrated, the overall weekly posture, the highest significant development, the principal operational exposure, and whether conditions are stable, deteriorating or mixed. Do not reduce this to a short statistical recap.
 - ACTIVISM AND PROTEST READ ("situation"): Analyse the dominant protest themes, geographic concentration, scale and disruption potential. State whether the activity represents routine mobilisation or something more significant. Do not merely say that protests may affect access.

@@ -60,8 +60,8 @@ jsPDF builder (e.g. `ShippingReportPreview` ↔ `exportShippingReportPdf` —
 
 ## Flashpoint analytical section roles
 
-**Rule:** Flashpoint generation cleans feed artefacts and incomplete fragments before prose is written. Its seven narrative sections have distinct analytical roles; Watch Next prioritises rather than repeats the forecast.
+**Rule:** Flashpoint uses short, direct business prose: lead with the point, explain why it matters, name concrete effects and compare priorities clearly. It cleans feed fragments before writing.
 
 **Why:** The generic topic prompt produced headline concatenation, command-style implications, recommendations in the closing assessment and repetitive forecast lists.
 
-**How to apply:** Keep these as Flashpoint-only generation instructions. Use accepted incidents and supplied forecast evidence, omit ambiguous broken text, avoid repeated conclusions, and do not add prose-quality save/export gates.
+**How to apply:** Apply this voice to all seven Flashpoint sections only. Use accepted incidents and forecast evidence, omit ambiguous broken text, prioritise rather than restate, and add no prose-quality save/export gates.
