@@ -1,0 +1,60 @@
+I need a coverage audit of Flashpoint collection across the full APAC country set.
+
+Do not invent incidents and do not lower evidence standards simply to populate countries.
+
+The current Flashpoint shows strong reporting from Thailand, South Korea and the Philippines, but I am seeing little or no reporting from:
+
+Cambodia
+China
+Australia
+New Zealand
+Vietnam
+Laos
+
+Note that Australia and New Zealand do appear in the protest forecast, and New Zealand has at least one accepted historical incident. The concern is whether the incident collection pipeline has balanced country coverage, not whether every country must contain an incident every week.
+
+Audit the collection pipeline country by country.
+
+For each of those six countries, show:
+
+sources queried
+
+number of raw records retrieved
+
+number rejected as duplicates
+
+number rejected as unverified
+
+number rejected as outside the reporting window
+
+number rejected as irrelevant to Flashpoint
+
+number accepted into the final dataset
+
+Also confirm the actual search/query terms used for each country.
+
+Check whether the collector is relying too heavily on English-language international media and therefore missing local reporting.
+
+Check whether country names, major cities and local terminology are included in collection queries.
+
+For example, country coverage should consider relevant national and major-city terms rather than searching only the word protest.
+
+The purpose is to establish whether:
+
+there genuinely were no qualifying incidents,
+incidents were collected but rejected,
+the sources did not return them,
+
+or
+
+those countries are not being searched adequately.
+
+Do not change the Flashpoint narrative generator, PDF export, evidence gates or report formatting.
+
+First give me the collection audit for those six countries.
+
+If a country was properly searched and produced no qualifying confirmed incidents, that is acceptable. The report should not manufacture content to fill a geographic gap.
+
+However, if a country has zero or near-zero raw collection because the source/query coverage is weak, identify that explicitly as a collection gap.
+
+I want balanced APAC collection, not artificially balanced reporting.
