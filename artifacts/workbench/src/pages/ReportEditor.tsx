@@ -1620,7 +1620,6 @@ export default function ReportEditor() {
     // built from the actual window. Seed exactly once per report id.
     if (!incidents) return;
     if (seededForId.current === report.id) return;
-    seededForId.current = report.id;
     const savedExec =
       (report.executiveSummary ?? "").trim()
         ? report.executiveSummary
@@ -1877,6 +1876,10 @@ export default function ReportEditor() {
     setSectionOverrides(
       (report.sectionOverrides as TopicSectionOverrides | null) ?? {},
     );
+    // Mark the report seeded only after every synchronous derivation above has
+    // completed. Setting this before the work meant any interrupted/failed seed
+    // permanently trapped the editor behind its loading screen.
+    seededForId.current = report.id;
     setSeededId(report.id);
   }, [report, incidents]);
 
@@ -2349,7 +2352,11 @@ export default function ReportEditor() {
   const loadingTopicLabel =
     TOPIC_LABELS[pendingTopic ?? report?.topic ?? form.topic] ?? "report";
 
-  if (isLoading || (report && seededId !== report.id)) {
+  // Once the report row exists, keep the editor shell mounted while incident-
+  // dependent prose/details seed. The right-hand preview already has its own
+  // reportDetailsLoading state. Blocking the whole route here turned any slow
+  // or interrupted seed into a permanently blank report page.
+  if (isLoading) {
     return (
       <div className="max-w-[1900px] mx-auto">
         <ReportDetailsLoading topicLabel={loadingTopicLabel} />
