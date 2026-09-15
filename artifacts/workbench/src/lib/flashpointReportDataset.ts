@@ -4270,13 +4270,15 @@ export function resolveFlashpointRenderedModel(args: {
     return `${place || "The reported location"}: ${title}.`;
   });
   const eventSpecificImplications = recoveryLeads.map((row) => {
-    const title = displayIncidentTitle(row.title, row.displayTitle).replace(/\.$/, "");
     const place = [row.location, row.country].filter(Boolean).join(", ");
-    return `For activity linked to “${title}”${place ? ` in ${place}` : ""}, check the reported venue or route for a confirmed closure, dispersal measure or transport effect before changing staff movement.`;
+    return `${place || "For each reported location"} — confirm any closure, dispersal measure or transport effect with a current operational source before changing staff movement.`;
   });
   const regionalConcentration = leadCountry
     ? `Reporting is concentrated in ${leadCountry}${supportingCountries.length ? `, with additional activity in ${joinList(supportingCountries)}` : ""}.`
     : "The accepted reporting does not establish a defensible geographic concentration.";
+  const regionalComparison = topCountries.length
+    ? `The country comparison covers ${joinList(topCountries)}.`
+    : "The accepted record does not support a country comparison.";
   const fallbackWatchNext =
     scheduleWatchNext ||
     topCountries
@@ -4289,27 +4291,27 @@ export function resolveFlashpointRenderedModel(args: {
     "Monitor verified mobilisation notices, transport disruption and changes to official access restrictions.";
   const groundedRecovery = makeModel({
     executiveSummary: activityPresent
-      ? `${regionalConcentration} The severity ceiling is ${severityCeiling}. The immediate operating concern is short-notice disruption to movement, site access and staff communications where public gatherings or enforcement activity affect key routes.`
+      ? `${regionalConcentration} The highest assessed incident is ${severityCeiling}. The immediate operating concern is short-notice disruption to movement, site access and staff communications where public gatherings or enforcement activity affect key routes.`
       : "No confirmed public-order activity was established for the reporting period. Maintain routine monitoring of verified mobilisation notices and official access restrictions.",
     activismRead: activityPresent
-      ? `${regionalConcentration} Mobilisation reporting should be treated as an indicator of possible access and transport disruption, not as evidence of escalation unless later reporting confirms a material change.`
+      ? `Accepted mobilisation reports identify possible access and transport disruption. They do not establish escalation unless follow-on evidence confirms a material change in reach, duration or enforcement response.`
       : "No confirmed mobilisation activity was established for the reporting period.",
     civilUnrestRead: activityPresent
-      ? `The severity ceiling is ${severityCeiling}. Review the accepted incidents for evidence of road closures, crowd dispersal, arrests, violence or damage before changing operating posture; country volume alone does not establish impact.`
+      ? `The accepted public-order set reaches ${severityCeiling}. Review it for road closures, crowd dispersal, arrests, violence or damage before changing operating posture; country volume alone does not establish impact.`
       : "No confirmed civil-unrest activity was established for the reporting period.",
     forecastRead: reconcileProtestForecastRead(
       "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
       protestSchedule,
     ),
-    regionalCountryRead: `${regionalConcentration} This distribution identifies where reporting is concentrated, while the severity colour identifies the highest assessed incident in each country; neither measure by itself establishes nationwide disruption.`,
+    regionalCountryRead: `${regionalComparison} Bar length represents accepted incident volume and colour represents each country's highest assessed severity; neither measure by itself establishes nationwide disruption.`,
     whatMatters: leadLines.length
       ? `${leadLines.join(" ")} These are the developments that matter this period; each should change operating posture only where its reporting identifies a specific access, transport, facility or personnel effect.`
       : "The accepted record does not support a geographic lead. Operational decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.",
     implications: eventSpecificImplications.join("\n"),
     watchNext: fallbackWatchNext,
-    polestarView: leadLines.length
-      ? `The current severity ceiling is ${severityCeiling}. The assessment is led by ${leadLines.map((line) => line.replace(/\.$/, "")).join("; ")} Escalate only where follow-on reporting confirms a wider footprint, sustained disruption or direct effects on personnel, routes or facilities.`
-      : `The current severity ceiling is ${severityCeiling}, but the accepted record does not establish a specific operational exposure.`,
+    polestarView: activityPresent
+      ? `Current evidence supports an overall ceiling of ${severityCeiling}. Escalate operating posture only where follow-on reporting confirms a wider footprint, sustained disruption or direct effects on personnel, routes or facilities.`
+      : `No specific operational exposure is established by the accepted record.`,
   });
   assertFlashpointRenderedModelValid(groundedRecovery);
   return Object.freeze(groundedRecovery);

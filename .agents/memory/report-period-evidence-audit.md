@@ -21,6 +21,12 @@ description: How report metrics and final client prose distinguish current-perio
 
 **How to apply:** Run the shared repetition audit after analyst/AI/canonical precedence is resolved. Topic PDF exports and Spot/Special section authorities fail closed; domain validators for Country/Cities, Cargo, Flashpoint and Shipping remain complementary.
 
+**Rule:** Any safe or grounded prose fallback must pass the same final cross-section audit as primary prose; a fallback is not valid merely because its facts are canonical.
+
+**Why:** Flashpoint's canonical prose recovery repeated its concentration sentence and full lead-event descriptions across sections. The renderer accepted the recovery, but the final publication audit correctly blocked every PDF.
+
+**How to apply:** Give fallback sections distinct editorial jobs. Keep event retelling in one section, use location-only operational checks in implications, and reserve portfolio-level posture for the closing view.
+
 **Rule:** Validation diagnostics never render inside a report preview or exported report. Keep rule codes, evidence warnings and audit details internal; enforce blocking checks at the export boundary.
 
 **Why:** Owner explicitly rejected the large Fuel/Flashpoint/Shipping validation panels as report content. They exposed engine internals and displaced the actual report.

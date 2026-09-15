@@ -2566,6 +2566,11 @@ export default function ReportEditor() {
       ) : update.isSuccess && !update.isPending ? (
         <p className="text-[12px] font-medium text-emerald-700">Saved.</p>
       ) : null}
+      {exportError ? (
+        <p className="text-[12px] font-medium text-destructive" role="alert">
+          PDF export failed — {exportError}
+        </p>
+      ) : null}
 
       {/* Save intercepted: orphaned Fast Facts edits exist. Names each orphan
           so the owner sees exactly what would persist dead; "Save anyway"
