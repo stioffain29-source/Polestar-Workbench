@@ -1518,32 +1518,22 @@ export async function exportTopicReportPdf(
     if (show("what-matters")) {
       renderProseSection("What Matters", fuelEffective?.whatMatters);
     }
-    // Render the exact final text checked by the publication gate.
+    // Fuel narrative sections must render as the same full paragraphs and in
+    // the same order as ReportPreview. The generic bullet renderer splits and
+    // truncates prose, so it must not be used for these sections.
     if (show("implications")) {
-      drawBulletSection(
-        ctx,
+      renderProseSection(
         "Implications for Business",
-        fuelEffective?.implications ?? "",
-      );
-    }
-    if (show("watch-next")) {
-      drawBulletSection(
-        ctx,
-        "Watch Next",
-        fuelEffective?.watchNext ?? "",
-        8,
+        fuelEffective?.implications,
       );
     }
     if (show("polestar-view")) {
-      const polestarView = fuelEffective?.polestarView ?? "";
-      if (polestarView.trim()) {
-        drawSectionWithProseAndDisclaimer(ctx, "Polestar View", polestarView);
-      } else {
-        drawDisclaimer(ctx);
-      }
-    } else {
-      drawDisclaimer(ctx);
+      renderProseSection("Polestar View", fuelEffective?.polestarView);
     }
+    if (show("watch-next")) {
+      renderProseSection("Watch Next", fuelEffective?.watchNext);
+    }
+    drawDisclaimer(ctx);
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
     // read the model's deterministic executive summary.

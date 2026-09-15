@@ -20,3 +20,9 @@ Persisted deterministic prose can outlive a corrected canonical builder because 
 **Why:** a repeated Fuel implications template remained in existing previews/PDFs after the builder was corrected because the old generated sentence had already been saved into the report row.
 
 **How to apply:** pair every canonical wording retirement with an exact-signature compatibility repair in the shared final resolver and regression coverage for both stale generated text and preserved analyst edits.
+
+PDF parity includes the renderer, not only the resolved strings: Fuel Implications, Polestar View and Watch Next are full paragraphs in that order. Never pass them through a bullet parser, which can silently keep only the first sentence.
+
+**Why:** the preview and exporter received the same resolved prose, but the PDF’s bullet renderer truncated two sections and reordered the closing sequence, so “shared resolver” checks falsely appeared to prove parity.
+
+**How to apply:** compare the browser-downloaded PDF against the visible preview after any Fuel closing-section change; verify full text and order, not merely the value passed into the exporter.
