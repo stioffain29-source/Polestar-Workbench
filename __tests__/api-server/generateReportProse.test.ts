@@ -202,6 +202,10 @@ describe("generateReportProse — request assembly", () => {
 
     const [flashpointSystem] = calls[0].body.messages;
     expect(flashpointSystem.content).toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+    expect(flashpointSystem.content).toMatch(/RAW EVIDENCE CLEANING/i);
+    expect(flashpointSystem.content).toMatch(/EXECUTIVE SUMMARY: Write a substantive overview/i);
+    expect(flashpointSystem.content).toMatch(/ACTIVISM AND PROTEST READ/i);
+    expect(flashpointSystem.content).toMatch(/CIVIL UNREST AND PUBLIC ORDER READ/i);
     expect(flashpointSystem.content).toMatch(/WHAT MATTERS: Summarise the most important developments/i);
     expect(flashpointSystem.content).toMatch(/IMPLICATIONS FOR BUSINESS: Explain the likely business consequences/i);
     expect(flashpointSystem.content).toMatch(/This is analysis, not advice/i);
@@ -215,6 +219,34 @@ describe("generateReportProse — request assembly", () => {
     await generateReportProse(input(), 0);
     const [shippingSystem] = calls[0].body.messages;
     expect(shippingSystem.content).not.toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
+  });
+
+  it("cleans Flashpoint feed artefacts before adding evidence to the prompt", async () => {
+    mockModelReply(topicReply());
+
+    await generateReportProse(
+      input({
+        topic: "flashpoint",
+        title: "Protests & Civil Unrest",
+        incidents: [{
+          id: "dirty",
+          topic: "flashpoint",
+          title: "RALLY OUTSIDE EMBASSY - News Wire - news wire",
+          summary: "A rally was held in Bangkok. Full story Link to the",
+          location: "Bangkok",
+          country: "Thailand",
+          severity: "Low",
+          occurredAt: "2026-09-14T00:00:00Z",
+          source: "News Wire",
+        }],
+      }),
+      0,
+    );
+
+    const user = calls[0].body.messages[1].content;
+    expect(user).toContain("RALLY OUTSIDE EMBASSY");
+    expect(user).not.toMatch(/News Wire - news wire/i);
+    expect(user).not.toMatch(/Full story|Link to the/i);
   });
 
   it("threads a numbered incident block, most-recent-first, and invents no third item", async () => {

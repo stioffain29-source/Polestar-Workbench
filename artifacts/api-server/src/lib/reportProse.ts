@@ -36,7 +36,7 @@ const MAX_COMPLETION_TOKENS = 8192;
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
 export const REPORT_PROSE_PROMPT_VERSION = "v5";
 export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v2";
-export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v1";
+export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v2";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
@@ -261,11 +261,15 @@ CONFLICT WATCH TRACEABILITY — additional non-negotiable rules:
     isFlashpoint
       ? `
 FLASHPOINT NARRATIVE — section-specific instructions:
+- RAW EVIDENCE CLEANING: Incident titles and summaries are evidence, not publication copy. Rewrite them into complete grammatical sentences. Remove publisher names, duplicated source names, URL remnants, "Full story", "Link to", "Read more" and similar feed artefacts. Correct obvious headline capitalisation. Never publish a sentence that begins in lower case, ends mid-word or ends as an incomplete phrase. If a broken fragment cannot be reconstructed unambiguously from the supplied accepted evidence, omit it. Never change the underlying factual meaning.
+- EXECUTIVE SUMMARY: Write a substantive overview of the reporting period. Explain where activity is concentrated, the overall weekly posture, the highest significant development, the principal operational exposure, and whether conditions are stable, deteriorating or mixed. Do not reduce this to a short statistical recap.
+- ACTIVISM AND PROTEST READ ("situation"): Analyse the dominant protest themes, geographic concentration, scale and disruption potential. State whether the activity represents routine mobilisation or something more significant. Do not merely say that protests may affect access.
+- CIVIL UNREST AND PUBLIC ORDER READ ("whatHappened"): Explain what differentiates the higher-severity public-order incidents from routine demonstrations and what that means for operating exposure. Do not write instructions.
 - WHAT MATTERS: Summarise the most important developments in analytical prose. Do not concatenate raw headlines, locations or source snippets. Explain which developments matter most, where the main exposure sits, whether disruption is localised or broader, and whether activity is routine, increasing or materially different from the normal pattern. Use only the accepted incident data supplied to the report.
 - IMPLICATIONS FOR BUSINESS: Explain the likely business consequences of the reported protest and unrest environment. Where supported, cover staff movement, site access, transport disruption, delivery schedules, public transport, workforce attendance, supplier or client movement, and business continuity. This is analysis, not advice. Do not write instructions and avoid sentence openings such as Review, Confirm, Check, Monitor or Track.
 - POLESTAR VIEW: Provide a genuine assessment using existing Polestar risk terminology. Distinguish the overall weekly posture from the highest single incident rating. Explain the principal geographic and operational exposures, whether activity is concentrated or broadening, the near-term direction, and what evidence would materially strengthen or weaken the assessment. Do not turn this section into recommendations.
 - WATCH NEXT: Use the supplied seven-day protest forecast as the evidence base where forecast entries are present. Prioritise, rather than repeat, the scheduled events most likely to affect transport, site access, staff movement, significant public spaces, and major government or commercial areas. Explain why the priority events matter and identify indicators of escalation, wider mobilisation or greater operational disruption. Avoid repetitive Watch for, Track or Monitor openings.
-- Keep these four sections concise, analytical and grounded in accepted Flashpoint data. Avoid raw scraped wording, obvious headline fragments and repetition of the same conclusion across sections. Do not invent facts.
+- Keep all seven sections analytical and grounded in accepted Flashpoint data. Avoid raw scraped wording, obvious headline fragments and repetition of the same conclusion across sections. Do not invent facts.
 `
       : "";
   const proseFormatRule =
@@ -334,6 +338,10 @@ Return ONLY the JSON object.`;
 
 function buildUserPrompt(input: GenerateReportProseInput): string {
   const facts = (input.facts ?? "").trim();
+  const promptIncidents =
+    input.topic === "flashpoint" || input.topic === "protests"
+      ? input.incidents.map(cleanFlashpointPromptIncident)
+      : input.incidents;
   return [
     `REPORT: ${input.title || metaFor(input.topic).label}`,
     `REPORTING WINDOW: ${input.periodWord} (rolling ${input.basisDays}-day window ending ${input.issueDate})`,
@@ -353,7 +361,7 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
         ]
       : []),
     "INCIDENTS (the ONLY source of this-window facts):",
-    incidentBlock(input.incidents),
+    incidentBlock(promptIncidents),
     ...(input.topic === "fuel" || input.topic === "conflict"
       ? [
           "",
@@ -364,6 +372,47 @@ function buildUserPrompt(input: GenerateReportProseInput): string {
         ]
       : []),
   ].join("\n");
+}
+
+function cleanFlashpointEvidenceText(
+  value: string | null | undefined,
+  source?: string | null,
+): string | null {
+  if (!value) return value ?? null;
+  let text = value
+    .normalize("NFKC")
+    .replace(/https?:\/\/\S+|www\.\S+/gi, " ")
+    .replace(/\b(?:Full story|Link to(?: the)?|Read more|Continue reading|Click here(?: to read)?|View article)\b[\s:.-]*.*$/i, " ")
+    .replace(/\s+-\s+([^-]{2,60})\s+-\s+\1\s*$/i, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const sourceName = (source ?? "").trim();
+  if (sourceName) {
+    const escaped = sourceName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    text = text
+      .replace(new RegExp(`(?:\\s*[-—|:]\\s*)?${escaped}(?:\\s*[-—|:]\\s*${escaped})?\\s*$`, "i"), "")
+      .trim();
+  }
+
+  // Known partial-word endings are scraper truncation, not evidence. Remove the
+  // unfinished trailing clause; never ask the model to guess the missing word.
+  if (/\b(?:govern|presiden|parliamen|departmen|administ|communit|activis|mobilis|demonstrat|proteste|supporte)\s*$/i.test(text)) {
+    const clause = Math.max(text.lastIndexOf(","), text.lastIndexOf(";"), text.lastIndexOf("."));
+    text = clause >= 0 ? text.slice(0, clause + (text[clause] === "." ? 1 : 0)).trim() : "";
+  }
+
+  return text || null;
+}
+
+function cleanFlashpointPromptIncident(
+  incident: ProseIncidentInput,
+): ProseIncidentInput {
+  return {
+    ...incident,
+    title: cleanFlashpointEvidenceText(incident.title, incident.source),
+    summary: cleanFlashpointEvidenceText(incident.summary, incident.source),
+  };
 }
 
 function coerceStr(v: unknown): string {

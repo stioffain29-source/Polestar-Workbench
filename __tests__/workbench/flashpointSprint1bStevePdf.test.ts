@@ -36,7 +36,7 @@ function inc(over: Partial<FlashpointReportIncident>): FlashpointReportIncident 
 
 describe("Sprint 1b Steve PDF hygiene", () => {
   it("bumps RELEVANCE_RULE_VERSION for backfill", () => {
-    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-10.2");
+    expect(RELEVANCE_RULE_VERSION).toBe("2026-09-14.2");
   });
 
   describe("FP-04 strike homonyms", () => {

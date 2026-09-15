@@ -557,8 +557,10 @@ describe("flashpoint report consistency", () => {
       }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", "2026-08-12");
-    expect(ds.activismRead).toContain(ds.activismRows[0].title);
-    expect(ds.civilUnrestRead).toContain(ds.unrestRows[0].title);
+    expect(ds.activismRead).not.toContain(ds.activismRows[0].title);
+    expect(ds.civilUnrestRead).not.toContain(ds.unrestRows[0].title);
+    expect(ds.activismRead).toMatch(/mobilisation|protest/i);
+    expect(ds.civilUnrestRead).toMatch(/public-order|unrest/i);
     expect(ds.activismRead).not.toMatch(/city-centre commercial districts/i);
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });
@@ -850,8 +852,10 @@ describe("flashpoint report consistency", () => {
       }),
     ];
     const ds = buildFlashpointReportDataset(rows, "flashpoint", ISSUE);
-    expect(ds.activismRead).toContain(ds.activismRows[0].title);
-    expect(ds.civilUnrestRead).toContain(ds.unrestRows[0].title);
+    expect(ds.activismRead).not.toContain(ds.activismRows[0].title);
+    expect(ds.civilUnrestRead).not.toContain(ds.unrestRows[0].title);
+    expect(ds.activismRead).toMatch(/mobilisation|protest/i);
+    expect(ds.civilUnrestRead).toMatch(/public-order|unrest/i);
     expect(ds.activismRead).not.toMatch(/city-centre commercial districts/i);
     expect(validateFlashpointReportDataset(ds)).toEqual([]);
   });

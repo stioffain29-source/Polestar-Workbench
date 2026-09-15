@@ -128,7 +128,8 @@ describe("Sprint B Flashpoint class gates", () => {
       "flashpoint",
       ISSUE,
     );
-    expect(ds.activismRead).toContain(ds.activismRows[0].title);
+    expect(ds.activismRead).not.toContain(ds.activismRows[0].title);
+    expect(ds.activismRead).toMatch(/mobilisation|protest/i);
     expect(ds.forecastRead).not.toMatch(/one reporting period/i);
     const firstForecast = ds.forecastRead.split(/\n+/)[0];
     expect(firstForecast.length).toBeGreaterThan(20);

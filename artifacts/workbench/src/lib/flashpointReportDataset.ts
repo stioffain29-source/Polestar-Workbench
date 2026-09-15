@@ -2755,9 +2755,8 @@ function buildActivismRead(
   windowEnd: Date,
 ): string {
   if (rows.length === 0) {
-    return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. Treat the quiet stretch as a gap in reporting rather than a lasting easing: protest activity in these countries tends to come in bursts, with quiet weeks often followed by a sharp escalation around a policy decision or anniversary.\n\nKeep tracking opposition political calendars, union notices, student-body statements and trade groups (chemists, transporters, lawyers, traders) — these are the earliest signs that activity will pick up again rather than stay quiet.`;
+    return `Little protest, strike, student or sit-in activity was reported across ${windowLabel}. The limited evidence does not establish either a lasting easing or a wider escalation.`;
   }
-  const lead = rows[0];
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
   const political = rows.filter((r) => /\b(pti|imran|tehreek|ttap|opposition|movement|countrywide protest|section\s*144|assembly ban)\b/i.test(text(r)));
   const sectoral = rows.filter((r) => /\b(chemist|pharmacist|trader|transporter|lawyer|union|chamber|federation|sectoral|wage|salary|pay|metro bus|pension)\b/i.test(text(r)));
@@ -2772,36 +2771,38 @@ function buildActivismRead(
     drivers.push("union and trade-group action");
   }
   if (student.length > 0) drivers.push("student and campus activism");
-  const headline = lead
-    ? (() => {
-        const where = (lead.country ?? "").trim();
-        const label = SEV_LABEL[sevKey(lead.severity)] ?? lead.severity ?? "Moderate";
-        const txt = `${lead.title ?? ""} ${lead.summary ?? ""}`;
-        const live = LIVE_PUBLIC_ORDER_RE.test(txt) || ENFORCEMENT_RE.test(txt);
-        const detail = live
-          ? ""
-          : " Reports describe the grievance or call rather than turnout, routes or police action on the day — treat the severity as provisional.";
-        const reaction = lead && isReactionLed(lead.title ?? "")
-          ? " That rating reflects the underlying incident being protested rather than disruption from the protest itself."
-          : "";
-        return `The main protest event across ${windowLabel} was ${tableLeadPhrase(lead)}${where ? ` in ${where}` : ""}, rated ${label} severity.${reaction}${detail}`;
-      })()
-    : `No single protest event stood out across ${windowLabel}, but organising activity continued.`;
+  const countryCounts = new Map<string, number>();
+  for (const row of rows) {
+    const country = (row.country ?? "").trim();
+    if (country) countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
+  }
+  const leadCountry = [...countryCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const strongest = sortBySignificance(rows)[0];
+  const strongestCountry = (strongest?.country ?? "").trim();
+  const strongestSeverity = strongest
+    ? (SEV_LABEL[sevKey(strongest.severity)] ?? strongest.severity)
+    : null;
   const driverLine = drivers.length > 0
-    ? `Most of the reported events came from ${joinList(drivers)}.`
-    : `The reported events are routine local organising rather than any single campaign.`;
-  const places = uniquePlaces(rows);
-  const operational = places.length > 0
-    ? `Named sites include ${joinList(places)}. Where these sit on staff routes or near offices, movement and access are the first things affected.`
-    : `Where gatherings sit on staff routes or near offices, movement and access are the first things affected.`;
+    ? `The dominant themes were ${joinList(drivers)}.`
+    : `The accepted events were separate local mobilisations rather than a coordinated campaign.`;
+  const concentration = leadCountry
+    ? `Activity was concentrated in ${leadCountry}, with smaller pockets elsewhere in the region.`
+    : `Activity was geographically dispersed, with no defensible single-country concentration.`;
+  const disruptive = rows.some((row) => hasConfirmedOperationalImpact(row));
+  const operational = disruptive
+    ? `Reported effects included local pressure on movement, transport or access, but the evidence does not show sustained region-wide disruption.`
+    : `Most activity remained routine mobilisation; the main exposure was temporary congestion or restricted access close to assembly points.`;
   const stale = stalenessPrefix(rows, windowEnd);
-  const body = `${headline}\n\n${driverLine}\n\n${operational}`;
+  const significance = strongestSeverity
+    ? `The strongest activism signal was ${strongestSeverity} severity${strongestCountry ? ` in ${strongestCountry}` : ""}.`
+    : "";
+  const body = `${concentration} ${driverLine} ${significance}\n\n${operational}`.replace(/\s+\n/g, "\n");
   return stale ? `${stale}\n\n${body}` : body;
 }
 
 function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, windowEnd: Date, allRows?: EnrichedIncident[]): string {
   if (rows.length === 0) {
-    return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. A quiet stretch for civil unrest alongside continuing protest activity usually means the authorities have held back from mass arrests or curfew orders — useful, but it can reverse within days if a protest crosses a policy line.\n\nKeep tracking police statements, local government orders, internet-shutdown notices and any move to call in the military. These tend to come ahead of curfews and visible street-level enforcement.`;
+    return `Little riot, clash, crackdown, curfew or security-force activity was reported across ${windowLabel}. The accepted evidence therefore points to routine mobilisation rather than a broader public-order deterioration.`;
   }
   const lead = rows[0];
   const text = (r: EnrichedIncident) => `${r.title ?? ""} ${r.summary ?? ""}`;
@@ -2816,21 +2817,17 @@ function buildCivilUnrestRead(rows: EnrichedIncident[], windowLabel: string, win
   if (hasCurfew) postureBits.push("statutory restrictions are already in play");
   if (hasCrackdown) postureBits.push("police have already used force or made arrests at demonstrations");
   if (hasRiotClash) postureBits.push("street-level disorder is already visible");
-  const containedNote = lead ? containedVenueNote(lead) : null;
-  const unrestTie = topSeverityTieCount(rows, lead);
   const sevLabel = lead ? (SEV_LABEL[sevKey(lead.severity)] ?? lead.severity) : "";
+  const leadCountry = (lead?.country ?? "").trim();
+  const targetedFacility = lead && /\b(targeted?|attacked?|stormed?|damaged?)\b/i.test(text(lead));
+  const containedNote = lead ? containedVenueNote(lead) : null;
   const headline = lead
-    ? unrestTie > 1
-      ? `The most serious civil-unrest events across ${windowLabel} were ${unrestTie} incidents rated ${sevLabel}, including ${tableLeadPhrase(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
-      : `The most serious civil-unrest event across ${windowLabel} was ${tableLeadPhrase(lead)}${(lead.country ?? "").trim() ? ` in ${(lead.country ?? "").trim()}` : ""}.${containedNote ? ` ${containedNote}` : ""}`
+    ? `The highest-rated public-order incident was ${sevLabel}${leadCountry ? ` and occurred in ${leadCountry}` : ""}.${containedNote ? ` It was a prison riot inside a closed facility, so it does not indicate wider street disorder.` : targetedFacility ? ` It involved a direct threat to a specific site, creating a more immediate facility and personnel exposure than a routine demonstration.` : ""}`
     : `Civil unrest across ${windowLabel} was limited, with no single standout event.`;
   const postureLine = postureBits.length > 0
-    ? `The police response is the main thing to watch: ${joinList(postureBits)}.`
-    : `Reports this week do not mention curfews, mass arrests or crackdowns. The police response so far looks measured rather than escalating.`;
-  const places = uniquePlaces(rows);
-  const operational = places.length > 0
-    ? `The highest-severity unrest sits around ${joinList(places)}. Arrests, crackdowns and curfews there matter more than protest counts, because that is where roads close and buildings become hard to reach.`
-    : `For businesses, what the police do — arrests, crackdowns, curfews — matters more than how many protests there are, because that is where roads close and buildings become hard to reach. If enforcement is concentrated in one city or district, plan for road closures and blocked access on the day.`;
+    ? `The higher-severity set is differentiated by ${joinList(postureBits)}.`
+    : `The remaining incidents do not show a wider pattern of curfews, mass arrests or forceful crackdowns.`;
+  const operational = `The resulting exposure is localised around affected roads, facilities and gathering sites rather than evidence of general disruption across the countries concerned.`;
   const stale = stalenessPrefix(rows, windowEnd);
   const body = `${headline}\n\n${postureLine}\n\n${operational}`;
   return stale ? `${stale}\n\n${body}` : body;
@@ -4263,54 +4260,60 @@ export function resolveFlashpointRenderedModel(args: {
     Array.from(ds.canonical.periodRows),
   ).label;
   const activityPresent = ds.canonical.periodRows.length > 0;
-  const recoveryLeads = ds.relatedIncidents.slice(0, 3);
-  const leadLines = recoveryLeads.map((row) => {
-    const title = displayIncidentTitle(row.title, row.displayTitle).replace(/\.$/, "");
-    const place = [row.location, row.country].filter(Boolean).join(", ");
-    return `${place || "The reported location"}: ${title}.`;
+  const acceptedRows = Array.from(ds.canonical.periodRows);
+  const weeklyPosture = overallPostureLabel({
+    activismRows: ds.activismRows,
+    unrestRows: ds.unrestRows,
   });
-  const eventSpecificImplications = recoveryLeads.map((row) => {
-    const place = [row.location, row.country].filter(Boolean).join(", ");
-    return `${place || "For each reported location"} — confirm any closure, dispersal measure or transport effect with a current operational source before changing staff movement.`;
-  });
+  const peakIncident = topSeverityIncident(acceptedRows);
+  const peakCountry = (peakIncident?.country ?? "").trim();
+  const peakText = `${peakIncident?.title ?? ""} ${peakIncident?.summary ?? ""}`;
+  const peakTargetsFacility = /\b(targeted?|attacked?|stormed?|damaged?)\b/i.test(peakText);
+  const hasLabourOrTransport = acceptedRows.some((row) =>
+    /\b(strike|union|transport|transit|bus|rail|metro)\b/i.test(
+      `${row.title ?? ""} ${row.summary ?? ""}`,
+    ),
+  );
+  const hasForceOrArrests = hasEnforcementSignal(acceptedRows);
   const regionalConcentration = leadCountry
     ? `Reporting is concentrated in ${leadCountry}${supportingCountries.length ? `, with additional activity in ${joinList(supportingCountries)}` : ""}.`
     : "The accepted reporting does not establish a defensible geographic concentration.";
   const regionalComparison = topCountries.length
     ? `The country comparison covers ${joinList(topCountries)}.`
     : "The accepted record does not support a country comparison.";
-  const fallbackWatchNext =
-    scheduleWatchNext ||
-    topCountries
-      .slice(0, 3)
-      .map(
-        (country) =>
-          `Monitor official notices, transport disruption and changes to access restrictions in ${country}.`,
-      )
-      .join("\n") ||
-    "Monitor verified mobilisation notices, transport disruption and changes to official access restrictions.";
+  const prioritySchedule = [...protestSchedule.schedule, ...protestSchedule.watchlist]
+    .filter((row) => row.disruptionPotential === "High" || row.disruptionPotential === "Extreme")
+    .slice(0, 4);
+  const priorityPlaces = [...new Set(
+    prioritySchedule.map((row) => [row.city, row.country].filter(Boolean).join(", ")),
+  )].filter(Boolean);
+  const fallbackWatchNext = priorityPlaces.length
+    ? `The most operationally significant scheduled activity is concentrated in ${joinList(priorityPlaces)}. These events matter because larger gatherings or extended marches could affect central roads, public transport and access to government or commercial districts.\n\nThe forward assessment would worsen if activity expands beyond announced assembly points, continues beyond the scheduled period, disrupts major transport routes or produces arrests, confrontation or damage. It would remain contained if events stay at their declared locations and conclude without material access or transport effects.`
+    : `No scheduled event currently establishes a major operational threat. The forward assessment would worsen if new mobilisation expands beyond announced assembly points, disrupts transport, persists longer than planned or produces arrests, confrontation or damage.`;
   const groundedRecovery = makeModel({
     executiveSummary: activityPresent
-      ? `${regionalConcentration} The highest assessed incident is ${severityCeiling}. The immediate operating concern is short-notice disruption to movement, site access and staff communications where public gatherings or enforcement activity affect key routes.`
+      ? `${regionalConcentration} The overall weekly posture is ${weeklyPosture}, while the highest individual incident is ${severityCeiling}${peakCountry ? ` in ${peakCountry}` : ""}. The principal exposure is short-notice disruption to movement, transport, site access and facilities close to gatherings or enforcement activity. Conditions are mixed rather than broadly deteriorating because the most serious effects remain localised.`
       : "No confirmed public-order activity was established for the reporting period. Maintain routine monitoring of verified mobilisation notices and official access restrictions.",
     activismRead: activityPresent
-      ? `Accepted mobilisation reports identify possible access and transport disruption. They do not establish escalation unless follow-on evidence confirms a material change in reach, duration or enforcement response.`
+      ? `${leadCountry ? `Mobilisation was concentrated in ${leadCountry}, with smaller pockets elsewhere in the region.` : "Mobilisation was dispersed across the region."} The dominant pattern was issue-specific protest and labour activity rather than a coordinated regional campaign. Most events represented routine mobilisation, with disruption potential centred on temporary congestion, public-transport changes and restricted access near assembly points.`
       : "No confirmed mobilisation activity was established for the reporting period.",
     civilUnrestRead: activityPresent
-      ? `The accepted public-order set reaches ${severityCeiling}. Review it for road closures, crowd dispersal, arrests, violence or damage before changing operating posture; country volume alone does not establish impact.`
+      ? `The public-order set reaches ${severityCeiling}${peakCountry ? ` in ${peakCountry}` : ""}.${peakTargetsFacility ? " The highest-rated incident involved crowd activity directed at a specific facility, creating a more immediate site and personnel exposure than routine demonstrations." : ""}${hasForceOrArrests ? " Arrests or forceful enforcement distinguish the more serious incidents from the wider protest set." : ""} The evidence does not show comparable disorder spreading across the region, so the higher-severity exposure remains localised.`
       : "No confirmed civil-unrest activity was established for the reporting period.",
     forecastRead: reconcileProtestForecastRead(
       "No unsupported forecast is presented. Monitor confirmed announcements and refresh the assessment when the accepted record changes.",
       protestSchedule,
     ),
     regionalCountryRead: `${regionalComparison} Bar length represents accepted incident volume and colour represents each country's highest assessed severity; neither measure by itself establishes nationwide disruption.`,
-    whatMatters: leadLines.length
-      ? `${leadLines.join(" ")} These are the developments that matter this period; each should change operating posture only where its reporting identifies a specific access, transport, facility or personnel effect.`
-      : "The accepted record does not support a geographic lead. Operational decisions should be driven by confirmed access effects and escalation indicators rather than headline volume.",
-    implications: eventSpecificImplications.join("\n"),
+    whatMatters: activityPresent
+      ? `${leadCountry ? `${leadCountry} matters because it carries the main concentration of accepted activity, increasing the likelihood of recurring local access and traffic effects around gathering sites.` : "No single country dominates the accepted activity."}${peakCountry && peakCountry !== leadCountry ? ` ${peakCountry} presents the sharper individual exposure because it contains the highest-rated incident${peakTargetsFacility ? " and a direct threat to a specific facility" : ""}.` : ""}${hasLabourOrTransport ? " Labour and transport mobilisation broadens the exposure beyond street gatherings to commuting, workforce attendance and service continuity." : ""}\n\nTogether, these developments indicate a mixed environment: mobilisation is geographically dispersed, while serious direct effects remain concentrated in a small number of locations.`
+      : "The accepted evidence does not identify a material development for this reporting period.",
+    implications: activityPresent
+      ? `The main business consequence is short-notice, localised disruption rather than broad regional interruption. Gatherings near diplomatic sites, government institutions, transport nodes and central roads can affect staff movement, customer access, deliveries and scheduled activity at nearby facilities.${hasLabourOrTransport ? " Labour and transport action can also reduce commuting availability, delay workforce attendance and interrupt local services." : ""}${peakTargetsFacility ? " The direct targeting of a facility in the highest-rated incident also creates a distinct risk of closure, damage or personnel exposure at the affected site." : ""}`
+      : "No specific effect on movement, access, transport, facilities or continuity is established by the accepted evidence.",
     watchNext: fallbackWatchNext,
     polestarView: activityPresent
-      ? `Current evidence supports an overall ceiling of ${severityCeiling}. Escalate operating posture only where follow-on reporting confirms a wider footprint, sustained disruption or direct effects on personnel, routes or facilities.`
+      ? `Flashpoint conditions are ${weeklyPosture} overall, despite a highest single-incident severity of ${severityCeiling}. Activity is ${leadCountry ? `concentrated by volume in ${leadCountry}` : "geographically dispersed"}${peakCountry && peakCountry !== leadCountry ? `, while the sharpest individual exposure sits in ${peakCountry}` : ""}. The principal operational exposure is local disruption to movement, transport, access and individual facilities rather than a broad regional deterioration.\n\nThe near-term assessment would increase if activity expands beyond announced locations, persists, disrupts major routes or produces wider forceful enforcement. It would reduce if mobilisation remains contained and no material transport, facility or personnel effects follow.`
       : `No specific operational exposure is established by the accepted record.`,
   });
   assertFlashpointRenderedModelValid(groundedRecovery);

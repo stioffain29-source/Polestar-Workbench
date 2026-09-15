@@ -60,8 +60,8 @@ jsPDF builder (e.g. `ShippingReportPreview` ↔ `exportShippingReportPdf` —
 
 ## Flashpoint analytical section roles
 
-**Rule:** Flashpoint What Matters synthesises priority, exposure, breadth and direction. Implications explains business consequences without instructions. Polestar View assesses weekly posture separately from peak incident severity. Watch Next prioritises the seven-day forecast and escalation indicators rather than repeating entries.
+**Rule:** Flashpoint generation cleans feed artefacts and incomplete fragments before prose is written. Its seven narrative sections have distinct analytical roles; Watch Next prioritises rather than repeats the forecast.
 
 **Why:** The generic topic prompt produced headline concatenation, command-style implications, recommendations in the closing assessment and repetitive forecast lists.
 
-**How to apply:** Keep these as Flashpoint-only generation instructions. Use accepted incidents and supplied forecast evidence, avoid raw scraped wording and repeated conclusions, and do not add prose-quality save/export gates.
+**How to apply:** Keep these as Flashpoint-only generation instructions. Use accepted incidents and supplied forecast evidence, omit ambiguous broken text, avoid repeated conclusions, and do not add prose-quality save/export gates.
