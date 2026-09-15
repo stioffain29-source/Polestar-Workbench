@@ -1,0 +1,159 @@
+Flashpoint is still not publication ready.
+
+Do not touch PDF export, save logic, report activation, evidence gates, source collection, incident filtering or forecast extraction.
+
+This is a text cleaning and narrative generation problem only.
+
+Fix Flashpoint at the generation stage so raw feed text is never published directly into the finished report.
+
+The current report contains:
+
+incomplete sentences
+
+truncated headlines
+
+inconsistent capitalisation
+
+source attribution fragments
+
+sentences beginning in lower case
+
+copied headline wording
+
+broken phrases such as Link to the.
+
+extremely thin analytical commentary
+
+These must be cleaned before presentation.
+
+RAW INCIDENT TEXT
+
+Incident titles and summaries may be used as evidence, but must not be copied blindly into the finished report.
+
+Before display:
+
+remove publisher names and feed artefacts
+
+remove Full story, Link to, URL remnants and similar scraper text
+
+remove duplicated source names
+
+correct obvious capitalisation inherited from headlines
+
+do not publish truncated sentences
+
+if source text ends mid-word or mid-sentence, either reconstruct it only where the meaning is unambiguous from the accepted source data or omit the broken fragment
+
+ensure every displayed sentence begins with a capital letter and ends as a complete grammatical sentence
+
+Do not change underlying factual meaning.
+
+EXECUTIVE SUMMARY
+
+Produce a substantive overview of the reporting period.
+
+It should explain:
+
+where activity is concentrated
+
+the overall weekly posture
+
+the highest significant development
+
+the principal operational exposure
+
+whether the environment is stable, deteriorating or mixed
+
+Do not make this a three-sentence statistical recap.
+
+ACTIVISM AND PROTEST READ
+
+Provide actual analysis of the protest picture.
+
+Explain the dominant themes, geographic concentration, scale, disruption potential and whether reported activity represents routine mobilisation or something more significant.
+
+Do not simply say that protests may affect access.
+
+CIVIL UNREST AND PUBLIC ORDER READ
+
+Explain what differentiates the higher-severity public-order incidents from routine demonstrations and what this means for operating exposure.
+
+Do not write instructions such as Review it for....
+
+WHAT MATTERS
+
+Rewrite completely from accepted evidence.
+
+Do not concatenate headlines, locations or source snippets.
+
+Produce clean analytical prose identifying the two or three developments that materially matter this period and explain why.
+
+IMPLICATIONS FOR BUSINESS
+
+Explain business consequences rather than telling the reader what to check.
+
+Cover relevant effects on staff movement, access, transport, workforce attendance, deliveries, facilities and continuity.
+
+Use complete professional prose, not location-by-location bullet instructions.
+
+WATCH NEXT
+
+The existing protest forecast already lists scheduled events.
+
+Do not repeat that table in prose.
+
+Identify the most operationally significant events and explain why they matter.
+
+Summarise the forward risk picture and the indicators that would suggest escalation or greater disruption.
+
+POLESTAR VIEW
+
+This must be a genuine assessment, not two generic sentences.
+
+Explain:
+
+overall weekly posture
+
+highest single-incident severity
+
+geographic concentration
+
+principal operational exposure
+
+whether activity is broadening or remaining localised
+
+near-term direction
+
+what would materially increase or reduce the assessment
+
+Keep it analytical and grounded in the accepted Flashpoint data.
+
+IMPORTANT
+
+Do not add any new blocking validation.
+
+Do not make prose quality a condition for save or PDF export.
+
+Do not reject reports because a section is short.
+
+Improve the generation and cleaning logic only.
+
+Apply this to all future Flashpoint reports.
+
+Then regenerate the current Flashpoint and show me the full text of:
+
+Executive Summary
+
+Activism and Protest Read
+
+Civil Unrest and Public Order Read
+
+What Matters
+
+Implications for Business
+
+Watch Next
+
+Polestar View
+
+before making any further changes.
