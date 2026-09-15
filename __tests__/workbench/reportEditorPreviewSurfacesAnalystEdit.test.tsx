@@ -104,6 +104,11 @@ jest.mock("@workspace/api-client-react", () => ({
   useGetReport: () => ({ data: mockReportData, isLoading: false }),
   useUpdateReport: () => ({ mutate: mockUpdateReport, isPending: false }),
   useListIncidents: () => ({ data: mockIncidents }),
+  useListProtestEvents: () => ({ data: [] }),
+  useCollectProtestEvents: () => ({ mutate: jest.fn(), isPending: false }),
+  useCreateProtestEvent: () => ({ mutate: jest.fn(), isPending: false }),
+  useUpdateProtestEvent: () => ({ mutate: jest.fn(), isPending: false }),
+  getListProtestEventsQueryKey: () => ["protest-events"],
   useListLatestMaritimeMovement: () => ({ data: [] }),
   useListMaritimeMovement: () => ({ data: [] }),
   useListMaritimeSecurityEvents: () => ({ data: [] }),
@@ -512,6 +517,29 @@ describe("ReportEditor — a saved analyst edit outranks the AI narrative in the
     expect(mockUpdateReport.mock.calls[0][0].data.proseBasisFingerprint).toBe(
       fingerprint,
     );
+  });
+
+  it("omits an absent Flashpoint prose basis instead of sending null", async () => {
+    const topic = "flashpoint";
+    mockReportData = {
+      ...report(topic),
+      proseBasisFingerprint: null,
+    };
+    mockIncidents = incidentsFor(topic).map((incident) => ({
+      ...incident,
+      ...validFlashpointSemantic(incident),
+    }));
+
+    const { getByRole } = render(<ReportEditor />);
+    fireEvent.click(getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(mockUpdateReport).toHaveBeenCalled());
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        mockUpdateReport.mock.calls[0][0].data,
+        "proseBasisFingerprint",
+      ),
+    ).toBe(false);
   });
 
   it("does not rebind an fpA analyst edit when incidents refresh to fpB", async () => {

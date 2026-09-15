@@ -2125,9 +2125,14 @@ export default function ReportEditor() {
         form.regionalCountryRead,
         gen.regionalCountryRead,
       );
-      payload.proseBasisFingerprint = flashpointProseDirty
+      const proseBasisFingerprint = flashpointProseDirty
         ? flashpointEditBasisFingerprint
-        : report?.proseBasisFingerprint ?? null;
+        : report?.proseBasisFingerprint;
+      if (proseBasisFingerprint) {
+        payload.proseBasisFingerprint = proseBasisFingerprint;
+      } else {
+        delete payload.proseBasisFingerprint;
+      }
     } else if (form.topic === "conflict") {
       // Conflict reads seed SAVED-ONLY too. Prune blank per-theatre entries so
       // the JSONB map holds only genuine analyst overrides (each absent key
