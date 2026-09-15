@@ -1,0 +1,109 @@
+Use the audit findings as the authoritative basis for the next work.
+
+DO NOT work on Shipping Watch, PDF fonts, Indonesia country reports, CI, mockup sandbox or unrelated report types yet.
+
+THIS TASK IS ONLY TO RESOLVE THE FLASHPOINT WHITE-SCREEN FAILURE SAFELY.
+
+PHASE 1 — CAPTURE THE REAL REPORT 79 FAILURE
+
+Before editing code:
+
+1. Open production report 79 in a browser.
+2. Capture the FIRST browser console exception.
+3. Record:
+   - exact error text
+   - stack trace
+   - file
+   - line
+   - component/function
+4. Save the exact API payload returned by:
+   GET /api/reports/79
+5. Replay the Flashpoint rendering path using that exact payload.
+
+Do not claim a root cause until the exception has been reproduced.
+
+PHASE 2 — FIX CONFIRMED FLASHPOINT VULNERABILITIES
+
+Audit identified unsafe non-null assertions in:
+
+flashpointReportDataset.ts
+
+including:
+
+eventDate!.trim()
+country!.trim()
+physicalLocation!.trim()
+eventType!
+
+Remove unsafe assumptions around persisted report data.
+
+Required behaviour:
+
+- null values must not throw
+- undefined values must not throw
+- empty strings must not throw
+- malformed dates must not throw
+- invalid accepted records must be rejected or safely normalised
+- report rendering must continue even if one source record is malformed
+
+Dates must be validated BEFORE formatting.
+
+Do not simply wrap everything in try/catch.
+Fix the data validation properly.
+
+PHASE 3 — ADD FAILURE CONTAINMENT
+
+Add a React error boundary around the report/editor route so a rendering exception can NEVER blank the entire Workbench.
+
+If a report render fails, display a visible diagnostic state such as:
+
+“Report could not be rendered.”
+
+Include enough development logging to identify:
+- report ID
+- topic
+- component
+- exception
+
+Do not expose technical stack traces to normal production users.
+
+The navigation/application shell must remain usable.
+
+PHASE 4 — VERIFY
+
+Test:
+
+- report 79 opens
+- report 79 direct refresh works
+- malformed Flashpoint record does not blank page
+- missing country does not blank page
+- missing physicalLocation does not blank page
+- missing eventDate does not blank page
+- invalid eventDate does not produce RangeError
+- another Flashpoint report opens
+- Fuel Watch opens
+- Shipping Watch opens
+- application shell remains visible if a deliberate render error is introduced inside a report component
+
+FINAL RESPONSE ONLY:
+
+REPORT 79 ACTUAL ERROR:
+[exact captured exception]
+
+ROOT CAUSE:
+[actual confirmed cause]
+
+FLASHPOINT HARDENING:
+[files and changes]
+
+ERROR BOUNDARY:
+[file and behaviour]
+
+VERIFICATION:
+Report 79 renders: YES/NO
+Malformed Flashpoint data handled: YES/NO
+White-screen failure contained: YES/NO
+Fuel Watch unaffected: YES/NO
+Shipping Watch unaffected: YES/NO
+
+Do not begin the other audit findings until this task is complete.
