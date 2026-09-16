@@ -9,16 +9,15 @@ Incidents are geocoded from a curated, dependency-free lookup table in
 `lib/ingest/src/geocode.ts` (`geocode(country, text)`), NOT an external
 geocoding service — the pipeline has no API for it.
 
-Resolution order inside the geocoder is city match → country centroid → null,
-but feed-country fallback is discovery metadata, not geographic evidence.
-Generic news ingest must not call the geocoder for fallback-only attribution,
-and the map must never plot a row with a null resolved location even if a
-legacy row still carries centroid coordinates.
+Resolution order inside ingest remains city match → country centroid → null.
+On the Geospatial Map, an accepted row without a resolved locality uses a
+labelled state/province-capital fallback when recognised, otherwise a labelled
+country-capital fallback. Exact locations always take priority.
 
-**Why:** Country-edition feeds repeatedly syndicated foreign sports,
-entertainment and Nigerian stories, then stamped them with Pakistan or Sri
-Lanka and plotted them at those centroids. A country default must not become a
-fabricated incident location.
+**Why:** The owner chose broad country visibility over omitting accepted
+incidents, while requiring fallback labels so approximate placement is not
+presented as exact incident geography. Relevance gates still prevent
+country-edition feed noise from becoming accepted incidents.
 
 **How to apply:**
 - The country-centroid keys MUST stay in sync with the canonical names emitted
@@ -30,8 +29,7 @@ fabricated incident location.
   which reuses the same `geocode()` so backfilled rows match fresh ingests.
 - Prod DB is read-only from the workspace, so the backfill (like the scrapers)
   must run inside the deployment runtime to write prod.
-- The stored coordinate is an honest country/city point; `Map.tsx` applies a
-  tiny deterministic id-seeded jitter (~±0.25°) at render time so many
-  same-centroid markers don't stack into one. Do not bake jitter into the DB.
+- Map fallback is presentation-only and must be labelled “capital fallback” or
+  “state-capital fallback”; never apply it to an Unknown country.
 - `Map.tsx topicToCategory` maps BOTH `protests` and `flashpoint` →
   "Civil Unrest" (live civil-unrest data is under topic `flashpoint`).

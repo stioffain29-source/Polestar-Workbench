@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
+import { incidentMapFallback } from "@/lib/incidentMapFallback";
 
 // Date windows offered on the map. Distinct from the topic monitors' default
 // set: the map exposes 60d/120d (per request) instead of 90d/180d/2y.
@@ -88,13 +89,12 @@ function topicToCategory(topic: string, text?: string): string {
 }
 
 // Incidents that couldn't be geocoded to a specific town/city fall back to
-// their country's centroid, so several unrelated incidents can share the
+// a labelled state/province capital or country capital, so several unrelated
+// incidents can share the
 // exact same coordinates. Fanning shared-coordinate points into a ring looks
 // tidy but is not practical: at ANY group size it draws a perfect geometric
 // shape that reads as a fabricated spatial pattern rather than real incident
-// spread (seen at country-centroid fallback points, e.g. Indonesia's
-// centroid sitting in open water in the Makassar Strait, and smaller rings
-// on West Papua/Papuan Highlands fallback points). There is no size below
+// spread. There is no size below
 // which a synthetic ring is an honest representation of the data, so
 // clustering only ever collapses points into a single marker with a count
 // badge — never a ring, regardless of how many points share the spot.
@@ -322,11 +322,21 @@ export default function MapPage() {
     if (view === "incidents") {
       const seenIncidentTitles = new Set<string>();
       const incidentPoints = incidents
-        // A country centroid is not an incident location. Legacy feed-fallback
-        // rows can carry centroid coordinates while location remains null; do
-        // not plot them or manufacture a country-level incident cluster.
-        .filter((i) => {
-          if (i.location == null || i.latitude == null || i.longitude == null) return false;
+        .map((i) => {
+          const fallback =
+            i.location != null && i.latitude != null && i.longitude != null
+              ? null
+              : incidentMapFallback(i.country, `${i.displayTitle ?? i.title} ${i.summary ?? ""}`);
+          return {
+            incident: i,
+            latitude: fallback?.latitude ?? i.latitude,
+            longitude: fallback?.longitude ?? i.longitude,
+            location: fallback?.location ?? i.location,
+          };
+        })
+        .filter((row) => {
+          const i = row.incident;
+          if (row.location == null || row.latitude == null || row.longitude == null) return false;
           const titleKey = `${i.topic}|${i.country}|${(i.displayTitle ?? i.title)
             .toLowerCase()
             .replace(/\s+/g, " ")
@@ -335,15 +345,15 @@ export default function MapPage() {
           seenIncidentTitles.add(titleKey);
           return true;
         })
-        .map<Point>((i) => ({
+        .map<Point>(({ incident: i, latitude, longitude, location }) => ({
           id: `i-${i.id}`,
-          lat: i.latitude!,
-          lng: i.longitude!,
+          lat: latitude!,
+          lng: longitude!,
           title: i.title,
           displayTitle: i.displayTitle ?? null,
           category: topicToCategory(i.topic, `${i.title ?? ""} ${i.summary ?? ""}`),
           country: i.country,
-          location: i.location ?? null,
+          location: location ?? null,
           when: i.occurredAt,
           rating: i.severity,
           summary: i.summary,
