@@ -51,6 +51,34 @@ const EXPORT_MAP_IDS = [
   "special-report-map",
 ] as const;
 
+function applyMapScaleExportLayout(map: HTMLElement): void {
+  map.querySelectorAll<HTMLElement>(".leaflet-control-scale").forEach((node) => {
+    node.style.marginLeft = "14px";
+    node.style.marginBottom = "14px";
+  });
+  map.querySelectorAll<HTMLElement>(".leaflet-control-scale-line").forEach((node) => {
+    const label = node.textContent?.trim() ?? "";
+    const span = document.createElement("span");
+    span.textContent = label;
+    span.style.display = "block";
+    span.style.position = "absolute";
+    span.style.left = "5px";
+    span.style.bottom = "4px";
+    span.style.font = "11px/1 Roboto, sans-serif";
+    span.style.whiteSpace = "nowrap";
+    node.replaceChildren(span);
+    node.style.position = "relative";
+    node.style.boxSizing = "border-box";
+    node.style.height = "22px";
+    node.style.border = "2px solid #777";
+    node.style.borderTop = "none";
+    node.style.background = "#fff";
+    node.style.padding = "0";
+    node.style.lineHeight = "1";
+    node.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.25)";
+  });
+}
+
 /**
  * Leaflet positions raster tiles with inline pixel transforms calculated for
  * the live map's current dimensions. cloneForExport deliberately widens the
@@ -88,6 +116,7 @@ async function snapshotMapsForExport(
     staging.style.overflow = "hidden";
     staging.style.transform = "none";
     document.body.appendChild(staging);
+    applyMapScaleExportLayout(staging);
 
     try {
       await waitForFontsAndImages(staging);
@@ -294,19 +323,7 @@ function applyMapExportLayout(
   // sitting on top of the map. A visible shadow makes it read clearly as a
   // floating chip, and the wrapper gets more breathing room from the map
   // edge (matching the zoom control's own 14px inset).
-  map.querySelectorAll<HTMLElement>(".leaflet-control-scale").forEach((node) => {
-    node.style.marginLeft = "14px";
-    node.style.marginBottom = "14px";
-  });
-  map.querySelectorAll<HTMLElement>(".leaflet-control-scale-line").forEach((node) => {
-    node.style.boxSizing = "border-box";
-    node.style.border = "2px solid #777";
-    node.style.borderTop = "none";
-    node.style.background = "#fff";
-    node.style.padding = "2px 5px 6px";
-    node.style.lineHeight = "1.1";
-    node.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.25)";
-  });
+  applyMapScaleExportLayout(map);
 
   const legend = map.nextElementSibling as HTMLElement | null;
   if (!legend) return;

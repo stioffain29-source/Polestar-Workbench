@@ -49,6 +49,12 @@ page.on("console", (m) => {
   if (m.type() === "error") console.error("[browser]", m.text());
 });
 page.on("pageerror", (e) => console.error("[pageerror]", e.message));
+if (process.env.FIXTURE_PATH) {
+  const fixture = JSON.parse(await readFile(process.env.FIXTURE_PATH, "utf8"));
+  await page.addInitScript((report) => {
+    window.__spotReportFixture = report;
+  }, fixture);
+}
 
 await page.goto(`http://127.0.0.1:${port}/scripts/pdfHarness/index.html`, {
   waitUntil: "networkidle",

@@ -22,7 +22,7 @@ const para = (lead: string, sentences: number): string => {
   return [lead, ...Array.from({ length: sentences }, () => filler)].join(" ");
 };
 
-const report = {
+const defaultReport = {
   id: 9001,
   title: "Spot Report – Indonesia – Danantara Corruption Probe Protests",
   status: "draft",
@@ -112,6 +112,10 @@ const report = {
   sourcesNotes: null,
   showSourcesInExport: false,
 } as unknown as SpotReport;
+
+const report =
+  (window as unknown as { __spotReportFixture?: SpotReport }).__spotReportFixture
+  ?? defaultReport;
 
 const root = createRoot(document.getElementById("root")!);
 root.render(<SpotReportPreview report={report} incidents={[]} />);

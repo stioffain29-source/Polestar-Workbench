@@ -21,7 +21,7 @@ const ROBOTO = "Roboto, sans-serif";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="report-section mb-6">
+    <div className="report-section mb-2" data-pdf-keep="true">
       <h2
         className="uppercase pb-2 mb-3 tracking-wide"
         data-pdf-keep-with-next="true"
@@ -246,7 +246,7 @@ export default function SpotReportPreview({ report, incidents }: SpotReportPrevi
               points={mapPoints}
               affectedRadiusKm={report.affectedRadiusKm}
               showLabels
-              height={420}
+              height={280}
             />
           </Section>
         )}
