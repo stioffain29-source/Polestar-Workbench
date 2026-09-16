@@ -126,6 +126,14 @@ export interface PubItem {
   href: string;
 }
 
+export function hideExpiredSpotReports(items: PubItem[], today: Date): PubItem[] {
+  return items.filter(
+    (item) =>
+      item.kind !== "spot"
+      || differenceInCalendarDays(today, parseISO(item.date)) <= 7,
+  );
+}
+
 export function buildPubItems(args: {
   topicReports: TopicReportLike[];
   spotReports: SpotReportLike[];

@@ -47,6 +47,7 @@ import {
   buildPubItems,
   buildTopicRows,
   CALENDAR_TOPICS,
+  hideExpiredSpotReports,
   pubFlag,
   PUB_FLAG_COLORS,
   PUB_KIND_COLORS,
@@ -65,11 +66,14 @@ export default function PublicationCalendar() {
 
   const allItems = useMemo(
     () =>
-      buildPubItems({
-        topicReports: reports,
-        spotReports: spots,
-        countryReports: countries,
-      }),
+      hideExpiredSpotReports(
+        buildPubItems({
+          topicReports: reports,
+          spotReports: spots,
+          countryReports: countries,
+        }),
+        new Date(),
+      ),
     [reports, spots, countries],
   );
 
