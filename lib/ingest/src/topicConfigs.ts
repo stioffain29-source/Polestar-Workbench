@@ -29,12 +29,13 @@ export const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "Myanmar", aliases: ["myanmar", "burma", "burmese", "yangon", "naypyidaw", "mandalay"] },
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "surabaya"] },
   { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "luzon", "mindanao", "cebu", "meralco", "napocor", "visayas", "davao", "iloilo", "quezon", "taguig", "cavite", "pampanga"] },
-  { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
-  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "phnom penh", "siem reap", "sihanoukville"] },
+  { canonical: "Vietnam", aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "saigon", "da nang", "hai phong", "haiphong", "việt nam", "hà nội"] },
+  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "kampuchea", "phnom penh", "siem reap", "sihanoukville", "កម្ពុជា", "ភ្នំពេញ"] },
+  { canonical: "Laos", aliases: ["laos", "lao", "lao pdr", "vientiane", "luang prabang", "savannakhet", "pakse", "ລາວ", "ວຽງຈັນ"] },
   { canonical: "Hong Kong", aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "koh larn", "phuket", "chiang mai", "pattaya"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur"] },
-  { canonical: "China", aliases: ["china", "chinese", "beijing", "shanghai", "guangdong"] },
+  { canonical: "China", aliases: ["china", "chinese", "prc", "mainland china", "beijing", "shanghai", "guangdong", "guangzhou", "shenzhen", "wuhan", "chengdu", "中国", "北京", "上海"] },
   { canonical: "Japan", aliases: ["japan", "japanese", "tokyo", "osaka", "tepco", "fukushima"] },
   { canonical: "South Korea", aliases: ["south korea", "korean", "seoul", "busan"] },
   { canonical: "Iran", aliases: ["iran", "iranian", "tehran"] },
@@ -45,8 +46,8 @@ export const COUNTRY_ALIASES: CountryAlias[] = [
   { canonical: "Kuwait", aliases: ["kuwait", "kuwaiti"] },
   { canonical: "Oman", aliases: ["oman", "omani", "muscat"] },
   { canonical: "Bahrain", aliases: ["bahrain", "bahraini", "manama"] },
-  { canonical: "Australia", aliases: ["australia", "australian", "sydney", "melbourne", "brisbane", "perth", "adelaide", "canberra", "queensland", "new south wales", "nsw"] },
-  { canonical: "New Zealand", aliases: ["new zealand", "auckland", "wellington", "christchurch"] },
+  { canonical: "Australia", aliases: ["australia", "australian", "sydney", "melbourne", "brisbane", "perth", "adelaide", "canberra", "hobart", "darwin", "queensland", "new south wales", "nsw", "victoria", "tasmania", "western australia", "south australia", "northern territory"] },
+  { canonical: "New Zealand", aliases: ["new zealand", "new zealander", "aotearoa", "nz", "auckland", "wellington", "christchurch", "dunedin", "hamilton", "tauranga"] },
 ];
 
 // Out-of-region ("global market") gazetteer, appended AFTER COUNTRY_ALIASES so
@@ -153,9 +154,17 @@ function countryFeeds(
   countries: string[],
   termGroup: string,
 ): TopicFeed[] {
+  const countrySearchTerms: Record<string, string> = {
+    Australia: `(Australia OR Sydney OR Melbourne OR Brisbane OR Canberra OR Perth OR Adelaide OR Hobart OR Darwin)`,
+    Cambodia: `(Cambodia OR Kampuchea OR "Phnom Penh" OR "Siem Reap" OR Sihanoukville OR កម្ពុជា OR ភ្នំពេញ)`,
+    China: `(China OR PRC OR Beijing OR Shanghai OR Guangzhou OR Shenzhen OR Wuhan OR Chengdu OR 中国 OR 北京 OR 上海)`,
+    Laos: `(Laos OR Lao OR "Lao PDR" OR Vientiane OR "Luang Prabang" OR Savannakhet OR Pakse OR ລາວ OR ວຽງຈັນ)`,
+    "New Zealand": `("New Zealand" OR Aotearoa OR Auckland OR Wellington OR Christchurch OR Dunedin OR Hamilton OR Tauranga)`,
+    Vietnam: `(Vietnam OR "Viet Nam" OR Hanoi OR "Ho Chi Minh" OR Saigon OR "Da Nang" OR "Hai Phong" OR "Việt Nam" OR "Hà Nội")`,
+  };
   return countries.map((c) => ({
     label: `${c}`,
-    q: `${termGroup} "${c}"`,
+    q: `${termGroup} ${countrySearchTerms[c] ?? `"${c}"`}`,
     defaultCountry: c,
     ...(EDITIONS[c] ?? {}),
   }));
@@ -575,6 +584,7 @@ const CONFLICT_ALIASES: CountryAlias[] = [
   { canonical: "West Papua", aliases: ["west papua", "papua barat", "tembagapura", "grasberg", "freeport", "pt freeport", "timika", "mimika", "kuala kencana", "intan jaya", "puncak jaya", "nduga", "ilaga", "sugapa", "paniai", "enarotali", "yahukimo", "dekai", "oksibil", "beoga", "kenyam", "wamena", "nabire", "jayapura", "merauke", "manokwari", "sorong", "biak", "tpnpb"] },
   { canonical: "Papua New Guinea", aliases: ["papua new guinea", "port moresby", "bougainville", "enga", "hela", "mount hagen", "goroka", "wewak", "raskol"] },
   { canonical: "Australia", aliases: ["australia", "australian", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
+  { canonical: "New Zealand", aliases: ["new zealand", "new zealander", "aotearoa", "nz", "auckland", "wellington", "christchurch", "dunedin", "hamilton", "tauranga"] },
   { canonical: "India", aliases: ["india", "indian", "delhi", "mumbai", "kashmir", "jammu", "srinagar", "manipur", "imphal", "chhattisgarh", "jharkhand", "bastar", "naxal", "maoist", "assam", "nagaland"] },
   { canonical: "Pakistan", aliases: ["pakistan", "pakistani", "balochistan", "quetta", "waziristan", "khyber", "peshawar", "karachi", "lahore", "islamabad"] },
   { canonical: "Bangladesh", aliases: ["bangladesh", "bangladeshi", "dhaka", "chittagong", "chattogram"] },
@@ -583,13 +593,13 @@ const CONFLICT_ALIASES: CountryAlias[] = [
   { canonical: "Myanmar", aliases: ["myanmar", "burma", "burmese", "yangon", "naypyidaw", "mandalay", "rakhine", "arakan", "shan state", "kachin", "chin state", "sagaing", "karen state", "kayah", "magway", "rohingya"] },
   { canonical: "Indonesia", aliases: ["indonesia", "indonesian", "jakarta", "java", "sumatra", "sulawesi", "poso", "aceh"] },
   { canonical: "Philippines", aliases: ["philippines", "filipino", "manila", "mindanao", "sulu", "jolo", "basilan", "maguindanao", "cotabato", "marawi", "zamboanga", "abu sayyaf", "bangsamoro"] },
-  { canonical: "Vietnam", aliases: ["vietnam", "vietnamese", "hanoi", "ho chi minh"] },
-  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "phnom penh", "siem reap", "sihanoukville"] },
-  { canonical: "Laos", aliases: ["laos", "lao", "vientiane", "luang prabang", "savannakhet", "pakse"] },
+  { canonical: "Vietnam", aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "saigon", "da nang", "hai phong", "việt nam"] },
+  { canonical: "Cambodia", aliases: ["cambodia", "cambodian", "kampuchea", "phnom penh", "siem reap", "sihanoukville", "កម្ពុជា"] },
+  { canonical: "Laos", aliases: ["laos", "lao", "lao pdr", "vientiane", "luang prabang", "savannakhet", "pakse", "ລາວ"] },
   { canonical: "Hong Kong", aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "Thailand", aliases: ["thailand", "thai", "bangkok", "pattani", "yala", "narathiwat", "songkhla"] },
   { canonical: "Malaysia", aliases: ["malaysia", "malaysian", "kuala lumpur", "sabah", "sarawak"] },
-  { canonical: "China", aliases: ["china", "chinese", "xinjiang", "beijing"] },
+  { canonical: "China", aliases: ["china", "chinese", "prc", "mainland china", "xinjiang", "beijing", "shanghai", "guangzhou", "shenzhen", "wuhan", "chengdu", "中国"] },
 ];
 
 const CONFLICT_COUNTRIES = [...BROAD_APAC, "Malaysia"];

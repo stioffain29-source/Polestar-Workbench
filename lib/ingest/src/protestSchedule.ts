@@ -11,8 +11,11 @@ type SearchFeed = { country: string; cities: string[]; locale: string; gl: strin
 
 // Country and city terms are deliberately explicit: broad country-only Google
 // queries tend to return historical commentary rather than event notices.
-const SEARCH_FEEDS: SearchFeed[] = [
+export const SEARCH_FEEDS: SearchFeed[] = [
   { country: "Australia", cities: ["Sydney", "Melbourne", "Brisbane", "Canberra", "Perth", "Adelaide"], locale: "en-AU", gl: "AU" },
+  { country: "Cambodia", cities: ["Phnom Penh", "Siem Reap", "Sihanoukville"], locale: "en", gl: "KH" },
+  { country: "China", cities: ["Beijing", "Shanghai", "Guangzhou", "Shenzhen", "Wuhan", "Chengdu"], locale: "en-US", gl: "US" },
+  { country: "Laos", cities: ["Vientiane", "Luang Prabang", "Savannakhet", "Pakse"], locale: "en", gl: "LA" },
   { country: "Bangladesh", cities: ["Dhaka", "Chattogram", "Rajshahi"], locale: "en-BD", gl: "BD" },
   { country: "India", cities: ["Delhi", "Mumbai", "Bengaluru", "Kolkata", "Chennai", "Hyderabad"], locale: "en-IN", gl: "IN" },
   { country: "Indonesia", cities: ["Jakarta", "Surabaya", "Bandung", "Medan", "Makassar", "Jayapura"], locale: "en-ID", gl: "ID" },

@@ -224,6 +224,9 @@ describe("generateReportProse — request assembly", () => {
     const [shippingSystem] = calls[0].body.messages;
     expect(shippingSystem.content).not.toMatch(/FLASHPOINT NARRATIVE — section-specific instructions/);
     expect(shippingSystem.content).not.toMatch(/WRITING STYLE FOR ALL SEVEN SECTIONS/i);
+    expect(shippingSystem.content).toMatch(/senior manager who needs to understand the situation quickly/i);
+    expect(shippingSystem.content).toMatch(/Lead with the point, then explain why it matters/i);
+    expect(shippingSystem.content).toMatch(/people, movement, access, transport, facilities, supply or continuity/i);
   });
 
   it("cleans Flashpoint feed artefacts before adding evidence to the prompt", async () => {
@@ -342,7 +345,7 @@ describe("computeReportProseFingerprint — Energy-only prompt version", () => {
       basisDays: 7,
       incidents: INCIDENTS,
     };
-    expect(REPORT_PROSE_PROMPT_VERSION).toBe("v5");
+    expect(REPORT_PROSE_PROMPT_VERSION).toBe("v6");
     expect(computeReportProseFingerprint(value)).toBe(
       fingerprintWithVersion(value, REPORT_PROSE_PROMPT_VERSION),
     );

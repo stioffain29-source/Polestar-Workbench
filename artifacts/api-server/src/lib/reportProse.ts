@@ -34,14 +34,14 @@ const MAX_COMPLETION_TOKENS = 8192;
 // Bump when the prompt or section contract changes so existing cache rows are
 // treated as stale and regenerated. Kept SEPARATE from the country brief's
 // PROSE_PROMPT_VERSION so bumping one never needlessly invalidates the other.
-export const REPORT_PROSE_PROMPT_VERSION = "v5";
-export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v2";
-export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v3";
+export const REPORT_PROSE_PROMPT_VERSION = "v6";
+export const FUEL_REPORT_PROSE_PROMPT_VERSION = "v3";
+export const FLASHPOINT_REPORT_PROSE_PROMPT_VERSION = "v4";
 // Energy has a deliberately different section contract (notably its
 // evidence-led Markdown headings), so its prompt change must invalidate only
 // Energy rows. Keep the general topic version above stable: changing it would
 // unnecessarily invalidate cached prose for every other topic.
-export const ENERGY_REPORT_PROSE_PROMPT_VERSION = "v1";
+export const ENERGY_REPORT_PROSE_PROMPT_VERSION = "v2";
 
 export { isLlmAvailable, MAX_PROSE_INCIDENTS_ACCEPTED };
 export type { ProseIncidentInput };
@@ -296,6 +296,10 @@ GROUNDING — non-negotiable:
 - If the window has few or no incidents, say so plainly and keep the narrative short. A quiet window reflects limited reporting, not the absence of risk: never imply the threat has gone away, and never fabricate activity to fill space.
 
 WRITING RULES:
+- Write clear, natural English for a senior manager who needs to understand the situation quickly. Lead with the point, then explain why it matters.
+- Use direct sentences, concrete language and short paragraphs. Each paragraph should answer the relevant practical questions: what happened, why it matters, who or what is affected, and what could happen next.
+- Name the country, city, disruption type and likely business effect when the accepted evidence supports them. Describe effects on people, movement, access, transport, facilities, supply or continuity rather than abstract risk.
+- Turn incident data into explanation rather than restating it. When comparing countries or incidents, say clearly which matters more and why.
 - This is a genuine analytical narrative, NOT a list of the incidents. Identify the themes, drivers and operational meaning the incidents add up to; the incident records are supporting detail, not the story.
 - Each section does a DISTINCT job. Never repeat the same fact or sentence across sections; in particular do not restate the lead location or event type in more than one section.
 - Do NOT state numeric counts of incidents or records in the prose (e.g. "three incidents", "2 records"). Counts appear elsewhere in the report.

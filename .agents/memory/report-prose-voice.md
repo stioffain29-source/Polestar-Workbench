@@ -60,8 +60,8 @@ jsPDF builder (e.g. `ShippingReportPreview` ↔ `exportShippingReportPdf` —
 
 ## Flashpoint analytical section roles
 
-**Rule:** Flashpoint uses short, direct business prose: lead with the point, explain why it matters, name concrete effects and compare priorities clearly. It cleans feed fragments before writing.
+**Rule:** All topic reports use short, direct business prose: lead with the point, explain why it matters, name concrete effects and compare priorities clearly. Flashpoint additionally cleans feed fragments before writing.
 
 **Why:** The generic topic prompt produced headline concatenation, command-style implications, recommendations in the closing assessment and repetitive forecast lists.
 
-**How to apply:** Apply this voice to all seven Flashpoint sections only. Use accepted incidents and forecast evidence, omit ambiguous broken text, prioritise rather than restate, and add no prose-quality save/export gates.
+**How to apply:** Apply this voice to every generated report section. Keep topic-specific evidence rules intact; Flashpoint also omits ambiguous broken text and prioritises rather than restates. Add no prose-quality save/export gates.
