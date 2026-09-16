@@ -269,12 +269,11 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     return byDate !== 0 ? byDate : Number(b.id) - Number(a.id);
   });
 
-  // The MOST RECENT fuel report is the LIVE tracker — it must always show the
-  // latest market close, never freeze behind a stale issue date. Crude wins the
-  // period end (it publishes daily; jet/FRED lags and is labelled, not clamped),
-  // so the live anchor = the latest available CRUDE close date. Older reports
-  // stay anchored to their own issue date as historical as-of snapshots.
-  const newestId = sorted[0]?.id;
+  // Every report on the latest issue date is a current Fuel Watch issue. Several
+  // drafts can legitimately share that date, so selecting only the highest id
+  // leaves the others on stale FRED jet data. Current-date reports all receive
+  // the current IATA benchmark; genuinely older issues remain historical.
+  const latestIssueDate = sorted[0]?.issueDate;
   const crudeDates = [...brent.points, ...wti.points].map((p) => p.date);
   const latestCrudeClose = crudeDates.length
     ? crudeDates.reduce((a, b) => (a > b ? a : b))
@@ -290,7 +289,9 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     // earlier), and the workbench reads these same dates back out of
     // hardNumbers to drive the cover/period, the Fast Facts and the jet chart,
     // so cover, prices, market-read prose and the jet chart can never disagree.
-    const isLive = r.id === newestId;
+    const isLive = Boolean(
+      latestIssueDate && r.issueDate === latestIssueDate,
+    );
     const anchorDate =
       isLive && latestCrudeClose && latestCrudeClose > issueDate
         ? latestCrudeClose
