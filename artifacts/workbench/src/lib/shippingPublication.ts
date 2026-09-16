@@ -1977,7 +1977,15 @@ export function assertShippingPublication(
   publication: ShippingPublicationBundle,
 ): ShippingPublicationBundle {
   const blockingIssues = publication.auditIssues.filter(
-    (publicationIssue) => publicationIssue.level === "ERROR",
+    // Reclassify at the final boundary rather than trusting a level stamped by
+    // an upstream or generic auditor. This keeps explicitly advisory
+    // prose-quality findings from blocking PDF export even when an older audit
+    // path supplied level="ERROR".
+    (publicationIssue) =>
+      classifyShippingPublicationIssue(
+        publicationIssue.code,
+        publicationIssue.section,
+      ) === "ERROR",
   );
   if (blockingIssues.length > 0) {
     throw new ShippingPublicationValidationError(blockingIssues);

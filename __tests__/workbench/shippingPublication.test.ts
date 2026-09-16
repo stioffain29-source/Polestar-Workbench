@@ -141,6 +141,27 @@ describe("Shipping publication final boundary", () => {
     expect(classifyShippingPublicationIssue("RISK_CONTRADICTION", "risk")).toBe("ERROR");
   });
 
+  it("reclassifies stale prose-quality errors at the final PDF boundary", () => {
+    const publication = {
+      auditIssues: [
+        {
+          code: "GENERIC_CROSS_SECTION_REPETITION",
+          message: "Two sections repeat the same conclusion.",
+          section: "cross-section",
+          level: "ERROR",
+        },
+        {
+          code: "UNSUPPORTED_PROSE_ASSERTION",
+          message: "A synthesis sentence could not be linked to one incident.",
+          section: "executiveSummary",
+          level: "ERROR",
+        },
+      ],
+    } as unknown as Parameters<typeof assertShippingPublication>[0];
+
+    expect(assertShippingPublication(publication)).toBe(publication);
+  });
+
   it("keeps the attack/seizure Fast Fact accurate when the vessel table cap applies", () => {
     const incidents = Array.from({ length: 13 }, (_, index) =>
       incident(index + 1, {
