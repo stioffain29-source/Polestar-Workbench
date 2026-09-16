@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
 import {
   useGetBrandSettings,
   useUpdateBrandSettings,
@@ -7,7 +6,7 @@ import {
   type BrandSettings as BrandSettingsT,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, ImagePlus } from "lucide-react";
+import { Save, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -44,7 +43,6 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export default function BrandSettings() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { data } = useGetBrandSettings();
@@ -106,13 +104,7 @@ export default function BrandSettings() {
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-5">
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setLocation("/card-builder")}
-          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
-        >
-          <ArrowLeft className="w-4 h-4" /> Card Studio
-        </button>
+      <div className="flex items-center justify-end">
         <Button onClick={save} className="rounded-sm">
           <Save className="w-4 h-4 mr-2" /> Save Settings
         </Button>

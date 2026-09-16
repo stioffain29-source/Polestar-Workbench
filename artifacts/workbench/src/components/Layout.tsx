@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, CalendarDays, Image as ImageIcon, Settings, Swords, Server, AlertTriangle, Layers, Crosshair
+  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, Settings, Swords, Server, AlertTriangle, Layers, Crosshair
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
@@ -63,7 +63,6 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
         { label: "Special Reports", href: "/special-reports", icon: FileText },
-        { label: "Publication Calendar", href: "/calendar", icon: CalendarDays },
       ]
     },
     {
@@ -80,7 +79,6 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Data Centres", href: "/topics/data-centres", icon: Server },
         { label: "Data Centre Registry", href: "/registry/data-centres", icon: Server },
         { label: "Data Centre Country Risk", href: "/registry/data-centre-risk", icon: Server },
-        { label: "Infographic Cards", href: "/card-builder", icon: ImageIcon },
         { label: "Brand Settings", href: "/card-settings", icon: Settings },
       ]
     }

@@ -32,9 +32,6 @@ import SpotReports from "./pages/SpotReports";
 import SpotReportEditor from "./pages/SpotReportEditor";
 import SpecialReports from "./pages/SpecialReports";
 import SpecialReportEditor from "./pages/SpecialReportEditor";
-import PublicationCalendar from "./pages/PublicationCalendar";
-import Cards from "./pages/Cards";
-import CardBuilder from "./pages/CardBuilder";
 import BrandSettings from "./pages/BrandSettings";
 import ReportRouteErrorBoundary from "./components/ReportRouteErrorBoundary";
 
@@ -234,9 +231,6 @@ function Router() {
         <Route path="/spot-reports/:id" component={SpotReportEditor} />
         <Route path="/special-reports" component={SpecialReports} />
         <Route path="/special-reports/:id" component={SpecialReportEditor} />
-        <Route path="/calendar" component={PublicationCalendar} />
-        <Route path="/card-builder" component={Cards} />
-        <Route path="/card-builder/:id" component={CardBuilder} />
         <Route path="/card-settings" component={BrandSettings} />
         <Route component={NotFound} />
       </Switch>

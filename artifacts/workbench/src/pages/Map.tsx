@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
 import { incidentMapFallback } from "@/lib/incidentMapFallback";
+import PublicationCalendar from "./PublicationCalendar";
 
 // Date windows offered on the map. Distinct from the topic monitors' default
 // set: the map exposes 60d/120d (per request) instead of 90d/180d/2y.
@@ -1118,6 +1119,10 @@ export default function MapPage() {
             </button>
           )}
         </span>
+      </div>
+
+      <div className="mt-8 border-t border-border pt-8">
+        <PublicationCalendar />
       </div>
     </div>
   );
