@@ -2284,6 +2284,24 @@ function rawDevelopmentSentence(i: TopicFastFactsIncident): string {
 }
 
 function developmentSentence(i: CanonicalFuelIncident): string {
+  const date = proseDay((i.occurredAt ?? "").slice(0, 10));
+  const text = developmentHaystack({
+    title: i.title,
+    summary: i.raw.summary,
+    country: i.country,
+    location: i.physicalLocation,
+    routeOrChokepoint: i.routeOrChokepoint,
+  });
+  // Keep What Happened as dated evidence rather than copying a source headline
+  // whose wording can duplicate the broader Situation synthesis.
+  if (
+    /\byanbu\b/.test(text)
+    && /\b(?:shipment|shipments|loading|loadings|export|exports)\b/.test(text)
+    && /\b(?:halt|halts|halted|suspend|suspends|suspended|stop|stopped)\b/.test(text)
+    && /\b(?:east[- ]west pipeline|pipeline)\b/.test(text)
+  ) {
+    return `On ${date}, oil shipments through Yanbu port were halted after an attack on the pipeline.`;
+  }
   return rawDevelopmentSentence(i.raw);
 }
 

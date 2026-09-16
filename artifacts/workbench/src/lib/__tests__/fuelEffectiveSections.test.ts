@@ -337,7 +337,7 @@ describe("Saudi pipeline and cargo narrative", () => {
           country: "Saudi Arabia",
           severity: "high",
           occurredAt: "2026-09-15T17:00:00Z",
-          title: "Saudi Aramco Suspends Yanbu Loadings",
+          title: "Saudi Arabia Halts Yanbu Port Oil Shipments Following East-West Pipeline Attack",
           summary: "Yanbu crude loadings and oil shipments were halted after the pipeline closure.",
         }),
         inc({
@@ -365,6 +365,9 @@ describe("Saudi pipeline and cargo narrative", () => {
     expect(rendered).toMatch(/European refiners|European crude cargoes/i);
     expect(rendered).not.toMatch(/Supplied market comparisons use lagged|greatest business exposure|A second material issue/i);
     expect(rendered).not.toMatch(/Resumed Saudi loading/i);
+    expect(sections.whatHappened).toContain(
+      "On 15 September 2026, oil shipments through Yanbu port were halted after an attack on the pipeline.",
+    );
     expect(
       validateFuelFinalEvidenceAudit(
         data.reportFacts,
