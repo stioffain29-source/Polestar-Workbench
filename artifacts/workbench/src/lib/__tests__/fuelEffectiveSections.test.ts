@@ -351,6 +351,7 @@ describe("Saudi pipeline and cargo narrative", () => {
       ],
     );
     const sections = data.narrativeData.canonicalSections;
+    expect(sections.regionalHighlights).toBe("");
     const rendered = [
       sections.situation,
       sections.whatMatters,

@@ -2577,25 +2577,10 @@ export function buildFuelAnalyticalSections(
   whatHappenedEvidenceIds: string[][];
   watchNextEvidenceIds: string[][];
 } {
-  const pressure =
-    facts.primaryPressurePoint.kind === "distributed"
-      ? { distributed: true as const, primaryCountry: null }
-      : facts.primaryPressurePoint.kind === "country"
-        ? { distributed: false as const, primaryCountry: facts.primaryPressurePoint.label }
-        : { distributed: false as const, primaryCountry: null };
-  const materialIncidents = facts.qualifyingIncidents.filter(
-    (incident) => incident.evidenceStatus !== "Potential"
-      && incident.evidenceWeight >= 1
-      && !["Insignificant", "Low"].includes(incident.severity),
-  );
-  const regionalHighlights =
-    buildFuelRegionalHighlights({
-      issueDate: facts.reportingPeriod.issueDate,
-      incidents: materialIncidents.map((i) => i.raw),
-      window: materialIncidents.map((i) => i.raw),
-      pressure,
-    })
-    ?? "No regional theatre carried a material, confirmed fuel-market development this period.";
+  // Regional Highlights was duplicating stronger evidence-led sections with
+  // generic country templates ("a material development was reported there").
+  // Fuel Watch now omits the section rather than publishing filler.
+  const regionalHighlights = "";
   const operationalRead =
     buildFuelOperationalRead({
       issueDate: facts.reportingPeriod.issueDate,
