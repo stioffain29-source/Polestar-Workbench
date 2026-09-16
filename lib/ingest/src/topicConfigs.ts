@@ -393,6 +393,15 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     // Island export halt (Aug 2026): a terminal going idle is neither a
     // refinery nor a depot event, so the whole class was invisible.
     { label: "Crude export disruption (Gulf)", q: `("crude exports" OR "oil exports" OR "export terminal" OR "oil terminal" OR Kharg) (halt OR halted OR stall OR stalled OR suspended OR idle OR blockade OR disrupted OR resume) (Iran OR Iraq OR "Saudi Arabia" OR UAE OR Kuwait OR Qatar OR Oman)`, defaultCountry: "Unknown" },
+    // Commercial follow-through can be reported without repeating the generic
+    // "crude exports" phrases above. Keep a Saudi-specific feed for cancelled
+    // cargoes and suspended Yanbu loadings after East-West pipeline disruption.
+    {
+      label: "Saudi crude cargo and Yanbu loading disruption",
+      q: `("Saudi Arabia" OR Aramco) (cargo OR cargoes OR shipment OR shipments OR loading OR loadings) (cancelled OR canceled OR suspended OR halted) (Yanbu OR Europe OR "East-West pipeline") when:7d`,
+      defaultCountry: "Saudi Arabia",
+      ...EDITIONS["Saudi Arabia"],
+    },
     // Targeted feeds (Aug 2026): the broad per-country OR-query is rank-capped,
     // so two whole story classes never surfaced — freight/pump strikes over
     // fuel pricing (Pakistan goods-transport strike + 15 Aug nationwide pump
@@ -477,9 +486,14 @@ export const FUEL_CONFIG: NewsTopicConfig = {
     // Crude EXPORT disruption class (Kharg gap, Aug 2026)
     "crude export",
     "oil export",
+    "crude cargo",
+    "oil cargo",
+    "crude shipment",
+    "oil shipment",
     "export terminal",
     "oil terminal",
     "loading terminal",
+    "yanbu loading",
     "kharg",
     "floating storage",
     "tanker loading",
