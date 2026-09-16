@@ -235,6 +235,14 @@ const WATCH_NEXT_UNCERTAINTY_CODES = new Set([
   "GENERIC_WATCH_NEXT_UNGROUNDED",
 ]);
 
+// This matcher is intentionally heuristic: comparative and synthesis prose can
+// be grounded in several canonical incidents without sharing enough words with
+// one incident to satisfy sentenceSupported(). Keep surfacing that ambiguity to
+// the analyst, but do not block an otherwise valid report. Specific factual
+// safeguards (risk, severity, location, counts, routes, consequences and
+// semantic validity) remain fail-closed below.
+const ADVISORY_PROSE_CODES = new Set(["UNSUPPORTED_PROSE_ASSERTION"]);
+
 function isWatchNextSection(section: string | undefined): boolean {
   return Boolean(
     section
@@ -256,6 +264,7 @@ export function classifyShippingPublicationIssue(
 ): ShippingPublicationIssueLevel {
   const normalizedCode = trim(code).toUpperCase();
   if (
+    ADVISORY_PROSE_CODES.has(normalizedCode) ||
     WATCH_NEXT_UNCERTAINTY_CODES.has(normalizedCode) ||
     (isWatchNextSection(section) &&
       (normalizedCode.startsWith("GENERIC_WATCH_NEXT_") ||

@@ -136,6 +136,7 @@ describe("Shipping publication final boundary", () => {
   it("classifies serious Shipping issues as errors and Watch Next uncertainty as warnings", () => {
     expect(classifyShippingPublicationIssue("UNSUPPORTED_WATCH_NEXT", "watchNext")).toBe("WARNING");
     expect(classifyShippingPublicationIssue("WATCH_NEXT_UNGROUNDED", "watchNext")).toBe("WARNING");
+    expect(classifyShippingPublicationIssue("UNSUPPORTED_PROSE_ASSERTION", "whatMatters")).toBe("WARNING");
     expect(classifyShippingPublicationIssue("RISK_CONTRADICTION", "risk")).toBe("ERROR");
   });
 
