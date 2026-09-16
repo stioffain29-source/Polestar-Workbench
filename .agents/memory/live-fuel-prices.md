@@ -1,6 +1,6 @@
 ---
-name: Live fuel-market prices (Yahoo crude + FRED jet)
-description: Why Fuel report Brent/WTI/jet prices must be a live ingest (not a hardcoded sample), which source feeds each card, and the freshness/horizon constraints that keep every report covered.
+name: Live fuel-market prices (Yahoo crude + IATA jet)
+description: Why Fuel report Brent/WTI/jet prices must be live, which source feeds each headline card, and the freshness/horizon constraints that keep every report covered.
 ---
 
 Fuel Watch market prices (Brent/WTI/jet fuel) MUST come from a live ingest,
@@ -8,24 +8,20 @@ never a hardcoded constant.
 
 **Source per card (load-bearing):** Brent/WTI come from Yahoo Finance front-month
 futures (BZ=F / CL=F) PRIMARY, with FRED EIA spot (DCOILBRENTEU/DCOILWTICO) as an
-automatic fallback if Yahoo fails — crude must never go empty. JET is the REAL EIA
-U.S. Gulf Coast kerosene-type jet-fuel series (FRED DJFUELUSGULF), fetched via
-`fetchFredSeries` directly (NOT through fetchCrudeSeries — there is no Yahoo jet
-primary). The benchmark string is "U.S. Gulf Coast kerosene-type jet fuel" and the
-source "EIA / FRED (DJFUELUSGULF)". DJFUELUSGULF publishes WEEKLY, so the jet "as
-of" date normally sits a few business days behind the daily Brent/WTI close — that
-lag is honest and surfaced via `jetDataNote`, never hidden.
+automatic fallback if Yahoo fails — crude must never go empty. The HEADLINE JET
+card uses IATA / S&P Global Platts' weekly global jet-fuel composite in USD/bbl.
+FRED DJFUELUSGULF remains available only for dated U.S. Gulf Coast trajectory and
+historical-report context; it must not displace a newer IATA headline observation.
 **Why:** FRED's EIA SPOT crude series lag a few business days, so a FRED-only crude
 card genuinely missed real moves (e.g. Brent ~99.6→92.05 over 27-29 May) and the
 client correctly called it stale; Yahoo futures carry the most recent daily CLOSE.
-JET DECISION (current, supersedes the HO=F proxy episode): the user was OFFERED the
-choice — real weekly Gulf Coast jet (lags) vs a daily NY Harbor ULSD/heating-oil
-PROXY that moves with crude — and chose REAL jet, accepting the weekly lag, on the
-grounds that a labelled "heating-oil proxy" is not literally jet fuel. So do NOT
-proxy jet with HO=F; use DJFUELUSGULF. (The brief HO=F-proxy detour existed because
-a weekly-lagged jet read "stuck" next to daily crude; the user prefers honest-real
-over daily-but-fake.) Each series carries its own `source` string so attribution
-always names the source that actually served the data.
+JET DECISION (current, supersedes the FRED-headline and HO=F-proxy episodes):
+use the timely real IATA/Platts jet benchmark for the headline, never a heating-oil
+proxy and never a lagged FRED observation when IATA is newer. Each series carries
+its own source and benchmark, so attribution always names what supplied the value.
+**Why:** a report dated 16 September displayed FRED's 9 September jet observation
+while the live IATA monitor already carried the current weekly benchmark; the
+owner requires the current real jet benchmark, not last week's value or a proxy.
 
 **Why:** the original prices were a fixed sample constant that never changed
 across republishes; the client saw identical numbers every week and called it
