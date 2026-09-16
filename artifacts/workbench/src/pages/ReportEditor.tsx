@@ -2459,21 +2459,21 @@ export default function ReportEditor() {
   })();
 
   return (
-    <div className="max-w-[1900px] mx-auto space-y-4">
-      <div className="flex items-end justify-between no-print">
+    <div className="max-w-[1900px] mx-auto space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print border-b border-[#e2e2e2] pb-6">
         <div>
           <Link
             href="/reports"
-            className="text-xs uppercase tracking-widest text-muted-foreground hover:text-accent inline-flex items-center gap-1"
+            className="text-[11px] uppercase tracking-[0.15em] font-bold text-[#465bff] hover:text-[#0b0a3d] transition-colors inline-flex items-center gap-1.5 mb-3"
           >
-            <ArrowLeft className="w-3 h-3" /> All Reports
+            <ArrowLeft className="w-3.5 h-3.5" /> Back to All Reports
           </Link>
-          <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mt-2">
+          <div className="text-[10px] font-sans uppercase tracking-[0.2em] font-bold text-[#363636] opacity-70 mt-2 mb-1">
             Polestar Insights
           </div>
-          <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight mt-0.5">
+          <h1 className="text-[28px] font-serif font-bold text-[#0b0a3d] uppercase tracking-tight leading-none mt-0.5">
             {reportDetailsLoading && !(form.title || "").trim() ? (
-              <span className="inline-flex items-center gap-2 text-muted-foreground">
+              <span className="inline-flex items-center gap-2 text-[#363636] opacity-50">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Loading {loadingTopicLabel}
               </span>
@@ -2482,15 +2482,15 @@ export default function ReportEditor() {
             )}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {form.topic === "cargo_watch" && (
             <>
-              <label className="flex items-center gap-1.5 text-[11px] uppercase tracking-widest text-muted-foreground cursor-pointer select-none mr-1">
+              <label className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.1em] text-[#363636] font-bold cursor-pointer select-none mr-2">
                 <input
                   type="checkbox"
                   checked={includeFullAnnex}
                   onChange={(e) => setIncludeFullAnnex(e.target.checked)}
-                  className="accent-accent"
+                  className="accent-[#465bff] w-3.5 h-3.5"
                 />
                 Include full annex
               </label>
@@ -2503,9 +2503,9 @@ export default function ReportEditor() {
                   )
                 }
                 disabled={cargoRegisterRows.length === 0}
-                className="rounded-sm"
+                className="rounded-[2px] border-[#e2e2e2] text-[#0b0a3d] hover:bg-[#f4f4f8] hover:text-[#0b0a3d] font-bold tracking-[0.05em] h-9 px-4"
               >
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-2" />
                 Export Incident Register
               </Button>
             </>
@@ -2525,24 +2525,24 @@ export default function ReportEditor() {
               !incidentWindowReady ||
               seededId !== report.id
             }
-            className="rounded-sm"
+            className="rounded-[2px] border-[#e2e2e2] text-[#0b0a3d] hover:bg-[#f4f4f8] hover:text-[#0b0a3d] font-bold tracking-[0.05em] h-9 px-4"
           >
             {exporting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-3.5 h-3.5 mr-2" />
             )}
             {exporting ? "Generating PDF..." : "Download PDF"}
           </Button>
           <Button
             onClick={() => save()}
             disabled={update.isPending}
-            className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
+            className="rounded-[2px] bg-[#465bff] hover:bg-[#3b4ce6] text-white font-bold tracking-[0.05em] h-9 px-6 border-none shadow-none"
           >
             {update.isPending ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
             ) : (
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-3.5 h-3.5 mr-2" />
             )}
             {update.isPending ? "Saving..." : "Save"}
           </Button>
@@ -2583,11 +2583,15 @@ export default function ReportEditor() {
         />
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-card border border-border rounded-sm p-5 space-y-3 no-print">
+      <div className="grid grid-cols-1 xl:grid-cols-[460px_minmax(0,1fr)] 2xl:grid-cols-[540px_minmax(0,1fr)] gap-6 items-start">
+        <div className="bg-white border border-[#e2e2e2] rounded-[2px] flex flex-col no-print shadow-sm overflow-hidden">
+          <div className="bg-[#0b0a3d] text-white px-5 py-3.5 text-[11px] uppercase tracking-[0.15em] font-bold shrink-0">
+            Report Configuration
+          </div>
+          <div className="p-5 space-y-6">
           {scope && (
             <div
-              className="text-[12px] leading-snug p-3 rounded-sm border"
+              className="text-[12px] leading-snug p-3 rounded-[2px] border"
               style={{
                 background: "#f3f4fa",
                 borderColor: "#465bff",
@@ -2596,7 +2600,7 @@ export default function ReportEditor() {
               }}
             >
               <div
-                className="uppercase tracking-widest font-bold text-[10px] mb-1"
+                className="uppercase tracking-[0.1em] font-bold text-[10px] mb-1.5"
                 style={{ color: "#465bff" }}
               >
                 {TOPIC_LABELS[form.topic]} scope
@@ -2608,7 +2612,7 @@ export default function ReportEditor() {
             <Input
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
-              className="rounded-sm"
+              className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
           <div className="grid grid-cols-3 gap-3">
@@ -2620,7 +2624,7 @@ export default function ReportEditor() {
                   set("topic", v);
                 }}
               >
-                <SelectTrigger className="rounded-sm">
+                <SelectTrigger className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2637,7 +2641,7 @@ export default function ReportEditor() {
                 value={form.status}
                 onValueChange={(v) => set("status", v)}
               >
-                <SelectTrigger className="rounded-sm">
+                <SelectTrigger className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2670,7 +2674,7 @@ export default function ReportEditor() {
                         ),
                   )
                 }
-                className="rounded-sm"
+                className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
               />
             </Field>
           </div>
@@ -2688,7 +2692,7 @@ export default function ReportEditor() {
             <Input
               value={form.author}
               onChange={(e) => set("author", e.target.value)}
-              className="rounded-sm"
+              className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
           <Field label="Risk Rating">
@@ -2699,7 +2703,7 @@ export default function ReportEditor() {
               }
               disabled={computedRating != null}
             >
-              <SelectTrigger className="rounded-sm">
+              <SelectTrigger className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -2733,7 +2737,7 @@ export default function ReportEditor() {
               section keys), and excludes / demote-only-rerates relevance-passing
               window incidents. STRICT no-fabrication: curate only from the
               in-window pool; nothing can be added or up-rated. */}
-          <div className="border-t border-border pt-3 mt-1">
+          <div className="border-t border-[#e2e2e2] pt-3 mt-1">
             <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
               Section visibility
             </div>
@@ -2773,7 +2777,7 @@ export default function ReportEditor() {
               clearing every field reverts the tile fully to auto. Applied
               identically in the preview AND the PDF exporters. */}
           {fastFactEditorRows.length > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
+            <div className="border-t border-[#e2e2e2] pt-3 mt-1">
               <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
                 Fast Facts overrides
               </div>
@@ -2801,7 +2805,7 @@ export default function ReportEditor() {
                   return (
                     <div
                       key={card.label}
-                      className="border border-border rounded-sm p-2"
+                      className="border border-[#e2e2e2] rounded-[2px] p-2"
                     >
                       <div className="text-[11px] text-muted-foreground mb-1.5">
                         {card.label} —{" "}
@@ -2814,19 +2818,19 @@ export default function ReportEditor() {
                             placeholder="Label"
                             value={ov.label ?? ""}
                             onChange={(e) => setF("label", e.target.value)}
-                            className="rounded-sm text-[12px] h-8"
+                            className="rounded-[2px] text-[12px] h-8"
                           />
                           <Input
                             placeholder="Value"
                             value={ov.value ?? ""}
                             onChange={(e) => setF("value", e.target.value)}
-                            className="rounded-sm text-[12px] h-8"
+                            className="rounded-[2px] text-[12px] h-8"
                           />
                           <Input
                             placeholder="Note"
                             value={ov.note ?? ""}
                             onChange={(e) => setF("note", e.target.value)}
-                            className="rounded-sm text-[12px] h-8"
+                            className="rounded-[2px] text-[12px] h-8"
                           />
                         </div>
                       ) : (
@@ -2930,7 +2934,7 @@ export default function ReportEditor() {
               Blank = live FRED value. */}
           {(form.topic === "energy" || form.topic === "fertiliser") &&
             marketPriceRows.length > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
+            <div className="border-t border-[#e2e2e2] pt-3 mt-1">
               <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
                 Market Prices overrides
               </div>
@@ -2972,13 +2976,13 @@ export default function ReportEditor() {
                           placeholder="Value"
                           value={ov.value ?? ""}
                           onChange={(e) => setM("value", e.target.value)}
-                          className="rounded-sm text-[12px] h-8"
+                          className="rounded-[2px] text-[12px] h-8"
                         />
                         <Input
                           placeholder="Change"
                           value={ov.change ?? ""}
                           onChange={(e) => setM("change", e.target.value)}
-                          className="rounded-sm text-[12px] h-8"
+                          className="rounded-[2px] text-[12px] h-8"
                         />
                       </div>
                     );
@@ -2988,7 +2992,7 @@ export default function ReportEditor() {
           )}
 
           {curationPool.length > 0 && (
-            <div className="border-t border-border pt-3 mt-1">
+            <div className="border-t border-[#e2e2e2] pt-3 mt-1">
               <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
                 Incident selection &amp; severity ({curationPool.length} in window)
               </div>
@@ -3003,7 +3007,7 @@ export default function ReportEditor() {
                   return (
                     <div
                       key={incId}
-                      className="border border-border rounded-sm p-2 flex gap-2.5 items-start"
+                      className="border border-[#e2e2e2] rounded-[2px] p-2 flex gap-2.5 items-start"
                       style={{ opacity: excluded ? 0.5 : 1 }}
                     >
                       <input
@@ -3031,7 +3035,7 @@ export default function ReportEditor() {
                       <select
                         value={demoteTo}
                         disabled={excluded}
-                        className="text-[11px] border border-border rounded-sm p-1 text-muted-foreground"
+                        className="text-[11px] border border-[#e2e2e2] rounded-[2px] p-1 text-muted-foreground"
                         onChange={(e) => {
                           const v = e.target.value;
                           setSectionOverrides((ov) => {
@@ -3069,7 +3073,7 @@ export default function ReportEditor() {
                 rows={4}
                 value={form.executiveSummary}
                 onChange={(e) => set("executiveSummary", e.target.value)}
-                className="rounded-sm"
+                className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
               />
             </Field>
           )}
@@ -3084,7 +3088,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.activismRead}
                   onChange={(e) => set("activismRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Clear any read to restore the auto-generated text.
@@ -3095,7 +3099,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.civilUnrestRead}
                   onChange={(e) => set("civilUnrestRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <ProtestScheduleEditor
@@ -3114,7 +3118,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.forecastRead}
                   onChange={(e) => set("forecastRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Add narrative assessment here. Structured schedule rows are
@@ -3126,7 +3130,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.regionalCountryRead}
                   onChange={(e) => set("regionalCountryRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
             </>
@@ -3142,7 +3146,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.chokepointRouteRead}
                   onChange={(e) => set("chokepointRouteRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Clear any read to restore the auto-generated text.
@@ -3153,7 +3157,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.vesselPiracyRead}
                   onChange={(e) => set("vesselPiracyRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <Field label="Piracy and Armed Robbery Read">
@@ -3161,7 +3165,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.maritimeSecurityRead}
                   onChange={(e) => set("maritimeSecurityRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <Field label="Commercial Impact Read">
@@ -3169,7 +3173,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.commercialImpactRead}
                   onChange={(e) => set("commercialImpactRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <Field label="Regional Picture Read">
@@ -3177,7 +3181,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.regionalCountryRead}
                   onChange={(e) => set("regionalCountryRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
             </>
@@ -3189,7 +3193,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.cargoSecurityRead}
                   onChange={(e) => set("cargoSecurityRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Clear any read to restore the auto-generated text.
@@ -3200,7 +3204,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.logisticsHubRead}
                   onChange={(e) => set("logisticsHubRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <Field label="Regional Read">
@@ -3208,7 +3212,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.regionalCountryRead}
                   onChange={(e) => set("regionalCountryRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
             </>
@@ -3220,7 +3224,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.fuelMarketRead}
                   onChange={(e) => set("fuelMarketRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Boxes hold the text the report currently renders — edit, cut
@@ -3233,7 +3237,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.fuelOperationalRead}
                   onChange={(e) => set("fuelOperationalRead", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
               <Field label="Regional Highlights">
@@ -3241,7 +3245,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.fuelRegionalHighlights}
                   onChange={(e) => set("fuelRegionalHighlights", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
             </>
@@ -3259,7 +3263,7 @@ export default function ReportEditor() {
                         [theatre]: e.target.value,
                       })
                     }
-                    className="rounded-sm"
+                    className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                   />
                   {idx === 0 && (
                     <p className="text-[11px] text-muted-foreground mt-1">
@@ -3275,7 +3279,7 @@ export default function ReportEditor() {
                   onChange={(e) =>
                     set("conflictOtherWatchedRead", e.target.value)
                   }
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
                 {conflictAreaTheatres.length === 0 && (
                   <p className="text-[11px] text-muted-foreground mt-1">
@@ -3291,7 +3295,7 @@ export default function ReportEditor() {
                 rows={4}
                 value={form.situation}
                 onChange={(e) => set("situation", e.target.value)}
-                className="rounded-sm"
+                className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
               />
             </Field>
           )}
@@ -3303,7 +3307,7 @@ export default function ReportEditor() {
                   rows={5}
                   value={form.whatHappened}
                   onChange={(e) => set("whatHappened", e.target.value)}
-                  className="rounded-sm"
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
             )}
@@ -3312,7 +3316,7 @@ export default function ReportEditor() {
               rows={4}
               value={form.whatMatters}
               onChange={(e) => set("whatMatters", e.target.value)}
-              className="rounded-sm"
+              className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
           {form.topic !== "conflict" && (
@@ -3327,7 +3331,7 @@ export default function ReportEditor() {
                 rows={4}
                 value={form.implications}
                 onChange={(e) => set("implications", e.target.value)}
-                className="rounded-sm"
+                className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
               />
             </Field>
           )}
@@ -3336,7 +3340,7 @@ export default function ReportEditor() {
               rows={3}
               value={form.watchNext}
               onChange={(e) => set("watchNext", e.target.value)}
-              className="rounded-sm"
+              className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
           <Field label="Polestar View">
@@ -3344,12 +3348,12 @@ export default function ReportEditor() {
               rows={3}
               value={form.polestarView}
               onChange={(e) => set("polestarView", e.target.value)}
-              className="rounded-sm"
+              className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
 
           {summariesEnabled && relatedForSummaries.length > 0 && (
-            <div className="border-t border-border pt-4 mt-2 space-y-3">
+            <div className="border-t border-[#e2e2e2] pt-4 mt-2 space-y-3">
               <div className="flex items-end justify-between gap-2">
                 <div>
                   <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
@@ -3365,7 +3369,7 @@ export default function ReportEditor() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-sm h-8 text-xs"
+                    className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                     disabled={generateSummaries.isPending}
                     onClick={() => {
                       if (!id) return;
@@ -3391,7 +3395,7 @@ export default function ReportEditor() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-sm h-8 text-xs"
+                    className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                     disabled={editSummaries.isPending || !summaryRes}
                     onClick={saveIncidentSummaries}
                   >
@@ -3408,7 +3412,7 @@ export default function ReportEditor() {
               )}
               {summaryEditError && (
                 <div
-                  className="text-[12px] p-2 rounded-sm border"
+                  className="text-[12px] p-2 rounded-[2px] border"
                   style={{
                     background: "#f7eded",
                     borderColor: "#a33232",
@@ -3446,7 +3450,7 @@ export default function ReportEditor() {
                         rows={2}
                         value={value}
                         onChange={(e) => setIncidentSummary(key, e.target.value)}
-                        className="rounded-sm text-[12px]"
+                        className="rounded-[2px] text-[12px]"
                       />
                     </div>
                   );
@@ -3456,10 +3460,10 @@ export default function ReportEditor() {
           )}
 
           {form.topic === "fuel" && (
-            <div className="border-t border-border pt-4 mt-2 space-y-3">
+            <div className="border-t border-[#e2e2e2] pt-4 mt-2 space-y-3">
               {sampleAutoSeeded && (
                 <div
-                  className="text-[11px] leading-snug p-2 rounded-sm border"
+                  className="text-[11px] leading-snug p-2 rounded-[2px] border"
                   style={{
                     background: "#f3f4fa",
                     borderColor: "#465bff",
@@ -3494,7 +3498,7 @@ export default function ReportEditor() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-sm h-8 text-xs"
+                    className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                     onClick={loadSampleFuelData}
                   >
                     Load sample
@@ -3502,7 +3506,7 @@ export default function ReportEditor() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-sm h-8 text-xs"
+                    className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                     onClick={() => setShowFuelJson((v) => !v)}
                   >
                     {showFuelJson ? "Hide JSON" : "Advanced JSON"}
@@ -3516,7 +3520,7 @@ export default function ReportEditor() {
               {liveFuelData &&
                 !liveFuelData.validation.hasRequiredFuelWatchData && (
                   <div
-                    className="text-[12px] p-3 rounded-sm border space-y-1"
+                    className="text-[12px] p-3 rounded-[2px] border space-y-1"
                     style={{
                       background: "#fdecec",
                       borderColor: "#a33232",
@@ -3546,14 +3550,14 @@ export default function ReportEditor() {
                 onChange={(k, v) => setFuelCardField("wti", k, v)}
               />
 
-              <div className="border border-border rounded-sm p-3 space-y-2">
+              <div className="border border-[#e2e2e2] rounded-[2px] p-3 space-y-2">
                 <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
                   Jet fuel
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Field label="Benchmark">
                     <Input
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.benchmark}
                       onChange={(e) =>
                         setFuelJetField("benchmark", e.target.value)
@@ -3563,7 +3567,7 @@ export default function ReportEditor() {
                   </Field>
                   <Field label="Source">
                     <Input
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.source}
                       onChange={(e) =>
                         setFuelJetField("source", e.target.value)
@@ -3573,7 +3577,7 @@ export default function ReportEditor() {
                   </Field>
                   <Field label="Value">
                     <Input
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.value}
                       onChange={(e) => setFuelJetField("value", e.target.value)}
                       placeholder="e.g. 4.152"
@@ -3581,7 +3585,7 @@ export default function ReportEditor() {
                   </Field>
                   <Field label="Unit">
                     <Input
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.unit}
                       onChange={(e) => setFuelJetField("unit", e.target.value)}
                       placeholder="e.g. USD/gal"
@@ -3589,7 +3593,7 @@ export default function ReportEditor() {
                   </Field>
                   <Field label="Change">
                     <Input
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.change}
                       onChange={(e) =>
                         setFuelJetField("change", e.target.value)
@@ -3600,7 +3604,7 @@ export default function ReportEditor() {
                   <Field label="As of">
                     <Input
                       type="date"
-                      className="rounded-sm h-8 text-xs"
+                      className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
                       value={fuelForm.jet.asOf}
                       onChange={(e) => setFuelJetField("asOf", e.target.value)}
                     />
@@ -3614,12 +3618,12 @@ export default function ReportEditor() {
                     placeholder={
                       "2026-04-17, 3.709\n2026-04-24, 3.906\n2026-05-01, 4.160"
                     }
-                    className="rounded-sm font-mono text-[11px]"
+                    className="rounded-[2px] font-mono text-[11px]"
                   />
                 </Field>
                 {fuelFormErrors.length > 0 && (
                   <div
-                    className="text-[11px] p-2 rounded-sm border"
+                    className="text-[11px] p-2 rounded-[2px] border"
                     style={{
                       background: "#fdecec",
                       borderColor: "#a33232",
@@ -3635,7 +3639,7 @@ export default function ReportEditor() {
               </div>
 
               {showFuelJson && (
-                <div className="border border-border rounded-sm p-3 space-y-2">
+                <div className="border border-[#e2e2e2] rounded-[2px] p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
                       Advanced: hardNumbers JSON
@@ -3643,7 +3647,7 @@ export default function ReportEditor() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="rounded-sm h-7 text-[11px]"
+                      className="rounded-[2px] h-7 text-[11px]"
                       onClick={validateFuelData}
                     >
                       Validate &amp; sync form
@@ -3664,11 +3668,11 @@ export default function ReportEditor() {
                       setHardNumbersEdited(undefined);
                       setSampleAutoSeeded(false);
                     }}
-                    className="rounded-sm font-mono text-[11px]"
+                    className="rounded-[2px] font-mono text-[11px]"
                   />
                   {hardNumbersError && (
                     <div
-                      className="text-[11px] p-2 rounded-sm border"
+                      className="text-[11px] p-2 rounded-[2px] border"
                       style={{
                         background: "#fdecec",
                         borderColor: "#a33232",
@@ -3711,7 +3715,7 @@ export default function ReportEditor() {
                 if (hints.length === 0) return null;
                 return (
                   <div
-                    className="text-[11px] p-2 rounded-sm border"
+                    className="text-[11px] p-2 rounded-[2px] border"
                     style={{
                       background: "#f3f4fa",
                       borderColor: "#465bff",
@@ -3742,7 +3746,7 @@ export default function ReportEditor() {
         <div>
         {staleProse && (
           <div
-            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
             style={{
               borderColor: "#A33232",
               background: "#fbeeee",
@@ -3759,7 +3763,7 @@ export default function ReportEditor() {
         {((proseRes?.stale && proseRes.edited) ||
           Object.keys(staleSavedProse).length > 0) && (
           <details
-            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
             style={{
               borderColor: "#9a6700",
               background: "#fff8e6",
@@ -3797,7 +3801,7 @@ export default function ReportEditor() {
           maritimeValidationSummary.pending > 0 &&
           maritimeValidationSummary.validated === 0 && (
             <div
-              className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+              className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
               style={{
                 borderColor: "#9a6700",
                 background: "#fff8e6",
@@ -3817,7 +3821,7 @@ export default function ReportEditor() {
           maritimeValidationSummary.sourceRows > 0 &&
           maritimeValidationSummary.validated === 0 && (
             <div
-              className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+              className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
               style={{
                 borderColor: "#6b7280",
                 background: "#f5f5f5",
@@ -3837,7 +3841,7 @@ export default function ReportEditor() {
 
         {proseEnabled && proseUnavailable && (
           <div
-            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
             style={{ borderColor: "#363636", background: "#f4f4f4", color: "#363636" }}
           >
             <span style={{ fontWeight: 700 }}>
@@ -3854,7 +3858,7 @@ export default function ReportEditor() {
 
         {proseEnabled && proseRes?.stale && (
           <div
-            className="no-print rounded-sm border px-4 py-3 mb-3 text-xs"
+            className="no-print rounded-[2px] border px-4 py-3 mb-3 text-xs"
             style={{ borderColor: "#A33232", background: "#fff", color: "#A33232" }}
           >
             <span style={{ fontWeight: 700 }}>Saved edit may be out of date.</span>{" "}
@@ -3864,11 +3868,18 @@ export default function ReportEditor() {
             AI draft.
           </div>
         )}
+          </div>
+        </div>
 
         <div
           ref={previewRef}
-          className="bg-white border border-border rounded-sm overflow-hidden relative min-h-[480px]"
+          className="bg-[#f4f4f8] border border-[#e2e2e2] rounded-[2px] overflow-hidden relative min-h-[480px] flex flex-col"
         >
+          <div className="bg-[#0b0a3d] text-white px-5 py-3.5 text-[11px] uppercase tracking-[0.15em] font-bold shrink-0">
+            Report Preview
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 flex justify-center">
+            <div className="w-full max-w-[210mm]">
           {reportDetailsLoading ? (
             <ReportDetailsLoading topicLabel={loadingTopicLabel} />
           ) : form.topic === "shipping" ? (
@@ -3929,7 +3940,8 @@ export default function ReportEditor() {
               sectionOverrides={sectionOverrides}
             />
           )}
-        </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -3966,14 +3978,14 @@ function FuelMarketCardFields({
   onChange: (key: keyof FuelMarketCardForm, value: string) => void;
 }) {
   return (
-    <div className="border border-border rounded-sm p-3 space-y-2">
+    <div className="border border-[#e2e2e2] rounded-[2px] p-3 space-y-2">
       <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
         {title}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Value">
           <Input
-            className="rounded-sm h-8 text-xs"
+            className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
             value={form.value}
             onChange={(e) => onChange("value", e.target.value)}
             placeholder="e.g. 109.26"
@@ -3981,7 +3993,7 @@ function FuelMarketCardFields({
         </Field>
         <Field label="Unit">
           <Input
-            className="rounded-sm h-8 text-xs"
+            className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
             value={form.unit}
             onChange={(e) => onChange("unit", e.target.value)}
             placeholder="e.g. USD/bbl"
@@ -3989,7 +4001,7 @@ function FuelMarketCardFields({
         </Field>
         <Field label="Change">
           <Input
-            className="rounded-sm h-8 text-xs"
+            className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
             value={form.change}
             onChange={(e) => onChange("change", e.target.value)}
             placeholder="e.g. +7.9% 7d"
@@ -3998,14 +4010,14 @@ function FuelMarketCardFields({
         <Field label="As of">
           <Input
             type="date"
-            className="rounded-sm h-8 text-xs"
+            className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
             value={form.asOf}
             onChange={(e) => onChange("asOf", e.target.value)}
           />
         </Field>
         <Field label="Source">
           <Input
-            className="rounded-sm h-8 text-xs"
+            className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636] h-8 text-xs"
             value={form.source}
             onChange={(e) => onChange("source", e.target.value)}
             placeholder="e.g. Manual"
@@ -4065,7 +4077,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground block mb-1">
+      <label className="text-[10px] font-sans uppercase tracking-[0.1em] text-[#0b0a3d] font-bold block mb-1.5">
         {label}
       </label>
       {children}

@@ -178,7 +178,7 @@ function KpiGrid({ cards }: { cards: KpiCard[] }) {
         return (
           <div
             key={i}
-            className="bg-white border rounded-sm relative"
+            className="bg-white border rounded-[2px] relative"
             style={{ borderColor: POLAR, paddingLeft: 14, paddingRight: 12, paddingTop: 10, paddingBottom: 10 }}
           >
             <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: 4, background: accent }} />
@@ -575,7 +575,7 @@ function MaritimeCoverageDisclosure({
   if (!disclosure) return null;
   return (
     <div
-      className="rounded-sm px-3 py-2"
+      className="rounded-[2px] px-3 py-2"
       role="status"
       style={{
         marginTop: 10,
@@ -611,7 +611,7 @@ function MaritimeIntelligenceReportSection({
       <KpiGrid cards={execCards} />
       <MaritimeCoverageDisclosure completeness={completeness} />
 
-      <div className="rounded-sm p-4" style={{ background: NAVY, marginTop: 12 }}>
+      <div className="rounded-[2px] p-4" style={{ background: NAVY, marginTop: 12 }}>
         <div
           className="uppercase"
           style={{ color: "rgba(255,255,255,0.7)", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 10, letterSpacing: "0.18em", marginBottom: 6 }}
@@ -859,7 +859,7 @@ export default function ShippingReportPreview({
           </div>}
 
          {show("executive-summary") && (
-           <div className="bg-[#0b0a3d] text-white p-6 rounded-sm mb-6 flex-shrink-0 shadow-md">
+           <div className="bg-[#0b0a3d] text-white p-6 rounded-[2px] mb-6 flex-shrink-0 shadow-md">
              <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Bottom Line Up Front</h3>
              <p className="font-light leading-relaxed text-[15px]">{publication.prose.executiveSummary}</p>
            </div>
@@ -1024,7 +1024,7 @@ export default function ShippingReportPreview({
            <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
          </div>
 
-          {show("polestar-view") && <div className="bg-[#0b0a3d] text-white p-6 rounded-sm mb-6 flex-shrink-0 shadow-md">
+          {show("polestar-view") && <div className="bg-[#0b0a3d] text-white p-6 rounded-[2px] mb-6 flex-shrink-0 shadow-md">
            <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Current Judgement</h3>
            <div className="font-light leading-relaxed text-[15px]"><Paragraphs text={publication.prose.polestarView} color="#fff" /></div>
           </div>}
@@ -1038,7 +1038,7 @@ export default function ShippingReportPreview({
           </div>}
 
           <div
-            className="bg-[#e2e2e2] p-4 text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-sm mt-auto mb-[15mm]"
+            className="bg-[#e2e2e2] p-4 text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-[2px] mt-auto mb-[15mm]"
             style={{ fontSize: "9pt" }}
           >
            {DISCLAIMER_TEXT}
