@@ -294,6 +294,76 @@ describe("consistency gate over the FINAL effective text", () => {
   });
 });
 
+describe("Saudi pipeline and cargo narrative", () => {
+  it("names the outage, Yanbu suspension and cancelled European cargoes without boilerplate or a false resumption", () => {
+    const data = buildFuelWatchReportData(
+      {
+        issueDate: "2026-09-16",
+        hardNumbers: {
+          fastFacts: {
+            prices: [{
+              label: "Jet fuel",
+              value: 181.46,
+              unit: "USD/bbl",
+              change: "+6.1% 7d",
+              asOf: "2026-09-16",
+              source: "IATA / S&P Global Platts Jet Fuel Price Monitor",
+            }],
+          },
+        },
+      },
+      [
+        inc({
+          id: 9101,
+          country: "Saudi Arabia",
+          severity: "high",
+          occurredAt: "2026-09-12T04:05:00Z",
+          title: "Saudi East-West Pipeline Shut Down After Drone Attack",
+          summary: "The East-West Pipeline was shut after a drone attack disrupted crude flows to Yanbu.",
+        }),
+        inc({
+          id: 9102,
+          country: "Saudi Arabia",
+          severity: "high",
+          occurredAt: "2026-09-15T17:00:00Z",
+          title: "Saudi Aramco Suspends Yanbu Loadings",
+          summary: "Yanbu crude loadings and oil shipments were halted after the pipeline closure.",
+        }),
+        inc({
+          id: 9103,
+          country: "Saudi Arabia",
+          severity: "high",
+          occurredAt: "2026-09-15T16:30:00Z",
+          title: "Saudi Aramco cancels, delays European crude cargoes after pipeline outage",
+          summary: "European refiners were told September-loading crude cargoes were cancelled or delayed.",
+        }),
+      ],
+    );
+    const sections = data.narrativeData.canonicalSections;
+    const rendered = [
+      sections.situation,
+      sections.whatMatters,
+      sections.implications,
+      sections.polestarView,
+      sections.watchNext,
+    ].join(" ");
+    expect(sections.situation).toMatch(/181\.46 USD\/bbl/);
+    expect(rendered).toMatch(/East-West Pipeline/i);
+    expect(rendered).toMatch(/Yanbu.*(?:loading|shipment|export route|export operations)/i);
+    expect(rendered).toMatch(/cancelled some late-September|cancellation and delay|cancelled or delayed|cancels, delays/i);
+    expect(rendered).toMatch(/European refiners|European crude cargoes/i);
+    expect(rendered).not.toMatch(/Supplied market comparisons use lagged|greatest business exposure|A second material issue/i);
+    expect(rendered).not.toMatch(/Resumed Saudi loading/i);
+    expect(
+      validateFuelFinalEvidenceAudit(
+        data.reportFacts,
+        sections,
+        data.canonicalFacts.watchIndicators,
+      ).filter((issue) => issue.level === "ERROR"),
+    ).toEqual([]);
+  });
+});
+
 const RISING_ROAD_FUEL_JUDGEMENT: FuelJudgement = {
   mainRisk: "Oil Surges Past $99 After Saudi Refinery Attack",
   exposure: { geography: "Saudi Arabia", sector: "road fuel distribution" },

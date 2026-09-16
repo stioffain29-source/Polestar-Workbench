@@ -206,10 +206,7 @@ export function buildFuelRegionalHighlights(opts: {
       why = `${why} The near-term watch is on operational follow-through rather than headline volume.`;
     }
     usedWhy.add(why.split(".")[0] ?? why);
-    const leadItem = items.slice().sort(compareIncidentSignificance)[0];
-    const signal = leadItem
-      ? rawDevelopmentSentence(leadItem)
-      : regionalSignalPhrase(country, items, fam);
+    const signal = regionalSignalPhrase(country, items, fam);
     paragraphs.push(`${signal} ${why}`);
   }
   return paragraphs.join("\n\n");
@@ -1508,12 +1505,15 @@ export function buildFuelOperationalRead(opts: {
   );
 
   const lead = ordered[0];
-  const driverPara = window
-    .slice()
-    .sort(compareIncidentSignificance)
+  const themeLine = ordered
     .slice(0, 3)
-    .map(rawDevelopmentSentence)
-    .join(" ");
+    .map(({ fam }) =>
+      fam.key === "shortage"
+        ? observedAccessCondition(window.map((i) => haystack(i)).join(" ").toLowerCase())
+        : fam.phrase,
+    )
+    .join("; ");
+  const driverPara = `The operational constraints are ${themeLine}.`;
 
   // Name geographies only when significance is material — never rank by
   // raw record volume ("carries N records" / "most activity this week").
@@ -2036,7 +2036,23 @@ function businessImpactForDevelopment(i: CanonicalFuelIncident): string {
       ? "Cross-border gasoline flows shift who supplies Russia's shortage, affecting landed cost for buyers still lifting Russian product."
       : "Cross-border gasoline flows shift the source of refined-product supply for buyers lifting the reported cargo.";
   }
-  if (/\b(aramco|saudi)\b/.test(t) && /\b(resume|loading|export)\b/.test(t)) {
+  if (/\b(?:saudi|aramco)\b/.test(t)
+      && /\b(?:cancel(?:led|s)?|delay(?:ed|s)?|suspend(?:ed|s)?|halt(?:ed|s)?)\b/.test(t)
+      && /\b(?:cargo(?:es)?|loading|loadings|shipment(?:s)?|deliver(?:y|ies))\b/.test(t)) {
+    return "Cancelled or delayed crude cargoes force affected European refiners to replace contracted barrels, revise delivery schedules and absorb any change in landed cost.";
+  }
+  if (/\b(?:yanbu)\b/.test(t)
+      && /\b(?:suspend(?:ed|s)?|halt(?:ed|s)?|stop(?:ped|s)?|clos(?:e|ed|ure))\b/.test(t)
+      && /\b(?:loading|loadings|shipment(?:s)?|export(?:s)?)\b/.test(t)) {
+    return "Suspended Yanbu loadings remove near-term west-coast export availability until terminal shipments and pipeline feed resume.";
+  }
+  if (/\b(?:east[- ]west pipeline|pipeline)\b/.test(t)
+      && /\b(?:attack|damage|shut|shutdown|closure|closed|outage)\b/.test(t)
+      && /\b(?:saudi|yanbu)\b/.test(t)) {
+    return "The East-West Pipeline outage restricts Saudi crude movement to Yanbu and reduces the export flexibility normally available when Gulf routes are under pressure.";
+  }
+  if (/\b(aramco|saudi)\b/.test(t) && /\b(resume(?:d|s)?|restart(?:ed|s)?)\b/.test(t)
+      && /\b(loading|loadings|export|exports)\b/.test(t)) {
     return /\b(gulf|hormuz|route|transit|disrupt|attack|delay)\b/.test(t)
       ? "Resumed Saudi loading eases immediate crude availability but leaves Gulf route risk priced into differentials."
       : "Resumed Saudi loading adds near-term crude availability to the reported market.";
@@ -2109,7 +2125,8 @@ function developmentTheme(i: CanonicalFuelIncident): DevelopmentTheme {
   if (/\b(moscow|ration|rationing)\b/.test(t) && /\b(russia|petrol|gasoline)\b/.test(t)) return "shortage";
   if (/\b(russia)\b/.test(t) && /\b(shortage|fuel crisis|refinery)\b/.test(t)) return "shortage";
   if (/\b(india|indian)\b/.test(t) && /\b(windfall|duty|tax|levy|subsidy)\b/.test(t)) return "policy";
-  if (/\b(aramco|adnoc|saudi)\b/.test(t) && /\b(resume|loading|export|output)\b/.test(t)) return "producer";
+  if (/\b(aramco|adnoc|saudi|yanbu|east[- ]west pipeline)\b/.test(t)
+      && /\b(resume|restart|cancel|delay|suspend|halt|loading|export|output|pipeline)\w*\b/.test(t)) return "producer";
   if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) return "refinery";
   if (/\b(red sea|houthi|mokha|yemen)\b/.test(t) && !/\bexit(ing)?\s+(the\s+)?strait of hormuz\b/.test(t)) {
     return "chokepoint-redsea";
@@ -2132,6 +2149,8 @@ function materialDevelopmentScore(i: CanonicalFuelIncident): number {
   ]);
   if (/\b(ration|rationing|moscow)\b/.test(t) && /\b(russia|petrol|gasoline)\b/.test(t)) score += 30;
   if (/\b(windfall|duty|tax|levy)\b/.test(t) && /\b(india|indian)\b/.test(t)) score += 24;
+  if (/\b(?:cancel(?:led)?|delay(?:ed)?|suspend(?:ed)?|halt(?:ed)?|shut|shutdown)\b/.test(t)
+      && /\b(?:saudi|aramco|yanbu|east[- ]west pipeline|cargo(?:es)?|loading)\b/.test(t)) score += 42;
   if (/\b(aramco|loading|resume)\b/.test(t) && /\b(saudi|export)\b/.test(t)) score += 22;
   if (/\b(jazan)\b/.test(t) && /\b(refinery|attack)\b/.test(t)) score += 20;
   if (/\b(red sea|houthi)\b/.test(t) && /\b(attack|missile|killed)\b/.test(t)) score += 12;
@@ -2185,6 +2204,34 @@ function rankMaterialDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncid
     if (keepMaterialDevelopment(i, kept, keptTokens)) keptFamilies.add(i.evidenceFamilyId);
   }
   return kept;
+}
+
+function selectExplicitSaudiSupplyChainDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
+  const available = facts.qualifyingIncidents
+    .filter((incident) => incident.evidenceStatus !== "Potential");
+  const patterns = [
+    /\beast[- ]west pipeline\b.*\b(?:attack|damage|shut|shutdown|closure|closed|outage)\b|\b(?:attack|damage|shut|shutdown|closure|closed|outage)\b.*\beast[- ]west pipeline\b/i,
+    /\byanbu\b.*\b(?:suspend(?:ed|s)?|halt(?:ed|s)?|stop(?:ped|s)?|clos(?:e|ed|ure))\b.*\b(?:loading|loadings|shipment(?:s)?|export(?:s)?)\b|\b(?:suspend(?:ed|s)?|halt(?:ed|s)?|stop(?:ped|s)?|clos(?:e|ed|ure))\b.*\byanbu\b/i,
+    /\b(?:cancel(?:led|s)?|delay(?:ed|s)?)\b.*\b(?:european|europe)\b.*\b(?:cargo(?:es)?|loading|loadings|shipment(?:s)?)\b|\b(?:european|europe)\b.*\b(?:cargo(?:es)?|loading|loadings|shipment(?:s)?)\b.*\b(?:cancel(?:led|s)?|delay(?:ed|s)?)\b/i,
+  ];
+  const selected: CanonicalFuelIncident[] = [];
+  for (const pattern of patterns) {
+    const match = available
+      .filter((incident) => pattern.test(`${incident.title} ${incident.raw.summary ?? ""}`))
+      .sort((a, b) => materialDevelopmentScore(b) - materialDevelopmentScore(a)
+        || b.date.localeCompare(a.date))[0];
+    if (match && !selected.includes(match)) selected.push(match);
+  }
+  return selected;
+}
+
+function selectFuelSupplyChainDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
+  const selected = selectExplicitSaudiSupplyChainDevelopments(facts);
+  for (const incident of rankMaterialDevelopments(facts)) {
+    if (selected.length >= 3) break;
+    if (!selected.includes(incident)) selected.push(incident);
+  }
+  return selected;
 }
 
 function rankBusinessSignificantDevelopments(facts: FuelCanonicalFacts): CanonicalFuelIncident[] {
@@ -2248,43 +2295,27 @@ function buildFuelExecutiveSummary(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelSituationAssessment(facts: FuelCanonicalFacts): string {
-  const hay = incidentsHaystack(facts.qualifyingIncidents);
-  const parts: string[] = [];
-  const periodMoves = facts.marketIndicators.filter((i) => i.comparisonScope === "reporting-period");
-  const marketDir = periodMoves.some((i) => i.direction === "rising")
-    ? "Market-price pressure is upward on crude and refined products."
-    : periodMoves.some((i) => i.direction === "falling")
-      ? "Market-price pressure eased within the reporting period, but the backdrop remains sensitive to route and supply shocks."
-      : periodMoves.length
-        ? "Market prices were broadly stable within the reporting period, leaving physical and policy developments as the main swing factors."
-        : facts.marketIndicators.length
-          ? "Supplied market comparisons use lagged or undated references, so they provide context rather than a reporting-period direction."
-        : "Market-price direction is unclear from the supplied observations.";
-  parts.push(marketDir);
-  for (const incident of rankMaterialDevelopments(facts).slice(0, 2)) {
-    if (incident.evidenceStatus === "Potential") continue;
-    parts.push(developmentSentence(incident));
+  const explicitSupplyChain = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (explicitSupplyChain.length < 2) {
+    const hay = incidentsHaystack(facts.qualifyingIncidents);
+    const parts = rankMaterialDevelopments(facts)
+      .slice(0, 2)
+      .map((incident) => {
+        const impact = businessImpactForDevelopment(incident);
+        return impact === "No specific operational consequence is established by this development alone; watch for confirmed effects on fuel availability, routing or cost."
+          ? `The incident record confirms a physical fuel-supply interruption in ${incident.country || "the reported market"}.`
+          : impact;
+      });
+    if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test)) {
+      parts.push("Confirmed refinery or terminal disruption leaves regional product availability dependent on the duration of lost output.");
+    }
+    return parts.join(" ");
   }
-  if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
-    parts.push(`The evidence records ${observedAccessCondition(hay)} in at least one market.`);
-  }
-  if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "refinery")!.test)) {
-    parts.push("Refinery or production disruption is confirmed; actual output loss could affect regional product supply or crack spreads.");
-  }
-  if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "policy")!.test)) {
-    parts.push("Government policy moves on duties, subsidies or allocation are resetting local price assumptions.");
-  }
-  if (/\b(export|import|load|loading|ship|shipment|tender|contract|buy|buyer|turns to|seeking)\b/.test(hay)
-      && /\b(gasoline|petrol|diesel|jet fuel|crude|fuel)\b/.test(hay)) {
-    parts.push("Producer and buyer responses — export shifts, import tenders or cross-border product flows — are reshaping who supplies whom.");
-  }
-  if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "chokepoint")!.test)) {
-    parts.push("Route and chokepoint events are confirmed; transit time and war-risk premium could rise if passage is constrained.");
-  }
-  if (!facts.qualifyingIncidents.some((i) => i.evidenceStatus !== "Potential")) {
-    parts.push("With no fresh operational reporting in the window, the standing cost-and-continuity exposures carry over from recent weeks.");
-  }
-  return parts.join(" ");
+  const jet = facts.marketIndicators.find((indicator) => /\b(?:jet|aviation)\b/i.test(indicator.label));
+  const market = jet
+    ? `${jet.label} was ${jet.currentValue}${jet.unit ? ` ${jet.unit}` : ""}${jet.percentageChange !== null ? `, ${jet.percentageChange >= 0 ? "up" : "down"} ${Math.abs(jet.percentageChange).toFixed(1)}% against the prior observation` : ""}${jet.asOf ? ` as of ${proseDay(jet.asOf)}` : ""}${jet.source ? ` (${jet.source})` : ""}.`
+    : marketPriceParagraph(facts);
+  return `Saudi Arabia has cut oil shipments to Europe and cancelled some late-September crude cargoes after the attack on its East-West Pipeline forced the Yanbu Red Sea export route offline. European buyers, particularly Poland's Orlen, are seeking replacement barrels from the North Sea, United States, Algeria, Kazakhstan and Guyana. ${market}`;
 }
 
 function buildFuelWhatHappenedItems(facts: FuelCanonicalFacts): Array<{
@@ -2311,6 +2342,13 @@ function buildFuelWhatHappenedProse(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
+  const explicitSupplyChain = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (explicitSupplyChain.length >= 2) {
+    return [
+      "The pipeline outage is now a physical export and delivery disruption, not only an infrastructure incident. With the Yanbu route offline, Saudi Arabia has lost west-coast loading capacity that normally provides flexibility when Gulf routes are constrained.",
+      "The cancellation and delay of contracted European cargoes transfers the disruption directly to refinery procurement. Orlen and other affected buyers must secure replacement crude, revise delivery schedules and manage differences in grade, freight and landed cost.",
+    ].join("\n\n");
+  }
   const lead = rankBusinessSignificantDevelopments(facts);
   if (!lead.length) {
     return businessContinuityParagraph(facts);
@@ -2318,28 +2356,20 @@ function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
   const paras = lead.slice(0, 2).map((i, idx) => {
     const impact = businessImpactForDevelopment(i);
     const place = i.physicalLocation ?? i.country;
-    // What Happened owns chronology and event description. What Matters names
-    // only the ranked exposure and consequence so the same development is not
-    // retold in two adjacent sections.
-    if (idx === 0) {
-      return `${place ? `${place} carries` : "The lead development carries"} the greatest business exposure. ${impact}`;
-    }
-    if (idx === 1) {
-      return `${place ? `A second material issue is developing around ${place}` : "A second material issue remains unresolved"}. ${impact}`;
-    }
-    return `${place ? `${place} is also relevant` : "The remaining material issue is regional"}. ${impact}`;
+    return idx === 0
+      ? `${place ? `${place} carries` : "The lead development carries"} the greatest business exposure. ${impact}`
+      : `${place ? `A second material issue is developing around ${place}` : "A second material issue remains unresolved"}. ${impact}`;
   });
   const j = facts.judgement;
-  // What Matters owns the assessed risk, exposure and direction. The
-  // conditional indicator belongs only in Watch Next.
   const judgement = `The main risk is ${j.mainRisk}. The principal exposure is ${j.exposure.sector}${j.exposure.geography ? ` in ${j.exposure.geography}` : ""}; the near-term direction is ${j.direction}.`;
-  // Lead with the ranked, evidence-specific developments. The canonical
-  // judgement remains in What Matters, but must not bury a directly evidenced
-  // forecourt or policy development behind generic risk framing.
   return [...paras, judgement].join("\n\n");
 }
 
 function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
+  const key = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (key.length >= 2) {
+    return "European refiners exposed to the cancelled Saudi programme face spot-market replacement costs, longer or altered voyages and possible changes to refinery crude slates. Orlen's search across the North Sea, United States, Algeria, Kazakhstan and Guyana broadens supply options but may change freight, quality and delivery economics. Importers should reconcile confirmed Saudi nominations against expected refinery runs, available inventory and replacement arrival dates. The loss of Yanbu capacity also reduces Saudi Arabia's ability to redirect exports away from Gulf constraints. Separately, the IATA jet-fuel reading of 181.46 USD/bbl, up 6.1% week on week, raises aviation fuel-cost exposure while crude deliveries remain unsettled.";
+  }
   const hay = incidentsHaystack(facts.qualifyingIncidents);
   const consequences: string[] = [];
   const rising = facts.marketIndicators.some(
@@ -2374,6 +2404,16 @@ function buildFuelImplicationsProse(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
+  const supplyChain = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (supplyChain.length >= 2) {
+    return [
+      "Confirm the East-West Pipeline repair timetable and the first restored crude flow to the Red Sea coast.",
+      "Verify the restart of Yanbu export operations and publication of a revised Saudi loading programme.",
+      "Track whether cancelled late-September cargoes are reinstated, deferred into October or permanently replaced.",
+      "Monitor Orlen's replacement purchases and arrival schedules, together with any premium paid for alternative grades.",
+      "Compare the next IATA jet-fuel observation with 181.46 USD/bbl to determine whether the August-to-September rise continues.",
+    ].join(" ");
+  }
   const items: Array<{ text: string; supportingEvidenceIds: string[] }> = [];
   const potentialIndicator = facts.watchIndicators.find((indicator) => {
     const needle = indicator.trim().toLowerCase();
@@ -2480,8 +2520,12 @@ function buildFuelWatchNextFromFacts(facts: FuelCanonicalFacts): string {
 }
 
 function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
+  const supplyChain = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (supplyChain.length >= 2) {
+    return `Fuel risk is ${facts.overallSeverity}. The evidence has moved from damaged infrastructure to lost export capacity and disrupted contractual performance. Saudi Arabia cannot currently use the East-West Pipeline and Yanbu route to maintain its normal west-coast programme, while affected European refiners must replace barrels that were due later in September. Orlen's purchases and tenders across Atlantic Basin and other non-Saudi sources show that buyers are already adapting procurement rather than waiting for normal service to return. The principal exposure is refinery feedstock continuity, replacement cost and delivery timing for Saudi-dependent European buyers. Risk will remain elevated until pipeline throughput resumes, Yanbu publishes a workable loading programme and replacement cargoes arrive. Casualty-only vessel incidents without a stated fuel-market effect do not alter this assessment.`;
+  }
   if (facts.analystReviewRequired) {
-    return `Fuel risk is ${facts.overallSeverity}, with low confidence in the principal exposure. The available reports do not establish enough confirmed location or outcome detail to distinguish whether price, availability, distribution, infrastructure or routing pressure is dominant. The business exposure therefore remains uncertain rather than absent, particularly for fuel-dependent transport and replenishment. The near-term direction cannot be assessed reliably until unresolved reports establish where disruption occurred and whether it affected supply, distribution or delivered cost.`;
+    return `Fuel risk is ${facts.overallSeverity}. Confidence in the principal exposure is low. The available reports do not establish enough confirmed location or outcome detail to distinguish whether price, availability, distribution, infrastructure or routing pressure is dominant. The business exposure therefore remains uncertain rather than absent, particularly for fuel-dependent transport and replenishment. The near-term direction cannot be assessed reliably until unresolved reports establish where disruption occurred and whether it affected supply, distribution or delivered cost.`;
   }
   const j = facts.judgement;
   const outlook = j.direction === "upward"

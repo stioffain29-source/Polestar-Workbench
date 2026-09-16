@@ -14,3 +14,17 @@ description: How Fuel Watch prevents repeated coverage from inflating significan
 **Why:** Generic defaults could be inserted first and then accepted as “validated” indicators, creating circular evidence and orphan risks.
 
 **How to apply:** A short section is acceptable when evidence is thin. Every watch item must resolve to one typed current development or forward trigger before render.
+
+**Rule:** When a fuel event progresses from infrastructure damage to lost
+loading capacity, cancelled deliveries and buyer replacement sourcing, lead
+with that causal sequence and name the affected operator or buyer. Do not lead
+with generic severity, exposure, uncertainty or "pressure point" language.
+
+**Why:** Generic templates hid the material headline even though the evidence
+contained an offline export route, cancelled cargoes and a named buyer seeking
+replacement barrels.
+
+**How to apply:** Situation states the headline chain; What Happened holds dated
+evidence; What Matters explains significance; Implications covers business
+effects; Watch Next lists concrete verification points. Do not repeat the same
+source sentence across sections.
