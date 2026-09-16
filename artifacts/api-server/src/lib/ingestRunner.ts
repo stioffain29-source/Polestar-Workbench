@@ -876,10 +876,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // table; running them one after another mirrors scrape:prod. Each is isolated
     // in its own try so a DB or unexpected failure in one topic can never abort
     // the rest of the chain (mirrors strikes / market prices below).
-    markIngestStage("runIncidentIngest:flashpoint");
-    const flashpoint = await runIncidentIngest("flashpoint", () =>
-      runFlashpointIngest({ commit: true }),
-    );
     markIngestStage("runIncidentIngest:cargo_watch");
     const cargoWatch = await runIncidentIngest("cargo_watch", () =>
       runCargoWatchIngest({ commit: true }),
@@ -945,6 +941,15 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     markIngestStage("runIncidentIngest:apac_local");
     const apacLocal = await runIncidentIngest("apac_local", () =>
       runApacLocalIngest({ commit: true }),
+    );
+    // Flashpoint has the broadest feed set and can take materially longer than
+    // the other incident collectors. Keep it last in the map-critical sequence
+    // so a slow Flashpoint run cannot starve every other topic and leave the
+    // strict 24-hour geospatial map empty. Its collection, relevance and
+    // semantic-validity gates are unchanged.
+    markIngestStage("runIncidentIngest:flashpoint");
+    const flashpoint = await runIncidentIngest("flashpoint", () =>
+      runFlashpointIngest({ commit: true }),
     );
     // PNG per-incident structured extraction. The PNG country brief reads
     // province / category / business_impact / incident_date STRAIGHT from the

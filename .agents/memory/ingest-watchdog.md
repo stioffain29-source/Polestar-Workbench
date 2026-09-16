@@ -51,6 +51,17 @@ recovers some flashpoint-family events once its stage completes.
 deployment logs; corroborate with `sources.last_success_at` ordering (the
 stage after the last-touched source is the culprit).
 
+**Map-critical ordering:** run the narrower incident-topic collectors before
+Flashpoint. Flashpoint has the broadest feed set and may consume most of a
+worker run; placing it first can leave every topic on the strict 24-hour map
+empty even though the worker is technically running.
+
+**Why:** The map needs any current accepted incident, while one slow topic must
+not block unrelated topic freshness.
+
+**How to apply:** Keep evidence gates and sequential writes unchanged; preserve
+Flashpoint as the last incident collector rather than widening the map window.
+
 **Why the lock diagnosis is subtle:** by the time you query `pg_locks` the
 lock is often already free (the lock client died mid-hang) — absence of an
 advisory lock does NOT mean no run is stuck in-process.

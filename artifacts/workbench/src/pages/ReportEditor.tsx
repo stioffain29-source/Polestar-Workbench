@@ -2584,18 +2584,58 @@ export default function ReportEditor() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[460px_minmax(0,1fr)] 2xl:grid-cols-[540px_minmax(0,1fr)] gap-6 items-start">
-        <div className="bg-white border border-[#e2e2e2] rounded-[2px] flex flex-col no-print shadow-sm overflow-hidden">
+        <div className={`bg-white border border-[#e2e2e2] rounded-[2px] flex flex-col no-print shadow-sm overflow-hidden ${form.topic === "shipping" ? "shipping-editor-brand" : ""}`}>
+          {form.topic === "shipping" && (
+            <style>{`
+              .shipping-editor-brand .shipping-editor-body {
+                background: #f4f4f8;
+              }
+              .shipping-editor-brand .shipping-brand-section {
+                background: #ffffff;
+                border: 1px solid #d9d9e6;
+                border-top: 0;
+                padding: 0 12px 12px;
+                margin-top: 4px;
+              }
+              .shipping-editor-brand .shipping-brand-heading {
+                display: block;
+                margin: 0 -12px 12px;
+                padding: 9px 12px;
+                background: #0b0a3d;
+                color: #ffffff;
+                border-left: 4px solid #465bff;
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: .16em;
+                text-transform: uppercase;
+              }
+              .shipping-editor-brand input,
+              .shipping-editor-brand textarea,
+              .shipping-editor-brand button[role="combobox"],
+              .shipping-editor-brand select {
+                background-color: #ffffff;
+                border-color: #cfd0dd;
+              }
+              .shipping-editor-brand input[type="checkbox"] {
+                accent-color: #465bff;
+              }
+              .shipping-editor-brand .shipping-brand-card {
+                background: #ffffff;
+                border-left: 3px solid #465bff;
+              }
+            `}</style>
+          )}
           <div className="bg-[#0b0a3d] text-white px-5 py-3.5 text-[11px] uppercase tracking-[0.15em] font-bold shrink-0">
             Report Configuration
           </div>
-          <div className="p-5 space-y-6">
+          <div className="shipping-editor-body p-5 space-y-6">
           {scope && (
             <div
               className="text-[12px] leading-snug p-3 rounded-[2px] border"
               style={{
-                background: "#f3f4fa",
+                background: form.topic === "shipping" ? "#0b0a3d" : "#f3f4fa",
                 borderColor: "#465bff",
-                color: "#0b0a3d",
+                color: form.topic === "shipping" ? "#ffffff" : "#0b0a3d",
                 fontFamily: "Roboto, sans-serif",
               }}
             >
@@ -2737,8 +2777,8 @@ export default function ReportEditor() {
               section keys), and excludes / demote-only-rerates relevance-passing
               window incidents. STRICT no-fabrication: curate only from the
               in-window pool; nothing can be added or up-rated. */}
-          <div className="border-t border-[#e2e2e2] pt-3 mt-1">
-            <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
+          <div className={form.topic === "shipping" ? "shipping-brand-section" : "border-t border-[#e2e2e2] pt-3 mt-1"}>
+            <div className={form.topic === "shipping" ? "shipping-brand-heading" : "text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2"}>
               Section visibility
             </div>
             <div className="grid grid-cols-2 gap-1.5">
@@ -2777,8 +2817,8 @@ export default function ReportEditor() {
               clearing every field reverts the tile fully to auto. Applied
               identically in the preview AND the PDF exporters. */}
           {fastFactEditorRows.length > 0 && (
-            <div className="border-t border-[#e2e2e2] pt-3 mt-1">
-              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1">
+            <div className={form.topic === "shipping" ? "shipping-brand-section" : "border-t border-[#e2e2e2] pt-3 mt-1"}>
+              <div className={form.topic === "shipping" ? "shipping-brand-heading" : "text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-1"}>
                 Fast Facts overrides
               </div>
               <p className="text-[11px] text-muted-foreground mb-2">
@@ -2805,7 +2845,7 @@ export default function ReportEditor() {
                   return (
                     <div
                       key={card.label}
-                      className="border border-[#e2e2e2] rounded-[2px] p-2"
+                      className={`border border-[#e2e2e2] rounded-[2px] p-2 ${form.topic === "shipping" ? "shipping-brand-card" : ""}`}
                     >
                       <div className="text-[11px] text-muted-foreground mb-1.5">
                         {card.label} —{" "}
@@ -2992,8 +3032,8 @@ export default function ReportEditor() {
           )}
 
           {curationPool.length > 0 && (
-            <div className="border-t border-[#e2e2e2] pt-3 mt-1">
-              <div className="text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2">
+            <div className={form.topic === "shipping" ? "shipping-brand-section" : "border-t border-[#e2e2e2] pt-3 mt-1"}>
+              <div className={form.topic === "shipping" ? "shipping-brand-heading" : "text-[11px] font-sans uppercase tracking-widest text-muted-foreground mb-2"}>
                 Incident selection &amp; severity ({curationPool.length} in window)
               </div>
               <div className="flex flex-col gap-2 max-h-[420px] overflow-y-auto pr-1">
@@ -3007,7 +3047,7 @@ export default function ReportEditor() {
                   return (
                     <div
                       key={incId}
-                      className="border border-[#e2e2e2] rounded-[2px] p-2 flex gap-2.5 items-start"
+                      className={`border border-[#e2e2e2] rounded-[2px] p-2 flex gap-2.5 items-start ${form.topic === "shipping" ? "shipping-brand-card" : ""}`}
                       style={{ opacity: excluded ? 0.5 : 1 }}
                     >
                       <input
