@@ -4,6 +4,7 @@ import { recordSourceHealth } from "./sourceHealth";
 import {
   fetchCrudeSeries,
   fetchFredSeries,
+  fetchIataJetFuelSeries,
   valueAsOf,
   changeOver,
   trajectoryAsOf,
@@ -68,10 +69,11 @@ function buildHardNumbers(
   brent: Series,
   wti: Series,
   jet: Series,
+  jetHeadline?: Series,
 ): { hardNumbers: Record<string, unknown>; brent: number | null; wti: number | null; jet: number | null; asOf: string | null } | null {
   const b = valueAsOf(brent, anchorDate);
   const w = valueAsOf(wti, anchorDate);
-  const j = valueAsOf(jet, anchorDate);
+  const j = valueAsOf(jetHeadline ?? jet, anchorDate) ?? valueAsOf(jet, anchorDate);
   if (!b && !w && !j) return null;
 
   const prices: Record<string, unknown>[] = [];
@@ -87,8 +89,23 @@ function buildHardNumbers(
     if (!asOf || w.date > asOf) asOf = w.date;
   }
   if (j) {
-    const change = changePct(jet, j.date, j.value);
-    prices.push({ label: "Jet fuel", benchmark: "U.S. Gulf Coast kerosene-type jet fuel", value: j.value, unit: "USD/gal", ...(change ? { change } : {}), asOf: j.date, source: jet.source });
+    const headlineSeries =
+      valueAsOf(jetHeadline ?? jet, anchorDate)?.date === j.date
+        ? (jetHeadline ?? jet)
+        : jet;
+    const change = changePct(headlineSeries, j.date, j.value);
+    const isIata = headlineSeries.id === "IATA_GLOBAL_JET";
+    prices.push({
+      label: "Jet fuel",
+      benchmark: isIata
+        ? "Global jet fuel composite"
+        : "U.S. Gulf Coast kerosene-type jet fuel",
+      value: j.value,
+      unit: isIata ? "USD/bbl" : "USD/gal",
+      ...(change ? { change } : {}),
+      asOf: j.date,
+      source: headlineSeries.source,
+    });
     if (!asOf || j.date > asOf) asOf = j.date;
   }
 
@@ -167,7 +184,7 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   // DJFUELUSGULF) directly — a daily series whose EIA publication still lags
   // the daily crude close by a few days, but it is the genuine jet price, not
   // a daily distillate proxy. All run in parallel.
-  const [brent, wti, jet] = await Promise.all([
+  const [brent, wti, jet, jetHeadline] = await Promise.all([
     safe(
       "BZ=F",
       () =>
@@ -194,6 +211,15 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
       "DJFUELUSGULF",
       () => fetchFredSeries("DJFUELUSGULF", "EIA / FRED (DJFUELUSGULF)", startDate),
       { id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)", points: [] },
+    ),
+    safe(
+      "IATA_GLOBAL_JET",
+      () => fetchIataJetFuelSeries(today),
+      {
+        id: "IATA_GLOBAL_JET",
+        source: "IATA / S&P Global Platts Jet Fuel Price Monitor",
+        points: [],
+      },
     ),
   ]);
 
@@ -262,7 +288,13 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
       isLive && latestCrudeClose && latestCrudeClose > issueDate
         ? latestCrudeClose
         : issueDate;
-    const built = buildHardNumbers(anchorDate, brent, wti, jet);
+    const built = buildHardNumbers(
+      anchorDate,
+      brent,
+      wti,
+      jet,
+      isLive && jetHeadline.points.length > 0 ? jetHeadline : undefined,
+    );
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);
       continue;

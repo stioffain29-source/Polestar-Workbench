@@ -2,6 +2,7 @@ import { db, marketPricesTable, type InsertMarketPrice } from "@workspace/db";
 import {
   fetchFredSeries,
   fetchCrudeSeries,
+  fetchIataJetFuelSeries,
   fetchWorldBankFertiliser,
   valueAsOf,
   changeOver,
@@ -38,6 +39,7 @@ type CrudeSpec = {
   fred: { id: string; source: string };
 };
 type FredSpec = { kind: "fred"; id: string; source: string };
+type IataJetSpec = { kind: "iata-jet" };
 type WorldBankSpec = { kind: "worldbank"; commodity: "urea" | "dap" | "potash" };
 
 type Spec = {
@@ -49,7 +51,7 @@ type Spec = {
   changeMode: "7d" | "prev";
   trajCount: number;
   decimals: number;
-  fetch: CrudeSpec | FredSpec | WorldBankSpec;
+  fetch: CrudeSpec | FredSpec | IataJetSpec | WorldBankSpec;
   /**
    * Cadence-aware staleness threshold (days). Set ONLY on the monthly series
    * whose upstream can return HTTP 200 while its data silently stops advancing.
@@ -105,15 +107,9 @@ const SPECS: Spec[] = [
     },
   },
   {
-    // Jet fuel: the REAL EIA U.S. Gulf Coast kerosene-type jet-fuel series
-    // (FRED DJFUELUSGULF), USD/gal. Publishes weekly, so it lags the daily
-    // crude close by a few days — it is the genuine jet price, not a proxy.
-    group: "fuel", key: "jet", label: "Jet Fuel", unit: "USD/gal",
-    benchmark: "U.S. Gulf Coast kerosene-type jet fuel", changeMode: "7d", trajCount: 16, decimals: 2,
-    fetch: {
-      kind: "fred",
-      id: "DJFUELUSGULF", source: "EIA / FRED (DJFUELUSGULF)",
-    },
+    group: "fuel", key: "jet", label: "Jet Fuel", unit: "USD/bbl",
+    benchmark: "Global jet fuel composite", changeMode: "7d", trajCount: 16, decimals: 2,
+    fetch: { kind: "iata-jet" },
   },
   // --- Energy ---------------------------------------------------------------
   {
@@ -214,6 +210,10 @@ export async function runMarketSnapshotIngest(
       let series: Series;
       if (spec.fetch.kind === "crude") {
         series = await fetchCrudeSeries(spec.fetch.yahoo, spec.fetch.fred, cosd, log);
+      } else if (spec.fetch.kind === "iata-jet") {
+        series = await fetchIataJetFuelSeries(anchor);
+        const last = series.points.at(-1);
+        log(`  IATA jet      points=${series.points.length} latest=${last ? `${last.date} ${last.value}` : "(none)"}`);
       } else if (spec.fetch.kind === "fred") {
         series = await fetchFredSeries(spec.fetch.id, spec.fetch.source, cosd);
         const last = series.points.at(-1);
@@ -345,11 +345,13 @@ export async function runMarketSnapshotIngest(
 function priceFeedName(spec: Spec): string {
   if (spec.fetch.kind === "crude") return `${spec.label} (${spec.fetch.yahoo.symbol})`;
   if (spec.fetch.kind === "fred") return `${spec.label} (${spec.fetch.id})`;
+  if (spec.fetch.kind === "iata-jet") return `${spec.label} (IATA / Platts)`;
   return `${spec.label} (World Bank Pink Sheet)`;
 }
 
 function priceFeedUrl(spec: Spec): string {
   if (spec.fetch.kind === "crude") return `https://finance.yahoo.com/quote/${spec.fetch.yahoo.symbol}`;
   if (spec.fetch.kind === "fred") return `https://fred.stlouisfed.org/series/${spec.fetch.id}`;
+  if (spec.fetch.kind === "iata-jet") return "https://www.iata.org/en/publications/economics/fuel-monitor/";
   return "https://www.worldbank.org/en/research/commodity-markets";
 }

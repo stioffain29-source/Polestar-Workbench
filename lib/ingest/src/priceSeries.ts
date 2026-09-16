@@ -12,6 +12,8 @@
 
 export const FRED_CSV = "https://fred.stlouisfed.org/graph/fredgraph.csv";
 const YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart";
+export const IATA_FUEL_MONITOR =
+  "https://www.iata.org/en/publications/economics/fuel-monitor/";
 
 export type PricePoint = { date: string; value: number };
 
@@ -41,6 +43,52 @@ export function parseFredCsv(text: string): PricePoint[] {
   }
   points.sort((a, b) => a.date.localeCompare(b.date));
   return points;
+}
+
+export function parseIataJetFuelMonitor(
+  html: string,
+  asOf: string,
+): PricePoint[] {
+  const match = html.match(
+    /global average jet fuel price[\s\S]{0,240}?last week (rose|fell) ([0-9]+(?:\.[0-9]+)?)%[\s\S]{0,120}?to \$([0-9]+(?:\.[0-9]+)?)\/bbl/i,
+  );
+  if (!match) throw new Error("IATA fuel monitor: current price not found");
+  const direction = match[1].toLowerCase() === "rose" ? 1 : -1;
+  const changePct = Number(match[2]) * direction;
+  const current = Number(match[3]);
+  if (
+    !Number.isFinite(current) ||
+    current <= 0 ||
+    !Number.isFinite(changePct) ||
+    Math.abs(changePct) >= 100
+  ) {
+    throw new Error("IATA fuel monitor: invalid current price");
+  }
+  const previous = current / (1 + changePct / 100);
+  const previousDate = new Date(`${asOf}T00:00:00Z`);
+  previousDate.setUTCDate(previousDate.getUTCDate() - 7);
+  return [
+    {
+      date: previousDate.toISOString().slice(0, 10),
+      value: previous,
+    },
+    { date: asOf, value: current },
+  ];
+}
+
+export async function fetchIataJetFuelSeries(
+  asOf = new Date().toISOString().slice(0, 10),
+): Promise<Series> {
+  const res = await fetch(IATA_FUEL_MONITOR, {
+    headers: { "User-Agent": "Mozilla/5.0 (PolestarWorkbench MarketPrices)" },
+  });
+  if (!res.ok) throw new Error(`IATA fuel monitor HTTP ${res.status}`);
+  const html = await res.text();
+  return {
+    id: "IATA_GLOBAL_JET",
+    source: "IATA / S&P Global Platts Jet Fuel Price Monitor",
+    points: parseIataJetFuelMonitor(html, asOf),
+  };
 }
 
 /**
