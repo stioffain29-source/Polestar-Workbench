@@ -19,23 +19,29 @@ const FOOTER_BAND_H = 30;
 const BODY_TOP_PAD = 14;
 const BODY_BOTTOM_PAD = 12;
 const EXPORT_REPORT_WIDTH_PX = 960;
+const ASSET_WAIT_TIMEOUT_MS = 4_000;
+
+function waitAtMost<T>(promise: Promise<T>, timeoutMs = ASSET_WAIT_TIMEOUT_MS): Promise<void> {
+  return Promise.race([
+    promise.then(() => undefined, () => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, timeoutMs)),
+  ]);
+}
 
 async function waitForFontsAndImages(element: HTMLElement): Promise<void> {
   if ("fonts" in document) {
-    await document.fonts.ready;
+    await waitAtMost(document.fonts.ready);
   }
 
   const images = Array.from(element.querySelectorAll("img"));
   await Promise.all(images.map(async (img) => {
-    if (img.complete && img.naturalWidth > 0) return;
-    try {
-      await img.decode();
-    } catch {
-      await new Promise<void>((resolve) => {
-        img.addEventListener("load", () => resolve(), { once: true });
-        img.addEventListener("error", () => resolve(), { once: true });
-      });
-    }
+    // `complete` also covers failed images. Never attach listeners after that
+    // terminal event has already fired, or a broken map tile can hang export.
+    if (img.complete) return;
+    await waitAtMost(new Promise<void>((resolve) => {
+      img.addEventListener("load", () => resolve(), { once: true });
+      img.addEventListener("error", () => resolve(), { once: true });
+    }));
   }));
 }
 

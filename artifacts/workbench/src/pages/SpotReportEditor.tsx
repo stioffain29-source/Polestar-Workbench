@@ -948,8 +948,13 @@ export default function SpotReportEditor() {
       } else {
         downloadSpotReportText(previewReport, linkedIncidents, `${slug}.txt`);
       }
-    } catch {
-      toast({ title: "Export failed", variant: "destructive" });
+    } catch (error) {
+      console.error("Spot Report export failed", error);
+      toast({
+        title: "Export failed",
+        description: error instanceof Error ? error.message : "The PDF could not be generated.",
+        variant: "destructive",
+      });
       return;
     }
     if (id != null) {
