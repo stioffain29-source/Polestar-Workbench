@@ -137,6 +137,7 @@ describe("Shipping publication final boundary", () => {
     expect(classifyShippingPublicationIssue("UNSUPPORTED_WATCH_NEXT", "watchNext")).toBe("WARNING");
     expect(classifyShippingPublicationIssue("WATCH_NEXT_UNGROUNDED", "watchNext")).toBe("WARNING");
     expect(classifyShippingPublicationIssue("UNSUPPORTED_PROSE_ASSERTION", "whatMatters")).toBe("WARNING");
+    expect(classifyShippingPublicationIssue("GENERIC_CROSS_SECTION_REPETITION", "cross-section")).toBe("WARNING");
     expect(classifyShippingPublicationIssue("RISK_CONTRADICTION", "risk")).toBe("ERROR");
   });
 

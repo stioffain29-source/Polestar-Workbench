@@ -241,7 +241,10 @@ const WATCH_NEXT_UNCERTAINTY_CODES = new Set([
 // the analyst, but do not block an otherwise valid report. Specific factual
 // safeguards (risk, severity, location, counts, routes, consequences and
 // semantic validity) remain fail-closed below.
-const ADVISORY_PROSE_CODES = new Set(["UNSUPPORTED_PROSE_ASSERTION"]);
+const ADVISORY_PROSE_CODES = new Set([
+  "UNSUPPORTED_PROSE_ASSERTION",
+  "GENERIC_CROSS_SECTION_REPETITION",
+]);
 
 function isWatchNextSection(section: string | undefined): boolean {
   return Boolean(
@@ -1547,11 +1550,19 @@ function auditWithGenericEvidence(
       typedReferences,
     });
     for (const finding of generic) {
+      const code = `GENERIC_${finding.code ?? "EVIDENCE"}`;
+      const classified = classifyShippingPublicationIssue(
+        code,
+        finding.section,
+      );
       issues.push({
-        code: `GENERIC_${finding.code ?? "EVIDENCE"}`,
+        code,
         message: finding.message,
         section: finding.section,
-        level: finding.level,
+        // Preserve warnings emitted by the generic audit, while allowing the
+        // Shipping boundary to downgrade explicitly advisory prose-quality
+        // findings that are not factual-integrity failures.
+        level: classified === "WARNING" ? "WARNING" : finding.level,
       });
     }
   } catch (error) {
