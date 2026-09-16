@@ -1171,3 +1171,17 @@ mtime_ms = 1789349829303
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/41c2afa7-e105-4e73-a8c7-ce4afa603e7f/00713d85-02ca-49bb-b878-4498241009d4"
 storage_version_token = "1789349985889514"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "6y7QVrHJ8tXAkFkl2regt"
+uri = "file://deliverables/conversation-transcript.docx"
+type = "word_document"
+title = "Conversation Transcript"
+description = "Word document containing the full user–assistant conversation available in this session, the supplied prior-conversation summary, and both attached screenshots."
+logical_id = "52ea1a19-fc9f-4eed-805c-f81952a49603"
+content_hash = "sha256:eb379c30b321583e9174c3f60525046d667ac41313b8f7acaad808fed75edb9c"
+size = 335403
+mtime_ms = 1789544697901
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/52ea1a19-fc9f-4eed-805c-f81952a49603/f5c926b8-c2d0-4d6d-b269-9bf8f5406ca4"
+storage_version_token = "1789544705285667"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
