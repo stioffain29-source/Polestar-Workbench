@@ -25,4 +25,20 @@ describe("incident ingest map priority", () => {
       ).toBeLessThan(flashpoint);
     }
   });
+
+  it("runs direct local incident feeds before ancillary context collectors", () => {
+    const source = readFileSync(
+      "artifacts/api-server/src/lib/ingestRunner.ts",
+      "utf8",
+    );
+    const protestSchedule = source.indexOf(
+      'markIngestStage("runProtestScheduleIngest")',
+    );
+    expect(
+      source.indexOf('markIngestStage("runIncidentIngest:apac_local")'),
+    ).toBeLessThan(protestSchedule);
+    expect(
+      source.indexOf('markIngestStage("runIncidentIngest:indonesia_local")'),
+    ).toBeLessThan(protestSchedule);
+  });
 });

@@ -729,6 +729,18 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       logger.error({ err }, "strikes ingest failed");
       strikes = emptyStrikes(err);
     }
+    // Populate the strict 24-hour incident map before ancillary context feeds.
+    // These direct/local collectors are the fastest path to current accepted
+    // rows and must not sit behind protest schedules, maritime PDFs, title
+    // translation, or the broad Flashpoint pass.
+    markIngestStage("runIncidentIngest:apac_local");
+    const apacLocal = await runIncidentIngest("apac_local", () =>
+      runApacLocalIngest({ commit: true }),
+    );
+    markIngestStage("runIncidentIngest:indonesia_local");
+    const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
+      runIndonesiaLocalIngest({ commit: true }),
+    );
     // Forward-looking protest schedule is an isolated context collector. It
     // intentionally runs outside every incident ingest and never touches the
     // incidents table.
@@ -926,22 +938,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
         logger.error({ err }, "conflict clustering pass failed (non-fatal)");
       }
     }
-    // Broad Bahasa-first local coverage for the Indonesia + Jakarta country
-    // briefs (unrest, crime, natural hazard, fire, haze, transport, government,
-    // labour, terrorism). Runs BEFORE the West Papua extract backfill below so
-    // any rows this pass diverts to "West Papua" get structured this same run.
-    markIngestStage("runIncidentIngest:indonesia_local");
-    const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
-      runIndonesiaLocalIngest({ commit: true }),
-    );
-    // Curated DIRECT-outlet RSS (not Google News) across the six tracked APAC
-    // territories. Classified/scored across protest, crime, terrorism, civil
-    // unrest, transport disruption and security incidents; West Papua rows are
-    // diverted to their own tag (never Indonesia) by the Papua-first aliases.
-    markIngestStage("runIncidentIngest:apac_local");
-    const apacLocal = await runIncidentIngest("apac_local", () =>
-      runApacLocalIngest({ commit: true }),
-    );
     // Flashpoint has the broadest feed set and can take materially longer than
     // the other incident collectors. Keep it last in the map-critical sequence
     // so a slow Flashpoint run cannot starve every other topic and leave the

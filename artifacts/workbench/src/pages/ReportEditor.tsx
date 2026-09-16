@@ -2583,7 +2583,7 @@ export default function ReportEditor() {
         />
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[460px_minmax(0,1fr)] 2xl:grid-cols-[540px_minmax(0,1fr)] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         <div className={`bg-white border border-[#e2e2e2] rounded-[2px] flex flex-col no-print shadow-sm overflow-hidden ${form.topic === "shipping" ? "shipping-editor-brand" : ""}`}>
           {form.topic === "shipping" && (
             <style>{`
