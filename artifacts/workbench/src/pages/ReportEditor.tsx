@@ -126,6 +126,10 @@ import {
   type FuelMarketCardForm,
   type ProducerBuyerActionRow,
 } from "@/lib/fuelWatchReport";
+import {
+  assembleFuelWatchReport,
+  assertFuelHydrationValid,
+} from "@/lib/fuelReportAssembler";
 
 const legacyExecSummaryStorageKey = (id: number) =>
   `polestar:exec-summary:report:${id}`;
@@ -545,6 +549,10 @@ export default function ReportEditor() {
   const [flashpointEditBasisFingerprint, setFlashpointEditBasisFingerprint] =
     useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [fuelAssembly, setFuelAssembly] = useState<Awaited<
+    ReturnType<typeof assembleFuelWatchReport>
+  > | null>(null);
+  const [fuelAssemblyError, setFuelAssemblyError] = useState<string | null>(null);
   // Id of the report whose data the seed effect below has populated into `form`.
   // Drives `activeTopic`: before the CURRENT report is seeded we scope the
   // incident fetch off the report's own topic; after it we follow the editable
@@ -1670,24 +1678,34 @@ export default function ReportEditor() {
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}-${formatExportTimestampForFilename()}.pdf`;
       let fuelExportHardNumbers: Record<string, unknown> | null = null;
       let fuelExportIssueDate = form.issueDate;
+      let fuelExportIncidents = incidentsForExport;
+      let fuelExportMarketPrices = marketPriceRows;
       if (form.topic === "fuel") {
-        // Export is a publication boundary: do not trust an earlier React render
-        // or a one-shot seed effect for live market data. Fetch the report again
-        // and assemble the freshest per-commodity payload synchronously at click
-        // time so Download cannot fall back to a stale persisted FRED snapshot.
-        const freshReport = id
-          ? await getReport(id, { cache: "no-store" })
-          : report;
-        const liveMarket = fuelHardNumbersFromMarketRows(
-          marketPriceRows,
-          new Date().toISOString().slice(0, 10),
-        );
-        fuelExportHardNumbers = mergeFuelMarketHardNumbers(
-          hardNumbersEdited ?? freshReport?.hardNumbers,
-          liveMarket,
-        );
-        fuelExportIssueDate =
-          fuelMarketLatestDate(fuelExportHardNumbers) ?? form.issueDate;
+        if (!id) throw new Error("Fuel Watch export requires an exact report id.");
+        const assembled = await assembleFuelWatchReport(id);
+        assertFuelHydrationValid(assembled.validation);
+        const publicationFailures = [
+          ...(!assembled.publication.marketReadiness.ready
+            ? assembled.publication.marketReadiness.missingRequired.map(
+                (item) => `Missing required market data: ${item}.`,
+              )
+            : []),
+          ...assembled.publication.auditIssues.canonical.map(
+            (issue) =>
+              `Canonical ${issue.section} conflict: ${issue.conflictingStatement} (expected ${issue.canonicalValue}).`,
+          ),
+          ...assembled.publication.auditIssues.consistency.map((issue) => issue.message),
+          ...assembled.publication.auditIssues.evidence.map((issue) => issue.message),
+        ];
+        if (publicationFailures.length > 0) {
+          throw new Error(
+            `Fuel Watch export blocked by publication validation: ${publicationFailures.join(" ")}`,
+          );
+        }
+        fuelExportHardNumbers = assembled.hydratedReport.hardNumbers as Record<string, unknown>;
+        fuelExportIssueDate = assembled.validation.reportingPeriodEnd;
+        fuelExportIncidents = assembled.incidents as never;
+        fuelExportMarketPrices = assembled.marketPrices;
       }
 
       // Common payload shared by all PDF exporters.
@@ -1764,13 +1782,13 @@ export default function ReportEditor() {
                 ? fuelExportHardNumbers
                 : hardNumbersEdited ?? report?.hardNumbers,
           },
-          incidentsForExport,
+          fuelExportIncidents,
           TOPIC_LABELS,
           filename,
           {
             incidentSummaries: effectiveSummaries,
             aiProse: aiProseSections,
-            marketPrices: marketPriceRows,
+            marketPrices: fuelExportMarketPrices,
             includeFullAnnex,
             hiddenSections,
             sectionOverrides,
@@ -1791,6 +1809,32 @@ export default function ReportEditor() {
       setExporting(false);
     }
   };
+  useEffect(() => {
+    if (form.topic !== "fuel" || !id) {
+      setFuelAssembly(null);
+      setFuelAssemblyError(null);
+      return;
+    }
+    let active = true;
+    void assembleFuelWatchReport(id)
+      .then((assembled) => {
+        if (active) {
+          setFuelAssembly(assembled);
+          setFuelAssemblyError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setFuelAssembly(null);
+          setFuelAssemblyError(
+            error instanceof Error ? error.message : "Fuel Watch data assembly failed.",
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [form.topic, id]);
   useEffect(() => {
     if (!report) return;
     // Wait until incidents have loaded before seeding so the draft prose is
@@ -4317,18 +4361,40 @@ export default function ReportEditor() {
               sectionOverrides={sectionOverrides}
             />
           ) : (
-            <ReportPreview
-              report={{
-                ...form,
-                hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
-              }}
-              incidents={incidentsForExport}
-              incidentSummaries={effectiveSummaries}
-              aiProse={aiProseSections}
-              marketPrices={marketPriceRows}
-              hiddenSections={hiddenSections}
-              sectionOverrides={sectionOverrides}
-            />
+            form.topic === "fuel" && !fuelAssembly ? (
+              <div className="border border-[#e2e2e2] bg-white rounded-sm p-8 text-center">
+                <div className="text-[#0b0a3d] font-bold uppercase tracking-[0.12em] text-sm">
+                  {fuelAssemblyError ? "Fuel Watch preview blocked" : "Assembling Fuel Watch"}
+                </div>
+                <p className="mt-3 text-sm text-[#363636]">
+                  {fuelAssemblyError ??
+                    "Fetching the selected report, current market benchmarks, and reporting-window developments…"}
+                </p>
+                {fuelAssemblyError && (
+                  <p className="mt-2 text-xs text-[#8b2d2d]">
+                    Preview is blocked to prevent stale persisted or cached data from being shown.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <ReportPreview
+                report={{
+                  ...form,
+                  issueDate:
+                    fuelAssembly?.validation.reportingPeriodEnd ?? form.issueDate,
+                  hardNumbers:
+                    fuelAssembly?.hydratedReport.hardNumbers ??
+                    hardNumbersEdited ??
+                    report?.hardNumbers,
+                }}
+                incidents={fuelAssembly?.incidents ?? incidentsForExport}
+                incidentSummaries={effectiveSummaries}
+                aiProse={aiProseSections}
+                marketPrices={fuelAssembly?.marketPrices ?? marketPriceRows}
+                hiddenSections={hiddenSections}
+                sectionOverrides={sectionOverrides}
+              />
+            )
           )}
             </div>
           </div>

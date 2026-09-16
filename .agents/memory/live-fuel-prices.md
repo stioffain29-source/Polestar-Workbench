@@ -39,22 +39,18 @@ incident-only, so there was nothing fabricated to replace there.
   report carries (`fuelMarketLatestDate(hardNumbers)` = max of price asOf, jet
   snapshot asOf, jet trajectory point dates), NOT the latest incident. The
   workbench DERIVES the render period from the market close.
-- LIVE-REPORT FORWARD ROLL (current rule; INTENTIONALLY reverses the old "anchor
-  every report to its issue date / do NOT special-case the newest" guidance
-  below). The newest fuel report (max issueDate, tie-break highest serial id) is
-  the LIVE TRACKER: its `anchorDate` rolls FORWARD to the latest available CRUDE
-  close (`latestCrudeClose` = max date across Brent+WTI points) whenever that is
-  newer than its issue date — never backward. OLDER reports still anchor to their
-  own issue date (frozen historical as-of snapshots). **Why:** with the strict
-  issue-date anchor, the single prod fuel report (issue_date 2026-05-31) was
-  permanently pinned to the 29 May close even though Yahoo/FRED ran to June; the
-  client treats the one fuel report as a live tracker and (by their own words,
-  "when the market closes that should be the last date") wants the LATEST close.
-  This does NOT re-create the old period/price MISMATCH the warning below guards
-  against, because the render period is derived from the SAME hardNumbers — Fast
-  Facts, MARKET READ prose (`buildFuelMarketRead`, computed from the cards at
-  render), jet trajectory and cover/period all move together. Issue_date is NOT
-  mutated; only the anchor used for the price build advances.
+- EXACT-REPORT LIVE ASSEMBLY (current rule): whichever Fuel report the owner
+  opens or exports is hydrated by its exact report identity into a rolling
+  seven-day issue ending today. Never identify the "live" report by highest
+  serial id. Every report on the current issue date receives the current IATA
+  benchmark; genuinely older reports may remain historical snapshots.
+  **Why:** production report 101 exported stale FRED data while report 105 alone
+  received IATA because highest-id selection silently made report identity decide
+  data freshness.
+  **How to apply:** preview and PDF must use the same fail-closed assembled
+  object. Re-fetch the exact selected report and current market/development
+  inputs; never fall back to persisted or cached page state while assembly is
+  pending or failed.
   Cover date, REPORTING PERIOD label, Fast Facts asOf, jet chart latest, and the
   incident window ALL flow from this one date (`renderIssueDate` in
   ReportPreview.tsx + exportTopicReportPdf.ts; `resolveFuelPeriodEnd` in the
@@ -119,13 +115,15 @@ incident-only, so there was nothing fabricated to replace there.
   the current IATA row nor later Saudi/Yanbu Fuel evidence was written.
   **How to apply:** current-day Fuel work must complete before unrelated,
   long-running feeds; never make its freshness depend on the whole chain ending.
-- LIVE EDITOR OVERLAY: a draft Fuel report must overlay the live `market_prices`
-  rows even when it already has persisted `hard_numbers`; wait for those rows
-  before resolving the report period.
+- LIVE EDITOR/PDF OVERLAY: every selected Fuel report must overlay live market
+  rows even when it already has persisted hard numbers; wait for those rows
+  before resolving the rolling seven-day period.
   **Why:** persisted FRED values otherwise outranked a newer IATA snapshot and
   kept the PDF on the old seven-day window after the ingest had been corrected.
-  **How to apply:** preserve non-market hard-number fields, replace the three
-  price cards and jet trajectory, then derive preview/PDF period from that result.
+  **How to apply:** replace the three price cards and jet trajectory from one
+  canonical assembly. Jet headline and trajectory must share source and unit;
+  block preview/export when today's date, rolling-window dates, source/unit
+  parity, or IATA-over-FRED precedence fails.
 - HORIZON TRAP: the FRED fetch window must reach back to the OLDEST fuel
   report's issue date (with buffer for the prior-week change line + the weekly
   jet trajectory), NOT a fixed recent window — a fixed window silently skips

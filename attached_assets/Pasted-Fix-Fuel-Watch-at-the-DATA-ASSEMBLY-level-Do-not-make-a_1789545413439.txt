@@ -1,0 +1,98 @@
+Fix Fuel Watch at the DATA ASSEMBLY level. Do not make another cosmetic PDF or frontend-only fix.
+
+ROOT CAUSE
+The selected Fuel report can contain a stale persisted market snapshot. Production report 101 still contains the old EIA/FRED Jet Fuel payload, while the current ingestion logic updates only the newest Fuel report (report 105). The PDF is therefore correctly exporting stale report data.
+
+REQUIRED ARCHITECTURE
+
+1. Create one canonical function to assemble/hydrate a Fuel Watch report by exact reportId.
+
+2. That function must be used by BOTH:
+   - Report Editor / preview
+   - PDF export
+
+3. The canonical assembled object must:
+   - load the selected report by exact reportId;
+   - set reportingPeriodEnd to today;
+   - set reportingPeriodStart to today minus 6 days;
+   - fetch current Brent, WTI and Jet Fuel benchmark data;
+   - overlay current market benchmarks onto the report;
+   - fetch Fuel developments for that same rolling seven-day period;
+   - rebuild Fast Facts and Jet Fuel trajectory from the same market source.
+
+4. JET FUEL RULE
+Use the current IATA / S&P Global Platts benchmark as the authoritative Jet Fuel headline when it is newer than FRED.
+
+Current required value:
+181.46 USD/bbl
++6.1% week-on-week
+16 September 2026
+Source: IATA / S&P Global Platts
+
+FRED must NEVER overwrite a newer IATA value.
+
+5. TRAJECTORY RULE
+The Jet Fuel trajectory must use:
+   - the same IATA source as the headline;
+   - the same USD/bbl unit;
+   - dates covering the current reporting window.
+
+Do not display a U.S. Gulf Coast FRED USD/gal trajectory underneath an IATA USD/bbl headline.
+
+6. REMOVE THIS BUG
+Remove any logic that updates or hydrates only the "newest Fuel report".
+
+Market data must be hydrated for whichever reportId the user actually opens or exports.
+
+7. PRODUCTION MARKET DATA
+Refresh the production market_prices Jet Fuel record so it is no longer:
+4.34 USD/gal
+9 September 2026
+EIA/FRED
+
+The current production record must contain the IATA benchmark above.
+
+8. PDF EXPORT
+At Download click:
+   - fetch the selected report again by exact reportId;
+   - run it through the canonical Fuel hydration function;
+   - export that returned object directly;
+   - do not use cached React/page state or the original persisted market snapshot.
+
+9. HARD VALIDATION BEFORE PDF CREATION
+Abort export with an explicit error if any of these are false:
+   - reportingPeriodEnd == today
+   - reportingPeriodStart == today - 6 days
+   - Jet Fuel benchmark date is current
+   - Jet Fuel headline and trajectory use the same source
+   - Jet Fuel headline and trajectory use the same unit
+   - a newer IATA value has not been replaced by older FRED data
+
+10. VERIFY THE ACTUAL OUTPUT
+Do not report this as fixed after typecheck/build.
+
+Publish it, generate the actual production Fuel Watch PDF for the selected report, and verify the PDF itself contains:
+
+REPORTING PERIOD:
+10 September 2026 - 16 September 2026
+
+JET FUEL:
+181.46 USD/bbl
++6.1%
+IATA / S&P Global Platts
+16 September 2026
+
+TRAJECTORY:
+IATA
+USD/bbl
+current reporting period
+
+And confirm the Saudi East-West Pipeline / Yanbu / cancelled European cargo developments appear in the reporting window.
+
+If the actual production PDF still contains:
+8-14 September
+4.340 USD/gal
+EIA/FRED
+or "U.S. Gulf Coast kerosene-type jet fuel"
+
+then the task has FAILED.

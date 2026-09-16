@@ -262,17 +262,16 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   let latestIssue = "";
 
   // Sort newest issue date first so `latest` reflects the most recent report.
-  // Tie-break on id (serial, so highest = most recently created) to keep the
-  // "live report" selection deterministic when several share an issue date.
+  // The id tie-break is only for deterministic logging; it must never decide
+  // which report receives current-date market data.
   const sorted = [...fuelReports].sort((a, b) => {
     const byDate = (b.issueDate ?? "").localeCompare(a.issueDate ?? "");
     return byDate !== 0 ? byDate : Number(b.id) - Number(a.id);
   });
 
   // Every report on the latest issue date is a current Fuel Watch issue. Several
-  // drafts can legitimately share that date, so selecting only the highest id
-  // leaves the others on stale FRED jet data. Current-date reports all receive
-  // the current IATA benchmark; genuinely older issues remain historical.
+  // drafts can legitimately share that date, so all of them receive the
+  // current IATA benchmark; genuinely older issues remain historical.
   const latestIssueDate = sorted[0]?.issueDate;
   const crudeDates = [...brent.points, ...wti.points].map((p) => p.date);
   const latestCrudeClose = crudeDates.length
@@ -289,11 +288,11 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
     // earlier), and the workbench reads these same dates back out of
     // hardNumbers to drive the cover/period, the Fast Facts and the jet chart,
     // so cover, prices, market-read prose and the jet chart can never disagree.
-    const isLive = Boolean(
+    const isCurrentIssue = Boolean(
       latestIssueDate && r.issueDate === latestIssueDate,
     );
     const anchorDate =
-      isLive && latestCrudeClose && latestCrudeClose > issueDate
+      isCurrentIssue && latestCrudeClose && latestCrudeClose > issueDate
         ? latestCrudeClose
         : issueDate;
     const built = buildHardNumbers(
@@ -301,7 +300,7 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
       brent,
       wti,
       jet,
-      isLive && jetHeadline.points.length > 0 ? jetHeadline : undefined,
+      isCurrentIssue && jetHeadline.points.length > 0 ? jetHeadline : undefined,
     );
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);
