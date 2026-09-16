@@ -113,6 +113,19 @@ incident-only, so there was nothing fabricated to replace there.
   Mozilla-prefixed UA (curl TLS fingerprint), but Node fetch — the actual ingest
   path — succeeds with the same UA. Manual dev refresh:
   `pnpm --filter @workspace/scripts run scrape:prices --commit`.
+- FORCED-BOOT ORDER: run the small price refresh before the long forced full
+  ingest, and run Fuel news before Cargo in that full chain.
+  **Why:** production's forced ingest was terminated during Cargo, so neither
+  the current IATA row nor later Saudi/Yanbu Fuel evidence was written.
+  **How to apply:** current-day Fuel work must complete before unrelated,
+  long-running feeds; never make its freshness depend on the whole chain ending.
+- LIVE EDITOR OVERLAY: a draft Fuel report must overlay the live `market_prices`
+  rows even when it already has persisted `hard_numbers`; wait for those rows
+  before resolving the report period.
+  **Why:** persisted FRED values otherwise outranked a newer IATA snapshot and
+  kept the PDF on the old seven-day window after the ingest had been corrected.
+  **How to apply:** preserve non-market hard-number fields, replace the three
+  price cards and jet trajectory, then derive preview/PDF period from that result.
 - HORIZON TRAP: the FRED fetch window must reach back to the OLDEST fuel
   report's issue date (with buffer for the prior-week change line + the weekly
   jet trajectory), NOT a fixed recent window — a fixed window silently skips

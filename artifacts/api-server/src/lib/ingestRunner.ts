@@ -888,6 +888,14 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     // table; running them one after another mirrors scrape:prod. Each is isolated
     // in its own try so a DB or unexpected failure in one topic can never abort
     // the rest of the chain (mirrors strikes / market prices below).
+    // Fuel Watch is a same-day market product. Run its relatively small,
+    // targeted news pass before the longer topic chain so an autoscale
+    // termination later in the run cannot leave today's report on yesterday's
+    // evidence set (notably Saudi/Yanbu loading and cargo updates).
+    markIngestStage("runIncidentIngest:fuel");
+    const fuel = await runIncidentIngest("fuel", () =>
+      runFuelIngest({ commit: true }),
+    );
     markIngestStage("runIncidentIngest:cargo_watch");
     const cargoWatch = await runIncidentIngest("cargo_watch", () =>
       runCargoWatchIngest({ commit: true }),
@@ -903,10 +911,6 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     markIngestStage("runIncidentIngest:fertiliser");
     const fertiliser = await runIncidentIngest("fertiliser", () =>
       runFertiliserIngest({ commit: true }),
-    );
-    markIngestStage("runIncidentIngest:fuel");
-    const fuel = await runIncidentIngest("fuel", () =>
-      runFuelIngest({ commit: true }),
     );
     // Data-centre coverage — a world-scope market topic (operational disruption
     // + build-out / planning risk). Its analyst-maintained facility REGISTRY is

@@ -798,6 +798,10 @@ export function startIngestScheduler(): void {
               { forceVersion: INGEST_FORCE_VERSION },
               "boot ingest: forced run for new ingest version, refreshing now",
             );
+            // Fuel prices are fast and current-day critical. Refresh them before
+            // entering the long full-ingest worker so a later unrelated feed or
+            // autoscale termination cannot leave the live Fuel Watch card stale.
+            await priceTick("boot-forced-prices");
             const ran = await tick("boot-forced");
             if (ran) {
               // Only record the marker when a full ingest actually completed. A

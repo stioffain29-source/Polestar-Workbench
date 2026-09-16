@@ -216,6 +216,34 @@ function fuelHardNumbersFromMarketRows(
   };
 }
 
+function mergeFuelMarketHardNumbers(
+  persisted: unknown,
+  liveMarket: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!liveMarket) {
+    return persisted && typeof persisted === "object"
+      ? (persisted as Record<string, unknown>)
+      : null;
+  }
+  const base =
+    persisted && typeof persisted === "object"
+      ? (persisted as Record<string, unknown>)
+      : {};
+  const baseFastFacts =
+    base.fastFacts && typeof base.fastFacts === "object"
+      ? (base.fastFacts as Record<string, unknown>)
+      : {};
+  const liveFastFacts =
+    liveMarket.fastFacts && typeof liveMarket.fastFacts === "object"
+      ? (liveMarket.fastFacts as Record<string, unknown>)
+      : {};
+  return {
+    ...base,
+    ...liveMarket,
+    fastFacts: { ...baseFastFacts, ...liveFastFacts },
+  };
+}
+
 function readLegacyExecSummary(id: number): string {
   try {
     return typeof window !== "undefined" && window.localStorage
@@ -1658,6 +1686,10 @@ export default function ReportEditor() {
     // Wait until incidents have loaded before seeding so the draft prose is
     // built from the actual window. Seed exactly once per report id.
     if (!incidents) return;
+    // Fuel's living draft must not choose its period from a stale persisted
+    // price payload. Wait for the live snapshot, then use that same market
+    // payload for the period end and the seven-day incident window.
+    if (report.topic === "fuel" && !marketPricesFetched) return;
     if (seededForId.current === report.id) return;
     const savedExec =
       (report.executiveSummary ?? "").trim()
@@ -1678,6 +1710,17 @@ export default function ReportEditor() {
     const isDraft = (report.status ?? "draft") === "draft";
     const draftAdvanced = isDraft && storedIssueDate < today;
     const renderIssueDate = draftAdvanced ? today : storedIssueDate;
+    const liveFuelMarket =
+      topic === "fuel" && isDraft
+        ? fuelHardNumbersFromMarketRows(
+            marketPriceRows as FuelSnapshotRow[],
+            renderIssueDate,
+          )
+        : null;
+    const effectiveFuelHardNumbers =
+      topic === "fuel"
+        ? mergeFuelMarketHardNumbers(report.hardNumbers, liveFuelMarket)
+        : report.hardNumbers;
     // Option A: never date a report past the latest real record for its data
     // topic. Topics with a live feed (flashpoint/protests) stay on the current
     // date; static/import-only topics (fuel/shipping/cargo/etc.) clamp back to
@@ -1695,7 +1738,7 @@ export default function ReportEditor() {
       topic === "fuel"
         ? resolveFuelPeriodEnd(
             renderIssueDate,
-            report.hardNumbers,
+            effectiveFuelHardNumbers,
             incidents ?? [],
           )
         : clampIssueDateToLatestRecord(
@@ -1706,7 +1749,7 @@ export default function ReportEditor() {
     const seedFuelBasis =
       topic === "fuel"
         ? buildFuelWatchReportData(
-            { issueDate, hardNumbers: report.hardNumbers },
+            { issueDate, hardNumbers: effectiveFuelHardNumbers },
             incidents ?? [],
           ).generationBasisFingerprint
         : null;
@@ -1940,7 +1983,7 @@ export default function ReportEditor() {
     // permanently trapped the editor behind its loading screen.
     seededForId.current = report.id;
     setSeededId(report.id);
-  }, [report, incidents]);
+  }, [report, incidents, marketPriceRows, marketPricesFetched]);
 
   // Reset the seed guard if the route id changes.
   useEffect(() => {
@@ -1989,12 +2032,15 @@ export default function ReportEditor() {
     if (!report) return;
     if (hardNumbersSeededForId.current === report.id) return;
     const hasPersisted = report.hardNumbers != null;
-    if (report.topic === "fuel" && !hasPersisted && !marketPricesFetched) return;
+    if (report.topic === "fuel" && !marketPricesFetched) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const isLiveFuel =
+      report.topic === "fuel" && (report.status ?? "draft") === "draft";
     const recovered =
-      report.topic === "fuel" && !hasPersisted
+      isLiveFuel
         ? fuelHardNumbersFromMarketRows(
             marketPriceRows as FuelSnapshotRow[],
-            report.issueDate ?? new Date().toISOString().slice(0, 10),
+            today,
           )
         : null;
     hardNumbersSeededForId.current = report.id;
@@ -2003,17 +2049,22 @@ export default function ReportEditor() {
     // FRED market-price ingest (lib/ingest/marketPrices). A report with no
     // saved data renders empty market fields rather than fake numbers; the
     // author can still click "Load sample" to populate a template explicitly.
-    const effectiveHardNumbers = hasPersisted
-      ? report.hardNumbers
-      : recovered;
+    const effectiveHardNumbers =
+      report.topic === "fuel"
+        ? mergeFuelMarketHardNumbers(report.hardNumbers, recovered)
+        : hasPersisted
+          ? (report.hardNumbers as Record<string, unknown>)
+          : recovered;
     setHardNumbersText(
       effectiveHardNumbers ? JSON.stringify(effectiveHardNumbers, null, 2) : "",
     );
     setHardNumbersError(null);
-    setHardNumbersEdited(recovered ?? undefined);
+    setHardNumbersEdited(
+      isLiveFuel && recovered ? effectiveHardNumbers ?? undefined : recovered ?? undefined,
+    );
     const seeded = buildFuelWatchReportData(
       {
-        issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
+        issueDate: isLiveFuel ? today : report.issueDate ?? today,
         hardNumbers: effectiveHardNumbers,
       },
       [],
