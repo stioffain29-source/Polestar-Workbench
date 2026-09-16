@@ -1771,6 +1771,94 @@ function drawPolestarPanel(
   ctx.y = y + h + 18;
 }
 
+
+function drawMonthlyIncidentRegister(ctx: Ctx, presentation: ShippingSevenPagePresentation) {
+  const { pdf, MX, CW } = ctx;
+  const rows = presentation.register.rows;
+  if (rows.length === 0) return;
+
+  const rowH = 20;
+  const colDate = 35;
+  const colLoc = 50;
+  const colCountry = 50;
+  const colCat = 50;
+  const colConf = 40;
+
+  const colIncident = (CW - colDate - colLoc - colCountry - colCat - colConf) * 0.55;
+  const colOpRel = (CW - colDate - colLoc - colCountry - colCat - colConf) * 0.45;
+
+  const drawHeader = () => {
+    setFill(pdf, NAVY);
+    pdf.rect(MX, ctx.y, CW, rowH, "F");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y, MX + CW, ctx.y);
+    pdf.line(MX, ctx.y, MX, ctx.y + rowH);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rowH);
+    setText(pdf, WHITE);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(6);
+
+    let x = MX + 4;
+    pdf.text("DATE", x, ctx.y + 12); x += colDate;
+    pdf.text("LOCATION", x, ctx.y + 12); x += colLoc;
+    pdf.text("COUNTRY", x, ctx.y + 12); x += colCountry;
+    pdf.text("CATEGORY", x, ctx.y + 12); x += colCat;
+    pdf.text("INCIDENT", x, ctx.y + 12); x += colIncident;
+    pdf.text("OPERATIONAL RELEVANCE", x, ctx.y + 12); x += colOpRel;
+    pdf.text("CONFIDENCE", x, ctx.y + 12);
+    ctx.y += rowH;
+  };
+
+  drawHeader();
+
+  for (const r of rows) {
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(7);
+
+    const locLines = pdf.splitTextToSize(sanitize(r.physicalLocation || "—"), colLoc - 6);
+    const ctryLines = pdf.splitTextToSize(sanitize(r.country || "—"), colCountry - 6);
+    const catLines = pdf.splitTextToSize(sanitize(r.type || "—"), colCat - 6);
+    const incLines = pdf.splitTextToSize(sanitize(r.title || "—"), colIncident - 6);
+    const opLines = pdf.splitTextToSize(sanitize(r.summary || "—"), colOpRel - 6);
+
+    const maxLines = Math.max(locLines.length, ctryLines.length, catLines.length, incLines.length, opLines.length);
+    const rh = Math.max(rowH, maxLines * 10 + 8);
+
+    if (ctx.y + rh > ctx.H - ctx.BOTTOM) {
+      newPage(ctx);
+      drawHeader();
+      setRoboto(pdf, "regular");
+      pdf.setFontSize(7);
+    }
+
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.6);
+    pdf.line(MX, ctx.y + rh, MX + CW, ctx.y + rh);
+    pdf.line(MX, ctx.y, MX, ctx.y + rh);
+    pdf.line(MX + CW, ctx.y, MX + CW, ctx.y + rh);
+
+    setText(pdf, DUSK);
+    const textOpts = { lineHeightFactor: 1.4 };
+
+    let x = MX + 4;
+    pdf.text(format(r.date, "dd MMM"), x, ctx.y + 12, textOpts); x += colDate;
+    pdf.text(locLines, x, ctx.y + 12, textOpts); x += colLoc;
+    pdf.text(ctryLines, x, ctx.y + 12, textOpts); x += colCountry;
+    pdf.text(catLines, x, ctx.y + 12, textOpts); x += colCat;
+
+    setText(pdf, NAVY);
+    pdf.text(incLines, x, ctx.y + 12, textOpts); x += colIncident;
+
+    setText(pdf, DUSK);
+    pdf.text(opLines, x, ctx.y + 12, textOpts); x += colOpRel;
+    pdf.text("High", x, ctx.y + 12, textOpts);
+
+    ctx.y += rh;
+  }
+}
+
+
 function drawRelatedRegistry(
   ctx: Ctx,
   presentation: ShippingSevenPagePresentation,
@@ -1916,7 +2004,7 @@ export async function exportShippingReportPdf(
   }
   drawPolestarCover(ctx, {
     title: resolvedTitle,
-    subtitle: "POLESTAR INSIGHTS",
+    subtitle: "MONTHLY MARITIME SECURITY & OPERATIONAL RISK ASSESSMENT",
     // win.label is just the date range. The cover renderer expects the
     // full "REPORTING PERIOD: ..." string — every caller prepends its own
     // prefix so the label never reads twice.
@@ -1932,59 +2020,117 @@ export async function exportShippingReportPdf(
   // an eighth page for long analyst prose.
   beginBodyPages(ctx);
 
-  // PAGE 2 — Fast Facts, BLUF, useful coordinate-true regional map.
-  const showSituation =
-    show("maritime-intelligence") ||
-    show("executive-summary") ||
-    show("fast-facts");
-  if (showSituation) {
-    drawInteriorTitle(ctx, "Maritime Situation");
-    if (show("fast-facts")) drawFiveFastFacts(ctx, publication);
-    if (show("executive-summary")) drawBlufPanel(ctx, publication.prose.executiveSummary);
-    if (show("maritime-intelligence")) drawShippingRegionalMap(ctx, presentation);
+  const writeKpi = (label: string, value: string, note: string, x: number, y: number) => {
+    ctx.pdf.setFontSize(8);
+    setRoboto(ctx.pdf, "bold");
+    setText(ctx.pdf, DUSK);
+    ctx.pdf.text(label.toUpperCase(), x, y);
+    ctx.pdf.setFontSize(18);
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.text(value, x, y + 20);
+    ctx.pdf.setFontSize(8);
+    setRoboto(ctx.pdf, "regular");
+    setText(ctx.pdf, DUSK);
+    ctx.pdf.text(note, x, y + 32);
+  };
+
+  // PAGE 1 — Monthly Executive Assessment
+  startInteriorPage(ctx, "Monthly Executive Assessment");
+
+  ensureSpace(ctx, 60);
+  drawSectionHeading(ctx, "Indicators");
+  const y = ctx.y;
+  writeKpi("Vessel Security", publication.prose.vesselSecurityAssessment, publication.prose.vesselSecurityTrend, ctx.MX, y + 15);
+  writeKpi("Piracy / Armed Robbery", publication.prose.piracyAssessment, publication.prose.piracyTrend, ctx.MX + 150, y + 15);
+  writeKpi("Ports & Terminals", publication.prose.portsTerminalsAssessment, publication.prose.portsTerminalsTrend, ctx.MX + 300, y + 15);
+  ctx.y += 60;
+
+  ensureSpace(ctx, 60);
+  writeKpi("Key Routes / Chokepoints", publication.prose.routesChokepointsAssessment, publication.prose.routesChokepointsTrend, ctx.MX, ctx.y + 15);
+  writeKpi("Commercial Disruption", publication.prose.commercialDisruptionAssessment, publication.prose.commercialDisruptionTrend, ctx.MX + 150, ctx.y + 15);
+  ctx.y += 60;
+
+  drawSectionHeading(ctx, "Bottom Line Up Front");
+  renderProse(ctx, publication.prose.executiveSummary);
+
+  drawSectionHeading(ctx, "Key Judgements");
+  renderProse(ctx, publication.prose.keyJudgements);
+
+
+  // PAGE 2 — Regional Maritime Security Picture
+  startInteriorPage(ctx, "Regional Maritime Security Picture");
+  drawSectionHeading(ctx, "Regional Picture");
+  renderProse(ctx, publication.prose.regionalCountryRead);
+  drawSectionHeading(ctx, "Active Map");
+  drawShippingRegionalMap(ctx, presentation);
+
+  // PAGE 3 — Threat Trends
+  startInteriorPage(ctx, "Threat Trends");
+  drawSectionHeading(ctx, "Monthly Trends");
+  if (publication.dataset.threatTrends && publication.dataset.threatTrends.length > 0) {
+    for (const t of publication.dataset.threatTrends) {
+      ensureSpace(ctx, 50);
+      setRoboto(ctx.pdf, "bold");
+      ctx.pdf.setFontSize(11);
+      setText(ctx.pdf, NAVY);
+      ctx.pdf.text(t.category, ctx.MX, ctx.y);
+      ctx.y += 15;
+
+      setRoboto(ctx.pdf, "regular");
+      ctx.pdf.setFontSize(9);
+      setText(ctx.pdf, DUSK);
+      ctx.pdf.text(`Current month: ${t.currentMonth}`, ctx.MX, ctx.y);
+      ctx.pdf.text(`Previous month: ${t.previousMonth !== null ? t.previousMonth : "—"}`, ctx.MX + 120, ctx.y);
+      ctx.pdf.text(`3-month average: ${t.threeMonthAverage !== null ? t.threeMonthAverage : "—"}`, ctx.MX + 260, ctx.y);
+      ctx.pdf.text(`Trend: ${t.trend !== null ? t.trend : "—"}`, ctx.MX + 400, ctx.y);
+      ctx.y += 20;
+    }
+  } else {
+    renderProse(ctx, "Trend data is unavailable for this reporting period.");
   }
 
-  // PAGE 3 — one seven-route chokepoint matrix.
-  if (show("chokepoint-route")) {
-    startInteriorPage(ctx, "Chokepoint Watch");
-    drawChokepointMatrix(ctx, presentation);
+
+  // PAGE 4 — Routes & Ports to Watch
+  startInteriorPage(ctx, "Routes & Ports to Watch");
+  drawSectionHeading(ctx, "Dynamic Routes and Ports");
+  renderProse(ctx, publication.prose.routesAndPortsRead);
+
+  // PAGE 5 — Commercial & Operational Impact
+  startInteriorPage(ctx, "Commercial & Operational Impact");
+  drawSectionHeading(ctx, "Commercial Signal");
+  renderProse(ctx, publication.prose.commercialImpactRead);
+
+  // PAGE 6 — Polestar View
+  startInteriorPage(ctx, "Polestar View — Next 30 Days");
+  drawSectionHeading(ctx, "Strategic Picture");
+  renderProse(ctx, publication.prose.polestarView);
+  drawSectionHeading(ctx, "Outlook — Next 30 Days");
+  renderProse(ctx, publication.prose.polestarOutlookRead);
+  drawSectionHeading(ctx, "Watch Indicators");
+  renderProse(ctx, publication.prose.polestarWatchIndicators);
+  drawSectionHeading(ctx, "Escalation Triggers");
+  renderProse(ctx, publication.prose.polestarEscalationTriggers);
+
+  // PAGE 7 — Monthly Incident Register
+  startInteriorPage(ctx, "Monthly Incident Register");
+  drawSectionHeading(ctx, "Incident Register");
+  const rm = publication.dataset.registerMetrics;
+  if (rm) {
+    setRoboto(ctx.pdf, "bold");
+    ctx.pdf.setFontSize(9);
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.text(`TOTAL MATERIAL INCIDENTS THIS MONTH: ${rm.currentMonth}`, ctx.MX, ctx.y);
+    if (rm.previousMonth !== null) {
+      ctx.pdf.text(`PREVIOUS MONTH: ${rm.previousMonth}`, ctx.MX + 240, ctx.y);
+    }
+    if (rm.threeMonthAverage !== null) {
+      ctx.pdf.text(`3-MONTH AVERAGE: ${rm.threeMonthAverage}`, ctx.MX + 360, ctx.y);
+    }
+    ctx.y += 20;
   }
 
-  // PAGE 4 — threat timeline, separate piracy read, AIS context only.
-  if (show("vessel-piracy") || show("maritime-security")) {
-    startInteriorPage(ctx, "Threat Picture");
-    drawThreatPicture(ctx, presentation, {
-      vessel: show("vessel-piracy"),
-      piracy: show("maritime-security"),
-    });
-  }
-
-  // PAGE 5 — commercial consequences and both charts on the same page.
-  if (show("commercial-impact") || show("regional")) {
-    startInteriorPage(ctx, "Commercial and Regional Impact");
-    drawCommercialAndRegional(ctx, publication, presentation, {
-      commercial: show("commercial-impact"),
-      regional: show("regional"),
-    });
-  }
-
-  // PAGE 6 — the analytical judgement and client-facing actions.
-  if (show("what-matters") || show("implications") || show("watch-next")) {
-    startInteriorPage(ctx, "What Matters");
-    drawAnalysisPage(ctx, publication, {
-      whatMatters: show("what-matters"),
-      implications: show("implications"),
-      watchNext: show("watch-next"),
-    });
-  }
-
-  // PAGE 7 — prominent Polestar judgement, compact registry, shallow footer.
-  if (show("polestar-view") || show("related-incidents")) {
-    startInteriorPage(ctx, "Polestar View and Related Incidents");
-    if (show("polestar-view")) drawPolestarPanel(ctx, publication);
-    if (show("related-incidents")) drawRelatedRegistry(ctx, presentation);
-    drawShallowDisclaimerFooter9pt(ctx);
-  }
+  drawMonthlyIncidentRegister(ctx, presentation);
+  drawShallowDisclaimerFooter9pt(ctx);
 
   drawFooters(ctx.pdf, undefined, undefined, true);
   ctx.pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);

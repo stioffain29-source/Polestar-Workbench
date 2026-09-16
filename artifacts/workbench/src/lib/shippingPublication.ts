@@ -164,6 +164,23 @@ export interface ShippingPublicationReport {
   maritimeSecurityRead?: string | null;
   commercialImpactRead?: string | null;
   regionalCountryRead?: string | null;
+
+  // Monthly Redesign
+  vesselSecurityAssessment?: string | null;
+  vesselSecurityTrend?: string | null;
+  piracyAssessment?: string | null;
+  piracyTrend?: string | null;
+  portsTerminalsAssessment?: string | null;
+  portsTerminalsTrend?: string | null;
+  routesChokepointsAssessment?: string | null;
+  routesChokepointsTrend?: string | null;
+  commercialDisruptionAssessment?: string | null;
+  commercialDisruptionTrend?: string | null;
+  keyJudgements?: string | null;
+  routesAndPortsRead?: string | null;
+  polestarOutlookRead?: string | null;
+  polestarWatchIndicators?: string | null;
+  polestarEscalationTriggers?: string | null;
 }
 
 export interface ShippingPublicationOptions {
@@ -197,6 +214,22 @@ export interface ShippingPublicationProse {
   implications: string;
   watchNext: string;
   polestarView: string;
+
+  vesselSecurityAssessment: string;
+  vesselSecurityTrend: string;
+  piracyAssessment: string;
+  piracyTrend: string;
+  portsTerminalsAssessment: string;
+  portsTerminalsTrend: string;
+  routesChokepointsAssessment: string;
+  routesChokepointsTrend: string;
+  commercialDisruptionAssessment: string;
+  commercialDisruptionTrend: string;
+  keyJudgements: string;
+  routesAndPortsRead: string;
+  polestarOutlookRead: string;
+  polestarWatchIndicators: string;
+  polestarEscalationTriggers: string;
 }
 
 export interface ShippingPublicationTables {
@@ -244,6 +277,7 @@ const WATCH_NEXT_UNCERTAINTY_CODES = new Set([
 const ADVISORY_PROSE_CODES = new Set([
   "UNSUPPORTED_PROSE_ASSERTION",
   "GENERIC_CROSS_SECTION_REPETITION",
+  "DUPLICATE_INCIDENT_RETELLING",
 ]);
 
 function isWatchNextSection(section: string | undefined): boolean {
@@ -586,6 +620,22 @@ function safeDeterministicProse(
       `${completeness.complete ? `Polestar assesses overall maritime risk as ${risk}.` : "Polestar's overall maritime risk assessment is pending because coverage is incomplete."} ` +
       `The highest individual incident severity is ${highest}, a separate assessment from overall risk. ` +
       `Priority remains ${place}; the assessment would change if a new ${event} or route disruption were reported.`,
+
+    vesselSecurityAssessment: "Insignificant",
+    vesselSecurityTrend: "→",
+    piracyAssessment: "Insignificant",
+    piracyTrend: "→",
+    portsTerminalsAssessment: "Insignificant",
+    portsTerminalsTrend: "→",
+    routesChokepointsAssessment: "Insignificant",
+    routesChokepointsTrend: "→",
+    commercialDisruptionAssessment: "Insignificant",
+    commercialDisruptionTrend: "→",
+    keyJudgements: "",
+    routesAndPortsRead: "",
+    polestarOutlookRead: "",
+    polestarWatchIndicators: "",
+    polestarEscalationTriggers: "",
   };
 }
 
@@ -1254,7 +1304,20 @@ function validateProse(
   board: MaritimeIntelligence,
   issues: ShippingPublicationIssue[],
 ): void {
-  const sections = Object.entries(prose) as Array<[keyof ShippingPublicationProse, string]>;
+  // Validate the monthly product's rendered narrative only. The legacy weekly
+  // fields remain on the stored report for backward compatibility, but they
+  // are no longer visible and must not block the redesigned PDF.
+  const sections: Array<[keyof ShippingPublicationProse, string]> = [
+    ["executiveSummary", prose.executiveSummary],
+    ["keyJudgements", prose.keyJudgements],
+    ["regionalCountryRead", prose.regionalCountryRead],
+    ["routesAndPortsRead", prose.routesAndPortsRead],
+    ["commercialImpactRead", prose.commercialImpactRead],
+    ["polestarView", prose.polestarView],
+    ["polestarOutlookRead", prose.polestarOutlookRead],
+    ["polestarWatchIndicators", prose.polestarWatchIndicators],
+    ["polestarEscalationTriggers", prose.polestarEscalationTriggers],
+  ];
   const references = referencesFor(dataset, board);
   const allText = sections.map(([, text]) => text).join("\n");
   const canonicalTitles = dataset.canonicalIncidents
@@ -1863,6 +1926,31 @@ export function finalizeShippingPublication(
     implications: resolveNarrative("implications", deterministic.implications),
     watchNext: resolveNarrative("watchNext", deterministic.watchNext),
     polestarView: resolveNarrative("polestarView", deterministic.polestarView),
+
+    vesselSecurityAssessment: trim(report.vesselSecurityAssessment) || "Insignificant",
+    vesselSecurityTrend: trim(report.vesselSecurityTrend) || "→",
+    piracyAssessment: trim(report.piracyAssessment) || "Insignificant",
+    piracyTrend: trim(report.piracyTrend) || "→",
+    portsTerminalsAssessment: trim(report.portsTerminalsAssessment) || "Insignificant",
+    portsTerminalsTrend: trim(report.portsTerminalsTrend) || "→",
+    routesChokepointsAssessment: trim(report.routesChokepointsAssessment) || "Insignificant",
+    routesChokepointsTrend: trim(report.routesChokepointsTrend) || "→",
+    commercialDisruptionAssessment: trim(report.commercialDisruptionAssessment) || "Insignificant",
+    commercialDisruptionTrend: trim(report.commercialDisruptionTrend) || "→",
+
+    // Older Shipping reports predate these monthly fields. Seed them from the
+    // existing deterministic, evidence-grounded reads so the redesign remains
+    // complete and downloadable without inventing unsupported comparisons.
+    keyJudgements:
+      trim(report.keyJudgements) || deterministic.whatMatters,
+    routesAndPortsRead:
+      trim(report.routesAndPortsRead) || deterministic.chokepointRouteRead,
+    polestarOutlookRead:
+      trim(report.polestarOutlookRead) || deterministic.polestarView,
+    polestarWatchIndicators:
+      trim(report.polestarWatchIndicators) || deterministic.watchNext,
+    polestarEscalationTriggers:
+      trim(report.polestarEscalationTriggers) || deterministic.implications,
   };
   const summaries: Record<string, string> = {};
   // Summary generation and rendering are scoped to the final Related

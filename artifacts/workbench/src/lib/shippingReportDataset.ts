@@ -115,6 +115,14 @@ export interface ChokepointRow {
 
 export interface BarRow { label: string; value: number; color?: string }
 
+export interface ThreatTrendMetric {
+  category: string;
+  currentMonth: number;
+  previousMonth: number | null;
+  threeMonthAverage: number | null;
+  trend: "↑" | "→" | "↓" | null;
+}
+
 export interface ShippingReportDataset {
   reportingPeriodShort: string;
   reportingPeriodLong: string;
@@ -142,6 +150,12 @@ export interface ShippingReportDataset {
   regionRows: BarRow[];
   countryRows: BarRow[];
   commercialRows: EnrichedIncident[];
+  threatTrends: ThreatTrendMetric[];
+  registerMetrics: {
+    currentMonth: number;
+    previousMonth: number | null;
+    threeMonthAverage: number | null;
+  };
   /** Title of the single dominant chokepoint development in the window — the
    *  headline the report names up front (Executive Summary + Chokepoint Read).
    *  Null when no chokepoint-tied record sits in the window. */
@@ -755,6 +769,68 @@ export function buildShippingReportDataset(
   const canonicalIncidents = canonicalBuild.canonicalIncidents;
   const articleCount = canonicalBuild.articleCount;
 
+  // Calculate Threat Trends & Register Metrics
+  const minDateMs = incidents.reduce((min, i) => {
+    const d = new Date(i.occurredAt).getTime();
+    return !isNaN(d) && d < min ? d : min;
+  }, Infinity);
+
+  const prevStartMs = win.start.getTime() - win.days * 24 * 60 * 60 * 1000;
+  const prevEndMs = win.start.getTime() - 1;
+  const prevValid = minDateMs <= prevStartMs;
+
+  const threeMonthStartMs = win.start.getTime() - 3 * win.days * 24 * 60 * 60 * 1000;
+  const threeMonthValid = minDateMs <= threeMonthStartMs;
+
+  const prevIncidents = prevValid ? buildShippingCanonicalIncidents(incidents, topic, { start: new Date(prevStartMs), end: new Date(prevEndMs) }).canonicalIncidents : [];
+  const threeMonthIncidents = threeMonthValid ? buildShippingCanonicalIncidents(incidents, topic, { start: new Date(threeMonthStartMs), end: new Date(prevEndMs) }).canonicalIncidents : [];
+
+  const countCat = (rows: CanonicalIncident[], cat: string) => {
+    return rows.filter(r => {
+      const cls = semanticEventClass(r);
+      if (cat === "VESSEL ATTACKS / SEIZURES") return classifyVesselIncident(r) !== null || cls === "commercial_attack" || cls === "commercial_seizure";
+      if (cat === "PIRACY / ARMED ROBBERY") return classifyPiracy(r) !== null || cls === "piracy_or_armed_robbery";
+      if (cat === "PORT / TERMINAL SECURITY INCIDENTS") return cls === "port_disruption";
+      if (cat === "CARGO / LANDSIDE SECURITY") return r.issue?.toLowerCase().includes("cargo") || false;
+      if (cat === "NAVAL / STATE ACTIVITY AFFECTING COMMERCIAL SHIPPING") return cls === "naval_activity" || cls === "military_naval_activity" || cls === "military_exercise" || cls === "drone_activity";
+      return false;
+    }).length;
+  };
+
+  const getTrend = (current: number, prev: number | null): "↑" | "→" | "↓" | null => {
+    if (prev === null) return null;
+    if (current > prev) return "↑";
+    if (current < prev) return "↓";
+    return "→";
+  };
+
+  const categories = [
+    "VESSEL ATTACKS / SEIZURES",
+    "PIRACY / ARMED ROBBERY",
+    "PORT / TERMINAL SECURITY INCIDENTS",
+    "CARGO / LANDSIDE SECURITY",
+    "NAVAL / STATE ACTIVITY AFFECTING COMMERCIAL SHIPPING"
+  ];
+
+  const threatTrends: ThreatTrendMetric[] = categories.map(cat => {
+    const cur = countCat(canonicalIncidents, cat);
+    const p = prevValid ? countCat(prevIncidents, cat) : null;
+    const tm = threeMonthValid ? Math.round(countCat(threeMonthIncidents, cat) / 3 * 10) / 10 : null;
+    return {
+      category: cat,
+      currentMonth: cur,
+      previousMonth: p,
+      threeMonthAverage: tm,
+      trend: getTrend(cur, p)
+    };
+  });
+
+  const registerMetrics = {
+    currentMonth: canonicalIncidents.length,
+    previousMonth: prevValid ? prevIncidents.length : null,
+    threeMonthAverage: threeMonthValid ? Math.round(threeMonthIncidents.length / 3 * 10) / 10 : null
+  };
+
   // One final canonical set drives every report derivation. The historical
   // rolling re-query path is intentionally absent: the cover and every table
   // describe this same resolved report window.
@@ -1110,6 +1186,8 @@ export function buildShippingReportDataset(
     regionRows,
     countryRows,
     commercialRows: commercialRecords.map(toShippingPresentationIncident),
+    threatTrends,
+    registerMetrics,
     leadDevelopment: leadDevelopmentIncident
       ? describeShippingLead(leadDevelopmentIncident)
       : null,

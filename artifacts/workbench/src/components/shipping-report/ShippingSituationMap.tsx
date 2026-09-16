@@ -13,10 +13,14 @@ export function ShippingSituationMap({ chokepoints }: { chokepoints: Array<{ nam
     <g clipPath="url(#shipping-map-clip)">
       {SHIPPING_REGIONAL_GEO.features.map((feature, i) => <path key={i} d={featurePath(feature, project) || ""} fill="#e2e2e2" stroke="#fff" strokeWidth=".8" />)}
     </g>
+
     {SHIPPING_REGIONAL_MAP_POINTS.map((point, i) => {
       const route = chokepoints.find(cp => normal(cp.name) === normal(point.key));
-      const pending = !route || route.level == null || /pending/i.test(route.label);
+      const pending = !route || route.level == null || /pending/i.test(route.label) || route.label === "Not assessed";
+      if (pending) return null;
+
       const [x, y] = project(point.longitude, point.latitude);
+
       const [dx, dy] = SHIPPING_REGIONAL_MAP_LABEL_OFFSETS[i];
       const lx = Math.min(714, Math.max(65, x + dx));
       const ly = y + dy;

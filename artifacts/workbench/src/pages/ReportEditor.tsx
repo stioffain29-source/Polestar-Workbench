@@ -292,6 +292,22 @@ interface FormState {
   conflictOtherWatchedRead: string;
   conflictAreaReads: Record<string, string>;
   author: string;
+
+  vesselSecurityAssessment: string;
+  vesselSecurityTrend: string;
+  piracyAssessment: string;
+  piracyTrend: string;
+  portsTerminalsAssessment: string;
+  portsTerminalsTrend: string;
+  routesChokepointsAssessment: string;
+  routesChokepointsTrend: string;
+  commercialDisruptionAssessment: string;
+  commercialDisruptionTrend: string;
+  keyJudgements: string;
+  routesAndPortsRead: string;
+  polestarOutlookRead: string;
+  polestarWatchIndicators: string;
+  polestarEscalationTriggers: string;
 }
 
 const REPORT_PROSE_EDIT_KEYS = new Set<keyof FormState>([
@@ -317,6 +333,11 @@ const REPORT_PROSE_EDIT_KEYS = new Set<keyof FormState>([
   "fuelRegionalHighlights",
   "conflictOtherWatchedRead",
   "conflictAreaReads",
+  "keyJudgements",
+  "routesAndPortsRead",
+  "polestarOutlookRead",
+  "polestarWatchIndicators",
+  "polestarEscalationTriggers",
 ]);
 
 const EMPTY: FormState = {
@@ -348,6 +369,21 @@ const EMPTY: FormState = {
   conflictOtherWatchedRead: "",
   conflictAreaReads: {},
   author: "",
+  vesselSecurityAssessment: "",
+  vesselSecurityTrend: "",
+  piracyAssessment: "",
+  piracyTrend: "",
+  portsTerminalsAssessment: "",
+  portsTerminalsTrend: "",
+  routesChokepointsAssessment: "",
+  routesChokepointsTrend: "",
+  commercialDisruptionAssessment: "",
+  commercialDisruptionTrend: "",
+  keyJudgements: "",
+  routesAndPortsRead: "",
+  polestarOutlookRead: "",
+  polestarWatchIndicators: "",
+  polestarEscalationTriggers: "",
 };
 
 // Shipping's interior was redesigned around the seven-page reader journey.
@@ -359,19 +395,13 @@ const SHIPPING_EDITOR_SECTION_KEYS: ReadonlyArray<{
   key: string;
   label: string;
 }> = [
-  { key: "maritime-intelligence", label: "Maritime Situation Map" },
-  { key: "executive-summary", label: "BLUF" },
-  { key: "fast-facts", label: "Fast Facts" },
-  { key: "chokepoint-route", label: "Chokepoint Watch" },
-  { key: "vessel-piracy", label: "Threat Picture" },
-  { key: "maritime-security", label: "Piracy and Armed Robbery" },
-  { key: "commercial-impact", label: "Commercial Impact" },
+  { key: "executive-summary", label: "Monthly Executive Assessment" },
   { key: "regional", label: "Regional Picture" },
-  { key: "what-matters", label: "What Matters" },
-  { key: "implications", label: "Implications for Business" },
-  { key: "watch-next", label: "Watch Next" },
-  { key: "polestar-view", label: "Polestar View" },
-  { key: "related-incidents", label: "Related Incidents" },
+  { key: "threat-trends", label: "Threat Trends" },
+  { key: "routes-ports", label: "Routes & Ports to Watch" },
+  { key: "commercial-impact", label: "Commercial & Operational Impact" },
+  { key: "polestar-view", label: "Polestar View — Next 30 Days" },
+  { key: "related-incidents", label: "Monthly Incident Register" },
 ];
 
 const SEVERITY_ORDER: Record<string, number> = {
@@ -1870,13 +1900,33 @@ export default function ReportEditor() {
       maritimeSecurityRead: pick(report.maritimeSecurityRead, ""),
       cargoSecurityRead: pick(report.cargoSecurityRead, ""),
       logisticsHubRead: pick(report.logisticsHubRead, ""),
+
+
       fuelMarketRead: pick(report.fuelMarketRead, ""),
       fuelOperationalRead: pick(report.fuelOperationalRead, ""),
       fuelRegionalHighlights: pick(report.fuelRegionalHighlights, ""),
       conflictOtherWatchedRead: pick(report.conflictOtherWatchedRead, ""),
-      conflictAreaReads: proseIsStale ? {} : (report.conflictAreaReads ?? {}),
+      conflictAreaReads: (report.conflictAreaReads as Record<string, string>) || {},
       author: report.author ?? "",
+
+      vesselSecurityAssessment: (report as any).vesselSecurityAssessment ?? "",
+      vesselSecurityTrend: (report as any).vesselSecurityTrend ?? "",
+      piracyAssessment: (report as any).piracyAssessment ?? "",
+      piracyTrend: (report as any).piracyTrend ?? "",
+      portsTerminalsAssessment: (report as any).portsTerminalsAssessment ?? "",
+      portsTerminalsTrend: (report as any).portsTerminalsTrend ?? "",
+      routesChokepointsAssessment: (report as any).routesChokepointsAssessment ?? "",
+      routesChokepointsTrend: (report as any).routesChokepointsTrend ?? "",
+      commercialDisruptionAssessment: (report as any).commercialDisruptionAssessment ?? "",
+      commercialDisruptionTrend: (report as any).commercialDisruptionTrend ?? "",
+      keyJudgements: pick((report as any).keyJudgements, ""),
+      routesAndPortsRead: pick((report as any).routesAndPortsRead, ""),
+      polestarOutlookRead: pick((report as any).polestarOutlookRead, ""),
+      polestarWatchIndicators: pick((report as any).polestarWatchIndicators, ""),
+      polestarEscalationTriggers: pick((report as any).polestarEscalationTriggers, ""),
     });
+
+
     setSectionOverrides(
       (report.sectionOverrides as TopicSectionOverrides | null) ?? {},
     );
@@ -3181,38 +3231,175 @@ export default function ReportEditor() {
               SAVED-ONLY, so an empty field means "use the auto read". */}
           {form.topic === "shipping" && (
             <>
-              <Field label="Chokepoint Watch Read">
+              <div className="shipping-brand-section text-[11px] uppercase tracking-widest font-bold text-muted-foreground mt-4 mb-2">Monthly Executive Assessment</div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Vessel Security Assessment">
+                  <Select value={form.vesselSecurityAssessment} onValueChange={(v) => set("vesselSecurityAssessment", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Insignificant">Insignificant</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Moderate">Moderate</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Extreme">Extreme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Vessel Security Trend">
+                  <Select value={form.vesselSecurityTrend} onValueChange={(v) => set("vesselSecurityTrend", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="↑">↑ Deteriorating</SelectItem>
+                      <SelectItem value="→">→ Stable</SelectItem>
+                      <SelectItem value="↓">↓ Improving</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Piracy / Armed Robbery Assessment">
+                  <Select value={form.piracyAssessment} onValueChange={(v) => set("piracyAssessment", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Insignificant">Insignificant</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Moderate">Moderate</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Extreme">Extreme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Piracy / Armed Robbery Trend">
+                  <Select value={form.piracyTrend} onValueChange={(v) => set("piracyTrend", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="↑">↑ Deteriorating</SelectItem>
+                      <SelectItem value="→">→ Stable</SelectItem>
+                      <SelectItem value="↓">↓ Improving</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Ports & Terminals Assessment">
+                  <Select value={form.portsTerminalsAssessment} onValueChange={(v) => set("portsTerminalsAssessment", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Insignificant">Insignificant</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Moderate">Moderate</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Extreme">Extreme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Ports & Terminals Trend">
+                  <Select value={form.portsTerminalsTrend} onValueChange={(v) => set("portsTerminalsTrend", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="↑">↑ Deteriorating</SelectItem>
+                      <SelectItem value="→">→ Stable</SelectItem>
+                      <SelectItem value="↓">↓ Improving</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Routes & Chokepoints Assessment">
+                  <Select value={form.routesChokepointsAssessment} onValueChange={(v) => set("routesChokepointsAssessment", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Insignificant">Insignificant</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Moderate">Moderate</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Extreme">Extreme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Routes & Chokepoints Trend">
+                  <Select value={form.routesChokepointsTrend} onValueChange={(v) => set("routesChokepointsTrend", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="↑">↑ Deteriorating</SelectItem>
+                      <SelectItem value="→">→ Stable</SelectItem>
+                      <SelectItem value="↓">↓ Improving</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Commercial Disruption Assessment">
+                  <Select value={form.commercialDisruptionAssessment} onValueChange={(v) => set("commercialDisruptionAssessment", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Insignificant">Insignificant</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
+                      <SelectItem value="Moderate">Moderate</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Extreme">Extreme</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Commercial Disruption Trend">
+                  <Select value={form.commercialDisruptionTrend} onValueChange={(v) => set("commercialDisruptionTrend", v)}>
+                    <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="↑">↑ Deteriorating</SelectItem>
+                      <SelectItem value="→">→ Stable</SelectItem>
+                      <SelectItem value="↓">↓ Improving</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Key Judgements (Page 1)">
                 <Textarea
                   rows={5}
-                  value={form.chokepointRouteRead}
-                  onChange={(e) => set("chokepointRouteRead", e.target.value)}
+                  value={form.keyJudgements}
+                  onChange={(e) => set("keyJudgements", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Clear any read to restore the auto-generated text.
-                </p>
               </Field>
-              <Field label="Threat Picture Read">
+
+              <div className="shipping-brand-section text-[11px] uppercase tracking-widest font-bold text-muted-foreground mt-4 mb-2">Regional & Threat Picture</div>
+              <Field label="Regional Picture (Page 2)">
                 <Textarea
                   rows={5}
-                  value={form.vesselPiracyRead}
-                  onChange={(e) => set("vesselPiracyRead", e.target.value)}
+                  value={form.regionalCountryRead}
+                  onChange={(e) => set("regionalCountryRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
-              <Field label="Piracy and Armed Robbery Read">
+              <Field label="Routes & Ports to Watch (Page 4)">
                 <Textarea
                   rows={5}
-                  value={form.maritimeSecurityRead}
-                  onChange={(e) => set("maritimeSecurityRead", e.target.value)}
+                  value={form.routesAndPortsRead}
+                  onChange={(e) => set("routesAndPortsRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
-              <Field label="Commercial Impact Read">
+              <Field label="Commercial & Operational Impact (Page 5)">
                 <Textarea
                   rows={5}
                   value={form.commercialImpactRead}
                   onChange={(e) => set("commercialImpactRead", e.target.value)}
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
+                />
+              </Field>
+              <div className="shipping-brand-section text-[11px] uppercase tracking-widest font-bold text-muted-foreground mt-4 mb-2">Next 30 Days</div>
+              <Field label="Outlook — Next 30 Days (Page 6)">
+                <Textarea
+                  rows={5}
+                  value={form.polestarOutlookRead}
+                  onChange={(e) => set("polestarOutlookRead", e.target.value)}
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
+                />
+              </Field>
+              <Field label="Watch Indicators (Page 6)">
+                <Textarea
+                  rows={5}
+                  value={form.polestarWatchIndicators}
+                  onChange={(e) => set("polestarWatchIndicators", e.target.value)}
+                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
+                />
+              </Field>
+              <Field label="Escalation Triggers (Page 6)">
+                <Textarea
+                  rows={5}
+                  value={form.polestarEscalationTriggers}
+                  onChange={(e) => set("polestarEscalationTriggers", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>

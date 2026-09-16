@@ -12,7 +12,7 @@ export type Cadence = "weekly" | "monthly";
 // Fertiliser dashboard's 30-day scope instead of a 7-day slice. Conflict is a
 // WEEKLY product (per user): a 30-day window pulled in incidents from outside
 // the intended reporting week, so it stays out of this set.
-const MONTHLY_TOPICS = new Set<string>(["cargo_watch", "fertiliser"]);
+const MONTHLY_TOPICS = new Set<string>(["cargo_watch", "fertiliser", "shipping"]);
 
 export function reportCadence(topic: string): Cadence {
   return MONTHLY_TOPICS.has(topic) ? "monthly" : "weekly";

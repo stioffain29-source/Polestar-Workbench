@@ -5,6 +5,7 @@ import {
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
+import polestarLogoWhite from "@assets/Reverse_white_logo_hor_1779525768654.png";
 import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import type { TopicAiProse } from "@/lib/topicProseResolution";
@@ -100,7 +101,28 @@ export interface ShippingPreviewReport {
   whatMatters?: string | null;
   implications?: string | null;
   watchNext?: string | null;
-  polestarView?: string | null; chokepointRouteRead?: string | null; vesselPiracyRead?: string | null; commercialImpactRead?: string | null; maritimeSecurityRead?: string | null; regionalCountryRead?: string | null;
+  polestarView?: string | null;
+  chokepointRouteRead?: string | null;
+  vesselPiracyRead?: string | null;
+  commercialImpactRead?: string | null;
+  maritimeSecurityRead?: string | null;
+  regionalCountryRead?: string | null;
+
+  vesselSecurityAssessment?: string | null;
+  vesselSecurityTrend?: string | null;
+  piracyAssessment?: string | null;
+  piracyTrend?: string | null;
+  portsTerminalsAssessment?: string | null;
+  portsTerminalsTrend?: string | null;
+  routesChokepointsAssessment?: string | null;
+  routesChokepointsTrend?: string | null;
+  commercialDisruptionAssessment?: string | null;
+  commercialDisruptionTrend?: string | null;
+  keyJudgements?: string | null;
+  routesAndPortsRead?: string | null;
+  polestarOutlookRead?: string | null;
+  polestarWatchIndicators?: string | null;
+  polestarEscalationTriggers?: string | null;
 }
 
 function toBullets(text?: string | null, max = 7): string[] {
@@ -816,243 +838,212 @@ export default function ShippingReportPreview({
       `}</style>
       {/* PAGE 1: COVER */}
       <div className="shipping-page p-0 relative overflow-hidden" data-shipping-page="1">
-        <div className="absolute inset-0 bg-[#0b0a3d]" />
+        <div className="absolute inset-x-0 top-0 h-[16mm] bg-gradient-to-r from-[#08073f] to-[#465bff]">
+          <img
+            src={polestarLogoWhite}
+            alt="Polestar Advisory"
+            className="absolute left-[7mm] top-1/2 h-[7mm] -translate-y-1/2 object-contain"
+          />
+        </div>
         <img
           src={shippingCoverUrl}
           alt=""
-          className="absolute inset-x-0 top-0 w-full h-[62%] object-cover opacity-75 mix-blend-luminosity"
+          className="absolute inset-x-0 top-[16mm] h-[197mm] w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0b0a3d]/15 via-[#0b0a3d]/75 to-[#0b0a3d]" />
-        <div className="relative z-10 h-full flex flex-col justify-between p-[20mm]">
-          <div>
-            <img src={polestarLogo} alt="Polestar Advisory" className="h-10 mb-8" />
-            <div className="text-[#8794ff] text-[14px] font-bold tracking-[0.2em] uppercase mb-2">
-              Polestar Insights
-            </div>
-            <h1 className="text-white text-[48px] font-bold uppercase tracking-wide leading-none">
+        <div className="absolute inset-x-0 bottom-0 h-[84mm] bg-gradient-to-r from-[#08073f] to-[#465bff] text-white">
+          <div className="absolute left-[11mm] right-[11mm] top-[13mm]">
+            <h1 className="text-[13mm] font-bold uppercase leading-none tracking-[-0.02em]">
               {resolvedTitle}
             </h1>
+            <div className="mt-[11mm] text-[5mm] font-light uppercase tracking-[0.12em]">
+              MONTHLY MARITIME SECURITY & OPERATIONAL RISK ASSESSMENT
+            </div>
+            <div className="mt-[3mm] text-[3.1mm] font-normal uppercase tracking-[0.12em]">
+              Reporting period: {ds.reportingPeriodLong}
+            </div>
           </div>
-          <div className="text-white text-[14px] font-light border-t border-[#465bff] pt-4">
-            {ds.reportingPeriodLong}
-            <br />
-            polestaradvisory.com
+          <div className="absolute bottom-[7mm] left-[11mm] text-[3.1mm] font-light uppercase tracking-[0.12em]">
+            Polestar-Advisory.com
           </div>
         </div>
       </div>
 
-      {/* PAGE 2: MARITIME SITUATION */}
-       {showSituation && (
-       <div className="shipping-page" data-shipping-page="2">
-         <div className="page-header">
-           <div className="page-title">Maritime Situation</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
 
-          {show("fast-facts") && <div className="flex items-center justify-between border-y-2 border-[#0b0a3d] py-4 mb-6">
-           {[
-             { label: "Overall Risk", value: isPending ? "PENDING" : riskFact.label.toUpperCase() },
-              { label: "Confirmed Incidents", value: confirmedCount },
-             { label: "Chokepoints Affected", value: `${affectedChokepoints} / 7` },
-             { label: "Vessel Attacks / Seizures", value: String(vesselAttacks) },
-             { label: "Main Affected Chokepoint", value: mainAffected.toUpperCase() }
-           ].map((f, i, arr) => (
-              <div key={i} className={`flex flex-col text-center px-4 ${i !== arr.length - 1 ? 'border-r border-[#e2e2e2]' : ''} flex-1`}>
-                 <span className="text-[10px] uppercase font-bold tracking-widest text-[#363636] mb-1">{f.label}</span>
-                 <span className="text-[14px] font-bold text-[#0b0a3d] leading-none">{f.value}</span>
-               </div>
-           ))}
-          </div>}
+      {/* PAGE 1: MONTHLY EXECUTIVE ASSESSMENT */}
+      <div className="shipping-page" data-shipping-page="2">
+        <div className="page-header">
+          <div className="page-title">Monthly Executive Assessment</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Indicators">
+          <KpiGrid cards={[
+            { label: "Vessel Security", value: report.vesselSecurityAssessment || "Insignificant", note: report.vesselSecurityTrend || "→", severity: report.vesselSecurityAssessment || undefined },
+            { label: "Piracy / Armed Robbery", value: report.piracyAssessment || "Insignificant", note: report.piracyTrend || "→", severity: report.piracyAssessment || undefined },
+            { label: "Ports & Terminals", value: report.portsTerminalsAssessment || "Insignificant", note: report.portsTerminalsTrend || "→", severity: report.portsTerminalsAssessment || undefined },
+            { label: "Key Routes / Chokepoints", value: report.routesChokepointsAssessment || "Insignificant", note: report.routesChokepointsTrend || "→", severity: report.routesChokepointsAssessment || undefined },
+            { label: "Commercial Disruption", value: report.commercialDisruptionAssessment || "Insignificant", note: report.commercialDisruptionTrend || "→", severity: report.commercialDisruptionAssessment || undefined },
+          ]} />
+        </Section>
+        <Section title="Bottom Line Up Front">
+          <Paragraphs text={report.executiveSummary} />
+        </Section>
+        <Section title="Key Judgements">
+          <Paragraphs text={report.keyJudgements} />
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 1</div>
+        </div>
+      </div>
 
-         {show("executive-summary") && (
-           <div className="bg-[#0b0a3d] text-white p-6 rounded-[2px] mb-6 flex-shrink-0 shadow-md">
-             <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Bottom Line Up Front</h3>
-             <p className="font-light leading-relaxed text-[15px]">{publication.prose.executiveSummary}</p>
-           </div>
-         )}
-
-          {show("maritime-intelligence") && <div className="flex-1 min-h-0 w-full relative pb-[15mm]">
-            <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Regional Maritime Map</h3>
-             <ShippingSituationMap chokepoints={presentation.matrix.map(row => ({
-               name: row.key,
-               level: row.risk.level ?? 1,
-               label: row.risk.display,
-             }))} />
-          </div>}
-         <div className="page-footer"><span>Shipping Watch</span><span>Page 2</span></div>
-       </div>
-       )}
-
-      {/* PAGE 3: CHOKEPOINT WATCH */}
-      {show("chokepoint-route") && (
+      {/* PAGE 2: REGIONAL MARITIME SECURITY PICTURE */}
       <div className="shipping-page" data-shipping-page="3">
-         <div className="page-header">
-           <div className="page-title">Chokepoint Watch</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
-         <ShippingReportMatrix rows={presentation.matrix} />
-         <div className="page-footer"><span>Shipping Watch</span><span>Page 3</span></div>
+        <div className="page-header">
+          <div className="page-title">Regional Maritime Security Picture</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Regional Picture">
+          <Paragraphs text={report.regionalCountryRead} />
+        </Section>
+        <Section title="Active Map">
+          <div className="mt-4" style={{ height: 400 }}>
+            {/* Map Component Updated */}
+            <ShippingSituationMap chokepoints={maritimeBoard.chokepointCards.map(c => ({ name: c.key, level: c.risk.level, label: c.risk.label }))} />
+          </div>
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 2</div>
+        </div>
       </div>
-      )}
 
-      {/* PAGE 4: THREAT PICTURE */}
-       {(show("vessel-piracy") || show("maritime-security")) && (
+      {/* PAGE 3: THREAT TRENDS */}
       <div className="shipping-page" data-shipping-page="4">
-         <div className="page-header">
-           <div className="page-title">Threat Picture</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
-         <div className="flex flex-col gap-6">
-           {show("vessel-piracy") && (
-           <div>
-             <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] font-bold">Major Incidents Timeline</h3>
-             {presentation.timeline.countNote && (
-               <div className="flex flex-col gap-1 mb-2">
-                 <div className="text-[11px] text-[#363636] font-light">
-                   {presentation.timeline.countNote}
-                 </div>
-               </div>
-             )}
-             <ShippingThreatTimeline incidents={presentation.timeline.rows} />
-           </div>
-           )}
-           
-            {show("maritime-security") && (
-           <div className={show("vessel-piracy") ? "mt-8 border-t border-[#e2e2e2] pt-6" : ""}>
-             <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] font-bold mb-4">Piracy and Armed Robbery</h3>
-             {presentation.piracySecondary.rows.length > 0 ? (
-               <>
-                 {presentation.piracySecondary.countNote && (
-                   <div className="text-[11px] text-[#363636] font-light mb-2">
-                     {presentation.piracySecondary.countNote}
-                   </div>
-                 )}
-                 <ShippingThreatTimeline incidents={presentation.piracySecondary.rows} />
-               </>
-             ) : (
-               <div className="text-[14px] text-[#363636] font-light leading-relaxed">
-                 No validated piracy or armed-robbery event is reported.
-               </div>
-             )}
-           </div>
-           )}
-         </div>
-         {presentation.matrix.some(row => row.movement) && <div style={{ marginTop: 24, paddingTop: 10, borderTop: `1px solid ${POLAR}`, fontSize: 10, lineHeight: 1.5, color: DUSK }}>
-           <strong>AIS movement context — </strong>
-           {presentation.matrix.filter(row => row.movement).map(row => `${row.key}: ${format(new Date(row.movement!.dataAsOf), "dd MMM")}, ${row.movement!.totalVessels == null ? "sample size unavailable" : `${row.movement!.totalVessels} vessels tracked`}`).join(" · ")}
-         </div>}
-         <div className="page-footer"><span>Shipping Watch</span><span>Page 4</span></div>
+        <div className="page-header">
+          <div className="page-title">Threat Trends</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Monthly Trends">
+          {ds.threatTrends && ds.threatTrends.length > 0 ? (
+            <div className="flex flex-col gap-4">
+              {ds.threatTrends.map(t => (
+                <div key={t.category} className="border p-4" style={{ borderColor: POLAR }}>
+                  <div className="text-[14px] font-bold text-navy mb-2">{t.category}</div>
+                  <div className="grid grid-cols-4 gap-4 text-[12px]">
+                    <div><span className="text-dusk font-bold">Current month:</span> {t.currentMonth}</div>
+                    <div><span className="text-dusk font-bold">Previous month:</span> {t.previousMonth !== null ? t.previousMonth : "—"}</div>
+                    <div><span className="text-dusk font-bold">3-month average:</span> {t.threeMonthAverage !== null ? t.threeMonthAverage : "—"}</div>
+                    <div><span className="text-dusk font-bold">Trend:</span> {t.trend !== null ? t.trend : "—"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+             <Paragraphs text="Trend data is unavailable for this reporting period." />
+          )}
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 3</div>
+        </div>
       </div>
-      )}
 
-      {/* PAGE 5: COMMERCIAL AND REGIONAL IMPACT */}
-      {(show("commercial-impact") || show("regional")) && (
+      {/* PAGE 4: ROUTES & PORTS TO WATCH */}
       <div className="shipping-page" data-shipping-page="5">
-         <div className="page-header">
-           <div className="page-title">Commercial & Regional Impact</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
-         <div className="flex-1 flex flex-col gap-8">
-            {show("commercial-impact") && (
-            <div className="flex-shrink-0">
-               <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Commercial Impact on Shipping</h3>
-               <div className="text-[14px] text-[#363636] font-light leading-relaxed mb-6"><Paragraphs text={publication.prose.commercialImpactRead} /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "15px 24px", marginBottom: 12 }}>
-               {buildShippingCommercialCategories(presentation.commercialEffects).map(group => (
-                 <div key={group.title} style={{ borderTop: "1px solid #e2e2e2", paddingTop: 8, gridColumn: group.title === "Other documented effects" ? "1 / -1" : undefined }}>
-                   <div style={{ textTransform: "uppercase", fontSize: 11, color: NAVY, fontWeight: 700, marginBottom: 5 }}>{group.title}</div>
-                   {(group.lines.length ? group.lines : ["Not established in available reporting."]).map((line, i) =>
-                     <p key={i} style={{ fontSize: 11, lineHeight: 1.5, color: DUSK, fontWeight: 300, marginBottom: 4 }}>{line}</p>)}
-                 </div>
-               ))}
-            </div>
-            
-            </div>
-            )}
-            {show("regional") && (
-            <div className={`flex flex-col gap-4 flex-1 min-h-0 ${show("commercial-impact") ? 'pt-4 border-t border-[#e2e2e2]' : ''}`}>
-               <div className="flex gap-8 flex-1">
-                 <div className="flex-1">
-                   <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-4 font-bold">Incidents by Region</h3>
-                   <HorizontalBarChart rows={presentation.geography.regions.rows} labelW={120} />
-                 </div>
-                 <div className="flex-1">
-                   <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-4 font-bold">Records by Country</h3>
-                   <HorizontalBarChart rows={presentation.geography.countries.rows} labelW={120} />
-                 </div>
-               </div>
-               
-               {(presentation.geography.regions.unknownCount > 0 || presentation.geography.countries.unknownCount > 0) && (
-                 <div className="text-[11px] text-[#363636] font-light mt-2 pt-2 border-t border-dashed border-[#e2e2e2]">
-                   {[
-                     presentation.geography.regions.unknownCount > 0 ? `${presentation.geography.regions.unknownCount} incidents have no established region` : null,
-                     presentation.geography.countries.unknownCount > 0 ? `${presentation.geography.countries.unknownCount} incidents have no established country` : null,
-                   ].filter(Boolean).join("; ")}. Unknown records remain in the totals.
-                 </div>
-               )}
-            </div>
-            )}
-         </div>
-         <div className="page-footer"><span>Shipping Watch</span><span>Page 5</span></div>
+        <div className="page-header">
+          <div className="page-title">Routes & Ports to Watch</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Dynamic Routes and Ports">
+          <Paragraphs text={report.routesAndPortsRead} />
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 4</div>
+        </div>
       </div>
-      )}
 
-      {/* PAGE 6: WHAT MATTERS */}
-       {showAssessment && (
-       <div className="shipping-page" data-shipping-page="6">
-         <div className="page-header">
-           <div className="page-title">Analytical Assessment</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
-         <div className="flex flex-col gap-10 mt-6">
-             {show("what-matters") && <div>
-               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">What Matters</h3>
-               <div className="text-[16px] leading-relaxed text-[#363636] font-light"><Paragraphs text={publication.prose.whatMatters} /></div>
-             </div>}
-             {show("implications") && <div>
-               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">Implications for Business</h3>
-               <div className="text-[15px] leading-relaxed text-[#0b0a3d] font-medium"><Paragraphs text={publication.prose.implications} /></div>
-             </div>}
-             {show("watch-next") && <div>
-               <h3 className="uppercase text-[14px] tracking-widest text-[#465bff] mb-3 font-bold border-b border-[#e2e2e2] pb-2">Watch Next</h3>
-               <div className="text-[15px] leading-relaxed text-[#363636]"><Paragraphs text={publication.prose.watchNext} /></div>
-             </div>}
-          </div>
-          <div className="page-footer"><span>Shipping Watch</span><span>Page 6</span></div>
-       </div>
-       )}
-
-      {/* PAGE 7: POLESTAR VIEW AND RELATED INCIDENTS */}
-       {showClosing && (
-       <div className="shipping-page" data-shipping-page="7">
-         <div className="page-header">
-           <div className="page-title">Polestar View</div>
-           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
-         </div>
-
-          {show("polestar-view") && <div className="bg-[#0b0a3d] text-white p-6 rounded-[2px] mb-6 flex-shrink-0 shadow-md">
-           <h3 className="uppercase text-[11px] tracking-widest text-[#465bff] mb-2 font-bold">Current Judgement</h3>
-           <div className="font-light leading-relaxed text-[15px]"><Paragraphs text={publication.prose.polestarView} color="#fff" /></div>
-          </div>}
-
-           {show("related-incidents") && <div className="flex-1 min-h-0 flex flex-col mb-4">
-           <h3 className="uppercase text-[12px] tracking-widest text-[#0b0a3d] mb-3 font-bold">Related Incidents</h3>
-           <div className="text-[11px] text-[#363636] font-light mb-2">
-             {presentation.register.countNote || `Compact register: latest ${presentation.register.shownCount} prioritised developments.`}
-            </div>
-            <RelatedIncidentsTable rows={presentation.register.rows} />
-          </div>}
-
-          <div
-            className="bg-[#e2e2e2] p-4 text-[#363636] leading-relaxed font-light flex-shrink-0 rounded-[2px] mt-auto mb-[15mm]"
-            style={{ fontSize: "9pt" }}
-          >
-           {DISCLAIMER_TEXT}
-          </div>
-         <div className="page-footer"><span>Shipping Watch</span><span>Page 7</span></div>
+      {/* PAGE 5: COMMERCIAL & OPERATIONAL IMPACT */}
+      <div className="shipping-page" data-shipping-page="6">
+        <div className="page-header">
+          <div className="page-title">Commercial & Operational Impact</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Commercial Signal">
+          <Paragraphs text={report.commercialImpactRead} />
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 5</div>
+        </div>
       </div>
-       )}
 
+      {/* PAGE 6: POLESTAR VIEW */}
+      <div className="shipping-page" data-shipping-page="7">
+        <div className="page-header">
+          <div className="page-title">Polestar View — Next 30 Days</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Strategic Picture">
+          <Paragraphs text={report.polestarView} />
+        </Section>
+        <Section title="Outlook — Next 30 Days">
+          <Paragraphs text={report.polestarOutlookRead} />
+        </Section>
+        <Section title="Watch Indicators">
+          <Paragraphs text={report.polestarWatchIndicators} />
+        </Section>
+        <Section title="Escalation Triggers">
+          <Paragraphs text={report.polestarEscalationTriggers} />
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 6</div>
+        </div>
+      </div>
+
+      {/* PAGE 7: MONTHLY INCIDENT REGISTER */}
+      <div className="shipping-page" data-shipping-page="8">
+        <div className="page-header">
+          <div className="page-title">Monthly Incident Register</div>
+          <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
+        </div>
+        <Section title="Incident Register">
+          {ds.registerMetrics && (
+            <div className="flex gap-6 mb-4 text-[12px] font-bold text-navy">
+              <div>TOTAL MATERIAL INCIDENTS THIS MONTH: {ds.registerMetrics.currentMonth}</div>
+              {ds.registerMetrics.previousMonth !== null && <div>PREVIOUS MONTH: {ds.registerMetrics.previousMonth}</div>}
+              {ds.registerMetrics.threeMonthAverage !== null && <div>3-MONTH AVERAGE: {ds.registerMetrics.threeMonthAverage}</div>}
+            </div>
+          )}
+          <div className="w-full border" style={{ borderColor: POLAR }}>
+            <div className="grid uppercase tracking-widest" style={{ gridTemplateColumns: "0.6fr 0.8fr 0.8fr 1fr 2fr 1.5fr 0.6fr", background: NAVY, color: "#fff", fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 8, padding: "8px 10px", gap: 10 }}>
+              <div>Date</div>
+              <div>Location</div>
+              <div>Country</div>
+              <div>Category</div>
+              <div>Incident</div>
+              <div>Operational Relevance</div>
+              <div>Confidence</div>
+            </div>
+            {ds.relatedIncidents.map((r, i) => (
+              <div key={String(r.id)} className="grid" style={{ gridTemplateColumns: "0.6fr 0.8fr 0.8fr 1fr 2fr 1.5fr 0.6fr", padding: "8px 10px", gap: 10, borderTop: i === 0 ? "none" : `1px solid ${POLAR}`, fontFamily: "Roboto, sans-serif", fontSize: 10, color: DUSK, alignItems: "start" }}>
+                <div>{format(r.date, "dd MMM")}</div>
+                <div>{r.physicalLocation || "—"}</div>
+                <div>{r.incidentCountry || "—"}</div>
+                <div>{r.issue || "—"}</div>
+                <div style={{ color: NAVY }}>{r.title}</div>
+                <div>{incidentSummaries[String(r.id)] || r.summary || "—"}</div>
+                <div>High</div>
+              </div>
+            ))}
+          </div>
+        </Section>
+        <div className="page-footer">
+          <div>{resolvedTitle}</div>
+          <div>Page 7</div>
+        </div>
+      </div>
     </div>
   );
 }

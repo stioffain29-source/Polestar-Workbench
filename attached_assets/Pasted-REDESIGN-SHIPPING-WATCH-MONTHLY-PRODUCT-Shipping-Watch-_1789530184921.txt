@@ -1,0 +1,443 @@
+REDESIGN SHIPPING WATCH — MONTHLY PRODUCT
+
+Shipping Watch is a MONTHLY report. The current version is not fit for purpose because it is structured like a weekly incident report and over-focuses on individual events.
+
+Redesign the product around MONTH-ON-MONTH CHANGE, TREND, OPERATIONAL CONSEQUENCE and NEXT-30-DAY OUTLOOK.
+
+DO NOT simply restyle the existing PDF. Change the report logic, data structure, prompts and export layout.
+
+CORE PURPOSE
+
+Shipping Watch should answer:
+
+1. What materially changed during the month?
+2. Where did maritime/security risk increase or decrease?
+3. What trends are developing?
+4. What are the operational and commercial consequences?
+5. What should shipping, security, logistics and supply-chain teams watch during the next 30 days?
+
+REPORTING PERIOD
+
+Use a full calendar month or clearly defined monthly reporting period.
+
+Do not use a 7-day reporting structure.
+
+Where possible compare:
+- Current month
+- Previous month
+- 3-month average
+
+Do not invent comparisons where historical data is unavailable.
+
+==================================================
+PAGE 1 — MONTHLY EXECUTIVE ASSESSMENT
+==================================================
+
+Title:
+SHIPPING WATCH
+
+Subtitle:
+MONTHLY MARITIME SECURITY & OPERATIONAL RISK ASSESSMENT
+
+Show reporting period clearly.
+
+Replace the current single "Overall Maritime Risk" assessment with several meaningful indicators:
+
+- Vessel Security
+- Piracy / Armed Robbery
+- Ports & Terminals
+- Key Routes / Chokepoints
+- Commercial Disruption
+
+For each show:
+
+ASSESSMENT:
+Insignificant / Low / Moderate / High / Extreme
+
+TREND:
+↑ Deteriorating
+→ Stable
+↓ Improving
+
+Then include:
+
+BLUF
+
+Maximum 120 words.
+
+The BLUF must explain:
+- What changed this month
+- Where the principal risk is concentrated
+- Whether conditions deteriorated, improved or remained broadly stable
+- The most important operational consequence
+
+Then:
+
+KEY JUDGEMENTS
+
+3-5 concise analytical judgements.
+
+These must not simply repeat incident headlines.
+
+Each judgement should explain:
+- What happened
+- What it indicates
+- Why it matters
+
+==================================================
+PAGE 2 — REGIONAL MARITIME SECURITY PICTURE
+==================================================
+
+Create a regional maritime risk picture.
+
+Regions:
+
+- Middle East / Red Sea
+- Southeast Asia
+- North Asia
+- Oceania
+
+Include South Asia only if within the configured product scope.
+
+For each region show:
+
+- Current assessment
+- Month-on-month trend
+- Principal threat or driver
+- Short operational significance statement
+
+Example structure:
+
+SOUTHEAST ASIA
+Assessment: Moderate
+Trend: →
+Driver: Armed robbery / opportunistic boarding
+Operational significance: Persistent crew and vessel-security exposure in selected approaches and anchorages.
+
+MAP
+
+Use a regional maritime map showing ONLY:
+
+- Significant incidents
+- Threat concentrations
+- Routes or chokepoints experiencing meaningful change
+- Ports experiencing meaningful disruption
+
+Do not display fixed locations merely because they exist.
+
+Do not fill the map with inactive or "pending" chokepoints.
+
+==================================================
+PAGE 3 — THREAT TRENDS
+==================================================
+
+This page must show monthly trends rather than a chronological incident timeline.
+
+Track:
+
+VESSEL ATTACKS / SEIZURES
+
+PIRACY / ARMED ROBBERY
+
+PORT / TERMINAL SECURITY INCIDENTS
+
+CARGO / LANDSIDE SECURITY
+
+NAVAL / STATE ACTIVITY AFFECTING COMMERCIAL SHIPPING
+
+For each category show where data exists:
+
+Current month: X
+Previous month: X
+3-month average: X
+Trend: ↑ / → / ↓
+
+Then provide a short analytical paragraph explaining the significance.
+
+Do not count duplicate reporting as separate incidents.
+
+Deduplicate events that appear through multiple sources.
+
+One real-world event = one incident record.
+
+==================================================
+PAGE 4 — ROUTES & PORTS TO WATCH
+==================================================
+
+Remove the current fixed seven-chokepoint table.
+
+Do NOT show rows such as:
+
+Pending
+No AIS sample
+No confirmed incident
+
+unless the absence itself is operationally significant.
+
+Create two dynamic sections:
+
+ROUTES TO WATCH
+
+Include only routes/chokepoints where something materially changed or where continuing risk is operationally relevant.
+
+Possible locations include:
+
+- Strait of Hormuz
+- Bab el-Mandeb
+- Red Sea
+- Suez Canal
+- Gulf of Aden
+- Malacca Strait
+- Singapore Strait
+- South China Sea
+- Other relevant routes
+
+For each show:
+
+LOCATION
+RISK
+TREND
+KEY DEVELOPMENT
+OPERATIONAL EFFECT
+WATCH INDICATOR
+
+Then:
+
+PORTS TO WATCH
+
+Select 3-6 ports or terminals where a meaningful security, political, labour, infrastructure, crime or operational development occurred.
+
+For each show:
+
+PORT
+COUNTRY
+ISSUE
+CURRENT IMPACT
+TREND
+WHAT TO WATCH
+
+The ports must be dynamic and change each month.
+
+==================================================
+PAGE 5 — COMMERCIAL & OPERATIONAL IMPACT
+==================================================
+
+This page must assess whether maritime-security developments are producing real commercial or operational effects.
+
+Track where evidence exists:
+
+- Route deviation
+- Transit volumes
+- Transit delays
+- Port disruption
+- War-risk premiums
+- Marine insurance
+- Freight rates
+- Chartering
+- Bunker / fuel effects
+- Cargo security
+- Landside logistics
+- Additional security costs
+
+IMPORTANT RULE:
+
+NO DATA = OMIT THE METRIC.
+
+Do NOT fill the page with repeated statements such as:
+
+"Not established in available reporting."
+
+Only include categories for which meaningful information exists.
+
+Use evidence-led language.
+
+Example:
+
+COMMERCIAL SIGNAL
+
+Hormuz transit volumes declined during the reporting period. Available reporting does not yet demonstrate a corresponding material increase in APAC freight rates.
+
+Distinguish clearly between:
+
+CONFIRMED IMPACT
+EMERGING SIGNAL
+NO MATERIAL CHANGE IDENTIFIED
+
+==================================================
+PAGE 6 — POLESTAR VIEW: NEXT 30 DAYS
+==================================================
+
+Merge the existing "What Matters" and "Polestar View" concepts into ONE strong analytical page.
+
+Sections:
+
+POLESTAR VIEW
+
+A concise current judgement explaining the strategic picture.
+
+OUTLOOK — NEXT 30 DAYS
+
+3-5 analytical points covering the most important expected developments.
+
+WATCH INDICATORS
+
+Specific observable indicators that analysts should monitor.
+
+Examples:
+
+- Increase in attacks outside the current threat concentration
+- Major carrier route suspension
+- Material reduction in vessel transit volumes
+- Change in war-risk premium
+- Increase in Singapore/Malacca boarding incidents
+- Port closure or access restriction
+- Naval escalation affecting commercial routes
+
+ESCALATION TRIGGERS
+
+Identify developments that would materially change the assessment.
+
+Example:
+
+Further commercial-vessel attacks outside the present Hormuz concentration would indicate geographic expansion of the threat.
+
+Do not use generic recommendations such as:
+
+"Continue to monitor the situation."
+
+Every indicator or trigger must be specific.
+
+==================================================
+PAGE 7 — MONTHLY INCIDENT REGISTER
+==================================================
+
+Keep the detailed incident data at the back of the report.
+
+Include MATERIAL VALIDATED incidents from the full reporting period.
+
+Columns:
+
+DATE
+LOCATION
+COUNTRY
+CATEGORY
+INCIDENT
+OPERATIONAL RELEVANCE
+CONFIDENCE
+
+Categories may include:
+
+- Vessel attack
+- Vessel seizure / detention
+- Piracy
+- Armed robbery
+- Port / terminal incident
+- Cargo security
+- Route disruption
+- Naval activity
+- Geopolitical maritime development
+- Labour / protest disruption
+- Regulatory development
+
+Do not use raw news headlines as the incident description.
+
+Rewrite each as a concise factual incident summary.
+
+Deduplicate incidents.
+
+Where useful show at the top of the register:
+
+TOTAL MATERIAL INCIDENTS THIS MONTH
+PREVIOUS MONTH
+3-MONTH AVERAGE
+
+Do not invent previous-month values if historical data is unavailable.
+
+==================================================
+ANALYTICAL RULES
+==================================================
+
+1. Shipping Watch is MONTHLY.
+
+2. Prioritise TREND and CHANGE over volume of reporting.
+
+3. One news article does not equal one incident.
+
+4. Multiple reports of the same event must be deduplicated.
+
+5. Do not allow one active theatre, such as the Gulf, to automatically define the risk level for the entire Shipping Watch product.
+
+6. Regional and thematic assessments must be separate.
+
+7. Overall assessments must be based on evidence across the reporting scope.
+
+8. Do not assign Extreme simply because an Extreme incident exists.
+
+9. Incident severity and regional risk are separate assessments.
+
+10. Do not populate pages with "Pending", "Unknown", "No AIS sample", or "Not established" unless analytically important.
+
+11. Where location data is available, resolve the country and region before publication.
+
+12. Minimise "Unknown" geography.
+
+13. Do not duplicate the same analytical judgement across several pages.
+
+14. Every page must add new information.
+
+15. The report must be useful to:
+- Corporate security
+- Shipping operations
+- Port and terminal operators
+- Logistics teams
+- Supply-chain teams
+- Business continuity teams
+- Risk managers
+- Commercial leadership
+
+==================================================
+DESIGN PRINCIPLES
+==================================================
+
+Keep existing Polestar branding.
+
+Use the existing Polestar colour palette and report header/footer style.
+
+Maintain a professional intelligence-report appearance.
+
+Reduce empty white space.
+
+Use charts and tables only where they communicate useful information.
+
+Do not create charts purely for decoration.
+
+Use month-on-month arrows and trend indicators consistently.
+
+The report should feel like a premium maritime intelligence product, not a collection of scraped news stories.
+
+FINAL TARGET STRUCTURE:
+
+PAGE 1
+Monthly Executive Assessment
+
+PAGE 2
+Regional Maritime Security Picture + Map
+
+PAGE 3
+Threat Trends
+
+PAGE 4
+Routes & Ports to Watch
+
+PAGE 5
+Commercial & Operational Impact
+
+PAGE 6
+Polestar View — Next 30 Days
+
+PAGE 7
+Monthly Incident Register
+
+The central product question is:
+
+WHAT CHANGED THIS MONTH, WHAT TREND IS FORMING, WHAT DOES IT MEAN OPERATIONALLY, AND WHAT SHOULD THE CLIENT WATCH NEXT?

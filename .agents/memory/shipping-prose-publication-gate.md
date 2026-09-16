@@ -4,7 +4,8 @@ description: Distinguishes advisory prose-linkage uncertainty from factual Shipp
 ---
 
 Treat a failure to link a synthesis sentence to one individual incident, and
-cross-section repetition, as analyst warnings rather than PDF blockers.
+cross-section or incident-development repetition, as analyst warnings rather
+than PDF blockers.
 
 **Why:** Comparative and analytical prose can synthesize several canonical
 incidents without sharing enough words with any single incident to satisfy the
