@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoute, Link } from "wouter";
 import {
   useGetReport,
+  getReport,
   useUpdateReport,
   useListIncidents,
   useListMarketPrices,
@@ -1667,12 +1668,34 @@ export default function ReportEditor() {
     setExportError(null);
     try {
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}-${formatExportTimestampForFilename()}.pdf`;
+      let fuelExportHardNumbers: Record<string, unknown> | null = null;
+      let fuelExportIssueDate = form.issueDate;
+      if (form.topic === "fuel") {
+        // Export is a publication boundary: do not trust an earlier React render
+        // or a one-shot seed effect for live market data. Fetch the report again
+        // and assemble the freshest per-commodity payload synchronously at click
+        // time so Download cannot fall back to a stale persisted FRED snapshot.
+        const freshReport = id
+          ? await getReport(id, { cache: "no-store" })
+          : report;
+        const liveMarket = fuelHardNumbersFromMarketRows(
+          marketPriceRows,
+          new Date().toISOString().slice(0, 10),
+        );
+        fuelExportHardNumbers = mergeFuelMarketHardNumbers(
+          hardNumbersEdited ?? freshReport?.hardNumbers,
+          liveMarket,
+        );
+        fuelExportIssueDate =
+          fuelMarketLatestDate(fuelExportHardNumbers) ?? form.issueDate;
+      }
 
       // Common payload shared by all PDF exporters.
       const pdfPayload = {
         title: form.title,
         topic: form.topic,
-        issueDate: form.issueDate,
+        issueDate:
+          form.topic === "fuel" ? fuelExportIssueDate : form.issueDate,
         author: form.author,
         executiveSummary: form.executiveSummary,
         situation: form.situation,
@@ -1736,7 +1759,10 @@ export default function ReportEditor() {
         await exportTopicReportPdf(
           {
             ...pdfPayload,
-            hardNumbers: hardNumbersEdited ?? report?.hardNumbers,
+            hardNumbers:
+              form.topic === "fuel"
+                ? fuelExportHardNumbers
+                : hardNumbersEdited ?? report?.hardNumbers,
           },
           incidentsForExport,
           TOPIC_LABELS,
