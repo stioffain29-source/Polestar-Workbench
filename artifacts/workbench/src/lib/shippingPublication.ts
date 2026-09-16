@@ -1434,16 +1434,40 @@ function validateProse(
     }
   }
 
-  if (trim(prose.whatMatters).split(/\s+/).length < 12 || !/\b(assessment|matters|means|risk|exposure|priority|operational)\b/i.test(prose.whatMatters)) {
-    issue(issues, "NON_SUBSTANTIVE_WHAT_MATTERS", "What Matters must contain a substantive operational assessment.", "whatMatters");
+  if (
+    trim(prose.keyJudgements).split(/\s+/).length < 12 ||
+    !/\b(assessment|judg(?:e)?ment|matters|means|risk|exposure|priority|operational)\b/i.test(
+      prose.keyJudgements,
+    )
+  ) {
+    issue(
+      issues,
+      "NON_SUBSTANTIVE_KEY_JUDGEMENTS",
+      "Key Judgements must contain a substantive operational assessment.",
+      "keyJudgements",
+    );
   }
-  if (!/\b(assess|assessment|risk|monitor|indicator|trigger|if|would|could|may)\b/i.test(prose.watchNext)) {
-    issue(issues, "WATCH_NEXT_NOT_ASSESSMENT", "Watch Next must distinguish forward assessment from a reported fact.", "watchNext");
+  if (
+    !/\b(assess|assessment|risk|monitor|indicator|trigger|if|would|could|may)\b/i.test(
+      prose.polestarWatchIndicators,
+    )
+  ) {
+    issue(
+      issues,
+      "WATCH_NEXT_NOT_ASSESSMENT",
+      "Watch Indicators must distinguish forward assessment from a reported fact.",
+      "polestarWatchIndicators",
+    );
   }
   if (dataset.canonicalIncidents.length > 0) {
-    const forward = proseSentences(prose.watchNext);
+    const forward = proseSentences(prose.polestarWatchIndicators);
     if (forward.length === 0 || !forward.some((sentence) => sentenceSupported(sentence, references))) {
-      issue(issues, "UNGROUNDED_WATCH_NEXT", "Watch Next contains no event-specific indicator tied to canonical evidence.", "watchNext");
+      issue(
+        issues,
+        "UNGROUNDED_WATCH_NEXT",
+        "Watch Indicators contain no event-specific indicator tied to canonical evidence.",
+        "polestarWatchIndicators",
+      );
     }
   }
   if (!/\b(assess|assessment|risk|priority|judg)\b/i.test(prose.polestarView)) {
@@ -1602,11 +1626,17 @@ function auditWithGenericEvidence(
       })),
       sections: {
         executiveSummary: prose.executiveSummary,
-        whatMatters: prose.whatMatters,
-        implications: prose.implications,
-        // With no canonical incidents, the deterministic Watch Next sentence
-        // is intentionally a safe no-data instruction, not an evidence claim.
-        watchNext: typedReferences.length > 0 ? prose.watchNext : "",
+        keyJudgements: prose.keyJudgements,
+        regionalCountryRead: prose.regionalCountryRead,
+        routesAndPortsRead: prose.routesAndPortsRead,
+        commercialImpactRead: prose.commercialImpactRead,
+        polestarOutlookRead: prose.polestarOutlookRead,
+        polestarEscalationTriggers: prose.polestarEscalationTriggers,
+        // With no canonical incidents, the deterministic Watch Indicators
+        // sentence is intentionally a safe no-data instruction, not an
+        // evidence claim.
+        polestarWatchIndicators:
+          typedReferences.length > 0 ? prose.polestarWatchIndicators : "",
         polestarView: prose.polestarView,
       },
       validatedForwardIndicators: [],
