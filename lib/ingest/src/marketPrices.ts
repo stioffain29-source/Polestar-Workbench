@@ -109,16 +109,23 @@ function buildHardNumbers(
     if (!asOf || j.date > asOf) asOf = j.date;
   }
 
-  const trajPoints = trajectoryAsOf(jet, anchorDate, 6);
+  const trajectorySeries =
+    jetHeadline && valueAsOf(jetHeadline, anchorDate)
+      ? jetHeadline
+      : jet;
+  const trajPoints = trajectoryAsOf(trajectorySeries, anchorDate, 6);
   const hardNumbers: Record<string, unknown> = {
     fastFacts: { prices },
   };
   if (trajPoints.length >= 2) {
+    const isIataTrajectory = trajectorySeries.id === "IATA_GLOBAL_JET";
     hardNumbers["jetFuelTrajectory"] = {
-      benchmark: "U.S. Gulf Coast kerosene-type jet fuel",
-      source: jet.source,
-      unit: "USD/gal",
-      period: "recent weeks",
+      benchmark: isIataTrajectory
+        ? "Global jet fuel composite"
+        : "U.S. Gulf Coast kerosene-type jet fuel",
+      source: trajectorySeries.source,
+      unit: isIataTrajectory ? "USD/bbl" : "USD/gal",
+      period: isIataTrajectory ? "latest weekly comparison" : "recent weeks",
       points: trajPoints,
     };
   }

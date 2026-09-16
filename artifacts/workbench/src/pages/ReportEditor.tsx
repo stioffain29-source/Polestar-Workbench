@@ -237,10 +237,94 @@ function mergeFuelMarketHardNumbers(
     liveMarket.fastFacts && typeof liveMarket.fastFacts === "object"
       ? (liveMarket.fastFacts as Record<string, unknown>)
       : {};
+  const basePrices = Array.isArray(baseFastFacts.prices)
+    ? (baseFastFacts.prices as Array<Record<string, unknown>>)
+    : [];
+  const livePrices = Array.isArray(liveFastFacts.prices)
+    ? (liveFastFacts.prices as Array<Record<string, unknown>>)
+    : [];
+  const priceKey = (card: Record<string, unknown>) =>
+    String(card.label ?? card.benchmark ?? "").toLowerCase().includes("brent")
+      ? "brent"
+      : String(card.label ?? card.benchmark ?? "").toLowerCase().includes("wti")
+        ? "wti"
+        : String(card.label ?? card.benchmark ?? "").toLowerCase().includes("jet")
+          ? "jet"
+          : String(card.label ?? card.benchmark ?? "").toLowerCase();
+  const mergedByKey = new Map<string, Record<string, unknown>>();
+  for (const card of [...basePrices, ...livePrices]) {
+    const key = priceKey(card);
+    const current = mergedByKey.get(key);
+    const currentDate = String(current?.asOf ?? "");
+    const candidateDate = String(card.asOf ?? "");
+    if (!current || candidateDate > currentDate) mergedByKey.set(key, card);
+  }
+  const mergedPrices = [...mergedByKey.values()];
+  const selectedJet = mergedPrices.find((card) => priceKey(card) === "jet");
+  const jetSource = String(selectedJet?.source ?? "");
+  const jetChange = String(selectedJet?.change ?? "");
+  const jetAsOf = String(selectedJet?.asOf ?? "");
+  const jetValue = Number(selectedJet?.value);
+  const changeMatch = jetChange.match(/([+-]?\d+(?:\.\d+)?)%/);
+  let derivedIataTrajectory: Record<string, unknown> | null = null;
+  if (
+    /IATA|Platts/i.test(jetSource) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(jetAsOf) &&
+    Number.isFinite(jetValue) &&
+    changeMatch
+  ) {
+    const changePct = Number(changeMatch[1]);
+    const prior = jetValue / (1 + changePct / 100);
+    const priorDate = new Date(`${jetAsOf}T00:00:00Z`);
+    priorDate.setUTCDate(priorDate.getUTCDate() - 7);
+    derivedIataTrajectory = {
+      benchmark: "Global jet fuel composite",
+      source: jetSource,
+      unit: String(selectedJet?.unit ?? "USD/bbl"),
+      period: "latest weekly comparison",
+      points: [
+        {
+          date: priorDate.toISOString().slice(0, 10),
+          value: prior,
+        },
+        { date: jetAsOf, value: jetValue },
+      ],
+    };
+  }
+  const baseTrajectory =
+    base.jetFuelTrajectory && typeof base.jetFuelTrajectory === "object"
+      ? (base.jetFuelTrajectory as Record<string, unknown>)
+      : null;
+  const liveTrajectory =
+    liveMarket.jetFuelTrajectory &&
+    typeof liveMarket.jetFuelTrajectory === "object"
+      ? (liveMarket.jetFuelTrajectory as Record<string, unknown>)
+      : null;
+  const latestTrajectoryDate = (trajectory: Record<string, unknown> | null) =>
+    Array.isArray(trajectory?.points)
+      ? Math.max(
+          ...trajectory.points.map((point) =>
+            Date.parse(String((point as Record<string, unknown>).date ?? "")),
+          ),
+        )
+      : Number.NEGATIVE_INFINITY;
+  const freshestTrajectory =
+    latestTrajectoryDate(liveTrajectory) > latestTrajectoryDate(baseTrajectory)
+      ? liveTrajectory
+      : baseTrajectory;
   return {
     ...base,
     ...liveMarket,
-    fastFacts: { ...baseFastFacts, ...liveFastFacts },
+    fastFacts: {
+      ...baseFastFacts,
+      ...liveFastFacts,
+      prices: mergedPrices,
+    },
+    ...(derivedIataTrajectory
+      ? { jetFuelTrajectory: derivedIataTrajectory }
+      : freshestTrajectory
+        ? { jetFuelTrajectory: freshestTrajectory }
+        : {}),
   };
 }
 

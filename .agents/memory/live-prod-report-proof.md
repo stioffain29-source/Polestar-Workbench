@@ -5,6 +5,17 @@ description: How to produce screenshots and screen-faithful PDFs from the LIVE p
 
 # Live-production report/PDF proof
 
+Unless the owner explicitly says development-only, a requested fix means the
+published production application and its live data, not merely workspace code.
+
+**Why:** repeated development-only fixes were described as complete while the
+owner was still seeing the unchanged published PDF.
+
+**How to apply:** do not say "fixed" or "done" until the production route and,
+for report work, the downloaded production PDF have been verified. If publishing
+or production authentication remains user-controlled, state that boundary before
+claiming completion.
+
 When an acceptance pass demands proof from the **published** app (refuses dev), the in-app
 "Download PDF" must be driven against the production URL in a real browser — `runTest` targets
 dev/localhost, and `screenshot external_url` only captures the cover (no scroll, no button click).
