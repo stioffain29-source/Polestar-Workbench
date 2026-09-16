@@ -29,7 +29,7 @@ function inc(over: Partial<TopicFastFactsIncident> & { title: string; topic: str
 describe("filterFuelContinuityCrossRead", () => {
   it("admits fuel-linked chokepoint transit and a fuel-to-power continuity event", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Houthi missile attack strikes oil tanker carrying fuel in Gulf of Oman off Pakistan", country: "Pakistan" }),
+      inc({ topic: "shipping", title: "Houthi missile attack in Gulf of Oman halts fuel tanker shipments", country: "Pakistan" }),
       inc({ topic: "energy", title: "Gas shortage intensifies load shedding in Chittagong", country: "Bangladesh", severity: "moderate" }),
     ];
     const out = filterFuelContinuityCrossRead(rows, ISSUE, []);
@@ -40,6 +40,14 @@ describe("filterFuelContinuityCrossRead", () => {
     const rows = [
       inc({ topic: "shipping", title: "Missile strike reported on cargo vessel near Durban" }), // kinetic, no chokepoint
       inc({ topic: "shipping", title: "Freight rates through the Strait of Hormuz tick higher" }), // chokepoint, no kinetic
+    ];
+    expect(filterFuelContinuityCrossRead(rows, ISSUE, [])).toHaveLength(0);
+  });
+
+  it("rejects vessel attacks that state no fuel-market consequence", () => {
+    const rows = [
+      inc({ topic: "shipping", title: "Missile attack in the Red Sea kills seafarers on a commercial vessel" }),
+      inc({ topic: "shipping", title: "Commercial oil tanker attacked in the Strait of Hormuz, killing crew" }),
     ];
     expect(filterFuelContinuityCrossRead(rows, ISSUE, [])).toHaveLength(0);
   });
@@ -64,9 +72,9 @@ describe("filterFuelContinuityCrossRead", () => {
 
   it("collapses syndicated rewrites of the same chokepoint strike to one row", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Three Killed in Houthi Missile Strike on Oil Tanker Near Bab al-Mandab" }),
-      inc({ topic: "shipping", title: "Houthi missile strike hits oil tanker near Bab el-Mandeb and kills three crew" }),
-      inc({ topic: "shipping", title: "Death toll rises after Houthi missile attack on fuel tanker in Bab el-Mandeb strait" }),
+      inc({ topic: "shipping", title: "Houthi missile strike delays oil cargoes near Bab al-Mandab" }),
+      inc({ topic: "shipping", title: "Oil cargo shipments delayed after Houthi missile strike near Bab el-Mandeb" }),
+      inc({ topic: "shipping", title: "Missile attack in Bab el-Mandeb disrupts crude cargo flows" }),
     ];
     expect(filterFuelContinuityCrossRead(rows, ISSUE, [])).toHaveLength(1);
   });
@@ -83,7 +91,7 @@ describe("filterFuelContinuityCrossRead", () => {
 describe("cross-read rows keep the consistency gate green", () => {
   it("a report whose only window events are cross-read admits validates cleanly", () => {
     const rows = [
-      inc({ topic: "shipping", title: "Houthi missile attack strikes oil tanker carrying fuel in Gulf of Oman off Pakistan", country: "Pakistan" }),
+      inc({ topic: "shipping", title: "Houthi missile attack in Gulf of Oman halts fuel tanker shipments", country: "Pakistan" }),
       inc({ topic: "energy", title: "Gas shortage intensifies load shedding in Chittagong", country: "Bangladesh", severity: "moderate", occurredAt: "2026-08-11T08:00:00+00:00" }),
     ];
     const data = buildFuelWatchReportData(

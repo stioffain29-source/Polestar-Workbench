@@ -16,8 +16,11 @@ const row = (overrides: Partial<MarketPrice>): MarketPrice => ({
   source: "IATA / S&P Global Platts",
   benchmark: "Global jet fuel composite",
   trajectory: [
-    { date: "2026-09-09", value: 171 },
-    { date: "2026-09-16", value: 181.46 },
+    { date: "2026-08-14", value: 158.91 },
+    { date: "2026-08-21", value: 163.87 },
+    { date: "2026-08-28", value: 156.85 },
+    { date: "2026-09-04", value: 171.01 },
+    { date: "2026-09-11", value: 181.46 },
   ],
   ...overrides,
 });
@@ -50,7 +53,9 @@ describe("Fuel Watch canonical market assembly", () => {
     expect(hardNumbers.jetFuelTrajectory).toMatchObject({
       source: "IATA / S&P Global Platts",
       unit: "USD/bbl",
+      period: "latest month",
     });
+    expect((hardNumbers.jetFuelTrajectory as { points: unknown[] }).points).toHaveLength(5);
   });
 
   it("resolves a UTC rolling seven-day window", () => {

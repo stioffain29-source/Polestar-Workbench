@@ -206,27 +206,11 @@ export function buildFuelRegionalHighlights(opts: {
       why = `${why} The near-term watch is on operational follow-through rather than headline volume.`;
     }
     usedWhy.add(why.split(".")[0] ?? why);
-    const signal = regionalSignalPhrase(country, items, fam);
-    let opener: string;
-    if (idx === 0) {
-      // Leader phrasing is only allowed when the canonical facts ranked this
-      // country the unique primary pressure point. A distributed picture (or
-      // a facts leader that disagrees with the local sort) gets spread
-      // phrasing so this section can never contradict the facts object.
-      const factsLeader = opts.pressure
-        ? !opts.pressure.distributed &&
-          (opts.pressure.primaryCountry ?? "").toLowerCase() ===
-            country.toLowerCase()
-        : true;
-      opener = factsLeader
-        ? `${titleCase(country)} is the clearest pressure point right now.`
-        : `${titleCase(country)} is one of several pressure points right now, with activity spread across the region rather than concentrated in one theatre.`;
-    } else if (idx === 1) {
-      opener = `${titleCase(country)} is a secondary but credible concern.`;
-    } else {
-      opener = `${titleCase(country)} adds further weight to the picture.`;
-    }
-    paragraphs.push(`${opener} ${signal} ${why}`);
+    const leadItem = items.slice().sort(compareIncidentSignificance)[0];
+    const signal = leadItem
+      ? rawDevelopmentSentence(leadItem)
+      : regionalSignalPhrase(country, items, fam);
+    paragraphs.push(`${signal} ${why}`);
   }
   return paragraphs.join("\n\n");
 }
@@ -1102,6 +1086,12 @@ const FUEL_POWER_CONTINUITY_RE =
 const FUEL_CROSS_READ_EVIDENCE_RE =
   /\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|(?:oil|fuel|crude|product) tanker)\b[^.!?]{0,100}\b(?:production|output|refin(?:e|ing)|supply|shortage|scarcity|availability|unavailable|ration(?:ing|ed)?|price[s]?|cost[s]?|transit|shipment|cargo|flow[s]?|delivery|distribution|logistics|loading|export[s]?|import[s]?|route[s]?|traffic|continuity|outage|shutdown|closure|attack|struck|damaged|halt(?:ed)?|disrupt(?:ed|ion)?|block(?:ed|ade)?|rerout(?:ed|ing)?|reroute)\b|\b(?:production|output|refin(?:e|ing)|supply|shortage|scarcity|availability|unavailable|ration(?:ing|ed)?|price[s]?|cost[s]?|transit|shipment|cargo|flow[s]?|delivery|distribution|logistics|loading|export[s]?|import[s]?|route[s]?|traffic|continuity|outage|shutdown|closure|attack|struck|damaged|halt(?:ed)?|disrupt(?:ed|ion)?|block(?:ed|ade)?|rerout(?:ed|ing)?|reroute)\b[^.!?]{0,100}\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|(?:oil|fuel|crude|product) tanker)\b/i;
 
+// A vessel attack is not a Fuel Watch development merely because the vessel is
+// called an oil tanker. Shipping cross-reads must state the resulting fuel-side
+// effect; casualties, an attack verb, or chokepoint geography alone stay out.
+const SHIPPING_FUEL_CONSEQUENCE_RE =
+  /\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|(?:oil|fuel|crude|product) tanker)\b[^.!?]{0,120}\b(?:production|output|supply|shortage|scarcity|availability|price[s]?|cost[s]?|transit|shipment|cargo|flow[s]?|delivery|distribution|logistics|loading|export[s]?|import[s]?|route[s]?|traffic|continuity)\b[^.!?]{0,80}\b(?:cancel(?:led|ed|lation)?|delay(?:ed|s)?|suspend(?:ed|s)?|halt(?:ed|s)?|stop(?:ped|s)?|curtail(?:ed|s)?|divert(?:ed|s)?|rerout(?:ed|ing)?|disrupt(?:ed|ion|s)?|block(?:ed|ade)?|shutdown|closure|unavailable|reduc(?:ed|tion))\b|\b(?:cancel(?:led|ed|lation)?|delay(?:ed|s)?|suspend(?:ed|s)?|halt(?:ed|s)?|stop(?:ped|s)?|curtail(?:ed|s)?|divert(?:ed|s)?|rerout(?:ed|ing)?|disrupt(?:ed|ion|s)?|block(?:ed|ade)?|shutdown|closure|unavailable|reduc(?:ed|tion))\b[^.!?]{0,120}\b(?:fuel|petrol|gasoline|diesel|kerosene|lpg|lng|jet fuel|aviation fuel|crude|oil|petroleum|bunker|marine fuel|refiner(?:y|ies)?|pipeline|fuel depot|terminal|shipment|cargo|loading|export|import|flow|delivery|distribution)\b/i;
+
 // Conflict rows are normally pre-filtered by the conflict topic relevance
 // gate. Cross-read candidates need to be evaluated before that gate, though:
 // a concise but genuine fuel consequence ("missile strike damages refinery")
@@ -1146,7 +1136,7 @@ export function filterFuelContinuityCrossRead(
     // A chokepoint and a kinetic verb establish shipping risk, not fuel
     // relevance.  Require an explicit fuel cargo/flow/price/infrastructure
     // consequence in the article itself.
-    if (!FUEL_CROSS_READ_EVIDENCE_RE.test(hay)) continue;
+    if (!SHIPPING_FUEL_CONSEQUENCE_RE.test(hay)) continue;
     shippingCandidates.push(i);
   }
   const energyCandidates: TopicFastFactsIncident[] = [];
@@ -1517,20 +1507,13 @@ export function buildFuelOperationalRead(opts: {
       aggregateIncidentSignificance(b.items) - aggregateIncidentSignificance(a.items),
   );
 
-  const themeLine = ordered
-    .slice(0, 3)
-    .map(({ fam }) =>
-      fam.key === "shortage"
-        ? observedAccessCondition(window.map((i) => haystack(i)).join(" ").toLowerCase())
-        : fam.phrase,
-    )
-    .join("; ");
-
   const lead = ordered[0];
-  // Use `opMeaning` here, not `why` — `why` is already used verbatim in
-  // Regional Highlights and we don't want the same sentence in two
-  // adjacent sections.
-  const driverPara = `The main themes right now are ${themeLine}. ${lead.fam.opMeaning}`;
+  const driverPara = window
+    .slice()
+    .sort(compareIncidentSignificance)
+    .slice(0, 3)
+    .map(rawDevelopmentSentence)
+    .join(" ");
 
   // Name geographies only when significance is material — never rank by
   // raw record volume ("carries N records" / "most activity this week").
@@ -1546,7 +1529,8 @@ export function buildFuelOperationalRead(opts: {
         : ` The reported operational themes are most visible in ${joinWithAnd(sigCountries)}.`
       : "";
 
-  return where ? `${driverPara}\n\n${where.trim()}` : driverPara;
+  const implication = `${lead.fam.opMeaning}${where}`;
+  return `${driverPara}\n\n${implication.trim()}`;
 }
 
 function bulletNormKey(s: string): string {
@@ -2242,19 +2226,18 @@ function rankBusinessSignificantDevelopments(facts: FuelCanonicalFacts): Canonic
   return kept.slice(0, 3);
 }
 
+function rawDevelopmentSentence(i: TopicFastFactsIncident): string {
+  const date = proseDay((i.occurredAt ?? "").slice(0, 10));
+  const title = stripWireCruft(i.title ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.!?]+$/, "");
+  if (!title) return `On ${date}, a fuel-market development was reported.`;
+  return `On ${date}, ${title}.`;
+}
+
 function developmentSentence(i: CanonicalFuelIncident): string {
-  const where = eventLocationForProse(i);
-  const date = proseDay(i.date);
-  const fact = summarizeFuelDevelopmentClause({
-    title: i.title,
-    summary: i.raw.summary,
-    country: i.country,
-    location: i.physicalLocation,
-    routeOrChokepoint: i.routeOrChokepoint,
-  });
-  const factText = fact.replace(/\.$/, "");
-  const loc = where && !locationAlreadyInClause(factText, where) ? ` in ${where}` : "";
-  return `On ${date}${loc}, ${factText}.`;
+  return rawDevelopmentSentence(i.raw);
 }
 
 function buildFuelExecutiveSummary(facts: FuelCanonicalFacts): string {
@@ -2278,6 +2261,10 @@ function buildFuelSituationAssessment(facts: FuelCanonicalFacts): string {
           ? "Supplied market comparisons use lagged or undated references, so they provide context rather than a reporting-period direction."
         : "Market-price direction is unclear from the supplied observations.";
   parts.push(marketDir);
+  for (const incident of rankMaterialDevelopments(facts).slice(0, 2)) {
+    if (incident.evidenceStatus === "Potential") continue;
+    parts.push(developmentSentence(incident));
+  }
   if (hasPattern(hay, ISSUE_FAMILIES.find((f) => f.key === "shortage")!.test)) {
     parts.push(`The evidence records ${observedAccessCondition(hay)} in at least one market.`);
   }

@@ -8,10 +8,10 @@ Per-country when:14d targeted feeds + regulator gazetteer aliases; "oil transpor
 
 ## Qualifying-set continuity cross-read (fuelNarratives.filterFuelContinuityCrossRead)
 Fuel Watch's qualifying set = fuel-topic window PLUS a bounded cross-read:
-- shipping-topic rows with a tracked chokepoint name AND a kinetic verb (missile/attack/seizure/closure…) — a strike on a vessel in the Gulf of Oman is fuel-route pressure even with no fuel token in the headline;
+- shipping-topic rows require a tracked chokepoint, a kinetic event, AND an explicit resulting fuel-side effect (halted/delayed/cancelled cargo, loading, supply or flow). Vessel attacks and casualties alone are OUT, even for an oil tanker;
 - energy-topic rows with a fuel-to-power continuity signal (load-shedding, or shortage/rationing WITH an explicit fuel/gas anchor). Bare "power cuts/blackout" is deliberately excluded (ordinary grid faults) and service-guide/explainer titles are rejected.
 
-**Why:** the fuel relevance gate is fuel-operational-scoped, so Pakistan chokepoint strikes (shipping) and Bangladesh gas-shortage load-shedding (energy) were invisible to the report though relevant in the DB.
+**Why:** casualty-only Red Sea/Hormuz attacks polluted Fuel Watch. Route risk is not fuel-market evidence until the record states a physical fuel consequence.
 
 **Invariants:**
 - Cross-read admits are syndication-collapsed: nearDuplicate title tokens AND a per-(canonicalised chokepoint, day) coarse key; also collapsed AGAINST the fuel window's titles (identity keys alone double-count a cross-topic rewrite). Pools are capped separately (shipping 4 / energy 4) so a strike week can't starve the energy admits.

@@ -53,7 +53,9 @@ function freshestRow(rows: MarketPrice[], key: string, end: string): MarketPrice
         .filter((point) => point.date <= end && Number.isFinite(point.value))
         .sort((a, b) => a.date.localeCompare(b.date));
       const point = points.at(-1);
-      return point ? { row, date: point.date } : row.asOf <= end ? { row, date: row.asOf } : null;
+      const dates = [point?.date, row.asOf <= end ? row.asOf : null]
+        .filter((date): date is string => !!date);
+      return dates.length ? { row, date: dates.sort().at(-1)! } : null;
     })
     .filter((candidate): candidate is { row: MarketPrice; date: string } => !!candidate)
     .sort((a, b) => {
@@ -69,17 +71,13 @@ export function buildFuelHardNumbersFromMarket(rows: MarketPrice[], end: string)
     .map((key) => ({ key, row: freshestRow(rows, key, end) }))
     .filter((entry): entry is { key: "brent" | "wti" | "jet"; row: MarketPrice } => !!entry.row);
   const prices = selected.map(({ key, row }) => {
-    const point = (row.trajectory ?? [])
-      .filter((candidate) => candidate.date <= end && Number.isFinite(candidate.value))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .at(-1);
     return {
       label: key === "jet" ? "Jet fuel" : row.label,
       ...(row.benchmark ? { benchmark: row.benchmark } : {}),
-      value: point?.value ?? row.value,
+      value: row.value,
       unit: row.unit,
       ...(row.change ? { change: row.change } : {}),
-      asOf: point?.date ?? row.asOf,
+      asOf: row.asOf,
       source: row.source,
     };
   });
@@ -95,7 +93,7 @@ export function buildFuelHardNumbersFromMarket(rows: MarketPrice[], end: string)
             benchmark: jet.benchmark ?? "Global jet fuel composite",
             source: jet.source,
             unit: jet.unit,
-            period: "current reporting period",
+            period: "latest month",
             points: jetPoints,
           },
         }

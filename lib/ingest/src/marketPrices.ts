@@ -70,6 +70,7 @@ function buildHardNumbers(
   wti: Series,
   jet: Series,
   jetHeadline?: Series,
+  previousHardNumbers?: unknown,
 ): { hardNumbers: Record<string, unknown>; brent: number | null; wti: number | null; jet: number | null; asOf: string | null } | null {
   const b = valueAsOf(brent, anchorDate);
   const w = valueAsOf(wti, anchorDate);
@@ -113,19 +114,42 @@ function buildHardNumbers(
     jetHeadline && valueAsOf(jetHeadline, anchorDate)
       ? jetHeadline
       : jet;
-  const trajPoints = trajectoryAsOf(trajectorySeries, anchorDate, 6);
+  const freshTrajPoints = trajectoryAsOf(trajectorySeries, anchorDate, 6);
+  const previousTrajectory =
+    previousHardNumbers && typeof previousHardNumbers === "object"
+      ? (previousHardNumbers as { jetFuelTrajectory?: { source?: unknown; unit?: unknown; points?: unknown } })
+          .jetFuelTrajectory
+      : undefined;
+  const isIataTrajectory = trajectorySeries.id === "IATA_GLOBAL_JET";
+  const trajectorySourceMatches =
+    previousTrajectory?.source === trajectorySeries.source &&
+    previousTrajectory?.unit === (isIataTrajectory ? "USD/bbl" : "USD/gal");
+  const merged = new Map<string, number>();
+  if (trajectorySourceMatches && Array.isArray(previousTrajectory?.points)) {
+    for (const point of previousTrajectory.points) {
+      if (!point || typeof point !== "object") continue;
+      const date = (point as { date?: unknown }).date;
+      const value = Number((point as { value?: unknown }).value);
+      if (typeof date === "string" && date <= anchorDate && Number.isFinite(value)) {
+        merged.set(date, value);
+      }
+    }
+  }
+  for (const point of freshTrajPoints) merged.set(point.date, point.value);
+  const trajPoints = Array.from(merged, ([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-6);
   const hardNumbers: Record<string, unknown> = {
     fastFacts: { prices },
   };
   if (trajPoints.length >= 2) {
-    const isIataTrajectory = trajectorySeries.id === "IATA_GLOBAL_JET";
     hardNumbers["jetFuelTrajectory"] = {
       benchmark: isIataTrajectory
         ? "Global jet fuel composite"
         : "U.S. Gulf Coast kerosene-type jet fuel",
       source: trajectorySeries.source,
       unit: isIataTrajectory ? "USD/bbl" : "USD/gal",
-      period: isIataTrajectory ? "latest weekly comparison" : "recent weeks",
+      period: isIataTrajectory ? "latest month" : "recent weeks",
       points: trajPoints,
     };
   }
@@ -157,7 +181,11 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
   // 70-day buffer (covers the prior-week change line + the 6-point weekly jet
   // trajectory, with margin for FRED reporting gaps).
   const fuelReports = await db
-    .select({ id: reportsTable.id, issueDate: reportsTable.issueDate })
+    .select({
+      id: reportsTable.id,
+      issueDate: reportsTable.issueDate,
+      hardNumbers: reportsTable.hardNumbers,
+    })
     .from(reportsTable)
     .where(eq(reportsTable.topic, "fuel"));
 
@@ -301,6 +329,7 @@ export async function runMarketPricesIngest(opts: { commit?: boolean } = {}): Pr
       wti,
       jet,
       isCurrentIssue && jetHeadline.points.length > 0 ? jetHeadline : undefined,
+      r.hardNumbers,
     );
     if (!built) {
       log(`  report ${r.id} (issue ${issueDate}, anchor ${anchorDate}): no price data on or before anchor — skipped`);

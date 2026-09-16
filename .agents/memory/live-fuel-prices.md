@@ -124,6 +124,13 @@ incident-only, so there was nothing fabricated to replace there.
   canonical assembly. Jet headline and trajectory must share source and unit;
   block preview/export when today's date, rolling-window dates, source/unit
   parity, or IATA-over-FRED precedence fails.
+- IATA MONTHLY CHART HISTORY: IATA's text supplies only the current value and
+  prior-week change, while its authoritative "Recent Jet Fuel Price Development"
+  table supplies the latest five weekly observations. Preserve same-source,
+  same-unit IATA points across refreshes; merge by date and cap the rolling
+  history rather than replacing it with two reconstructed comparison points.
+  **Why:** replacement collapsed the normal monthly chart to one straight
+  two-point weekly segment.
 - HORIZON TRAP: the FRED fetch window must reach back to the OLDEST fuel
   report's issue date (with buffer for the prior-week change line + the weekly
   jet trajectory), NOT a fixed recent window — a fixed window silently skips

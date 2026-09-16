@@ -33,6 +33,28 @@ export type MarketSnapshotSummary = {
   logLines: string[];
 };
 
+type TrajectoryPoint = { date: string; value: number };
+
+function mergeTrajectoryHistory(
+  previous: unknown,
+  incoming: TrajectoryPoint[],
+  limit: number,
+): TrajectoryPoint[] {
+  const points = new Map<string, number>();
+  if (Array.isArray(previous)) {
+    for (const point of previous) {
+      if (!point || typeof point !== "object") continue;
+      const date = (point as { date?: unknown }).date;
+      const value = Number((point as { value?: unknown }).value);
+      if (typeof date === "string" && Number.isFinite(value)) points.set(date, value);
+    }
+  }
+  for (const point of incoming) points.set(point.date, point.value);
+  return Array.from(points, ([date, value]) => ({ date, value }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-limit);
+}
+
 type CrudeSpec = {
   kind: "crude";
   yahoo: { symbol: string; source: string };
@@ -204,6 +226,10 @@ export async function runMarketSnapshotIngest(
     }
   }
 
+  const existingRows = await db.select().from(marketPricesTable);
+  const existingByKey = new Map(
+    existingRows.map((row) => [`${row.group}:${row.key}`, row]),
+  );
   let upserted = 0;
   for (const spec of SPECS) {
     try {
@@ -262,10 +288,17 @@ export async function runMarketSnapshotIngest(
         spec.changeMode === "prev"
           ? changeVsPrev(series, latest.date, "MoM")
           : changeOver(series, latest.date, latest.value, 7, "7d");
-      const trajectory = trajectoryAsOf(series, latest.date, spec.trajCount).map((p) => ({
+      const freshTrajectory = trajectoryAsOf(series, latest.date, spec.trajCount).map((p) => ({
         date: p.date,
         value: round(p.value, spec.decimals),
       }));
+      const previous = existingByKey.get(`${spec.group}:${spec.key}`);
+      const trajectory =
+        spec.fetch.kind === "iata-jet" &&
+        previous?.source === series.source &&
+        previous.unit === spec.unit
+          ? mergeTrajectoryHistory(previous.trajectory, freshTrajectory, spec.trajCount)
+          : freshTrajectory;
 
       const row: InsertMarketPrice = {
         group: spec.group,
