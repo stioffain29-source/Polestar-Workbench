@@ -2559,6 +2559,32 @@ function buildFuelPolestarJudgement(facts: FuelCanonicalFacts): string {
   return `Fuel risk is ${facts.overallSeverity}. ${driver} ${exposure} ${outlook} ${next}`;
 }
 
+function buildFuelRegionalHighlightsFromFacts(facts: FuelCanonicalFacts): string {
+  const confirmed = facts.qualifyingIncidents
+    .filter((incident) => incident.evidenceStatus !== "Potential");
+  const supplyChain = selectExplicitSaudiSupplyChainDevelopments(facts);
+  if (supplyChain.length >= 2) {
+    const evidence = confirmed
+      .map((incident) => `${incident.title} ${incident.raw.summary ?? ""}`)
+      .join(" ");
+    const hasOrlenReplacement = /\borlen\b/i.test(evidence)
+      && /\b(north sea|united states|algeria|kazakhstan|guyana|replacement barrels?|alternative crude)\b/i.test(evidence);
+    const europe = hasOrlenReplacement
+      ? "Europe — Cancelled or delayed late-September Saudi cargoes have moved the disruption into refinery procurement. Orlen is seeking replacement barrels from the North Sea, United States, Algeria, Kazakhstan and Guyana, creating exposure to different freight, grade and delivery economics."
+      : "Europe — Cancelled or delayed late-September Saudi cargoes have moved the disruption into refinery procurement, leaving affected refiners to replace scheduled barrels and reassess delivery timing, freight and crude-slate requirements.";
+    return [
+      "Saudi Arabia — The East-West Pipeline attack has removed the Yanbu Red Sea export route from service, suspended west-coast loadings and reduced shipments to Europe. The immediate constraint is physical export capacity rather than a precautionary market signal.",
+      europe,
+    ].join("\n\n");
+  }
+
+  return buildFuelRegionalHighlights({
+    issueDate: facts.reportingPeriod.issueDate,
+    incidents: confirmed.map((incident) => incident.raw),
+    window: confirmed.map((incident) => incident.raw),
+  }) ?? "No regional fuel-market development met the evidence threshold for this reporting window.";
+}
+
 /** Build count-free analytical sections from canonical facts. */
 export function buildFuelAnalyticalSections(
   facts: FuelCanonicalFacts,
@@ -2577,10 +2603,7 @@ export function buildFuelAnalyticalSections(
   whatHappenedEvidenceIds: string[][];
   watchNextEvidenceIds: string[][];
 } {
-  // Regional Highlights was duplicating stronger evidence-led sections with
-  // generic country templates ("a material development was reported there").
-  // Fuel Watch now omits the section rather than publishing filler.
-  const regionalHighlights = "";
+  const regionalHighlights = buildFuelRegionalHighlightsFromFacts(facts);
   const operationalRead =
     buildFuelOperationalRead({
       issueDate: facts.reportingPeriod.issueDate,

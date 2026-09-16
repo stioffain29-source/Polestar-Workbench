@@ -351,7 +351,11 @@ describe("Saudi pipeline and cargo narrative", () => {
       ],
     );
     const sections = data.narrativeData.canonicalSections;
-    expect(sections.regionalHighlights).toBe("");
+    expect(sections.regionalHighlights).toMatch(/Saudi Arabia —/);
+    expect(sections.regionalHighlights).toMatch(/East-West Pipeline/i);
+    expect(sections.regionalHighlights).toMatch(/Yanbu Red Sea export route/i);
+    expect(sections.regionalHighlights).toMatch(/Europe —/);
+    expect(sections.regionalHighlights).toMatch(/cancelled or delayed late-September Saudi cargoes/i);
     const rendered = [
       sections.situation,
       sections.whatMatters,
