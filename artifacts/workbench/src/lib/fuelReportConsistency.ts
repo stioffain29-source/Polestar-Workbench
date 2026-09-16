@@ -864,6 +864,17 @@ export function resolveFuelEffectiveSections(opts: {
       field === "whatHappened" ? "\n\n" : "\n",
     ) || deterministic;
   };
+  const resolveSituation = (
+    editor: string | null | undefined,
+    ai: string | null | undefined,
+    deterministic: string,
+  ): string => {
+    const e = (editor ?? "").trim();
+    const a = (ai ?? "").trim();
+    if (generated?.isAnalystEdited === true) return e || a || deterministic;
+    if (e && (!a || e !== a)) return e;
+    return deterministic;
+  };
   const resolveCanonicalAnalysis = (
     field: "whatMatters" | "polestarView" | "implications" | "watchNext",
     editor: string | null | undefined,
@@ -906,7 +917,7 @@ export function resolveFuelEffectiveSections(opts: {
   );
   return {
     executiveSummary: resolveText(report.executiveSummary, generated?.executiveSummary, canonical.executiveSummary),
-    situation: resolveText(report.situation, generated?.situation, canonical.situation),
+    situation: resolveSituation(report.situation, generated?.situation, canonical.situation),
     whatHappened: resolveAnalytical("whatHappened", report.whatHappened, generated?.whatHappened, canonical.whatHappened),
     whatMatters: resolveCanonicalAnalysis("whatMatters", report.whatMatters, generated?.whatMatters, canonical.whatMatters),
     polestarView: resolveCanonicalAnalysis("polestarView", report.polestarView, generated?.polestarView, canonical.polestarView),

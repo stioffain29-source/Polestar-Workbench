@@ -24,3 +24,6 @@ description: One facts object drives Fuel Watch; factual and semantic validation
   **How to apply:** overall and severity totals may include the full qualifying set; country rows and active-country counts use only developments with verified country attribution.
 - Generated prose may draft chronology, but it must not outrank canonical What Matters, Implications, Watch Next or Polestar View unless it is an explicit analyst edit.
   **Why:** generic generated text displaced evidence-led sections while the operator table changed independently, leaving a sparse table beside stale prose.
+- Fuel operational severity is internally ordered S1-S5 but displayed as Limited, Material, Serious, Major, Critical under "Current Severity". It never uses report risk or generic incident severity.
+  **Why:** Low/Moderate/High reused risk-like labels and obscured the difference between event impact and forward-looking risk.
+  **How to apply:** assess each canonical development from evidenced disruption, supply, price and geographic consequences; country severity is the highest operational level among its developments.

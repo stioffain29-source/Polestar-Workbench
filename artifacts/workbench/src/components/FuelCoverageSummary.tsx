@@ -2,10 +2,12 @@ import type { CSSProperties, ReactElement } from "react";
 import {
   buildFuelCoverageSummary,
   FUEL_COVERAGE_SEVERITIES,
+  FUEL_OPERATIONAL_SEVERITY_LABELS,
   type FuelCoverageCountry,
+  type FuelOperationalSeverity,
   type FuelCoverageSummary as FuelCoverageModel,
 } from "@/lib/fuelCoverage";
-import type { FuelCanonicalFacts, FuelSeverity } from "@/lib/fuelCanonicalFacts";
+import type { FuelCanonicalFacts } from "@/lib/fuelCanonicalFacts";
 import { SEV_COLOR, WHITE } from "@/lib/pdfChrome";
 
 const NAVY = "#0b0a3d";
@@ -13,8 +15,15 @@ const ELECTRIC = "#465bff";
 const DUSK = "#363636";
 const POLAR = "#e2e2e2";
 
-function severityColor(severity: FuelSeverity): string {
-  return SEV_COLOR[severity.toLowerCase()] ?? SEV_COLOR.insignificant;
+function severityColor(severity: FuelOperationalSeverity): string {
+  const colorKey: Record<FuelOperationalSeverity, keyof typeof SEV_COLOR> = {
+    S1: "insignificant",
+    S2: "low",
+    S3: "moderate",
+    S4: "high",
+    S5: "extreme",
+  };
+  return SEV_COLOR[colorKey[severity]] ?? SEV_COLOR.insignificant;
 }
 
 const rootStyle: CSSProperties = {
@@ -61,8 +70,8 @@ const tableCellStyle: CSSProperties = {
   verticalAlign: "middle",
 };
 
-function severityPill(severity: FuelSeverity | null): ReactElement {
-  const label = severity ?? "Not assessed";
+function severityPill(severity: FuelOperationalSeverity | null): ReactElement {
+  const label = severity ? FUEL_OPERATIONAL_SEVERITY_LABELS[severity] : "Not assessed";
   return (
     <span
       style={{
@@ -140,13 +149,6 @@ function BarRows({
   );
 }
 
-function countrySeverityDetail(row: FuelCoverageCountry): string {
-  return FUEL_COVERAGE_SEVERITIES
-    .filter((severity) => row.severityDistribution[severity] > 0)
-    .map((severity) => `${severity} ${row.severityDistribution[severity]}`)
-    .join(" · ");
-}
-
 function CoverageBody({
   model,
   countryRows = model.affectedCountries,
@@ -159,7 +161,7 @@ function CoverageBody({
   continued?: boolean;
 }): ReactElement {
   const severityRows = FUEL_COVERAGE_SEVERITIES.map((severity) => ({
-    label: severity,
+    label: FUEL_OPERATIONAL_SEVERITY_LABELS[severity],
     value: model.severityDistribution[severity],
     color: severityColor(severity),
   }));
@@ -263,10 +265,9 @@ function CoverageBody({
         >
           <thead>
             <tr>
-              <th style={{ ...tableHeadStyle, width: "37%" }}>Country</th>
-              <th style={{ ...tableHeadStyle, width: "16%", textAlign: "right" }}>Developments</th>
-              <th style={{ ...tableHeadStyle, width: "20%" }}>Highest severity</th>
-              <th style={{ ...tableHeadStyle, width: "27%" }}>Severity detail</th>
+              <th style={{ ...tableHeadStyle, width: "50%" }}>Country</th>
+              <th style={{ ...tableHeadStyle, width: "22%", textAlign: "right" }}>Developments</th>
+              <th style={{ ...tableHeadStyle, width: "28%" }}>Current Severity</th>
             </tr>
           </thead>
           <tbody>
@@ -279,9 +280,6 @@ function CoverageBody({
                   {row.count}
                 </td>
                 <td style={tableCellStyle}>{severityPill(row.highestSeverity)}</td>
-                <td style={{ ...tableCellStyle, color: DUSK }}>
-                  {countrySeverityDetail(row)}
-                </td>
               </tr>
             ))}
           </tbody>

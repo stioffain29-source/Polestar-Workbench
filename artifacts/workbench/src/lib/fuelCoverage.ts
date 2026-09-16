@@ -1,24 +1,26 @@
 import { addDays, format, parseISO } from "date-fns";
 import type {
   FuelCanonicalFacts,
-  FuelSeverity,
 } from "./fuelCanonicalFacts";
 import { deriveIncidentCountry } from "./shippingCountry";
 
-export interface FuelCoverageSeverityCounts {
-  Insignificant: number;
-  Low: number;
-  Moderate: number;
-  High: number;
-  Extreme: number;
-}
+export type FuelOperationalSeverity = "S1" | "S2" | "S3" | "S4" | "S5";
+export type FuelCoverageSeverityCounts = Record<FuelOperationalSeverity, number>;
+
+export const FUEL_OPERATIONAL_SEVERITY_LABELS: Record<FuelOperationalSeverity, string> = {
+  S1: "Limited",
+  S2: "Material",
+  S3: "Serious",
+  S4: "Major",
+  S5: "Critical",
+};
 
 export interface FuelCoverageCountry {
   country: string;
   /** Number of distinct, evidence-family-deduplicated developments. */
   count: number;
-  /** Highest severity among this country's canonical developments. */
-  highestSeverity: FuelSeverity | null;
+  /** Highest fuel-operational severity among this country's developments. */
+  highestSeverity: FuelOperationalSeverity | null;
   severityDistribution: FuelCoverageSeverityCounts;
 }
 
@@ -42,29 +44,52 @@ export interface FuelCoverageSummary {
   reportingPeriod: { start: string; end: string };
 }
 
-const SEVERITIES: readonly FuelSeverity[] = [
-  "Insignificant",
-  "Low",
-  "Moderate",
-  "High",
-  "Extreme",
-];
+const SEVERITIES: readonly FuelOperationalSeverity[] = ["S1", "S2", "S3", "S4", "S5"];
 
-const SEVERITY_RANK: Record<FuelSeverity, number> = {
-  Insignificant: 1,
-  Low: 2,
-  Moderate: 3,
-  High: 4,
-  Extreme: 5,
+const SEVERITY_RANK: Record<FuelOperationalSeverity, number> = {
+  S1: 1,
+  S2: 2,
+  S3: 3,
+  S4: 4,
+  S5: 5,
 };
 function emptySeverityCounts(): FuelCoverageSeverityCounts {
-  return {
-    Insignificant: 0,
-    Low: 0,
-    Moderate: 0,
-    High: 0,
-    Extreme: 0,
-  };
+  return { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 };
+}
+
+/**
+ * Fuel severity measures the confirmed operational or market effect of a
+ * development. It is deliberately independent of both the source incident's
+ * generic severity label and the report's forward-looking risk rating.
+ */
+export function assessFuelOperationalSeverity(
+  incident: FuelCanonicalFacts["qualifyingIncidents"][number],
+): FuelOperationalSeverity {
+  const text = `${incident.title} ${incident.raw.summary ?? ""}`.toLowerCase();
+  const international = /\b(?:international|global|multiple countries|multi-market|european customers?|european refiners?|cross-border)\b/.test(text);
+  const sustained = /\b(?:sustained|prolonged|indefinite|weeks?|months?|strategic-scale)\b/.test(text);
+  if (international && sustained
+      && /\b(?:supply cut|shipments? (?:halted|suspended|cancelled)|critical shortage|exports? (?:halted|suspended))\b/.test(text)) {
+    return "S5";
+  }
+  if (
+    /\b(?:pipeline|refinery|terminal|export route|port)\b/.test(text)
+    && /\b(?:offline|shut(?:down)?|closed|closure|major damage|destroyed|outage)\b/.test(text)
+    || /\b(?:cancelled|canceled|delayed|suspended|halted)\b.{0,60}\b(?:cargoes?|shipments?|loadings?|exports?)\b/.test(text)
+    || /\b(?:cargoes?|shipments?|loadings?|exports?)\b.{0,60}\b(?:cancelled|canceled|delayed|suspended|halted)\b/.test(text)
+  ) {
+    return "S4";
+  }
+  if (
+    /\b(?:significant|rationing|shortage|supply constraint|output loss|production cut|price surge|prices? (?:rose|jumped|surged))\b/.test(text)
+    || /\b(?:fuel|crude|diesel|petrol|gasoline|jet fuel)\b.{0,60}\b(?:disruption|tightness|unavailable)\b/.test(text)
+  ) {
+    return "S3";
+  }
+  if (/\b(?:delay|disruption|allocation|price increase|duty|subsidy|tender|replacement barrels?)\b/.test(text)) {
+    return "S2";
+  }
+  return "S1";
 }
 
 function dateOnly(value: string): string | null {
@@ -115,7 +140,8 @@ export function buildFuelCoverageSummary(
   const countries = new Map<string, FuelCoverageCountry>();
 
   for (const incident of incidents) {
-    severityDistribution[incident.severity] += 1;
+    const operationalSeverity = assessFuelOperationalSeverity(incident);
+    severityDistribution[operationalSeverity] += 1;
 
     const date = dateOnly(incident.occurredAt) ?? incident.date;
     if (date) daily.set(date, (daily.get(date) ?? 0) + 1);
@@ -138,12 +164,12 @@ export function buildFuelCoverageSummary(
         severityDistribution: emptySeverityCounts(),
       };
     row.count += 1;
-    row.severityDistribution[incident.severity] += 1;
+    row.severityDistribution[operationalSeverity] += 1;
     if (
       !row.highestSeverity ||
-      SEVERITY_RANK[incident.severity] > SEVERITY_RANK[row.highestSeverity]
+      SEVERITY_RANK[operationalSeverity] > SEVERITY_RANK[row.highestSeverity]
     ) {
-      row.highestSeverity = incident.severity;
+      row.highestSeverity = operationalSeverity;
     }
     countries.set(country, row);
   }

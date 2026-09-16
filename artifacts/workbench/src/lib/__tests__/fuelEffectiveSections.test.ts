@@ -89,7 +89,7 @@ describe("resolveFuelEffectiveSections precedence", () => {
       fuelData,
     });
     expect(eff.executiveSummary).toBe("AI exec.");
-    expect(eff.situation).toBe("AI situation.");
+    expect(eff.situation).toBe(fuelData.narrativeData.canonicalSections.situation);
     expect(eff.whatHappened).toBe("AI what happened.");
     expect(eff.whatMatters).toBe(fuelData.narrativeData.canonicalSections.whatMatters);
     expect(eff.polestarView).toBe(fuelData.narrativeData.canonicalSections.polestarView);
@@ -145,7 +145,18 @@ describe("resolveFuelEffectiveSections precedence", () => {
       fuelData,
     });
     expect(eff.executiveSummary).toBe("Analyst exec.");
-    expect(eff.situation).toBe("AI situation.");
+    expect(eff.situation).toBe(fuelData.narrativeData.canonicalSections.situation);
+  });
+
+  it("cannot let generated Situation duplicate the canonical What Happened chronology", () => {
+    const canonical = fuelData.narrativeData.canonicalSections;
+    const eff = resolveFuelEffectiveSections({
+      report: {},
+      aiProse: { situation: canonical.whatHappened },
+      fuelData,
+    });
+    expect(eff.situation).toBe(canonical.situation);
+    expect(eff.situation).not.toBe(canonical.whatHappened);
   });
 
   it("reads: legacy saved read fields are ignored in favour of canonical auto text", () => {
