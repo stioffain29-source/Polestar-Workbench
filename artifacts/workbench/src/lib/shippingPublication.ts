@@ -1915,6 +1915,39 @@ export function finalizeShippingPublication(
     const saved = trim(report[field]);
     return saved && !isGeneratedCandidate(field, saved) ? saved : fallback;
   };
+  const assessedSeverity = (rows: ShippingReportIncident[]): string => {
+    const assessed = highestSeverity(rows);
+    return assessed === "Not assessed" ? "Insignificant" : assessed;
+  };
+  const portRows = dataset.canonicalIncidents.filter((row) =>
+    /\b(port|terminal|berth|dock|harbour|harbor|anchorage)\b/i.test(
+      `${row.title} ${row.summary ?? ""} ${row.issue ?? ""} ${row.location ?? ""}`,
+    ),
+  );
+  const activeRouteAssessment = dataset.chokepointRows
+    .filter((row) => row.count > 0)
+    .reduce(
+      (best, row) => {
+        const key = trim(row.highestSeverityKey).toLowerCase();
+        return (SEVERITY_RANK[key] ?? 0) > best.rank
+          ? { rank: SEVERITY_RANK[key] ?? 0, label: row.highestSeverityLabel }
+          : best;
+      },
+      { rank: 0, label: "Insignificant" },
+    ).label;
+  const threatTrend = (category: string): string =>
+    dataset.threatTrends.find((metric) => metric.category === category)?.trend ??
+    "—";
+  const routeTrend =
+    dataset.registerMetrics.previousMonth === null
+      ? "—"
+      : dataset.registerMetrics.currentMonth >
+          dataset.registerMetrics.previousMonth
+        ? "↑"
+        : dataset.registerMetrics.currentMonth <
+            dataset.registerMetrics.previousMonth
+          ? "↓"
+          : "→";
   const prose: ShippingPublicationProse = {
     executiveSummary: resolveNarrative("executiveSummary", deterministic.executiveSummary),
     chokepointRouteRead: resolveRead("chokepointRouteRead", deterministic.chokepointRouteRead),
@@ -1927,16 +1960,33 @@ export function finalizeShippingPublication(
     watchNext: resolveNarrative("watchNext", deterministic.watchNext),
     polestarView: resolveNarrative("polestarView", deterministic.polestarView),
 
-    vesselSecurityAssessment: trim(report.vesselSecurityAssessment) || "Insignificant",
-    vesselSecurityTrend: trim(report.vesselSecurityTrend) || "→",
-    piracyAssessment: trim(report.piracyAssessment) || "Insignificant",
-    piracyTrend: trim(report.piracyTrend) || "→",
-    portsTerminalsAssessment: trim(report.portsTerminalsAssessment) || "Insignificant",
-    portsTerminalsTrend: trim(report.portsTerminalsTrend) || "→",
-    routesChokepointsAssessment: trim(report.routesChokepointsAssessment) || "Insignificant",
-    routesChokepointsTrend: trim(report.routesChokepointsTrend) || "→",
-    commercialDisruptionAssessment: trim(report.commercialDisruptionAssessment) || "Insignificant",
-    commercialDisruptionTrend: trim(report.commercialDisruptionTrend) || "→",
+    vesselSecurityAssessment:
+      trim(report.vesselSecurityAssessment) ||
+      assessedSeverity(dataset.vesselRows),
+    vesselSecurityTrend:
+      trim(report.vesselSecurityTrend) ||
+      threatTrend("VESSEL ATTACKS / SEIZURES"),
+    piracyAssessment:
+      trim(report.piracyAssessment) || assessedSeverity(dataset.piracyRows),
+    piracyTrend:
+      trim(report.piracyTrend) ||
+      threatTrend("PIRACY / ARMED ROBBERY"),
+    portsTerminalsAssessment:
+      trim(report.portsTerminalsAssessment) || assessedSeverity(portRows),
+    portsTerminalsTrend:
+      trim(report.portsTerminalsTrend) ||
+      threatTrend("PORT / TERMINAL SECURITY INCIDENTS"),
+    routesChokepointsAssessment:
+      trim(report.routesChokepointsAssessment) || activeRouteAssessment,
+    routesChokepointsTrend:
+      trim(report.routesChokepointsTrend) || routeTrend,
+    commercialDisruptionAssessment:
+      trim(report.commercialDisruptionAssessment) ||
+      assessedSeverity(dataset.commercialRows),
+    // There is no historical commercial-only comparison in the canonical
+    // dataset yet. Do not invent a direction when the evidence is unavailable.
+    commercialDisruptionTrend:
+      trim(report.commercialDisruptionTrend) || "—",
 
     // Older Shipping reports predate these monthly fields. Seed them from the
     // existing deterministic, evidence-grounded reads so the redesign remains

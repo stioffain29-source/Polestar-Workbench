@@ -877,18 +877,18 @@ export default function ShippingReportPreview({
         </div>
         <Section title="Indicators">
           <KpiGrid cards={[
-            { label: "Vessel Security", value: report.vesselSecurityAssessment || "Insignificant", note: report.vesselSecurityTrend || "→", severity: report.vesselSecurityAssessment || undefined },
-            { label: "Piracy / Armed Robbery", value: report.piracyAssessment || "Insignificant", note: report.piracyTrend || "→", severity: report.piracyAssessment || undefined },
-            { label: "Ports & Terminals", value: report.portsTerminalsAssessment || "Insignificant", note: report.portsTerminalsTrend || "→", severity: report.portsTerminalsAssessment || undefined },
-            { label: "Key Routes / Chokepoints", value: report.routesChokepointsAssessment || "Insignificant", note: report.routesChokepointsTrend || "→", severity: report.routesChokepointsAssessment || undefined },
-            { label: "Commercial Disruption", value: report.commercialDisruptionAssessment || "Insignificant", note: report.commercialDisruptionTrend || "→", severity: report.commercialDisruptionAssessment || undefined },
+            { label: "Vessel Security", value: prose.vesselSecurityAssessment, note: prose.vesselSecurityTrend, severity: prose.vesselSecurityAssessment },
+            { label: "Piracy / Armed Robbery", value: prose.piracyAssessment, note: prose.piracyTrend, severity: prose.piracyAssessment },
+            { label: "Ports & Terminals", value: prose.portsTerminalsAssessment, note: prose.portsTerminalsTrend, severity: prose.portsTerminalsAssessment },
+            { label: "Key Routes / Chokepoints", value: prose.routesChokepointsAssessment, note: prose.routesChokepointsTrend, severity: prose.routesChokepointsAssessment },
+            { label: "Commercial Disruption", value: prose.commercialDisruptionAssessment, note: prose.commercialDisruptionTrend, severity: prose.commercialDisruptionAssessment },
           ]} />
         </Section>
         <Section title="Bottom Line Up Front">
-          <Paragraphs text={report.executiveSummary} />
+          <Paragraphs text={prose.executiveSummary} />
         </Section>
         <Section title="Key Judgements">
-          <Paragraphs text={report.keyJudgements} />
+          <Paragraphs text={prose.keyJudgements} />
         </Section>
         <div className="page-footer">
           <div>{resolvedTitle}</div>
@@ -903,7 +903,7 @@ export default function ShippingReportPreview({
           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
         </div>
         <Section title="Regional Picture">
-          <Paragraphs text={report.regionalCountryRead} />
+          <Paragraphs text={prose.regionalCountryRead} />
         </Section>
         <Section title="Active Map">
           <div className="mt-4" style={{ height: 400 }}>
@@ -955,7 +955,7 @@ export default function ShippingReportPreview({
           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
         </div>
         <Section title="Dynamic Routes and Ports">
-          <Paragraphs text={report.routesAndPortsRead} />
+          <Paragraphs text={prose.routesAndPortsRead} />
         </Section>
         <div className="page-footer">
           <div>{resolvedTitle}</div>
@@ -970,7 +970,7 @@ export default function ShippingReportPreview({
           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
         </div>
         <Section title="Commercial Signal">
-          <Paragraphs text={report.commercialImpactRead} />
+          <Paragraphs text={prose.commercialImpactRead} />
         </Section>
         <div className="page-footer">
           <div>{resolvedTitle}</div>
@@ -985,16 +985,16 @@ export default function ShippingReportPreview({
           <img src={polestarLogo} alt="Polestar" className="h-5 opacity-80 mix-blend-multiply filter brightness-0" />
         </div>
         <Section title="Strategic Picture">
-          <Paragraphs text={report.polestarView} />
+          <Paragraphs text={prose.polestarView} />
         </Section>
         <Section title="Outlook — Next 30 Days">
-          <Paragraphs text={report.polestarOutlookRead} />
+          <Paragraphs text={prose.polestarOutlookRead} />
         </Section>
         <Section title="Watch Indicators">
-          <Paragraphs text={report.polestarWatchIndicators} />
+          <Paragraphs text={prose.polestarWatchIndicators} />
         </Section>
         <Section title="Escalation Triggers">
-          <Paragraphs text={report.polestarEscalationTriggers} />
+          <Paragraphs text={prose.polestarEscalationTriggers} />
         </Section>
         <div className="page-footer">
           <div>{resolvedTitle}</div>

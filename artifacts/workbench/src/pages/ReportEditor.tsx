@@ -88,7 +88,10 @@ import {
 } from "@/components/OrphanedFuelOverridesPanel";
 import { buildConflictReportDataset } from "@/lib/conflictReportDataset";
 import { buildShippingReportDataset } from "@/lib/shippingReportDataset";
-import { finalizeShippingPublication } from "@/lib/shippingPublication";
+import {
+  finalizeShippingPublication,
+  type ShippingPublicationProse,
+} from "@/lib/shippingPublication";
 import {
   buildFlashpointReportDataset,
   resolveFlashpointRenderedModel,
@@ -718,6 +721,7 @@ export default function ReportEditor() {
   const shippingFastFactProjection = useMemo<{
     editable: Array<{ label: string; value: string; note?: string }>;
     readonly: Array<{ label: string; value: string; note?: string }>;
+    prose: ShippingPublicationProse;
   } | null>(() => {
     if (form.topic !== "shipping" || !form.issueDate || !shippingDataset) {
       return null;
@@ -748,6 +752,7 @@ export default function ReportEditor() {
       });
       return {
         editable,
+        prose: publication.prose,
         readonly: [
           {
             label: "Overall Risk",
@@ -3234,7 +3239,7 @@ export default function ReportEditor() {
               <div className="shipping-brand-section text-[11px] uppercase tracking-widest font-bold text-muted-foreground mt-4 mb-2">Monthly Executive Assessment</div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Vessel Security Assessment">
-                  <Select value={form.vesselSecurityAssessment} onValueChange={(v) => set("vesselSecurityAssessment", v)}>
+                  <Select value={form.vesselSecurityAssessment || shippingFastFactProjection?.prose.vesselSecurityAssessment || ""} onValueChange={(v) => set("vesselSecurityAssessment", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Insignificant">Insignificant</SelectItem>
@@ -3246,17 +3251,18 @@ export default function ReportEditor() {
                   </Select>
                 </Field>
                 <Field label="Vessel Security Trend">
-                  <Select value={form.vesselSecurityTrend} onValueChange={(v) => set("vesselSecurityTrend", v)}>
+                  <Select value={form.vesselSecurityTrend || shippingFastFactProjection?.prose.vesselSecurityTrend || ""} onValueChange={(v) => set("vesselSecurityTrend", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="↑">↑ Deteriorating</SelectItem>
                       <SelectItem value="→">→ Stable</SelectItem>
                       <SelectItem value="↓">↓ Improving</SelectItem>
+                      <SelectItem value="—">— Not enough history</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Piracy / Armed Robbery Assessment">
-                  <Select value={form.piracyAssessment} onValueChange={(v) => set("piracyAssessment", v)}>
+                  <Select value={form.piracyAssessment || shippingFastFactProjection?.prose.piracyAssessment || ""} onValueChange={(v) => set("piracyAssessment", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Insignificant">Insignificant</SelectItem>
@@ -3268,17 +3274,18 @@ export default function ReportEditor() {
                   </Select>
                 </Field>
                 <Field label="Piracy / Armed Robbery Trend">
-                  <Select value={form.piracyTrend} onValueChange={(v) => set("piracyTrend", v)}>
+                  <Select value={form.piracyTrend || shippingFastFactProjection?.prose.piracyTrend || ""} onValueChange={(v) => set("piracyTrend", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="↑">↑ Deteriorating</SelectItem>
                       <SelectItem value="→">→ Stable</SelectItem>
                       <SelectItem value="↓">↓ Improving</SelectItem>
+                      <SelectItem value="—">— Not enough history</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Ports & Terminals Assessment">
-                  <Select value={form.portsTerminalsAssessment} onValueChange={(v) => set("portsTerminalsAssessment", v)}>
+                  <Select value={form.portsTerminalsAssessment || shippingFastFactProjection?.prose.portsTerminalsAssessment || ""} onValueChange={(v) => set("portsTerminalsAssessment", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Insignificant">Insignificant</SelectItem>
@@ -3290,17 +3297,18 @@ export default function ReportEditor() {
                   </Select>
                 </Field>
                 <Field label="Ports & Terminals Trend">
-                  <Select value={form.portsTerminalsTrend} onValueChange={(v) => set("portsTerminalsTrend", v)}>
+                  <Select value={form.portsTerminalsTrend || shippingFastFactProjection?.prose.portsTerminalsTrend || ""} onValueChange={(v) => set("portsTerminalsTrend", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="↑">↑ Deteriorating</SelectItem>
                       <SelectItem value="→">→ Stable</SelectItem>
                       <SelectItem value="↓">↓ Improving</SelectItem>
+                      <SelectItem value="—">— Not enough history</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Routes & Chokepoints Assessment">
-                  <Select value={form.routesChokepointsAssessment} onValueChange={(v) => set("routesChokepointsAssessment", v)}>
+                  <Select value={form.routesChokepointsAssessment || shippingFastFactProjection?.prose.routesChokepointsAssessment || ""} onValueChange={(v) => set("routesChokepointsAssessment", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Insignificant">Insignificant</SelectItem>
@@ -3312,17 +3320,18 @@ export default function ReportEditor() {
                   </Select>
                 </Field>
                 <Field label="Routes & Chokepoints Trend">
-                  <Select value={form.routesChokepointsTrend} onValueChange={(v) => set("routesChokepointsTrend", v)}>
+                  <Select value={form.routesChokepointsTrend || shippingFastFactProjection?.prose.routesChokepointsTrend || ""} onValueChange={(v) => set("routesChokepointsTrend", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="↑">↑ Deteriorating</SelectItem>
                       <SelectItem value="→">→ Stable</SelectItem>
                       <SelectItem value="↓">↓ Improving</SelectItem>
+                      <SelectItem value="—">— Not enough history</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Commercial Disruption Assessment">
-                  <Select value={form.commercialDisruptionAssessment} onValueChange={(v) => set("commercialDisruptionAssessment", v)}>
+                  <Select value={form.commercialDisruptionAssessment || shippingFastFactProjection?.prose.commercialDisruptionAssessment || ""} onValueChange={(v) => set("commercialDisruptionAssessment", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="Insignificant" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Insignificant">Insignificant</SelectItem>
@@ -3334,12 +3343,13 @@ export default function ReportEditor() {
                   </Select>
                 </Field>
                 <Field label="Commercial Disruption Trend">
-                  <Select value={form.commercialDisruptionTrend} onValueChange={(v) => set("commercialDisruptionTrend", v)}>
+                  <Select value={form.commercialDisruptionTrend || shippingFastFactProjection?.prose.commercialDisruptionTrend || ""} onValueChange={(v) => set("commercialDisruptionTrend", v)}>
                     <SelectTrigger className="rounded-[2px] shadow-none"><SelectValue placeholder="→ Stable" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="↑">↑ Deteriorating</SelectItem>
                       <SelectItem value="→">→ Stable</SelectItem>
                       <SelectItem value="↓">↓ Improving</SelectItem>
+                      <SelectItem value="—">— Not enough history</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -3347,7 +3357,7 @@ export default function ReportEditor() {
               <Field label="Key Judgements (Page 1)">
                 <Textarea
                   rows={5}
-                  value={form.keyJudgements}
+                  value={form.keyJudgements || shippingFastFactProjection?.prose.keyJudgements || ""}
                   onChange={(e) => set("keyJudgements", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3357,7 +3367,7 @@ export default function ReportEditor() {
               <Field label="Regional Picture (Page 2)">
                 <Textarea
                   rows={5}
-                  value={form.regionalCountryRead}
+                  value={form.regionalCountryRead || shippingFastFactProjection?.prose.regionalCountryRead || ""}
                   onChange={(e) => set("regionalCountryRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3365,7 +3375,7 @@ export default function ReportEditor() {
               <Field label="Routes & Ports to Watch (Page 4)">
                 <Textarea
                   rows={5}
-                  value={form.routesAndPortsRead}
+                  value={form.routesAndPortsRead || shippingFastFactProjection?.prose.routesAndPortsRead || ""}
                   onChange={(e) => set("routesAndPortsRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3373,7 +3383,7 @@ export default function ReportEditor() {
               <Field label="Commercial & Operational Impact (Page 5)">
                 <Textarea
                   rows={5}
-                  value={form.commercialImpactRead}
+                  value={form.commercialImpactRead || shippingFastFactProjection?.prose.commercialImpactRead || ""}
                   onChange={(e) => set("commercialImpactRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3382,7 +3392,7 @@ export default function ReportEditor() {
               <Field label="Outlook — Next 30 Days (Page 6)">
                 <Textarea
                   rows={5}
-                  value={form.polestarOutlookRead}
+                  value={form.polestarOutlookRead || shippingFastFactProjection?.prose.polestarOutlookRead || ""}
                   onChange={(e) => set("polestarOutlookRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3390,7 +3400,7 @@ export default function ReportEditor() {
               <Field label="Watch Indicators (Page 6)">
                 <Textarea
                   rows={5}
-                  value={form.polestarWatchIndicators}
+                  value={form.polestarWatchIndicators || shippingFastFactProjection?.prose.polestarWatchIndicators || ""}
                   onChange={(e) => set("polestarWatchIndicators", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
@@ -3398,16 +3408,8 @@ export default function ReportEditor() {
               <Field label="Escalation Triggers (Page 6)">
                 <Textarea
                   rows={5}
-                  value={form.polestarEscalationTriggers}
+                  value={form.polestarEscalationTriggers || shippingFastFactProjection?.prose.polestarEscalationTriggers || ""}
                   onChange={(e) => set("polestarEscalationTriggers", e.target.value)}
-                  className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
-                />
-              </Field>
-              <Field label="Regional Picture Read">
-                <Textarea
-                  rows={5}
-                  value={form.regionalCountryRead}
-                  onChange={(e) => set("regionalCountryRead", e.target.value)}
                   className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
                 />
               </Field>
