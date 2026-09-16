@@ -17,9 +17,6 @@ import {
   drawFooters,
   drawPolestarCover,
   beginBodyPages,
-  prepareCoverImage,
-  COVER_TOP_BAND_H,
-  COVER_BOTTOM_BLOCK_H,
   HEADER_BAND_H,
   FOOTER_BAND_H,
   DISCLAIMER_TEXT,
@@ -38,7 +35,6 @@ import {
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
-import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportWindow } from "./reportWindow";
 import { canonicalTopic, resolveReportTitle } from "./reportNaming";
 import type { TopicSectionOverrides } from "./topicSectionOverrides";
@@ -1904,24 +1900,13 @@ export async function exportShippingReportPdf(
   // Embed Roboto on this pdf instance before drawing any text. Without this,
   // jsPDF silently falls back to Helvetica, which the brand spec forbids.
   await ensureRobotoLoaded(ctx.pdf);
-  let coverImage: Awaited<ReturnType<typeof prepareCoverImage>> | undefined;
-  try {
-    const heroH = ctx.H - COVER_TOP_BAND_H - COVER_BOTTOM_BLOCK_H;
-    coverImage = await prepareCoverImage(shippingCoverUrl, ctx.W, heroH);
-  } catch (err) {
-    console.warn(
-      "[exportShippingReportPdf] cover image load failed, falling back to gradient hero",
-      err,
-    );
-  }
   drawPolestarCover(ctx, {
     title: resolvedTitle,
-    subtitle: "POLESTAR INSIGHTS",
+    subtitle: "POLESTAR INSIGHTS · MARITIME INTELLIGENCE",
     // win.label is just the date range. The cover renderer expects the
     // full "REPORTING PERIOD: ..." string — every caller prepends its own
     // prefix so the label never reads twice.
     reportingPeriod: `REPORTING PERIOD: ${win.label.toUpperCase()}`,
-    coverImage,
   });
   void cadence;
 

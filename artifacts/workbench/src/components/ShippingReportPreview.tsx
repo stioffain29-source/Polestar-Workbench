@@ -5,7 +5,6 @@ import {
 import { format, parseISO } from "date-fns";
 import { useMemo } from "react";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
-import shippingCoverUrl from "@assets/william-william-NndKt2kF1L4-unsplash_1779617475306.jpg";
 import { resolveReportTitle } from "@/lib/reportNaming";
 import type { TopicAiProse } from "@/lib/topicProseResolution";
 import { ShippingSituationMap } from "./shipping-report/ShippingSituationMap";
@@ -816,23 +815,35 @@ export default function ShippingReportPreview({
       `}</style>
       {/* PAGE 1: COVER */}
       <div className="shipping-page p-0 relative overflow-hidden" data-shipping-page="1">
-         <div className="absolute inset-0 bg-[#0b0a3d]" />
-         <img src={shippingCoverUrl} alt="" className="absolute inset-0 w-full h-[65%] object-cover opacity-80 mix-blend-luminosity" />
-         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0a3d]/80 to-[#0b0a3d]" />
-         <div className="relative z-10 h-full flex flex-col justify-between p-[20mm]">
-           <div>
-             <img src={polestarLogo} alt="Polestar Insights" className="h-10 mb-8" />
-             <div className="text-[#465bff] text-[14px] font-bold tracking-[0.2em] uppercase mb-2">Polestar Insights</div>
-             <h1 className="text-white text-[48px] font-bold uppercase tracking-wide leading-none mb-4">Shipping Watch</h1>
-             <div className="text-white text-[18px] font-light">{resolvedTitle}</div>
-           </div>
-           <div>
-             <div className="text-white text-[14px] font-light border-t border-[#465bff] pt-4">
-               Reporting Period: {issueDate ? format(parseISO(issueDate), "MMMM yyyy") : "Current"} <br/>
-               polestaradvisory.com
-             </div>
-           </div>
-         </div>
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(145deg, #0b0a3d 0%, #17145f 56%, #465bff 145%)",
+          }}
+        />
+        <div className="relative z-10 h-full flex flex-col p-[20mm] text-white">
+          <img
+            src={polestarLogo}
+            alt="Polestar Advisory"
+            className="h-10 w-auto self-start"
+          />
+          <div className="flex-1 flex flex-col justify-center">
+            <div className="text-[12px] font-bold tracking-[0.24em] uppercase mb-5 text-white/85">
+              Polestar Insights · Maritime Intelligence
+            </div>
+            <h1 className="text-[48px] font-bold uppercase tracking-wide leading-none mb-6">
+              {resolvedTitle}
+            </h1>
+            <div className="w-20 h-1 bg-[#465bff] mb-6" />
+            <div className="text-[15px] font-light uppercase tracking-[0.12em]">
+              {ds.reportingPeriodLong}
+            </div>
+          </div>
+          <div className="text-[12px] font-medium uppercase tracking-[0.14em]">
+            polestaradvisory.com
+          </div>
+        </div>
       </div>
 
       {/* PAGE 2: MARITIME SITUATION */}
