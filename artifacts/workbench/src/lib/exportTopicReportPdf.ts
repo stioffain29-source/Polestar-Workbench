@@ -87,7 +87,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic } from "./regionalWeekly";
-import { buildRegionalDevelopments, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist } from "./regionalWeekly";
+import { buildRegionalBluf, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -372,6 +372,7 @@ export interface TopicReportIncident {
   summary?: string | null;
   source?: string | null;
   sourceUrl?: string | null;
+  analystNotes?: string | null;
   location?: string | null;
 }
 
@@ -711,6 +712,19 @@ function drawRegionalActivityCharts(ctx: Ctx, incidents: TopicReportIncident[]) 
   };
   drawChart("Weekly developments by category", summary.byCategory);
   drawChart("Activity by country", summary.byCountry.slice(0, 8));
+}
+
+function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[]) {
+  const briefs = buildRegionalDomainBriefs(buildRegionalDevelopments(incidents));
+  for (const brief of briefs) {
+    ensureSpace(ctx, 24);
+    setRoboto(ctx.pdf, "bold");
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.setFontSize(8);
+    ctx.pdf.text(brief.heading.toUpperCase(), ctx.MX, ctx.y + 8);
+    ctx.y += 12;
+    renderProse(ctx, brief.assessment);
+  }
 }
 
 function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[]) {
@@ -1068,6 +1082,12 @@ export async function exportTopicReportPdf(
   filename: string,
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
+  if (isRegionalWeeklyTopic(data.topic)) {
+    const regionalErrors = validateRegionalWeeklyAssessment(buildRegionalDevelopments(incidents));
+    if (regionalErrors.length > 0) {
+      throw new Error(`Regional Weekly export blocked: ${regionalErrors.join(" ")}`);
+    }
+  }
   if (data.topic === "fuel") {
     console.info("[FUEL_PDF_TRACE] EXPORT FUNCTION CALLED");
   }
@@ -1261,7 +1281,9 @@ export async function exportTopicReportPdf(
   // layer is deliberately NOT consulted so the strict format rules always hold.
   // Every other topic keeps the AI narrative + template fallback stack.
   const execText =
-    fuelEffective
+    isRegionalWeekly
+      ? buildRegionalBluf(buildRegionalDevelopments(incidents))
+      : fuelEffective
       ? (fuelEffective.executiveSummary ?? "")
       : isCargo && cargoModel
         ? resolveSimpleProse(data.executiveSummary, null, cargoModel.executiveSummary)
@@ -1832,6 +1854,9 @@ export async function exportTopicReportPdf(
       ];
       for (const [key, label, body] of proseSections) {
         if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
+      }
+      if (isRegionalWeekly && show("situation")) {
+        drawRegionalDomainBriefs(ctx, incidents);
       }
       if (isRegionalWeekly && show("what-happened")) {
         const intro = resolveSimpleProse(

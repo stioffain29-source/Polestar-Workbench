@@ -24,6 +24,7 @@ export interface TopicFastFactsIncident {
   summary?: string | null;
   source?: string | null;
   sourceUrl?: string | null;
+  analystNotes?: string | null;
   location?: string | null;
   /** Current source-grounded maritime classification, when topic is shipping. */
   maritimeSemantic?: ShippingMaritimeSemanticEvidence | null;

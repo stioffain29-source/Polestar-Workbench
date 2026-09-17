@@ -1,0 +1,373 @@
+AMENDMENT TO EXISTING APAC WEEKLY / MIDDLE EAST WEEKLY GENERATION LOGIC
+
+DO NOT rebuild the product.
+
+DO NOT change the existing PDF structure, branding or export workflow.
+
+The current report is incorrect because it is still generating an INCIDENT LIST from the scraped feed and merely assigning category labels to stories.
+
+This must change.
+
+THE WEEKLY REPORT IS A CURATED REGIONAL INTELLIGENCE ASSESSMENT, NOT AN INCIDENT DATABASE EXPORT.
+
+1. STOP USING THE INCIDENT FEED AS THE REPORT STRUCTURE
+
+Do not select the highest number of scraped incidents and print them sequentially.
+
+Do not attempt to fill the report by taking individual articles and classifying them as:
+
+Security
+Operational Disruption
+Political
+Regulatory
+Weather
+Cyber
+
+Instead:
+
+FIRST identify the material regional DEVELOPMENTS during the reporting period.
+
+THEN group source articles into those developments.
+
+THEN select only developments that materially affect the regional business operating environment.
+
+A development may be supported by multiple source articles but must appear only once.
+
+2. THE REPORT MUST ACTIVELY SEARCH EACH INTELLIGENCE DOMAIN
+
+Do not rely on the existing security / protest incident feed to discover political, regulatory, weather or cyber developments.
+
+The generation process must actively search / query sources separately for:
+
+SECURITY & CONFLICT
+
+POLITICAL
+
+REGULATORY
+
+ADVERSE WEATHER & NATURAL HAZARDS
+
+CYBER & INFORMATION RISK
+
+BUSINESS & OPERATIONAL DISRUPTION
+
+Each domain requires its own discovery pass before the report is written.
+
+The absence of items in the general incident feed does NOT mean there were no political, regulatory, weather or cyber developments.
+
+3. POLITICAL COVERAGE
+
+Actively identify significant political developments during the reporting period.
+
+Relevant examples include:
+
+Elections and election results
+Government or cabinet changes
+Coalition instability
+Leadership changes
+Major parliamentary developments
+Important government policy announcements
+Political crises
+Diplomatic tensions
+Interstate relations
+Sanctions
+Major bilateral agreements
+Defence or security agreements
+Political decisions affecting foreign companies
+Government intervention affecting markets or operations
+
+Do not classify a routine protest story as the sole political item.
+
+The political section should explain:
+
+WHAT changed politically
+WHY it matters to business
+WHAT could happen next
+
+4. REGULATORY COVERAGE
+
+Actively search for actual regulatory developments.
+
+Relevant items include:
+
+New legislation
+Regulatory changes
+Sanctions
+Tariffs
+Customs changes
+Import restrictions
+Export controls
+Foreign ownership rules
+Labour legislation
+Visa / immigration changes
+Data regulation
+Cybersecurity regulation
+AI regulation
+Environmental rules
+Energy regulation
+Shipping regulation
+Port rules
+Aviation regulation
+Tax changes
+Compliance requirements
+Licensing changes
+Market access restrictions
+
+A criminal investigation, corruption investigation or visa fraud case is NOT automatically a regulatory development.
+
+Only classify something as Regulatory when there has been an actual or proposed change to rules, legislation, enforcement requirements or business obligations.
+
+For each regulatory development explain:
+
+WHAT changed
+WHEN it takes effect
+WHO is affected
+WHAT businesses may need to do
+
+5. ADVERSE WEATHER & NATURAL HAZARDS
+
+Actively search current regional weather and hazard sources.
+
+Include:
+
+Typhoons
+Cyclones
+Tropical storms
+Flooding
+Monsoon disruption
+Extreme rainfall
+Heatwaves
+Wildfires
+Haze
+Drought
+Earthquakes
+Volcanic activity
+Landslides
+Tsunami warnings
+Major adverse weather systems
+
+A charity fundraising story about historic flooding is NOT a weather development.
+
+Weather items must relate to a CURRENT or FORWARD operational hazard.
+
+Prioritise:
+
+Airport disruption
+Port disruption
+Road closures
+Site access
+Power disruption
+Personnel exposure
+Supply chain disruption
+Manufacturing exposure
+
+Include forecast information where it materially affects the next seven days.
+
+6. CYBER COVERAGE
+
+Cyber must be actively searched every week.
+
+Do not omit Cyber simply because no cyber story entered the normal incident feed.
+
+Look for:
+
+Major ransomware
+State sponsored cyber activity
+Critical infrastructure attacks
+Telecommunications disruption
+Major data breaches
+Government network compromise
+Attacks affecting ports
+Attacks affecting airlines
+Attacks affecting logistics
+Attacks affecting financial services
+Attacks affecting utilities
+Major cloud / digital infrastructure outages
+New cyber regulation
+Material regional threat campaigns
+
+Only include material developments.
+
+If no material cyber development is found after a dedicated search, state:
+
+NO MATERIAL REGIONAL CYBER DEVELOPMENT IDENTIFIED DURING THIS REPORTING PERIOD.
+
+Do not fabricate an item merely to populate the category.
+
+7. REMOVE LOW VALUE INCIDENT NOISE
+
+The report must aggressively reject stories that do not contribute to understanding the regional operating environment.
+
+Exclude examples such as:
+
+Anniversary articles
+Historical retrospectives
+Opinion pieces with no current development
+Local murders with no wider operational relevance
+Charity fundraising stories
+Religious events with no operational impact
+Generic terrorism commentary
+Minor isolated crime
+Routine police activity
+Duplicate protest reporting
+Multiple articles covering the same event
+Social media reposts of an event already captured from a credible source
+
+The fact that a story contains words such as:
+
+attack
+terrorism
+protest
+security
+flood
+fuel
+visa
+
+does NOT automatically make it relevant.
+
+8. DEDUPLICATE AGGRESSIVELY
+
+Several articles about the same event must become ONE intelligence development.
+
+Examples:
+
+Five articles about the same Bangkok protest = ONE development.
+
+Several articles covering the same MANIBELA strike = ONE development.
+
+Multiple sources covering the same Myanmar airport attack = ONE development.
+
+Different sources are supporting evidence, NOT separate report entries.
+
+9. BALANCE THE REGIONAL PICTURE
+
+Do not allow one country to dominate simply because its media environment produces more searchable articles.
+
+The current report is heavily skewed toward the Philippines because the system is counting source volume rather than regional importance.
+
+Selection must be based on MATERIALITY, not article count.
+
+The final report should represent the significant regional picture across APAC / Middle East.
+
+There is NO requirement to include every country.
+
+There IS a requirement to avoid mistaking source volume for risk importance.
+
+10. KEY DEVELOPMENTS
+
+Reduce Key Developments to approximately 6–10 genuinely important developments.
+
+They should represent the most consequential developments across the entire regional risk picture.
+
+A typical report might contain:
+
+2 Security / Conflict
+1–2 Political
+1–2 Regulatory / Policy
+1 Weather / Natural Hazard
+1 Operational / Infrastructure
+1 Cyber
+
+THIS IS NOT A FIXED QUOTA.
+
+Do not manufacture weak items to fill categories.
+
+But the system must have actively searched every category before deciding there is nothing material to include.
+
+11. CREATE DISTINCT INTELLIGENCE SECTIONS
+
+The report should contain concise analytical sections for:
+
+SECURITY & CONFLICT
+
+POLITICAL & GEOPOLITICAL
+
+REGULATORY & POLICY
+
+WEATHER & NATURAL HAZARDS
+
+CYBER & INFORMATION RISK
+
+BUSINESS & OPERATIONAL DISRUPTION
+
+These sections should summarise the regional picture.
+
+They must NOT simply repeat the Key Developments verbatim.
+
+If a domain genuinely has no material development, use one short sentence saying so rather than filling the section with irrelevant content.
+
+12. BLUF MUST USE ALL INTELLIGENCE DOMAINS
+
+The BLUF must not default to public order or protest reporting.
+
+It should identify the 3–5 developments that most changed the APAC / Middle East operating environment during the reporting period regardless of category.
+
+The BLUF should potentially draw from:
+
+Political
+Regulatory
+Security
+Conflict
+Weather
+Cyber
+Infrastructure
+Energy
+Transport
+Supply chain
+
+13. CHARTS MUST REPRESENT THE CURATED REPORT
+
+Do not create charts from every scraped article.
+
+The existing chart showing counts such as:
+
+Security 33
+Operational Disruption 21
+Regulatory 1
+Political 1
+
+is measuring the SCRAPE, not the regional risk environment.
+
+Charts should use the CURATED intelligence dataset after deduplication and relevance filtering.
+
+Suitable visuals include:
+
+Material developments by domain
+Material developments by sub-region
+Four week trend by domain
+Current regional risk themes
+Weather systems affecting operations
+Political / regulatory timeline
+7 day forward watchlist
+
+Do not visualise junk data.
+
+14. FINAL QUALITY TEST
+
+Before generating the PDF, ask:
+
+Does this read like a regional intelligence briefing for a corporate security / risk / operations leader?
+
+OR
+
+Does it read like a long list of news incidents?
+
+If it reads like an incident list, DO NOT EXPORT.
+
+Re-run curation and synthesis first.
+
+The desired product is:
+
+A concise assessment of the regional operating environment covering:
+
+Security
+Politics
+Geopolitics
+Regulation
+Weather
+Cyber
+Business disruption
+
+It is NOT:
+
+A twenty page list of scraped security incidents.

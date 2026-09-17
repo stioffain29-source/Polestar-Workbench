@@ -1,12 +1,15 @@
 import { canonicalTopic } from "../reportNaming";
 import { buildTopicRows } from "../publicationCalendar";
 import {
+  buildRegionalBluf,
   buildRegionalDevelopments,
+  buildRegionalDomainBriefs,
   buildRegionalOutlook,
   buildRegionalWatchlist,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
   selectRegionalKeyDevelopments,
+  validateRegionalWeeklyAssessment,
 } from "../regionalWeekly";
 
 function incident(
@@ -48,11 +51,11 @@ describe("regional weekly products", () => {
     expect(rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
-  it("caps key developments at eight and keeps the Middle East boundary", () => {
-    const rows = Array.from({ length: 10 }, (_, index) =>
+  it("caps key developments at ten and keeps the Middle East boundary", () => {
+    const rows = Array.from({ length: 12 }, (_, index) =>
       incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
-    expect(selectRegionalKeyDevelopments(rows)).toHaveLength(8);
+    expect(selectRegionalKeyDevelopments(rows)).toHaveLength(10);
     expect(
       curateRegionalWeeklyIncidents(
         [incident(99, "Indonesia", "high", "2026-09-17")],
@@ -118,18 +121,19 @@ describe("regional weekly products", () => {
     ]);
   });
 
-  it("builds structured watch rows from development evidence and caps at eight", () => {
-    const developments = Array.from({ length: 10 }, (_, index) => ({
+  it("builds structured watch rows from development evidence and caps at ten", () => {
+    const developments = Array.from({ length: 12 }, (_, index) => ({
       country: `Country ${index}`,
       title: `Issue ${index}`,
       severity: "Extreme" as const,
+      category: "Security" as const,
       whatHappened: "Confirmed event summary.",
       whyItMatters: "Operational implication remains evidence-safe.",
       outlook: "Watch for confirmed follow-on developments over the next seven days.",
     }));
     const [first] = buildRegionalWatchlist(developments);
     const rows = buildRegionalWatchlist(developments);
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(10);
     expect(first).toEqual({
       location: "Country 0",
       issue: "Issue 0",
@@ -147,6 +151,35 @@ describe("regional weekly products", () => {
     expect(outlook).toContain("Weather & Natural Hazards");
     expect(outlook).toContain("people, travel, sites, supply chains and compliance");
     expect(outlook).not.toContain("Nothing useful came through");
+  });
+
+  it("uses the dedicated discovery-pass domain instead of relabelling headline keywords", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [{
+        ...incident(1, "Singapore", "moderate", "2026-09-17", "Government announces new obligations for cloud providers"),
+        analystNotes: "auto-scraped:regional-weekly:cyber:Regional Weekly APAC cyber",
+      }],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(buildRegionalDevelopments(rows)[0].category).toBe("Cyber");
+  });
+
+  it("produces six distinct domain assessments and a cross-domain BLUF", () => {
+    const developments = buildRegionalDevelopments([
+      {
+        ...incident(1, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+        analystNotes: "auto-scraped:regional-weekly:regulatory:test",
+      },
+    ]);
+    const briefs = buildRegionalDomainBriefs(developments);
+    expect(briefs).toHaveLength(6);
+    expect(briefs.find((brief) => brief.domain === "Regulatory")?.assessment).toContain("business relevance");
+    expect(briefs.find((brief) => brief.domain === "Cyber")?.assessment).toBe(
+      "NO MATERIAL REGIONAL CYBER DEVELOPMENT IDENTIFIED DURING THIS REPORTING PERIOD.",
+    );
+    expect(buildRegionalBluf(developments)).toContain("regional operating environment");
+    expect(validateRegionalWeeklyAssessment(developments)).toEqual([]);
   });
 
   it("uses the weekly cadence for calendar due dates", () => {

@@ -11,6 +11,8 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import {
   buildRegionalDevelopments,
+  buildRegionalBluf,
+  buildRegionalDomainBriefs,
   buildRegionalOutlook,
   buildRegionalVisualSummary,
   buildRegionalWatchlist,
@@ -260,6 +262,27 @@ function RegionalActivityCharts({
         </h3>
         <div className="space-y-2">{renderBars(summary.byCountry.slice(0, 8))}</div>
       </div>
+    </div>
+  );
+}
+
+function RegionalDomainBriefs({
+  briefs,
+}: {
+  briefs: ReturnType<typeof buildRegionalDomainBriefs>;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-4 mt-5">
+      {briefs.map((brief) => (
+        <div key={brief.domain} className="border-l-[3px] border-l-[#465bff] bg-[#f7f8fb] p-4">
+          <h3 className="uppercase tracking-wide text-[11px] font-bold mb-2" style={{ color: NAVY }}>
+            {brief.heading}
+          </h3>
+          <p className="text-[12px] leading-[1.55] m-0" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+            {brief.assessment}
+          </p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -1032,6 +1055,8 @@ export default function ReportPreview({
   const isFuel = report.topic === "fuel";
   const isRegionalWeekly = isRegionalWeeklyTopic(report.topic ?? "");
   const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(incidents) : [];
+  const regionalDomainBriefs = isRegionalWeekly ? buildRegionalDomainBriefs(regionalDevelopments) : [];
+  const regionalBluf = isRegionalWeekly ? buildRegionalBluf(regionalDevelopments) : "";
   const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
   const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(incidents) : { byCategory: [], byCountry: [] };
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
@@ -1190,7 +1215,9 @@ export default function ReportPreview({
   // ONE shared resolver the PDF exporter and editor prefill also call, so all
   // three surfaces render byte-identical section text.
   const fuelEffective = fuelBundle?.effectiveSections ?? null;
-  const execText = fuelEffective
+  const execText = isRegionalWeekly
+    ? regionalBluf
+    : fuelEffective
     ? (fuelEffective.executiveSummary ?? "")
     : resolveSimpleProse(
         report.executiveSummary,
@@ -1521,12 +1548,21 @@ export default function ReportPreview({
                       )}
                     </>
                   )}
-                  <NarrativeSection
-                    hidden={!show("situation")} title={isRegionalWeekly ? "Regional Intelligence Picture" : "Situation"}
-                    text={isCargo
-                      ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
-                      : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
-                  />
+                  {isRegionalWeekly ? (
+                    <Section hidden={!show("situation")} title="Regional Intelligence Picture">
+                      {resolveSimpleProse(report.situation, aiProse?.situation, "").trim() && (
+                        <Paragraphs text={resolveSimpleProse(report.situation, aiProse?.situation, "")} />
+                      )}
+                      <RegionalDomainBriefs briefs={regionalDomainBriefs} />
+                    </Section>
+                  ) : (
+                    <NarrativeSection
+                      hidden={!show("situation")} title="Situation"
+                      text={isCargo
+                        ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
+                        : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
+                    />
+                  )}
                   {isRegionalWeekly ? (
                     <Section hidden={!show("what-happened")} title="Key Developments">
                       {resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened).trim() && (

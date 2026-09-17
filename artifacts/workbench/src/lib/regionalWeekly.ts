@@ -13,6 +13,7 @@ type RegionalIncident = {
   severity?: string | null;
   category?: string | null;
   eventClusterKey?: string | null;
+  analystNotes?: string | null;
   occurredAt: string;
 };
 
@@ -37,6 +38,12 @@ export interface RegionalDevelopment {
 export interface RegionalVisualSummary {
   byCategory: Array<{ label: RegionalIntelligenceCategory; count: number }>;
   byCountry: Array<{ label: string; count: number }>;
+}
+
+export interface RegionalDomainBrief {
+  domain: RegionalIntelligenceCategory;
+  heading: string;
+  assessment: string;
 }
 
 export interface RegionalWatchItem {
@@ -68,6 +75,9 @@ const MATERIAL_RE =
 const OPERATIONAL_RE =
   /\b(airline|airspace|airport|asset|border|business|cargo|compliance|continuity|customs|data|energy|export|fuel|grid|import|infrastructure|logistics|personnel|port|regulat|road|sanction|shipping|site|supply chain|tariff|telecom|transport|travel|utilities?|visa|workforce)\b/i;
 
+const LOW_VALUE_RE =
+  /\b(anniversary|commemorati|fundrais|charity appeal|opinion|editorial|historical retrospective|years ago|religious ceremony|routine patrol|police blotter|visa fraud|criminal investigation)\b/i;
+
 const CATEGORY_RULES: Array<[RegionalIntelligenceCategory, RegExp]> = [
   ["Weather & Natural Hazards", /\b(cyclone|drought|earthquake|extreme heat|flood|landslide|storm|typhoon|volcan|wildfire)\b/i],
   ["Cyber", /\b(cyber|data breach|malware|ransomware|state-linked hack)\b/i],
@@ -96,6 +106,13 @@ export function regionalCountryQuery(topic: RegionalWeeklyTopic): string {
 export function regionalIntelligenceCategory(
   incident: RegionalIncident,
 ): RegionalIntelligenceCategory {
+  const discovery = incident.analystNotes?.match(/regional-weekly:(security|political|regulatory|weather|cyber|operational)/i)?.[1]?.toLowerCase();
+  if (discovery === "security") return "Security";
+  if (discovery === "political") return "Political";
+  if (discovery === "regulatory") return "Regulatory";
+  if (discovery === "weather") return "Weather & Natural Hazards";
+  if (discovery === "cyber") return "Cyber";
+  if (discovery === "operational") return "Operational Disruption";
   const text = `${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""} ${incident.category ?? ""}`;
   return CATEGORY_RULES.find(([, pattern]) => pattern.test(text))?.[0] ?? "Operational Disruption";
 }
@@ -110,13 +127,27 @@ function consolidateRegionalEvents<T extends RegionalIncident>(rows: T[]): T[] {
   }
   return [...byScope.values()].flatMap((scoped) => {
     const authoritative = new Map<string, T[]>();
+    const inferred = new Map<string, T[]>();
     const unclustered: T[] = [];
     for (const row of scoped) {
       const key = row.eventClusterKey?.trim();
-      if (!key) unclustered.push(row);
-      else authoritative.set(key, [...(authoritative.get(key) ?? []), row]);
+      if (key) {
+        authoritative.set(key, [...(authoritative.get(key) ?? []), row]);
+        continue;
+      }
+      const text = `${row.displayTitle ?? row.title ?? ""} ${row.summary ?? ""}`.toLowerCase();
+      const inferredKey =
+        /\bbangkok\b/.test(text) && /\b(protest|demonstration|rally)\b/.test(text)
+          ? "bangkok-protest"
+          : /\bmanibela\b/.test(text) && /\b(strike|transport|protest)\b/.test(text)
+            ? "philippines-manibela-strike"
+            : /\bmyanmar\b/.test(text) && /\bairport\b/.test(text) && /\b(attack|drone|explosion|strike)\b/.test(text)
+              ? "myanmar-airport-attack"
+              : null;
+      if (inferredKey) inferred.set(inferredKey, [...(inferred.get(inferredKey) ?? []), row]);
+      else unclustered.push(row);
     }
-    const representatives = [...authoritative.values()].map((members) => {
+    const representatives = [...authoritative.values(), ...inferred.values()].map((members) => {
       const representative = members.reduce((best, row) => {
         const rank = SEVERITY_RANK[row.severity?.toLowerCase() ?? ""] ?? 0;
         const bestRank = SEVERITY_RANK[best.severity?.toLowerCase() ?? ""] ?? 0;
@@ -154,6 +185,7 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
       return countries.has(country as never)
         && age >= 0
         && age <= 6
+        && !LOW_VALUE_RE.test(text)
         && MATERIAL_RE.test(text)
         && (OPERATIONAL_RE.test(text) || regionalIntelligenceCategory(incident) === "Security");
     })
@@ -179,7 +211,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     selected.push(incident);
     categoryCounts.set(category, 1);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 8) return selected;
+    if (selected.length === 10) return selected;
   }
   for (const incident of incidents) {
     if (selected.includes(incident)) continue;
@@ -187,7 +219,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     if ((countryCounts.get(country) ?? 0) >= 2 && selected.length < 5) continue;
     selected.push(incident);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 8) break;
+    if (selected.length === 10) break;
   }
   // If the real evidence is concentrated in one country/category, fill the
   // remaining slots rather than suppressing distinct material events. The
@@ -195,7 +227,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
   for (const incident of incidents) {
     if (selected.includes(incident)) continue;
     selected.push(incident);
-    if (selected.length === 8) break;
+    if (selected.length === 10) break;
   }
   return selected;
 }
@@ -280,10 +312,85 @@ export function buildRegionalOutlook(developments: RegionalDevelopment[]): strin
   return `Over the next seven days, attention should focus on ${categories.join(", ")} developments affecting ${countries.join(", ")}. Conditions may deteriorate if reported disruption intensifies, spreads or triggers new government or regulatory action. Monitor confirmed effective dates, transport access, utility and communications continuity, weather warnings and security escalation indicators, together with the resulting effects on people, travel, sites, supply chains and compliance.`;
 }
 
+const DOMAIN_ORDER: RegionalIntelligenceCategory[] = [
+  "Security",
+  "Political",
+  "Regulatory",
+  "Weather & Natural Hazards",
+  "Cyber",
+  "Operational Disruption",
+];
+
+const DOMAIN_HEADING: Record<RegionalIntelligenceCategory, string> = {
+  Security: "Security & Conflict",
+  Political: "Political & Geopolitical",
+  Regulatory: "Regulatory & Policy",
+  "Weather & Natural Hazards": "Weather & Natural Hazards",
+  Cyber: "Cyber & Information Risk",
+  "Operational Disruption": "Business & Operational Disruption",
+};
+
+export function buildRegionalDomainBriefs(
+  developments: RegionalDevelopment[],
+): RegionalDomainBrief[] {
+  return DOMAIN_ORDER.map((domain) => {
+    const rows = developments.filter((development) => development.category === domain);
+    if (rows.length === 0) {
+      return {
+        domain,
+        heading: DOMAIN_HEADING[domain],
+        assessment: domain === "Cyber"
+          ? "NO MATERIAL REGIONAL CYBER DEVELOPMENT IDENTIFIED DURING THIS REPORTING PERIOD."
+          : `No material ${domain.toLowerCase()} development was identified during this reporting period.`,
+      };
+    }
+    const countries = [...new Set(rows.map((row) => row.country))].slice(0, 4);
+    const highest = rows.reduce((best, row) =>
+      SEVERITY_RANK[row.severity.toLowerCase()] > SEVERITY_RANK[best.severity.toLowerCase()] ? row : best,
+    );
+    return {
+      domain,
+      heading: DOMAIN_HEADING[domain],
+      assessment: `${rows.length} material ${domain.toLowerCase()} development${rows.length === 1 ? "" : "s"} affected ${countries.join(", ")}. The highest-rated development was ${highest.severity.toLowerCase()}; the main business relevance is ${highest.whyItMatters.replace(/^This\s+/i, "").replace(/\.$/, "")}.`,
+    };
+  });
+}
+
+export function buildRegionalBluf(developments: RegionalDevelopment[]): string {
+  const lead = developments.slice(0, 5);
+  if (lead.length === 0) {
+    return "No material change to the regional operating environment was identified after review across security, political, regulatory, weather, cyber and operational-disruption domains.";
+  }
+  const domains = [...new Set(lead.map((row) => row.category))];
+  const countries = [...new Set(lead.map((row) => row.country))];
+  return `The regional operating environment was shaped by ${lead.length} priority developments across ${domains.join(", ")}, with the principal exposure concentrated in ${countries.join(", ")}. The immediate business considerations are personnel and travel safety, continuity of sites and transport, supply-chain access, utilities and compliance obligations.`;
+}
+
+export function validateRegionalWeeklyAssessment(
+  developments: RegionalDevelopment[],
+): string[] {
+  const errors: string[] = [];
+  if (developments.length > 10) errors.push("More than ten developments were selected.");
+  const uniqueTitles = new Set(
+    developments.map((row) => row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
+  );
+  if (uniqueTitles.size !== developments.length) errors.push("Duplicate developments remain.");
+  if (buildRegionalDomainBriefs(developments).length !== 6) {
+    errors.push("All six intelligence-domain assessments are required.");
+  }
+  if (developments.some((row) => !row.whyItMatters.trim() || !row.outlook.trim())) {
+    errors.push("Every development requires business relevance and forward outlook.");
+  }
+  if (!/\bregional operating environment\b/i.test(buildRegionalBluf(developments))) {
+    errors.push("The BLUF does not assess the regional operating environment.");
+  }
+  return errors;
+}
+
 export function buildRegionalWatchlist(
   developments: RegionalDevelopment[],
 ): RegionalWatchItem[] {
-  return developments.slice(0, 8).map((development) => ({
+  return developments.slice(0, 10).map((development) => ({
     location: development.country,
     issue: development.title,
     currentSeverity: development.severity,

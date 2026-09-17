@@ -930,6 +930,19 @@ const APAC_LOCAL_ALIASES: CountryAlias[] = [
   { canonical: "Timor-Leste", aliases: ["timor-leste", "timor leste", "east timor", "timor timur", "dili"] },
   { canonical: "Brunei", aliases: ["brunei"] },
   { canonical: "Indonesia", aliases: INDONESIA_BROAD_ALIASES },
+  // Wider regional-weekly discovery footprint. Existing country-specific
+  // entries above retain precedence; these aliases let the six dedicated
+  // intelligence-domain queries attribute APAC and Middle East developments.
+  ...COUNTRY_ALIASES,
+  { canonical: "Singapore", aliases: ["singapore", "singapura"] },
+  { canonical: "Israel", aliases: ["israel", "israeli", "jerusalem", "tel aviv", "haifa"] },
+  { canonical: "Palestine", aliases: ["palestine", "palestinian", "west bank", "gaza"] },
+  { canonical: "Egypt", aliases: ["egypt", "egyptian", "cairo", "suez"] },
+  { canonical: "Jordan", aliases: ["jordan", "jordanian", "amman"] },
+  { canonical: "Lebanon", aliases: ["lebanon", "lebanese", "beirut"] },
+  { canonical: "Syria", aliases: ["syria", "syrian", "damascus"] },
+  { canonical: "Yemen", aliases: ["yemen", "yemeni", "sanaa", "aden"] },
+  { canonical: "Turkey", aliases: ["turkey", "türkiye", "turkiye", "turkish", "ankara", "istanbul"] },
 ];
 
 // Curated direct-outlet RSS. defaultCountry names each outlet's home nation so
@@ -955,6 +968,22 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
   { q: "", label: "Khaosod English", directUrl: "https://www.khaosodenglish.com/feed/", sourceName: "Khaosod English", defaultCountry: "Thailand" },
   // Regional security / terrorism desk (multi-country → Unknown default)
   { q: "", label: "BenarNews", directUrl: "https://www.benarnews.org/english/rss", sourceName: "BenarNews", defaultCountry: "Unknown" },
+  // Regional Weekly: six independent discovery domains across both report
+  // regions. These are deliberately separate queries, not categories assigned
+  // after a general incident scrape. The domain marker is persisted with each
+  // source record and drives event synthesis downstream.
+  { label: "Regional Weekly APAC security", q: `("armed conflict" OR terrorism OR "civil unrest" OR "maritime security" OR kidnapping) (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines OR Thailand) when:7d`, defaultCountry: "Unknown", discoveryDomain: "security" },
+  { label: "Regional Weekly Middle East security", q: `("armed conflict" OR terrorism OR "civil unrest" OR "maritime security" OR kidnapping) ("Middle East" OR Gulf OR Israel OR Iran OR Iraq OR Yemen OR Syria OR Lebanon) when:7d`, defaultCountry: "Unknown", discoveryDomain: "security" },
+  { label: "Regional Weekly APAC political", q: `(election OR cabinet OR coalition OR parliament OR "government policy" OR diplomacy OR sanctions OR "bilateral agreement") (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines OR Thailand) when:7d`, defaultCountry: "Unknown", discoveryDomain: "political" },
+  { label: "Regional Weekly Middle East political", q: `(election OR cabinet OR coalition OR parliament OR "government policy" OR diplomacy OR sanctions OR "bilateral agreement") ("Middle East" OR Gulf OR Israel OR Iran OR Iraq OR Saudi OR UAE OR Turkey) when:7d`, defaultCountry: "Unknown", discoveryDomain: "political" },
+  { label: "Regional Weekly APAC regulatory", q: `("new law" OR regulation OR tariff OR customs OR "export control" OR "foreign ownership" OR visa OR tax OR licensing OR compliance) (Asia OR ASEAN OR Australia OR India OR Japan OR China OR Singapore) when:7d`, defaultCountry: "Unknown", discoveryDomain: "regulatory" },
+  { label: "Regional Weekly Middle East regulatory", q: `("new law" OR regulation OR tariff OR customs OR "export control" OR "foreign ownership" OR visa OR tax OR licensing OR compliance) ("Middle East" OR Gulf OR Saudi OR UAE OR Qatar OR Israel OR Turkey) when:7d`, defaultCountry: "Unknown", discoveryDomain: "regulatory" },
+  { label: "Regional Weekly APAC weather", q: `(typhoon OR cyclone OR "tropical storm" OR flooding OR monsoon OR heatwave OR wildfire OR haze OR earthquake OR volcano OR landslide OR tsunami) (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines) (airport OR port OR road OR power OR personnel OR supply OR operations) when:7d`, defaultCountry: "Unknown", discoveryDomain: "weather" },
+  { label: "Regional Weekly Middle East weather", q: `(cyclone OR flooding OR "extreme rainfall" OR heatwave OR wildfire OR earthquake OR landslide OR drought) ("Middle East" OR Gulf OR Saudi OR UAE OR Oman OR Iran OR Iraq OR Turkey) (airport OR port OR road OR power OR personnel OR supply OR operations) when:7d`, defaultCountry: "Unknown", discoveryDomain: "weather" },
+  { label: "Regional Weekly APAC cyber", q: `(ransomware OR "cyber attack" OR "data breach" OR malware OR "network compromise" OR "cloud outage") (Asia OR ASEAN OR Australia OR India OR Japan OR China OR Singapore) (infrastructure OR telecom OR port OR airline OR logistics OR bank OR utility OR government) when:7d`, defaultCountry: "Unknown", discoveryDomain: "cyber" },
+  { label: "Regional Weekly Middle East cyber", q: `(ransomware OR "cyber attack" OR "data breach" OR malware OR "network compromise" OR "cloud outage") ("Middle East" OR Gulf OR Israel OR Iran OR Saudi OR UAE OR Qatar) (infrastructure OR telecom OR port OR airline OR logistics OR bank OR utility OR government) when:7d`, defaultCountry: "Unknown", discoveryDomain: "cyber" },
+  { label: "Regional Weekly APAC operational", q: `("airport closure" OR "port closure" OR "airspace closure" OR "border closure" OR "rail disruption" OR "power outage" OR "telecom outage" OR "industrial action" OR "supply chain disruption") (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines) when:7d`, defaultCountry: "Unknown", discoveryDomain: "operational" },
+  { label: "Regional Weekly Middle East operational", q: `("airport closure" OR "port closure" OR "airspace closure" OR "border closure" OR "road disruption" OR "power outage" OR "telecom outage" OR "industrial action" OR "supply chain disruption") ("Middle East" OR Gulf OR Israel OR Iran OR Saudi OR UAE OR Yemen) when:7d`, defaultCountry: "Unknown", discoveryDomain: "operational" },
 ];
 
 export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
@@ -1008,6 +1037,15 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     // The "-an"/"pag-" forms are used, not the bare "patay" (=dead), so a
     // non-incident "patay na baterya" (dead battery) does not leak in.
     "barilan", "pamamaril", "nakawan", "holdap", "saksak", "patayan", "pagpatay",
+    // regional political / regulatory / cyber discovery
+    "election", "cabinet", "coalition", "parliament", "government policy",
+    "diplomatic", "bilateral agreement", "new law", "legislation", "regulation",
+    "tariff", "customs", "export control", "foreign ownership", "visa",
+    "immigration", "compliance", "licensing", "tax change", "cyber attack",
+    "ransomware", "data breach", "malware", "network compromise", "cloud outage",
+    // regional operational discovery
+    "airport closure", "airspace closure", "border closure", "rail disruption",
+    "power outage", "telecom outage", "supply chain disruption",
     // terrorism
     "terror", "terrorist", "terrorism", "suicide bomb", "bomb blast",
     "bombing", "explosion", "improvised explosive", "insurgent", "insurgency",

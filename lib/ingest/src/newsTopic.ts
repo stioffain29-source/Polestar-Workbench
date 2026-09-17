@@ -55,6 +55,8 @@ export type TopicFeed = {
    * RSS channel title is absent. Never fabricated for Google-News feeds.
    */
   sourceName?: string;
+  /** Optional regional-weekly discovery domain retained in analystNotes. */
+  discoveryDomain?: "security" | "political" | "regulatory" | "weather" | "cyber" | "operational";
 };
 
 export type NewsTopicConfig = {
@@ -526,6 +528,7 @@ type Accepted = {
   source: string;
   sourceUrl: string;
   feedLabel: string;
+  discoveryDomain?: TopicFeed["discoveryDomain"];
   reason: string;
   countrySource: "text" | "feed-fallback";
 };
@@ -658,6 +661,7 @@ export async function runNewsTopicIngest(
           source: sourceName.slice(0, 200),
           sourceUrl: link,
           feedLabel: feed.label,
+          discoveryDomain: feed.discoveryDomain,
           reason: c.reason,
           countrySource: c.countrySource ?? "feed-fallback",
         });
@@ -843,7 +847,9 @@ export async function runNewsTopicIngest(
       confidence: cfg.classifyConfidence ? cfg.classifyConfidence(a.source) : "low",
       source: a.source,
       sourceUrl: a.sourceUrl,
-      analystNotes: `auto-scraped:${a.feedLabel}`,
+      analystNotes: a.discoveryDomain
+        ? `auto-scraped:regional-weekly:${a.discoveryDomain}:${a.feedLabel}`
+        : `auto-scraped:${a.feedLabel}`,
       relevanceStatus: rel.status,
       relevanceScore: rel.score,
       relevanceReason: rel.reason,
