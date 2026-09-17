@@ -96,6 +96,7 @@ import {
   type CargoGroupedDataset,
   type CargoGroupedSection,
 } from "@/lib/cargoGroupedDataset";
+import IncidentMap from "@/components/IncidentMap";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 
 const NAVY = "#0b0a3d";
@@ -422,41 +423,20 @@ function RegionalHotspotMap({
       </p>
     );
   }
-  const lats = points.map((point) => point.lat);
-  const lngs = points.map((point) => point.lng);
-  const minLat = Math.min(...lats) - 3;
-  const maxLat = Math.max(...lats) + 3;
-  const minLng = Math.min(...lngs) - 5;
-  const maxLng = Math.max(...lngs) + 5;
   return (
-    <div
-      className="relative h-[260px] overflow-hidden border border-[#d2d6e1] bg-[#f7f8fb]"
-      style={{
-        backgroundImage:
-          "linear-gradient(rgba(11,10,61,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(11,10,61,.06) 1px, transparent 1px)",
-        backgroundSize: "12.5% 25%",
-      }}
-    >
-      {points.map((point, index) => {
-        const left = 4 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * 90;
-        const top = 8 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * 82;
-        return (
-          <div
-            key={`${point.lat}-${point.lng}-${index}`}
-            className="absolute"
-            style={{ left: `${left}%`, top: `${top}%` }}
-            title={point.title}
-          >
-            <span className="block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#465bff] shadow" />
-            <span
-              className="absolute left-2 top-0 whitespace-nowrap text-[9px] font-bold uppercase tracking-wide"
-              style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
-            >
-              {point.label}
-            </span>
-          </div>
-        );
-      })}
+    <div className="border border-[#d2d6e1] bg-[#f7f8fb]">
+      <IncidentMap
+        points={points.map(p => ({
+          lat: p.lat,
+          lng: p.lng,
+          title: p.title,
+          label: p.label,
+          severity: p.severity,
+          primary: false
+        }))}
+        height={320}
+        showLabels={true}
+      />
     </div>
   );
 }
@@ -1566,7 +1546,7 @@ export default function ReportPreview({
       {report.topic === "apac_weekly" ? (
         <div className="regional-weekly-body">
           {/* Page 2: Regional Outlook & Week at a Glance */}
-          <div className="px-10 py-10 report-page" style={{ position: "relative" }}>
+          <div className="px-10 py-10">
             <Section hidden={!show("executive-summary")} title="Regional Outlook">
               <Paragraphs text={regionalBluf} />
             </Section>
@@ -1588,28 +1568,28 @@ export default function ReportPreview({
           </div>
 
           {/* Page 3: What Changed This Week */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+          <div className="px-10 pb-10">
             <Section hidden={!show("situation")} title="What Changed This Week">
               <ApacThemes themes={apacThemes} />
             </Section>
           </div>
 
           {/* Page 4-5: Key Developments */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+          <div className="px-10 pb-10">
             <Section hidden={!show("what-happened")} title="Key Developments">
               <ApacDevelopmentCards developments={regionalDevelopments} />
             </Section>
           </div>
 
           {/* Page 6: Business Implications */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+          <div className="px-10 pb-10">
             <Section hidden={!show("implications")} title="Business Implications">
               <ApacBusinessImplications blocks={apacImplications} />
             </Section>
           </div>
 
           {/* Page 7: 7-Day Watch & Polestar Outlook */}
-          <div className="px-10 pt-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+          <div className="px-10 pb-10">
             <Section hidden={!show("watch-next")} title="7 Day Watch">
               <ApacWatchlist items={apacWatchlist} />
             </Section>

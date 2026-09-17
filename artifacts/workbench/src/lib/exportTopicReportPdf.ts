@@ -6,6 +6,8 @@ import { buildFuelCoverageSummary } from "@/lib/fuelCoverage";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
+import worldCompleteGeo from "@/assets/worldComplete.geo.json";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import type { MarketPrice } from "@workspace/api-client-react";
 import {
   buildCargoPatternModel,
@@ -850,6 +852,57 @@ function drawApacBusinessImplicationBlocks(
   }
 }
 
+function drawApacBusinessImplicationGrid(
+  ctx: Ctx,
+  incidents: TopicReportIncident[],
+  issueDate: string,
+): boolean {
+  const blocks = buildApacBusinessImplications(
+    buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly"),
+  );
+  if (blocks.length === 0) return true;
+  const gap = 7;
+  const cardW = (ctx.CW - gap) / 2;
+  const rows = Math.ceil(blocks.length / 2);
+  const heights = Array.from({ length: rows }, (_, row) => {
+    let height = 0;
+    for (let col = 0; col < 2; col += 1) {
+      const block = blocks[row * 2 + col];
+      if (!block) continue;
+      ctx.pdf.setFontSize(7);
+      height = Math.max(height, 22 + ctx.pdf.splitTextToSize(block.body, cardW - 14).length * 8.2);
+    }
+    return height;
+  });
+  const required = 24 + heights.reduce((sum, height) => sum + height + gap, 0);
+  if (ctx.y + required > ctx.H - ctx.BOTTOM) return false;
+  drawApacCompactHeading(ctx, "Business Implications");
+  for (let row = 0; row < rows; row += 1) {
+    const height = heights[row];
+    for (let col = 0; col < 2; col += 1) {
+      const block = blocks[row * 2 + col];
+      if (!block) continue;
+      const x = ctx.MX + col * (cardW + gap);
+      const y = ctx.y;
+      setFill(ctx.pdf, "#ffffff");
+      setStroke(ctx.pdf, POLAR);
+      ctx.pdf.setLineWidth(0.45);
+      ctx.pdf.rect(x, y, cardW, height, "FD");
+      setText(ctx.pdf, NAVY);
+      setRoboto(ctx.pdf, "bold");
+      ctx.pdf.setFontSize(7);
+      ctx.pdf.text(block.heading.toUpperCase(), x + 7, y + 11);
+      setText(ctx.pdf, DUSK);
+      setRoboto(ctx.pdf, "regular");
+      ctx.pdf.setFontSize(7);
+      const lines = ctx.pdf.splitTextToSize(block.body, cardW - 14);
+      ctx.pdf.text(lines, x + 7, y + 22, { lineHeightFactor: 8.2 / 7 });
+    }
+    ctx.y += height + gap;
+  }
+  return true;
+}
+
 /*
  * APAC Weekly has a deliberately fixed reader journey.  These compact
  * primitives do not call ensureSpace/newPage: the APAC branch allocates each
@@ -885,6 +938,81 @@ function drawApacCompactText(
   return lines.length;
 }
 
+function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void {
+  const points = buildRegionalMapPoints(incidents, "apac_weekly");
+  drawApacCompactHeading(ctx, "Regional Risk Map");
+  const mapH = 112;
+  const minLng = 85, maxLng = 180, minLat = -15, maxLat = 60;
+  const project = (lng: number, lat: number): [number, number] => [
+    ctx.MX + 8 + ((lng - minLng) / (maxLng - minLng)) * (ctx.CW - 16),
+    ctx.y + 6 + ((maxLat - lat) / (maxLat - minLat)) * (mapH - 12),
+  ];
+  setFill(ctx.pdf, "#f3f6fa");
+  setStroke(ctx.pdf, "#b8c4d5");
+  ctx.pdf.setLineWidth(0.4);
+  ctx.pdf.rect(ctx.MX, ctx.y, ctx.CW, mapH, "FD");
+  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
+  for (const feature of collection.features) {
+    const polygons = feature.geometry.type === "Polygon"
+      ? [feature.geometry.coordinates]
+      : feature.geometry.coordinates;
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        const mapped = ring
+          .filter(([lng, lat]) => lng >= minLng - 4 && lng <= maxLng + 4 && lat >= minLat - 4 && lat <= maxLat + 4)
+          .map(([lng, lat]) => project(lng, lat));
+        if (
+          mapped.length < 3 ||
+          mapped.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))
+        ) continue;
+        // Keep the renderer export-safe: jsPDF.lines expects relative vectors
+        // and rejects absolute coordinate tuples. Draw a conservative fan fill
+        // plus explicit outline segments instead.
+        setFill(ctx.pdf, "#dce5ef");
+        for (let index = 1; index < mapped.length - 1; index += 1) {
+          ctx.pdf.triangle(
+            mapped[0][0], mapped[0][1],
+            mapped[index][0], mapped[index][1],
+            mapped[index + 1][0], mapped[index + 1][1],
+            "F",
+          );
+        }
+        setStroke(ctx.pdf, "#9cabbf");
+        for (let index = 0; index < mapped.length; index += 1) {
+          const [x1, y1] = mapped[index];
+          const [x2, y2] = mapped[(index + 1) % mapped.length];
+          if (x1 !== x2 || y1 !== y2) ctx.pdf.line(x1, y1, x2, y2);
+        }
+      }
+    }
+  }
+  const labels = new Set<string>();
+  const boxes: Array<{ left: number; top: number; right: number; bottom: number }> = [];
+  for (const point of points) {
+    const [x, y] = project(point.lng, point.lat);
+    setFill(ctx.pdf, ELECTRIC);
+    ctx.pdf.circle(x, y, 2.8, "F");
+    const key = point.label.trim().toLowerCase();
+    if (labels.has(key)) continue;
+    labels.add(key);
+    setRoboto(ctx.pdf, "bold");
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.setFontSize(6.2);
+    const label = sanitize(point.label);
+    const width = ctx.pdf.getTextWidth(label);
+    const candidates = [[x + 4, y - 2], [x + 4, y - 11], [x - width - 4, y - 2], [x - width - 4, y + 8]];
+    const chosen = candidates.find(([left, top]) => {
+      const box = { left, top, right: left + width, bottom: top + 7 };
+      return !boxes.some((other) =>
+        box.left < other.right + 2 && box.right > other.left - 2 &&
+        box.top < other.bottom + 2 && box.bottom > other.top - 2);
+    }) ?? [Math.min(x + 4, ctx.MX + ctx.CW - width - 4), y - 2];
+    boxes.push({ left: chosen[0], top: chosen[1], right: chosen[0] + width, bottom: chosen[1] + 7 });
+    ctx.pdf.text(label, chosen[0], chosen[1] + 5);
+  }
+  ctx.y += mapH + 8;
+}
+
 function drawApacPageTwo(
   ctx: Ctx,
   incidents: TopicReportIncident[],
@@ -897,93 +1025,7 @@ function drawApacPageTwo(
   // height, so the next heading cannot touch the final BLUF baseline.
   ctx.y += Math.max(8, blufLines > 0 ? 8 : 0);
 
-  const points = buildRegionalMapPoints(incidents, "apac_weekly");
-  drawApacCompactHeading(ctx, "Regional Risk Map");
-  const mapH = 82;
-  setFill(ctx.pdf, "#f7f8fb");
-  setStroke(ctx.pdf, "#d2d6e1");
-  ctx.pdf.setLineWidth(0.5);
-  ctx.pdf.rect(ctx.MX, ctx.y, ctx.CW, mapH, "FD");
-  if (points.length > 0) {
-    const lats = points.map((point) => point.lat);
-    const lngs = points.map((point) => point.lng);
-    const minLat = Math.min(...lats) - 3;
-    const maxLat = Math.max(...lats) + 3;
-    const minLng = Math.min(...lngs) - 5;
-    const maxLng = Math.max(...lngs) + 5;
-    const labelBoxes: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    const labelledCountries = new Set<string>();
-    const labelOffsets = [
-      { dx: 4, dy: 2 },
-      { dx: 4, dy: -9 },
-      { dx: 4, dy: 13 },
-      { dx: -4, dy: -9, rightAligned: true },
-      { dx: -4, dy: 13, rightAligned: true },
-      { dx: 10, dy: -18 },
-      { dx: 10, dy: 22 },
-      { dx: -10, dy: -18, rightAligned: true },
-      { dx: -10, dy: 22, rightAligned: true },
-    ];
-    for (const point of points) {
-      const x = ctx.MX + 10 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (ctx.CW - 20);
-      const y = ctx.y + 8 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (mapH - 16);
-      setFill(ctx.pdf, ELECTRIC);
-      ctx.pdf.circle(x, y, 2.8, "F");
-      const countryKey = point.label.trim().toLowerCase();
-      if (labelledCountries.has(countryKey)) continue;
-      labelledCountries.add(countryKey);
-      setText(ctx.pdf, NAVY);
-      setRoboto(ctx.pdf, "bold");
-      ctx.pdf.setFontSize(5.8);
-      const label = sanitize(point.label);
-      const labelW = ctx.pdf.getTextWidth(label);
-      const mapLeft = ctx.MX + 5;
-      const mapRight = ctx.MX + ctx.CW - 5;
-      const mapTop = ctx.y + 4;
-      const mapBottom = ctx.y + mapH - 4;
-      let chosen = {
-        left: Math.min(Math.max(x + 4, mapLeft), mapRight - labelW),
-        top: Math.min(Math.max(y - 4, mapTop), mapBottom - 7),
-        rightAligned: false,
-      };
-      for (const offset of labelOffsets) {
-        const rawLeft = offset.rightAligned ? x + offset.dx - labelW : x + offset.dx;
-        const left = Math.min(Math.max(rawLeft, mapLeft), mapRight - labelW);
-        const top = Math.min(Math.max(y + offset.dy - 5, mapTop), mapBottom - 7);
-        const candidate = { left, top, right: left + labelW, bottom: top + 7 };
-        const collides = labelBoxes.some(
-          (box) =>
-            candidate.left < box.right + 2 &&
-            candidate.right > box.left - 2 &&
-            candidate.top < box.bottom + 2 &&
-            candidate.bottom > box.top - 2,
-        );
-        if (!collides) {
-          chosen = { left, top, rightAligned: Boolean(offset.rightAligned) };
-          break;
-        }
-      }
-      labelBoxes.push({
-        left: chosen.left,
-        top: chosen.top,
-        right: chosen.left + labelW,
-        bottom: chosen.top + 7,
-      });
-      ctx.pdf.text(
-        label,
-        chosen.rightAligned ? chosen.left + labelW : chosen.left,
-        chosen.top + 5,
-        chosen.rightAligned ? { align: "right" } : undefined,
-      );
-    }
-  } else {
-    setText(ctx.pdf, DUSK);
-    setRoboto(ctx.pdf, "regular");
-    ctx.pdf.setFontSize(7);
-    ctx.pdf.text("No selected development has a verified plottable location.", ctx.MX + 10, ctx.y + 18);
-  }
-  ctx.y += mapH + 8;
-
+  drawApacGeographicMap(ctx, incidents);
   const developments = buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly");
   const glance = buildRegionalGlanceItems(developments, "apac_weekly");
   drawApacCompactHeading(ctx, "Week at a Glance");
@@ -996,8 +1038,22 @@ function drawApacPageTwo(
     setRoboto(ctx.pdf, "regular");
     ctx.pdf.setFontSize(6.8);
     const lines = ctx.pdf.splitTextToSize(sanitize(item.statement), ctx.CW - 105);
-    ctx.pdf.text(lines, ctx.MX + 105, ctx.y + 7, { lineHeightFactor: 1.15 });
-    ctx.y += Math.max(15, lines.length * 7.8 + 3);
+    const glanceLineHeight = 7.8;
+    ctx.pdf.text(lines, ctx.MX + 105, ctx.y + 7, { lineHeightFactor: glanceLineHeight / 6.8 });
+    ctx.y += Math.max(15, lines.length * glanceLineHeight + 9);
+  }
+  ctx.y += 8;
+  // Keep the first page dense: the thematic read follows the glance when it
+  // fits, rather than reserving a mostly empty fixed page for it.
+  drawApacCompactHeading(ctx, "What Changed This Week");
+  const briefs = buildRegionalDomainBriefs(developments, "apac_weekly");
+  for (const brief of briefs) {
+    setText(ctx.pdf, NAVY);
+    setRoboto(ctx.pdf, "bold");
+    ctx.pdf.setFontSize(7.2);
+    ctx.pdf.text(sanitize(brief.heading.toUpperCase()), ctx.MX, ctx.y + 7);
+    ctx.y += 10;
+    drawApacCompactText(ctx, brief.assessment, 7.2, 8.3, 6);
   }
 }
 
@@ -1035,7 +1091,7 @@ function drawApacDevelopmentPage(
     for (let col = 0; col < cols; col++) {
       const development = pageRows[row * cols + col];
       if (!development) continue;
-      ctx.pdf.setFontSize(6.25);
+       ctx.pdf.setFontSize(7);
       const body = [
         `Category: ${development.category}`,
         `Current Severity: ${development.severity}`,
@@ -1049,7 +1105,7 @@ function drawApacDevelopmentPage(
         cardW - 12,
       ).length;
       const bodyLines = ctx.pdf.splitTextToSize(sanitize(body), cardW - 12).length;
-      max = Math.max(max, 12 + titleLines * 8 + bodyLines * 6.9 + 10);
+       max = Math.max(max, 12 + titleLines * 8.2 + bodyLines * 7.8 + 10);
     }
     return max;
   });
@@ -1068,7 +1124,7 @@ function drawApacDevelopmentPage(
       ctx.pdf.rect(x, y, 2.5, h, "F");
       setText(ctx.pdf, NAVY);
       setRoboto(ctx.pdf, "bold");
-      ctx.pdf.setFontSize(6.35);
+       ctx.pdf.setFontSize(7.1);
       const titleLines = ctx.pdf.splitTextToSize(
         `${development.country} | ${development.title}`,
         cardW - 12,
@@ -1084,9 +1140,9 @@ function drawApacDevelopmentPage(
       ].join("\n");
       setText(ctx.pdf, DUSK);
       setRoboto(ctx.pdf, "regular");
-      ctx.pdf.setFontSize(6.25);
+       ctx.pdf.setFontSize(7);
       const bodyLines = ctx.pdf.splitTextToSize(sanitize(body), cardW - 12);
-      ctx.pdf.text(bodyLines, x + 7, y + 10 + titleLines.length * 8, { lineHeightFactor: 1.1 });
+       ctx.pdf.text(bodyLines, x + 7, y + 10 + titleLines.length * 8.2, { lineHeightFactor: 1.1 });
       if (development.sourceCount && development.sourceCount > 1) {
         setRoboto(ctx.pdf, "italic");
         ctx.pdf.setFontSize(5.5);
@@ -1095,6 +1151,44 @@ function drawApacDevelopmentPage(
     }
     ctx.y += rowHeights[row] + gap;
   }
+}
+
+function splitApacDevelopmentPages(
+  ctx: Ctx,
+  developments: ReturnType<typeof buildApacWeeklyDevelopments>,
+): Array<ReturnType<typeof buildApacWeeklyDevelopments>> {
+  const gap = 7;
+  const cardW = (ctx.CW - gap) / 2;
+  const usable = ctx.H - ctx.BOTTOM - ctx.TOP - 38;
+  const rowHeights = developments.map((development) => {
+    const body = [
+      `Category: ${development.category}`,
+      `Current Severity: ${development.severity}`,
+      `What Changed: ${development.whatChanged}`,
+      `Operational Impact: ${development.operationalImpact ?? development.operationalSignificance}`,
+      `Polestar View: ${development.polestarView ?? development.operationalSignificance}`,
+      ...(development.outlook7Days ? [`Outlook 7 Days: ${development.outlook7Days}`] : []),
+    ].join("\n");
+    ctx.pdf.setFontSize(7);
+    const titleLines = ctx.pdf.splitTextToSize(`${development.country} | ${development.title}`, cardW - 12).length;
+    const bodyLines = ctx.pdf.splitTextToSize(sanitize(body), cardW - 12).length;
+    return 12 + titleLines * 8.2 + bodyLines * 7.8 + 10;
+  });
+  const pages: Array<ReturnType<typeof buildApacWeeklyDevelopments>> = [];
+  let page: ReturnType<typeof buildApacWeeklyDevelopments> = [];
+  let height = 0;
+  for (let index = 0; index < developments.length; index += 2) {
+    const rowHeight = Math.max(rowHeights[index], rowHeights[index + 1] ?? 0) + gap;
+    if (page.length > 0 && height + rowHeight > usable) {
+      pages.push(page);
+      page = [];
+      height = 0;
+    }
+    page.push(...developments.slice(index, index + 2));
+    height += rowHeight;
+  }
+  if (page.length > 0) pages.push(page);
+  return pages;
 }
 
 function drawApacFinalPage(
@@ -2232,32 +2326,36 @@ export async function exportTopicReportPdf(
       }
     } else if (isRegionalWeekly) {
       if (regionalTopic === "apac_weekly") {
-        // APAC has a fixed seven-page reader journey. Every page after the
-        // cover is allocated explicitly; the compact renderers above never
-        // call ensureSpace/newPage and therefore cannot create spill pages.
         const apacDevelopments = buildApacWeeklyDevelopments(
           regionalPdfIncidents,
           data.issueDate,
         );
-        newPage(ctx);
-        if (show("situation")) drawApacThemesPage(ctx, regionalPdfIncidents, data.issueDate);
-
-        const splitAt = Math.ceil(apacDevelopments.length / 2);
-        newPage(ctx);
-        if (show("what-happened")) {
-          drawApacDevelopmentPage(ctx, apacDevelopments.slice(0, splitAt));
-        }
-        newPage(ctx);
-        if (show("what-happened")) {
-          drawApacDevelopmentPage(ctx, apacDevelopments.slice(splitAt));
+        const developmentPages = show("what-happened")
+          ? splitApacDevelopmentPages(ctx, apacDevelopments)
+          : [];
+        if (developmentPages.length > 0) {
+          developmentPages.forEach((pageRows) => {
+            newPage(ctx);
+            drawApacDevelopmentPage(ctx, pageRows);
+          });
         }
 
         newPage(ctx);
         if (show("implications")) {
-          drawApacBusinessImplicationBlocks(ctx, regionalPdfIncidents, data.issueDate);
+          const fit = drawApacBusinessImplicationGrid(
+            ctx,
+            regionalPdfIncidents,
+            data.issueDate,
+          );
+          if (!fit) {
+            newPage(ctx);
+            drawApacBusinessImplicationBlocks(
+              ctx,
+              regionalPdfIncidents,
+              data.issueDate,
+            );
+          }
         }
-
-        newPage(ctx);
         if (show("watch-next") || show("polestar-view")) {
           drawApacFinalPage(
             ctx,
