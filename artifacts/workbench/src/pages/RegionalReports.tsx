@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
+  createReport as createReportRequest,
   type Report,
-  useCreateReport,
   useDeleteReport,
   useListReports,
   getGetDashboardOverviewQueryKey,
@@ -13,6 +13,7 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, Globe2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { reportStatusClass } from "@/lib/topics";
 import {
   canonicalTopic,
@@ -39,38 +40,43 @@ export default function RegionalReports() {
     older: olderReports,
     completed: completedReports,
   } = splitReportsByLifecycle(regionalReports);
-  const create = useCreateReport();
   const del = useDeleteReport();
   const createBusy = useRef(false);
   const [creatingTopic, setCreatingTopic] = useState<RegionalTopic | null>(null);
 
-  const createRegionalReport = (topic: RegionalTopic) => {
-    if (create.isPending || createBusy.current) return;
+  const createRegionalReport = async (topic: RegionalTopic) => {
+    if (createBusy.current) return;
     createBusy.current = true;
     setCreatingTopic(topic);
-    create.mutate(
-      {
-        data: {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    try {
+      const report = await createReportRequest(
+        {
           title: canonicalReportTitle(topic),
           topic,
           issueDate: currentReportDate(),
           status: "draft",
         } as never,
-      },
-      {
-        onSuccess: (report) => {
-          createBusy.current = false;
-          setCreatingTopic(null);
-          qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
-          qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
-          setLocation(`/reports/${(report as { id: number }).id}`);
-        },
-        onError: () => {
-          createBusy.current = false;
-          setCreatingTopic(null);
-        },
-      },
-    );
+        { signal: controller.signal },
+      );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: getListReportsQueryKey() }),
+        qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
+      ]);
+      setLocation(`/reports/${report.id}`);
+    } catch (error) {
+      const timedOut = error instanceof DOMException && error.name === "AbortError";
+      toast.error(
+        timedOut
+          ? "Report creation timed out. The request was stopped; please try again."
+          : "Report creation failed. Please try again.",
+      );
+    } finally {
+      window.clearTimeout(timeout);
+      createBusy.current = false;
+      setCreatingTopic(null);
+    }
   };
 
   const deleteReport = (report: Report) => {
@@ -122,7 +128,7 @@ export default function RegionalReports() {
               </div>
               <Button
                 onClick={() => createRegionalReport(topic)}
-                disabled={create.isPending}
+                disabled={creatingTopic !== null}
                 className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm shrink-0"
               >
                 <Plus className="w-4 h-4 mr-2" />
