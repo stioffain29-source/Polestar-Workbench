@@ -15,7 +15,12 @@ import { TOPICS, TOPIC_LABELS, REPORT_STATUSES, reportStatusClass } from "@/lib/
 import { format, parseISO } from "date-fns";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { canonicalTopic, REPORT_TOPICS } from "@/lib/reportNaming";
+import {
+  canonicalTopic,
+  isReportableTopic,
+  REGIONAL_REPORT_TOPICS,
+  STANDARD_REPORT_TOPICS,
+} from "@/lib/reportNaming";
 import {
   currentReportDate,
   splitReportsByLifecycle,
@@ -30,7 +35,11 @@ export default function Reports() {
   const params: Record<string, unknown> = {};
   if (topic) params.topic = topic;
   if (status) params.status = status;
-  const { data: reports = [] } = useListReports(params);
+  const { data: allReports = [] } = useListReports(params);
+  const reports = allReports.filter(
+    (report) =>
+      !(REGIONAL_REPORT_TOPICS as readonly string[]).includes(report.topic),
+  );
   const del = useDeleteReport();
   const create = useCreateReport();
   const {
@@ -72,7 +81,7 @@ export default function Reports() {
                       offering them here would 400 on create. */}
                   <Select value={form.topic} onValueChange={(v) => setForm({ ...form, topic: v })}>
                     <SelectTrigger className="rounded-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{REPORT_TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{STANDARD_REPORT_TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}</SelectContent>
                   </Select>
                 </Field>
                 <Field label="Issue Date"><Input type="date" value={form.issueDate} onChange={(e) => setForm({ ...form, issueDate: e.target.value })} className="rounded-sm" /></Field>
@@ -114,7 +123,7 @@ export default function Reports() {
           <SelectTrigger className="rounded-sm w-48"><SelectValue placeholder="All topics" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All topics</SelectItem>
-            {TOPICS.map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}
+            {TOPICS.filter((t) => isReportableTopic(t) && !(REGIONAL_REPORT_TOPICS as readonly string[]).includes(t)).map((t) => <SelectItem key={t} value={t}>{TOPIC_LABELS[t]}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={status || "all"} onValueChange={(v) => setStatus(v === "all" ? "" : v)}>

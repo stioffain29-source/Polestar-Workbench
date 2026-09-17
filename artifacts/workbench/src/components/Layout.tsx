@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { 
-  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, Settings, Swords, Server, AlertTriangle, Layers, Crosshair
+  Activity, Database, Home, Clock, Flame, Droplet, Zap, Ship, Package, Navigation, Target, Radio, FileText, Flag, Search, Bell, Siren, Settings, Swords, Server, AlertTriangle, Layers, Crosshair, Globe2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import polestarLogo from "@assets/Reverse_colour_logo_vert.png";
@@ -60,6 +60,7 @@ export default function Layout({ children }: LayoutProps) {
     {
       title: "REPORTS",
       items: [
+        { label: "Regional Reports", href: "/regional-reports", icon: Globe2 },
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
         { label: "Special Reports", href: "/special-reports", icon: FileText },

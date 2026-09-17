@@ -27,6 +27,7 @@ import OfficialSourcesQueue from "./pages/OfficialSourcesQueue";
 import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
 import Reports from "./pages/Reports";
+import RegionalReports from "./pages/RegionalReports";
 import ReportEditor from "./pages/ReportEditor";
 import SpotReports from "./pages/SpotReports";
 import SpotReportEditor from "./pages/SpotReportEditor";
@@ -226,6 +227,7 @@ function Router() {
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />
         <Route path="/reports" component={Reports} />
+        <Route path="/regional-reports" component={RegionalReports} />
         <Route path="/reports/:id" component={ReportEditorRoute} />
         <Route path="/spot-reports" component={SpotReports} />
         <Route path="/spot-reports/:id" component={SpotReportEditor} />

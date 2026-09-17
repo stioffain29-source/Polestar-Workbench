@@ -2677,6 +2677,12 @@ export default function ReportEditor() {
     );
 
   const scope = scopeFor(form.topic);
+  const reportListHref = isRegionalWeeklyTopic(form.topic)
+    ? "/regional-reports"
+    : "/reports";
+  const reportListLabel = isRegionalWeeklyTopic(form.topic)
+    ? "Back to Regional Reports"
+    : "Back to All Reports";
   // The rating a card pull would derive if the analyst leaves the override
   // blank: worst credible tier among scoped incidents, else the prose
   // heuristic. Built from the live form so it tracks topic / issue-date /
@@ -2744,10 +2750,10 @@ export default function ReportEditor() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 no-print border-b border-[#e2e2e2] pb-6">
         <div>
           <Link
-            href="/reports"
+            href={reportListHref}
             className="text-[11px] uppercase tracking-[0.15em] font-bold text-[#465bff] hover:text-[#0b0a3d] transition-colors inline-flex items-center gap-1.5 mb-3"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to All Reports
+            <ArrowLeft className="w-3.5 h-3.5" /> {reportListLabel}
           </Link>
           <div className="text-[10px] font-sans uppercase tracking-[0.2em] font-bold text-[#363636] opacity-70 mt-2 mb-1">
             Polestar Insights

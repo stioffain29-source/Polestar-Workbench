@@ -49,6 +49,13 @@ export const REPORT_TOPICS = [
   "shipping", "cargo_watch", "conflict", "data_centres",
   "apac_weekly", "middle_east_weekly",
 ] as const;
+export const REGIONAL_REPORT_TOPICS = [
+  "apac_weekly",
+  "middle_east_weekly",
+] as const;
+export const STANDARD_REPORT_TOPICS = REPORT_TOPICS.filter(
+  (topic) => !(REGIONAL_REPORT_TOPICS as readonly string[]).includes(topic),
+);
 export type ReportTopic = (typeof REPORT_TOPICS)[number];
 export function isReportableTopic(topic: string): topic is ReportTopic {
   return (REPORT_TOPICS as readonly string[]).includes(topic);
