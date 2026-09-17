@@ -87,7 +87,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic } from "./regionalWeekly";
-import { buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalIntelligencePicture, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -678,40 +678,87 @@ function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]
     ctx.y += 3;
     renderProse(
       ctx,
-      `Category: ${development.category}\nCurrent Severity: ${development.severity}\nWhat Changed: ${development.whatChanged}\nOperational Significance: ${development.operationalSignificance}${development.whatToWatch ? `\nWhat To Watch: ${development.whatToWatch}` : ""}`,
+      `Category: ${development.category}\nCurrent Severity: ${development.severity}\nWhat Changed: ${development.whatChanged}\nWhy It Matters: ${development.operationalSignificance}${development.whatToWatch ? `\nWhat To Watch: ${development.whatToWatch}` : ""}`,
     );
   }
 }
 
-function drawRegionalActivityCharts(ctx: Ctx, incidents: TopicReportIncident[]) {
-  const summary = buildRegionalVisualSummary(incidents);
-  if (summary.byCategory.length === 0) return;
+function drawRegionalGlance(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
+  const developments = buildRegionalDevelopments(incidents, issueDate);
+  const items = buildRegionalGlanceItems(developments);
   const { pdf, MX, CW } = ctx;
-  const drawChart = (title: string, rows: Array<{ label: string; count: number }>) => {
-    ensureSpace(ctx, 20 + rows.length * 11);
+  drawSectionHeading(ctx, "Week at a Glance");
+  for (const item of items) {
+    ensureSpace(ctx, 24);
     setRoboto(pdf, "bold");
     setText(pdf, NAVY);
     pdf.setFontSize(8);
-    pdf.text(title.toUpperCase(), MX, ctx.y + 8);
-    ctx.y += 14;
-    const max = Math.max(1, ...rows.map((row) => row.count));
-    for (const row of rows) {
-      setRoboto(pdf, "regular");
-      setText(pdf, DUSK);
-      pdf.setFontSize(7);
-      pdf.text(row.label, MX, ctx.y + 7);
-      pdf.setFillColor(238, 240, 245);
-      pdf.rect(MX + 105, ctx.y + 1, CW - 125, 6, "F");
-      pdf.setFillColor(70, 91, 255);
-      pdf.rect(MX + 105, ctx.y + 1, ((CW - 125) * row.count) / max, 6, "F");
-      setRoboto(pdf, "bold");
-      pdf.text(String(row.count), MX + CW, ctx.y + 7, { align: "right" });
-      ctx.y += 11;
-    }
-    ctx.y += 5;
-  };
-  drawChart("Weekly developments by category", summary.byCategory);
-  drawChart("Activity by country", summary.byCountry.slice(0, 8));
+    pdf.text(item.category.toUpperCase(), MX, ctx.y + 8);
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.setFontSize(7.5);
+    const lines = pdf.splitTextToSize(item.statement, CW - 105);
+    pdf.text(lines, MX + 105, ctx.y + 8);
+    ctx.y += Math.max(18, lines.length * 9 + 5);
+  }
+}
+
+function drawRegionalHotspotMap(ctx: Ctx, incidents: TopicReportIncident[]) {
+  const points = buildRegionalMapPoints(incidents);
+  const { pdf, MX, CW } = ctx;
+  const h = 105;
+  ensureSpace(ctx, h + 22);
+  drawSectionHeading(ctx, "Regional Hotspot Map");
+  pdf.setFillColor(247, 248, 251);
+  pdf.setDrawColor(210, 214, 225);
+  pdf.rect(MX, ctx.y, CW, h, "FD");
+  if (points.length === 0) {
+    setRoboto(pdf, "regular");
+    setText(pdf, DUSK);
+    pdf.setFontSize(8);
+    pdf.text("No selected development has a verified plottable location.", MX + 12, ctx.y + 20);
+    ctx.y += h + 8;
+    return;
+  }
+  const lats = points.map((point) => point.lat);
+  const lngs = points.map((point) => point.lng);
+  const minLat = Math.min(...lats) - 3;
+  const maxLat = Math.max(...lats) + 3;
+  const minLng = Math.min(...lngs) - 5;
+  const maxLng = Math.max(...lngs) + 5;
+  for (const point of points) {
+    const x = MX + 12 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (CW - 24);
+    const y = ctx.y + 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
+    pdf.setFillColor(70, 91, 255);
+    pdf.circle(x, y, 3.5, "F");
+    setRoboto(pdf, "bold");
+    setText(pdf, NAVY);
+    pdf.setFontSize(6.5);
+    pdf.text(point.label, Math.min(x + 5, MX + CW - 55), y + 2);
+  }
+  ctx.y += h + 8;
+}
+
+function drawRegionalTimeline(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
+  const items = buildRegionalWatchlist(buildRegionalDevelopments(incidents, issueDate));
+  if (items.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  ensureSpace(ctx, 42);
+  setStroke(pdf, NAVY);
+  pdf.setLineWidth(1);
+  pdf.line(MX + 12, ctx.y + 15, MX + CW - 12, ctx.y + 15);
+  items.forEach((item, index) => {
+    const x = items.length === 1
+      ? MX + CW / 2
+      : MX + 12 + (index / (items.length - 1)) * (CW - 24);
+    pdf.setFillColor(70, 91, 255);
+    pdf.circle(x, ctx.y + 15, 3, "F");
+    setRoboto(pdf, "bold");
+    setText(pdf, NAVY);
+    pdf.setFontSize(6);
+    pdf.text(item.date.slice(5), x, ctx.y + 28, { align: "center" });
+  });
+  ctx.y += 38;
 }
 
 function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
@@ -1310,6 +1357,10 @@ export async function exportTopicReportPdf(
       renderProse(ctx, cargoModel.highSeverityNote);
     }
   }
+  if (isRegionalWeekly) {
+    drawRegionalHotspotMap(ctx, regionalPdfIncidents);
+    drawRegionalGlance(ctx, regionalPdfIncidents, data.issueDate);
+  }
 
   const rawWindow = filterIncidentsToWindow(
     incidents,
@@ -1831,6 +1882,47 @@ export async function exportTopicReportPdf(
       if (show("incident-annex") && options.includeFullAnnex) {
         drawFullAnnex(ctx, cargoModel.appendix);
       }
+    } else if (isRegionalWeekly) {
+      newPage(ctx);
+      drawSectionHeading(ctx, "What Changed");
+      if (show("situation")) {
+        drawRegionalDomainBriefs(ctx, regionalPdfIncidents, data.issueDate);
+      }
+
+      newPage(ctx);
+      if (show("what-happened")) {
+        drawSectionHeading(ctx, "Key Developments");
+        drawRegionalDevelopmentCards(ctx, regionalPdfIncidents, data.issueDate);
+      }
+
+      newPage(ctx);
+      if (show("watch-next")) {
+        drawSectionHeading(ctx, "7 Day Watch");
+        drawRegionalTimeline(ctx, regionalPdfIncidents, data.issueDate);
+        drawRegionalWatchlist(ctx, regionalPdfIncidents, data.issueDate);
+      }
+      if (show("implications")) {
+        const travel = resolveRegionalNarrative(
+          data.implications,
+          aiProse?.implications,
+          buildRegionalTravelImplications(
+            buildRegionalDevelopments(regionalPdfIncidents, data.issueDate),
+          ),
+        );
+        if (travel.trim()) drawSectionWithProse(ctx, "Travel & Personnel", travel);
+      }
+
+      newPage(ctx);
+      if (show("polestar-view")) {
+        const outlook = resolveRegionalNarrative(
+          data.polestarView,
+          aiProse?.polestarView,
+          buildRegionalOutlook(
+            buildRegionalDevelopments(regionalPdfIncidents, data.issueDate),
+          ),
+        );
+        if (outlook.trim()) drawSectionWithProse(ctx, "Polestar Outlook", outlook);
+      }
     } else {
       const proseSections: [string, string, string][] = [
         [
@@ -1869,14 +1961,6 @@ export async function exportTopicReportPdf(
       ];
       for (const [key, label, body] of proseSections) {
         if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
-      }
-      if (isRegionalWeekly && show("situation")) {
-        drawRegionalDomainBriefs(ctx, regionalPdfIncidents, data.issueDate);
-      }
-      if (isRegionalWeekly && show("what-happened")) {
-        drawSectionHeading(ctx, "Key Developments");
-        drawRegionalActivityCharts(ctx, regionalPdfIncidents);
-        drawRegionalDevelopmentCards(ctx, regionalPdfIncidents, data.issueDate);
       }
       if (show("implications")) {
         const implBody = isRegionalWeekly

@@ -15,6 +15,8 @@ type RegionalIncident = {
   eventClusterKey?: string | null;
   analystNotes?: string | null;
   location?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   source?: string | null;
   occurredAt: string;
 };
@@ -55,6 +57,19 @@ export interface RegionalWatchItem {
   trigger: string;
   whyItMatters: string;
   whatToWatch: string;
+}
+
+export interface RegionalGlanceItem {
+  category: RegionalIntelligenceCategory;
+  statement: string;
+}
+
+export interface RegionalMapPoint {
+  lat: number;
+  lng: number;
+  severity: string | null;
+  title: string;
+  label: string;
 }
 
 const APAC = [
@@ -254,7 +269,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     selected.push(incident);
     categoryCounts.set(category, 1);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 10) return selected;
+    if (selected.length === 6) return selected;
   }
   for (const incident of ranked) {
     if (selected.includes(incident)) continue;
@@ -262,7 +277,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     if ((countryCounts.get(country) ?? 0) >= 3) continue;
     selected.push(incident);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 10) break;
+    if (selected.length === 6) break;
   }
   // If the real evidence is concentrated in one country/category, fill the
   // remaining slots rather than suppressing distinct material events. The
@@ -270,7 +285,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
   for (const incident of ranked) {
     if (selected.includes(incident)) continue;
     selected.push(incident);
-    if (selected.length === 10) break;
+    if (selected.length === 6) break;
   }
   return selected;
 }
@@ -287,6 +302,25 @@ function clip(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
   if (clean.length <= max) return clean;
   return `${clean.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
+}
+
+export function clipRegionalWords(text: string, maxWords: number): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  const words = clean.split(" ").filter(Boolean);
+  if (words.length <= maxWords) return clean;
+  return `${words.slice(0, maxWords).join(" ").replace(/[,:;]$/, "")}…`;
+}
+
+function firstSentences(text: string, maxSentences: number, maxWords: number): string {
+  return clipRegionalWords(
+    text
+      .replace(/\s+/g, " ")
+      .trim()
+      .split(/(?<=[.!?])\s+/)
+      .slice(0, maxSentences)
+      .join(" "),
+    maxWords,
+  );
 }
 
 function sentenceWith(text: string, pattern: RegExp): string | null {
@@ -338,10 +372,14 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
       title: clip(sourceTitle, 90),
       severity: SEVERITY_LABEL[incident.severity?.toLowerCase() ?? ""] ?? "Moderate",
       category: regionalIntelligenceCategory(incident),
-      whatChanged: clip(evidence, 480),
-      operationalSignificance: operationalSignificance(incident, evidence),
+      whatChanged: firstSentences(evidence, 2, 30),
+      operationalSignificance: firstSentences(operationalSignificance(incident, evidence), 1, 25),
       watchDate: extractWatchDate(incident, issueDate),
-      whatToWatch: specificWatch(incident, evidence, extractWatchDate(incident, issueDate)),
+      whatToWatch: firstSentences(
+        specificWatch(incident, evidence, extractWatchDate(incident, issueDate)),
+        1,
+        20,
+      ),
     };
   });
 }
@@ -372,7 +410,7 @@ export function buildRegionalOutlook(developments: RegionalDevelopment[]): strin
   const forward = watchable.length
     ? watchable.map((row) => row.whatToWatch.replace(/[.!?]+$/, "")).join("; ")
     : "whether the leading developments produce further transport, utility, compliance or personnel consequences";
-  return `The next seven days will be shaped by the unresolved consequences of ${current}. These developments matter because they connect current political, security, regulatory and infrastructure conditions to practical decisions on staff movement, site continuity, transport access, supply chains and compliance. Deterioration is most likely where an existing disruption broadens geographically, a policy decision moves into implementation, severe weather reaches exposed infrastructure, or violence affects commercial locations and transport links. The principal forward indicators are ${forward}. Operators should distinguish confirmed changes from commentary and adjust controls only where the evidence changes: new closure notices, official effective dates, revised weather warnings, interruption to utilities or communications, restrictions on cross-border movement, and credible signs of security escalation. Stable markets should remain under routine monitoring rather than being elevated solely because reporting volume increased.`;
+  return clipRegionalWords(`The next seven days will be shaped by the unresolved consequences of ${current}. These developments matter because they connect current political, security, regulatory and infrastructure conditions to practical decisions on staff movement, site continuity, transport access, supply chains and compliance. Deterioration is most likely where an existing disruption broadens geographically, a policy decision moves into implementation, severe weather reaches exposed infrastructure, or violence affects commercial locations and transport links. The principal forward indicators are ${forward}. Operators should distinguish confirmed changes from commentary and adjust controls only where the evidence changes: new closure notices, official effective dates, revised weather warnings, interruption to utilities or communications, restrictions on cross-border movement, and credible signs of security escalation. Stable markets should remain under routine monitoring rather than being elevated solely because reporting volume increased.`, 200);
 }
 
 const DOMAIN_ORDER: RegionalIntelligenceCategory[] = [
@@ -414,7 +452,10 @@ export function buildRegionalDomainBriefs(
     return {
       domain,
       heading: DOMAIN_HEADING[domain],
-      assessment: `${changes} defined the material change in this domain. ${significance}.${watch ? ` ${watch}` : ""}`,
+        assessment: clipRegionalWords(
+          `${changes} defined the material change in this domain. ${significance}.${watch ? ` ${watch}` : ""}`,
+          80,
+        ),
     };
   });
 }
@@ -430,7 +471,7 @@ export function buildRegionalBluf(developments: RegionalDevelopment[]): string {
   const consequences = [...new Set(lead.flatMap((row) =>
     materialityDimensions(`${row.whatChanged} ${row.operationalSignificance}`)))].slice(0, 5);
   const forward = lead.find((row) => row.whatToWatch)?.whatToWatch;
-  return `The regional operating environment changed this week through ${joined}. The immediate implications concern ${consequences.join(", ")}.${forward ? ` Over the coming seven days, the clearest forward indicator is ${forward.replace(/^[Tt]he /, "").replace(/[.!?]+$/, "")}.` : ""}`;
+  return clipRegionalWords(`The regional operating environment changed this week through ${joined}. The immediate implications concern ${consequences.join(", ")}.${forward ? ` Over the coming seven days, the clearest forward indicator is ${forward.replace(/^[Tt]he /, "").replace(/[.!?]+$/, "")}.` : ""}`, 150);
 }
 
 export function buildRegionalIntelligencePicture(developments: RegionalDevelopment[]): string {
@@ -469,16 +510,76 @@ export function buildRegionalTravelImplications(developments: RegionalDevelopmen
   const travel = developments.filter((row) =>
     /\b(personnel|travel|airport|airline|airspace|border|road|rail|movement|access|transport)\b/i
       .test(`${row.whatChanged} ${row.operationalSignificance}`));
-  return travel.slice(0, 5)
-    .map((row) => `${row.country}: ${row.whatChanged}`)
-    .join("\n");
+  if (travel.length === 0) {
+    return "No changed regional travel or personnel implication was identified during the reporting period.";
+  }
+  return clipRegionalWords(
+    travel.slice(0, 5)
+      .map((row) => `${row.country}: ${row.whatChanged}`)
+      .join(" "),
+    150,
+  );
+}
+
+export function buildRegionalGlanceItems(
+  developments: RegionalDevelopment[],
+): RegionalGlanceItem[] {
+  const chosen: RegionalDevelopment[] = [];
+  const seen = new Set<RegionalIntelligenceCategory>();
+  for (const development of developments) {
+    if (seen.has(development.category)) continue;
+    chosen.push(development);
+    seen.add(development.category);
+    if (chosen.length === 5) break;
+  }
+  for (const development of developments) {
+    if (chosen.includes(development)) continue;
+    chosen.push(development);
+    if (chosen.length === 5) break;
+  }
+  const items: RegionalGlanceItem[] = chosen.map((development) => ({
+    category: development.category,
+    statement: clipRegionalWords(
+      `${development.country}: ${development.whatChanged}`,
+      28,
+    ),
+  }));
+  for (const domain of DOMAIN_ORDER) {
+    if (items.length === 5) break;
+    if (items.some((item) => item.category === domain)) continue;
+    items.push({
+      category: domain,
+      statement: `No material ${DOMAIN_HEADING[domain].toLowerCase()} change was identified this week.`,
+    });
+  }
+  return items.slice(0, 5);
+}
+
+export function buildRegionalMapPoints<T extends RegionalIncident>(
+  incidents: T[],
+): RegionalMapPoint[] {
+  return selectRegionalKeyDevelopments(incidents)
+    .filter(
+      (incident) =>
+        typeof incident.latitude === "number" &&
+        Number.isFinite(incident.latitude) &&
+        typeof incident.longitude === "number" &&
+        Number.isFinite(incident.longitude),
+    )
+    .map((incident) => ({
+      lat: incident.latitude!,
+      lng: incident.longitude!,
+      severity: incident.severity ?? null,
+      title: incident.displayTitle ?? incident.title ?? "Regional development",
+      label: incident.country?.trim() || incident.location?.trim() || "Regional",
+    }));
 }
 
 export function validateRegionalWeeklyAssessment(
   developments: RegionalDevelopment[],
 ): string[] {
   const errors: string[] = [];
-  if (developments.length > 10) errors.push("More than ten developments were selected.");
+  if (developments.length > 6) errors.push("More than six developments were selected.");
   const uniqueTitles = new Set(
     developments.map((row) => row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
   );
@@ -491,6 +592,15 @@ export function validateRegionalWeeklyAssessment(
   }
   if (!/\bregional operating environment\b/i.test(buildRegionalBluf(developments))) {
     errors.push("The BLUF does not assess the regional operating environment.");
+  }
+  if (buildRegionalBluf(developments).split(/\s+/).length > 150) {
+    errors.push("The BLUF exceeds 150 words.");
+  }
+  if (buildRegionalOutlook(developments).split(/\s+/).length > 200) {
+    errors.push("The Outlook exceeds 200 words.");
+  }
+  if (buildRegionalGlanceItems(developments).length !== 5) {
+    errors.push("Exactly five Week at a Glance items are required.");
   }
   return errors;
 }

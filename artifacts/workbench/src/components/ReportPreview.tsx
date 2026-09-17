@@ -17,8 +17,9 @@ import {
   buildRegionalIntelligencePicture,
   buildRegionalBusinessRisk,
   buildRegionalTravelImplications,
-  buildRegionalVisualSummary,
   buildRegionalWatchlist,
+  buildRegionalGlanceItems,
+  buildRegionalMapPoints,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
   resolveRegionalNarrative,
@@ -221,7 +222,7 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
           <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
             <p><strong>What Changed:</strong> {development.whatChanged}</p>
-            <p><strong>Operational Significance:</strong> {development.operationalSignificance}</p>
+            <p><strong>Why It Matters:</strong> {development.operationalSignificance}</p>
             {development.whatToWatch && <p><strong>What To Watch:</strong> {development.whatToWatch}</p>}
           </div>
         </article>
@@ -231,42 +232,6 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
           No qualifying developments were identified in the reporting period.
         </p>
       )}
-    </div>
-  );
-}
-
-function RegionalActivityCharts({
-  summary,
-}: {
-  summary: ReturnType<typeof buildRegionalVisualSummary>;
-}) {
-  const renderBars = (rows: Array<{ label: string; count: number }>) => {
-    const max = Math.max(1, ...rows.map((row) => row.count));
-    return rows.map((row) => (
-      <div key={row.label} className="grid grid-cols-[150px_1fr_24px] items-center gap-3 text-[11px]">
-        <span className="font-medium">{row.label}</span>
-        <div className="h-3 bg-[#eef0f5]">
-          <div className="h-full bg-[#465bff]" style={{ width: `${(row.count / max) * 100}%` }} />
-        </div>
-        <span className="font-bold text-right">{row.count}</span>
-      </div>
-    ));
-  };
-  if (summary.byCategory.length === 0) return null;
-  return (
-    <div className="grid grid-cols-2 gap-5 mb-6" style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}>
-      <div className="border border-[#e2e2e2] bg-white p-4">
-        <h3 className="uppercase tracking-wide text-[11px] font-bold mb-3" style={{ color: NAVY }}>
-          Weekly developments by category
-        </h3>
-        <div className="space-y-2">{renderBars(summary.byCategory)}</div>
-      </div>
-      <div className="border border-[#e2e2e2] bg-white p-4">
-        <h3 className="uppercase tracking-wide text-[11px] font-bold mb-3" style={{ color: NAVY }}>
-          Activity by country
-        </h3>
-        <div className="space-y-2">{renderBars(summary.byCountry.slice(0, 8))}</div>
-      </div>
     </div>
   );
 }
@@ -297,34 +262,83 @@ function RegionalWatchlist({
 }: {
   items: ReturnType<typeof buildRegionalWatchlist>;
 }) {
+  if (items.length === 0) {
+    return (
+      <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+        No qualifying watch items were identified in the reporting period.
+      </p>
+    );
+  }
   return (
-    <div className="border border-[#e2e2e2] bg-white overflow-hidden">
-      <div className="grid grid-cols-[.7fr_1fr_1.25fr_1.5fr_1.5fr] bg-[#0b0a3d] text-white text-[10px] uppercase tracking-wide font-bold">
-        <div className="p-3">Date</div>
-        <div className="p-3">Location</div>
-        <div className="p-3">Trigger / Event</div>
-        <div className="p-3">Why It Matters</div>
-        <div className="p-3">What To Watch</div>
-      </div>
-      {items.length === 0 ? (
-        <p className="p-4 text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
-          No qualifying watch items were identified in the reporting period.
-        </p>
-      ) : (
-        items.map((item, index) => (
-          <div
-            key={`${item.date}-${item.location}-${item.trigger}-${index}`}
-            className="grid grid-cols-[.7fr_1fr_1.25fr_1.5fr_1.5fr] border-t border-[#e2e2e2] text-[12px] leading-[1.45]"
-            style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}
-          >
-            <div className="p-3">{item.date}</div>
-            <div className="p-3 font-bold">{item.location}</div>
-            <div className="p-3">{item.trigger}</div>
-            <div className="p-3">{item.whyItMatters}</div>
-            <div className="p-3">{item.whatToWatch}</div>
+    <div className="relative border-l-2 border-[#465bff] ml-4 space-y-6">
+      {items.map((item, index) => (
+        <div key={`${item.date}-${item.location}-${index}`} className="relative pl-6">
+          <div className="absolute w-3 h-3 bg-[#465bff] rounded-full -left-[7px] top-1 border-2 border-white" />
+          <div className="border border-[#e2e2e2] bg-white p-3 shadow-sm">
+            <div className="flex justify-between items-baseline mb-2">
+              <span className="font-bold text-[13px] tracking-wide" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+                {item.date} — {item.location}
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+              <p><strong>Trigger / Event:</strong> {item.trigger}</p>
+              <p><strong>Why It Matters:</strong> {item.whyItMatters}</p>
+              <p><strong>What To Watch:</strong> {item.whatToWatch}</p>
+            </div>
           </div>
-        ))
-      )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RegionalHotspotMap({
+  points,
+}: {
+  points: ReturnType<typeof buildRegionalMapPoints>;
+}) {
+  if (points.length === 0) {
+    return (
+      <p className="text-[12px] text-muted-foreground italic" style={{ fontFamily: "Roboto, sans-serif" }}>
+        No selected development has a verified plottable location.
+      </p>
+    );
+  }
+  const lats = points.map((point) => point.lat);
+  const lngs = points.map((point) => point.lng);
+  const minLat = Math.min(...lats) - 3;
+  const maxLat = Math.max(...lats) + 3;
+  const minLng = Math.min(...lngs) - 5;
+  const maxLng = Math.max(...lngs) + 5;
+  return (
+    <div
+      className="relative h-[260px] overflow-hidden border border-[#d2d6e1] bg-[#f7f8fb]"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(11,10,61,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(11,10,61,.06) 1px, transparent 1px)",
+        backgroundSize: "12.5% 25%",
+      }}
+    >
+      {points.map((point, index) => {
+        const left = 4 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * 90;
+        const top = 8 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * 82;
+        return (
+          <div
+            key={`${point.lat}-${point.lng}-${index}`}
+            className="absolute"
+            style={{ left: `${left}%`, top: `${top}%` }}
+            title={point.title}
+          >
+            <span className="block h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#465bff] shadow" />
+            <span
+              className="absolute left-2 top-0 whitespace-nowrap text-[9px] font-bold uppercase tracking-wide"
+              style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
+            >
+              {point.label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1072,11 +1086,10 @@ export default function ReportPreview({
   const regionalDomainBriefs = isRegionalWeekly ? buildRegionalDomainBriefs(regionalDevelopments) : [];
   const regionalBluf = isRegionalWeekly ? buildRegionalBluf(regionalDevelopments) : "";
   const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
-  const regionalIntelligencePicture = isRegionalWeekly ? buildRegionalIntelligencePicture(regionalDevelopments) : "";
-  const regionalBusinessRisk = isRegionalWeekly ? buildRegionalBusinessRisk(regionalDevelopments) : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
-  const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(regionalCuratedIncidents) : { byCategory: [], byCountry: [] };
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
+  const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments) : [];
+  const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents) : [];
   const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest
   // market close the report carries, NOT the stored issue date. Deriving the
@@ -1404,17 +1417,72 @@ export default function ReportPreview({
       </div>
       </div>
 
-      <div className="px-10 py-10">
-        {execText.trim() && (
-          <Section
-            hidden={!show("executive-summary")}
-            title={isRegionalWeekly ? "BLUF — Regional Outlook" : "Executive Summary"}
-          >
-            <Paragraphs text={execText} />
-          </Section>
-        )}
+      {isRegionalWeekly ? (
+        <div className="regional-weekly-body">
+          {/* Page 2: Week at a Glance */}
+          <div className="px-10 py-10 report-page" style={{ position: "relative" }}>
+            <Section hidden={!show("executive-summary")} title="Week at a Glance">
+              <h3 style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, textTransform: "uppercase" }}>BLUF — Regional Outlook</h3>
+              <Paragraphs text={regionalBluf} />
+              <div style={{ marginTop: 24, marginBottom: 24 }}>
+                <RegionalHotspotMap points={regionalMapPoints} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 mt-6">
+                {regionalGlanceItems.map((item, i) => (
+                  <div key={i} className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-3 flex items-center gap-4">
+                    <span className="uppercase text-[11px] font-bold min-w-[150px]" style={{ color: NAVY }}>{item.category}</span>
+                    <span className="text-[12px] leading-[1.45]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>{item.statement}</span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
 
-        {isFuel && fuelData ? (
+          {/* Page 3: What Changed */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("situation")} title="What Changed">
+              <RegionalDomainBriefs briefs={regionalDomainBriefs} />
+            </Section>
+          </div>
+
+          {/* Page 4: Key Developments */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("what-happened")} title="Key Developments">
+              <RegionalDevelopmentCards developments={regionalDevelopments} />
+            </Section>
+          </div>
+
+          {/* Page 5: 7-Day Watch & Travel */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("watch-next")} title="7-Day Watchlist">
+              <RegionalWatchlist items={regionalWatchlist} />
+            </Section>
+            <div style={{ marginTop: 40 }}>
+              <Section hidden={!show("implications")} title="Travel & Personnel">
+                <Paragraphs text={resolveRegionalNarrative(report.implications, aiProse?.implications, regionalTravelImplications)} />
+              </Section>
+            </div>
+          </div>
+
+          {/* Page 6: Polestar Outlook */}
+          <div className="px-10 pt-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("polestar-view")} title="Polestar Outlook">
+              <Paragraphs text={resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)} />
+            </Section>
+          </div>
+        </div>
+      ) : (
+        <div className="px-10 py-10">
+          {execText.trim() && (
+            <Section
+              hidden={!show("executive-summary")}
+              title="Executive Summary"
+            >
+              <Paragraphs text={execText} />
+            </Section>
+          )}
+
+          {isFuel && fuelData ? (
           <>
             <Section hidden={!show("fast-facts")} title="Fast Facts">
               {/* Fast Facts is built from marketData only — never back-filled
@@ -1565,75 +1633,47 @@ export default function ReportPreview({
                       )}
                     </>
                   )}
-                  {isRegionalWeekly ? (
-                    <Section hidden={!show("situation")} title="Regional Intelligence Picture">
-                      {resolveRegionalNarrative(report.situation, aiProse?.situation, regionalIntelligencePicture).trim() && (
-                        <Paragraphs text={resolveRegionalNarrative(report.situation, aiProse?.situation, regionalIntelligencePicture)} />
-                      )}
-                      <RegionalDomainBriefs briefs={regionalDomainBriefs} />
-                    </Section>
-                  ) : (
-                    <NarrativeSection
-                      hidden={!show("situation")} title="Situation"
-                      text={isCargo
-                        ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
-                        : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
-                    />
-                  )}
-                  {isRegionalWeekly ? (
-                    <Section hidden={!show("what-happened")} title="Key Developments">
-                      <RegionalActivityCharts summary={regionalVisualSummary} />
-                      <RegionalDevelopmentCards developments={regionalDevelopments} />
-                    </Section>
-                  ) : (
-                    <NarrativeSection
-                      hidden={!show("what-happened")} title="What Happened"
-                      text={isCargo
-                        ? pickRead(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
-                        : resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)}
-                    />
-                  )}
                   <NarrativeSection
-                    hidden={!show("what-matters")} title={isRegionalWeekly ? "Business & Operational Risk" : "What Matters"}
+                    hidden={!show("situation")} title="Situation"
+                    text={isCargo
+                      ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
+                      : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
+                  />
+                  <NarrativeSection
+                    hidden={!show("what-happened")} title="What Happened"
+                    text={isCargo
+                      ? pickRead(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
+                      : resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)}
+                  />
+                  <NarrativeSection
+                    hidden={!show("what-matters")} title="What Matters"
                     text={isCargo
                       ? pickRead(report.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(cargoWindow)))
-                      : isRegionalWeekly
-                        ? resolveRegionalNarrative(report.whatMatters, aiProse?.whatMatters, regionalBusinessRisk)
-                        : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
+                      : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
                   />
                   <BulletsSection
-                    hidden={!show("implications")} title={isRegionalWeekly ? "Travel & Personnel" : "Implications for Business"}
+                    hidden={!show("implications")} title="Implications for Business"
                     text={isCargo
                       ? pickRead(report.implications, aiOr(aiProse?.implications, buildCargoImplications(cargoWindow)))
-                      : isRegionalWeekly
-                        ? resolveRegionalNarrative(report.implications, aiProse?.implications, regionalTravelImplications)
-                        : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
+                      : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
                   />
-                  {isRegionalWeekly ? (
-                    <Section hidden={!show("watch-next")} title="7-Day Watchlist">
-                      <RegionalWatchlist items={regionalWatchlist} />
-                    </Section>
-                  ) : (
-                    <BulletsSection
-                      hidden={!show("watch-next")} title="Watch Next"
-                      text={isCargo
-                        ? pickRead(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
-                        : resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
-                      max={8}
-                    />
-                  )}
+                  <BulletsSection
+                    hidden={!show("watch-next")} title="Watch Next"
+                    text={isCargo
+                      ? pickRead(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
+                      : resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
+                    max={8}
+                  />
                   <NarrativeSection
-                    hidden={!show("polestar-view")} title={isRegionalWeekly ? "Polestar Outlook" : "Polestar View"}
+                    hidden={!show("polestar-view")} title="Polestar View"
                     text={isCargo
                       ? pickRead(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
-                      : isRegionalWeekly
-                        ? resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)
-                        : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
+                      : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
                   />
                   {isCargo && cargoGrouped && (
                     <CargoClustersSection grouped={cargoGrouped} />
                   )}
-                  {!isRegionalWeekly && relatedRows.length > 0 && (
+                  {relatedRows.length > 0 && (
                     <Section hidden={!show("related-incidents")} title="Related Incidents">
                       <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />
                     </Section>
@@ -1644,6 +1684,7 @@ export default function ReportPreview({
           </>
         )}
       </div>
+      )}
 
       {/* Full-bleed Polar Gray footer — website, email, page note */}
       <div className="px-10 pb-10">

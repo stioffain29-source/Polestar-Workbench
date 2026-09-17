@@ -4,6 +4,7 @@ import {
   buildRegionalBluf,
   buildRegionalDevelopments,
   buildRegionalDomainBriefs,
+  buildRegionalGlanceItems,
   buildRegionalOutlook,
   buildRegionalWatchlist,
   curateRegionalWeeklyIncidents,
@@ -51,12 +52,12 @@ describe("regional weekly products", () => {
     expect(rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
-  it("caps key developments at ten and keeps the Middle East boundary", () => {
+  it("caps key developments at six and keeps the Middle East boundary", () => {
     const rows = Array.from({ length: 12 }, (_, index) =>
       incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
     const selected = selectRegionalKeyDevelopments(rows);
-    expect(selected).toHaveLength(10);
+    expect(selected).toHaveLength(6);
     expect(validateRegionalWeeklyAssessment(buildRegionalDevelopments(rows))).toEqual([]);
     expect(
       curateRegionalWeeklyIncidents(
@@ -189,6 +190,9 @@ describe("regional weekly products", () => {
     expect(buildRegionalBluf(developments)).not.toMatch(/\b\d+\s+(?:priority|material)\s+developments\b/i);
     expect(briefs.map((brief) => brief.assessment).join(" ")).not.toMatch(/highest-rated|main business relevance/i);
     expect(validateRegionalWeeklyAssessment(developments)).toEqual([]);
+    expect(buildRegionalGlanceItems(developments)).toHaveLength(5);
+    expect(buildRegionalBluf(developments).split(/\s+/).length).toBeLessThanOrEqual(150);
+    expect(buildRegionalOutlook(developments).split(/\s+/).length).toBeLessThanOrEqual(200);
   });
 
   it("rejects retrospectives, charity coverage and isolated local crime", () => {
