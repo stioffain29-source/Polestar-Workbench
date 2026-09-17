@@ -150,3 +150,4 @@
 - [Flashpoint numeric-claim audit](flashpoint-numeric-claim-audit.md) — “24/7” labels and context-bound compact clock times are not incident counts; exclude narrowly without weakening real count checks.
 - [PDF asset waits](pdf-asset-waits.md) — font and cover-image requests must be time-bounded; Flashpoint falls back rather than leaving Download stuck indefinitely.
 - [Report footer standard](report-footer-standard.md) — every report keeps page numbering in the footer; never move, suppress or duplicate it in body-page headers.
+- [Map incident identity](map-incident-identity.md) — map markers represent distinct events, not source articles; preserve all corroborating links on the single event marker.

@@ -1,0 +1,128 @@
+import { consolidateCountryStories } from "@/lib/countrySameStory";
+import { SEV_RANK } from "@/lib/monitorDedupe";
+
+export type MapIncidentCorroboration = {
+  id: number;
+  url: string;
+  reportTitle: string;
+  sourceAgency?: string | null;
+};
+
+export type MapIncidentDedupeRow = {
+  id: number;
+  topic: string;
+  title: string;
+  displayTitle?: string | null;
+  summary?: string | null;
+  country: string;
+  location?: string | null;
+  occurredAt: string;
+  severity?: string | null;
+  category?: string | null;
+  eventClusterKey?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
+  resolvedUrl?: string | null;
+  corroborations?: MapIncidentCorroboration[] | null;
+};
+
+type RowWithMembers<T> = T & { sourceMembers?: T[] };
+
+function bestRepresentative<T extends MapIncidentDedupeRow>(rows: T[]): T {
+  return rows.reduce((best, row) => {
+    const rowRank = SEV_RANK[(row.severity ?? "").toLowerCase()] ?? 0;
+    const bestRank = SEV_RANK[(best.severity ?? "").toLowerCase()] ?? 0;
+    if (rowRank !== bestRank) return rowRank > bestRank ? row : best;
+    const rowDate = Date.parse(row.occurredAt);
+    const bestDate = Date.parse(best.occurredAt);
+    return (Number.isNaN(rowDate) ? -Infinity : rowDate) >
+      (Number.isNaN(bestDate) ? -Infinity : bestDate)
+      ? row
+      : best;
+  });
+}
+
+function flattenMembers<T extends MapIncidentDedupeRow>(row: RowWithMembers<T>): T[] {
+  const members = row.sourceMembers ?? [row];
+  return members.flatMap((member) => {
+    const nested = member as RowWithMembers<T>;
+    return nested.sourceMembers ?? [member];
+  });
+}
+
+function evidenceFor<T extends MapIncidentDedupeRow>(
+  members: T[],
+): MapIncidentCorroboration[] {
+  const byUrl = new Map<string, MapIncidentCorroboration>();
+  for (const member of members) {
+    for (const corroboration of member.corroborations ?? []) {
+      if (corroboration.url && !byUrl.has(corroboration.url)) {
+        byUrl.set(corroboration.url, corroboration);
+      }
+    }
+    const url = member.resolvedUrl?.trim() || member.sourceUrl?.trim();
+    if (url && !byUrl.has(url)) {
+      byUrl.set(url, {
+        id: member.id,
+        url,
+        reportTitle: member.displayTitle?.trim() || member.title,
+        sourceAgency: member.source ?? null,
+      });
+    }
+  }
+  return [...byUrl.values()];
+}
+
+/**
+ * Collapse high-confidence same-event records before they become map markers.
+ *
+ * The server-stamped event cluster is authoritative when present. Remaining
+ * rows use the established conservative country-story matcher, scoped by both
+ * topic and country so nearby or similarly worded events in different feeds
+ * cannot merge. Every source URL from the collapsed rows is retained as marker
+ * evidence.
+ */
+export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(rows: T[]): T[] {
+  const byScope = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = `${row.topic}|${row.country.trim().toLowerCase()}`;
+    const scoped = byScope.get(key);
+    if (scoped) scoped.push(row);
+    else byScope.set(key, [row]);
+  }
+
+  return [...byScope.values()].flatMap((scopedRows) => {
+    const authoritative = new Map<string, T[]>();
+    const unclustered: T[] = [];
+    for (const row of scopedRows) {
+      const key = row.eventClusterKey?.trim();
+      if (!key) {
+        unclustered.push(row);
+        continue;
+      }
+      const group = authoritative.get(key);
+      if (group) group.push(row);
+      else authoritative.set(key, [row]);
+    }
+
+    const authoritativeRepresentatives: T[] = [...authoritative.values()].map(
+      (members) =>
+        ({
+          ...bestRepresentative(members),
+          sourceMembers: members,
+        }) as T,
+    );
+    const storyRepresentatives = consolidateCountryStories([
+      ...authoritativeRepresentatives,
+      ...unclustered,
+    ]);
+
+    return storyRepresentatives.map((representative) => {
+      const members = flattenMembers(representative as RowWithMembers<T>);
+      return {
+        ...representative,
+        corroborations: evidenceFor(members),
+      };
+    });
+  });
+}

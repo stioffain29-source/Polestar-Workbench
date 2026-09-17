@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
 import { incidentMapFallback } from "@/lib/incidentMapFallback";
+import { dedupeMapIncidents } from "@/lib/mapIncidentDedupe";
 import PublicationCalendar from "./PublicationCalendar";
 
 // Date windows offered on the map. Distinct from the topic monitors' default
@@ -321,8 +322,16 @@ export default function MapPage() {
 
   const allPoints = useMemo<Point[]>(() => {
     if (view === "incidents") {
-      const seenIncidentTitles = new Set<string>();
-      const incidentPoints = incidents
+      const distinctIncidents = dedupeMapIncidents(
+        incidents.map((incident) => ({
+          ...incident,
+          category: topicToCategory(
+            incident.topic,
+            `${incident.title ?? ""} ${incident.summary ?? ""}`,
+          ),
+        })),
+      );
+      const incidentPoints = distinctIncidents
         .map((i) => {
           const fallback =
             i.location != null && i.latitude != null && i.longitude != null
@@ -335,17 +344,12 @@ export default function MapPage() {
             location: fallback?.location ?? i.location,
           };
         })
-        .filter((row) => {
-          const i = row.incident;
-          if (row.location == null || row.latitude == null || row.longitude == null) return false;
-          const titleKey = `${i.topic}|${i.country}|${(i.displayTitle ?? i.title)
-            .toLowerCase()
-            .replace(/\s+/g, " ")
-            .trim()}`;
-          if (seenIncidentTitles.has(titleKey)) return false;
-          seenIncidentTitles.add(titleKey);
-          return true;
-        })
+        .filter(
+          (row) =>
+            row.location != null &&
+            row.latitude != null &&
+            row.longitude != null,
+        )
         .map<Point>(({ incident: i, latitude, longitude, location }) => ({
           id: `i-${i.id}`,
           lat: latitude!,
