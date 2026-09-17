@@ -82,7 +82,15 @@ function inferredEventFamilyKey(row: MapIncidentDedupeRow): string | null {
       /\b(haze|smoke)\b/.test(text)
       || (/\b(fire|forest fire|burn(?:ed|ing|s)?)\b/.test(text) && /\b(wind|direction|air quality)\b/.test(text))
     );
-  return isThailandIndonesiaHaze ? "thailand-indonesia-transboundary-haze" : null;
+  if (isThailandIndonesiaHaze) return "thailand-indonesia-transboundary-haze";
+
+  const isAustralianVisaOverhaul =
+    /\baustralia(?:n|'s)?\b/.test(text)
+    && /\b(?:visa|visas|migration|immigration)\b/.test(text)
+    && /\b(?:crackdown|overhaul|visa hopping|international students?|backpackers?)\b/.test(text);
+  if (isAustralianVisaOverhaul) return "australia-visa-policy-overhaul";
+
+  return null;
 }
 
 /**

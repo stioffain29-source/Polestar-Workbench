@@ -27,7 +27,6 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
-import { incidentMapFallback } from "@/lib/incidentMapFallback";
 import { dedupeMapIncidents } from "@/lib/mapIncidentDedupe";
 import { isSportsFixtureNoise } from "@/lib/topicRelevance";
 import PublicationCalendar from "./PublicationCalendar";
@@ -337,33 +336,23 @@ export default function MapPage() {
           })),
       );
       const incidentPoints = distinctIncidents
-        .map((i) => {
-          const fallback =
-            i.location != null && i.latitude != null && i.longitude != null
-              ? null
-              : incidentMapFallback(i.country, `${i.displayTitle ?? i.title} ${i.summary ?? ""}`);
-          return {
-            incident: i,
-            latitude: fallback?.latitude ?? i.latitude,
-            longitude: fallback?.longitude ?? i.longitude,
-            location: fallback?.location ?? i.location,
-          };
-        })
         .filter(
-          (row) =>
-            row.location != null &&
-            row.latitude != null &&
-            row.longitude != null,
+          (i) =>
+            i.location != null &&
+            i.latitude != null &&
+            i.longitude != null &&
+            Number.isFinite(i.latitude) &&
+            Number.isFinite(i.longitude),
         )
-        .map<Point>(({ incident: i, latitude, longitude, location }) => ({
+        .map<Point>((i) => ({
           id: `i-${i.id}`,
-          lat: latitude!,
-          lng: longitude!,
+          lat: i.latitude!,
+          lng: i.longitude!,
           title: i.title,
           displayTitle: i.displayTitle ?? null,
           category: topicToCategory(i.topic, `${i.title ?? ""} ${i.summary ?? ""}`),
           country: i.country,
-          location: location ?? null,
+          location: i.location ?? null,
           when: i.occurredAt,
           rating: i.severity,
           summary: i.summary,
@@ -703,12 +692,11 @@ export default function MapPage() {
                     <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 260 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d", marginBottom: 4 }}>
-                          {p.clusterSize} incidents near {p.country}
+                          {p.clusterSize} distinct developments in this area
                         </div>
                         <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.35 }}>
-                          These incidents share an unresolved fallback location and
-                          couldn't be placed at a specific city — shown here as one
-                          marker. {mixedSeverity
+                          These verified locations overlap at the current zoom and
+                          separate as the map is enlarged. {mixedSeverity
                             ? `The marker is neutral because the group contains mixed severities. ${severitySummary}.`
                             : `All ${p.clusterSize} incidents are rated ${SEVERITY_LABELS[p.rating] ?? p.rating}.`}
                         </div>

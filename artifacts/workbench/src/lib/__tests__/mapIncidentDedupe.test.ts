@@ -76,4 +76,21 @@ describe("dedupeMapIncidents", () => {
       "https://example.com/3",
     ]);
   });
+
+  it("collapses differently worded reports of the same Australian visa overhaul", () => {
+    const result = dedupeMapIncidents([
+      row(1, "Australian immigration crackdown: visas for international students and backpackers targeted", {
+        country: "Australia",
+      }),
+      row(2, "Australia's migration overhaul: Crackdown on visa hopping, tighter rules for student families and visitors", {
+        country: "Australia",
+      }),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].corroborations?.map((source) => source.url)).toEqual([
+      "https://example.com/1",
+      "https://example.com/2",
+    ]);
+  });
 });
