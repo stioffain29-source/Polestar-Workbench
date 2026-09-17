@@ -1,0 +1,932 @@
+THIRD ITERATION AMENDMENT – APAC WEEKLY / MIDDLE EAST WEEKLY
+
+DO NOT REBUILD THE PRODUCT.
+
+DO NOT CHANGE THE COVER, BRANDING, PDF EXPORT, HEADER, FOOTER OR EXISTING VISUAL IDENTITY.
+
+THIS AMENDMENT IS TO FIX THE CONTENT GENERATION, CURATION AND ANALYSIS ONLY.
+
+THE CURRENT VERSION IS STILL WRONG.
+
+It is still taking the raw scraped article feed, assigning categories to individual articles and printing them sequentially.
+
+That must stop.
+
+The finished Weekly must read like a curated regional intelligence briefing written by an analyst.
+
+It must NOT read like a news scrape, incident register or database export.
+
+
+==================================================
+1. CHANGE THE GENERATION MODEL
+==================================================
+
+The raw article feed is SOURCE MATERIAL ONLY.
+
+It is NOT the report.
+
+Use the following process:
+
+STEP 1
+Collect source material.
+
+STEP 2
+Run separate discovery and research passes for:
+
+Security & Conflict
+
+Political & Geopolitical
+
+Regulatory & Policy
+
+Weather & Natural Hazards
+
+Cyber & Information Risk
+
+Business & Operational Disruption
+
+STEP 3
+Identify the MATERIAL DEVELOPMENTS within each domain.
+
+STEP 4
+Cluster all reporting about the same event or issue.
+
+STEP 5
+Remove duplicates, irrelevant material and low-value reporting.
+
+STEP 6
+Rank the remaining developments by BUSINESS RELEVANCE and REGIONAL SIGNIFICANCE.
+
+STEP 7
+Select only the developments needed to explain the week's regional operating environment.
+
+STEP 8
+Write analysis from the curated developments.
+
+Only after this process should the PDF be generated.
+
+
+==================================================
+2. STOP PRINTING THE RAW INCIDENT FEED
+==================================================
+
+Do not print every article that passes a keyword or severity test.
+
+The current output of 40+ security stories and 20+ operational disruption stories is unacceptable.
+
+The published Weekly should normally contain approximately:
+
+10–15 MATERIAL DEVELOPMENTS TOTAL.
+
+This is across ALL intelligence domains, not per category.
+
+The report should normally be approximately 8–12 pages.
+
+It must never expand to 25–30 pages simply because more articles were scraped.
+
+
+==================================================
+3. MATERIALITY TEST
+==================================================
+
+Before any development enters the report, ask:
+
+Does this materially affect or potentially affect:
+
+People
+
+Business travel
+
+Corporate sites
+
+Assets
+
+Supply chains
+
+Transport
+
+Ports
+
+Airports
+
+Energy
+
+Utilities
+
+Communications
+
+Regulatory obligations
+
+Market access
+
+Political exposure
+
+Business continuity
+
+Corporate reputation
+
+If NO, exclude it.
+
+
+==================================================
+4. HARD REJECTION FILTER
+==================================================
+
+Automatically reject low-value material such as:
+
+Historical retrospectives
+
+Anniversary stories
+
+9/11 commemorative reporting
+
+Opinion pieces with no current development
+
+Generic terrorism commentary
+
+Local murders with no wider business relevance
+
+Bodies being discovered
+
+Charity fundraising stories
+
+Religious youth rallies
+
+Routine police activity
+
+Minor isolated crime
+
+Human-interest stories
+
+Stories from outside the region incorrectly attached to an APAC country
+
+Articles that merely mention a target country
+
+Social media reposts where the original event is already captured
+
+Stories with no identifiable operational or business consequence
+
+Do not include material merely because it contains keywords such as:
+
+terrorism
+
+attack
+
+protest
+
+visa
+
+flood
+
+fuel
+
+security
+
+cyber
+
+regulation
+
+The CONTENT and BUSINESS RELEVANCE must determine inclusion.
+
+
+==================================================
+5. DEDUPLICATION MUST HAPPEN BEFORE WRITING
+==================================================
+
+Multiple articles about the same event must become ONE development.
+
+Examples:
+
+Six articles about the same Bangkok protest = ONE development.
+
+Four articles about the same India fuel tax change = ONE development.
+
+Multiple articles about the same BRICS declaration = ONE development.
+
+Multiple reports about the same Myanmar airport attack = ONE development.
+
+Several follow-up statements about the same Panguna incident = normally ONE development.
+
+Source articles are supporting evidence.
+
+They are NOT separate report entries.
+
+Where several events form one wider theme, consider combining them into one analytical development.
+
+Example:
+
+Several violent incidents around the BARMM election may be analysed as:
+
+PHILIPPINES | BARMM Election Security Environment
+
+rather than being printed as multiple disconnected shootings and displacement incidents.
+
+
+==================================================
+6. SECURITY & CONFLICT
+==================================================
+
+Select only material developments.
+
+Do not attempt to catalogue every security incident.
+
+Prioritise:
+
+Conflict escalation
+
+Terrorism with credible operational significance
+
+Major civil unrest
+
+Election violence
+
+Significant insurgent activity
+
+Major interstate tension
+
+Security deterioration affecting commercial locations
+
+Attacks affecting airports, ports, infrastructure or corporate assets
+
+A typical Weekly may contain approximately 2–3 major Security & Conflict themes.
+
+This is guidance, not a quota.
+
+
+==================================================
+7. POLITICAL & GEOPOLITICAL
+==================================================
+
+Actively research this domain separately.
+
+Do not derive political coverage only from protest articles.
+
+Look for:
+
+Election outcomes
+
+Government changes
+
+Cabinet changes
+
+Coalition instability
+
+Major parliamentary decisions
+
+Policy changes
+
+Leadership changes
+
+Bilateral relations
+
+Diplomatic disputes
+
+Defence agreements
+
+Trade relations
+
+Sanctions
+
+Interstate tensions
+
+Regional geopolitical developments
+
+Government actions affecting foreign companies
+
+Write actual political analysis:
+
+WHAT changed.
+
+WHY it matters.
+
+WHAT business exposure it creates.
+
+WHAT happens next.
+
+A polling station being used during an election is NOT itself a meaningful political development.
+
+The election and its implications may be.
+
+
+==================================================
+8. REGULATORY & POLICY
+==================================================
+
+This section must contain ACTUAL regulatory or policy developments.
+
+Suitable material includes:
+
+New legislation
+
+New regulations
+
+Policy changes
+
+Tariffs
+
+Sanctions
+
+Import restrictions
+
+Export controls
+
+Customs changes
+
+Labour rules
+
+Immigration rules
+
+Visa rules
+
+Foreign ownership changes
+
+Data regulation
+
+Cyber regulation
+
+AI regulation
+
+Environmental regulation
+
+Tax changes
+
+Energy regulation
+
+Aviation regulation
+
+Shipping regulation
+
+Port regulation
+
+Licensing requirements
+
+Compliance requirements
+
+For every regulatory item answer:
+
+WHAT CHANGED?
+
+WHEN DOES IT TAKE EFFECT?
+
+WHO IS AFFECTED?
+
+WHAT DOES A BUSINESS NEED TO KNOW OR DO?
+
+A corruption investigation or visa extortion investigation is NOT automatically a regulatory development.
+
+
+==================================================
+9. WEATHER & NATURAL HAZARDS
+==================================================
+
+Actively research CURRENT and FORWARD weather and hazards.
+
+Suitable developments include:
+
+Typhoons
+
+Cyclones
+
+Tropical storms
+
+Flooding
+
+Monsoon disruption
+
+Extreme rainfall
+
+Heatwaves
+
+Wildfires
+
+Haze
+
+Drought
+
+Earthquakes
+
+Volcanic activity
+
+Landslides
+
+Tsunami warnings
+
+The section should focus on operational consequences such as:
+
+Airport disruption
+
+Port disruption
+
+Road access
+
+Site access
+
+Power supply
+
+Manufacturing
+
+Personnel exposure
+
+Supply chains
+
+A charity donation relating to an old flood is NOT a weather development.
+
+A planning decision discussing historic flooding is NOT automatically a weather development.
+
+Use current hazard and forecast information wherever available.
+
+
+==================================================
+10. CYBER & INFORMATION RISK
+==================================================
+
+Cyber must receive a dedicated research pass every week.
+
+Search for:
+
+Ransomware
+
+State-linked cyber activity
+
+Critical infrastructure attacks
+
+Telecom disruption
+
+Major data breaches
+
+Government system compromise
+
+Airport or airline cyber disruption
+
+Port cyber incidents
+
+Logistics cyber incidents
+
+Financial-sector cyber disruption
+
+Utility attacks
+
+Cloud or major digital infrastructure outages
+
+New cyber legislation
+
+Significant threat campaigns
+
+Only include material developments.
+
+If there is genuinely nothing material after a dedicated cyber search, use:
+
+No material regional cyber development identified during this reporting period.
+
+Do not manufacture a weak cyber story simply to fill the section.
+
+
+==================================================
+11. BUSINESS & OPERATIONAL DISRUPTION
+==================================================
+
+Focus on developments affecting:
+
+Ports
+
+Airports
+
+Airspace
+
+Shipping
+
+Road networks
+
+Rail
+
+Borders
+
+Fuel
+
+Energy
+
+Electricity
+
+Utilities
+
+Telecommunications
+
+Industrial action
+
+Supply chains
+
+Cargo
+
+Manufacturing
+
+Critical infrastructure
+
+Do not classify an unrelated local crime as Operational Disruption.
+
+There must be an actual operational consequence.
+
+
+==================================================
+12. BLUF – COMPLETELY REWRITE THE LOGIC
+==================================================
+
+The BLUF must describe what ACTUALLY changed during the week.
+
+DO NOT write:
+
+“The regional operating environment was shaped by 5 priority developments across…”
+
+DO NOT list category names.
+
+DO NOT count developments.
+
+DO NOT write database statistics.
+
+The BLUF should identify the 3–5 most consequential developments and connect them into a regional assessment.
+
+Example structure:
+
+The APAC operating environment this week was shaped by [major political development], [major regulatory change], [material security development], [weather or infrastructure issue] and [other major regional issue]. The immediate implications are [specific operational consequences]. Over the coming seven days, attention should focus on [specific forward indicators].
+
+The wording must be based on the actual week's intelligence.
+
+No boilerplate.
+
+
+==================================================
+13. REGIONAL INTELLIGENCE PICTURE
+==================================================
+
+Replace generic text with genuine synthesis.
+
+Do not write:
+
+“Risk to transport, access and central business districts persists whether or not new reporting lands.”
+
+Instead provide approximately 150–250 words analysing:
+
+The dominant regional themes.
+
+Where risk materially changed.
+
+Where conditions remained stable.
+
+Emerging cross-border or cross-sector patterns.
+
+What matters operationally.
+
+This should connect multiple developments rather than repeat them.
+
+
+==================================================
+14. DOMAIN SUMMARIES
+==================================================
+
+Do not generate sentences such as:
+
+“45 material security developments affected…”
+
+“The highest-rated development was High…”
+
+“The main business relevance is…”
+
+These are database outputs and must never appear in the published report.
+
+Each domain summary should instead be concise analytical prose.
+
+Example:
+
+SECURITY & CONFLICT
+
+Security deterioration was concentrated in Myanmar and parts of the southern Philippines. Fighting in Rakhine and disruption at Mandalay Airport demonstrated continued exposure to transport infrastructure, while post-election violence in BARMM created localised movement and personnel concerns. Elsewhere, protest activity remained largely manageable but several scheduled demonstrations warrant monitoring during the coming week.
+
+This is the expected analytical style.
+
+
+==================================================
+15. KEY DEVELOPMENTS
+==================================================
+
+Select approximately 6–10 of the most important developments.
+
+Do NOT publish dozens.
+
+Use:
+
+COUNTRY | SHORT ANALYTICAL TITLE
+
+Category
+
+Current Severity
+
+What Changed
+
+Operational Significance
+
+What To Watch
+
+Do NOT use:
+
+What happened
+
+Why it matters
+
+Outlook
+
+repeated mechanically for every story if it results in identical blocks.
+
+The writing must vary naturally and be specific to the development.
+
+
+==================================================
+16. REMOVE GENERIC TEMPLATE LANGUAGE
+==================================================
+
+Do not repeatedly use phrases such as:
+
+“This is relevant to personnel safety and site security…”
+
+“This may affect transport, logistics or supply-chain continuity…”
+
+“Monitor confirmed changes.”
+
+“Watch for confirmed follow-on developments…”
+
+“Changes in severity…”
+
+“Monitor implementation and business-facing consequences…”
+
+Every analytical statement must be SPECIFIC.
+
+BAD:
+
+This may affect transport and logistics.
+
+GOOD:
+
+The temporary closure of Mandalay Airport disrupted domestic and regional connectivity and demonstrates the continuing vulnerability of transport infrastructure to drone attack. Further attacks on aviation facilities would materially increase movement constraints for personnel operating in central Myanmar.
+
+
+==================================================
+17. COUNTRY BALANCE
+==================================================
+
+Do not allow countries with high media output to dominate the report.
+
+Article volume does NOT equal risk importance.
+
+India, Philippines or any other country should not receive ten pages simply because more searchable articles were available.
+
+Normally no single country should account for more than approximately 25–30% of the report unless events in that country genuinely dominate the regional operating environment.
+
+Prioritise regional significance, not source volume.
+
+
+==================================================
+18. CHARTS, MAPS AND GRAPHS
+==================================================
+
+Keep visual intelligence in the product.
+
+However, visuals must use the CURATED DATASET.
+
+Do NOT create charts from the raw scrape.
+
+Therefore charts such as:
+
+Security 45
+Operational Disruption 21
+Political 1
+Regulatory 2
+
+must not appear.
+
+Those numbers describe search results, not the regional risk picture.
+
+Useful visuals include:
+
+Regional hotspot map
+
+Material developments by intelligence domain
+
+Material developments by sub-region
+
+Four-week trend of curated developments
+
+Current weather hazard map
+
+Political / regulatory timeline
+
+Operational disruption map
+
+Seven-day forward watch timeline
+
+Maps should plot only significant report developments.
+
+
+==================================================
+19. TRAVEL & PERSONNEL
+==================================================
+
+This section should give concise changed travel implications.
+
+Do not use generic standing advice such as:
+
+“Review staff movement plans…”
+
+unless tied to actual current developments.
+
+Instead identify:
+
+Where movement conditions changed.
+
+Where protests may affect access.
+
+Where weather may disrupt transport.
+
+Where airports or roads are affected.
+
+Where additional precautions are genuinely warranted.
+
+
+==================================================
+20. 7-DAY WATCHLIST
+==================================================
+
+The Watchlist is FORWARD LOOKING.
+
+Only include something if there is a future event, trigger or decision to watch.
+
+Suitable items include:
+
+Scheduled protest
+
+Election
+
+Political deadline
+
+Court ruling
+
+Legislative vote
+
+Regulation entering force
+
+Strike
+
+Union action
+
+Major public event
+
+Storm landfall
+
+Flood forecast
+
+Conflict escalation trigger
+
+Cyber deadline or threat
+
+Transport disruption
+
+A ferry accident that already happened is NOT a watchlist item unless there is a specific unresolved forward consequence.
+
+A retrospective article is NOT a watchlist item.
+
+Use approximately 5–8 genuinely forward-looking watchpoints.
+
+Show:
+
+DATE
+
+LOCATION
+
+TRIGGER / EVENT
+
+WHY IT MATTERS
+
+WHAT TO WATCH
+
+
+==================================================
+21. POLESTAR OUTLOOK
+==================================================
+
+Completely remove the old public-order fallback logic.
+
+NEVER write:
+
+“Nothing useful came through on public order this week.”
+
+The Polestar Outlook must synthesise the WHOLE regional risk environment.
+
+Approximately 150–200 words.
+
+It should assess:
+
+What is most likely to matter over the coming seven days.
+
+Where conditions may deteriorate.
+
+Important political or regulatory developments ahead.
+
+Weather exposure.
+
+Security escalation indicators.
+
+Operational vulnerabilities.
+
+Potential business consequences.
+
+This is Polestar analysis, not a report completeness statement.
+
+
+==================================================
+22. FINAL EDITORIAL QA BEFORE EXPORT
+==================================================
+
+Before creating the PDF, run this validation:
+
+QUESTION 1
+
+Does the report read like an analyst briefing or an incident list?
+
+If incident list:
+STOP AND RECURATE.
+
+QUESTION 2
+
+Are there more than approximately 15 Key Developments?
+
+If yes:
+STOP AND REDUCE.
+
+QUESTION 3
+
+Are multiple entries describing the same underlying event?
+
+If yes:
+MERGE THEM.
+
+QUESTION 4
+
+Does the report contain historical retrospectives, charity stories, irrelevant local crime or other low-value content?
+
+If yes:
+REMOVE THEM.
+
+QUESTION 5
+
+Are Political, Regulatory, Weather and Cyber based on dedicated research rather than accidental keyword matches?
+
+If no:
+RUN THE DOMAIN SEARCHES AGAIN.
+
+QUESTION 6
+
+Does each analytical item contain specific operational relevance?
+
+If no:
+REWRITE IT.
+
+QUESTION 7
+
+Is the Watchlist genuinely forward looking?
+
+If no:
+REBUILD IT.
+
+QUESTION 8
+
+Does the Polestar Outlook synthesise the entire regional environment?
+
+If no:
+REWRITE IT.
+
+QUESTION 9
+
+Are maps and charts based on the final curated dataset rather than raw scraped article counts?
+
+If no:
+REBUILD THE VISUAL DATA.
+
+QUESTION 10
+
+Can the final report be delivered in approximately 8–12 pages without losing material intelligence?
+
+If yes:
+DO SO.
+
+The target product is:
+
+A CURATED WEEKLY REGIONAL RISK INTELLIGENCE BRIEF.
+
+It should tell a corporate decision maker:
+
+WHAT CHANGED THIS WEEK.
+
+WHY IT MATTERS.
+
+WHAT IT MEANS FOR OPERATIONS.
+
+WHAT IS COMING NEXT.
+
+Everything else should be removed.

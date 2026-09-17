@@ -76,18 +76,20 @@ describe("regional weekly products", () => {
       title: "Port closure after security incident",
       severity: "High",
       category: "Operational Disruption",
-      whatHappened: "Operational security and continuity impact reported.",
-      whyItMatters: expect.stringContaining("transport"),
-      outlook: expect.stringContaining("next seven days"),
+      whatChanged: "Operational security and continuity impact reported.",
+      operationalSignificance: expect.stringContaining("Port closure"),
+      whatToWatch: "",
+      watchDate: null,
     });
     expect(Object.keys(development)).toEqual([
       "country",
       "title",
       "severity",
       "category",
-      "whatHappened",
-      "whyItMatters",
-      "outlook",
+      "whatChanged",
+      "operationalSignificance",
+      "watchDate",
+      "whatToWatch",
     ]);
   });
 
@@ -123,25 +125,28 @@ describe("regional weekly products", () => {
     ]);
   });
 
-  it("builds structured watch rows from development evidence and caps at ten", () => {
+  it("builds only forward-dated watch rows and caps them at eight", () => {
     const developments = Array.from({ length: 12 }, (_, index) => ({
       country: `Country ${index}`,
       title: `Issue ${index}`,
       severity: "Extreme" as const,
       category: "Security" as const,
-      whatHappened: "Confirmed event summary.",
-      whyItMatters: "Operational implication remains evidence-safe.",
-      outlook: "Watch for confirmed follow-on developments over the next seven days.",
+      whatChanged: "Confirmed event summary.",
+      operationalSignificance: "The scheduled event affects airport access.",
+      watchDate: `2026-09-${String(18 + index).padStart(2, "0")}`,
+      whatToWatch: "The airport is scheduled to reopen after the security review.",
     }));
     const [first] = buildRegionalWatchlist(developments);
     const rows = buildRegionalWatchlist(developments);
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(8);
     expect(first).toEqual({
+      date: "2026-09-18",
       location: "Country 0",
-      issue: "Issue 0",
-      currentSeverity: "Extreme",
-      whatWeAreWatching: "Watch for confirmed follow-on developments over the next seven days.",
+      trigger: "Issue 0",
+      whyItMatters: "The scheduled event affects airport access.",
+      whatToWatch: "The airport is scheduled to reopen after the security review.",
     });
+    expect(buildRegionalWatchlist([{ ...developments[0], watchDate: null, whatToWatch: "" }])).toEqual([]);
   });
 
   it("builds a cross-category operating outlook instead of a security-only quiet-week fallback", () => {
@@ -149,9 +154,9 @@ describe("regional weekly products", () => {
       incident(1, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
       incident(2, "Philippines", "high", "2026-09-17", "Typhoon flooding disrupts airports and utilities"),
     ]));
-    expect(outlook).toContain("Regulatory");
-    expect(outlook).toContain("Weather & Natural Hazards");
-    expect(outlook).toContain("people, travel, sites, supply chains and compliance");
+    expect(outlook).toContain("Singapore:");
+    expect(outlook).toContain("Philippines:");
+    expect(outlook).toContain("staff movement");
     expect(outlook).not.toContain("Nothing useful came through");
   });
 
@@ -176,12 +181,64 @@ describe("regional weekly products", () => {
     ]);
     const briefs = buildRegionalDomainBriefs(developments);
     expect(briefs).toHaveLength(6);
-    expect(briefs.find((brief) => brief.domain === "Regulatory")?.assessment).toContain("business relevance");
+    expect(briefs.find((brief) => brief.domain === "Regulatory")?.assessment).toContain("Singapore");
     expect(briefs.find((brief) => brief.domain === "Cyber")?.assessment).toBe(
       "NO MATERIAL REGIONAL CYBER DEVELOPMENT IDENTIFIED DURING THIS REPORTING PERIOD.",
     );
     expect(buildRegionalBluf(developments)).toContain("regional operating environment");
+    expect(buildRegionalBluf(developments)).not.toMatch(/\b\d+\s+(?:priority|material)\s+developments\b/i);
+    expect(briefs.map((brief) => brief.assessment).join(" ")).not.toMatch(/highest-rated|main business relevance/i);
     expect(validateRegionalWeeklyAssessment(developments)).toEqual([]);
+  });
+
+  it("rejects retrospectives, charity coverage and isolated local crime", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Indonesia", "moderate", "2026-09-17", "Anniversary retrospective on an old terror attack at an airport"),
+        incident(2, "Philippines", "moderate", "2026-09-17", "Charity donation follows last year's flood disruption"),
+        incident(3, "India", "moderate", "2026-09-17", "Local murder investigation after isolated stabbing"),
+        incident(4, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).toEqual([4]);
+  });
+
+  it("extracts a future date instead of turning every past incident into a watch item", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        {
+          ...incident(1, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+          summary: "The regulation takes effect on 2026-09-22 and changes compliance requirements for cloud providers.",
+        },
+        incident(2, "Philippines", "high", "2026-09-17", "Typhoon flooding disrupts airports and utilities"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    const developments = buildRegionalDevelopments(rows, "2026-09-17");
+    expect(developments.map((row) => ({
+      country: row.country,
+      watchDate: row.watchDate,
+      whatToWatch: row.whatToWatch,
+    }))).toEqual([
+      {
+        country: "Philippines",
+        watchDate: null,
+        whatToWatch: "",
+      },
+      {
+        country: "Singapore",
+        watchDate: "2026-09-22",
+        whatToWatch: "The regulation takes effect on 2026-09-22 and changes compliance requirements for cloud providers.",
+      },
+    ]);
+    expect(buildRegionalWatchlist(developments)).toHaveLength(1);
+    expect(buildRegionalWatchlist(developments)[0]).toMatchObject({
+      date: "2026-09-22",
+      location: "Singapore",
+    });
   });
 
   it("uses the weekly cadence for calendar due dates", () => {

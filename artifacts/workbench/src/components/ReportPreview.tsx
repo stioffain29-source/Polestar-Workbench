@@ -14,10 +14,14 @@ import {
   buildRegionalBluf,
   buildRegionalDomainBriefs,
   buildRegionalOutlook,
+  buildRegionalIntelligencePicture,
+  buildRegionalBusinessRisk,
+  buildRegionalTravelImplications,
   buildRegionalVisualSummary,
   buildRegionalWatchlist,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
+  resolveRegionalNarrative,
   type RegionalDevelopment,
 } from "@/lib/regionalWeekly";
 import { pickRead } from "@/lib/pickRead";
@@ -215,10 +219,10 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
             {development.country} | {development.title}
           </h3>
           <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Severity:</strong> {development.severity}</p>
-            <p><strong>What happened:</strong> {development.whatHappened}</p>
-            <p><strong>Why it matters:</strong> {development.whyItMatters}</p>
-            <p><strong>Outlook:</strong> {development.outlook}</p>
+            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
+            <p><strong>What Changed:</strong> {development.whatChanged}</p>
+            <p><strong>Operational Significance:</strong> {development.operationalSignificance}</p>
+            {development.whatToWatch && <p><strong>What To Watch:</strong> {development.whatToWatch}</p>}
           </div>
         </article>
       ))}
@@ -295,11 +299,12 @@ function RegionalWatchlist({
 }) {
   return (
     <div className="border border-[#e2e2e2] bg-white overflow-hidden">
-      <div className="grid grid-cols-[1fr_1.4fr_.8fr_2fr] bg-[#0b0a3d] text-white text-[10px] uppercase tracking-wide font-bold">
+      <div className="grid grid-cols-[.7fr_1fr_1.25fr_1.5fr_1.5fr] bg-[#0b0a3d] text-white text-[10px] uppercase tracking-wide font-bold">
+        <div className="p-3">Date</div>
         <div className="p-3">Location</div>
-        <div className="p-3">Issue</div>
-        <div className="p-3">Current Severity</div>
-        <div className="p-3">What We Are Watching</div>
+        <div className="p-3">Trigger / Event</div>
+        <div className="p-3">Why It Matters</div>
+        <div className="p-3">What To Watch</div>
       </div>
       {items.length === 0 ? (
         <p className="p-4 text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
@@ -308,14 +313,15 @@ function RegionalWatchlist({
       ) : (
         items.map((item, index) => (
           <div
-            key={`${item.location}-${item.issue}-${index}`}
-            className="grid grid-cols-[1fr_1.4fr_.8fr_2fr] border-t border-[#e2e2e2] text-[12px] leading-[1.45]"
+            key={`${item.date}-${item.location}-${item.trigger}-${index}`}
+            className="grid grid-cols-[.7fr_1fr_1.25fr_1.5fr_1.5fr] border-t border-[#e2e2e2] text-[12px] leading-[1.45]"
             style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}
           >
+            <div className="p-3">{item.date}</div>
             <div className="p-3 font-bold">{item.location}</div>
-            <div className="p-3">{item.issue}</div>
-            <div className="p-3">{item.currentSeverity}</div>
-            <div className="p-3">{item.whatWeAreWatching}</div>
+            <div className="p-3">{item.trigger}</div>
+            <div className="p-3">{item.whyItMatters}</div>
+            <div className="p-3">{item.whatToWatch}</div>
           </div>
         ))
       )}
@@ -1062,10 +1068,13 @@ export default function ReportPreview({
   const regionalCuratedIncidents = regionalTopic
     ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
     : [];
-  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(regionalCuratedIncidents) : [];
+  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined) : [];
   const regionalDomainBriefs = isRegionalWeekly ? buildRegionalDomainBriefs(regionalDevelopments) : [];
   const regionalBluf = isRegionalWeekly ? buildRegionalBluf(regionalDevelopments) : "";
   const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
+  const regionalIntelligencePicture = isRegionalWeekly ? buildRegionalIntelligencePicture(regionalDevelopments) : "";
+  const regionalBusinessRisk = isRegionalWeekly ? buildRegionalBusinessRisk(regionalDevelopments) : "";
+  const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(regionalCuratedIncidents) : { byCategory: [], byCountry: [] };
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const isEnergy = report.topic === "energy";
@@ -1558,8 +1567,8 @@ export default function ReportPreview({
                   )}
                   {isRegionalWeekly ? (
                     <Section hidden={!show("situation")} title="Regional Intelligence Picture">
-                      {resolveSimpleProse(report.situation, aiProse?.situation, "").trim() && (
-                        <Paragraphs text={resolveSimpleProse(report.situation, aiProse?.situation, "")} />
+                      {resolveRegionalNarrative(report.situation, aiProse?.situation, regionalIntelligencePicture).trim() && (
+                        <Paragraphs text={resolveRegionalNarrative(report.situation, aiProse?.situation, regionalIntelligencePicture)} />
                       )}
                       <RegionalDomainBriefs briefs={regionalDomainBriefs} />
                     </Section>
@@ -1573,17 +1582,6 @@ export default function ReportPreview({
                   )}
                   {isRegionalWeekly ? (
                     <Section hidden={!show("what-happened")} title="Key Developments">
-                      {resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened).trim() && (
-                        <div className="mb-5">
-                          <Paragraphs
-                            text={resolveSimpleProse(
-                              report.whatHappened,
-                              aiProse?.whatHappened,
-                              proseDraft.whatHappened,
-                            )}
-                          />
-                        </div>
-                      )}
                       <RegionalActivityCharts summary={regionalVisualSummary} />
                       <RegionalDevelopmentCards developments={regionalDevelopments} />
                     </Section>
@@ -1599,23 +1597,20 @@ export default function ReportPreview({
                     hidden={!show("what-matters")} title={isRegionalWeekly ? "Business & Operational Risk" : "What Matters"}
                     text={isCargo
                       ? pickRead(report.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(cargoWindow)))
-                      : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
+                      : isRegionalWeekly
+                        ? resolveRegionalNarrative(report.whatMatters, aiProse?.whatMatters, regionalBusinessRisk)
+                        : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
                   />
                   <BulletsSection
                     hidden={!show("implications")} title={isRegionalWeekly ? "Travel & Personnel" : "Implications for Business"}
                     text={isCargo
                       ? pickRead(report.implications, aiOr(aiProse?.implications, buildCargoImplications(cargoWindow)))
-                      : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
+                      : isRegionalWeekly
+                        ? resolveRegionalNarrative(report.implications, aiProse?.implications, regionalTravelImplications)
+                        : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
                   />
                   {isRegionalWeekly ? (
                     <Section hidden={!show("watch-next")} title="7-Day Watchlist">
-                      {resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext).trim() && (
-                        <div className="mb-5">
-                          <Paragraphs
-                            text={resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
-                          />
-                        </div>
-                      )}
                       <RegionalWatchlist items={regionalWatchlist} />
                     </Section>
                   ) : (
@@ -1631,11 +1626,9 @@ export default function ReportPreview({
                     hidden={!show("polestar-view")} title={isRegionalWeekly ? "Polestar Outlook" : "Polestar View"}
                     text={isCargo
                       ? pickRead(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
-                      : resolveSimpleProse(
-                          report.polestarView,
-                          aiProse?.polestarView,
-                          isRegionalWeekly ? regionalOutlook : proseDraft.polestarView,
-                        )}
+                      : isRegionalWeekly
+                        ? resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)
+                        : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
                   />
                   {isCargo && cargoGrouped && (
                     <CargoClustersSection grouped={cargoGrouped} />

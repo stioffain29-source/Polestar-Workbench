@@ -87,7 +87,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic } from "./regionalWeekly";
-import { buildRegionalBluf, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist, curateRegionalWeeklyIncidents, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalIntelligencePicture, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -655,8 +655,8 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
-function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]) {
-  const developments = buildRegionalDevelopments(incidents);
+function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
+  const developments = buildRegionalDevelopments(incidents, issueDate);
   const { pdf, MX, CW } = ctx;
   if (developments.length === 0) {
     renderProse(ctx, "No qualifying developments were identified in the reporting period.");
@@ -678,7 +678,7 @@ function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]
     ctx.y += 3;
     renderProse(
       ctx,
-      `Category: ${development.category}\nSeverity: ${development.severity}\nWhat happened: ${development.whatHappened}\nWhy it matters: ${development.whyItMatters}\nOutlook: ${development.outlook}`,
+      `Category: ${development.category}\nCurrent Severity: ${development.severity}\nWhat Changed: ${development.whatChanged}\nOperational Significance: ${development.operationalSignificance}${development.whatToWatch ? `\nWhat To Watch: ${development.whatToWatch}` : ""}`,
     );
   }
 }
@@ -714,8 +714,8 @@ function drawRegionalActivityCharts(ctx: Ctx, incidents: TopicReportIncident[]) 
   drawChart("Activity by country", summary.byCountry.slice(0, 8));
 }
 
-function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[]) {
-  const briefs = buildRegionalDomainBriefs(buildRegionalDevelopments(incidents));
+function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
+  const briefs = buildRegionalDomainBriefs(buildRegionalDevelopments(incidents, issueDate));
   for (const brief of briefs) {
     ensureSpace(ctx, 24);
     setRoboto(ctx.pdf, "bold");
@@ -727,8 +727,8 @@ function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[]) {
   }
 }
 
-function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[]) {
-  const items = buildRegionalWatchlist(buildRegionalDevelopments(incidents));
+function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string) {
+  const items = buildRegionalWatchlist(buildRegionalDevelopments(incidents, issueDate));
   if (items.length === 0) {
     renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
     return;
@@ -738,11 +738,11 @@ function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[]) {
     setRoboto(ctx.pdf, "bold");
     setText(ctx.pdf, NAVY);
     ctx.pdf.setFontSize(9);
-    ctx.pdf.text(`${item.location} | ${item.issue}`, ctx.MX, ctx.y + 10);
+    ctx.pdf.text(`${item.date} | ${item.location} | ${item.trigger}`, ctx.MX, ctx.y + 10);
     ctx.y += 14;
     renderProse(
       ctx,
-      `Location: ${item.location}\nIssue: ${item.issue}\nCurrent Severity: ${item.currentSeverity}\nWhat We Are Watching: ${item.whatWeAreWatching}`,
+      `Date: ${item.date}\nLocation: ${item.location}\nTrigger / Event: ${item.trigger}\nWhy It Matters: ${item.whyItMatters}\nWhat To Watch: ${item.whatToWatch}`,
     );
   }
 }
@@ -1836,7 +1836,13 @@ export async function exportTopicReportPdf(
         [
           "situation",
           isRegionalWeekly ? "Regional Intelligence Picture" : "Situation",
-          resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
+          isRegionalWeekly
+            ? resolveRegionalNarrative(
+                data.situation,
+                aiProse?.situation,
+                buildRegionalIntelligencePicture(buildRegionalDevelopments(regionalPdfIncidents, data.issueDate)),
+              )
+            : resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
         ],
         ...(!isRegionalWeekly
           ? [[
@@ -1852,62 +1858,58 @@ export async function exportTopicReportPdf(
         [
           "what-matters",
           isRegionalWeekly ? "Business & Operational Risk" : "What Matters",
-          resolveSimpleProse(
-            data.whatMatters,
-            aiProse?.whatMatters,
-            proseDraft.whatMatters,
-          ),
+          isRegionalWeekly
+            ? resolveRegionalNarrative(
+                data.whatMatters,
+                aiProse?.whatMatters,
+                buildRegionalBusinessRisk(buildRegionalDevelopments(regionalPdfIncidents, data.issueDate)),
+              )
+            : resolveSimpleProse(data.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters),
         ],
       ];
       for (const [key, label, body] of proseSections) {
         if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
       if (isRegionalWeekly && show("situation")) {
-        drawRegionalDomainBriefs(ctx, regionalPdfIncidents);
+        drawRegionalDomainBriefs(ctx, regionalPdfIncidents, data.issueDate);
       }
       if (isRegionalWeekly && show("what-happened")) {
-        const intro = resolveSimpleProse(
-          data.whatHappened,
-          aiProse?.whatHappened,
-          proseDraft.whatHappened,
-        );
         drawSectionHeading(ctx, "Key Developments");
-        if (intro.trim()) renderProse(ctx, intro);
         drawRegionalActivityCharts(ctx, regionalPdfIncidents);
-        drawRegionalDevelopmentCards(ctx, regionalPdfIncidents);
+        drawRegionalDevelopmentCards(ctx, regionalPdfIncidents, data.issueDate);
       }
       if (show("implications")) {
-        const implBody = resolveSimpleProse(
-          data.implications,
-          aiProse?.implications,
-          proseDraft.implications,
-        );
+        const implBody = isRegionalWeekly
+          ? resolveRegionalNarrative(
+              data.implications,
+              aiProse?.implications,
+              buildRegionalTravelImplications(buildRegionalDevelopments(regionalPdfIncidents, data.issueDate)),
+            )
+          : resolveSimpleProse(data.implications, aiProse?.implications, proseDraft.implications);
         if (implBody.trim()) {
           drawBulletSection(ctx, isRegionalWeekly ? "Travel & Personnel" : "Implications for Business", implBody);
         }
       }
       if (show("watch-next")) {
-        const wnBody = resolveSimpleProse(
-          data.watchNext,
-          aiProse?.watchNext,
-          proseDraft.watchNext,
-        );
+        const wnBody = isRegionalWeekly
+          ? ""
+          : resolveSimpleProse(data.watchNext, aiProse?.watchNext, proseDraft.watchNext);
         if (isRegionalWeekly) {
           drawSectionHeading(ctx, "7-Day Watchlist");
           if (wnBody.trim()) renderProse(ctx, wnBody);
-          drawRegionalWatchlist(ctx, regionalPdfIncidents);
+          drawRegionalWatchlist(ctx, regionalPdfIncidents, data.issueDate);
         } else if (wnBody.trim()) {
           drawBulletSection(ctx, isRegionalWeekly ? "7-Day Watchlist" : "Watch Next", wnBody, 8);
         }
       }
       if (show("polestar-view")) {
-        const psBody = resolveSimpleProse(
-          data.polestarView,
-          aiProse?.polestarView,
-          isRegionalWeekly
-            ? buildRegionalOutlook(buildRegionalDevelopments(regionalPdfIncidents))
-            : proseDraft.polestarView,
-        );
+        const psBody = isRegionalWeekly
+          ? resolveRegionalNarrative(
+              data.polestarView,
+              aiProse?.polestarView,
+              buildRegionalOutlook(buildRegionalDevelopments(regionalPdfIncidents, data.issueDate)),
+            )
+          : resolveSimpleProse(data.polestarView, aiProse?.polestarView, proseDraft.polestarView);
         if (psBody.trim()) {
           drawSectionWithProse(ctx, isRegionalWeekly ? "Polestar Outlook" : "Polestar View", psBody);
         }
