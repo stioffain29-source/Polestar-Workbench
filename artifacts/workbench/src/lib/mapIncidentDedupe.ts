@@ -73,6 +73,18 @@ function evidenceFor<T extends MapIncidentDedupeRow>(
   return [...byUrl.values()];
 }
 
+function inferredEventFamilyKey(row: MapIncidentDedupeRow): string | null {
+  const text = `${row.displayTitle ?? row.title} ${row.summary ?? ""}`.toLowerCase();
+  const isThailandIndonesiaHaze =
+    /\bthailand\b/.test(text)
+    && /\bindonesia(?:n)?\b/.test(text)
+    && (
+      /\b(haze|smoke)\b/.test(text)
+      || (/\b(fire|forest fire|burn(?:ed|ing|s)?)\b/.test(text) && /\b(wind|direction|air quality)\b/.test(text))
+    );
+  return isThailandIndonesiaHaze ? "thailand-indonesia-transboundary-haze" : null;
+}
+
 /**
  * Collapse high-confidence same-event records before they become map markers.
  *
@@ -93,19 +105,30 @@ export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(rows: T[]): T
 
   return [...byScope.values()].flatMap((scopedRows) => {
     const authoritative = new Map<string, T[]>();
+    const inferred = new Map<string, T[]>();
     const unclustered: T[] = [];
     for (const row of scopedRows) {
       const key = row.eventClusterKey?.trim();
-      if (!key) {
+      if (key) {
+        const group = authoritative.get(key);
+        if (group) group.push(row);
+        else authoritative.set(key, [row]);
+        continue;
+      }
+      const familyKey = inferredEventFamilyKey(row);
+      if (!familyKey) {
         unclustered.push(row);
         continue;
       }
-      const group = authoritative.get(key);
+      const group = inferred.get(familyKey);
       if (group) group.push(row);
-      else authoritative.set(key, [row]);
+      else inferred.set(familyKey, [row]);
     }
 
-    const authoritativeRepresentatives: T[] = [...authoritative.values()].map(
+    const clusteredRepresentatives: T[] = [
+      ...authoritative.values(),
+      ...inferred.values(),
+    ].map(
       (members) =>
         ({
           ...bestRepresentative(members),
@@ -113,7 +136,7 @@ export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(rows: T[]): T
         }) as T,
     );
     const storyRepresentatives = consolidateCountryStories([
-      ...authoritativeRepresentatives,
+      ...clusteredRepresentatives,
       ...unclustered,
     ]);
 

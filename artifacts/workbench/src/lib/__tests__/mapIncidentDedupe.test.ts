@@ -58,4 +58,22 @@ describe("dedupeMapIncidents", () => {
 
     expect(result).toHaveLength(2);
   });
+
+  it("collapses differently worded reports of the Thailand-Indonesia haze episode", () => {
+    const result = dedupeMapIncidents([
+      row(1, "Indonesian fires put southern Thailand on haze watch"),
+      row(2, "Indonesian forest fire smoke haze reaches Thailand and its impacts", {
+        severity: "high",
+      }),
+      row(3, "Indonesia fires burn over 64,000 hectares in a week as Thailand watches wind direction"),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(2);
+    expect(result[0].corroborations?.map((source) => source.url)).toEqual([
+      "https://example.com/1",
+      "https://example.com/2",
+      "https://example.com/3",
+    ]);
+  });
 });
