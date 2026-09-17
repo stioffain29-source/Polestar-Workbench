@@ -31,6 +31,7 @@ import {
   isPreparednessDrill,
 } from "../src/lib/countryMatch";
 import { isJakartaScoped } from "@workspace/ingest/jakartaExtract";
+import { isSportsFixtureNoise } from "../src/lib/topicRelevance";
 import type {
   PdfCountry,
   PdfIncident,
@@ -80,7 +81,14 @@ export async function loadIncidents(): Promise<CountryIncident[]> {
     .from(incidentsTable)
     .where(gte(incidentsTable.occurredAt, cutoff))
     .orderBy(desc(incidentsTable.occurredAt));
-  return rows.map((r) => ({
+  return rows
+    .filter(
+      (r) =>
+        !isSportsFixtureNoise(
+          `${r.displayTitle ?? r.title ?? ""} ${r.title ?? ""} ${r.summary ?? ""}`,
+        ),
+    )
+    .map((r) => ({
     id: r.id,
     topic: r.topic,
     title: r.title,
@@ -102,7 +110,7 @@ export async function loadIncidents(): Promise<CountryIncident[]> {
     category: r.category,
     businessImpact: r.businessImpact,
     analystNotes: r.analystNotes,
-  }));
+    }));
 }
 
 // Mirrors the client-side filter in CountryReport.tsx for the three structured
@@ -133,6 +141,13 @@ export function filterForCountry(
       )
     : new Set<string>();
   return all.filter((i) => {
+    if (
+      isSportsFixtureNoise(
+        `${i.displayTitle ?? i.title ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`,
+      )
+    ) {
+      return false;
+    }
     // Preparedness drills / exercises / simulations are non-events; drop them
     // from EVERY brief before any theme is built so an "active shooter drill"
     // never surfaces as the "most serious reported" incident.

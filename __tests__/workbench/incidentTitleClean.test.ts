@@ -121,6 +121,20 @@ describe("selectRelatedIncidents — video-cruft cleaning + dedupe", () => {
       "Drone strike on Kharkiv substation",
     );
   });
+
+  it("removes sports fixtures from weekly-report incident tables even if an upstream caller passes one", () => {
+    const out = selectRelatedIncidents(
+      [
+        row({
+          topic: "indonesia_local",
+          title: "Super League: Persija Vs Java United Bentrok Sama Pilkades",
+          summary: "Persija vs Java United Super League match clashes with village elections.",
+        }),
+      ],
+      "indonesia_local",
+    );
+    expect(out).toEqual([]);
+  });
 });
 
 // The generic country report (every non-structured country) shares one source of

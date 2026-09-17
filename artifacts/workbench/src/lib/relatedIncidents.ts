@@ -9,6 +9,7 @@
 import { classifyIncidentType, type ClassifiableIncident } from "./incidentClassifier";
 import { relatedIncidentsLimit } from "./reportWindow";
 import { stripWireCruft } from "./incidentTitle";
+import { isSportsFixtureNoise } from "./topicRelevance";
 
 export interface RelatedIncidentInput {
   topic: string;
@@ -110,14 +111,21 @@ export function selectRelatedIncidents<T extends RelatedIncidentInput>(
   // same fix the flashpoint dataset applies. The same shared selector feeds both
   // the on-screen preview and the PDF builder, so cleaning here keeps the two in
   // lockstep. Shared with flashpoint via lib/incidentTitle.stripWireCruft.
-  const cleaned: T[] = windowIncidents.map((i) => {
+  const cleaned: T[] = windowIncidents
+    .filter(
+      (i) =>
+        !isSportsFixtureNoise(
+          `${(i as { displayTitle?: unknown }).displayTitle ?? i.title ?? ""} ${i.title ?? ""} ${i.summary ?? ""}`,
+        ),
+    )
+    .map((i) => {
     const cleanedTitle = stripWireCruft(i.title);
     const dt = (i as { displayTitle?: unknown }).displayTitle;
     if (typeof dt === "string") {
       return { ...i, title: cleanedTitle, displayTitle: stripWireCruft(dt) };
     }
     return cleanedTitle === i.title ? i : { ...i, title: cleanedTitle };
-  });
+    });
 
   const seen = new Set<string>();
   const deduped: T[] = [];
