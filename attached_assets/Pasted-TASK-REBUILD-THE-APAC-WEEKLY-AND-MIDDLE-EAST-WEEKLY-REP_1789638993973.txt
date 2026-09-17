@@ -1,0 +1,720 @@
+TASK: REBUILD THE APAC WEEKLY AND MIDDLE EAST WEEKLY REPORT GENERATION LOGIC
+
+IMPORTANT
+
+Work ONLY on:
+
+1. Polestar APAC Weekly
+2. Polestar Middle East Weekly
+
+DO NOT alter Fuel Watch, Shipping Watch, Cargo Watch, Conflict Watch, Flashpoint, country reports or any other existing Polestar product.
+
+DO NOT rebuild the PDF export system.
+
+DO NOT redesign the existing Polestar header, footer or overall report branding.
+
+The current APAC Weekly is not acceptable. It has become a 15 page feed dump rather than a curated regional intelligence report.
+
+The raw feed is research material.
+
+THE RAW FEED IS NOT THE REPORT.
+
+The final report must be a curated regional business risk intelligence product.
+
+==================================================
+1. PURPOSE OF THE REPORT
+==================================================
+
+The report is intended for regional:
+
+Security leaders
+Risk leaders
+Resilience and business continuity teams
+Operations teams
+Supply chain and logistics teams
+Travel managers
+Commercial and senior management stakeholders
+
+The report must answer four questions:
+
+1. What changed this week?
+2. Where does it matter?
+3. What does it mean operationally?
+4. What should the reader watch next?
+
+The product is NOT a general news digest.
+
+Do not publish every article or incident collected.
+
+A large number of source articles may result in only 6 to 10 published developments.
+
+==================================================
+2. COVERAGE
+==================================================
+
+The collection universe includes:
+
+Security and conflict
+Terrorism
+Civil unrest and activism
+Political developments
+Geopolitical developments
+Regulation and policy
+Sanctions
+Trade restrictions
+Customs and border changes
+Labour regulation
+Immigration changes
+Business and market access regulation
+Adverse weather
+Natural hazards
+Cyclones and typhoons
+Flooding
+Wildfire
+Drought
+Extreme heat
+Earthquake
+Volcanic activity
+Cyber incidents
+Major data breaches
+Ransomware
+Telecommunications disruption
+Critical infrastructure cyber incidents
+Business and operational disruption
+Airports
+Ports
+Shipping
+Road transport
+Border crossings
+Supply chains
+Fuel
+Energy
+Electricity
+Utilities
+Telecommunications
+Site access
+Business continuity
+
+These are COLLECTION THEMES.
+
+They are NOT mandatory report sections.
+
+DO NOT create empty sections saying:
+
+"No material cyber development identified"
+
+or similar.
+
+If nothing material happened in a category, omit it.
+
+==================================================
+3. EDITORIAL FILTER
+==================================================
+
+An event should only appear in the final report if it could materially affect one or more of:
+
+People
+Business travel
+Sites
+Assets
+Operations
+Ports
+Airports
+Transport
+Supply chains
+Energy
+Utilities
+Business continuity
+Market access
+Regulation
+Corporate exposure
+Commercial decision making
+
+Minor local crime, routine political statements, irrelevant community stories, minor accidents and general news must be rejected.
+
+Examples of material that should NOT have survived into the current APAC report:
+
+A missionary attending a youth rally
+
+A skeleton being found beside an abandoned condominium
+
+Multiple articles reporting the same Indian fuel tax decision
+
+Generic political speeches about terrorism with no meaningful operational change
+
+Charity fundraising stories
+
+These are source-feed items, not regional intelligence developments.
+
+==================================================
+4. DEDUPLICATION AND INCIDENT CLUSTERING
+==================================================
+
+THIS IS CRITICAL.
+
+Multiple articles describing the same event must be combined into ONE development.
+
+Do not publish individual media stories as separate developments.
+
+Example:
+
+Five articles reporting an Indian fuel export duty change = ONE regulatory/energy development.
+
+Six articles reporting one Saudi pipeline attack = ONE development.
+
+Several stories about the same protest = ONE development unless there are genuinely separate events.
+
+Cluster source material by:
+
+Country
+Location
+Event
+Date
+Actors
+Underlying incident
+Policy decision
+Operational consequence
+
+Use multiple sources to improve confidence and detail.
+
+Do not use multiple sources to create multiple report entries.
+
+==================================================
+5. TARGET REPORT LENGTH
+==================================================
+
+Normal target:
+
+7 pages.
+
+Maximum:
+
+8 pages unless there is an exceptional major regional crisis.
+
+DO NOT allow the number of scraped stories to determine report length.
+
+Do not create another 15 page report.
+
+==================================================
+6. REPORT STRUCTURE
+==================================================
+
+PAGE 1
+
+COVER
+
+Keep existing Polestar visual structure.
+
+Regional cover image/map.
+
+Title:
+
+POLESTAR APAC WEEKLY
+
+or
+
+POLESTAR MIDDLE EAST WEEKLY
+
+Polestar Insights
+
+Reporting period
+
+Website
+
+No additional content.
+
+==================================================
+
+PAGE 2
+
+REGIONAL OUTLOOK
+
+Create a genuine executive BLUF of approximately 250 to 350 words.
+
+Do NOT concatenate headlines.
+
+Do NOT write:
+
+"The regional environment changed through X, Y, Z..."
+
+Write an analytical regional summary explaining:
+
+What materially changed
+Where risk is increasing or decreasing
+What matters most operationally
+What the main themes are
+What the next seven days are likely to bring
+
+Then include:
+
+REGIONAL RISK MAP
+
+Plot only the 6 to 10 most important geographically relevant developments.
+
+Do not map every feed item.
+
+Then:
+
+WEEK AT A GLANCE
+
+Use simple metrics derived ONLY from the curated final dataset.
+
+Examples:
+
+8 material developments
+5 markets requiring increased monitoring
+3 operational disruptions
+2 significant regulatory or political changes
+6 forward watch items
+
+Do not generate meaningless metrics from the raw feed.
+
+==================================================
+
+PAGE 3
+
+WHAT CHANGED THIS WEEK
+
+Identify approximately 4 to 6 major regional themes.
+
+These are not fixed categories.
+
+Examples:
+
+Philippines | Political mobilisation building ahead of demonstrations
+
+Myanmar | Conflict affecting aviation and transport access
+
+Australia | Migration reform changes workforce environment
+
+Indonesia | Wildfire and haze exposure increasing
+
+Regional Aviation | Fuel costs creating carrier pressure
+
+Each theme should explain:
+
+What changed
+
+Why it matters
+
+Keep each concise.
+
+DO NOT mechanically create one paragraph for Security, one for Political, one for Regulatory, one for Weather, one for Cyber etc.
+
+Only include meaningful themes.
+
+==================================================
+
+PAGES 4 TO 5
+
+KEY DEVELOPMENTS
+
+Maximum:
+
+8 to 10 developments across the whole region.
+
+These must be genuinely different developments.
+
+Format:
+
+COUNTRY | SHORT DEVELOPMENT TITLE
+
+Category:
+Security / Political / Geopolitical / Regulatory / Weather & Natural Hazard / Cyber / Operational Disruption / Energy / Other appropriate category
+
+Current Severity:
+Insignificant / Low / Moderate / High / Extreme
+
+WHAT CHANGED
+
+Write a short factual synthesis from the available source material.
+
+Do not copy article headlines or feed summaries.
+
+OPERATIONAL IMPACT
+
+Explain the specific relevance to:
+
+People
+Travel
+Operations
+Assets
+Logistics
+Supply chain
+Energy
+Continuity
+Regulation
+Market access
+Commercial exposure
+
+Only mention the areas actually affected.
+
+POLESTAR VIEW
+
+Provide a short analytical assessment.
+
+Explain what the development means.
+
+Do not simply repeat the facts.
+
+OUTLOOK 7 DAYS
+
+State specific forward indicators.
+
+Examples:
+
+Scheduled protest
+Government decision
+Court ruling
+Storm landfall
+Airport reopening
+Port restriction
+Security operation
+Policy implementation
+Strike escalation
+Military activity
+Weather forecast
+Negotiation deadline
+
+DO NOT use generic filler such as:
+
+"Monitor for further developments"
+
+"Watch for confirmed follow-on developments"
+
+"Changes in severity may occur"
+
+These phrases are prohibited unless followed by a specific indicator.
+
+==================================================
+7. BUSINESS IMPLICATIONS PAGE
+==================================================
+
+Create a page summarising the implications across the region.
+
+Use up to four blocks:
+
+PEOPLE & TRAVEL
+
+OPERATIONS & ASSETS
+
+SUPPLY CHAIN & LOGISTICS
+
+REGULATORY & MARKET ACCESS
+
+Only display a block if there is meaningful content.
+
+Do not display empty blocks.
+
+Each block should contain concise analytical prose.
+
+==================================================
+8. VISUAL INTELLIGENCE
+==================================================
+
+The report must include useful maps, graphs and charts.
+
+Target:
+
+2 to 4 meaningful visuals per edition in addition to the cover image.
+
+Visuals must be driven by the week's intelligence.
+
+Examples:
+
+Regional hotspot map
+
+4 week or 6 week incident trend graph
+
+Developments by country
+
+Developments by category
+
+Weather impact map
+
+Cyclone or typhoon track
+
+Wildfire or haze exposure map
+
+Port or airport disruption map
+
+Conflict activity map
+
+Shipping chokepoint map
+
+Energy/fuel trend chart
+
+Protest concentration map
+
+DO NOT generate charts simply because the template has space.
+
+Every visual must answer one of:
+
+WHERE is something happening?
+
+WHAT type of activity is occurring?
+
+IS activity increasing or decreasing?
+
+WHAT is likely to happen next?
+
+WHAT operational route or asset is exposed?
+
+If a chart does not provide useful intelligence, do not create it.
+
+==================================================
+9. 7 DAY WATCH
+==================================================
+
+This must be a genuine forward-looking section.
+
+Do NOT derive it only from articles already in the reporting window.
+
+The system must search for upcoming events over the NEXT SEVEN DAYS.
+
+Search for:
+
+Scheduled protests
+Elections
+Political deadlines
+Court hearings
+Regulatory implementation dates
+Strikes
+Union action
+Military exercises
+Major religious gatherings
+Anniversaries with mobilisation potential
+Storms
+Typhoons
+Cyclones
+Flood forecasts
+Major infrastructure disruption
+Transport action
+Border changes
+Security operations where publicly announced
+
+Display as a timeline or structured table.
+
+Fields:
+
+DATE
+
+LOCATION
+
+TRIGGER / EVENT
+
+WHY IT MATTERS
+
+CURRENT SEVERITY
+
+Maximum approximately 8 items.
+
+The current APAC report states on page 2 that the Manila September 21 protest and transport strike are forward indicators, then later says:
+
+"No qualifying watch items were identified."
+
+This contradiction must not happen again.
+
+Validate the report before export.
+
+If forward indicators exist elsewhere in the report, the 7 Day Watch must reflect them where appropriate.
+
+==================================================
+10. POLESTAR OUTLOOK
+==================================================
+
+Final analytical section.
+
+Approximately 200 to 300 words.
+
+Do NOT repeat the BLUF.
+
+Answer:
+
+What is likely to drive regional risk during the next seven days?
+
+Where could conditions deteriorate?
+
+Which countries or issues require increased monitoring?
+
+What indicators would change the assessment?
+
+What matters operationally to regional businesses?
+
+This must read like analyst judgement, not an automated collection of headlines.
+
+==================================================
+11. VISUAL AND PDF RULES
+==================================================
+
+Retain the existing:
+
+Polestar header
+Blue gradient branding
+Footer
+Website
+Email
+Page numbering
+Typography hierarchy
+
+Improve information layout where required.
+
+Do not redesign unrelated export code.
+
+Keep whitespace.
+
+Do not fill pages simply because space exists.
+
+Avoid dense walls of text.
+
+Maps, tables and charts should be large enough to read in the PDF.
+
+==================================================
+12. CONTENT QUALITY RULES
+==================================================
+
+Prose must be clean English.
+
+Do not output scraped source fragments.
+
+Do not include:
+
+"READ:"
+Source website names inside prose
+Broken article excerpts
+Ellipses caused by scraped truncation
+Raw feed formatting
+Duplicated text
+Headline concatenation
+
+Do not write sentences such as:
+
+"Philippines's Philippine ferry fire death toll reaches 35 defined the material change in this domain."
+
+That is unacceptable.
+
+Do not repeat the article title as:
+
+What Changed
+Why It Matters
+What To Watch
+
+Each field must add new information.
+
+==================================================
+13. SEVERITY
+==================================================
+
+Use ONLY:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+Severity represents CURRENT SEVERITY.
+
+Do not display:
+
+Highest severity
+Peak severity
+Maximum severity
+Historical severity
+
+Do not use the word:
+
+Severe
+
+==================================================
+14. APAC REGIONAL COVERAGE
+==================================================
+
+APAC Weekly should cover, where material:
+
+Northeast Asia
+Southeast Asia
+South Asia
+Australia
+New Zealand
+Papua New Guinea
+Papua
+Pacific Islands
+
+Do not force equal geographic representation.
+
+A quiet country does not need an entry.
+
+==================================================
+15. MIDDLE EAST REGIONAL COVERAGE
+==================================================
+
+Middle East Weekly should cover, where material:
+
+Gulf states
+Iran
+Iraq
+Israel
+Lebanon
+Syria
+Jordan
+Yemen
+Red Sea approaches
+Relevant surrounding areas where developments materially affect Middle East operations
+
+Again:
+
+Do not force equal geographic representation.
+
+==================================================
+16. FINAL VALIDATION BEFORE PDF GENERATION
+==================================================
+
+Before export automatically check:
+
+No duplicate developments
+
+No duplicate source stories masquerading as separate developments
+
+No irrelevant feed items
+
+No empty category sections
+
+No raw scraped text
+
+No repeated What Changed / Why It Matters / Outlook text
+
+No generic filler Outlook statements
+
+No contradiction between BLUF and 7 Day Watch
+
+No article domain names embedded in report prose
+
+No report longer than 8 pages without an exceptional reason
+
+No charts based on meaningless data
+
+No severity term outside:
+Insignificant / Low / Moderate / High / Extreme
+
+==================================================
+17. DO THIS IN STAGES
+==================================================
+
+Do not make wholesale changes across the application.
+
+FIRST:
+
+Fix the data selection, clustering, curation and report generation logic for APAC Weekly only.
+
+SECOND:
+
+Generate a fresh APAC Weekly PDF.
+
+STOP.
+
+Show me the generated result before applying the same logic to Middle East Weekly.
+
+Do not proceed to Middle East Weekly until the APAC output has been reviewed.
+
+DO NOT change anything outside this scope.

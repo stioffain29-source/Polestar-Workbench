@@ -12,7 +12,7 @@
 //
 // Mirrors the API handlers in artifacts/api-server/src/routes/{reports,
 // incidents,maritimeMovement}.ts and lib/relevanceFilter.ts.
-import { and, desc, eq, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import {
   db,
   reportsTable,
@@ -21,8 +21,13 @@ import {
   maritimeSemanticEvidenceTable,
   maritimeMovementTable,
   marketPricesTable,
+  protestEventsTable,
 } from "@workspace/db";
 import { currentMaritimeSemanticProjectionCondition } from "../../api-server/src/lib/relevanceFilter";
+import {
+  buildApacFutureEvents,
+  type RegionalFutureEventInput,
+} from "../src/lib/regionalWeekly";
 
 // JSON-roundtrip a Drizzle row set so Date columns become ISO strings exactly
 // as Express's res.json() → client r.json() would, guaranteeing the headless
@@ -269,6 +274,51 @@ export async function fetchMaritimeMovement(
 // this returns the full relevance-filtered set ordered by occurredAt desc).
 export async function fetchTopicIncidents(): Promise<unknown[]> {
   return loadIncidents();
+}
+
+/**
+ * Headless equivalent of ReportEditor's APAC forward-event projection.
+ * Protest events are context-only and never enter the incident dataset.
+ * Query the report's own issue-date window rather than "now" so a historical
+ * headless review is identical to the editor's preview.
+ */
+export async function fetchApacFutureEvents(
+  issueDate: string,
+): Promise<RegionalFutureEventInput[]> {
+  const issueMs = Date.parse(`${issueDate.trim()}T00:00:00.000Z`);
+  if (!Number.isFinite(issueMs)) return [];
+  const dayMs = 24 * 60 * 60 * 1000;
+  const start = new Date(issueMs + dayMs);
+  const end = new Date(issueMs + 8 * dayMs);
+  const rows = await db
+    .select()
+    .from(protestEventsTable)
+    .where(
+      and(
+        gte(protestEventsTable.eventDate, start),
+        lt(protestEventsTable.eventDate, end),
+        inArray(protestEventsTable.status, ["Confirmed", "Planned", "Possible"]),
+      ),
+    )
+    .orderBy(protestEventsTable.eventDate, protestEventsTable.id);
+  return buildApacFutureEvents(
+    rows.map((event) => ({
+      eventDate: event.eventDate?.toISOString() ?? null,
+      country: event.country,
+      city: event.city,
+      venue: event.venue,
+      eventType: event.eventType,
+      issue: event.issue,
+      organiser: event.organiser,
+      description: event.description,
+      sourceTitle: event.sourceTitle,
+      disruptionPotential: event.disruptionPotential,
+      confidence: event.confidence,
+      status: event.status,
+      attendance: event.attendance,
+    })),
+    issueDate,
+  );
 }
 
 // Mirror of GET /api/market-prices?group=… (routes/marketPrices.ts): the

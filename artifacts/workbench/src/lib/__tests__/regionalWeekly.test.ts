@@ -1,6 +1,12 @@
 import { canonicalTopic } from "../reportNaming";
 import { buildTopicRows } from "../publicationCalendar";
 import {
+  buildApacBusinessImplications,
+  buildApacFutureEvents,
+  buildApacWeeklyBluf,
+  buildApacWeeklyOutlook,
+  buildApacWeeklyDevelopments,
+  buildApacWeeklyWatchlist,
   buildRegionalBluf,
   buildRegionalDevelopments,
   buildRegionalDomainBriefs,
@@ -11,6 +17,7 @@ import {
   isRegionalWeeklyTopic,
   selectRegionalKeyDevelopments,
   validateRegionalWeeklyAssessment,
+  validateApacWeeklyAssessment,
 } from "../regionalWeekly";
 
 function incident(
@@ -266,5 +273,412 @@ describe("regional weekly products", () => {
       ["apac_weekly"],
     );
     expect(rows[0].nextDue).toBe("2026-09-24");
+  });
+
+  it("APAC selects at most ten real developments and never pads a short evidence set", () => {
+    const short = [
+      incident(1, "Indonesia", "high", "2026-09-17", "Port closure disrupts cargo operations"),
+      incident(2, "Japan", "moderate", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+    ];
+    expect(selectRegionalKeyDevelopments(short, "apac_weekly")).toHaveLength(2);
+    expect(selectRegionalKeyDevelopments(
+      Array.from({ length: 14 }, (_, index) =>
+        incident(index, ["Indonesia", "Japan", "Singapore", "Australia", "India", "Malaysia", "Thailand"][index % 7], "moderate", "2026-09-17", `Port closure disrupts cargo operations ${index}`),
+      ),
+      "apac_weekly",
+    )).toHaveLength(10);
+  });
+
+  it("APAC omits empty domains, rejects source slop, and exposes distinct editorial fields", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Australia", "high", "2026-09-17", "Australia migration policy changes visa compliance for employers"),
+        incident(2, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+        incident(3, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+        incident(4, "India", "moderate", "2026-09-17", "Government official gives speech about terrorism"),
+        incident(5, "Philippines", "moderate", "2026-09-17", "READ: charity donation drive follows old flood"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).toEqual([3, 1, 2]);
+    const developments = buildApacWeeklyDevelopments(rows, "2026-09-17");
+    expect(buildRegionalDomainBriefs(developments, "apac_weekly").every((brief) => brief.assessment.trim())).toBe(true);
+    expect(buildRegionalDomainBriefs(developments, "apac_weekly")).toHaveLength(2);
+    expect(developments.every((row) => row.operationalImpact && row.polestarView && row.outlook7Days !== undefined)).toBe(true);
+  });
+
+  it("APAC metrics and business implication blocks derive from the selected set", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "Indonesia", "high", "2026-09-17", "Port closure disrupts cargo operations"),
+      incident(2, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+      incident(3, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+    ], "2026-09-17");
+    const bluf = buildApacWeeklyBluf(developments);
+    expect(bluf.split(/\s+/).length).toBeGreaterThanOrEqual(250);
+    expect(buildApacBusinessImplications(developments).length).toBeGreaterThan(0);
+    expect(validateApacWeeklyAssessment(developments)).not.toContain("Duplicate APAC developments remain.");
+  });
+
+  it("APAC retains one development and source evidence for differently worded policy reports", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Australia", "moderate", "2026-09-17", "Australian immigration crackdown targets visas for international students and backpackers"),
+        incident(2, "Australia", "high", "2026-09-17", "Australia migration overhaul tightens rules on visa hopping"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows).toHaveLength(1);
+    expect(buildApacWeeklyDevelopments(rows)[0].sourceCount).toBe(2);
+    expect(buildApacWeeklyDevelopments(rows)[0].sourceEvidence).toHaveLength(2);
+  });
+
+  it("APAC accepts externally supplied next-seven-day events without inventing past watch rows", () => {
+    const items = buildApacWeeklyWatchlist(
+      [],
+      [{
+        date: "2026-09-21",
+        location: "Manila",
+        trigger: "Scheduled transport strike",
+        whyItMatters: "The action may restrict employee movement and airport access.",
+        currentSeverity: "High",
+      }, {
+        date: "2026-09-30",
+        location: "Manila",
+        trigger: "Outside the watch window",
+        whyItMatters: "This should not appear yet.",
+        currentSeverity: "Low",
+      }],
+      "2026-09-17",
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      date: "2026-09-21",
+      location: "Manila",
+      currentSeverity: "High",
+    });
+  });
+
+  it("keeps APAC development fields materially distinct for recurring report shapes", () => {
+    const developments = buildApacWeeklyDevelopments([
+      {
+        ...incident(1, "Australia", "moderate", "2026-09-17", "Australia migration overhaul changes visa rules"),
+        summary: "The government announced a migration overhaul that changes visa eligibility and employer obligations for international students and skilled workers.",
+      },
+      {
+        ...incident(2, "China", "high", "2026-09-17", "Deadly floods prompt China-Nepal climate attribution"),
+        summary: "Flooding killed people in the border area after intense rainfall, while officials attributed the conditions to a changing climate pattern.",
+      },
+      {
+        ...incident(3, "Myanmar", "high", "2026-09-17", "Drone activity shuts Mandalay airport"),
+        summary: "Mandalay airport suspended flights after a drone incident; operators were advised to use alternate routing while security checks continued.",
+      },
+      {
+        ...incident(4, "Myanmar", "high", "2026-09-17", "Arakan Army offensive affects the border"),
+        summary: "The Arakan Army offensive intensified near the border, prompting new security restrictions and disrupting movement on affected routes.",
+      },
+    ], "2026-09-17");
+
+    for (const development of developments) {
+      const fields = [
+        development.whatChanged,
+        development.operationalImpact,
+        development.polestarView,
+        development.outlook7Days,
+      ].map((field) => field?.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() ?? "");
+      expect(new Set(fields).size).toBe(fields.length);
+      expect(fields[1]).not.toBe(fields[0]);
+      expect(fields[2]).not.toBe(fields[0]);
+      expect(fields[3]).not.toBe(fields[0]);
+      expect(fields[2]).not.toBe(fields[1]);
+      expect(fields[3]).not.toBe(fields[1]);
+      expect(fields[3]).not.toBe(fields[2]);
+    }
+    expect(validateApacWeeklyAssessment(developments)
+      .filter((error) => error.startsWith("Semantically repeated narrative fields"))).toEqual([]);
+  });
+
+  it("projects only material scheduled events into distinct operating fields", () => {
+    const [event] = buildApacFutureEvents(
+      [
+        {
+          eventDate: "2026-09-20T00:00:00Z",
+          country: "Japan",
+          city: "Tokyo",
+          eventType: "community gathering",
+          sourceTitle: "Local charity community gathering",
+          description: "A small neighbourhood donation event.",
+          status: "Possible",
+          confidence: "Low",
+        },
+        {
+          eventDate: "2026-09-21T00:00:00Z",
+          country: "Philippines",
+          city: "Manila",
+          eventType: "transport strike",
+          sourceTitle: "Metro Manila transport strike",
+          description: "Drivers plan a citywide walkout affecting routes.",
+          disruptionPotential: "High",
+          status: "Planned",
+          confidence: "High",
+        },
+      ],
+      "2026-09-17",
+    );
+    expect(event).toMatchObject({
+      date: "2026-09-21",
+      location: "Manila, Philippines",
+      trigger: "Metro Manila transport strike",
+      currentSeverity: "High",
+    });
+    expect(event.whyItMatters).not.toBe(event.trigger);
+    expect(event.whatToWatch).not.toBe(event.trigger);
+    expect(event.whyItMatters).not.toContain(event.trigger);
+    expect(event.whatToWatch).not.toContain(event.trigger);
+    expect(buildApacFutureEvents(
+      [{
+        eventDate: "2026-09-20T00:00:00Z",
+        country: "Japan",
+        city: "Tokyo",
+        eventType: "community gathering",
+        sourceTitle: "Local charity community gathering",
+        description: "A small neighbourhood donation event.",
+        status: "Possible",
+        confidence: "Low",
+      }],
+      "2026-09-17",
+    )).toEqual([]);
+  });
+
+  it("cleans source prose from future-event triggers without ellipsis", () => {
+    const [event] = buildApacFutureEvents(
+      [{
+        eventDate: "2026-09-21T00:00:00Z",
+        country: "India",
+        city: "Mumbai",
+        eventType: "march",
+        sourceTitle: "Maratha reservation mobilisation and campaign. Related actions are expected to concentrate in Mumbai The scheduled route may affect traffic.",
+        description: "A planned march may affect roads.",
+        disruptionPotential: "High",
+        status: "Planned",
+        confidence: "High",
+      }],
+      "2026-09-17",
+    );
+    expect(event.trigger).toBe("Maratha reservation mobilisation and campaign");
+    expect(event.trigger).not.toMatch(/Related actions|The scheduled|concentrate in Mumbai/i);
+    expect(event.trigger).not.toContain("...");
+  });
+
+  it("APAC excludes polling-place human-interest items and future-only protest commentary", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Philippines", "low", "2026-09-17", "Islamic school-turned-evacuation site now BARMM polling center"),
+        incident(2, "Philippines", "high", "2026-09-17", "Manila groups plan to hold a Sept. 21 protest"),
+        incident(3, "Philippines", "high", "2026-09-17", "Manila protest blocks roads and police deploy crowd-control units"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).toEqual([3]);
+  });
+
+  it("APAC strips datelines, source names and raw truncation from What Changed", () => {
+    const [development] = buildApacWeeklyDevelopments([{
+      ...incident(1, "Myanmar", "high", "2026-09-17", "Mandalay airport shut after drone attack"),
+      summary: "MANDALAY, Myanmar - Flights were suspended after a drone attack disrupted airport operations... Reuters",
+    }], "2026-09-17");
+    expect(development.whatChanged).not.toMatch(/MANDALAY|Reuters|\.\.\./i);
+    expect(development.whatChanged).not.toBe("Mandalay airport shut after drone attack");
+    expect(validateApacWeeklyAssessment([development])).not.toContain(
+      "Raw scrape fragments, source domains or rejected feed prose remain.",
+    );
+    expect(validateApacWeeklyAssessment([development])).not.toContain(
+      "Truncation ellipses or generic impact templates remain.",
+    );
+  });
+
+  it("APAC clusters India windfall and export fuel tax variants with source evidence", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        {
+          ...incident(1, "India", "moderate", "2026-09-17", "Centre slashes windfall tax on export of petrol, diesel and aviation turbine fuel Business Today"),
+          source: "Business Today",
+        },
+        {
+          ...incident(2, "India", "high", "2026-09-17", "Fuel exporters to pay less: Government cuts windfall tax on export of petrol, diesel, ATF Mathrubhumi English"),
+          source: "Mathrubhumi English",
+        },
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows).toHaveLength(1);
+    const [development] = buildApacWeeklyDevelopments(rows, "2026-09-17");
+    expect(development.sourceCount).toBe(2);
+    expect(development.sourceEvidence).toEqual(expect.arrayContaining(["Business Today", "Mathrubhumi English"]));
+    expect(development.whatChanged).not.toMatch(/Reporting indicates that|Business Today|Mathrubhumi|a operational/i);
+    expect(development.whatChanged).toContain("India reduced export-linked fuel taxation");
+  });
+
+  it("APAC BLUF stays within the 250-350 word editorial range", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "India", "high", "2026-09-17", "Government cuts windfall tax on export of petrol, diesel and ATF"),
+      incident(2, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+      incident(3, "Myanmar", "high", "2026-09-17", "Drone activity shuts Mandalay airport"),
+      incident(4, "Australia", "moderate", "2026-09-17", "Australia migration overhaul changes visa rules"),
+    ], "2026-09-17");
+    const words = buildApacWeeklyBluf(developments).split(/\s+/).filter(Boolean);
+    expect(words.length).toBeGreaterThanOrEqual(250);
+    expect(words.length).toBeLessThanOrEqual(350);
+  });
+
+  it("APAC rejects local egg-truck robbery and casualty aftermath without ongoing disruption", () => {
+    const rejected = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Bangladesh", "moderate", "2026-09-17", "Pickup loaded with eggs robbed in Narsingdi: 5 arrested, goods recovered"),
+        incident(2, "Philippines", "high", "2026-09-17", "Philippine ferry fire death toll reaches 35"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rejected).toHaveLength(0);
+  });
+
+  it("APAC keeps an ongoing transport disruption after a casualty event", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [{
+        ...incident(1, "Philippines", "high", "2026-09-17", "Ferry service remains suspended after fire as investigation continues"),
+        summary: "The ferry service remains suspended and the port authority has restricted departures pending a safety review.",
+      }],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("APAC outlook envelopes remain distinct and contain no recorded-a boilerplate", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "India", "high", "2026-09-17", "Government cuts windfall tax on export of petrol, diesel and ATF"),
+      incident(2, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+      incident(3, "Myanmar", "high", "2026-09-17", "Drone activity shuts Mandalay airport"),
+      incident(4, "Australia", "moderate", "2026-09-17", "Australia migration overhaul changes visa rules"),
+    ], "2026-09-17");
+    const regionalOutlook = buildApacWeeklyBluf(developments);
+    const finalOutlook = buildApacWeeklyOutlook(developments);
+    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(250);
+    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(350);
+    expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(200);
+    expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(300);
+    expect(`${regionalOutlook} ${finalOutlook}`).not.toMatch(/recorded a operational|recorded a (?:security|regulatory|weather|operational)/i);
+  });
+
+  it("APAC rejects an egg robbery even when the feed mentions goods, cargo and supply chain", () => {
+    const developments = buildApacWeeklyDevelopments([{
+      ...incident(1, "Bangladesh", "moderate", "2026-09-17", "Pickup loaded with eggs robbed in Narsingdi"),
+      summary: "A pickup loaded with eggs was robbed; goods were recovered and the local supply chain was unaffected.",
+    }], "2026-09-17");
+    expect(developments).toHaveLength(0);
+  });
+
+  it("APAC selected What Changed fields contain no reported or recorded category fallbacks", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "India", "high", "2026-09-17", "Government cuts windfall tax on export of petrol, diesel and ATF"),
+      incident(2, "Myanmar", "high", "2026-09-17", "Arakan Army offensive affects the border"),
+      incident(3, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+    ], "2026-09-17");
+    for (const development of developments) {
+      expect(development.whatChanged).not.toMatch(/\b(?:reported|recorded) an? (?:security|regulatory|weather|operational|political|cyber) change\b/i);
+    }
+  });
+
+  it("APAC rejects generic diplomatic condemnations and applies event-family precedence", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "India", "low", "2026-09-17", "India, Israel unequivocally condemn terrorism in all its forms and manifestations"),
+        incident(2, "Philippines", "low", "2026-09-17", "Manibela starts 2-day transport strike vs oil price hikes"),
+        incident(3, "India", "low", "2026-09-17", "Government cuts export duty across the board on petrol, diesel and aviation turbine fuel"),
+        incident(4, "Papua New Guinea", "moderate", "2026-09-17", "Panguna Landowners Interim Council condemn arson attack on LMEL Machinery in Panguna"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).not.toContain(1);
+    const developments = buildApacWeeklyDevelopments(rows, "2026-09-17");
+    const strike = developments.find((row) => row.id === undefined && row.title.includes("Manibela"));
+    const fuel = developments.find((row) => row.title.includes("Government cuts export duty"));
+    const arson = developments.find((row) => row.title.includes("Panguna"));
+    expect(strike?.operationalImpact).toMatch(/public transport|employee movement/i);
+    expect(strike?.operationalImpact).not.toMatch(/fuel pricing|trade economics/i);
+    expect(fuel?.operationalImpact).toMatch(/fuel.export pricing|trade economics/i);
+    expect(fuel?.operationalImpact).not.toMatch(/passenger movement and air cargo/i);
+    expect(arson?.operationalImpact).toMatch(/site assets|investigation/i);
+    expect(arson?.outlook7Days).toMatch(/investigation|site-access/i);
+  });
+
+  it("APAC keeps complete titles and sentence-complete BLUF and Outlook", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "Australia", "high", "2026-09-17", "Australia migration overhaul: Crackdown on visa hopping, tighter rules for student families and visitor visas with implementation guidance"),
+      incident(2, "India", "high", "2026-09-17", "Government cuts export duty across the board on petrol, diesel and aviation turbine fuel"),
+      incident(3, "Myanmar", "high", "2026-09-17", "Drone activity shuts Mandalay airport"),
+    ], "2026-09-17");
+    expect(developments.find((row) => row.country === "Australia")?.title).not.toMatch(/…|\.\.\./);
+    const bluf = buildApacWeeklyBluf(developments);
+    const outlook = buildApacWeeklyOutlook(developments);
+    expect(bluf).not.toMatch(/…|\.\.\./);
+    expect(outlook).not.toMatch(/…|\.\.\./);
+    expect(bluf.trim()).toMatch(/[.!?]$/);
+    expect(outlook.trim()).toMatch(/[.!?]$/);
+  });
+
+  it("APAC keeps airline bankruptcy outside the India fuel-policy family", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        {
+          ...incident(1, "India", "high", "2026-09-17", "Centre slashes windfall tax on export of petrol, diesel and aviation turbine fuel"),
+          source: "Business Today",
+        },
+        {
+          ...incident(2, "India", "high", "2026-09-17", "Fuel exporters to pay less: Government cuts windfall tax on export of petrol, diesel, ATF"),
+          source: "Mathrubhumi English",
+        },
+        incident(3, "Latvia", "high", "2026-09-17", "AirBaltic seeks bankruptcy protection as jet fuel costs surge"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].country).toBe("India");
+    const developments = buildApacWeeklyDevelopments([
+      ...rows,
+      { ...incident(4, "India", "high", "2026-09-17", "AirBaltic seeks bankruptcy protection as jet fuel costs surge") },
+    ], "2026-09-17");
+    expect(developments.filter((row) => /AirBaltic/i.test(row.title))).toHaveLength(0);
+    expect(developments.filter((row) => /fuel taxation/i.test(row.whatChanged))).toHaveLength(1);
+  });
+
+  it("APAC rejects declarations, local protests and retrospective commendations without operating effects", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "India", "low", "2026-09-17", "BRICS New Delhi Declaration adopted: Terrorism, conflict resolution, tariff concerns addressed"),
+        incident(2, "Philippines", "moderate", "2026-09-17", "Groups hold anti-Pax Silica protest in Angeles City"),
+        incident(3, "South Korea", "moderate", "2026-09-17", "U.S. NCIS Commends Busan Police for Port Intrusion Arrests"),
+        incident(4, "India", "high", "2026-09-17", "Government cuts export duty on petrol, diesel and aviation turbine fuel"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).toEqual([4]);
+  });
+
+  it("APAC fuel policy takes precedence over aviation in Polestar View and Outlook", () => {
+    const [development] = buildApacWeeklyDevelopments([
+      incident(1, "India", "high", "2026-09-17", "Government cuts export duty on petrol, diesel and aviation turbine fuel"),
+    ], "2026-09-17");
+    expect(development.polestarView).toMatch(/policy-and-pricing|fuel markets/i);
+    expect(development.polestarView).not.toMatch(/aviation assessment|access constraint/i);
+    expect(development.outlook7Days).toMatch(/export-duty schedule|fuel-market pricing/i);
+    expect(development.outlook7Days).not.toMatch(/airport status|flight cancellations/i);
   });
 });

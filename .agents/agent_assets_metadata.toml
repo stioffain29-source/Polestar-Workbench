@@ -1185,3 +1185,17 @@ mtime_ms = 1789544697901
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/52ea1a19-fc9f-4eed-805c-f81952a49603/f5c926b8-c2d0-4d6d-b269-9bf8f5406ca4"
 storage_version_token = "1789544705285667"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "90krMonwu25PI9RHcfwJs"
+uri = "file://artifacts/workbench/screenshots/apac-weekly-review-2026-09-17.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly — Review PDF"
+description = "Fresh 7-page APAC Weekly generated from the 17 September 2026 production report and current forward-event data."
+logical_id = "899bce96-9408-45bd-a262-e803009c4daa"
+content_hash = "sha256:0daa4ba25359169c4868bfa86e3a6594750eb8ff6959f923d60958294b539df7"
+size = 1509931
+mtime_ms = 1789643933863
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/899bce96-9408-45bd-a262-e803009c4daa/2a58ef1d-7de5-4cdf-9089-4bc18dd24832"
+storage_version_token = "1789643984796161"
+content_type = "application/pdf"

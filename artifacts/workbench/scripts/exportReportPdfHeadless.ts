@@ -84,6 +84,7 @@ async function main() {
   const {
     fetchTopicReport,
     fetchTopicIncidents,
+    fetchApacFutureEvents,
     fetchMaritimeMovement,
     fetchLatestTopicReportId,
   } = await import("./topicReportData");
@@ -173,6 +174,9 @@ async function main() {
         hiddenSections,
         sectionOverrides,
         marketPrices: marketPrices as never,
+        ...(TOPIC === "apac_weekly"
+          ? { futureEvents: await fetchApacFutureEvents(data.issueDate) }
+          : {}),
       },
     );
   }

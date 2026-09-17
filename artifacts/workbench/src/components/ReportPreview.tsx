@@ -11,19 +11,25 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import {
   buildRegionalDevelopments,
+  buildApacWeeklyDevelopments,
+  buildApacWeeklyBluf,
   buildRegionalBluf,
   buildRegionalDomainBriefs,
   buildRegionalOutlook,
+  buildApacWeeklyOutlook,
   buildRegionalIntelligencePicture,
   buildRegionalBusinessRisk,
   buildRegionalTravelImplications,
   buildRegionalWatchlist,
+  buildApacWeeklyWatchlist,
   buildRegionalGlanceItems,
   buildRegionalMapPoints,
+  buildApacBusinessImplications,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
   resolveRegionalNarrative,
   type RegionalDevelopment,
+  type RegionalFutureEventInput,
 } from "@/lib/regionalWeekly";
 import { pickRead } from "@/lib/pickRead";
 import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
@@ -205,6 +211,83 @@ function NarrativeSection({ title, text, hidden }: { title: string; text?: strin
   );
 }
 
+function ApacDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
+  return (
+    <div className="space-y-4">
+      {developments.map((development, index) => (
+        <article
+          key={`${development.country}-${development.title}-${index}`}
+          className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-4"
+        >
+          <h3
+            className="uppercase tracking-wide text-[13px] font-bold mb-2"
+            style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
+          >
+            {development.country} | {development.title}
+          </h3>
+          <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
+            <p><strong>WHAT CHANGED:</strong> {development.whatChanged}</p>
+            <p><strong>OPERATIONAL IMPACT:</strong> {development.operationalImpact || development.operationalSignificance}</p>
+            {development.polestarView && <p><strong>POLESTAR VIEW:</strong> {development.polestarView}</p>}
+            {development.outlook7Days && <p><strong>OUTLOOK 7 DAYS:</strong> {development.outlook7Days}</p>}
+          </div>
+        </article>
+      ))}
+      {developments.length === 0 && (
+        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+          No qualifying developments were identified in the reporting period.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ApacThemes({ themes }: { themes: RegionalDevelopment[] }) {
+  return (
+    <div className="space-y-4">
+      {themes.map((theme, index) => (
+        <div key={index} className="border-l-[3px] border-l-[#465bff] bg-[#f7f8fb] p-4">
+          <h3 className="uppercase tracking-wide text-[13px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+            {theme.country} | {theme.title}
+          </h3>
+          <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+             <p><strong>What Changed:</strong> {theme.whatChanged}</p>
+             <p><strong>Why It Matters:</strong> {theme.operationalImpact || theme.operationalSignificance}</p>
+          </div>
+        </div>
+      ))}
+      {themes.length === 0 && (
+        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+          No major regional themes were identified in the reporting period.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ApacBusinessImplications({ blocks }: { blocks: ReturnType<typeof buildApacBusinessImplications> }) {
+  return (
+    <div className="space-y-6">
+      {blocks.map((block, i) => (
+        <div key={i} className="border border-[#e2e2e2] bg-white p-4 shadow-sm">
+           <h3 className="uppercase tracking-wide text-[13px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+             {block.heading}
+           </h3>
+           <p className="text-[12px] leading-[1.55] m-0" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+             {block.body}
+           </p>
+        </div>
+      ))}
+      {blocks.length === 0 && (
+        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+          No specific regional business implications were identified.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RegionalDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
   return (
     <div className="space-y-4">
@@ -251,6 +334,41 @@ function RegionalDomainBriefs({
           <p className="text-[12px] leading-[1.55] m-0" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             {brief.assessment}
           </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ApacWatchlist({
+  items,
+}: {
+  items: ReturnType<typeof buildApacWeeklyWatchlist>;
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+        No qualifying watch items were identified in the reporting period.
+      </p>
+    );
+  }
+  return (
+    <div className="relative border-l-2 border-[#465bff] ml-4 space-y-6">
+      {items.map((item, index) => (
+        <div key={`${item.date}-${item.location}-${index}`} className="relative pl-6">
+          <div className="absolute w-3 h-3 bg-[#465bff] rounded-full -left-[7px] top-1 border-2 border-white" />
+          <div className="border border-[#e2e2e2] bg-white p-3 shadow-sm">
+            <div className="flex justify-between items-baseline mb-2">
+              <span className="font-bold text-[13px] tracking-wide" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+                {item.date} — {item.location}
+              </span>
+            </div>
+            <div className="space-y-1.5 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+              <p><strong>Trigger / Event:</strong> {item.trigger}</p>
+              <p><strong>Why It Matters:</strong> {item.whyItMatters}</p>
+              {item.currentSeverity && <p><strong>Current Severity:</strong> {item.currentSeverity}</p>}
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -1058,6 +1176,7 @@ export default function ReportPreview({
   marketPrices,
   hiddenSections,
   sectionOverrides,
+  futureEvents = [],
 }: {
   report: ReportPreviewData;
   incidents?: TopicFastFactsIncident[];
@@ -1066,6 +1185,7 @@ export default function ReportPreview({
   marketPrices?: MarketPrice[];
   hiddenSections?: string[];
   sectionOverrides?: TopicSectionOverrides | null;
+  futureEvents?: RegionalFutureEventInput[];
 }) {
   const show = makeSectionGate(hiddenSections);
   const ffOverrides = sectionOverrides?.fastFactOverrides;
@@ -1082,14 +1202,40 @@ export default function ReportPreview({
   const regionalCuratedIncidents = regionalTopic
     ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
     : [];
-  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined) : [];
-  const regionalDomainBriefs = isRegionalWeekly ? buildRegionalDomainBriefs(regionalDevelopments) : [];
-  const regionalBluf = isRegionalWeekly ? buildRegionalBluf(regionalDevelopments) : "";
-  const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
+  const regionalDevelopments = isRegionalWeekly
+    ? report.topic === "apac_weekly"
+      ? buildApacWeeklyDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined)
+      : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined)
+    : [];
+  const regionalDomainBriefs = isRegionalWeekly
+    ? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined)
+    : [];
+  const regionalBluf = isRegionalWeekly
+    ? report.topic === "apac_weekly"
+      ? buildApacWeeklyBluf(regionalDevelopments)
+      : buildRegionalBluf(regionalDevelopments)
+    : "";
+  const regionalOutlook = isRegionalWeekly
+    ? report.topic === "apac_weekly"
+      ? buildApacWeeklyOutlook(regionalDevelopments)
+      : buildRegionalOutlook(regionalDevelopments)
+    : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
-  const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments) : [];
-  const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents) : [];
+  const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
+  const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
+  const apacGlanceMetrics = report.topic === "apac_weekly" ? [
+    { label: "Material Developments", value: regionalDevelopments.length.toString() },
+    { label: "Markets Affected", value: new Set(regionalDevelopments.map(d => d.country)).size.toString() },
+    { label: "Operational Disruptions", value: regionalDevelopments.filter(d => d.category === "Operational Disruption").length.toString() },
+    { label: "Regulatory Changes", value: regionalDevelopments.filter(d => d.category === "Regulatory").length.toString() },
+    { label: "Forward Watch Items", value: regionalDevelopments.filter(d => d.whatToWatch || d.outlook7Days).length.toString() },
+  ].filter(m => parseInt(m.value) > 0).slice(0, 5) : [];
+
+  const apacThemes = report.topic === "apac_weekly" ? regionalDevelopments.slice(0, 6) : [];
+  const apacImplications = report.topic === "apac_weekly" ? buildApacBusinessImplications(regionalDevelopments) : [];
+  const apacWatchlist = report.topic === "apac_weekly" ? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate) : [];
+
   const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest
   // market close the report carries, NOT the stored issue date. Deriving the
@@ -1417,7 +1563,64 @@ export default function ReportPreview({
       </div>
       </div>
 
-      {isRegionalWeekly ? (
+      {report.topic === "apac_weekly" ? (
+        <div className="regional-weekly-body">
+          {/* Page 2: Regional Outlook & Week at a Glance */}
+          <div className="px-10 py-10 report-page" style={{ position: "relative" }}>
+            <Section hidden={!show("executive-summary")} title="Regional Outlook">
+              <Paragraphs text={regionalBluf} />
+            </Section>
+
+            <div style={{ marginTop: 24, marginBottom: 32 }}>
+              <RegionalHotspotMap points={regionalMapPoints} />
+            </div>
+
+            <Section hidden={!show("fast-facts")} title="Week at a Glance">
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                {apacGlanceMetrics.map((item, i) => (
+                  <div key={i} className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-3 flex flex-col justify-center gap-1">
+                    <span className="uppercase text-[10px] font-bold tracking-wide" style={{ color: NAVY }}>{item.label}</span>
+                    <span className="text-[18px] font-bold leading-[1.1]" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          </div>
+
+          {/* Page 3: What Changed This Week */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("situation")} title="What Changed This Week">
+              <ApacThemes themes={apacThemes} />
+            </Section>
+          </div>
+
+          {/* Page 4-5: Key Developments */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("what-happened")} title="Key Developments">
+              <ApacDevelopmentCards developments={regionalDevelopments} />
+            </Section>
+          </div>
+
+          {/* Page 6: Business Implications */}
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("implications")} title="Business Implications">
+              <ApacBusinessImplications blocks={apacImplications} />
+            </Section>
+          </div>
+
+          {/* Page 7: 7-Day Watch & Polestar Outlook */}
+          <div className="px-10 pt-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <Section hidden={!show("watch-next")} title="7 Day Watch">
+              <ApacWatchlist items={apacWatchlist} />
+            </Section>
+            <div style={{ marginTop: 40 }}>
+              <Section hidden={!show("polestar-view")} title="Polestar Outlook">
+                <Paragraphs text={resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)} />
+              </Section>
+            </div>
+          </div>
+        </div>
+      ) : isRegionalWeekly ? (
         <div className="regional-weekly-body">
           {/* Page 2: Week at a Glance */}
           <div className="px-10 py-10 report-page" style={{ position: "relative" }}>

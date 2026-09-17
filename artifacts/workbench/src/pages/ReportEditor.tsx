@@ -67,8 +67,10 @@ import {
 import { resolveReportTitle } from "@/lib/reportNaming";
 import {
   curateRegionalWeeklyIncidents,
+  buildApacFutureEvents,
   isRegionalWeeklyTopic,
   regionalCountryQuery,
+  type RegionalFutureEventInput,
 } from "@/lib/regionalWeekly";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { computeTopicFastFacts, filterTopicReportIncidents } from "@/lib/topicFastFacts";
@@ -114,7 +116,7 @@ import { CARD_RATINGS, CARD_RATING_LABELS } from "@/lib/cardTemplates";
 import { latestRecordDate, utcYmd } from "@/lib/reportDataStatus";
 import { clampIssueDateToLatestRecord, reportCadence } from "@/lib/reportWindow";
 import { resolveFuelEffectiveSections } from "@/lib/fuelReportConsistency";
-import { format, parseISO } from "date-fns";
+import { addDays, format, isAfter, isValid, parseISO } from "date-fns";
 import {
   FUEL_MARKET_DATA_SAMPLE,
   validateFuelHardNumbersJson,
@@ -729,7 +731,10 @@ export default function ReportEditor() {
   // incident count.
   const protestEventsQuery = useListProtestEvents(undefined, {
     query: {
-      enabled: form.topic === "flashpoint" || form.topic === "protests",
+      enabled:
+        form.topic === "flashpoint" ||
+        form.topic === "protests" ||
+        form.topic === "apac_weekly",
       staleTime: 30_000,
       queryKey: ["protest-events"],
     },
@@ -742,6 +747,17 @@ export default function ReportEditor() {
       ),
     [protestEventsQuery.data],
   );
+  // APAC Weekly consumes the standalone forward-event store as context only:
+  // these rows never enter incident counts or curation. Filter here to the
+  // report's own seven-day horizon so preview and PDF receive the same payload.
+  const apacFutureEvents = useMemo<RegionalFutureEventInput[]>(() => {
+    if (form.topic !== "apac_weekly" || !form.issueDate) return [];
+    const rows = [
+      ...(protestEventsQuery.data?.confirmedPlanned ?? []),
+      ...(protestEventsQuery.data?.possible ?? []),
+    ];
+    return buildApacFutureEvents(rows, form.issueDate);
+  }, [form.topic, form.issueDate, protestEventsQuery.data]);
   const seededForId = useRef<number | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   // Staleness check shared by the seeding effect and the live warning banner.
@@ -1813,6 +1829,7 @@ export default function ReportEditor() {
             includeFullAnnex,
             hiddenSections,
             sectionOverrides,
+            futureEvents: apacFutureEvents,
           },
         );
       }
@@ -4434,6 +4451,7 @@ export default function ReportEditor() {
                 marketPrices={fuelAssembly?.marketPrices ?? marketPriceRows}
                 hiddenSections={hiddenSections}
                 sectionOverrides={sectionOverrides}
+                futureEvents={apacFutureEvents}
               />
             )
           )}
