@@ -1088,7 +1088,11 @@ export async function exportTopicReportPdf(
   if (isRegionalWeeklyTopic(data.topic)) {
     const regionalErrors = validateRegionalWeeklyAssessment(buildRegionalDevelopments(regionalPdfIncidents));
     if (regionalErrors.length > 0) {
-      throw new Error(`Regional Weekly export blocked: ${regionalErrors.join(" ")}`);
+      // Do not strand the analyst in the editor. Regional Weekly already renders
+      // from the curated, event-clustered set above; quality findings remain
+      // diagnostic rather than preventing the user from downloading and editing
+      // the PDF further.
+      console.warn("[Regional Weekly PDF quality advisory]", regionalErrors);
     }
   }
   if (data.topic === "fuel") {
