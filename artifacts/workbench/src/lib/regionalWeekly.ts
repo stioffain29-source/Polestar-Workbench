@@ -936,17 +936,26 @@ export interface ApacMapItem {
 }
 
 const COUNTRY_FLAGS: Record<string, string> = {
-  "Australia": "🇦🇺", "Bangladesh": "🇧🇩", "Bhutan": "🇧🇹", "Brunei": "🇧🇳",
-  "Cambodia": "🇰🇭", "China": "🇨🇳", "Fiji": "🇫🇯", "Hong Kong": "🇭🇰",
-  "India": "🇮🇳", "Indonesia": "🇮🇩", "Japan": "🇯🇵", "Kiribati": "🇰🇮",
-  "Laos": "🇱🇦", "Malaysia": "🇲🇾", "Maldives": "🇲🇻", "Marshall Islands": "🇲🇭",
-  "Micronesia": "🇫🇲", "Mongolia": "🇲🇳", "Myanmar": "🇲🇲", "Nauru": "🇳🇷",
-  "Nepal": "🇳🇵", "New Zealand": "🇳🇿", "North Korea": "🇰🇵", "Pakistan": "🇵🇰",
-  "Palau": "🇵🇼", "Papua New Guinea": "🇵🇬", "Philippines": "🇵🇭", "Samoa": "🇼🇸",
-  "Singapore": "🇸🇬", "Solomon Islands": "🇸🇧", "South Korea": "🇰🇷", "Sri Lanka": "🇱🇰",
-  "Taiwan": "🇹🇼", "Thailand": "🇹🇭", "Timor-Leste": "🇹🇱", "Tonga": "🇹🇴",
-  "Tuvalu": "🇹🇻", "Vanuatu": "🇻🇺", "Vietnam": "🇻🇳"
+  "Australia": "au", "Bangladesh": "bd", "Bhutan": "bt", "Brunei": "bn",
+  "Cambodia": "kh", "China": "cn", "Fiji": "fj", "Hong Kong": "hk",
+  "India": "in", "Indonesia": "id", "Japan": "jp", "Kiribati": "ki",
+  "Laos": "la", "Malaysia": "my", "Maldives": "mv", "Marshall Islands": "mh",
+  "Micronesia": "fm", "Mongolia": "mn", "Myanmar": "mm", "Nauru": "nr",
+  "Nepal": "np", "New Zealand": "nz", "North Korea": "kp", "Pakistan": "pk",
+  "Palau": "pw", "Papua New Guinea": "pg", "Philippines": "ph", "Samoa": "ws",
+  "Singapore": "sg", "Solomon Islands": "sb", "South Korea": "kr", "Sri Lanka": "lk",
+  "Taiwan": "tw", "Thailand": "th", "Timor-Leste": "tl", "Tonga": "to",
+  "Tuvalu": "tv", "Vanuatu": "vu", "Vietnam": "vn"
 };
+
+
+export function clipTitleToMeaningfulWords(text: string, maxWords: number = 6): string {
+  const clean = text.replace(/^[A-Za-z]+'s\s+/, "").replace(/\s+/g, " ").trim();
+  const words = clean.split(" ").filter(Boolean);
+  if (words.length <= maxWords) return clean;
+  // No ellipsis, just truncate to words and strip trailing punctuation
+  return words.slice(0, maxWords).join(" ").replace(/[,:;.\!?]+$/, "");
+}
 
 export function buildApacMapItems<T extends RegionalIncident>(
   incidents: T[],
@@ -990,7 +999,7 @@ export function buildApacMapItems<T extends RegionalIncident>(
       developments: items.map(item => {
         const title = item.displayTitle ?? item.title ?? "Unspecified development";
         const cleanTitle = cleanApacTitle(title);
-        const label = clipRegionalWords(cleanTitle, 5).replace(/^[A-Za-z]+'s\s+/, "");
+        const label = clipTitleToMeaningfulWords(cleanTitle, 5);
         return {
           label,
           severity: SEVERITY_LABEL[item.severity?.toLowerCase() ?? ""] ?? "Moderate",

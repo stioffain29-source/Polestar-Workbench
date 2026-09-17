@@ -1,0 +1,127 @@
+FIX THE APAC WEEKLY MAP ONLY.
+
+Do not change any other report component.
+
+The current map is still not acceptable.
+
+PROBLEMS
+
+1. Map is too zoomed out.
+2. Too much empty ocean and Antarctica.
+3. Markers mean nothing without reading the side list.
+4. Side list text is truncated.
+5. Country flags are not visually clear.
+6. Multiple incidents in one country are badly represented.
+7. The finished result looks like a backend map, not an intelligence report graphic.
+
+REPLACE IT WITH THIS LAYOUT:
+
+LEFT 60–65%:
+Regional APAC map cropped tightly to:
+India / South Asia
+Southeast Asia
+East Asia
+Papua New Guinea
+Australia / New Zealand
+
+Do NOT show Antarctica.
+
+RIGHT 35–40%:
+Clean intelligence callout panel.
+
+Each country entry must use:
+
+FLAG ICON
+COUNTRY NAME
+CURRENT SEVERITY
+SHORT EVENT TITLE(S)
+
+Example:
+
+🇵🇭 PHILIPPINES
+HIGH
+
+Manila protest mobilisation
+Transport strike
+
+🇲🇲 MYANMAR
+HIGH
+
+Mandalay airport drone disruption
+Arakan clashes
+
+🇦🇺 AUSTRALIA
+MODERATE
+
+Migration regulation changes
+
+MAP MARKERS
+
+Use one numbered marker per affected country.
+
+The number must correspond directly to the right-hand country panel.
+
+Example:
+
+1 = Australia
+2 = Myanmar
+3 = Philippines
+
+If a country has multiple developments, do NOT add multiple random markers unless the incidents are geographically distinct and location matters.
+
+MARKER STYLE
+
+Marker colour = current severity.
+
+Marker must also contain the matching number.
+
+Do not use colour alone to convey meaning.
+
+FLAGS
+
+Use proper country flag SVG or PNG assets.
+
+Do not rely on text country codes such as AU, PH, MM as a substitute for flags.
+
+TEXT
+
+Do not truncate development titles with "...".
+
+Shorten the title deliberately before rendering.
+
+Maximum:
+4–6 words per event title.
+
+Examples:
+
+GOOD:
+Manila protest mobilisation
+Mandalay airport disruption
+India fuel duty change
+
+BAD:
+Australia's migration overhaul: Crackdown...
+
+MAP CROP
+
+Fit bounds only to the selected APAC developments, but enforce sensible APAC regional limits.
+
+Do not allow the map engine to zoom out to include irrelevant empty geography.
+
+VISUAL TARGET
+
+The finished graphic should look like a polished intelligence briefing:
+
+Map gives geographic context.
+
+Right panel tells the reader exactly what happened.
+
+Numbers connect the two.
+
+Severity is immediately visible.
+
+The reader should understand the graphic in 5 seconds.
+
+Do not add anything else.
+
+Generate the APAC report map again and STOP.
