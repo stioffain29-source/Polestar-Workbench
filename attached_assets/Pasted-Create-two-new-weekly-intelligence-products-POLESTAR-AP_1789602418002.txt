@@ -1,0 +1,244 @@
+Create two new weekly intelligence products:
+
+POLESTAR APAC WEEKLY
+Security, Risk & Operational Intelligence
+
+POLESTAR MIDDLE EAST WEEKLY
+Security, Risk & Operational Intelligence
+
+PURPOSE
+
+These are regional intelligence products, not general news summaries.
+
+The reports must identify what materially changed during the reporting period, explain why it matters operationally, and identify what should be watched during the following seven days.
+
+Do not fill the report with every event collected by the system. Only include developments that are materially relevant to:
+
+* Personnel safety and security
+* Business travel
+* Site and asset security
+* Supply-chain continuity
+* Ports, airports and transport
+* Energy and fuel
+* Business continuity
+* Regulatory or political disruption
+* Armed conflict
+* Civil unrest
+* Significant crime or organised crime
+* Corporate operational exposure
+
+The final published report should be curated. Most scraped incidents should not appear unless they materially change the regional risk picture.
+
+REPORT STRUCTURE
+
+1. BLUF — REGIONAL OUTLOOK
+
+150–200 words.
+
+Summarise:
+
+* What materially changed this week
+* Whether the regional operating environment is improving, stable or deteriorating
+* The 3–4 most important issues affecting businesses, travellers or operations
+* Any major change from the previous reporting period
+
+Do not simply repeat headlines.
+
+2. KEY DEVELOPMENTS
+
+Maximum 6–8 developments.
+
+Each development must use:
+
+COUNTRY | SHORT EVENT TITLE
+
+Severity: Insignificant / Low / Moderate / High / Extreme
+
+What happened:
+100–150 words describing the confirmed development in concise prose.
+
+Why it matters:
+50–80 words explaining the implications for personnel, operations, travel, logistics, assets, business continuity or corporate exposure.
+
+Outlook:
+A short assessment of what should be watched over the next seven days.
+
+Only include significant developments. Avoid minor incidents unless they indicate a wider trend.
+
+3. REGIONAL SECURITY PICTURE
+
+Provide a concise assessment of meaningful changes involving:
+
+* Armed conflict
+* Terrorism
+* Civil unrest and activism
+* Political instability
+* Significant crime or organised crime
+* Interstate tensions
+
+Do not provide a generic country-by-country threat summary.
+
+Focus on what changed during this reporting period.
+
+4. BUSINESS & OPERATIONAL RISK
+
+Identify developments affecting:
+
+* Airports and airspace
+* Ports and maritime operations
+* Road transport
+* Border crossings
+* Fuel and energy
+* Electricity and utilities
+* Telecommunications
+* Supply chains
+* Cargo security
+* Regulatory developments
+* Business continuity
+
+Only include issues with credible operational implications.
+
+5. TRAVEL & PERSONNEL
+
+Summarise new or changed considerations affecting:
+
+* Business travel
+* Personnel movement
+* Airport access
+* Ground transport
+* Demonstrations
+* Security restrictions
+* Curfews
+* Border controls
+* Significant localised security deterioration
+
+Do not repeat standing travel advice unless circumstances have changed.
+
+6. 7-DAY WATCHLIST
+
+Maximum 5–8 entries.
+
+Use the following fields:
+
+Location
+Issue
+Current Severity
+What We Are Watching
+
+The watchlist should identify credible developments or triggers that could materially affect operations during the following seven days.
+
+Examples include:
+
+* Scheduled protests
+* Elections
+* Court rulings
+* Military anniversaries
+* Political deadlines
+* Planned strikes
+* Major religious or public events
+* Conflict escalation indicators
+* Infrastructure disruption
+* Weather events with operational consequences
+
+7. POLESTAR OUTLOOK
+
+Approximately 150–200 words.
+
+Provide forward-looking analysis covering:
+
+* What is most likely to matter during the next seven days
+* Where conditions may deteriorate
+* Which indicators could change the current assessment
+* Potential operational consequences
+
+This section must add analysis rather than repeat earlier sections.
+
+APAC WEEKLY COVERAGE
+
+Primary coverage:
+
+* Southeast Asia
+* Northeast Asia
+* South Asia
+* Papua New Guinea
+* Papua
+* Pacific Islands
+* Australia
+* New Zealand
+
+Persistent monitoring areas should include, where relevant:
+
+* Papua and Papua New Guinea
+* Indonesia
+* Philippines, including BARMM
+* Thailand Deep South
+* Bangladesh
+* Korean Peninsula
+* Taiwan Strait
+* South China Sea
+* Regional protest and activist activity
+* Major logistics and supply-chain disruption
+
+MIDDLE EAST WEEKLY COVERAGE
+
+Primary coverage:
+
+* Gulf states
+* Iran
+* Iraq
+* Israel
+* Lebanon
+* Syria
+* Jordan
+* Yemen
+* Red Sea-facing states where developments affect Middle East operations
+
+Persistent monitoring areas should include, where relevant:
+
+* Iran–Gulf tensions
+* Iraq
+* Israel–Lebanon–Syria security dynamics
+* Yemen and Red Sea conflict
+* Regional airspace disruption
+* Gulf energy infrastructure
+* Oil and fuel disruption
+* Major protests
+* Political instability
+* Cross-border military activity
+* Maritime or logistics disruption where it directly affects regional business operations
+
+EDITORIAL RULES
+
+* BLUF first
+* Plain English
+* Incident details written in prose
+* No excessive bullet dumping
+* No generic news aggregation
+* No filler
+* No duplication between sections
+* Prioritise operational relevance
+* Separate confirmed facts from assessment
+* Do not exaggerate severity
+* Severity reflects the current incident or situation, not the highest theoretical risk
+* Use only: Insignificant / Low / Moderate / High / Extreme
+* Prefer developments from the reporting period
+* Older events should only appear when there has been a material new development
+* Distinguish isolated incidents from wider trends
+* Focus on what changed
+* Explain why developments matter to businesses
+* Avoid speculative conclusions unsupported by evidence
+* Recommendations are not required unless a specific development clearly warrants them
+
+CORE PRODUCT PRINCIPLE
+
+News tells the reader what happened.
+
+Polestar should tell the reader:
+
+What changed.
+
+Why it matters.
+
+What it means operationally.
+
+What to watch next.

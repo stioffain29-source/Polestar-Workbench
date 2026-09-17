@@ -9,6 +9,12 @@ import { format, parseISO } from "date-fns";
 import { TOPIC_LABELS, severityBadgeStyle } from "@/lib/topics";
 import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
+import {
+  buildRegionalDevelopments,
+  buildRegionalWatchlist,
+  isRegionalWeeklyTopic,
+  type RegionalDevelopment,
+} from "@/lib/regionalWeekly";
 import { pickRead } from "@/lib/pickRead";
 import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
@@ -186,6 +192,72 @@ function NarrativeSection({ title, text, hidden }: { title: string; text?: strin
     <Section title={title}>
       <Paragraphs text={trimmed} />
     </Section>
+  );
+}
+
+function RegionalDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
+  return (
+    <div className="space-y-4">
+      {developments.map((development, index) => (
+        <article
+          key={`${development.country}-${development.title}-${index}`}
+          className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-4"
+        >
+          <h3
+            className="uppercase tracking-wide text-[13px] font-bold mb-2"
+            style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
+          >
+            {development.country} | {development.title}
+          </h3>
+          <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+            <p><strong>Severity:</strong> {development.severity}</p>
+            <p><strong>What happened:</strong> {development.whatHappened}</p>
+            <p><strong>Why it matters:</strong> {development.whyItMatters}</p>
+            <p><strong>Outlook:</strong> {development.outlook}</p>
+          </div>
+        </article>
+      ))}
+      {developments.length === 0 && (
+        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+          No qualifying developments were identified in the reporting period.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function RegionalWatchlist({
+  items,
+}: {
+  items: ReturnType<typeof buildRegionalWatchlist>;
+}) {
+  return (
+    <div className="border border-[#e2e2e2] bg-white overflow-hidden">
+      <div className="grid grid-cols-[1fr_1.4fr_.8fr_2fr] bg-[#0b0a3d] text-white text-[10px] uppercase tracking-wide font-bold">
+        <div className="p-3">Location</div>
+        <div className="p-3">Issue</div>
+        <div className="p-3">Current Severity</div>
+        <div className="p-3">What We Are Watching</div>
+      </div>
+      {items.length === 0 ? (
+        <p className="p-4 text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
+          No qualifying watch items were identified in the reporting period.
+        </p>
+      ) : (
+        items.map((item, index) => (
+          <div
+            key={`${item.location}-${item.issue}-${index}`}
+            className="grid grid-cols-[1fr_1.4fr_.8fr_2fr] border-t border-[#e2e2e2] text-[12px] leading-[1.45]"
+            style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}
+          >
+            <div className="p-3 font-bold">{item.location}</div>
+            <div className="p-3">{item.issue}</div>
+            <div className="p-3">{item.currentSeverity}</div>
+            <div className="p-3">{item.whatWeAreWatching}</div>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
 
@@ -920,6 +992,9 @@ export default function ReportPreview({
     ? resolveReportTitle(report.topic, report.title)
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
+  const isRegionalWeekly = isRegionalWeeklyTopic(report.topic ?? "");
+  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(incidents) : [];
+  const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest
   // market close the report carries, NOT the stored issue date. Deriving the
@@ -930,7 +1005,7 @@ export default function ReportPreview({
     isFuel && report.issueDate
       ? (fuelMarketLatestDate(report.hardNumbers) ?? report.issueDate)
       : report.issueDate;
-  const fastFacts = isFuel ? [] : computePreviewFastFacts(report, incidents);
+  const fastFacts = isFuel || isRegionalWeekly ? [] : computePreviewFastFacts(report, incidents);
   // Cargo Watch report extras — computed once from the in-scope window so the
   // Fast Facts, the trend chart and the narrative all read the SAME records.
   const isCargo = report.topic === "cargo_watch";
@@ -1007,7 +1082,7 @@ export default function ReportPreview({
   // windowIncidents exactly (filterTopicReportIncidents == the PDF filter).
   // Fuel has its own canonical-family preview branch assembled below.
   const relatedRows =
-    !isFuel && report.topic && report.issueDate
+    !isFuel && !isRegionalWeekly && report.topic && report.issueDate
       ? selectRelatedIncidents(
           isCargo
             ? cargoWindow
@@ -1060,9 +1135,11 @@ export default function ReportPreview({
     topic: report.topic ?? "",
     issueDate: report.issueDate ?? new Date().toISOString().slice(0, 10),
     incidents: toDraftableIncidents(
-      report.topic && report.issueDate
-        ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
-        : incidents,
+      isRegionalWeekly
+        ? incidents
+        : report.topic && report.issueDate
+          ? filterTopicReportIncidents(incidents, report.topic, report.issueDate)
+          : incidents,
     ),
     // Fuel: the canonical-subset Gulf & Hormuz Chokepoint Watch from the same
     // payload rendered below. It cannot introduce records outside Fuel Watch's
@@ -1245,7 +1322,10 @@ export default function ReportPreview({
 
       <div className="px-10 py-10">
         {execText.trim() && (
-          <Section hidden={!show("executive-summary")} title="Executive Summary">
+          <Section
+            hidden={!show("executive-summary")}
+            title={isRegionalWeekly ? "BLUF — Regional Outlook" : "Executive Summary"}
+          >
             <Paragraphs text={execText} />
           </Section>
         )}
@@ -1335,9 +1415,11 @@ export default function ReportPreview({
           </>
         ) : (
           <>
-            <Section hidden={!show("fast-facts")} title="Fast Facts">
-              <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} />
-            </Section>
+            {!isRegionalWeekly && (
+              <Section hidden={!show("fast-facts")} title="Fast Facts">
+                <FastFactsGrid cards={applyFastFactOverrides(fastFacts, ffOverrides)} />
+              </Section>
+            )}
 
             {(report.topic === "energy" || report.topic === "fertiliser") && (
               <Section hidden={!show("market-prices")} title="Market Prices">
@@ -1400,38 +1482,68 @@ export default function ReportPreview({
                     </>
                   )}
                   <NarrativeSection
-                    hidden={!show("situation")} title="Situation"
+                    hidden={!show("situation")} title={isRegionalWeekly ? "Regional Security Picture" : "Situation"}
                     text={isCargo
                       ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
                       : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
                   />
+                  {isRegionalWeekly ? (
+                    <Section hidden={!show("what-happened")} title="Key Developments">
+                      {resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened).trim() && (
+                        <div className="mb-5">
+                          <Paragraphs
+                            text={resolveSimpleProse(
+                              report.whatHappened,
+                              aiProse?.whatHappened,
+                              proseDraft.whatHappened,
+                            )}
+                          />
+                        </div>
+                      )}
+                      <RegionalDevelopmentCards developments={regionalDevelopments} />
+                    </Section>
+                  ) : (
+                    <NarrativeSection
+                      hidden={!show("what-happened")} title="What Happened"
+                      text={isCargo
+                        ? pickRead(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
+                        : resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)}
+                    />
+                  )}
                   <NarrativeSection
-                    hidden={!show("what-happened")} title="What Happened"
-                    text={isCargo
-                      ? pickRead(report.whatHappened, aiOr(aiProse?.whatHappened, buildCargoWhatHappened(cargoWindow)))
-                      : resolveSimpleProse(report.whatHappened, aiProse?.whatHappened, proseDraft.whatHappened)}
-                  />
-                  <NarrativeSection
-                    hidden={!show("what-matters")} title="What Matters"
+                    hidden={!show("what-matters")} title={isRegionalWeekly ? "Business & Operational Risk" : "What Matters"}
                     text={isCargo
                       ? pickRead(report.whatMatters, aiOr(aiProse?.whatMatters, buildCargoWhatMatters(cargoWindow)))
                       : resolveSimpleProse(report.whatMatters, aiProse?.whatMatters, proseDraft.whatMatters)}
                   />
                   <BulletsSection
-                    hidden={!show("implications")} title="Implications for Business"
+                    hidden={!show("implications")} title={isRegionalWeekly ? "Travel & Personnel" : "Implications for Business"}
                     text={isCargo
                       ? pickRead(report.implications, aiOr(aiProse?.implications, buildCargoImplications(cargoWindow)))
                       : resolveSimpleProse(report.implications, aiProse?.implications, proseDraft.implications)}
                   />
-                  <BulletsSection
-                    hidden={!show("watch-next")} title="Watch Next"
-                    text={isCargo
-                      ? pickRead(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
-                      : resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
-                    max={8}
-                  />
+                  {isRegionalWeekly ? (
+                    <Section hidden={!show("watch-next")} title="7-Day Watchlist">
+                      {resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext).trim() && (
+                        <div className="mb-5">
+                          <Paragraphs
+                            text={resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
+                          />
+                        </div>
+                      )}
+                      <RegionalWatchlist items={regionalWatchlist} />
+                    </Section>
+                  ) : (
+                    <BulletsSection
+                      hidden={!show("watch-next")} title="Watch Next"
+                      text={isCargo
+                        ? pickRead(report.watchNext, aiOr(aiProse?.watchNext, buildCargoWatchNext(cargoWindow)))
+                        : resolveSimpleProse(report.watchNext, aiProse?.watchNext, proseDraft.watchNext)}
+                      max={8}
+                    />
+                  )}
                   <NarrativeSection
-                    hidden={!show("polestar-view")} title="Polestar View"
+                    hidden={!show("polestar-view")} title={isRegionalWeekly ? "Polestar Outlook" : "Polestar View"}
                     text={isCargo
                       ? pickRead(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
                       : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
@@ -1439,7 +1551,7 @@ export default function ReportPreview({
                   {isCargo && cargoGrouped && (
                     <CargoClustersSection grouped={cargoGrouped} />
                   )}
-                  {relatedRows.length > 0 && (
+                  {!isRegionalWeekly && relatedRows.length > 0 && (
                     <Section hidden={!show("related-incidents")} title="Related Incidents">
                       <RelatedIncidentsTable rows={relatedRows} summaries={incidentSummaries} />
                     </Section>

@@ -2121,6 +2121,8 @@ components:
         - cargo_watch
         - conflict
         - data_centres
+        - apac_weekly
+        - middle_east_weekly
         - apac_local
         - crime
 
@@ -4323,6 +4325,29 @@ components:
         model: { type: string }
         generatedAt: { type: string, format: date-time }
 
+    FuelAnalyticalProvenance:
+      type: object
+      required: [supportingIncidentIds, supportingEvidenceFamilyIds]
+      properties:
+        supportingIncidentIds:
+          type: array
+          items: { type: string }
+        supportingEvidenceFamilyIds:
+          type: array
+          items: { type: string }
+        supportingClaim: { type: string }
+        verifiedText: { type: string }
+
+    FuelSectionsProvenance:
+      type: object
+      properties:
+        whatHappened:
+          type: array
+          items: { $ref: "#/components/schemas/FuelAnalyticalProvenance" }
+        watchNext:
+          type: array
+          items: { $ref: "#/components/schemas/FuelAnalyticalProvenance" }
+
     TopicProseSections:
       type: object
       required:
@@ -4335,6 +4360,8 @@ components:
         implications: { type: string }
         watchNext: { type: string }
         polestarView: { type: string }
+        provenance:
+          $ref: "#/components/schemas/FuelSectionsProvenance"
 
     GenerateReportProseInput:
       type: object

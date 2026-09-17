@@ -65,6 +65,11 @@ import {
   toDraftableIncidents,
 } from "@/lib/topicProseResolution";
 import { resolveReportTitle } from "@/lib/reportNaming";
+import {
+  curateRegionalWeeklyIncidents,
+  isRegionalWeeklyTopic,
+  regionalCountryQuery,
+} from "@/lib/regionalWeekly";
 import { selectRelatedIncidents } from "@/lib/relatedIncidents";
 import { computeTopicFastFacts, filterTopicReportIncidents } from "@/lib/topicFastFacts";
 import {
@@ -580,17 +585,23 @@ export default function ReportEditor() {
   // (producer/operational actions); a flashpoint/protests report draws from
   // BOTH the live flashpoint bucket and the legacy protests bucket. Every other
   // topic reads only its own relevance-gated rows.
-  const primaryTopic = activeTopic === "protests" ? "flashpoint" : activeTopic;
+  const regionalTopic =
+    activeTopic && isRegionalWeeklyTopic(activeTopic) ? activeTopic : null;
+  const primaryTopic = regionalTopic
+    ? undefined
+    : activeTopic === "protests" ? "flashpoint" : activeTopic;
   const secondaryTopic =
     activeTopic === "fuel"
       ? "shipping"
       : activeTopic === "flashpoint" || activeTopic === "protests"
         ? "protests"
         : undefined;
-  const primaryParams = { topic: primaryTopic };
+  const primaryParams = regionalTopic
+    ? { countryLike: regionalCountryQuery(regionalTopic), days: 30 }
+    : { topic: primaryTopic };
   const { data: primaryIncidents } = useListIncidents(primaryParams as never, {
     query: {
-      enabled: !!primaryTopic,
+      enabled: !!activeTopic,
       queryKey: getListIncidentsQueryKey(primaryParams as never),
       refetchInterval:
         primaryTopic === "shipping" ? REPORT_INCIDENTS_REFETCH_MS : false,
@@ -622,7 +633,7 @@ export default function ReportEditor() {
   // never fires against a partial window (e.g. fuel without its shipping
   // cross-read) — which would freeze incomplete prose into the draft.
   const rawIncidents = useMemo(() => {
-    if (!primaryTopic || !primaryIncidents) return undefined;
+    if (!activeTopic || !primaryIncidents) return undefined;
     if (secondaryTopic && !secondaryIncidents) return undefined;
     if (tertiaryTopic && !tertiaryIncidents) return undefined;
     if (!secondaryTopic && !tertiaryTopic) return primaryIncidents;
@@ -631,7 +642,7 @@ export default function ReportEditor() {
       ...(secondaryTopic ? secondaryIncidents ?? [] : []),
       ...(tertiaryTopic ? tertiaryIncidents ?? [] : []),
     ];
-  }, [primaryTopic, secondaryTopic, tertiaryTopic, primaryIncidents, secondaryIncidents, tertiaryIncidents]);
+  }, [activeTopic, secondaryTopic, tertiaryTopic, primaryIncidents, secondaryIncidents, tertiaryIncidents]);
 
   // Market Prices rows render on energy/fertiliser reports and provide the
   // real-data recovery path for fuel drafts missing report-specific prices.
@@ -652,7 +663,17 @@ export default function ReportEditor() {
     },
   });
 
-  const incidents = rawIncidents;
+  const incidents = useMemo(
+    () =>
+      rawIncidents && activeTopic && isRegionalWeeklyTopic(activeTopic)
+        ? curateRegionalWeeklyIncidents(
+            rawIncidents,
+            activeTopic,
+            form.issueDate || report?.issueDate || new Date().toISOString().slice(0, 10),
+          )
+        : rawIncidents,
+    [rawIncidents, activeTopic, form.issueDate, report?.issueDate],
+  );
   const incidentWindowReady = rawIncidents !== undefined;
   // Shipping rows are deliberately admitted to the API before semantic
   // validation completes so an analyst can see what is being held. Keep that
@@ -3367,7 +3388,11 @@ export default function ReportEditor() {
               field, but presents it as BLUF too. */}
           {form.topic !== "conflict" && (
             <Field
-              label={form.topic === "shipping" ? "BLUF" : "Executive Summary"}
+              label={
+                isRegionalWeeklyTopic(form.topic)
+                  ? "BLUF — Regional Outlook"
+                  : form.topic === "shipping" ? "BLUF" : "Executive Summary"
+              }
             >
               <Textarea
                 rows={4}
@@ -3724,7 +3749,13 @@ export default function ReportEditor() {
             </>
           )}
           {form.topic !== "flashpoint" && form.topic !== "protests" && (
-            <Field label={form.topic === "conflict" ? "BLUF" : "Situation"}>
+            <Field
+              label={
+                isRegionalWeeklyTopic(form.topic)
+                  ? "Regional Security Picture"
+                  : form.topic === "conflict" ? "BLUF" : "Situation"
+              }
+            >
               <Textarea
                 rows={4}
                 value={form.situation}
@@ -3736,7 +3767,7 @@ export default function ReportEditor() {
           {form.topic !== "conflict" &&
             form.topic !== "flashpoint" &&
             form.topic !== "protests" && (
-              <Field label="What Happened">
+              <Field label={isRegionalWeeklyTopic(form.topic) ? "Key Developments" : "What Happened"}>
                 <Textarea
                   rows={5}
                   value={form.whatHappened}
@@ -3745,7 +3776,7 @@ export default function ReportEditor() {
                 />
               </Field>
             )}
-          <Field label="What Matters">
+          <Field label={isRegionalWeeklyTopic(form.topic) ? "Business & Operational Risk" : "What Matters"}>
             <Textarea
               rows={4}
               value={form.whatMatters}
@@ -3756,7 +3787,9 @@ export default function ReportEditor() {
           {form.topic !== "conflict" && (
             <Field
               label={
-                form.topic === "cargo_watch"
+                 isRegionalWeeklyTopic(form.topic)
+                   ? "Travel & Personnel"
+                   : form.topic === "cargo_watch"
                   ? "Implications"
                   : "Implications for Business"
               }
@@ -3769,7 +3802,7 @@ export default function ReportEditor() {
               />
             </Field>
           )}
-          <Field label="Watch Next">
+          <Field label={isRegionalWeeklyTopic(form.topic) ? "7-Day Watchlist" : "Watch Next"}>
             <Textarea
               rows={3}
               value={form.watchNext}
@@ -3777,7 +3810,7 @@ export default function ReportEditor() {
               className="rounded-[2px] border-[#e2e2e2] shadow-none focus-visible:ring-[#465bff] text-[#363636]"
             />
           </Field>
-          <Field label="Polestar View">
+          <Field label={isRegionalWeeklyTopic(form.topic) ? "Polestar Outlook" : "Polestar View"}>
             <Textarea
               rows={3}
               value={form.polestarView}
@@ -3786,7 +3819,9 @@ export default function ReportEditor() {
             />
           </Field>
 
-          {summariesEnabled && relatedForSummaries.length > 0 && (
+          {summariesEnabled &&
+            !isRegionalWeeklyTopic(form.topic) &&
+            relatedForSummaries.length > 0 && (
             <div className="border-t border-[#e2e2e2] pt-4 mt-2 space-y-3">
               <div className="flex items-end justify-between gap-2">
                 <div>

@@ -86,6 +86,8 @@ import {
   type TopicAiProse,
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
+import { isRegionalWeeklyTopic } from "./regionalWeekly";
+import { buildRegionalDevelopments, buildRegionalWatchlist } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -652,6 +654,54 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
+function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]) {
+  const developments = buildRegionalDevelopments(incidents);
+  const { pdf, MX, CW } = ctx;
+  if (developments.length === 0) {
+    renderProse(ctx, "No qualifying developments were identified in the reporting period.");
+    return;
+  }
+  for (const development of developments) {
+    ensureSpace(ctx, 28);
+    setRoboto(pdf, "bold");
+    setText(pdf, NAVY);
+    pdf.setFontSize(10);
+    const titleLines = pdf.splitTextToSize(
+      `${development.country} | ${development.title}`,
+      CW,
+    );
+    for (const line of titleLines) {
+      pdf.text(line, MX, ctx.y + 10);
+      ctx.y += 13;
+    }
+    ctx.y += 3;
+    renderProse(
+      ctx,
+      `Severity: ${development.severity}\nWhat happened: ${development.whatHappened}\nWhy it matters: ${development.whyItMatters}\nOutlook: ${development.outlook}`,
+    );
+  }
+}
+
+function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[]) {
+  const items = buildRegionalWatchlist(buildRegionalDevelopments(incidents));
+  if (items.length === 0) {
+    renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
+    return;
+  }
+  for (const item of items) {
+    ensureSpace(ctx, 24);
+    setRoboto(ctx.pdf, "bold");
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.setFontSize(9);
+    ctx.pdf.text(`${item.location} | ${item.issue}`, ctx.MX, ctx.y + 10);
+    ctx.y += 14;
+    renderProse(
+      ctx,
+      `Location: ${item.location}\nIssue: ${item.issue}\nCurrent Severity: ${item.currentSeverity}\nWhat We Are Watching: ${item.whatWeAreWatching}`,
+    );
+  }
+}
+
 // Compose the "Country — location" line for a curated card / annex row. Blank
 // segments are dropped (no fabricated "not reported"); when both are absent the
 // caller decides what to show.
@@ -1019,6 +1069,7 @@ export async function exportTopicReportPdf(
   // gradient hero. The image load is wrapped in try/catch so a missing or
   // unreadable asset never blocks PDF export.
   const isFuel = data.topic === "fuel";
+  const isRegionalWeekly = isRegionalWeeklyTopic(data.topic);
   const fuelIssueDate = isFuel
     ? (fuelMarketLatestDate(data.hardNumbers) ?? data.issueDate)
     : data.issueDate;
@@ -1086,7 +1137,9 @@ export async function exportTopicReportPdf(
     topic: data.topic,
     issueDate: data.issueDate,
     incidents: toDraftableIncidents(
-      filterTopicReportIncidents(incidents, data.topic, data.issueDate),
+      isRegionalWeekly
+        ? incidents
+        : filterTopicReportIncidents(incidents, data.topic, data.issueDate),
     ),
     fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
@@ -1191,7 +1244,7 @@ export async function exportTopicReportPdf(
     show("executive-summary") &&
     execText.trim()
   ) {
-    drawSectionHeading(ctx, "Executive Summary");
+    drawSectionHeading(ctx, isRegionalWeekly ? "BLUF — Regional Outlook" : "Executive Summary");
     renderProse(ctx, execText);
     if (isCargo && cargoModel?.highSeverityNote.trim()) {
       renderProse(ctx, cargoModel.highSeverityNote);
@@ -1537,7 +1590,7 @@ export async function exportTopicReportPdf(
   } else {
     // isCargo + cargoModel are hoisted above the Executive Summary so it can
     // read the model's deterministic executive summary.
-    if (show("fast-facts")) {
+    if (!isRegionalWeekly && show("fast-facts")) {
       drawSectionHeading(ctx, "Fast Facts");
       drawFastFactsKpiCards(
         ctx,
@@ -1722,21 +1775,23 @@ export async function exportTopicReportPdf(
       const proseSections: [string, string, string][] = [
         [
           "situation",
-          "Situation",
+          isRegionalWeekly ? "Regional Security Picture" : "Situation",
           resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
         ],
-        [
-          "what-happened",
-          "What Happened",
-          resolveSimpleProse(
-            data.whatHappened,
-            aiProse?.whatHappened,
-            proseDraft.whatHappened,
-          ),
-        ],
+        ...(!isRegionalWeekly
+          ? [[
+              "what-happened",
+              "What Happened",
+              resolveSimpleProse(
+                data.whatHappened,
+                aiProse?.whatHappened,
+                proseDraft.whatHappened,
+              ),
+            ] as [string, string, string]]
+          : []),
         [
           "what-matters",
-          "What Matters",
+          isRegionalWeekly ? "Business & Operational Risk" : "What Matters",
           resolveSimpleProse(
             data.whatMatters,
             aiProse?.whatMatters,
@@ -1747,6 +1802,16 @@ export async function exportTopicReportPdf(
       for (const [key, label, body] of proseSections) {
         if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
+      if (isRegionalWeekly && show("what-happened")) {
+        const intro = resolveSimpleProse(
+          data.whatHappened,
+          aiProse?.whatHappened,
+          proseDraft.whatHappened,
+        );
+        drawSectionHeading(ctx, "Key Developments");
+        if (intro.trim()) renderProse(ctx, intro);
+        drawRegionalDevelopmentCards(ctx, incidents);
+      }
       if (show("implications")) {
         const implBody = resolveSimpleProse(
           data.implications,
@@ -1754,7 +1819,7 @@ export async function exportTopicReportPdf(
           proseDraft.implications,
         );
         if (implBody.trim()) {
-          drawBulletSection(ctx, "Implications for Business", implBody);
+          drawBulletSection(ctx, isRegionalWeekly ? "Travel & Personnel" : "Implications for Business", implBody);
         }
       }
       if (show("watch-next")) {
@@ -1763,8 +1828,12 @@ export async function exportTopicReportPdf(
           aiProse?.watchNext,
           proseDraft.watchNext,
         );
-        if (wnBody.trim()) {
-          drawBulletSection(ctx, "Watch Next", wnBody, 8);
+        if (isRegionalWeekly) {
+          drawSectionHeading(ctx, "7-Day Watchlist");
+          if (wnBody.trim()) renderProse(ctx, wnBody);
+          drawRegionalWatchlist(ctx, incidents);
+        } else if (wnBody.trim()) {
+          drawBulletSection(ctx, isRegionalWeekly ? "7-Day Watchlist" : "Watch Next", wnBody, 8);
         }
       }
       if (show("polestar-view")) {
@@ -1774,7 +1843,7 @@ export async function exportTopicReportPdf(
           proseDraft.polestarView,
         );
         if (psBody.trim()) {
-          drawSectionWithProse(ctx, "Polestar View", psBody);
+          drawSectionWithProse(ctx, isRegionalWeekly ? "Polestar Outlook" : "Polestar View", psBody);
         }
       }
     }
@@ -1790,6 +1859,7 @@ export async function exportTopicReportPdf(
   if (
     data.topic !== "fuel" &&
     data.topic !== "cargo_watch" &&
+    !isRegionalWeekly &&
     show("related-incidents")
   ) {
     drawRelatedIncidents(

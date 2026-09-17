@@ -8,6 +8,8 @@ export const TOPIC_LABELS: Record<string, string> = {
   cargo_watch: "Cargo Watch",
   conflict: "Conflict",
   data_centres: "Data Centres",
+  apac_weekly: "Polestar APAC Weekly",
+  middle_east_weekly: "Polestar Middle East Weekly",
   maritime_security: "Maritime Security",
   crime: "Crime Watch",
 };

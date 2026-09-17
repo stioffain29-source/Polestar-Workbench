@@ -68,6 +68,8 @@ export const CALENDAR_TOPICS = [
   "flashpoint",
   "energy",
   "fertiliser",
+  "apac_weekly",
+  "middle_east_weekly",
 ] as const;
 
 export function canonicalTopicKey(topic: string): string {
