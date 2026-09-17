@@ -24,6 +24,7 @@ import {
   buildApacWeeklyWatchlist,
   buildRegionalGlanceItems,
   buildRegionalMapPoints,
+  buildApacMapItems,
   buildApacBusinessImplications,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
@@ -98,6 +99,7 @@ import {
 } from "@/lib/cargoGroupedDataset";
 import IncidentMap from "@/components/IncidentMap";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
+import { SPOT_SEV_COLOR } from "@/lib/spotReport";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
@@ -407,6 +409,59 @@ function RegionalWatchlist({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ApacHotspotMap({
+  items,
+}: {
+  items: ReturnType<typeof import("@/lib/regionalWeekly").buildApacMapItems>;
+}) {
+  if (items.length === 0) {
+    return (
+      <p className="text-[12px] text-muted-foreground italic" style={{ fontFamily: "Roboto, sans-serif" }}>
+        No selected development has a verified plottable location.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col md:flex-row gap-6">
+      <div className="flex-1 border border-[#d2d6e1] bg-[#f7f8fb] overflow-hidden" style={{ minWidth: 320 }}>
+        <IncidentMap
+          points={items.map(item => ({
+            lat: item.lat,
+            lng: item.lng,
+            title: item.country,
+            severity: item.developments[0]?.severity ?? "Moderate",
+            primary: false,
+            markerNumber: item.id
+          }))}
+          height={320}
+          showLabels={false}
+        />
+      </div>
+      <div className="w-full md:w-64 flex flex-col justify-center space-y-3">
+        {items.map(item => (
+          <div key={item.id} className="text-[12px] leading-[1.4]" style={{ fontFamily: "Roboto, sans-serif" }}>
+            <div className="font-bold flex items-center gap-1.5 mb-1" style={{ color: NAVY }}>
+              <span className="flex items-center justify-center bg-[#0b0a3d] text-white rounded-full w-[18px] h-[18px] text-[10px] font-bold">
+                {item.id}
+              </span>
+              <span>{item.flag} {item.country}</span>
+            </div>
+            {item.developments.map((dev, i) => (
+              <div key={i} className="pl-6 mb-1 last:mb-0 flex items-start gap-1.5">
+                <span 
+                  className="inline-block w-2 h-2 rounded-full mt-1 shrink-0" 
+                  style={{ background: SPOT_SEV_COLOR[dev.severity?.toLowerCase() ?? ""] ?? "#999" }} 
+                />
+                <span style={{ color: DUSK }}>{dev.label}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1204,6 +1259,7 @@ export default function ReportPreview({
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
+  const apacMapItems = report.topic === "apac_weekly" ? buildApacMapItems(regionalCuratedIncidents) : [];
   const apacGlanceMetrics = report.topic === "apac_weekly" ? [
     { label: "Material Developments", value: regionalDevelopments.length.toString() },
     { label: "Markets Affected", value: new Set(regionalDevelopments.map(d => d.country)).size.toString() },
@@ -1552,7 +1608,7 @@ export default function ReportPreview({
             </Section>
 
             <div style={{ marginTop: 24, marginBottom: 32 }}>
-              <RegionalHotspotMap points={regionalMapPoints} />
+              <ApacHotspotMap items={apacMapItems} />
             </div>
 
             <Section hidden={!show("fast-facts")} title="Week at a Glance">

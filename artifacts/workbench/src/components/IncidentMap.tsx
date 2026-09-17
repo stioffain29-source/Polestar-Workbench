@@ -19,6 +19,8 @@ export interface IncidentMapPoint {
   primary?: boolean;
   /** Optional caption drawn as text beside this marker on the map. */
   label?: string | null;
+  /** Render a specific number/text inside the marker dot. */
+  markerNumber?: number | string;
 }
 
 export interface IncidentMapProps {
@@ -201,7 +203,7 @@ export default function IncidentMap({
     for (const p of plottable) {
       const sk = (p.severity ?? "").toLowerCase();
       const color = SPOT_SEV_COLOR[sk] ?? "#999999";
-      const size = p.primary ? 20 : 14;
+      let size = p.primary ? 20 : 14;
 
       const dot = document.createElement("div");
       dot.style.position = "absolute";
@@ -211,6 +213,20 @@ export default function IncidentMap({
       dot.style.background = color;
       dot.style.border = p.primary ? "3px solid #ffffff" : "2px solid #ffffff";
       dot.style.boxSizing = "border-box";
+
+      if (p.markerNumber !== undefined) {
+        size = 20; // Ensure it's large enough for text
+        dot.style.width = `${size}px`;
+        dot.style.height = `${size}px`;
+        dot.style.display = "flex";
+        dot.style.alignItems = "center";
+        dot.style.justifyContent = "center";
+        dot.style.color = "#ffffff";
+        dot.style.font = "700 11px/1 Roboto, sans-serif";
+        dot.style.textShadow = "0px 1px 2px rgba(0,0,0,0.5)";
+        dot.textContent = String(p.markerNumber);
+        dot.style.border = "2px solid #ffffff";
+      }
 
       const sevDisplay = SPOT_SEV_LABEL[sk] ?? p.severity ?? "";
       dot.title = [p.title ?? "", sevDisplay ? `Severity: ${sevDisplay}` : ""]

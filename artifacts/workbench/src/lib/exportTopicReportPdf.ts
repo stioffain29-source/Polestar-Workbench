@@ -89,7 +89,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
-import { buildApacBusinessImplications, buildApacWeeklyBluf, buildApacWeeklyDevelopments, buildApacWeeklyOutlook, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildApacBusinessImplications, buildApacMapItems, buildApacWeeklyBluf, buildApacWeeklyDevelopments, buildApacWeeklyOutlook, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -939,7 +939,7 @@ function drawApacCompactText(
 }
 
 function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void {
-  const points = buildRegionalMapPoints(incidents, "apac_weekly");
+  const items = buildApacMapItems(incidents);
   drawApacCompactHeading(ctx, "Regional Risk Map");
   const mapH = 112;
   const minLng = 85, maxLng = 180, minLat = -15, maxLat = 60;
@@ -986,31 +986,101 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
       }
     }
   }
-  const labels = new Set<string>();
-  const boxes: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-  for (const point of points) {
-    const [x, y] = project(point.lng, point.lat);
-    setFill(ctx.pdf, ELECTRIC);
-    ctx.pdf.circle(x, y, 2.8, "F");
-    const key = point.label.trim().toLowerCase();
-    if (labels.has(key)) continue;
-    labels.add(key);
+  for (const item of items) {
+    const [x, y] = project(item.lng, item.lat);
+    const severityColor = SEV_COLOR[sevKey(item.developments[0]?.severity)] ?? ELECTRIC;
+    setFill(ctx.pdf, severityColor);
+    ctx.pdf.circle(x, y, 4.2, "F");
     setRoboto(ctx.pdf, "bold");
-    setText(ctx.pdf, NAVY);
+    setText(ctx.pdf, WHITE);
     ctx.pdf.setFontSize(6.2);
-    const label = sanitize(point.label);
-    const width = ctx.pdf.getTextWidth(label);
-    const candidates = [[x + 4, y - 2], [x + 4, y - 11], [x - width - 4, y - 2], [x - width - 4, y + 8]];
-    const chosen = candidates.find(([left, top]) => {
-      const box = { left, top, right: left + width, bottom: top + 7 };
-      return !boxes.some((other) =>
-        box.left < other.right + 2 && box.right > other.left - 2 &&
-        box.top < other.bottom + 2 && box.bottom > other.top - 2);
-    }) ?? [Math.min(x + 4, ctx.MX + ctx.CW - width - 4), y - 2];
-    boxes.push({ left: chosen[0], top: chosen[1], right: chosen[0] + width, bottom: chosen[1] + 7 });
-    ctx.pdf.text(label, chosen[0], chosen[1] + 5);
+    ctx.pdf.text(String(item.id), x, y + 2, { align: "center" });
   }
-  ctx.y += mapH + 8;
+  ctx.y += mapH + 7;
+  drawApacCompactHeading(ctx, "Map Key");
+  const listGap = 7;
+  const listW = (ctx.CW - listGap) / 2;
+  for (let index = 0; index < items.length; index += 2) {
+    const row = items.slice(index, index + 2);
+    const rowHeight = Math.max(...row.map((item) =>
+      24 + item.developments.length * 8));
+    row.forEach((item, column) => {
+      const x = ctx.MX + column * (listW + listGap);
+      setText(ctx.pdf, NAVY);
+      setRoboto(ctx.pdf, "bold");
+      ctx.pdf.setFontSize(7);
+      drawApacFlag(ctx.pdf, x, ctx.y + 2, item.country);
+      ctx.pdf.text(`${item.id}. ${item.country}`, x + 15, ctx.y + 8);
+      setText(ctx.pdf, DUSK);
+      setRoboto(ctx.pdf, "regular");
+      ctx.pdf.setFontSize(6.5);
+      item.developments.forEach((development, developmentIndex) => {
+        const marker = developmentIndex === 0 ? "•" : "↳";
+        ctx.pdf.text(
+          `${marker} ${development.label} — ${development.severity}`,
+          x + 7,
+          ctx.y + 16 + developmentIndex * 8,
+        );
+      });
+    });
+    ctx.y += rowHeight + 4;
+  }
+}
+
+const APAC_FLAG_CODES: Record<string, string> = {
+  Australia: "AU", Bangladesh: "BD", Bhutan: "BT", Brunei: "BN",
+  Cambodia: "KH", China: "CN", Fiji: "FJ", "Hong Kong": "HK",
+  India: "IN", Indonesia: "ID", Japan: "JP", Kiribati: "KI",
+  Laos: "LA", Malaysia: "MY", Maldives: "MV", "Marshall Islands": "MH",
+  Micronesia: "FM", Mongolia: "MN", Myanmar: "MM", Nauru: "NR",
+  Nepal: "NP", "New Zealand": "NZ", "North Korea": "KP", Pakistan: "PK",
+  Palau: "PW", "Papua New Guinea": "PG", Philippines: "PH", Samoa: "WS",
+  Singapore: "SG", "Solomon Islands": "SB", "South Korea": "KR",
+  "Sri Lanka": "LK", Taiwan: "TW", Thailand: "TH", "Timor-Leste": "TL",
+  Tonga: "TO", Tuvalu: "TV", Vanuatu: "VU", Vietnam: "VN",
+};
+
+function drawApacFlag(pdf: Ctx["pdf"], x: number, y: number, country: string): void {
+  const code = APAC_FLAG_CODES[country] ?? "AP";
+  const w = 11;
+  const h = 7;
+  const bands: Record<string, string[]> = {
+    AU: ["#1b3f8f", "#1b3f8f", "#1b3f8f"], BD: ["#006a4e", "#006a4e", "#006a4e"],
+    BT: ["#f6a800", "#f6a800", "#e31b23"], BN: ["#f7d117", "#f7d117", "#ffffff"],
+    KH: ["#032ea1", "#e00025", "#032ea1"], CN: ["#de2910", "#de2910", "#de2910"],
+    FJ: ["#68b7e8", "#68b7e8", "#68b7e8"], HK: ["#de2910", "#de2910", "#de2910"],
+    IN: ["#ff9933", "#ffffff", "#138808"], ID: ["#e31d3b", "#ffffff", "#ffffff"],
+    JP: ["#ffffff", "#ffffff", "#ffffff"], KI: ["#ce1126", "#ce1126", "#003f87"],
+    LA: ["#ce1126", "#002868", "#ce1126"], MY: ["#cc0001", "#ffffff", "#cc0001"],
+    MV: ["#d21034", "#007e3a", "#007e3a"], MH: ["#003087", "#003087", "#003087"],
+    FM: ["#75bde9", "#75bde9", "#75bde9"], MN: ["#c4272f", "#015197", "#c4272f"],
+    MM: ["#fecb00", "#34b233", "#ea2839"], NR: ["#002b7f", "#002b7f", "#002b7f"],
+    NP: ["#dc143c", "#dc143c", "#003893"], NZ: ["#00247d", "#00247d", "#00247d"],
+    KP: ["#024fa2", "#ffffff", "#ed1c27"], PK: ["#01411c", "#ffffff", "#01411c"],
+    PW: ["#4aadd6", "#4aadd6", "#4aadd6"], PG: ["#ce1126", "#000000", "#ce1126"],
+    PH: ["#0038a8", "#ffffff", "#ce1126"], WS: ["#ce1126", "#ce1126", "#ce1126"],
+    SG: ["#ed2939", "#ed2939", "#ffffff"], SB: ["#0051ba", "#0051ba", "#1b5e20"],
+    KR: ["#ffffff", "#ffffff", "#ffffff"], LK: ["#ffb700", "#8d153a", "#00534e"],
+    TW: ["#fe0000", "#ffffff", "#fe0000"], TH: ["#a51931", "#ffffff", "#2d2a4a"],
+    TL: ["#dc241f", "#ffffff", "#000000"], TO: ["#c8102e", "#ffffff", "#c8102e"],
+    TV: ["#418fde", "#418fde", "#418fde"], VU: ["#d21034", "#000000", "#009543"],
+    VN: ["#da251d", "#da251d", "#da251d"],
+  };
+  const colors = bands[code] ?? ["#667085", "#ffffff", "#667085"];
+  colors.forEach((color, index) => {
+    setFill(pdf, color);
+    pdf.rect(x, y + index * (h / 3), w, h / 3 + 0.2, "F");
+  });
+  if (code === "JP") {
+    setFill(pdf, "#bc002d");
+    pdf.circle(x + w / 2, y + h / 2, 2, "F");
+  } else if (code === "CN" || code === "BD" || code === "IN") {
+    setFill(pdf, code === "BD" ? "#f42a41" : "#f4d03f");
+    pdf.circle(x + 3.3, y + 3.5, 1.5, "F");
+  }
+  setStroke(pdf, "#667085");
+  pdf.setLineWidth(0.25);
+  pdf.rect(x, y, w, h);
 }
 
 function drawApacPageTwo(

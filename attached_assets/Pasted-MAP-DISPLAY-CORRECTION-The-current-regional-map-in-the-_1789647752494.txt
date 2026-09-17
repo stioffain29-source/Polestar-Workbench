@@ -1,0 +1,277 @@
+MAP DISPLAY CORRECTION
+
+The current regional map in the weekly report is not fit for purpose.
+
+A map with coloured dots and country labels is not enough.
+
+The map must communicate actual intelligence at a glance.
+
+==================================================
+1. PURPOSE OF THE MAP
+==================================================
+
+The regional map is an INTELLIGENCE VISUAL.
+
+It must show:
+
+Where the important developments are
+Which countries are affected
+What the issue is
+How severe it is
+
+The reader must be able to understand the map in seconds.
+
+The map must not be a decorative image.
+
+==================================================
+2. DO NOT USE
+==================================================
+
+Do NOT use:
+
+Unlabelled dots only
+
+Dots with only country names
+
+A basemap with random points and no explanation
+
+A map where the reader has to guess what each point represents
+
+A map that simply repeats a country name twice
+
+A map that shows raw feed points rather than curated developments
+
+==================================================
+3. REQUIRED MAP FORMAT
+==================================================
+
+The report map must be based ONLY on the final curated developments selected for publication.
+
+Do not map raw incidents.
+
+For each mapped development, display:
+
+Country flag
+Country name
+Short development label
+Severity colour
+
+Example display style:
+
+[FLAG] Philippines
+Ferry fire
+High
+
+[FLAG] Australia
+Migration reform
+Moderate
+
+[FLAG] Myanmar
+Mandalay airport disruption
+High
+
+[FLAG] Nepal
+Flood impact
+Moderate
+
+The label must be short and readable.
+
+Maximum label length:
+2 to 5 words preferred
+
+==================================================
+4. MAP LABELLING RULES
+==================================================
+
+Every visible mapped development must have human-readable text.
+
+Preferred format on or beside the map:
+
+FLAG + COUNTRY + SHORT LABEL
+
+Examples:
+
+🇵🇭 Philippines
+Manila protests
+
+🇦🇺 Australia
+Migration reform
+
+🇲🇲 Myanmar
+Airport disruption
+
+🇮🇳 India
+Fuel duty change
+
+Do not rely only on a legend to explain markers.
+
+The label must be directly visible.
+
+==================================================
+5. IF THE MAP GETS TOO CROWDED
+==================================================
+
+If there are too many developments to label cleanly, then:
+
+A. Limit the map to the 6 to 8 most important mapped developments
+
+OR
+
+B. Use numbered map markers linked to a side list
+
+Example:
+
+1 🇵🇭 Philippines — Manila protests — High
+2 🇲🇲 Myanmar — Mandalay airport disruption — High
+3 🇦🇺 Australia — Migration reform — Moderate
+4 🇳🇵 Nepal — Flood impact — Moderate
+
+This is preferable to a cluttered map.
+
+Readability is more important than showing everything.
+
+==================================================
+6. COUNTRY AGGREGATION RULE
+==================================================
+
+If multiple selected developments come from the same country, do NOT scatter multiple meaningless dots across the same country unless geography really matters.
+
+Instead either:
+
+A. Show one country callout with multiple short sub items
+
+Example:
+
+🇵🇭 Philippines
+• Ferry fire
+• Manila protests
+• BARMM polling
+
+OR
+
+B. Show one marker with a count, plus a side list
+
+Example:
+
+🇵🇭 Philippines (3)
+
+Then list the 3 developments beside the map.
+
+Use judgement based on readability.
+
+==================================================
+7. VISUAL STYLE
+==================================================
+
+The map should look closer to the workbench geospatial display, but adapted for PDF readability.
+
+Use:
+
+Clean basemap
+Minimal clutter
+Visible markers
+Short text callouts
+Flag icons
+Severity colour coding
+
+Severity colour can remain:
+
+Extreme
+High
+Moderate
+Low
+Insignificant
+
+But the colour must support the label, not replace it.
+
+The reader must still be able to understand the map in greyscale or when printed.
+
+==================================================
+8. LAYOUT OPTIONS
+==================================================
+
+Preferred layout for the report:
+
+Option A
+Map on left or top
+Structured callout list on right or below
+
+Option B
+Map with numbered markers
+Side panel listing each numbered item with:
+flag
+country
+short label
+severity
+
+Option C
+Small map with flagged text callouts anchored around the region
+
+Any of these is acceptable.
+
+Plain dots with country names are not acceptable.
+
+==================================================
+9. WHAT THE MAP SHOULD SHOW
+==================================================
+
+The map must show only curated report developments.
+
+It should highlight the weekly operating picture.
+
+Good examples of mapped items:
+
+Political mobilisation
+Airport shutdown
+Port disruption
+Fuel or energy issue
+Flood or wildfire impact
+Conflict hotspot
+Regulatory change with geographic relevance
+Major transport disruption
+
+Do not map low-value filler items.
+
+==================================================
+10. WEEK AT A GLANCE RELATIONSHIP
+==================================================
+
+The developments shown on the map must align with the Week at a Glance counts and with the actual key developments in the report.
+
+Do not show countries on the map that are not meaningfully represented in the report.
+
+Do not show a map that looks disconnected from the written analysis.
+
+==================================================
+11. APAC AND MIDDLE EAST
+==================================================
+
+Apply the same map logic to both:
+
+Polestar APAC Weekly
+Polestar Middle East Weekly
+
+But keep the geography region-specific.
+
+For APAC:
+show APAC developments
+
+For Middle East:
+show Middle East developments
+
+==================================================
+12. IMPLEMENTATION PRIORITY
+==================================================
+
+FIRST:
+Fix the map component for APAC Weekly.
+
+Generate one APAC weekly draft showing:
+flagged labels
+short text descriptions
+readable intelligence display
+no meaningless dots-only output
+
+STOP after generating APAC.
+
+Do not proceed further until reviewed.

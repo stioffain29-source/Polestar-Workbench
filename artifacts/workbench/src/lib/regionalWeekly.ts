@@ -922,6 +922,85 @@ export function buildApacWeeklyDevelopments<T extends RegionalIncident>(
   return buildRegionalDevelopments(incidents, issueDate, "apac_weekly");
 }
 
+export interface ApacMapItem {
+  id: number;
+  country: string;
+  flag: string;
+  lat: number;
+  lng: number;
+  developments: Array<{
+    label: string;
+    severity: string;
+    fullTitle: string;
+  }>;
+}
+
+const COUNTRY_FLAGS: Record<string, string> = {
+  "Australia": "🇦🇺", "Bangladesh": "🇧🇩", "Bhutan": "🇧🇹", "Brunei": "🇧🇳",
+  "Cambodia": "🇰🇭", "China": "🇨🇳", "Fiji": "🇫🇯", "Hong Kong": "🇭🇰",
+  "India": "🇮🇳", "Indonesia": "🇮🇩", "Japan": "🇯🇵", "Kiribati": "🇰🇮",
+  "Laos": "🇱🇦", "Malaysia": "🇲🇾", "Maldives": "🇲🇻", "Marshall Islands": "🇲🇭",
+  "Micronesia": "🇫🇲", "Mongolia": "🇲🇳", "Myanmar": "🇲🇲", "Nauru": "🇳🇷",
+  "Nepal": "🇳🇵", "New Zealand": "🇳🇿", "North Korea": "🇰🇵", "Pakistan": "🇵🇰",
+  "Palau": "🇵🇼", "Papua New Guinea": "🇵🇬", "Philippines": "🇵🇭", "Samoa": "🇼🇸",
+  "Singapore": "🇸🇬", "Solomon Islands": "🇸🇧", "South Korea": "🇰🇷", "Sri Lanka": "🇱🇰",
+  "Taiwan": "🇹🇼", "Thailand": "🇹🇭", "Timor-Leste": "🇹🇱", "Tonga": "🇹🇴",
+  "Tuvalu": "🇹🇻", "Vanuatu": "🇻🇺", "Vietnam": "🇻🇳"
+};
+
+export function buildApacMapItems<T extends RegionalIncident>(
+  incidents: T[],
+): ApacMapItem[] {
+  const selected = selectRegionalKeyDevelopments(incidents, "apac_weekly");
+  const plottable = selected.filter(
+    (incident) => typeof incident.latitude === "number" && typeof incident.longitude === "number"
+  );
+  
+  const byCountry = new Map<string, T[]>();
+  for (const incident of plottable) {
+    const country = incident.country?.trim() || "Regional";
+    if (country === "Regional") continue;
+    const current = byCountry.get(country) ?? [];
+    current.push(incident);
+    byCountry.set(country, current);
+  }
+  
+  const sortedCountries = [...byCountry.entries()].sort((a, b) => {
+    const aMax = Math.max(...a[1].map(i => SEVERITY_RANK[i.severity?.toLowerCase() ?? ""] ?? 0));
+    const bMax = Math.max(...b[1].map(i => SEVERITY_RANK[i.severity?.toLowerCase() ?? ""] ?? 0));
+    if (bMax !== aMax) return bMax - aMax;
+    // Tie-break by country name
+    return a[0].localeCompare(b[0]);
+  }).slice(0, 8);
+
+  let idCounter = 1;
+  return sortedCountries.map(([country, items]) => {
+    const representative = items.reduce((best, current) => {
+      const rank = SEVERITY_RANK[current.severity?.toLowerCase() ?? ""] ?? 0;
+      const bestRank = SEVERITY_RANK[best.severity?.toLowerCase() ?? ""] ?? 0;
+      return rank > bestRank ? current : best;
+    });
+    
+    return {
+      id: idCounter++,
+      country,
+      flag: COUNTRY_FLAGS[country] ?? "",
+      lat: representative.latitude!,
+      lng: representative.longitude!,
+      developments: items.map(item => {
+        const title = item.displayTitle ?? item.title ?? "Unspecified development";
+        const cleanTitle = cleanApacTitle(title);
+        const label = clipRegionalWords(cleanTitle, 5).replace(/^[A-Za-z]+'s\s+/, "");
+        return {
+          label,
+          severity: SEVERITY_LABEL[item.severity?.toLowerCase() ?? ""] ?? "Moderate",
+          fullTitle: cleanTitle
+        };
+      })
+    };
+  });
+}
+
 export function buildRegionalVisualSummary<T extends RegionalIncident>(
   incidents: T[],
   topic: RegionalWeeklyTopic = "middle_east_weekly",
