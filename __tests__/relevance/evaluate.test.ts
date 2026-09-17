@@ -32,6 +32,17 @@ describe("evaluateIncidentRelevance", () => {
     expect(verdict.score).toBe(0.7);
   });
 
+  it("removes team-vs-team league fixtures completely rather than retaining them at low severity", () => {
+    const verdict = evaluateIncidentRelevance("indonesia_local", {
+      topic: "indonesia_local",
+      title: "Super League: Persija Vs Java United Bentrok Sama Pilkades",
+      summary: "Persija vs Java United Super League match clashes with village head elections.",
+    });
+    expect(verdict.relevant).toBe(false);
+    expect(verdict.status).toBe("irrelevant");
+    expect(verdict.reason).toContain("sports-fixture");
+  });
+
   // A Levant land-conflict story (IDF / Hezbollah / a southern-Lebanon village)
   // carries a kinetic keyword ("hostage") that satisfies the conflict REQUIRED
   // gate, but names no APAC place — foreign syndication that the geocoder filed

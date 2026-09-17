@@ -3,7 +3,7 @@ name: Global sports-fixture gate
 description: Owner ruling "no sport in any report" — one global gate, override design, and the summary-token trap that let sports in.
 ---
 
-**Rule:** Owner banned ALL sports coverage from every report. One global gate rejects named sports, match-report idioms, standings/scorelines, result verbs and fan grievances, minus a narrowly framed real-world casualty/disorder override. Scripted TV and professional-wrestling coverage is a separate pre-override exclusion because fictional "firefight" and wrestling "rebel/dynamite" wording must never invoke the security rescue.
+**Rule:** Owner banned ALL sports coverage from the product. Sports records are removed from relevance-backed APIs and every map, monitor, and report—not retained as Insignificant or merely hidden in one view. One global gate rejects named sports, match-report idioms, standings/scorelines, result verbs and fan grievances, minus a narrowly framed real-world casualty/disorder override. Scripted TV and professional-wrestling coverage is a separate pre-override exclusion because fictional "firefight" and wrestling "rebel/dynamite" wording must never invoke the security rescue.
 
 **Why:** A football headline ("Harimau Malaya fall to Vietnam in Asean Cup semis") reached the incident map. Root cause: keep-tier cue tokens must be SUMMARY-safe, not just title-safe — bare `stoppage` in the unambiguous public-order REQUIRED regex fired on "stoppage time" in the *summary*. Fixed via `stoppage(?!s?[ -]time)` at all 5 cue sites.
 
