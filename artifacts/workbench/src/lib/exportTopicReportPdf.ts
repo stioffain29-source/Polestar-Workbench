@@ -87,7 +87,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic } from "./regionalWeekly";
-import { buildRegionalDevelopments, buildRegionalWatchlist } from "./regionalWeekly";
+import { buildRegionalDevelopments, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -677,9 +677,40 @@ function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]
     ctx.y += 3;
     renderProse(
       ctx,
-      `Severity: ${development.severity}\nWhat happened: ${development.whatHappened}\nWhy it matters: ${development.whyItMatters}\nOutlook: ${development.outlook}`,
+      `Category: ${development.category}\nSeverity: ${development.severity}\nWhat happened: ${development.whatHappened}\nWhy it matters: ${development.whyItMatters}\nOutlook: ${development.outlook}`,
     );
   }
+}
+
+function drawRegionalActivityCharts(ctx: Ctx, incidents: TopicReportIncident[]) {
+  const summary = buildRegionalVisualSummary(incidents);
+  if (summary.byCategory.length === 0) return;
+  const { pdf, MX, CW } = ctx;
+  const drawChart = (title: string, rows: Array<{ label: string; count: number }>) => {
+    ensureSpace(ctx, 20 + rows.length * 11);
+    setRoboto(pdf, "bold");
+    setText(pdf, NAVY);
+    pdf.setFontSize(8);
+    pdf.text(title.toUpperCase(), MX, ctx.y + 8);
+    ctx.y += 14;
+    const max = Math.max(1, ...rows.map((row) => row.count));
+    for (const row of rows) {
+      setRoboto(pdf, "regular");
+      setText(pdf, DUSK);
+      pdf.setFontSize(7);
+      pdf.text(row.label, MX, ctx.y + 7);
+      pdf.setFillColor(238, 240, 245);
+      pdf.rect(MX + 105, ctx.y + 1, CW - 125, 6, "F");
+      pdf.setFillColor(70, 91, 255);
+      pdf.rect(MX + 105, ctx.y + 1, ((CW - 125) * row.count) / max, 6, "F");
+      setRoboto(pdf, "bold");
+      pdf.text(String(row.count), MX + CW, ctx.y + 7, { align: "right" });
+      ctx.y += 11;
+    }
+    ctx.y += 5;
+  };
+  drawChart("Weekly developments by category", summary.byCategory);
+  drawChart("Activity by country", summary.byCountry.slice(0, 8));
 }
 
 function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[]) {
@@ -1775,7 +1806,7 @@ export async function exportTopicReportPdf(
       const proseSections: [string, string, string][] = [
         [
           "situation",
-          isRegionalWeekly ? "Regional Security Picture" : "Situation",
+          isRegionalWeekly ? "Regional Intelligence Picture" : "Situation",
           resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
         ],
         ...(!isRegionalWeekly
@@ -1810,6 +1841,7 @@ export async function exportTopicReportPdf(
         );
         drawSectionHeading(ctx, "Key Developments");
         if (intro.trim()) renderProse(ctx, intro);
+        drawRegionalActivityCharts(ctx, incidents);
         drawRegionalDevelopmentCards(ctx, incidents);
       }
       if (show("implications")) {
@@ -1840,7 +1872,9 @@ export async function exportTopicReportPdf(
         const psBody = resolveSimpleProse(
           data.polestarView,
           aiProse?.polestarView,
-          proseDraft.polestarView,
+          isRegionalWeekly
+            ? buildRegionalOutlook(buildRegionalDevelopments(incidents))
+            : proseDraft.polestarView,
         );
         if (psBody.trim()) {
           drawSectionWithProse(ctx, isRegionalWeekly ? "Polestar Outlook" : "Polestar View", psBody);

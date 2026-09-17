@@ -3758,7 +3758,7 @@ export default function ReportEditor() {
             <Field
               label={
                 isRegionalWeeklyTopic(form.topic)
-                  ? "Regional Security Picture"
+                  ? "Regional Intelligence Picture"
                   : form.topic === "conflict" ? "BLUF" : "Situation"
               }
             >

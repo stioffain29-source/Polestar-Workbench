@@ -2,6 +2,7 @@ import { canonicalTopic } from "../reportNaming";
 import { buildTopicRows } from "../publicationCalendar";
 import {
   buildRegionalDevelopments,
+  buildRegionalOutlook,
   buildRegionalWatchlist,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
@@ -33,26 +34,25 @@ describe("regional weekly products", () => {
     expect(canonicalTopic("middle_east_weekly").cadence).toBe("Weekly");
   });
 
-  it("keeps only material moderate-plus incidents in the seven-day regional window", () => {
+  it("keeps operationally material incidents across the seven-day regional window", () => {
     const rows = curateRegionalWeeklyIncidents(
       [
         incident(1, "Indonesia", "high", "2026-09-17"),
-        incident(2, "Indonesia", "low", "2026-09-17"),
+        incident(2, "Indonesia", "low", "2026-09-17", "Road closure disrupts factory access"),
         incident(3, "Indonesia", "high", "2026-09-10"),
         incident(4, "Iran", "extreme", "2026-09-16"),
       ],
       "apac_weekly",
       "2026-09-17",
     );
-    expect(rows.map((row) => row.id)).toEqual([1]);
+    expect(rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
   it("caps key developments at eight and keeps the Middle East boundary", () => {
     const rows = Array.from({ length: 10 }, (_, index) =>
-      incident(index, "Iran", "moderate", "2026-09-17"),
+      incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
-    const curated = curateRegionalWeeklyIncidents(rows, "middle_east_weekly", "2026-09-17");
-    expect(selectRegionalKeyDevelopments(curated)).toHaveLength(8);
+    expect(selectRegionalKeyDevelopments(rows)).toHaveLength(8);
     expect(
       curateRegionalWeeklyIncidents(
         [incident(99, "Indonesia", "high", "2026-09-17")],
@@ -70,6 +70,7 @@ describe("regional weekly products", () => {
       country: "Indonesia",
       title: "Port closure after security incident",
       severity: "High",
+      category: "Operational Disruption",
       whatHappened: "Operational security and continuity impact reported.",
       whyItMatters: expect.stringContaining("transport"),
       outlook: expect.stringContaining("next seven days"),
@@ -78,9 +79,42 @@ describe("regional weekly products", () => {
       "country",
       "title",
       "severity",
+      "category",
       "whatHappened",
       "whyItMatters",
       "outlook",
+    ]);
+  });
+
+  it("consolidates multiple reports of one event before selecting developments", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        { ...incident(1, "Philippines", "high", "2026-09-17", "Typhoon closes Cebu airport"), eventClusterKey: "typhoon-cebu" },
+        { ...incident(2, "Philippines", "moderate", "2026-09-17", "Flights halted as storm reaches Cebu"), eventClusterKey: "typhoon-cebu" },
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(1);
+  });
+
+  it("classifies and retains political, regulatory, weather and cyber developments with operational relevance", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Japan", "moderate", "2026-09-17", "Election policy may change energy regulation for business"),
+        incident(2, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+        incident(3, "Philippines", "high", "2026-09-17", "Typhoon flooding disrupts airports and utilities"),
+        incident(4, "Australia", "high", "2026-09-17", "Ransomware attack disrupts telecom infrastructure"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(buildRegionalDevelopments(rows).map((row) => row.category)).toEqual([
+      "Weather & Natural Hazards",
+      "Cyber",
+      "Political",
+      "Regulatory",
     ]);
   });
 
@@ -102,6 +136,17 @@ describe("regional weekly products", () => {
       currentSeverity: "Extreme",
       whatWeAreWatching: "Watch for confirmed follow-on developments over the next seven days.",
     });
+  });
+
+  it("builds a cross-category operating outlook instead of a security-only quiet-week fallback", () => {
+    const outlook = buildRegionalOutlook(buildRegionalDevelopments([
+      incident(1, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
+      incident(2, "Philippines", "high", "2026-09-17", "Typhoon flooding disrupts airports and utilities"),
+    ]));
+    expect(outlook).toContain("Regulatory");
+    expect(outlook).toContain("Weather & Natural Hazards");
+    expect(outlook).toContain("people, travel, sites, supply chains and compliance");
+    expect(outlook).not.toContain("Nothing useful came through");
   });
 
   it("uses the weekly cadence for calendar due dates", () => {

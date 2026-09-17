@@ -34,8 +34,8 @@ export const CANONICAL_TOPIC: Record<string, CanonicalTopic> = {
   fertiliser:  { topicLine: "Fertiliser",    cadence: "Monthly", title: "Fertiliser Watch" },
   conflict:    { topicLine: "Conflict",      cadence: "Weekly",  title: "Conflict Watch", subtitle: "War, Armed Conflict, Insurgency & Terrorism" },
   data_centres:{ topicLine: "Data Centres",  cadence: "Monthly", title: "Data Centres Watch" },
-  apac_weekly: { topicLine: "Regional Intelligence", cadence: "Weekly", title: "Polestar APAC Weekly", subtitle: "Security, Risk & Operational Intelligence" },
-  middle_east_weekly: { topicLine: "Regional Intelligence", cadence: "Weekly", title: "Polestar Middle East Weekly", subtitle: "Security, Risk & Operational Intelligence" },
+  apac_weekly: { topicLine: "Regional Intelligence", cadence: "Weekly", title: "Polestar APAC Weekly", subtitle: "Business Risk & Operational Intelligence" },
+  middle_east_weekly: { topicLine: "Regional Intelligence", cadence: "Weekly", title: "Polestar Middle East Weekly", subtitle: "Business Risk & Operational Intelligence" },
 };
 
 // Topics the report API actually accepts (mirrors the `Topic` enum in

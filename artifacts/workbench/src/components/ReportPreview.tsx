@@ -11,6 +11,8 @@ import { resolveReportWindow } from "@/lib/reportWindow";
 import { canonicalTopic, resolveReportTitle } from "@/lib/reportNaming";
 import {
   buildRegionalDevelopments,
+  buildRegionalOutlook,
+  buildRegionalVisualSummary,
   buildRegionalWatchlist,
   isRegionalWeeklyTopic,
   type RegionalDevelopment,
@@ -210,7 +212,7 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
             {development.country} | {development.title}
           </h3>
           <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            <p><strong>Severity:</strong> {development.severity}</p>
+            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Severity:</strong> {development.severity}</p>
             <p><strong>What happened:</strong> {development.whatHappened}</p>
             <p><strong>Why it matters:</strong> {development.whyItMatters}</p>
             <p><strong>Outlook:</strong> {development.outlook}</p>
@@ -222,6 +224,42 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
           No qualifying developments were identified in the reporting period.
         </p>
       )}
+    </div>
+  );
+}
+
+function RegionalActivityCharts({
+  summary,
+}: {
+  summary: ReturnType<typeof buildRegionalVisualSummary>;
+}) {
+  const renderBars = (rows: Array<{ label: string; count: number }>) => {
+    const max = Math.max(1, ...rows.map((row) => row.count));
+    return rows.map((row) => (
+      <div key={row.label} className="grid grid-cols-[150px_1fr_24px] items-center gap-3 text-[11px]">
+        <span className="font-medium">{row.label}</span>
+        <div className="h-3 bg-[#eef0f5]">
+          <div className="h-full bg-[#465bff]" style={{ width: `${(row.count / max) * 100}%` }} />
+        </div>
+        <span className="font-bold text-right">{row.count}</span>
+      </div>
+    ));
+  };
+  if (summary.byCategory.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-5 mb-6" style={{ fontFamily: "Roboto, sans-serif", color: DUSK }}>
+      <div className="border border-[#e2e2e2] bg-white p-4">
+        <h3 className="uppercase tracking-wide text-[11px] font-bold mb-3" style={{ color: NAVY }}>
+          Weekly developments by category
+        </h3>
+        <div className="space-y-2">{renderBars(summary.byCategory)}</div>
+      </div>
+      <div className="border border-[#e2e2e2] bg-white p-4">
+        <h3 className="uppercase tracking-wide text-[11px] font-bold mb-3" style={{ color: NAVY }}>
+          Activity by country
+        </h3>
+        <div className="space-y-2">{renderBars(summary.byCountry.slice(0, 8))}</div>
+      </div>
     </div>
   );
 }
@@ -994,6 +1032,8 @@ export default function ReportPreview({
   const isFuel = report.topic === "fuel";
   const isRegionalWeekly = isRegionalWeeklyTopic(report.topic ?? "");
   const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(incidents) : [];
+  const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
+  const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(incidents) : { byCategory: [], byCountry: [] };
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest
@@ -1482,7 +1522,7 @@ export default function ReportPreview({
                     </>
                   )}
                   <NarrativeSection
-                    hidden={!show("situation")} title={isRegionalWeekly ? "Regional Security Picture" : "Situation"}
+                    hidden={!show("situation")} title={isRegionalWeekly ? "Regional Intelligence Picture" : "Situation"}
                     text={isCargo
                       ? pickRead(report.situation, aiOr(aiProse?.situation, buildCargoSituation(cargoWindow)))
                       : resolveSimpleProse(report.situation, aiProse?.situation, proseDraft.situation)}
@@ -1500,6 +1540,7 @@ export default function ReportPreview({
                           />
                         </div>
                       )}
+                      <RegionalActivityCharts summary={regionalVisualSummary} />
                       <RegionalDevelopmentCards developments={regionalDevelopments} />
                     </Section>
                   ) : (
@@ -1546,7 +1587,11 @@ export default function ReportPreview({
                     hidden={!show("polestar-view")} title={isRegionalWeekly ? "Polestar Outlook" : "Polestar View"}
                     text={isCargo
                       ? pickRead(report.polestarView, aiOr(aiProse?.polestarView, buildCargoPolestarView(cargoWindow)))
-                      : resolveSimpleProse(report.polestarView, aiProse?.polestarView, proseDraft.polestarView)}
+                      : resolveSimpleProse(
+                          report.polestarView,
+                          aiProse?.polestarView,
+                          isRegionalWeekly ? regionalOutlook : proseDraft.polestarView,
+                        )}
                   />
                   {isCargo && cargoGrouped && (
                     <CargoClustersSection grouped={cargoGrouped} />

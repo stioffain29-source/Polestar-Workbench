@@ -1,0 +1,151 @@
+AMENDMENT TO EXISTING APAC WEEKLY AND MIDDLE EAST WEEKLY REPORTS
+
+Do not rebuild or replace the existing report product, structure, export process or styling.
+
+Amend the existing APAC Weekly and Middle East Weekly reports as follows.
+
+1. EXPAND INTELLIGENCE COVERAGE
+
+The reports must not focus only on security incidents.
+
+Add material developments across:
+
+SECURITY
+Armed conflict, terrorism, civil unrest, significant crime, maritime security and personnel security.
+
+POLITICAL
+Elections, government changes, political instability, major policy decisions, diplomatic tensions, sanctions, interstate tensions and political developments with business implications.
+
+REGULATORY
+New or changed legislation, tariffs, sanctions, customs rules, import/export controls, labour regulation, data regulation, cybersecurity regulation, foreign ownership rules, visa or immigration rules, shipping restrictions, energy regulation and other material compliance changes.
+
+ADVERSE WEATHER & NATURAL HAZARDS
+Typhoons, cyclones, flooding, extreme heat, wildfire, drought, earthquakes, volcanic activity, landslides and other hazards where there is credible impact on travel, personnel, infrastructure, utilities, sites, ports, airports or supply chains.
+
+CYBER
+Major ransomware, state-linked cyber activity, attacks affecting infrastructure, logistics, ports, airlines, utilities, telecoms or government systems, major data breaches and significant cyber regulatory developments.
+
+BUSINESS & OPERATIONAL DISRUPTION
+Ports, airports, airspace, roads, borders, shipping, fuel, energy, utilities, telecommunications, supply chains, industrial action and major infrastructure disruption.
+
+Only include developments with credible business or operational relevance.
+
+2. ADD VISUAL INTELLIGENCE
+
+The existing report needs significantly more visual content.
+
+Where data supports it, add:
+
+- Regional hotspot map showing the most significant developments of the week
+- Incident or development map by location
+- Weekly developments by category chart
+- Four week trend graph
+- Country or sub-region activity chart
+- Weather impact map where relevant
+- Political or regulatory timeline where relevant
+- 7 day forward watchlist timeline
+- Operational disruption map where relevant
+- Maritime, airspace or transport map where relevant
+
+Do not add charts simply as decoration.
+
+Each visual must answer at least one of:
+
+WHERE is activity occurring?
+WHAT type of risk is driving the week?
+IS activity increasing or decreasing?
+WHEN is the next significant event?
+WHAT operational exposure does it create?
+
+Charts must use real underlying data. Do not invent values to populate visuals.
+
+3. EVENT DEDUPLICATION
+
+Multiple articles covering the same underlying event must be consolidated into ONE development.
+
+Do not create separate Key Developments because Reuters, local media, trade press and other sources reported the same event.
+
+Cluster reporting by EVENT, then use multiple credible sources to build one consolidated assessment.
+
+4. KEY DEVELOPMENTS
+
+Maintain approximately 5 to 8 genuinely separate developments.
+
+Ensure the section reflects the full regional picture rather than being dominated by repeated reporting on one subject.
+
+Selection should consider:
+
+Security
+Political
+Regulatory
+Weather
+Cyber
+Operational disruption
+
+Not every category needs to appear every week. Only include material developments.
+
+5. 7 DAY WATCHLIST
+
+Expand the existing watchlist beyond security incidents.
+
+It may include:
+
+Scheduled protests
+Elections
+Political deadlines
+Court rulings
+Legislative votes
+New regulations entering force
+Sanctions deadlines
+Industrial action
+Port or transport disruption
+Major public events
+Conflict escalation indicators
+Storm landfall windows
+Flood or severe weather forecasts
+Cyber threat developments
+
+Use a visual timeline where practical.
+
+6. POLESTAR OUTLOOK
+
+The existing Polestar Outlook must assess the overall regional operating environment.
+
+It must not default to comments such as:
+
+“Nothing useful came through on public order this week.”
+
+If one intelligence category is quiet, assess the other material political, regulatory, security, operational, weather or cyber developments.
+
+The Outlook should explain:
+
+What is likely to matter next week
+Where conditions may deteriorate
+What indicators should be monitored
+What could change the current assessment
+Potential business and operational consequences
+
+7. CORE EDITORIAL TEST
+
+For every potential item ask:
+
+DOES THIS MATTER TO BUSINESS OPERATIONS?
+
+Relevant impacts include:
+
+People
+Travel
+Sites
+Assets
+Supply chains
+Transport
+Energy
+Utilities
+Compliance
+Regulation
+Business continuity
+Corporate exposure
+
+If there is no credible operational relevance, exclude it.
+
+Do not change the existing report branding, PDF layout, page structure or export workflow unless required to accommodate these additional intelligence categories and visuals.
