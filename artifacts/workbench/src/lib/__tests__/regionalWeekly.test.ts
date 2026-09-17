@@ -55,7 +55,9 @@ describe("regional weekly products", () => {
     const rows = Array.from({ length: 12 }, (_, index) =>
       incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
-    expect(selectRegionalKeyDevelopments(rows)).toHaveLength(10);
+    const selected = selectRegionalKeyDevelopments(rows);
+    expect(selected).toHaveLength(10);
+    expect(validateRegionalWeeklyAssessment(buildRegionalDevelopments(rows))).toEqual([]);
     expect(
       curateRegionalWeeklyIncidents(
         [incident(99, "Indonesia", "high", "2026-09-17")],

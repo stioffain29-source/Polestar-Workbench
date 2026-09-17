@@ -8,3 +8,7 @@ APAC Weekly and Middle East Weekly are regional business-operating intelligence 
 **Why:** The owner amended both products to provide a complete regional operating picture while retaining the existing branding, report structure and export workflow.
 
 **How to apply:** Run six independent discovery passes first: security/conflict, political, regulatory, weather/hazards, cyber/information risk and business/operational disruption. Persist the discovery domain with each source record; do not infer the report structure from a general incident feed. Cluster sources by underlying event before selecting approximately 6–10 developments by operational materiality, never article volume or fixed quotas. Preserve corroborating evidence. Produce six distinct domain assessments, a 3–5 development cross-domain BLUF and charts only from the final curated set. Cyber must state the explicit no-material-development sentence after a negative dedicated search. Keep preview/PDF parity and block export when structural quality checks fail.
+
+The export quality gate, preview, charts, BLUF, domain synthesis and watchlist must all receive the same region/window-filtered and event-clustered evidence before selecting the final developments. Never validate raw source rows: article volume and duplicate source coverage will falsely block a valid assessment.
+
+**Why:** A gate applied to raw articles reported “more than ten developments” and “duplicates remain” even though the rendered report had already curated and deduplicated them, preventing the analyst from downloading the PDF.

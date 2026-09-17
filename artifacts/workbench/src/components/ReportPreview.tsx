@@ -16,6 +16,7 @@ import {
   buildRegionalOutlook,
   buildRegionalVisualSummary,
   buildRegionalWatchlist,
+  curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
   type RegionalDevelopment,
 } from "@/lib/regionalWeekly";
@@ -1054,11 +1055,18 @@ export default function ReportPreview({
     : (report.title ?? "");
   const isFuel = report.topic === "fuel";
   const isRegionalWeekly = isRegionalWeeklyTopic(report.topic ?? "");
-  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(incidents) : [];
+  const regionalTopic =
+    report.topic === "apac_weekly" || report.topic === "middle_east_weekly"
+      ? report.topic
+      : null;
+  const regionalCuratedIncidents = regionalTopic
+    ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
+    : [];
+  const regionalDevelopments = isRegionalWeekly ? buildRegionalDevelopments(regionalCuratedIncidents) : [];
   const regionalDomainBriefs = isRegionalWeekly ? buildRegionalDomainBriefs(regionalDevelopments) : [];
   const regionalBluf = isRegionalWeekly ? buildRegionalBluf(regionalDevelopments) : "";
   const regionalOutlook = isRegionalWeekly ? buildRegionalOutlook(regionalDevelopments) : "";
-  const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(incidents) : { byCategory: [], byCountry: [] };
+  const regionalVisualSummary = isRegionalWeekly ? buildRegionalVisualSummary(regionalCuratedIncidents) : { byCategory: [], byCountry: [] };
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const isEnergy = report.topic === "energy";
   // Fuel Watch is a MARKET product: its reporting-period END is the latest

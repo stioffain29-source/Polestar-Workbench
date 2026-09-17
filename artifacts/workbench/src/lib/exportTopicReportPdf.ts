@@ -87,7 +87,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic } from "./regionalWeekly";
-import { buildRegionalBluf, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildRegionalBluf, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalOutlook, buildRegionalVisualSummary, buildRegionalWatchlist, curateRegionalWeeklyIncidents, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -1082,8 +1082,11 @@ export async function exportTopicReportPdf(
   filename: string,
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
+  const regionalPdfIncidents = isRegionalWeeklyTopic(data.topic)
+    ? curateRegionalWeeklyIncidents(incidents, data.topic, data.issueDate)
+    : incidents;
   if (isRegionalWeeklyTopic(data.topic)) {
-    const regionalErrors = validateRegionalWeeklyAssessment(buildRegionalDevelopments(incidents));
+    const regionalErrors = validateRegionalWeeklyAssessment(buildRegionalDevelopments(regionalPdfIncidents));
     if (regionalErrors.length > 0) {
       throw new Error(`Regional Weekly export blocked: ${regionalErrors.join(" ")}`);
     }
@@ -1282,7 +1285,7 @@ export async function exportTopicReportPdf(
   // Every other topic keeps the AI narrative + template fallback stack.
   const execText =
     isRegionalWeekly
-      ? buildRegionalBluf(buildRegionalDevelopments(incidents))
+      ? buildRegionalBluf(buildRegionalDevelopments(regionalPdfIncidents))
       : fuelEffective
       ? (fuelEffective.executiveSummary ?? "")
       : isCargo && cargoModel
@@ -1856,7 +1859,7 @@ export async function exportTopicReportPdf(
         if (show(key) && body && body.trim()) drawSectionWithProse(ctx, label, body);
       }
       if (isRegionalWeekly && show("situation")) {
-        drawRegionalDomainBriefs(ctx, incidents);
+        drawRegionalDomainBriefs(ctx, regionalPdfIncidents);
       }
       if (isRegionalWeekly && show("what-happened")) {
         const intro = resolveSimpleProse(
@@ -1866,8 +1869,8 @@ export async function exportTopicReportPdf(
         );
         drawSectionHeading(ctx, "Key Developments");
         if (intro.trim()) renderProse(ctx, intro);
-        drawRegionalActivityCharts(ctx, incidents);
-        drawRegionalDevelopmentCards(ctx, incidents);
+        drawRegionalActivityCharts(ctx, regionalPdfIncidents);
+        drawRegionalDevelopmentCards(ctx, regionalPdfIncidents);
       }
       if (show("implications")) {
         const implBody = resolveSimpleProse(
@@ -1888,7 +1891,7 @@ export async function exportTopicReportPdf(
         if (isRegionalWeekly) {
           drawSectionHeading(ctx, "7-Day Watchlist");
           if (wnBody.trim()) renderProse(ctx, wnBody);
-          drawRegionalWatchlist(ctx, incidents);
+          drawRegionalWatchlist(ctx, regionalPdfIncidents);
         } else if (wnBody.trim()) {
           drawBulletSection(ctx, isRegionalWeekly ? "7-Day Watchlist" : "Watch Next", wnBody, 8);
         }
@@ -1898,7 +1901,7 @@ export async function exportTopicReportPdf(
           data.polestarView,
           aiProse?.polestarView,
           isRegionalWeekly
-            ? buildRegionalOutlook(buildRegionalDevelopments(incidents))
+            ? buildRegionalOutlook(buildRegionalDevelopments(regionalPdfIncidents))
             : proseDraft.polestarView,
         );
         if (psBody.trim()) {
