@@ -120,6 +120,11 @@ const SPORTS_FIXTURE_RE = new RegExp(
     // A named sport in the headline is fixture coverage unless the real-world
     // casualty/disorder override below proves an incident happened at it.
     String.raw`\b(?:football|soccer|rugby(?: league| union)?|cricket|basketball|volleyball|netball|futsal|hockey|baseball)\b`,
+    // Fixture syntax where the headline names teams and a competition but
+    // omits the sport: "Persija vs Java United Super League match clashes with
+    // village elections". "vs" + league/cup is unambiguous sports coverage;
+    // any genuine crowd disorder still survives through the override below.
+    String.raw`\b(?:cup|league|tournament|championship)\b[^.!?]{0,100}\bvs\.?\b|\bvs\.?\b[^.!?]{0,100}\b(?:cup|league|tournament|championship)\b`,
     // Fan grievance / club-colour stories that borrow industrial-action terms.
     // "Sydney Swans fans threaten SCG walkout over hotel scandal" is sports
     // coverage, not civil unrest. Genuine disorder still survives through the

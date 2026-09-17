@@ -1,3 +1,5 @@
+import { isSportsFixtureNoise } from "@workspace/relevance";
+
 // Content-based severity classification for ingested incidents.
 //
 // Both scrapers used to hardcode severity="low", which collapsed the
@@ -467,6 +469,24 @@ const HIGH: RegExp[] = [
   ID_FATAL_RE,
 ];
 
+// A local dispute between resident/community groups with one non-fatal injury
+// is an active confrontation, but not automatically a High regional-security
+// event. The generic HIGH vocabulary above intentionally treats any "clash" or
+// "injured" as serious; this narrow guard prevents that broad rule from
+// over-rating parking/land/neighbourhood disputes. Weapons, fire/arson, deaths,
+// multiple injuries, state-force involvement, or operational disruption keep
+// the normal High path.
+const LOCAL_COMMUNITY_CLASH_RE =
+  /\b(?:clash(?:es|ed)? between (?:two )?(?:resident|community) groups?|resident groups? clash|community groups? clash|bentrok(?:\s+antar)?(?:\s+dua)?\s+kelompok warga|dua kelompok warga .{0,40} bentrok)\b/i;
+const SINGLE_MINOR_INJURY_RE =
+  /\b(?:one (?:person|resident|man|woman) (?:was |is |reportedly )?(?:injured|hurt)|satu orang (?:dikabarkan )?(?:terluka|luka)|1 orang (?:dikabarkan )?(?:terluka|luka)|1 orang luka)\b/i;
+const COMMUNITY_CLASH_HIGH_OVERRIDE_RE =
+  /\b(?:killed|dead|death|fatal|multiple (?:people )?(?:injured|wounded)|several (?:people )?(?:injured|wounded)|\d+\s+(?:people|persons?|residents?|orang)\s+(?:were\s+)?(?:injured|wounded|terluka)|gun(?:fire|shot)?|firearm|rifle|pistol|shot|shoot|molotov|bow(?:s)? and arrow|busur panah|senjata|tembak|knife|machete|pisau|arson|set (?:on )?fire|burn(?:ed|t)|dibakar|security forces?|police|military|airport|port|border|road closure|transport disruption|business disruption|curfew)\b/i;
+const NONVIOLENT_REGULATORY_CRACKDOWN_RE =
+  /\b(?:crackdown|cracks? down|clampdown|clamps? down)\b[^.!?]{0,100}\b(?:counterfeit|fake|supplements?|pharmaceuticals?|medicines?|customs|imports?|exports?|products?|goods|trademark|intellectual property)\b|\b(?:counterfeit|fake|supplements?|pharmaceuticals?|medicines?|customs|imports?|exports?|products?|goods|trademark|intellectual property)\b[^.!?]{0,100}\b(?:crackdown|cracks? down|clampdown|clamps? down)\b/i;
+const VIOLENT_OR_MAJOR_CRACKDOWN_RE =
+  /\b(?:killed|dead|fatal|injur\w*|wounded|riot\w*|protest\w*|tear gas|rubber bullets?|water cannon|gunfire|opened fire|mass arrests?|curfew|shutdown|closure|shortage|outage|major disruption)\b/i;
+
 // Active confrontation, arrests, blockades, operational disruption.
 const MODERATE: RegExp[] = [
   /\b(arrest(s|ed)?|detain(ed|ment)?|roadblock|road block|blockad(e|ed)|barricad(e|ed)|stand[- ]?off|confront(ation|ed)?|scuffle|skirmish)\b/i,
@@ -630,6 +650,7 @@ export function classifySeverity(
   topic: SeverityTopic,
 ): Severity {
   const hay = `${title}\n${summary}`;
+  if (isSportsFixtureNoise(hay)) return "insignificant";
 
   // Reaction guard (civil unrest + conflict only). A headline led by an
   // advocacy / statement verb is reporting a REACTION to a prior event, so its
@@ -705,6 +726,19 @@ export function classifySeverity(
     EXTREME.some((re) => re.test(hay))
   )
     return "extreme";
+  if (
+    LOCAL_COMMUNITY_CLASH_RE.test(hay) &&
+    SINGLE_MINOR_INJURY_RE.test(hay) &&
+    !COMMUNITY_CLASH_HIGH_OVERRIDE_RE.test(hay)
+  ) {
+    return "moderate";
+  }
+  if (
+    NONVIOLENT_REGULATORY_CRACKDOWN_RE.test(hay) &&
+    !VIOLENT_OR_MAJOR_CRACKDOWN_RE.test(hay)
+  ) {
+    return "moderate";
+  }
   if (
     !reactionLed &&
     (HIGH.some((re) => re.test(hay)) || SECURITY_INSTALLATION_ATTACK_RE.test(hay))

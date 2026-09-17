@@ -29,6 +29,7 @@ import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
 import { incidentMapFallback } from "@/lib/incidentMapFallback";
 import { dedupeMapIncidents } from "@/lib/mapIncidentDedupe";
+import { isSportsFixtureNoise } from "@/lib/topicRelevance";
 import PublicationCalendar from "./PublicationCalendar";
 
 // Date windows offered on the map. Distinct from the topic monitors' default
@@ -323,13 +324,17 @@ export default function MapPage() {
   const allPoints = useMemo<Point[]>(() => {
     if (view === "incidents") {
       const distinctIncidents = dedupeMapIncidents(
-        incidents.map((incident) => ({
+        incidents
+          .filter((incident) =>
+            !isSportsFixtureNoise(`${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""}`),
+          )
+          .map((incident) => ({
           ...incident,
           category: topicToCategory(
             incident.topic,
             `${incident.title ?? ""} ${incident.summary ?? ""}`,
           ),
-        })),
+          })),
       );
       const incidentPoints = distinctIncidents
         .map((i) => {
@@ -637,9 +642,27 @@ export default function MapPage() {
               // same incidents naturally decompose into individual markers
               // at their true coordinates once they clear the pixel radius.
               if (p.clusterSize && p.clusterSize > 1) {
-                const clusterStyle = markerStyle(p.rating);
-                const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
                 const members = p.clusterMembers ?? [];
+                const severityCounts = members.reduce<Record<string, number>>((counts, member) => {
+                  counts[member.rating] = (counts[member.rating] ?? 0) + 1;
+                  return counts;
+                }, {});
+                const mixedSeverity = Object.keys(severityCounts).length > 1;
+                // A cluster count is the TOTAL number of incidents, not the
+                // number at its highest tier. Colouring a 652-row mixed cluster
+                // red because one member is High falsely reads as "652 High".
+                // Mixed clusters therefore use a neutral marker and disclose
+                // their exact severity distribution in the popup.
+                const clusterStyle = mixedSeverity
+                  ? { fill: "#6c7190", stroke: "#0b0a3d" }
+                  : markerStyle(p.rating);
+                const severitySummary = SEVERITY_LEVELS
+                  .slice()
+                  .reverse()
+                  .filter((rating) => severityCounts[rating])
+                  .map((rating) => `${SEVERITY_LABELS[rating] ?? rating}: ${severityCounts[rating]}`)
+                  .join(" · ");
+                const clusterRadius = Math.min(10 + Math.log2(p.clusterSize) * 3, 22);
                 // A stack can bury a brand-new incident among 20 old ones with
                 // no visual cue at all - mirror the single-marker "new" ring
                 // (pulses until an analyst clears it) on the cluster itself
@@ -685,8 +708,9 @@ export default function MapPage() {
                         <div style={{ fontSize: 10, color: "#666", marginBottom: 6, lineHeight: 1.35 }}>
                           These incidents share an unresolved fallback location and
                           couldn't be placed at a specific city — shown here as one
-                          marker, coloured by the highest risk rating in the group
-                          ({SEVERITY_LABELS[p.rating] ?? p.rating}).
+                          marker. {mixedSeverity
+                            ? `The marker is neutral because the group contains mixed severities. ${severitySummary}.`
+                            : `All ${p.clusterSize} incidents are rated ${SEVERITY_LABELS[p.rating] ?? p.rating}.`}
                         </div>
                         <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 220, overflowY: "auto" }}>
                           {members.slice(0, 10).map((m) => {

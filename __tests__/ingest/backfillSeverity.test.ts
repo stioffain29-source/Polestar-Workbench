@@ -79,4 +79,61 @@ describe("nextSeverityForRow", () => {
       ),
     ).toBe("low");
   });
+
+  it("rates a local resident-group clash with one non-fatal injury as moderate", () => {
+    expect(
+      nextSeverityForRow(
+        row({
+          title: "Rebutan Lahan Parkir Buat Dua Kelompok Warga di Makassar Bentrok, 1 Orang Luka di Kepala",
+          summary: "Local parking-land dispute between resident groups.",
+          topic: "indonesia_local",
+        }),
+      ),
+    ).toBe("moderate");
+  });
+
+  it("keeps resident-group clashes high when weapons, arson, or wider danger are reported", () => {
+    expect(
+      nextSeverityForRow(
+        row({
+          title: "Bentrok Dua Kelompok Warga di Makassar, Molotov dan Busur Panah Melayang",
+          summary: "One person was injured during the clash.",
+          topic: "indonesia_local",
+        }),
+      ),
+    ).toBe("high");
+    expect(
+      nextSeverityForRow(
+        row({
+          title: "Konflik Lahan Picu Dua Kelompok Warga Bentrok, 2 Motor Dibakar",
+          summary: "One person was injured.",
+          topic: "indonesia_local",
+        }),
+      ),
+    ).toBe("high");
+  });
+
+  it("never lets sports fixture language create a high-severity incident", () => {
+    expect(
+      nextSeverityForRow(
+        row({
+          title: "Super League: Persija Vs Java United Bentrok Sama Pilkades",
+          summary: "Persija vs Java United Super League match clashes with village head elections.",
+          topic: "indonesia_local",
+        }),
+      ),
+    ).toBe("insignificant");
+  });
+
+  it("rates non-violent customs enforcement as moderate, not high", () => {
+    expect(
+      nextSeverityForRow(
+        row({
+          title: "China Expands Crackdown on Fake Australian Supplements",
+          summary: "Pharmaceutical exports were held at customs.",
+          topic: "apac_local",
+        }),
+      ),
+    ).toBe("moderate");
+  });
 });

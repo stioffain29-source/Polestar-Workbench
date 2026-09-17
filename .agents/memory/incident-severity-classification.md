@@ -24,6 +24,19 @@ deployment runtime which owns the writable DB.
 **How to apply:** if you change the classifier signals, re-run `pnpm --filter @workspace/scripts run
 backfill:severity -- --commit` on dev, and run the equivalent in the deployment to fix prod.
 
+## Local-clash and regulatory-enforcement caps
+
+A local resident/community-group dispute with exactly one non-fatal injury is Moderate, not High,
+unless the evidence names weapons, arson, deaths, multiple injuries, security-force involvement or
+wider operational disruption. A non-violent customs/counterfeit “crackdown” is regulatory
+enforcement and is also Moderate unless violence or major disruption is explicit.
+
+**Why:** the generic High vocabulary matched any “clash”, “injured” or “crackdown”, causing a
+one-injury parking-land dispute and a counterfeit-supplements customs action to appear as High.
+
+**How to apply:** keep these as narrow pre-High guards. Never weaken the High tier globally; preserve
+explicit lethal, armed, coercive and operational-impact overrides.
+
 ## Reaction / advocacy headline guard
 
 A headline LED by an advocacy/statement verb ("<group> demands ban … seeks justice for six slain
