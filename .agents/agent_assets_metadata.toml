@@ -1199,3 +1199,17 @@ mtime_ms = 1789655039934
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/899bce96-9408-45bd-a262-e803009c4daa/23476721-d230-4c5c-94f9-2584f6e07047"
 storage_version_token = "1789655164519786"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "xja4WnReYtAeAfdSSsnLV"
+uri = "file://deliverables/Polestar-APAC-Weekly.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly PDF"
+description = "Four-page delivery copy with a simplified filename."
+logical_id = "b5c9b1fa-42a8-4758-9fe5-f9b4878f67b7"
+content_hash = "sha256:2f01754aa3288bd0bf9f4c6d6f6b05013c843b51655ab36d1010f5cb829f486f"
+size = 1785286
+mtime_ms = 1789687941213
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/b5c9b1fa-42a8-4758-9fe5-f9b4878f67b7/b5cdf837-2d28-46b0-8085-ef3808c09695"
+storage_version_token = "1789687956975871"
+content_type = "application/pdf"
