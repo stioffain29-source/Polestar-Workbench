@@ -1,0 +1,315 @@
+REDESIGN THE MAIN INTELLIGENCE MAP CALLOUT SYSTEM
+
+The current implementation is not acceptable.
+
+The attached/current main map is showing tiny text boxes directly over the map, truncated incident descriptions, clusters competing with callouts and poor visual hierarchy.
+
+This needs to be redesigned.
+
+DO NOT CHANGE:
+• underlying map provider
+• incident coordinates
+• incident ingestion
+• severity logic
+• clustering logic
+• taxonomy
+• report data
+• source data
+
+This task is specifically about DISPLAY, CALLOUT DESIGN and MAP BEHAVIOUR.
+
+CORE PRINCIPLE
+
+The regional map must be readable immediately.
+
+At regional zoom:
+
+MAP = geographic context
+PINS = incident distribution
+CALLOUTS = only the most important incidents
+
+Do not attempt to display detailed information for every incident.
+
+--------------------------------------------------
+REGIONAL MAP BEHAVIOUR
+--------------------------------------------------
+
+When viewing APAC / large regional scale:
+
+Show:
+
+• normal incident pins
+• cluster markers where appropriate
+• maximum THREE featured incident callouts
+
+Do NOT expand every important incident into a small popup box.
+
+Only the three highest-priority/relevance incidents should receive expanded callouts.
+
+Other incidents remain pins or clusters.
+
+--------------------------------------------------
+CALLOUT DESIGN
+--------------------------------------------------
+
+Each featured callout must be substantially larger and cleaner than the current implementation.
+
+Recommended desktop width:
+240–300px
+
+Content:
+
+TITLE
+Maximum 2–5 words.
+
+SUMMARY
+Maximum 20–25 words.
+
+Example:
+
+STUDENT PROTEST
+
+Students were detained in Sentani while preparing to demonstrate against the Free Nutritious Meals programme.
+
+Do not display the full incident record.
+
+Do not truncate long database text inside the box.
+
+Instead, generate/use the short callout summary field.
+
+If no short summary exists, truncate intelligently to a complete sentence.
+
+NEVER end callout text with:
+"..."
+mid-sentence clipping
+database overflow
+
+--------------------------------------------------
+VISUAL STYLE
+--------------------------------------------------
+
+Callouts should use:
+
+• white background
+• strong clean border
+• subtle shadow
+• rounded corners consistent with Polestar UI
+• clear internal padding
+• bold title
+• smaller readable summary text
+• optional small category/severity icon
+• no huge coloured blocks
+
+Use existing Polestar colours and typography.
+
+The card must look like a deliberate UI component, not a browser popup.
+
+--------------------------------------------------
+LEADER LINES
+--------------------------------------------------
+
+Every expanded callout must have a visible leader line connecting it to the exact incident pin.
+
+The leader line must:
+
+• start at the relevant map pin
+• terminate at the callout edge
+• remain visually clear
+• not run through the callout body
+• not obscure other labels where avoidable
+• remain connected when map position changes
+
+The pin itself must remain visible.
+
+The visual relationship must be obvious:
+
+PIN
+   \
+    \
+     ───────── CALLOUT
+
+Do not simply position the callout directly on top of the incident.
+
+--------------------------------------------------
+CALLOUT POSITIONING
+--------------------------------------------------
+
+Use available empty map space.
+
+Priority order for placement:
+
+1. Empty sea / map space
+2. Outside major incident clusters
+3. Away from important country/city labels
+4. Away from other callouts
+
+The system should automatically test alternative positions:
+
+• left
+• right
+• upper-left
+• upper-right
+• lower-left
+• lower-right
+
+Choose the position with the least overlap.
+
+Do not allow callouts to:
+
+• overlap each other
+• extend outside the map container
+• cover their own incident pin
+• cover large incident clusters unnecessarily
+
+--------------------------------------------------
+REGIONAL MAP EXTENT
+--------------------------------------------------
+
+The current default regional view is unnecessarily wide.
+
+The APAC main view should focus primarily on the actual Polestar coverage area.
+
+Reduce irrelevant empty geography where practical.
+
+The default view should make Southeast Asia, East Asia and Oceania large enough that incidents can be understood.
+
+Do not waste large portions of the viewport showing Africa or other areas unrelated to the current map context.
+
+The viewport should still dynamically fit incidents where required.
+
+--------------------------------------------------
+CLUSTERS
+--------------------------------------------------
+
+Keep clusters, but visually subordinate them to featured callouts.
+
+Clusters should show only:
+
+• clean circular marker
+• incident count
+
+Do not expand cluster contents automatically.
+
+Clicking a cluster should zoom into that area.
+
+As the user zooms in:
+
+cluster → individual pins
+
+--------------------------------------------------
+ZOOM-DEPENDENT BEHAVIOUR
+--------------------------------------------------
+
+REGIONAL ZOOM
+
+• maximum 3 featured callouts
+• clusters
+• priority pins
+• very short summaries
+
+COUNTRY ZOOM
+
+• individual incidents become clearer
+• up to 3–5 relevant callouts may be shown where space permits
+
+CITY ZOOM
+
+• individual pins
+• click/tap incident to show one detailed popup
+• do not permanently cover the city map with numerous boxes
+
+--------------------------------------------------
+CLICK BEHAVIOUR
+--------------------------------------------------
+
+When the user clicks any normal incident pin:
+
+Show one clean incident card.
+
+That card can contain:
+
+• title
+• incident type
+• date/time
+• short summary
+• severity
+• View Incident / Read More action
+
+Only one clicked incident card should remain open at a time.
+
+--------------------------------------------------
+FEATURED INCIDENT SELECTION
+--------------------------------------------------
+
+The three regional callouts should use existing relevance/severity logic.
+
+Prioritise:
+
+1. highest operational relevance
+2. highest current severity
+3. significant new development
+4. geographical spread where practical
+
+Do not simply use the latest three incidents.
+
+Avoid showing three callouts from effectively the same location unless operationally justified.
+
+--------------------------------------------------
+TEXT SIZE
+--------------------------------------------------
+
+The current text is far too small.
+
+All callout text must remain comfortably readable at normal desktop resolution.
+
+Suggested minimum:
+
+Title: 14–16px bold
+Summary: 12–14px
+Metadata: 11–12px
+
+Do not reduce font size simply to fit more content.
+
+Reduce content instead.
+
+--------------------------------------------------
+TARGET APPEARANCE
+--------------------------------------------------
+
+The finished main map should visually read like this:
+
+                     ┌─────────────────────────────┐
+                     │ STUDENT PROTEST             │
+                     │ Students detained ahead of  │
+                     │ planned protest in Sentani. │
+                     └─────────────────────────────┘
+                                  /
+                                 /
+                            ● INCIDENT
+
+Other incidents nearby:
+
+●   ●   (4)   ●
+
+The featured incidents should immediately draw the eye.
+
+The rest of the map remains clean.
+
+--------------------------------------------------
+IMPORTANT
+
+Do not create a new separate map implementation.
+
+Inspect the current main map components, incident popup components, clustering component and map rendering logic.
+
+Modify the existing system.
+
+Before coding, identify:
+
+• map component
+• callout/popup component
+• cluster component
+• current featured incident selection logic
+• current zoom state logic
+
+Then implement the redesign within the existing architecture.

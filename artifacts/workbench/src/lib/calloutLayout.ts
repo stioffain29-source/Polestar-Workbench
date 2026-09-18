@@ -16,70 +16,58 @@ export interface CalloutPlacement {
   leaderY2: number;
 }
 
+export interface CalloutObstacle {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export function layoutCallouts(
   mapW: number,
   mapH: number,
   inputs: CalloutInput[],
-  padding = 4
+  padding = 12,
+  obstacles: CalloutObstacle[] = [],
 ): CalloutPlacement[] {
   const placements: CalloutPlacement[] = [];
   const rects: Array<{ left: number; top: number; right: number; bottom: number }> = [];
 
-  const overlaps = (left: number, top: number, w: number, h: number) => {
-    return rects.some((r) =>
-      left < r.right + padding &&
-      left + w + padding > r.left &&
-      top < r.bottom + padding &&
-      top + h + padding > r.top
-    );
-  };
+  const overlapArea = (
+    left: number,
+    top: number,
+    w: number,
+    h: number,
+    rect: CalloutObstacle,
+  ) => Math.max(0, Math.min(left + w, rect.right) - Math.max(left, rect.left))
+    * Math.max(0, Math.min(top + h, rect.bottom) - Math.max(top, rect.top));
 
   for (const input of inputs) {
     const { px, py, boxW, boxH } = input;
 
-    // Default offset: slightly to the right, or left if we're on the right edge
-    let left = px + 18;
-    if (px > mapW * 0.6) {
-      left = px - boxW - 18;
-    }
-    let top = py - boxH / 2;
-
-    left = Math.min(Math.max(left, padding), mapW - boxW - padding);
-    top = Math.min(Math.max(top, padding), mapH - boxH - padding);
-
-    if (overlaps(left, top, boxW, boxH)) {
-      // scan vertically
-      let candidateTop = top;
-      while (overlaps(left, candidateTop, boxW, boxH) && candidateTop + boxH + 6 <= mapH - padding) {
-        candidateTop += 6;
-      }
-      if (overlaps(left, candidateTop, boxW, boxH)) {
-        // scan up
-        candidateTop = top;
-        while (overlaps(left, candidateTop, boxW, boxH) && candidateTop - 6 >= padding) {
-          candidateTop -= 6;
-        }
-      }
-      if (overlaps(left, candidateTop, boxW, boxH)) {
-        // flip side
-        left = px < mapW / 2 ? px + 18 : px - boxW - 18;
-        // if it was on the right, now we flipped to left, etc.
-        // Actually, just try the other side
-        left = px > left ? px + 18 : px - boxW - 18;
-        left = Math.min(Math.max(left, padding), mapW - boxW - padding);
-        candidateTop = top;
-        while (overlaps(left, candidateTop, boxW, boxH) && candidateTop + boxH + 6 <= mapH - padding) {
-          candidateTop += 6;
-        }
-        if (overlaps(left, candidateTop, boxW, boxH)) {
-          candidateTop = top;
-          while (overlaps(left, candidateTop, boxW, boxH) && candidateTop - 6 >= padding) {
-            candidateTop -= 6;
-          }
-        }
-      }
-      top = candidateTop;
-    }
+    const gap = 34;
+    const candidates = [
+      [px + gap, py - boxH / 2],
+      [px - boxW - gap, py - boxH / 2],
+      [px + gap, py - boxH - gap / 2],
+      [px - boxW - gap, py - boxH - gap / 2],
+      [px + gap, py + gap / 2],
+      [px - boxW - gap, py + gap / 2],
+    ].map(([candidateLeft, candidateTop]) => {
+      const left = Math.min(Math.max(candidateLeft, padding), mapW - boxW - padding);
+      const top = Math.min(Math.max(candidateTop, padding), mapH - boxH - padding);
+      const calloutOverlap = rects.reduce((sum, rect) => sum + overlapArea(left, top, boxW, boxH, rect), 0);
+      const obstacleOverlap = obstacles.reduce((sum, rect) => sum + overlapArea(left, top, boxW, boxH, rect), 0);
+      const coversOwnPin = px >= left && px <= left + boxW && py >= top && py <= top + boxH;
+      const clampedDistance = Math.abs(left - candidateLeft) + Math.abs(top - candidateTop);
+      return {
+        left,
+        top,
+        score: calloutOverlap * 1000 + obstacleOverlap * 20 + (coversOwnPin ? 1_000_000 : 0) + clampedDistance,
+      };
+    });
+    candidates.sort((a, b) => a.score - b.score);
+    const { left, top } = candidates[0];
 
     const right = left + boxW;
     const bottom = top + boxH;

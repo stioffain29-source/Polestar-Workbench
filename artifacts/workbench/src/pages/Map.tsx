@@ -462,19 +462,21 @@ export default function MapPage() {
   );
 
   const top3Callouts = useMemo(() => {
-    // Out of the whole map, pick the top 3 most important incidents.
-    // Find their corresponding render point (either the point itself or its parent cluster).
-    const ranked = [...visiblePoints].sort((a, b) => severityRank(b.rating) - severityRank(a.rating));
-    const top3 = ranked.slice(0, 3);
+    const limit = zoom <= 5 ? 3 : zoom <= 8 ? 5 : 0;
+    if (limit === 0) return [];
+    const ranked = [...visiblePoints].sort((a, b) => {
+      const severityDifference = severityRank(b.rating) - severityRank(a.rating);
+      if (severityDifference !== 0) return severityDifference;
+      const newDifference = Number(newMarkerIds.includes(b.id)) - Number(newMarkerIds.includes(a.id));
+      return newDifference;
+    });
 
     const calloutPoints: Array<{ id: string, renderId: string, lat: number, lng: number, title: string, summary: string, severityColor: string }> = [];
-    for (const p of top3) {
-      // find which renderPoint contains this point
+    for (const p of ranked) {
       const renderPt = renderPoints.find(rp =>
         rp.id === p.id || (rp.clusterMembers && rp.clusterMembers.some(m => m.id === p.id))
       );
       if (renderPt) {
-        // avoid duplicates if multiple top3 are in the same cluster
         if (!calloutPoints.some(cp => cp.renderId === renderPt.id)) {
           calloutPoints.push({
             id: p.id,
@@ -485,11 +487,12 @@ export default function MapPage() {
             summary: clipCalloutSummary(p.summary),
             severityColor: SEV_COLOR[sevKey(p.rating)] ?? "#465bff"
           });
+          if (calloutPoints.length === limit) break;
         }
       }
     }
     return calloutPoints;
-  }, [visiblePoints, renderPoints]);
+  }, [newMarkerIds, renderPoints, visiblePoints, zoom]);
 
   // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
   // Leaflet's SVG renderer only applies pathOptions.className once, at the
@@ -642,7 +645,7 @@ export default function MapPage() {
             </div>
           )}
           <MapContainer
-            center={[15, 80]}
+            center={[12, 110]}
             zoom={4}
             minZoom={2}
             scrollWheelZoom
@@ -656,7 +659,17 @@ export default function MapPage() {
             />
             <MapZoomTracker onZoom={setZoom} />
             <div className="hidden md:block">
-              <CalloutsOverlay points={top3Callouts} />
+              <CalloutsOverlay
+                points={top3Callouts}
+                obstacles={renderPoints
+                  .filter((point) => (point.clusterSize ?? 0) > 1)
+                  .map((point) => ({
+                    id: point.id,
+                    lat: point.lat,
+                    lng: point.lng,
+                    radius: Math.min(10 + Math.log2(point.clusterSize ?? 2) * 3, 22),
+                  }))}
+              />
             </div>
             {renderPoints.map((p) => {
               // Markers within pixel-clustering range at the CURRENT zoom
@@ -715,6 +728,12 @@ export default function MapPage() {
                   <CircleMarker
                     center={[p.lat, p.lng]}
                     radius={clusterRadius}
+                    eventHandlers={{
+                      click: (event) => {
+                        event.target._map.setView([p.lat, p.lng], Math.min(zoom + 2, 12));
+                        requestAnimationFrame(() => event.target.closePopup());
+                      },
+                    }}
                     pathOptions={{
                       color: clusterStyle.stroke,
                       weight: 2,
@@ -725,7 +744,7 @@ export default function MapPage() {
                     <LeafletTooltip permanent direction="center" className="map-cluster-label" opacity={1}>
                       {p.clusterSize}
                     </LeafletTooltip>
-                    <LeafletPopup>
+                    {false && <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 260 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d", marginBottom: 4 }}>
                           {p.clusterSize} distinct developments in this area
@@ -826,7 +845,7 @@ export default function MapPage() {
                           </div>
                         )}
                       </div>
-                    </LeafletPopup>
+                    </LeafletPopup>}
                   </CircleMarker>
                   </Fragment>
                 );
@@ -898,7 +917,7 @@ export default function MapPage() {
                       </div>
                       {p.summary && (
                         <div style={{ fontSize: 11, color: "#363636", marginTop: 6, lineHeight: 1.35 }}>
-                          {p.summary.length > 220 ? `${p.summary.slice(0, 217)}…` : p.summary}
+                          {clipCalloutSummary(p.summary)}
                         </div>
                       )}
                       {p.corroborations.length > 0 && (
@@ -921,7 +940,18 @@ export default function MapPage() {
                     <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d" }}>
-                          {displayIncidentTitle(p.title, p.displayTitle)}
+                          {clipCalloutTitle(p.displayTitle ?? p.title)}
+                        </div>
+                        <div style={{ marginTop: 5, fontSize: 11, lineHeight: 1.4, color: "#5b6070" }}>
+                          {p.category} · {format(new Date(p.when), "dd MMM yyyy HH:mm")} · {SEVERITY_LABELS[p.rating] ?? p.rating}
+                        </div>
+                        {p.summary && (
+                          <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, color: "#363636" }}>
+                            {clipCalloutSummary(p.summary)}
+                          </div>
+                        )}
+                        <div style={{ marginTop: 6, fontSize: 11, color: "#5b6070" }}>
+                          {[p.country, p.location].filter(Boolean).join(" · ")}
                         </div>
                         {p.corroborations.length > 0 && (
                           <div style={{ marginTop: 6 }}>

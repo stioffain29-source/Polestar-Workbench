@@ -14,7 +14,20 @@ export interface CalloutPoint {
   severityColor: string;
 }
 
-export function CalloutsOverlay({ points }: { points: CalloutPoint[] }) {
+export interface CalloutObstaclePoint {
+  id: string;
+  lat: number;
+  lng: number;
+  radius: number;
+}
+
+export function CalloutsOverlay({
+  points,
+  obstacles = [],
+}: {
+  points: CalloutPoint[];
+  obstacles?: CalloutObstaclePoint[];
+}) {
   const map = useMap();
   const [placements, setPlacements] = useState<CalloutPlacement[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,12 +38,11 @@ export function CalloutsOverlay({ points }: { points: CalloutPoint[] }) {
       const mapW = map.getSize().x;
       const mapH = map.getSize().y;
 
+      const boxW = Math.min(280, Math.max(240, mapW * 0.24));
       const inputs = points.map((p, i) => {
         const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-        // We assume a fixed box width and estimate height based on text length
-        const boxW = 160;
-        const estLines = Math.ceil((p.summary.length * 5) / (boxW - 16));
-        const boxH = 24 + estLines * 12 + 12; // Rough estimate
+        const estLines = Math.max(1, Math.ceil(p.summary.length / 42));
+        const boxH = 48 + Math.min(estLines, 3) * 18;
         return {
           id: p.id || `c-${i}`,
           px: pt.x,
@@ -40,7 +52,16 @@ export function CalloutsOverlay({ points }: { points: CalloutPoint[] }) {
         };
       });
 
-      const newPlacements = layoutCallouts(mapW, mapH, inputs);
+      const obstacleRects = obstacles.map((obstacle) => {
+        const point = map.latLngToContainerPoint([obstacle.lat, obstacle.lng]);
+        return {
+          left: point.x - obstacle.radius - 10,
+          top: point.y - obstacle.radius - 10,
+          right: point.x + obstacle.radius + 10,
+          bottom: point.y + obstacle.radius + 10,
+        };
+      });
+      const newPlacements = layoutCallouts(mapW, mapH, inputs, 14, obstacleRects);
       setPlacements(newPlacements);
     };
 
@@ -49,7 +70,7 @@ export function CalloutsOverlay({ points }: { points: CalloutPoint[] }) {
     return () => {
       map.off("move zoom zoomend resize", update);
     };
-  }, [map, points]);
+  }, [map, obstacles, points]);
 
   return (
     <div ref={containerRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1000 }}>
@@ -83,21 +104,21 @@ export function CalloutsOverlay({ points }: { points: CalloutPoint[] }) {
                 position: "absolute",
                 left: pos.boxX,
                 top: pos.boxY,
-                width: 160,
+                width: "clamp(240px, 24vw, 280px)",
                 background: "#ffffff",
-                border: `1px solid ${POLAR}`,
-                borderLeft: `3px solid ${p.severityColor}`,
-                padding: "6px 8px",
-                borderRadius: "2px",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                border: "1px solid #aeb8c8",
+                borderTop: `3px solid ${p.severityColor}`,
+                padding: "12px 14px 13px",
+                borderRadius: "6px",
+                boxShadow: "0 4px 14px rgba(11,10,61,0.14)",
                 zIndex: 1000,
-                pointerEvents: "auto",
+                pointerEvents: "none",
               }}
             >
-              <div style={{ font: "700 11px/1.2 Roboto, sans-serif", color: NAVY, marginBottom: "3px" }}>
+              <div style={{ font: "700 15px/1.2 Roboto Condensed, Roboto, sans-serif", color: NAVY, marginBottom: "7px", letterSpacing: "0.02em" }}>
                 {p.title}
               </div>
-              <div style={{ font: "400 10px/1.35 Roboto, sans-serif", color: DUSK }}>
+              <div style={{ font: "400 13px/1.42 Roboto, sans-serif", color: DUSK }}>
                 {p.summary}
               </div>
             </div>
