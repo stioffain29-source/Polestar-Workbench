@@ -509,7 +509,27 @@ export function ApacHotspotMap({
     );
   }
 
-  const boxW = 160;
+  const boxW = 148;
+  const wrapSvgLines = (text: string, maxChars: number, maxLines: number): string[] => {
+    const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (candidate.length <= maxChars) {
+        line = candidate;
+      } else {
+        if (line) lines.push(line);
+        line = word;
+        if (lines.length === maxLines) break;
+      }
+    }
+    if (line && lines.length < maxLines) lines.push(line);
+    if (lines.length === maxLines && words.join(" ").length > lines.join(" ").length) {
+      lines[maxLines - 1] = `${lines[maxLines - 1].replace(/[.,;:!?]?$/, "")}…`;
+    }
+    return lines;
+  };
 
   const allIncidents = items.flatMap(i => i.developments.map((d, index) => ({
     ...d,
@@ -524,20 +544,18 @@ export function ApacHotspotMap({
 
   const prepared = top3.map((entry, index) => {
     const point = projectApac(entry.lng, entry.lat);
-    const title = clipCalloutTitle(entry.fullTitle);
+    const title = entry.label.toUpperCase();
     const summary = clipCalloutSummary(entry.summary || entry.fullTitle);
     const severityColor = SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC;
-
-    // Estimate height
-    const titleLines = Math.ceil(title.length / 25);
-    const summaryLines = Math.ceil(summary.length / 32);
-    const height = 12 + (titleLines * 12) + (summaryLines * 13) + 12;
+    const titleLines = wrapSvgLines(title, 25, 2);
+    const summaryLines = wrapSvgLines(summary, 36, 3);
+    const height = 10 + titleLines.length * 10 + 3 + summaryLines.length * 9 + 8;
 
     return {
       id: String(index),
       point,
-      title,
-      summary,
+      titleLines,
+      summaryLines,
       height,
       severityColor
     };
@@ -556,12 +574,13 @@ export function ApacHotspotMap({
   const mobilePrepared = mobileEntry ? {
     id: mobileEntry.id,
     point: projectApac(mobileEntry.lng, mobileEntry.lat),
-    title: clipCalloutTitle(mobileEntry.fullTitle),
-    summary: clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle),
-    height: 12
-      + Math.ceil(clipCalloutTitle(mobileEntry.fullTitle).length / 25) * 12
-      + Math.ceil(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle).length / 32) * 13
-      + 12,
+    titleLines: wrapSvgLines(mobileEntry.label.toUpperCase(), 25, 2),
+    summaryLines: wrapSvgLines(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle), 36, 3),
+    height: 10
+      + wrapSvgLines(mobileEntry.label.toUpperCase(), 25, 2).length * 10
+      + 3
+      + wrapSvgLines(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle), 36, 3).length * 9
+      + 8,
     severityColor: SEV_COLOR[sevKey(mobileEntry.severity)] ?? ELECTRIC,
   } : null;
   const mobilePlacement = mobilePrepared
@@ -608,16 +627,16 @@ export function ApacHotspotMap({
               <g key={i}>
                 <rect x={pos.boxX} y={pos.boxY} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
                 <rect x={pos.boxX} y={pos.boxY} width="3" height={entry.height} fill={entry.severityColor} rx="1" />
-                <foreignObject x={pos.boxX + 8} y={pos.boxY + 6} width={boxW - 16} height={entry.height - 12}>
-                  <div style={{ width: "100%", height: "100%" }}>
-                    <div style={{ font: "700 11px/1.2 Roboto, sans-serif", color: NAVY, marginBottom: "3px" }}>
-                      {entry.title}
-                    </div>
-                    <div style={{ font: "400 10px/1.35 Roboto, sans-serif", color: DUSK }}>
-                      {entry.summary}
-                    </div>
-                  </div>
-                </foreignObject>
+                <text x={pos.boxX + 9} y={pos.boxY + 13} fill={NAVY} fontFamily="Roboto, sans-serif" fontSize="8.5" fontWeight="700">
+                  {entry.titleLines.map((line, lineIndex) => (
+                    <tspan key={line} x={pos.boxX + 9} dy={lineIndex === 0 ? 0 : 10}>{line}</tspan>
+                  ))}
+                </text>
+                <text x={pos.boxX + 9} y={pos.boxY + 16 + entry.titleLines.length * 10} fill={DUSK} fontFamily="Roboto, sans-serif" fontSize="7.8" fontWeight="400">
+                  {entry.summaryLines.map((line, lineIndex) => (
+                    <tspan key={line} x={pos.boxX + 9} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
+                  ))}
+                </text>
               </g>
             );
           })}
@@ -636,16 +655,16 @@ export function ApacHotspotMap({
             <g>
               <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width={boxW} height={mobilePrepared.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
               <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width="3" height={mobilePrepared.height} fill={mobilePrepared.severityColor} rx="1" />
-              <foreignObject x={mobilePlacement.boxX + 8} y={mobilePlacement.boxY + 6} width={boxW - 16} height={mobilePrepared.height - 12}>
-                <div style={{ width: "100%", height: "100%" }}>
-                  <div style={{ font: "700 11px/1.2 Roboto, sans-serif", color: NAVY, marginBottom: "3px" }}>
-                    {mobilePrepared.title}
-                  </div>
-                  <div style={{ font: "400 10px/1.35 Roboto, sans-serif", color: DUSK }}>
-                    {mobilePrepared.summary}
-                  </div>
-                </div>
-              </foreignObject>
+              <text x={mobilePlacement.boxX + 9} y={mobilePlacement.boxY + 13} fill={NAVY} fontFamily="Roboto, sans-serif" fontSize="8.5" fontWeight="700">
+                {mobilePrepared.titleLines.map((line, lineIndex) => (
+                  <tspan key={line} x={mobilePlacement.boxX + 9} dy={lineIndex === 0 ? 0 : 10}>{line}</tspan>
+                ))}
+              </text>
+              <text x={mobilePlacement.boxX + 9} y={mobilePlacement.boxY + 16 + mobilePrepared.titleLines.length * 10} fill={DUSK} fontFamily="Roboto, sans-serif" fontSize="7.8" fontWeight="400">
+                {mobilePrepared.summaryLines.map((line, lineIndex) => (
+                  <tspan key={line} x={mobilePlacement.boxX + 9} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
+                ))}
+              </text>
             </g>
           </g>
         )}
@@ -1484,7 +1503,20 @@ export default function ReportPreview({
   const apacMapItems = (() => {
     if (report.topic !== "apac_weekly") return [];
     const core = buildApacMapItems(regionalCuratedIncidents)
-      .filter((item) => APAC_OUTLOOK_MARKETS.includes(item.country as (typeof APAC_OUTLOOK_MARKETS)[number]));
+      .filter((item) => APAC_OUTLOOK_MARKETS.includes(item.country as (typeof APAC_OUTLOOK_MARKETS)[number]))
+      .map((item) => {
+        const development = regionalDevelopments.find((row) => row.country === item.country);
+        if (!development) return item;
+        return {
+          ...item,
+          developments: item.developments.map((mapDevelopment) => ({
+            ...mapDevelopment,
+            label: clipTitleToMeaningfulWords(development.title, 5),
+            fullTitle: development.title,
+            summary: development.whatChanged,
+          })),
+        };
+      });
     const present = new Set(core.map((item) => item.country));
     const supplements = APAC_OUTLOOK_MARKETS.flatMap((country, index) => {
       if (present.has(country)) return [];
@@ -1502,10 +1534,10 @@ export default function ReportPreview({
         lat,
         lng,
         developments: [{
-          label: clipTitleToMeaningfulWords(fullTitle, 5),
+          label: clipTitleToMeaningfulWords(development?.title ?? fullTitle, 5),
           severity: development?.severity ?? SEV_LABEL[sevKey(incident?.severity)] ?? "Moderate",
-          fullTitle,
-          summary: incident?.summary ?? "",
+          fullTitle: development?.title ?? fullTitle,
+          summary: development?.whatChanged ?? incident?.summary ?? "",
         }],
       }];
     });

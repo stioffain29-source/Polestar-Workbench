@@ -91,7 +91,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
-import { buildApacBusinessImplications, buildApacMapItems, buildApacWeeklyBluf, buildApacWeeklyDevelopments, buildApacWeeklyOutlook, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildApacBusinessImplications, buildApacMapItems, buildApacWeeklyBluf, buildApacWeeklyDevelopments, buildApacWeeklyOutlook, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -1024,7 +1024,20 @@ function drawApacCompactText(
 }
 
 function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void {
-  const items = buildApacMapItems(incidents);
+  const developments = buildApacWeeklyDevelopments(incidents);
+  const items = buildApacMapItems(incidents).map((item) => {
+    const development = developments.find((row) => row.country === item.country);
+    if (!development) return item;
+    return {
+      ...item,
+      developments: item.developments.map((mapDevelopment) => ({
+        ...mapDevelopment,
+        label: clipTitleToMeaningfulWords(development.title, 5),
+        fullTitle: development.title,
+        summary: development.whatChanged,
+      })),
+    };
+  });
   drawApacCompactHeading(ctx, "Regional Risk Map");
   const mapH = 190;
   const minLng = 65, maxLng = 180, minLat = -15, maxLat = 60;
@@ -1093,8 +1106,8 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
 
   const prepared = top3.map((entry, index) => {
     const pointLocal = projectLocal(entry.lng, entry.lat);
-    const title = clipCalloutTitle(entry.fullTitle);
-    const summary = clipCalloutSummary(entry.summary);
+    const title = entry.label.toUpperCase();
+    const summary = clipCalloutSummary(entry.summary || entry.fullTitle);
     const severityColor = SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC;
 
     // Estimate height
@@ -1133,11 +1146,13 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
   }
 
   // Draw pins above leaders but below boxes
-  for (const entry of prepared) {
-    setFill(ctx.pdf, entry.severityColor);
+  for (const item of items) {
+    const development = item.developments[0];
+    const pointLocal = projectLocal(item.lng, item.lat);
+    setFill(ctx.pdf, SEV_COLOR[sevKey(development?.severity)] ?? ELECTRIC);
     setStroke(ctx.pdf, "#ffffff");
     ctx.pdf.setLineWidth(1);
-    ctx.pdf.circle(ctx.MX + entry.pointLocal[0], mapTop + entry.pointLocal[1], 3.5, "FD");
+    ctx.pdf.circle(ctx.MX + pointLocal[0], mapTop + pointLocal[1], 3.5, "FD");
   }
 
   // Draw boxes
