@@ -726,16 +726,36 @@ function RegionalHotspotMap({
           severity: p.severity,
           primary: false,
           markerNumber: index + 1,
-          expandedCallout: {
-            id: p.title,
-            title: `${index + 1}. ${clipCalloutTitle(p.title)}`,
-            summary: clipCalloutSummary(p.summary),
-            severityColor: SEV_COLOR[sevKey(p.severity)] ?? "#465bff"
-          }
         }))}
         height={320}
         showLabels={false}
       />
+      <div
+        className="grid grid-cols-3 gap-px border-t border-[#d2d6e1] bg-[#d2d6e1]"
+        style={{ fontFamily: "Roboto, sans-serif" }}
+      >
+        {top3Points.map((point, index) => {
+          const severityColor = SEV_COLOR[sevKey(point.severity)] ?? "#465bff";
+          return (
+            <div key={`${point.title}-${index}`} className="bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{ backgroundColor: severityColor }}
+                >
+                  {index + 1}
+                </span>
+                <span className="text-[10px] font-bold uppercase leading-tight" style={{ color: NAVY }}>
+                  {clipCalloutTitle(point.title)}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[9px] leading-[1.35]" style={{ color: "#4b5063" }}>
+                {clipCalloutSummary(point.summary)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
