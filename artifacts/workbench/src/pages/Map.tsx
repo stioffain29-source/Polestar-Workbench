@@ -525,7 +525,7 @@ export default function MapPage() {
   }
 
   return (
-    <div className="max-w-[1800px] mx-auto space-y-4">
+    <div className="w-full max-w-none space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight">Geospatial Map</h1>
@@ -584,7 +584,10 @@ export default function MapPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4">
-        <div className="relative rounded-sm border border-border overflow-hidden" style={{ height: "72vh" }}>
+        <div
+          className="relative rounded-sm border border-border overflow-hidden"
+          style={{ height: "calc(100vh - 180px)", minHeight: 560, maxHeight: 1000 }}
+        >
           {!incidentsLoading && windowedPoints.length === 0 && (
             <div
               className="absolute inset-0 z-[900] flex items-center justify-center bg-background/55 pointer-events-none"

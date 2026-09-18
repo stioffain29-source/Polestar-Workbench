@@ -183,7 +183,7 @@ export default function PublicationCalendar() {
   const today = new Date();
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-5">
+    <div className="w-full max-w-none space-y-5">
       <div className="flex items-end justify-between">
         <div>
           <div className="text-xs font-sans uppercase tracking-widest text-muted-foreground">Operations</div>
