@@ -47,18 +47,6 @@ export default function RegionalReports() {
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
     const issueDate = currentReportDate();
-    const existing = reports
-      .filter(
-        (report) =>
-          report.topic === topic &&
-          report.issueDate === issueDate &&
-          report.status === "draft",
-      )
-      .sort((a, b) => b.id - a.id)[0];
-    if (existing) {
-      setLocation(`/reports/${existing.id}`);
-      return;
-    }
     createBusy.current = true;
     setCreatingTopic(topic);
     const controller = new AbortController();
@@ -123,12 +111,14 @@ export default function RegionalReports() {
         {REGIONAL_REPORT_TOPICS.map((topic) => {
           const product = canonicalTopic(topic);
           const currentIssueDate = currentReportDate();
-          const hasCurrentReport = reports.some(
-            (report) =>
-              report.topic === topic &&
-              report.issueDate === currentIssueDate &&
-              report.status === "draft",
-          );
+          const currentReport = reports
+            .filter(
+              (report) =>
+                report.topic === topic &&
+                report.issueDate === currentIssueDate &&
+                report.status === "draft",
+            )
+            .sort((a, b) => b.id - a.id)[0];
           return (
             <section
               key={topic}
@@ -146,18 +136,26 @@ export default function RegionalReports() {
                   {product.subtitle}
                 </p>
               </div>
-              <Button
-                onClick={() => createRegionalReport(topic)}
-                disabled={creatingTopic !== null}
-                className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm shrink-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {creatingTopic === topic
-                  ? "Creating…"
-                  : hasCurrentReport
-                    ? "Open Current Report"
-                    : "New Weekly Report"}
-              </Button>
+              <div className="flex shrink-0 flex-col items-stretch gap-2">
+                <Button
+                  onClick={() => createRegionalReport(topic)}
+                  disabled={creatingTopic !== null}
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  {creatingTopic === topic ? "Creating…" : "New Weekly Report"}
+                </Button>
+                {currentReport && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setLocation(`/reports/${currentReport.id}`)}
+                    disabled={creatingTopic !== null}
+                    className="rounded-sm"
+                  >
+                    Open Current Report
+                  </Button>
+                )}
+              </div>
             </section>
           );
         })}
