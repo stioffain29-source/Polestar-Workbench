@@ -28,6 +28,7 @@ import {
   buildRegionalGlanceItems,
   buildRegionalMapPoints,
   buildApacMapItems,
+  clipTitleToMeaningfulWords,
   buildApacBusinessImplications,
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
@@ -462,13 +463,33 @@ const apacMapFeatures = (() => {
 })();
 
 const APAC_CALLOUT_OFFSETS: Record<string, [number, number]> = {
-  Australia: [18, 20],
+  Australia: [14, 8],
   China: [24, -44],
-  India: [-145, -18],
+  India: [-132, 12],
   Malaysia: [-145, 20],
-  Myanmar: [-145, 18],
+  Myanmar: [-132, -32],
   "Papua New Guinea": [20, -5],
   Philippines: [22, -34],
+};
+
+const APAC_OUTLOOK_MARKETS = [
+  "Australia",
+  "Myanmar",
+  "India",
+  "Philippines",
+  "China",
+  "Papua New Guinea",
+  "Malaysia",
+] as const;
+
+const APAC_MARKET_COORDS: Record<(typeof APAC_OUTLOOK_MARKETS)[number], [number, number]> = {
+  Australia: [-25.3, 133.8],
+  Myanmar: [21.9, 95.9],
+  India: [20.6, 78.9],
+  Philippines: [12.9, 121.8],
+  China: [35.9, 104.2],
+  "Papua New Guinea": [-6.3, 143.9],
+  Malaysia: [4.2, 102.0],
 };
 
 export function ApacHotspotMap({
@@ -521,7 +542,7 @@ export function ApacHotspotMap({
       item,
       point: projectApac(item.lng, item.lat),
       lines,
-      height: 10 + lines.length * 8 + 3,
+      height: 10 + lines.length * 9 + 3,
       worstSevStr,
       severityColor
     };
@@ -557,29 +578,20 @@ export function ApacHotspotMap({
     boxes.push({ ...box, entry, anchorX, anchorY });
   }
 
-  const severityByCountry = new Map(prepared.map((entry) => [
-    entry.item.country.toLowerCase(),
-    entry.severityColor,
-  ]));
-
   return (
     <div className="border border-[#bdc8d6] bg-[#dfeaf3] overflow-hidden w-full">
       <svg viewBox={`0 0 ${APAC_MAP_CW} ${APAC_MAP_H}`} className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
         <rect width={APAC_MAP_CW} height={APAC_MAP_H} fill="#dfeaf3" />
-        {apacMapFeatures.map((feature) => {
-          const selectedColor = severityByCountry.get(feature.name.toLowerCase());
-          return (
-            <path
-              key={feature.name}
-              d={feature.d}
-              fill={selectedColor ?? "#f7f4ed"}
-              fillOpacity={selectedColor ? 0.42 : 1}
-              stroke={selectedColor ? "#283b55" : "#8999aa"}
-              strokeWidth={selectedColor ? 0.9 : 0.5}
-              strokeLinejoin="round"
-            />
-          );
-        })}
+        {apacMapFeatures.map((feature) => (
+          <path
+            key={feature.name}
+            d={feature.d}
+            fill="#f7f4ed"
+            stroke="#8999aa"
+            strokeWidth="0.5"
+            strokeLinejoin="round"
+          />
+        ))}
 
         {/* Draw every connector beneath every callout so a line can never cross visible box content. */}
         {boxes.map((box, i) => {
@@ -608,7 +620,7 @@ export function ApacHotspotMap({
 
               {/* Text Lines */}
               {entry.lines.map((line, lineIdx) => {
-                const yOffset = box.top + 8 + lineIdx * 8;
+                const yOffset = box.top + 8 + lineIdx * 9;
                 if (line.isCountry) {
                   return (
                     <text key={lineIdx} x={box.left + 5} y={yOffset} fill={NAVY} fontSize="8" fontWeight="bold" fontFamily="Roboto, sans-serif">
@@ -623,7 +635,7 @@ export function ApacHotspotMap({
                   );
                 } else {
                   return (
-                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={DUSK} fontSize="7" fontFamily="Roboto, sans-serif">
+                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={DUSK} fontSize="7.8" fontWeight="500" fontFamily="Roboto, sans-serif">
                       {line.text}
                     </text>
                   );
@@ -1429,10 +1441,38 @@ export default function ReportPreview({
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
-  const apacMapItems = report.topic === "apac_weekly" ? buildApacMapItems(regionalCuratedIncidents) : [];
+  const apacMapItems = (() => {
+    if (report.topic !== "apac_weekly") return [];
+    const core = buildApacMapItems(regionalCuratedIncidents)
+      .filter((item) => APAC_OUTLOOK_MARKETS.includes(item.country as (typeof APAC_OUTLOOK_MARKETS)[number]));
+    const present = new Set(core.map((item) => item.country));
+    const supplements = APAC_OUTLOOK_MARKETS.flatMap((country, index) => {
+      if (present.has(country)) return [];
+      const incident = regionalCuratedIncidents.find((row) => row.country?.trim() === country)
+        ?? incidents.find((row) => row.country?.trim() === country);
+      const development = regionalDevelopments.find((row) => row.country === country);
+      if (!incident && !development) return [];
+      const fullTitle = incident
+        ? displayIncidentTitle(incident.title, incident.displayTitle)
+        : development!.title;
+      const [lat, lng] = APAC_MARKET_COORDS[country];
+      return [{
+        id: -(index + 1),
+        country,
+        lat,
+        lng,
+        developments: [{
+          label: clipTitleToMeaningfulWords(fullTitle, 5),
+          severity: development?.severity ?? SEV_LABEL[sevKey(incident?.severity)] ?? "Moderate",
+          fullTitle,
+        }],
+      }];
+    });
+    return [...core, ...supplements];
+  })();
   const apacGlanceMetrics = report.topic === "apac_weekly" ? [
     { label: "Material Developments", value: regionalDevelopments.length.toString() },
-    { label: "Markets Affected", value: new Set(regionalDevelopments.map(d => d.country)).size.toString() },
+    { label: "Markets Affected", value: apacMapItems.length.toString() },
     { label: "Operational Disruptions", value: regionalDevelopments.filter(d => d.category === "Operational Disruption").length.toString() },
     { label: "Regulatory Changes", value: regionalDevelopments.filter(d => d.category === "Regulatory").length.toString() },
     { label: "Forward Watch Items", value: regionalDevelopments.filter(d => d.whatToWatch || d.outlook7Days).length.toString() },
