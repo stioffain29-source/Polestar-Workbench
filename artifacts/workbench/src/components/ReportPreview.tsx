@@ -418,21 +418,25 @@ function RegionalWatchlist({
 
 
 const APAC_MAP_CW = 535;
-const APAC_MAP_H = 190;
-const APAC_MAP_MIN_LNG = 65;
-const APAC_MAP_MAX_LNG = 180;
-const APAC_MAP_MIN_LAT = -15;
-const APAC_MAP_MAX_LAT = 60;
+const APAC_MAP_H = 280;
+const APAC_MAP_MIN_LNG = 67;
+const APAC_MAP_MAX_LNG = 178;
+const APAC_MAP_MIN_LAT = -48;
+const APAC_MAP_MAX_LAT = 56;
 
 const projectApac = (lng: number, lat: number): [number, number] => [
   8 + ((lng - APAC_MAP_MIN_LNG) / (APAC_MAP_MAX_LNG - APAC_MAP_MIN_LNG)) * (APAC_MAP_CW - 16),
   6 + ((APAC_MAP_MAX_LAT - lat) / (APAC_MAP_MAX_LAT - APAC_MAP_MIN_LAT)) * (APAC_MAP_H - 12),
 ];
 
-const apacMapPaths = (() => {
-  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
-  const pathD: string[] = [];
+const apacMapFeatures = (() => {
+  const collection = worldCompleteGeo as unknown as FeatureCollection<
+    Polygon | MultiPolygon,
+    { name?: string }
+  >;
+  const features: Array<{ name: string; d: string }> = [];
   for (const feature of collection.features) {
+    const pathD: string[] = [];
     const polygons = feature.geometry.type === "Polygon"
       ? [feature.geometry.coordinates]
       : feature.geometry.coordinates;
@@ -450,9 +454,22 @@ const apacMapPaths = (() => {
         pathD.push(d);
       }
     }
+    if (pathD.length > 0) {
+      features.push({ name: feature.properties?.name ?? "", d: pathD.join(" ") });
+    }
   }
-  return pathD.join(" ");
+  return features;
 })();
+
+const APAC_CALLOUT_OFFSETS: Record<string, [number, number]> = {
+  Australia: [18, 20],
+  China: [24, -44],
+  India: [-145, -18],
+  Malaysia: [-145, 20],
+  Myanmar: [-145, 18],
+  "Papua New Guinea": [20, -5],
+  Philippines: [22, -34],
+};
 
 export function ApacHotspotMap({
   items,
@@ -467,11 +484,7 @@ export function ApacHotspotMap({
     );
   }
 
-  const mapLeft = 4;
-  const mapRight = APAC_MAP_CW - 4;
-  const mapTop = 4;
-  const mapBottom = APAC_MAP_H - 4;
-  const boxW = Math.min(158, APAC_MAP_CW * 0.34);
+  const boxW = 132;
 
   const prepared = items.map((item) => {
     const severities = item.developments.map((d) => d.severity);
@@ -508,16 +521,11 @@ export function ApacHotspotMap({
       item,
       point: projectApac(item.lng, item.lat),
       lines,
-      height: 10 + lines.length * 8 + 3, // slightly extra height for the severity line
+      height: 10 + lines.length * 8 + 3,
       worstSevStr,
       severityColor
     };
   });
-
-  const lanes: Array<typeof prepared> = [[], []];
-  [...prepared]
-    .sort((a, b) => a.point[1] - b.point[1] || a.point[0] - b.point[0])
-    .forEach((entry) => lanes[entry.point[0] < APAC_MAP_CW * 0.43 ? 0 : 1].push(entry));
 
   const boxes: Array<{
     left: number;
@@ -529,26 +537,49 @@ export function ApacHotspotMap({
     anchorY: number;
   }> = [];
 
-  lanes.forEach((lane, laneIndex) => {
-    let nextTop = mapTop;
-    for (const entry of lane) {
-      const [px, py] = entry.point;
-      const left = laneIndex === 0 ? mapLeft : mapRight - boxW;
-      const preferredTop = py - entry.height / 2;
-      const top = Math.min(Math.max(preferredTop, nextTop), mapBottom - entry.height);
-      const box = { left, top, right: left + boxW, bottom: top + entry.height };
-      nextTop = box.bottom + 6;
-      const anchorX = laneIndex === 0 ? box.right : box.left;
-      const anchorY = Math.min(Math.max(py, box.top + 5), box.bottom - 5);
-      boxes.push({ ...box, entry, anchorX, anchorY });
-    }
-  });
+  for (const entry of prepared) {
+    const [px, py] = entry.point;
+    const [dx, dy] = APAC_CALLOUT_OFFSETS[entry.item.country] ??
+      (px < APAC_MAP_CW / 2 ? [-145, 0] : [18, 0]);
+    const left = Math.min(Math.max(px + dx, 4), APAC_MAP_CW - boxW - 4);
+    let top = Math.min(Math.max(py + dy, 4), APAC_MAP_H - entry.height - 4);
+    const overlaps = (candidateTop: number) => boxes.some((box) =>
+      left < box.right + 4 &&
+      left + boxW + 4 > box.left &&
+      candidateTop < box.bottom + 4 &&
+      candidateTop + entry.height + 4 > box.top
+    );
+    while (overlaps(top) && top + entry.height + 6 <= APAC_MAP_H - 4) top += 6;
+    while (overlaps(top) && top - 6 >= 4) top -= 6;
+    const box = { left, top, right: left + boxW, bottom: top + entry.height };
+    const anchorX = px < box.left ? box.left : px > box.right ? box.right : Math.min(Math.max(px, box.left + 6), box.right - 6);
+    const anchorY = py < box.top ? box.top : py > box.bottom ? box.bottom : Math.min(Math.max(py, box.top + 5), box.bottom - 5);
+    boxes.push({ ...box, entry, anchorX, anchorY });
+  }
+
+  const severityByCountry = new Map(prepared.map((entry) => [
+    entry.item.country.toLowerCase(),
+    entry.severityColor,
+  ]));
 
   return (
-    <div className="border border-[#d2d6e1] bg-[#f3f6fa] overflow-hidden w-full">
+    <div className="border border-[#bdc8d6] bg-[#dfeaf3] overflow-hidden w-full">
       <svg viewBox={`0 0 ${APAC_MAP_CW} ${APAC_MAP_H}`} className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
-        {/* Background landmasses */}
-        <path d={apacMapPaths} fill="#dce5ef" stroke="#9cabbf" strokeWidth="0.4" strokeLinejoin="round" />
+        <rect width={APAC_MAP_CW} height={APAC_MAP_H} fill="#dfeaf3" />
+        {apacMapFeatures.map((feature) => {
+          const selectedColor = severityByCountry.get(feature.name.toLowerCase());
+          return (
+            <path
+              key={feature.name}
+              d={feature.d}
+              fill={selectedColor ?? "#f7f4ed"}
+              fillOpacity={selectedColor ? 0.42 : 1}
+              stroke={selectedColor ? "#283b55" : "#8999aa"}
+              strokeWidth={selectedColor ? 0.9 : 0.5}
+              strokeLinejoin="round"
+            />
+          );
+        })}
 
         {/* Lines and Boxes */}
         {boxes.map((box, i) => {
@@ -558,10 +589,10 @@ export function ApacHotspotMap({
           return (
             <g key={i}>
               {/* Leader Line */}
-              <line x1={px} y1={py} x2={box.anchorX} y2={box.anchorY} stroke="#718096" strokeWidth="0.45" />
+              <line x1={px} y1={py} x2={box.anchorX} y2={box.anchorY} stroke="#344a65" strokeWidth="0.8" />
 
               {/* Box */}
-              <rect x={box.left} y={box.top} width={boxW} height={entry.height} fill="#ffffff" stroke={entry.severityColor} strokeWidth="0.7" rx="1" />
+              <rect x={box.left} y={box.top} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={entry.severityColor} strokeWidth="0.9" rx="1" />
 
               {/* Text Lines */}
               {entry.lines.map((line, lineIdx) => {
