@@ -55,6 +55,8 @@ export function layoutCallouts(
       [px - boxW - gap, py - boxH - gap / 2],
       [px + gap, py + gap / 2],
       [px - boxW - gap, py + gap / 2],
+      [px - boxW / 2, py - boxH - gap],
+      [px - boxW / 2, py + gap],
     ].map(([candidateLeft, candidateTop]) => {
       const left = Math.min(Math.max(candidateLeft, padding), mapW - boxW - padding);
       const top = Math.min(Math.max(candidateTop, padding), mapH - boxH - padding);
@@ -65,7 +67,7 @@ export function layoutCallouts(
       return {
         left,
         top,
-        score: calloutOverlap * 1000 + obstacleOverlap * 20 + (coversOwnPin ? 1_000_000 : 0) + clampedDistance,
+        score: calloutOverlap * 1000 + obstacleOverlap * 10_000 + (coversOwnPin ? 1_000_000 : 0) + clampedDistance,
       };
     });
     candidates.sort((a, b) => a.score - b.score);

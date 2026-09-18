@@ -186,7 +186,19 @@ export default function IncidentMap({
           boxH: co.box.offsetHeight || 60,
         };
       });
-      const placements = layoutCallouts(mapW, mapH, inputs);
+      // A callout must never cover another incident marker: doing so makes a
+      // leader line appear to point into the card rather than to its event.
+      const markerObstacles = dotsRef.current.map((dot) => {
+        const p = map.latLngToContainerPoint([dot.lat, dot.lng]);
+        const clearance = Math.max(dot.size / 2 + 10, 14);
+        return {
+          left: p.x - clearance,
+          top: p.y - clearance,
+          right: p.x + clearance,
+          bottom: p.y + clearance,
+        };
+      });
+      const placements = layoutCallouts(mapW, mapH, inputs, 12, markerObstacles);
       for (let i = 0; i < visibleCallouts.length; i++) {
         const co = visibleCallouts[i];
         const pos = placements[i];
