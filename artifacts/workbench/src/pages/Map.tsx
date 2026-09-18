@@ -356,7 +356,6 @@ export default function MapPage() {
       const incidentPoints = distinctIncidents
         .filter(
           (i) =>
-            i.location != null &&
             i.latitude != null &&
             i.longitude != null &&
             Number.isFinite(i.latitude) &&
