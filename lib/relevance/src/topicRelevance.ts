@@ -1271,6 +1271,9 @@ const FP_OVERSEAS_PROTEST_RE = /\b(protest|demonstrat|rally|clash|picket|vigil|g
 const FP_APAC_ANCHOR_RE =
   /\b(?:australia|australian|australians|sydney|melbourne|brisbane|canberra|perth|adelaide|new zealand|new zealander|new zealanders|auckland|wellington|christchurch|dunedin|bangladesh|bangladeshi|bangladeshis|dhaka|chittagong|chattogram|comilla|cumilla|rangpur|sylhet|khulna|rajshahi|barisal|barishal|mymensingh|gazipur|narayanganj|china|beijing|shanghai|guangzhou|shenzhen|hong kong|wuhan|chengdu|xinjiang|india|indian|indians|delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|imphal|guwahati|lucknow|patna|manipur|indonesia|indonesian|indonesians|jakarta|java|sumatra|bali|sulawesi|surabaya|bandung|medan|makassar|yogyakarta|semarang|aceh|japan|japanese|tokyo|osaka|kyoto|yokohama|nagoya|fukuoka|malaysia|malaysian|malaysians|kuala lumpur|penang|johor|sabah|sarawak|putrajaya|myanmar|burma|burmese|yangon|mandalay|naypyidaw|nepal|nepali|nepalis|nepalese|kathmandu|pokhara|biratnagar|pakistan|pakistani|pakistanis|karachi|lahore|islamabad|rawalpindi|peshawar|quetta|multan|faisalabad|philippines|philippine|filipino|filipina|filipinos|filipinas|manila|cebu|davao|quezon|mindanao|iloilo|baguio|zamboanga|pnp|south korea|south korean|south koreans|seoul|busan|incheon|daegu|sri lanka|sri lankan|sri lankans|colombo|kandy|jaffna|galle|negombo|thailand|thai|thais|bangkok|chiang mai|phuket|vietnam|viet nam|vietnamese|hanoi|ho chi minh|haiphong|jamaat|shibir|awami|rohingya|naxal|maoist|hartal|tehreek|imran khan|papua|papuan|papua new guinea|png|port moresby|lae|taraka|mount hagen|mt hagen|bougainville|enga|hela|highlands highway|madang|morobe|kokopo|goroka|wewak|kimbe|tari|pngdf|rpngc|marape|bismarck archipelago|west papua|papua barat|jayapura|wamena|manokwari|sorong|merauke|nabire|timika|mimika|biak|fakfak|jayawijaya|free west papua|opm|tpnpb|intan jaya|nduga|puncak jaya|paniai|ilaga|sugapa|yahukimo|dekai|maybrat|beoga|lanny jaya|tolikara|dogiyai|deiyai|keerom|sarmi|waropen|supiori|boven digoel)\b/i;
 
+const CONFLICT_MIDDLE_EAST_ANCHOR_RE =
+  /\b(?:syria|syrian|damascus|aleppo|idlib|homs|latakia|deir ez-zor|hasakah|raqqa|iraq|iraqi|baghdad|mosul|kirkuk|basra|erbil|iran|iranian|tehran|israel|israeli|jerusalem|tel aviv|haifa|palestine|palestinian|gaza|west bank|ramallah|jenin|nablus|lebanon|lebanese|beirut|bekaa|yemen|yemeni|sanaa|aden|hodeidah|houthi|houthis|jordan|jordanian|amman|turkey|türkiye|turkiye|turkish|ankara|istanbul|saudi arabia|saudi|riyadh|jeddah|united arab emirates|uae|emirati|abu dhabi|dubai|oman|omani|muscat|qatar|qatari|doha|bahrain|bahraini|manama|kuwait|kuwaiti)\b/i;
+
 // Out-of-region theatre — countries / capitals / leaders OUTSIDE the 15-country
 // APAC scope (Latin America, the Middle East, Africa, non-APAC Europe/Eurasia,
 // the Americas, G7/G20 summits). A flashpoint/protests record that names one of
@@ -2730,9 +2733,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     const geo = mastheadStrippedGeoText(i);
     if (
       (FP_OFFSHORE_THEATRE_RE.test(geo) || NIGERIA_LOCAL_THEATRE_RE.test(geo)) &&
-      !FP_APAC_ANCHOR_RE.test(geo)
+      !FP_APAC_ANCHOR_RE.test(geo) &&
+      !CONFLICT_MIDDLE_EAST_ANCHOR_RE.test(geo)
     ) {
-      return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC anchor)" };
+      return { relevant: false, reason: "excluded: out-of-region theatre (foreign syndication, no APAC/Middle East anchor)" };
     }
   }
 
