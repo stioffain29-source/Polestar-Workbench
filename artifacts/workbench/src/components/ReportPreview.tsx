@@ -710,25 +710,27 @@ function RegionalHotspotMap({
       </p>
     );
   }
-  const sortedPoints = [...points].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-  const top3Ids = new Set(sortedPoints.slice(0, 3).map(p => p.title)); // using title as unique enough here
+  // buildRegionalMapPoints preserves the curated materiality order from
+  // selectRegionalKeyDevelopments. The map is intentionally limited to the
+  // first three issues that matter most, rather than re-ranking by severity.
+  const top3Points = points.slice(0, 3);
 
   return (
     <div className="border border-[#d2d6e1] bg-[#f7f8fb]">
       <IncidentMap
-        points={points.map(p => ({
+        points={top3Points.map(p => ({
           lat: p.lat,
           lng: p.lng,
           title: p.title,
           label: p.label,
           severity: p.severity,
           primary: false,
-          expandedCallout: top3Ids.has(p.title) ? {
+          expandedCallout: {
             id: p.title,
             title: clipCalloutTitle(p.title),
             summary: clipCalloutSummary(p.summary),
             severityColor: SEV_COLOR[sevKey(p.severity)] ?? "#465bff"
-          } : undefined
+          }
         }))}
         height={320}
         showLabels={false}
@@ -1891,7 +1893,7 @@ export default function ReportPreview({
             </Section>
 
             <div style={{ marginTop: 24, marginBottom: 32 }}>
-              <ApacHotspotMap items={apacMapItems} />
+              <RegionalHotspotMap points={regionalMapPoints} />
             </div>
 
             <Section hidden={!show("fast-facts")} title="Week at a Glance">

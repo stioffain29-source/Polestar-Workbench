@@ -1,0 +1,109 @@
+REGIONAL WEEKLY MAPS ONLY.
+
+Apply this change to BOTH:
+
+1. POLESTAR APAC WEEKLY
+2. POLESTAR MIDDLE EAST WEEKLY
+
+Keep the current callout design.
+
+Make ONLY these two changes.
+
+1. USE A NORMAL MAP
+
+Replace the current simplified/stylised basemap with a normal geographic basemap.
+
+Use a clean, light standard map showing:
+
+- country boundaries
+- country names
+- major coastlines
+- recognisable geography
+
+Preferred style:
+standard light OpenStreetMap / CARTO-style basemap suitable for a corporate intelligence report.
+
+Do NOT use:
+
+- abstract map shapes
+- heavily simplified geography
+- satellite imagery
+- dark map styling
+- terrain relief
+- decorative map graphics
+
+The reader must immediately recognise the geography.
+
+Keep the basemap visually quiet so the intelligence callouts remain dominant.
+
+APAC WEEKLY:
+Use an APAC regional extent appropriate to the selected developments.
+
+MIDDLE EAST WEEKLY:
+Use a Middle East regional extent appropriate to the selected developments.
+
+2. SHOW ONLY THREE DEVELOPMENTS
+
+Maximum:
+3 callouts per weekly regional map.
+
+Select the THREE MOST MATERIAL developments from the curated report.
+
+Do not select randomly.
+
+Selection priority:
+
+- operational consequence
+- regional significance
+- severity
+- relevance to business
+- forward relevance
+
+Each callout should contain:
+
+SHORT DEVELOPMENT TITLE
+
+1–2 sentence concise explanation
+
+Severity accent
+
+Do not add:
+
+- flags
+- numbered markers
+- side panels
+- cluster counts
+- raw article excerpts
+- more than three callouts
+
+The map is not intended to show every development.
+
+Its purpose is to visually communicate:
+
+THE THREE ISSUES THAT MATTER MOST THIS WEEK.
+
+IMPORTANT
+
+Apply exactly the same map logic to:
+
+POLESTAR APAC WEEKLY
+POLESTAR MIDDLE EAST WEEKLY
+
+Do not change:
+
+- Regional Outlook prose
+- Week at a Glance
+- Key Developments
+- report generation logic
+- other graphics
+- PDF export
+- any other Polestar report
+
+Change only:
+
+1. basemap style
+2. maximum map callouts = 3
+
+Generate APAC Weekly and Middle East Weekly.
+
+STOP.
