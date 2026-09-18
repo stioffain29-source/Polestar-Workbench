@@ -860,9 +860,12 @@ export default function MapPage() {
                     fillColor: s.fill,
                     fillOpacity: s.fillOpacity,
                   }}
-                  eventHandlers={
-                    isNew ? { click: () => clearMarkers([p.id]) } : undefined
-                  }
+                  eventHandlers={{
+                    click: (event) => {
+                      if (isNew) clearMarkers([p.id]);
+                      event.target.openPopup();
+                    },
+                  }}
                 >
                   {false && <LeafletTooltip direction="top" offset={[0, -6]}>
                     <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
