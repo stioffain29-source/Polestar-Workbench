@@ -27,9 +27,8 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
-import { CalloutsOverlay } from "@/components/CalloutsOverlay";
-import { clipCalloutTitle, clipCalloutSummary, severityRank } from "@/lib/incidentCallout";
-import { SEV_COLOR, sevKey } from "@/lib/pdfChrome";
+import { clipCalloutTitle, clipCalloutSummary } from "@/lib/incidentCallout";
+import { isLikelyNonEnglish } from "@/lib/incidentTitle";
 import { dedupeMapIncidents } from "@/lib/mapIncidentDedupe";
 import { isSportsFixtureNoise } from "@/lib/topicRelevance";
 import PublicationCalendar from "./PublicationCalendar";
@@ -220,6 +219,22 @@ type Point = {
   clusterSize?: number;
   clusterMembers?: Point[];
 };
+
+function englishPopupSummary(point: Point): string {
+  const summary = point.summary?.trim();
+  if (summary && !isLikelyNonEnglish(summary)) return clipCalloutSummary(summary);
+
+  const englishTitle = displayIncidentTitle(point.title, point.displayTitle);
+  if (englishTitle) return clipCalloutSummary(englishTitle);
+
+  const place = [point.location, point.country].filter(Boolean).join(", ");
+  return `A ${point.category.toLowerCase()} incident was reported${place ? ` in ${place}` : ""}.`;
+}
+
+function englishPopupTitle(point: Point): string {
+  const englishTitle = displayIncidentTitle(point.title, point.displayTitle);
+  return englishTitle ? clipCalloutTitle(englishTitle) : `${point.category.toUpperCase()} INCIDENT`;
+}
 
 // Must render as a child of MapContainer (useMapEvents needs the Leaflet map
 // context) and renders nothing itself — it just reports zoom changes up to
@@ -461,39 +476,6 @@ export default function MapPage() {
     [visiblePoints, zoom],
   );
 
-  const top3Callouts = useMemo(() => {
-    const limit = zoom <= 5 ? 3 : zoom <= 8 ? 5 : 0;
-    if (limit === 0) return [];
-    const ranked = [...visiblePoints].sort((a, b) => {
-      const severityDifference = severityRank(b.rating) - severityRank(a.rating);
-      if (severityDifference !== 0) return severityDifference;
-      const newDifference = Number(newMarkerIds.includes(b.id)) - Number(newMarkerIds.includes(a.id));
-      return newDifference;
-    });
-
-    const calloutPoints: Array<{ id: string, renderId: string, lat: number, lng: number, title: string, summary: string, severityColor: string }> = [];
-    for (const p of ranked) {
-      const renderPt = renderPoints.find(rp =>
-        rp.id === p.id || (rp.clusterMembers && rp.clusterMembers.some(m => m.id === p.id))
-      );
-      if (renderPt) {
-        if (!calloutPoints.some(cp => cp.renderId === renderPt.id)) {
-          calloutPoints.push({
-            id: p.id,
-            renderId: renderPt.id,
-            lat: renderPt.lat,
-            lng: renderPt.lng,
-            title: clipCalloutTitle(p.displayTitle ?? p.title),
-            summary: clipCalloutSummary(p.summary),
-            severityColor: SEV_COLOR[sevKey(p.rating)] ?? "#465bff"
-          });
-          if (calloutPoints.length === limit) break;
-        }
-      }
-    }
-    return calloutPoints;
-  }, [newMarkerIds, renderPoints, visiblePoints, zoom]);
-
   // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
   // Leaflet's SVG renderer only applies pathOptions.className once, at the
   // moment a marker's underlying <path> is first created (_initPath). Every
@@ -658,19 +640,6 @@ export default function MapPage() {
               subdomains={CARTO_SUBDOMAINS}
             />
             <MapZoomTracker onZoom={setZoom} />
-            <div className="hidden md:block">
-              <CalloutsOverlay
-                points={top3Callouts}
-                obstacles={renderPoints
-                  .filter((point) => (point.clusterSize ?? 0) > 1)
-                  .map((point) => ({
-                    id: point.id,
-                    lat: point.lat,
-                    lng: point.lng,
-                    radius: Math.min(10 + Math.log2(point.clusterSize ?? 2) * 3, 22),
-                  }))}
-              />
-            </div>
             {renderPoints.map((p) => {
               // Markers within pixel-clustering range at the CURRENT zoom
               // (see @/lib/mapClustering) are collapsed into a single
@@ -895,7 +864,7 @@ export default function MapPage() {
                     isNew ? { click: () => clearMarkers([p.id]) } : undefined
                   }
                 >
-                  <LeafletTooltip direction="top" offset={[0, -6]}>
+                  {false && <LeafletTooltip direction="top" offset={[0, -6]}>
                     <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 280 }}>
                       <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", color: "#666" }}>
                         {p.category}
@@ -917,7 +886,7 @@ export default function MapPage() {
                       </div>
                       {p.summary && (
                         <div style={{ fontSize: 11, color: "#363636", marginTop: 6, lineHeight: 1.35 }}>
-                          {clipCalloutSummary(p.summary)}
+                          {englishPopupSummary(p)}
                         </div>
                       )}
                       {p.corroborations.length > 0 && (
@@ -935,19 +904,19 @@ export default function MapPage() {
                         </div>
                       )}
                     </div>
-                  </LeafletTooltip>
+                  </LeafletTooltip>}
                   {p.id.startsWith("i-") && (
                     <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 240 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d" }}>
-                          {clipCalloutTitle(p.displayTitle ?? p.title)}
+                          {englishPopupTitle(p)}
                         </div>
                         <div style={{ marginTop: 5, fontSize: 11, lineHeight: 1.4, color: "#5b6070" }}>
                           {p.category} · {format(new Date(p.when), "dd MMM yyyy HH:mm")} · {SEVERITY_LABELS[p.rating] ?? p.rating}
                         </div>
                         {p.summary && (
                           <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, color: "#363636" }}>
-                            {clipCalloutSummary(p.summary)}
+                            {englishPopupSummary(p)}
                           </div>
                         )}
                         <div style={{ marginTop: 6, fontSize: 11, color: "#5b6070" }}>
