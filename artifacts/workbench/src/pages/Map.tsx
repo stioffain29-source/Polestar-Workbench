@@ -27,6 +27,9 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RANGE_DAYS, RANGE_NOTE, type RangeKey } from "@/lib/dateRange";
 import { RangeToggle } from "@/components/RangeToggle";
+import { CalloutsOverlay } from "@/components/CalloutsOverlay";
+import { clipCalloutTitle, clipCalloutSummary, severityRank } from "@/lib/incidentCallout";
+import { SEV_COLOR, sevKey } from "@/lib/pdfChrome";
 import { dedupeMapIncidents } from "@/lib/mapIncidentDedupe";
 import { isSportsFixtureNoise } from "@/lib/topicRelevance";
 import PublicationCalendar from "./PublicationCalendar";
@@ -458,6 +461,36 @@ export default function MapPage() {
     [visiblePoints, zoom],
   );
 
+  const top3Callouts = useMemo(() => {
+    // Out of the whole map, pick the top 3 most important incidents.
+    // Find their corresponding render point (either the point itself or its parent cluster).
+    const ranked = [...visiblePoints].sort((a, b) => severityRank(b.rating) - severityRank(a.rating));
+    const top3 = ranked.slice(0, 3);
+
+    const calloutPoints: Array<{ id: string, renderId: string, lat: number, lng: number, title: string, summary: string, severityColor: string }> = [];
+    for (const p of top3) {
+      // find which renderPoint contains this point
+      const renderPt = renderPoints.find(rp =>
+        rp.id === p.id || (rp.clusterMembers && rp.clusterMembers.some(m => m.id === p.id))
+      );
+      if (renderPt) {
+        // avoid duplicates if multiple top3 are in the same cluster
+        if (!calloutPoints.some(cp => cp.renderId === renderPt.id)) {
+          calloutPoints.push({
+            id: p.id,
+            renderId: renderPt.id,
+            lat: renderPt.lat,
+            lng: renderPt.lng,
+            title: clipCalloutTitle(p.displayTitle ?? p.title),
+            summary: clipCalloutSummary(p.summary),
+            severityColor: SEV_COLOR[sevKey(p.rating)] ?? "#465bff"
+          });
+        }
+      }
+    }
+    return calloutPoints;
+  }, [visiblePoints, renderPoints]);
+
   // Refs to the live Leaflet CircleMarker instances, keyed by incident id.
   // Leaflet's SVG renderer only applies pathOptions.className once, at the
   // moment a marker's underlying <path> is first created (_initPath). Every
@@ -622,6 +655,9 @@ export default function MapPage() {
               subdomains={CARTO_SUBDOMAINS}
             />
             <MapZoomTracker onZoom={setZoom} />
+            <div className="hidden md:block">
+              <CalloutsOverlay points={top3Callouts} />
+            </div>
             {renderPoints.map((p) => {
               // Markers within pixel-clustering range at the CURRENT zoom
               // (see @/lib/mapClustering) are collapsed into a single

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { layoutCallouts } from "@/lib/calloutLayout";
 import polestarLogo from "@assets/Polestar_navy_logo_hor.png";
 import { SPOT_SEV_COLOR, SPOT_SEV_LABEL, NAVY, POLAR, DUSK, ELECTRIC } from "@/lib/spotReport";
 import {
@@ -22,11 +23,11 @@ export interface IncidentMapPoint {
   /** Render a specific number/text inside the marker dot. */
   markerNumber?: number | string;
   /** Structured text callout linked to this marker. */
-  callout?: {
-    country: string;
-    severityLabel: string;
+  expandedCallout?: {
+    id: string;
+    title: string;
+    summary: string;
     severityColor: string;
-    developments: string[];
   };
 }
 
@@ -73,7 +74,7 @@ export default function IncidentMap({
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dotsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number; size: number }>>([]);
   const labelsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number }>>([]);
-  const calloutsRef = useRef<Array<{ box: HTMLDivElement; leader: HTMLDivElement; lat: number; lng: number }>>([]);
+  const calloutsRef = useRef<Array<{ id: string; box: HTMLDivElement; leader: HTMLDivElement; lat: number; lng: number }>>([]);
   const radiusRef = useRef<{ el: HTMLDivElement; lat: number; lng: number; km: number } | null>(null);
 
   // Memoise the plottable set by a content signature so unrelated form edits
@@ -148,6 +149,7 @@ export default function IncidentMap({
     }
 
     const map = mapRef.current;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
 
     if (!overlayRef.current) {
       const overlay = document.createElement("div");
@@ -171,13 +173,38 @@ export default function IncidentMap({
         lb.el.style.left = `${p.x + 14}px`;
         lb.el.style.top = `${p.y - 7}px`;
       }
-      for (const co of calloutsRef.current) {
+      const mapW = containerRef.current!.offsetWidth;
+      const mapH = containerRef.current!.offsetHeight;
+      const visibleCallouts = calloutsRef.current.filter((co) => co.box.style.display !== "none");
+      const inputs = visibleCallouts.map((co, i) => {
         const p = map.latLngToContainerPoint([co.lat, co.lng]);
-        co.leader.style.left = `${p.x}px`;
-        co.leader.style.top = `${p.y}px`;
-        co.box.style.left = `${p.x + 20}px`;
-        co.box.style.top = `${p.y}px`;
-        co.box.style.transform = "translateY(-50%)";
+        return {
+          id: co.id || String(i),
+          px: p.x,
+          py: p.y,
+          boxW: co.box.offsetWidth || 160,
+          boxH: co.box.offsetHeight || 60,
+        };
+      });
+      const placements = layoutCallouts(mapW, mapH, inputs);
+      for (let i = 0; i < visibleCallouts.length; i++) {
+        const co = visibleCallouts[i];
+        const pos = placements[i];
+        if (!pos) continue;
+
+        const dx = pos.leaderX2 - pos.leaderX1;
+        const dy = pos.leaderY2 - pos.leaderY1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        co.leader.style.left = `${pos.leaderX1}px`;
+        co.leader.style.top = `${pos.leaderY1}px`;
+        co.leader.style.width = `${length}px`;
+        co.leader.style.transform = `rotate(${angle}deg)`;
+
+        co.box.style.left = `${pos.boxX}px`;
+        co.box.style.top = `${pos.boxY}px`;
+        co.box.style.transform = "none";
       }
       const r = radiusRef.current;
       if (r) {
@@ -278,77 +305,70 @@ export default function IncidentMap({
         labelsRef.current.push({ el: lbl, lat: p.lat, lng: p.lng });
       }
 
-      if (p.callout) {
+      if (p.expandedCallout) {
         dot.style.zIndex = "500";
         const co = document.createElement("div");
         co.style.position = "absolute";
-        co.style.background = "rgba(255, 255, 255, 0.95)";
+        co.style.background = "#ffffff";
         co.style.border = `1px solid ${POLAR}`;
+        co.style.borderLeft = `3px solid ${p.expandedCallout.severityColor}`;
         co.style.padding = "6px 8px";
-        co.style.borderRadius = "3px";
-        co.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+        co.style.borderRadius = "2px";
+        co.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
         co.style.pointerEvents = "none";
         co.style.zIndex = "1000";
-        co.style.minWidth = "150px";
-        co.style.maxWidth = "220px";
+        co.style.width = "160px";
 
-        const cName = document.createElement("div");
-        cName.style.font = "700 12px/1.2 Roboto, sans-serif";
-        cName.style.color = NAVY;
-        cName.style.textTransform = "uppercase";
-        cName.style.marginBottom = "2px";
-        cName.textContent = p.callout.country;
-        co.appendChild(cName);
+        const titleEl = document.createElement("div");
+        titleEl.style.font = "700 11px/1.2 Roboto, sans-serif";
+        titleEl.style.color = NAVY;
+        titleEl.style.marginBottom = "3px";
+        titleEl.textContent = p.expandedCallout.title;
+        co.appendChild(titleEl);
 
-        const cSev = document.createElement("div");
-        cSev.style.font = "700 9px/1.2 Roboto, sans-serif";
-        cSev.style.color = p.callout.severityColor;
-        cSev.style.marginBottom = "5px";
-        cSev.style.letterSpacing = "0.02em";
-        cSev.textContent = `CURRENT SEVERITY: ${p.callout.severityLabel}`;
-        co.appendChild(cSev);
-
-        for (const devText of p.callout.developments) {
-          const dItem = document.createElement("div");
-          dItem.style.font = "400 11px/1.35 Roboto, sans-serif";
-          dItem.style.color = DUSK;
-          dItem.style.marginBottom = "3px";
-          dItem.style.display = "flex";
-          dItem.style.alignItems = "baseline";
-          
-          const bullet = document.createElement("span");
-          bullet.style.display = "inline-block";
-          bullet.style.width = "4px";
-          bullet.style.height = "4px";
-          bullet.style.borderRadius = "50%";
-          bullet.style.background = p.callout.severityColor;
-          bullet.style.marginRight = "5px";
-          bullet.style.flexShrink = "0";
-          bullet.style.transform = "translateY(-1.5px)";
-          
-          const dText = document.createElement("span");
-          dText.textContent = devText;
-
-          dItem.appendChild(bullet);
-          dItem.appendChild(dText);
-          co.appendChild(dItem);
-        }
-        
-        if (co.lastChild) {
-           (co.lastChild as HTMLElement).style.marginBottom = "0";
-        }
+        const summaryEl = document.createElement("div");
+        summaryEl.style.font = "400 10px/1.35 Roboto, sans-serif";
+        summaryEl.style.color = DUSK;
+        summaryEl.textContent = p.expandedCallout.summary;
+        co.appendChild(summaryEl);
 
         const leader = document.createElement("div");
         leader.style.position = "absolute";
-        leader.style.width = "20px";
         leader.style.height = "1px";
         leader.style.background = "#888888";
+        leader.style.transformOrigin = "0 0";
         leader.style.zIndex = "400";
-        
+
+        if (isMobile) {
+          co.style.display = "none";
+          leader.style.display = "none";
+          dot.style.pointerEvents = "auto";
+          dot.style.cursor = "pointer";
+          dot.setAttribute("role", "button");
+          dot.tabIndex = 0;
+          const showOnlyThisCallout = (event: Event) => {
+            event.stopPropagation();
+            for (const candidate of calloutsRef.current) {
+              const active = candidate.id === p.expandedCallout!.id;
+              candidate.box.style.display = active ? "block" : "none";
+              candidate.leader.style.display = active ? "block" : "none";
+            }
+            positionAll();
+          };
+          dot.addEventListener("click", showOnlyThisCallout);
+          dot.addEventListener("keydown", (event) => {
+            const key = (event as KeyboardEvent).key;
+            if (key === "Enter" || key === " ") {
+              event.preventDefault();
+              showOnlyThisCallout(event);
+            }
+          });
+        }
+
         overlay.appendChild(leader);
         overlay.appendChild(co);
-        
-        calloutsRef.current.push({ box: co, leader, lat: p.lat, lng: p.lng });
+
+        calloutsRef.current.push({ id: p.expandedCallout.id, box: co, leader, lat: p.lat, lng: p.lng });
       }
     }
 

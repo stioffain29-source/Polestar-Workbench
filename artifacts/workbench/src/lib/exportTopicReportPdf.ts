@@ -57,6 +57,8 @@ import {
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
+import { layoutCallouts } from "./calloutLayout";
+import { clipCalloutTitle, clipCalloutSummary, severityRank } from "./incidentCallout";
 import { embedReactChartInPdf } from "./embedReportChartInPdf";
 import { drawEnergyProse } from "./energyPdfFlow";
 import {
@@ -757,16 +759,99 @@ function drawRegionalHotspotMap(ctx: Ctx, incidents: TopicReportIncident[], topi
   const maxLat = Math.max(...lats) + 3;
   const minLng = Math.min(...lngs) - 5;
   const maxLng = Math.max(...lngs) + 5;
+
+  const sortedPoints = [...points].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+  const top3Ids = new Set(sortedPoints.slice(0, 3).map(p => p.title));
+
+  const boxW = Math.min(140, CW * 0.4);
+
+  const prepared = points.filter(p => top3Ids.has(p.title)).map((point, index) => {
+    // Project to local coordinates
+    const px = 12 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (CW - 24);
+    const py = 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
+    const title = clipCalloutTitle(point.title);
+    const summary = clipCalloutSummary(point.summary || point.label);
+    const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
+
+    pdf.setFontSize(7.5);
+    const titleLines = pdf.splitTextToSize(sanitize(title), boxW - 12);
+    pdf.setFontSize(7);
+    const summaryLines = pdf.splitTextToSize(sanitize(summary), boxW - 12);
+
+    const height = 6 + (titleLines.length * 9) + 4 + (summaryLines.length * 8) + 6;
+
+    return {
+      id: String(index),
+      point: [px, py],
+      titleLines,
+      summaryLines,
+      height,
+      severityColor
+    };
+  });
+
+  const inputs = prepared.map(p => ({
+    id: p.id,
+    px: p.point[0],
+    py: p.point[1],
+    boxW,
+    boxH: p.height
+  }));
+
+  const placements = layoutCallouts(CW, h, inputs);
+
+  const mapTop = ctx.y;
+
+  // Draw leaders first
+  setStroke(pdf, "#888888");
+  pdf.setLineWidth(0.4);
+  for (const pos of placements) {
+    pdf.line(MX + pos.leaderX1, mapTop + pos.leaderY1, MX + pos.leaderX2, mapTop + pos.leaderY2);
+  }
+
+  // Draw pins above leaders but below boxes
   for (const point of points) {
     const x = MX + 12 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (CW - 24);
-    const y = ctx.y + 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
-    pdf.setFillColor(70, 91, 255);
-    pdf.circle(x, y, 3.5, "F");
-    setRoboto(pdf, "bold");
-    setText(pdf, NAVY);
-    pdf.setFontSize(6.5);
-    pdf.text(point.label, Math.min(x + 5, MX + CW - 55), y + 2);
+    const y = mapTop + 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
+    const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
+    setFill(pdf, severityColor);
+    setStroke(pdf, "#ffffff");
+    pdf.setLineWidth(1);
+    pdf.circle(x, y, 3.5, "FD");
   }
+
+  // Draw boxes
+  for (const pos of placements) {
+    const entry = prepared.find(p => p.id === pos.id)!;
+    const boxX = MX + pos.boxX;
+    const boxY = mapTop + pos.boxY;
+
+    // Shadow
+    setFill(pdf, "#000000");
+    pdf.setGState(new (pdf.GState as any)({ opacity: 0.1 }));
+    pdf.rect(boxX + 1, boxY + 1, boxW, entry.height, "F");
+    pdf.setGState(new (pdf.GState as any)({ opacity: 1.0 }));
+
+    setFill(pdf, "#ffffff");
+    setStroke(pdf, POLAR);
+    pdf.setLineWidth(0.5);
+    pdf.rect(boxX, boxY, boxW, entry.height, "FD");
+
+    setFill(pdf, entry.severityColor);
+    pdf.rect(boxX, boxY, 3, entry.height, "F");
+
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(7.5);
+    pdf.text(entry.titleLines, boxX + 8, boxY + 9);
+
+    const summaryStartY = boxY + 9 + (entry.titleLines.length * 9) - 1;
+    setText(pdf, DUSK);
+    setRoboto(pdf, "regular");
+    pdf.setFontSize(7);
+    pdf.text(entry.summaryLines, boxX + 8, summaryStartY);
+  }
+
   ctx.y += h + 8;
 }
 
@@ -986,65 +1071,107 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
       }
     }
   }
-  const mapLeft = ctx.MX + 4;
-  const mapRight = ctx.MX + ctx.CW - 4;
-  const mapTop = ctx.y + 4;
-  const mapBottom = ctx.y + mapH - 4;
+  const mapTop = ctx.y;
+
+  // Project to local coordinates for layoutCallouts
+  const projectLocal = (lng: number, lat: number): [number, number] => [
+    8 + ((lng - minLng) / (maxLng - minLng)) * (ctx.CW - 16),
+    6 + ((maxLat - lat) / (maxLat - minLat)) * (mapH - 12),
+  ];
+
   const boxW = Math.min(158, ctx.CW * 0.34);
-  setRoboto(ctx.pdf, "regular");
-  ctx.pdf.setFontSize(7);
-  const prepared = items.map((item) => {
-    const severities = item.developments.map((development) => development.severity);
-    const severityRank = (severity: string) =>
-      ["insignificant", "low", "moderate", "high", "extreme"].indexOf(sevKey(severity));
-    const worstSeverity = severities.reduce((worst, current) =>
-      severityRank(current) > severityRank(worst) ? current : worst,
-      severities[0] || "Moderate",
-    );
-    const descriptionLines = ctx.pdf.splitTextToSize(item.developments[0]?.label ?? "", boxW - 10);
-    const lines = [
-      item.country.toUpperCase(),
-      `CURRENT SEVERITY: ${worstSeverity.toUpperCase()}`,
-      ...descriptionLines,
-    ];
-    return { item, point: project(item.lng, item.lat), lines, height: 13 + lines.length * 8, worstSeverity };
+
+  const allIncidents = items.flatMap(i => i.developments.map(d => ({
+    ...d,
+    lat: i.lat,
+    lng: i.lng,
+    country: i.country,
+  })));
+
+  allIncidents.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+  const top3 = allIncidents.slice(0, 3);
+
+  const prepared = top3.map((entry, index) => {
+    const pointLocal = projectLocal(entry.lng, entry.lat);
+    const title = clipCalloutTitle(entry.fullTitle);
+    const summary = clipCalloutSummary(entry.summary);
+    const severityColor = SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC;
+
+    // Estimate height
+    ctx.pdf.setFontSize(7.5);
+    const titleLines = ctx.pdf.splitTextToSize(sanitize(title), boxW - 12);
+    ctx.pdf.setFontSize(7);
+    const summaryLines = ctx.pdf.splitTextToSize(sanitize(summary), boxW - 12);
+
+    const height = 6 + (titleLines.length * 9) + 4 + (summaryLines.length * 8) + 6;
+
+    return {
+      id: String(index),
+      pointLocal,
+      titleLines,
+      summaryLines,
+      height,
+      severityColor
+    };
   });
-  const lanes: Array<typeof prepared> = [[], []];
-  prepared
-    .sort((a, b) => a.point[1] - b.point[1] || a.point[0] - b.point[0])
-    .forEach((entry) => lanes[entry.point[0] < ctx.MX + ctx.CW * 0.43 ? 0 : 1].push(entry));
-  lanes.forEach((lane, laneIndex) => {
-    let nextTop = mapTop;
-    for (const entry of lane) {
-      const [px, py] = entry.point;
-      const left = laneIndex === 0 ? mapLeft : mapRight - boxW;
-      const preferredTop = py - entry.height / 2;
-      const top = Math.min(Math.max(preferredTop, nextTop), mapBottom - entry.height);
-      const box = { left, top, right: left + boxW, bottom: top + entry.height };
-      nextTop = box.bottom + 6;
-      const anchorX = laneIndex === 0 ? box.right : box.left;
-      const anchorY = Math.min(Math.max(py, box.top + 5), box.bottom - 5);
-      setStroke(ctx.pdf, SEV_COLOR[sevKey(entry.worstSeverity)] ?? ELECTRIC);
+
+  const inputs = prepared.map((p) => ({
+    id: p.id,
+    px: p.pointLocal[0],
+    py: p.pointLocal[1],
+    boxW,
+    boxH: p.height
+  }));
+
+  const placements = layoutCallouts(ctx.CW, mapH, inputs);
+
+  // Draw leaders first
+  setStroke(ctx.pdf, "#888888");
+  ctx.pdf.setLineWidth(0.4);
+  for (const pos of placements) {
+    ctx.pdf.line(ctx.MX + pos.leaderX1, mapTop + pos.leaderY1, ctx.MX + pos.leaderX2, mapTop + pos.leaderY2);
+  }
+
+  // Draw pins above leaders but below boxes
+  for (const entry of prepared) {
+    setFill(ctx.pdf, entry.severityColor);
+    setStroke(ctx.pdf, "#ffffff");
+    ctx.pdf.setLineWidth(1);
+    ctx.pdf.circle(ctx.MX + entry.pointLocal[0], mapTop + entry.pointLocal[1], 3.5, "FD");
+  }
+
+  // Draw boxes
+  for (const pos of placements) {
+    const entry = prepared.find(p => p.id === pos.id)!;
+    const boxX = ctx.MX + pos.boxX;
+    const boxY = mapTop + pos.boxY;
+
+    // Box shadow (basic)
+    setFill(ctx.pdf, "#000000");
+    ctx.pdf.setGState(new (ctx.pdf.GState as any)({ opacity: 0.1 }));
+    ctx.pdf.rect(boxX + 1, boxY + 1, boxW, entry.height, "F");
+    ctx.pdf.setGState(new (ctx.pdf.GState as any)({ opacity: 1.0 }));
+
     setFill(ctx.pdf, "#ffffff");
-    ctx.pdf.setLineWidth(0.7);
-      ctx.pdf.rect(box.left, box.top, boxW, entry.height, "FD");
-    setStroke(ctx.pdf, "#718096");
-    ctx.pdf.setLineWidth(0.45);
-    ctx.pdf.line(px, py, anchorX, anchorY);
+    setStroke(ctx.pdf, POLAR);
+    ctx.pdf.setLineWidth(0.5);
+    ctx.pdf.rect(boxX, boxY, boxW, entry.height, "FD");
+
+    setFill(ctx.pdf, entry.severityColor);
+    ctx.pdf.rect(boxX, boxY, 3, entry.height, "F");
+
     setText(ctx.pdf, NAVY);
     setRoboto(ctx.pdf, "bold");
-      ctx.pdf.setFontSize(8);
-    ctx.pdf.text(entry.lines[0], box.left + 5, box.top + 8);
-    setText(ctx.pdf, SEV_COLOR[sevKey(entry.worstSeverity)] ?? ELECTRIC);
-    setRoboto(ctx.pdf, "bold");
-    ctx.pdf.setFontSize(6.5);
-    ctx.pdf.text(entry.lines[1], box.left + 5, box.top + 17);
+    ctx.pdf.setFontSize(7.5);
+    ctx.pdf.text(entry.titleLines, boxX + 8, boxY + 9);
+
+    const summaryStartY = boxY + 9 + (entry.titleLines.length * 9) - 1;
     setText(ctx.pdf, DUSK);
     setRoboto(ctx.pdf, "regular");
     ctx.pdf.setFontSize(7);
-    entry.lines.slice(2).forEach((line, index) => ctx.pdf.text(line, box.left + 5, box.top + 25 + index * 8));
-    }
-  });
+    ctx.pdf.text(entry.summaryLines, boxX + 8, summaryStartY);
+  }
+
   ctx.y += mapH + 7;
 }
 

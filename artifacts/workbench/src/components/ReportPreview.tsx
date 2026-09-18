@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import worldCompleteGeo from "@/assets/worldComplete.geo.json";
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import {
@@ -104,6 +104,8 @@ import {
 import IncidentMap from "@/components/IncidentMap";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { SPOT_SEV_COLOR } from "@/lib/spotReport";
+import { layoutCallouts } from "@/lib/calloutLayout";
+import { clipCalloutTitle, clipCalloutSummary, severityRank } from "@/lib/incidentCallout";
 
 const NAVY = "#0b0a3d";
 const ELECTRIC = "#465bff";
@@ -497,6 +499,8 @@ export function ApacHotspotMap({
 }: {
   items: ReturnType<typeof import("@/lib/regionalWeekly").buildApacMapItems>;
 }) {
+  const [activeMobileCallout, setActiveMobileCallout] = useState<string | null>(null);
+
   if (items.length === 0) {
     return (
       <p className="text-[12px] text-muted-foreground italic" style={{ fontFamily: "Roboto, sans-serif" }}>
@@ -505,81 +509,73 @@ export function ApacHotspotMap({
     );
   }
 
-  const boxW = 132;
+  const boxW = 160;
 
-  const prepared = items.map((item) => {
-    const severities = item.developments.map((d) => d.severity);
-    const worstSevStr = severities.reduce((worst, current) => {
-      const wRank = SEV_RANK[sevKey(worst)] ?? 0;
-      const cRank = SEV_RANK[sevKey(current)] ?? 0;
-      return cRank > wRank ? current : worst;
-    }, severities[0] || "Moderate");
+  const allIncidents = items.flatMap(i => i.developments.map((d, index) => ({
+    ...d,
+    id: `${i.country}-${index}`,
+    lat: i.lat,
+    lng: i.lng,
+    country: i.country,
+  })));
 
-    const severityColor = SEV_COLOR[sevKey(worstSevStr)] ?? ELECTRIC;
+  allIncidents.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+  const top3 = allIncidents.slice(0, 3);
 
-    const lines = [
-      { text: item.country.toUpperCase(), isCountry: true },
-      { text: `CURRENT SEVERITY: ${worstSevStr.toUpperCase()}`, isSeverity: true, color: severityColor },
-      ...item.developments.flatMap((development) => {
-        const words = development.label.split(" ");
-        const out: Array<{ text: string, isCountry?: boolean, isSeverity?: boolean, color?: string }> = [];
-        let currentLine = "";
-        for (const word of words) {
-          if (!currentLine) {
-            currentLine = word;
-          } else if (currentLine.length + 1 + word.length > 45) {
-            out.push({ text: currentLine });
-            currentLine = word;
-          } else {
-            currentLine += " " + word;
-          }
-        }
-        if (currentLine) out.push({ text: currentLine });
-        return out;
-      }),
-    ];
+  const prepared = top3.map((entry, index) => {
+    const point = projectApac(entry.lng, entry.lat);
+    const title = clipCalloutTitle(entry.fullTitle);
+    const summary = clipCalloutSummary(entry.summary || entry.fullTitle);
+    const severityColor = SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC;
+
+    // Estimate height
+    const titleLines = Math.ceil(title.length / 25);
+    const summaryLines = Math.ceil(summary.length / 32);
+    const height = 12 + (titleLines * 12) + (summaryLines * 13) + 12;
+
     return {
-      item,
-      point: projectApac(item.lng, item.lat),
-      lines,
-      height: 10 + lines.length * 9 + 3,
-      worstSevStr,
+      id: String(index),
+      point,
+      title,
+      summary,
+      height,
       severityColor
     };
   });
 
-  const boxes: Array<{
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
-    entry: typeof prepared[0];
-    anchorX: number;
-    anchorY: number;
-  }> = [];
+  const inputs = prepared.map(p => ({
+    id: p.id,
+    px: p.point[0],
+    py: p.point[1],
+    boxW,
+    boxH: p.height
+  }));
 
-  for (const entry of prepared) {
-    const [px, py] = entry.point;
-    const [dx, dy] = APAC_CALLOUT_OFFSETS[entry.item.country] ??
-      (px < APAC_MAP_CW / 2 ? [-145, 0] : [18, 0]);
-    const left = Math.min(Math.max(px + dx, 4), APAC_MAP_CW - boxW - 4);
-    let top = Math.min(Math.max(py + dy, 4), APAC_MAP_H - entry.height - 4);
-    const overlaps = (candidateTop: number) => boxes.some((box) =>
-      left < box.right + 4 &&
-      left + boxW + 4 > box.left &&
-      candidateTop < box.bottom + 4 &&
-      candidateTop + entry.height + 4 > box.top
-    );
-    while (overlaps(top) && top + entry.height + 6 <= APAC_MAP_H - 4) top += 6;
-    while (overlaps(top) && top - 6 >= 4) top -= 6;
-    const box = { left, top, right: left + boxW, bottom: top + entry.height };
-    const anchorX = px < box.left ? box.left : px > box.right ? box.right : Math.min(Math.max(px, box.left + 6), box.right - 6);
-    const anchorY = py < box.top ? box.top : py > box.bottom ? box.bottom : Math.min(Math.max(py, box.top + 5), box.bottom - 5);
-    boxes.push({ ...box, entry, anchorX, anchorY });
-  }
+  const placements = layoutCallouts(APAC_MAP_CW, APAC_MAP_H, inputs);
+  const mobileEntry = allIncidents.find((entry) => entry.id === activeMobileCallout);
+  const mobilePrepared = mobileEntry ? {
+    id: mobileEntry.id,
+    point: projectApac(mobileEntry.lng, mobileEntry.lat),
+    title: clipCalloutTitle(mobileEntry.fullTitle),
+    summary: clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle),
+    height: 12
+      + Math.ceil(clipCalloutTitle(mobileEntry.fullTitle).length / 25) * 12
+      + Math.ceil(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle).length / 32) * 13
+      + 12,
+    severityColor: SEV_COLOR[sevKey(mobileEntry.severity)] ?? ELECTRIC,
+  } : null;
+  const mobilePlacement = mobilePrepared
+    ? layoutCallouts(APAC_MAP_CW, APAC_MAP_H, [{
+        id: mobilePrepared.id,
+        px: mobilePrepared.point[0],
+        py: mobilePrepared.point[1],
+        boxW,
+        boxH: mobilePrepared.height,
+      }])[0]
+    : null;
 
   return (
-    <div className="border border-[#bdc8d6] bg-[#dfeaf3] overflow-hidden w-full">
+    <div className="border border-[#bdc8d6] bg-[#dfeaf3] overflow-hidden w-full relative">
       <svg viewBox={`0 0 ${APAC_MAP_CW} ${APAC_MAP_H}`} className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
         <rect width={APAC_MAP_CW} height={APAC_MAP_H} fill="#dfeaf3" />
         {apacMapFeatures.map((feature) => (
@@ -593,55 +589,90 @@ export function ApacHotspotMap({
           />
         ))}
 
-        {/* Draw every connector beneath every callout so a line can never cross visible box content. */}
-        {boxes.map((box, i) => {
-          const [px, py] = box.entry.point;
-          return (
+        <g className="hidden md:block">
+          {placements.map((pos, i) => (
             <line
               key={`leader-${i}`}
-              x1={px}
-              y1={py}
-              x2={box.anchorX}
-              y2={box.anchorY}
-              stroke="#344a65"
+              x1={pos.leaderX1}
+              y1={pos.leaderY1}
+              x2={pos.leaderX2}
+              y2={pos.leaderY2}
+              stroke="#888888"
               strokeWidth="0.8"
             />
-          );
-        })}
+          ))}
 
-        {/* Callouts are a separate top layer. */}
-        {boxes.map((box, i) => {
-          const entry = box.entry;
+          {placements.map((pos, i) => {
+            const entry = prepared.find(p => p.id === pos.id)!;
+            return (
+              <g key={i}>
+                <rect x={pos.boxX} y={pos.boxY} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
+                <rect x={pos.boxX} y={pos.boxY} width="3" height={entry.height} fill={entry.severityColor} rx="1" />
+                <foreignObject x={pos.boxX + 8} y={pos.boxY + 6} width={boxW - 16} height={entry.height - 12}>
+                  <div style={{ width: "100%", height: "100%" }}>
+                    <div style={{ font: "700 11px/1.2 Roboto, sans-serif", color: NAVY, marginBottom: "3px" }}>
+                      {entry.title}
+                    </div>
+                    <div style={{ font: "400 10px/1.35 Roboto, sans-serif", color: DUSK }}>
+                      {entry.summary}
+                    </div>
+                  </div>
+                </foreignObject>
+              </g>
+            );
+          })}
+        </g>
 
-          return (
-            <g key={i}>
-              {/* Box */}
-              <rect x={box.left} y={box.top} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={entry.severityColor} strokeWidth="0.9" rx="1" />
-
-              {/* Text Lines */}
-              {entry.lines.map((line, lineIdx) => {
-                const yOffset = box.top + 8 + lineIdx * 9;
-                if (line.isCountry) {
-                  return (
-                    <text key={lineIdx} x={box.left + 5} y={yOffset} fill={NAVY} fontSize="8" fontWeight="bold" fontFamily="Roboto, sans-serif">
-                      {line.text}
-                    </text>
-                  );
-                } else if (line.isSeverity) {
-                  return (
-                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={line.color} fontSize="6.5" fontWeight="bold" fontFamily="Roboto, sans-serif">
-                      {line.text}
-                    </text>
-                  );
-                } else {
-                  return (
-                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={DUSK} fontSize="7.8" fontWeight="500" fontFamily="Roboto, sans-serif">
-                      {line.text}
-                    </text>
-                  );
-                }
-              })}
+        {mobilePrepared && mobilePlacement && (
+          <g className="md:hidden">
+            <line
+              x1={mobilePlacement.leaderX1}
+              y1={mobilePlacement.leaderY1}
+              x2={mobilePlacement.leaderX2}
+              y2={mobilePlacement.leaderY2}
+              stroke="#888888"
+              strokeWidth="0.8"
+            />
+            <g>
+              <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width={boxW} height={mobilePrepared.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
+              <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width="3" height={mobilePrepared.height} fill={mobilePrepared.severityColor} rx="1" />
+              <foreignObject x={mobilePlacement.boxX + 8} y={mobilePlacement.boxY + 6} width={boxW - 16} height={mobilePrepared.height - 12}>
+                <div style={{ width: "100%", height: "100%" }}>
+                  <div style={{ font: "700 11px/1.2 Roboto, sans-serif", color: NAVY, marginBottom: "3px" }}>
+                    {mobilePrepared.title}
+                  </div>
+                  <div style={{ font: "400 10px/1.35 Roboto, sans-serif", color: DUSK }}>
+                    {mobilePrepared.summary}
+                  </div>
+                </div>
+              </foreignObject>
             </g>
+          </g>
+        )}
+
+        {allIncidents.map((entry) => {
+          const point = projectApac(entry.lng, entry.lat);
+          return (
+            <circle
+              key={`pin-${entry.id}`}
+              cx={point[0]}
+              cy={point[1]}
+              r={3.5}
+              fill={SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC}
+              stroke="#ffffff"
+              strokeWidth="1.5"
+              className="cursor-pointer"
+              role="button"
+              tabIndex={0}
+              aria-label={`Show ${entry.country} incident callout`}
+              onClick={() => setActiveMobileCallout(entry.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActiveMobileCallout(entry.id);
+                }
+              }}
+            />
           );
         })}
       </svg>
@@ -660,6 +691,9 @@ function RegionalHotspotMap({
       </p>
     );
   }
+  const sortedPoints = [...points].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+  const top3Ids = new Set(sortedPoints.slice(0, 3).map(p => p.title)); // using title as unique enough here
+
   return (
     <div className="border border-[#d2d6e1] bg-[#f7f8fb]">
       <IncidentMap
@@ -669,10 +703,16 @@ function RegionalHotspotMap({
           title: p.title,
           label: p.label,
           severity: p.severity,
-          primary: false
+          primary: false,
+          expandedCallout: top3Ids.has(p.title) ? {
+            id: p.title,
+            title: clipCalloutTitle(p.title),
+            summary: clipCalloutSummary(p.summary),
+            severityColor: SEV_COLOR[sevKey(p.severity)] ?? "#465bff"
+          } : undefined
         }))}
         height={320}
-        showLabels={true}
+        showLabels={false}
       />
     </div>
   );
@@ -1465,6 +1505,7 @@ export default function ReportPreview({
           label: clipTitleToMeaningfulWords(fullTitle, 5),
           severity: development?.severity ?? SEV_LABEL[sevKey(incident?.severity)] ?? "Moderate",
           fullTitle,
+          summary: incident?.summary ?? "",
         }],
       }];
     });

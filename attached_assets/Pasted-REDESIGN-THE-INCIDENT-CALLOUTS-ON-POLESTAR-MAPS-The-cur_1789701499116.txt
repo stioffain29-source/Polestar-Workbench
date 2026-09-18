@@ -1,0 +1,174 @@
+REDESIGN THE INCIDENT CALLOUTS ON POLESTAR MAPS
+
+The current map incident callouts are too cluttered and need to be cleaner, shorter and easier to read.
+
+Do not change the underlying map, incident data, geolocation, filtering, severity logic, pins, taxonomy or report generation logic.
+
+This task is specifically about improving the visual treatment of selected incident callouts.
+
+OBJECTIVE
+
+The map should show WHERE something happened.
+
+The callout should show WHAT happened.
+
+The report text should explain WHY IT MATTERS.
+
+Do not try to put full analysis into the map.
+
+CALLOUT CONTENT
+
+Each expanded callout should contain:
+
+1. SHORT TITLE
+Maximum 2–5 words.
+
+Examples:
+
+BASRA PROTESTS
+DRONE INCIDENT
+ROAD BLOCKED
+AIRPORT DISRUPTION
+
+2. ONE SHORT SENTENCE
+
+Maximum 25–30 words.
+
+It should describe only what happened.
+
+Example:
+
+BASRA PROTESTS
+
+Workers demonstrated over employment demands while separate pro-Iran rallies were reported elsewhere in the city.
+
+Do not include:
+
+• Polestar View
+• recommendations
+• outlook
+• lengthy background
+• sources
+• coordinates
+• risk explanation
+• unnecessary dates/times unless operationally important
+
+VISUAL DESIGN
+
+Each expanded incident callout should use:
+
+• compact white rectangular box
+• clean border
+• subtle shadow if needed
+• clear internal padding
+• bold short title
+• smaller body text below
+• thin leader line connecting the box to the exact incident pin
+• callout positioned away from the pin in available map space
+
+The leader line is important.
+
+The callout should NOT sit directly on top of the incident location.
+
+The pin remains visible and the line clearly shows which location the callout relates to.
+
+Use existing Polestar branding, fonts and colours.
+
+Do not redesign the map itself.
+
+DISPLAY RULES
+
+Show a maximum of THREE expanded callouts at one time.
+
+Other incidents remain as normal pins.
+
+Prioritise the three most relevant/significant incidents using the existing incident relevance/severity logic.
+
+Do not automatically choose the newest three if more significant incidents are present.
+
+POSITIONING
+
+Automatically position callout boxes to minimise:
+
+• overlapping callouts
+• callouts covering incident clusters
+• callouts covering major city/location labels
+• leader lines crossing through other callout boxes
+• boxes extending outside the map viewport
+
+Use empty map space wherever possible.
+
+If several incidents are clustered together:
+
+• expand only the most important event
+• keep the others as pins
+• allow users to click/tap those pins for details
+
+MOBILE
+
+On small screens:
+
+• keep incident pins visible
+• do not cover the map with multiple floating boxes
+• show one compact callout when a pin is tapped
+• use the same short title + one sentence format
+
+DESKTOP / REPORT MAPS
+
+On desktop and exported report maps:
+
+• use the full leader-line callout design
+• allow up to three visible callouts
+• preserve their position during export
+
+PDF EXPORT
+
+Ensure exported PDF maps preserve:
+
+• correct incident pin location
+• callout box
+• leader line
+• readable text
+• white background
+• border
+• spacing
+
+Callouts must not be clipped at the map edge during PDF export.
+
+IMPORTANT
+
+Do not create a second map system.
+
+Find the existing map rendering and callout components and improve the current implementation.
+
+Do not change:
+
+• incident ingestion
+• geolocation
+• severity logic
+• risk taxonomy
+• report generation
+• source processing
+• map provider
+• current incident pins
+
+TARGET RESULT
+
+The visual relationship should be:
+
+INCIDENT PIN
+      \
+       \
+        \ leader line
+         \
+     ┌───────────────────────┐
+     │ BASRA PROTESTS        │
+     │ Workers demonstrated  │
+     │ over employment...    │
+     └───────────────────────┘
+
+The finished map should feel sparse, clean and professional.
+
+Short callouts.
+Clear connection to the incident location.
+No paragraphs dumped onto the map.

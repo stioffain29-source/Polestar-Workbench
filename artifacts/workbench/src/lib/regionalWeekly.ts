@@ -113,6 +113,7 @@ export interface RegionalMapPoint {
   severity: string | null;
   title: string;
   label: string;
+  summary: string;
 }
 
 const APAC = [
@@ -931,6 +932,7 @@ export interface ApacMapItem {
     label: string;
     severity: string;
     fullTitle: string;
+    summary: string;
   }>;
 }
 
@@ -956,7 +958,7 @@ export function clipTitleToMeaningfulWords(text: string, maxWords: number = 6): 
 
   // Generic fallback
   clean = clean.replace(/^[A-Za-z]+'s\s+/, "");
-  
+
   const words = clean.split(" ").filter(Boolean);
   if (words.length <= maxWords) {
     return clean.replace(/[,:;.\!?]+$/, "");
@@ -965,7 +967,7 @@ export function clipTitleToMeaningfulWords(text: string, maxWords: number = 6): 
   // Pick first maxWords words
   const selected = words.slice(0, maxWords);
   const trailingStopWords = new Set(["the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for", "with", "as"]);
-  
+
   // Drop trailing stop words to make the label punchy
   while (selected.length > 3 && trailingStopWords.has(selected[selected.length - 1].toLowerCase())) {
     selected.pop();
@@ -981,7 +983,7 @@ export function buildApacMapItems<T extends RegionalIncident>(
   const plottable = selected.filter(
     (incident) => typeof incident.latitude === "number" && typeof incident.longitude === "number"
   );
-  
+
   const byCountry = new Map<string, T[]>();
   for (const incident of plottable) {
     const country = incident.country?.trim() || "Regional";
@@ -990,7 +992,7 @@ export function buildApacMapItems<T extends RegionalIncident>(
     current.push(incident);
     byCountry.set(country, current);
   }
-  
+
   const sortedCountries = [...byCountry.entries()].sort((a, b) => {
     const aMax = Math.max(...a[1].map(i => SEVERITY_RANK[i.severity?.toLowerCase() ?? ""] ?? 0));
     const bMax = Math.max(...b[1].map(i => SEVERITY_RANK[i.severity?.toLowerCase() ?? ""] ?? 0));
@@ -1006,7 +1008,7 @@ export function buildApacMapItems<T extends RegionalIncident>(
       const bestRank = SEVERITY_RANK[best.severity?.toLowerCase() ?? ""] ?? 0;
       return rank > bestRank ? current : best;
     });
-    
+
     return {
       id: idCounter++,
       country,
@@ -1019,7 +1021,8 @@ export function buildApacMapItems<T extends RegionalIncident>(
         return {
           label,
           severity: SEVERITY_LABEL[item.severity?.toLowerCase() ?? ""] ?? "Moderate",
-          fullTitle: cleanTitle
+          fullTitle: cleanTitle,
+          summary: item.summary ?? ""
         };
       })
     };
@@ -1294,6 +1297,7 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
       severity: incident.severity ?? null,
       title: incident.displayTitle ?? incident.title ?? "Regional development",
       label: incident.country?.trim() || incident.location?.trim() || "Regional",
+      summary: incident.summary ?? "",
     }));
 }
 
