@@ -581,16 +581,28 @@ export function ApacHotspotMap({
           );
         })}
 
-        {/* Lines and Boxes */}
+        {/* Draw every connector beneath every callout so a line can never cross visible box content. */}
+        {boxes.map((box, i) => {
+          const [px, py] = box.entry.point;
+          return (
+            <line
+              key={`leader-${i}`}
+              x1={px}
+              y1={py}
+              x2={box.anchorX}
+              y2={box.anchorY}
+              stroke="#344a65"
+              strokeWidth="0.8"
+            />
+          );
+        })}
+
+        {/* Callouts are a separate top layer. */}
         {boxes.map((box, i) => {
           const entry = box.entry;
-          const [px, py] = entry.point;
 
           return (
             <g key={i}>
-              {/* Leader Line */}
-              <line x1={px} y1={py} x2={box.anchorX} y2={box.anchorY} stroke="#344a65" strokeWidth="0.8" />
-
               {/* Box */}
               <rect x={box.left} y={box.top} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={entry.severityColor} strokeWidth="0.9" rx="1" />
 
