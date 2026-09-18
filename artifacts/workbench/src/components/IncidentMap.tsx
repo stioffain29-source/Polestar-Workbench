@@ -21,6 +21,13 @@ export interface IncidentMapPoint {
   label?: string | null;
   /** Render a specific number/text inside the marker dot. */
   markerNumber?: number | string;
+  /** Structured text callout linked to this marker. */
+  callout?: {
+    country: string;
+    severityLabel: string;
+    severityColor: string;
+    developments: string[];
+  };
 }
 
 export interface IncidentMapProps {
@@ -36,6 +43,10 @@ export interface IncidentMapProps {
   height?: number;
   /** Render as a square (height = width) instead of the fixed pixel height. */
   square?: boolean;
+  /** Hide unnecessary map controls (zoom/scale) for a clean static graphic. */
+  hideControls?: boolean;
+  /** Padding for the auto-fitted map bounds [x, y]. Defaults to [32, 32]. */
+  boundsPadding?: [number, number];
 }
 
 /**
@@ -54,12 +65,15 @@ export default function IncidentMap({
   locationLabel,
   height = 360,
   square = false,
+  hideControls = false,
+  boundsPadding = [32, 32],
 }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const dotsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number; size: number }>>([]);
   const labelsRef = useRef<Array<{ el: HTMLDivElement; lat: number; lng: number }>>([]);
+  const calloutsRef = useRef<Array<{ box: HTMLDivElement; leader: HTMLDivElement; lat: number; lng: number }>>([]);
   const radiusRef = useRef<{ el: HTMLDivElement; lat: number; lng: number; km: number } | null>(null);
 
   // Memoise the plottable set by a content signature so unrelated form edits
@@ -100,7 +114,7 @@ export default function IncidentMap({
 
     if (!mapRef.current) {
       mapRef.current = L.map(containerRef.current, {
-        zoomControl: true,
+        zoomControl: !hideControls,
         // Leaflet's built-in attribution control is disabled: it sits inside the
         // map and clashed with the location label. Instead a clean attribution
         // caption is rendered into the legend row below (in React), so it reads
@@ -126,9 +140,11 @@ export default function IncidentMap({
       // report product. This is Leaflet's built-in control: plain HTML
       // (div + text), not canvas/SVG, so it rasterises cleanly with the
       // html2canvas PDF export exactly like the other overlay elements here.
-      L.control
-        .scale({ position: "bottomleft", metric: true, imperial: false, maxWidth: 100 })
-        .addTo(mapRef.current);
+      if (!hideControls) {
+        L.control
+          .scale({ position: "bottomleft", metric: true, imperial: false, maxWidth: 100 })
+          .addTo(mapRef.current);
+      }
     }
 
     const map = mapRef.current;
@@ -155,6 +171,14 @@ export default function IncidentMap({
         lb.el.style.left = `${p.x + 14}px`;
         lb.el.style.top = `${p.y - 7}px`;
       }
+      for (const co of calloutsRef.current) {
+        const p = map.latLngToContainerPoint([co.lat, co.lng]);
+        co.leader.style.left = `${p.x}px`;
+        co.leader.style.top = `${p.y}px`;
+        co.box.style.left = `${p.x + 20}px`;
+        co.box.style.top = `${p.y}px`;
+        co.box.style.transform = "translateY(-50%)";
+      }
       const r = radiusRef.current;
       if (r) {
         const center = map.latLngToContainerPoint([r.lat, r.lng]);
@@ -170,6 +194,7 @@ export default function IncidentMap({
     overlay.replaceChildren();
     dotsRef.current = [];
     labelsRef.current = [];
+    calloutsRef.current = [];
     radiusRef.current = null;
 
     const doFit = lastFitKeyRef.current !== fitKey;
@@ -252,6 +277,79 @@ export default function IncidentMap({
         overlay.appendChild(lbl);
         labelsRef.current.push({ el: lbl, lat: p.lat, lng: p.lng });
       }
+
+      if (p.callout) {
+        dot.style.zIndex = "500";
+        const co = document.createElement("div");
+        co.style.position = "absolute";
+        co.style.background = "rgba(255, 255, 255, 0.95)";
+        co.style.border = `1px solid ${POLAR}`;
+        co.style.padding = "6px 8px";
+        co.style.borderRadius = "3px";
+        co.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+        co.style.pointerEvents = "none";
+        co.style.zIndex = "1000";
+        co.style.minWidth = "150px";
+        co.style.maxWidth = "220px";
+
+        const cName = document.createElement("div");
+        cName.style.font = "700 12px/1.2 Roboto, sans-serif";
+        cName.style.color = NAVY;
+        cName.style.textTransform = "uppercase";
+        cName.style.marginBottom = "2px";
+        cName.textContent = p.callout.country;
+        co.appendChild(cName);
+
+        const cSev = document.createElement("div");
+        cSev.style.font = "700 9px/1.2 Roboto, sans-serif";
+        cSev.style.color = p.callout.severityColor;
+        cSev.style.marginBottom = "5px";
+        cSev.style.letterSpacing = "0.02em";
+        cSev.textContent = `CURRENT SEVERITY: ${p.callout.severityLabel}`;
+        co.appendChild(cSev);
+
+        for (const devText of p.callout.developments) {
+          const dItem = document.createElement("div");
+          dItem.style.font = "400 11px/1.35 Roboto, sans-serif";
+          dItem.style.color = DUSK;
+          dItem.style.marginBottom = "3px";
+          dItem.style.display = "flex";
+          dItem.style.alignItems = "baseline";
+          
+          const bullet = document.createElement("span");
+          bullet.style.display = "inline-block";
+          bullet.style.width = "4px";
+          bullet.style.height = "4px";
+          bullet.style.borderRadius = "50%";
+          bullet.style.background = p.callout.severityColor;
+          bullet.style.marginRight = "5px";
+          bullet.style.flexShrink = "0";
+          bullet.style.transform = "translateY(-1.5px)";
+          
+          const dText = document.createElement("span");
+          dText.textContent = devText;
+
+          dItem.appendChild(bullet);
+          dItem.appendChild(dText);
+          co.appendChild(dItem);
+        }
+        
+        if (co.lastChild) {
+           (co.lastChild as HTMLElement).style.marginBottom = "0";
+        }
+
+        const leader = document.createElement("div");
+        leader.style.position = "absolute";
+        leader.style.width = "20px";
+        leader.style.height = "1px";
+        leader.style.background = "#888888";
+        leader.style.zIndex = "400";
+        
+        overlay.appendChild(leader);
+        overlay.appendChild(co);
+        
+        calloutsRef.current.push({ box: co, leader, lat: p.lat, lng: p.lng });
+      }
     }
 
     if (showLabels && locationLabel) {
@@ -275,7 +373,7 @@ export default function IncidentMap({
         // edits and the PDF export.
         map.setView(latLngs[0] as L.LatLngTuple, 14);
       } else {
-        map.fitBounds(L.latLngBounds(latLngs), { padding: [32, 32], maxZoom: 14 });
+        map.fitBounds(L.latLngBounds(latLngs), { padding: boundsPadding, maxZoom: 14 });
       }
       lastFitKeyRef.current = fitKey;
     }
@@ -298,6 +396,7 @@ export default function IncidentMap({
       overlayRef.current = null;
       dotsRef.current = [];
       labelsRef.current = [];
+      calloutsRef.current = [];
       radiusRef.current = null;
     };
   }, []);

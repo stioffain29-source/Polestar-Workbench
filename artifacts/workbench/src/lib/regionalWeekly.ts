@@ -925,7 +925,6 @@ export function buildApacWeeklyDevelopments<T extends RegionalIncident>(
 export interface ApacMapItem {
   id: number;
   country: string;
-  flag: string;
   lat: number;
   lng: number;
   developments: Array<{
@@ -935,26 +934,44 @@ export interface ApacMapItem {
   }>;
 }
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  "Australia": "au", "Bangladesh": "bd", "Bhutan": "bt", "Brunei": "bn",
-  "Cambodia": "kh", "China": "cn", "Fiji": "fj", "Hong Kong": "hk",
-  "India": "in", "Indonesia": "id", "Japan": "jp", "Kiribati": "ki",
-  "Laos": "la", "Malaysia": "my", "Maldives": "mv", "Marshall Islands": "mh",
-  "Micronesia": "fm", "Mongolia": "mn", "Myanmar": "mm", "Nauru": "nr",
-  "Nepal": "np", "New Zealand": "nz", "North Korea": "kp", "Pakistan": "pk",
-  "Palau": "pw", "Papua New Guinea": "pg", "Philippines": "ph", "Samoa": "ws",
-  "Singapore": "sg", "Solomon Islands": "sb", "South Korea": "kr", "Sri Lanka": "lk",
-  "Taiwan": "tw", "Thailand": "th", "Timor-Leste": "tl", "Tonga": "to",
-  "Tuvalu": "tv", "Vanuatu": "vu", "Vietnam": "vn"
-};
+
 
 
 export function clipTitleToMeaningfulWords(text: string, maxWords: number = 6): string {
-  const clean = text.replace(/^[A-Za-z]+'s\s+/, "").replace(/\s+/g, " ").trim();
+  // Strip all forms of ellipsis and excessive spaces
+  let clean = text.replace(/\.{2,}/g, "").replace(/…/g, "").replace(/\s+/g, " ").trim();
+  const lower = clean.toLowerCase();
+
+  // Targeted summaries for specific known contexts
+  if (lower.includes("migration") && (lower.includes("visa") || lower.includes("student") || lower.includes("regulation"))) return "Migration regulation changes";
+  if (lower.includes("mandalay") && lower.includes("drone")) return "Mandalay airport drone disruption";
+  if (lower.includes("arakan")) return "Arakan outpost clashes";
+  if (lower.includes("manibela") || (lower.includes("transport") && lower.includes("strike") && (lower.includes("manila") || lower.includes("philippines")))) return "Manila transport strike";
+  if (lower.includes("angeles") && (lower.includes("protest") || lower.includes("pax silica") || lower.includes("march"))) return "Angeles City protest";
+  if (lower.includes("fuel") && (lower.includes("duty") || lower.includes("tax")) && (lower.includes("india") || lower.includes("kerala"))) return "India fuel duty change";
+  if ((lower.includes("panguna") || lower.includes("bougainville")) && (lower.includes("arson") || lower.includes("machinery") || lower.includes("attack"))) return "Panguna machinery attack";
+  if (lower.includes("tariff") && (lower.includes("china") || lower.includes("us") || lower.includes("united states"))) return "US-China tariff developments";
+  if (lower.includes("russian") && lower.includes("oil") && lower.includes("china")) return "Russian oil import shifts";
+  if (lower.includes("drug") && lower.includes("trafficking") && lower.includes("india")) return "Illicit drug trafficking review";
+
+  // Generic fallback
+  clean = clean.replace(/^[A-Za-z]+'s\s+/, "");
+  
   const words = clean.split(" ").filter(Boolean);
-  if (words.length <= maxWords) return clean;
-  // No ellipsis, just truncate to words and strip trailing punctuation
-  return words.slice(0, maxWords).join(" ").replace(/[,:;.\!?]+$/, "");
+  if (words.length <= maxWords) {
+    return clean.replace(/[,:;.\!?]+$/, "");
+  }
+
+  // Pick first maxWords words
+  const selected = words.slice(0, maxWords);
+  const trailingStopWords = new Set(["the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "at", "by", "for", "with", "as"]);
+  
+  // Drop trailing stop words to make the label punchy
+  while (selected.length > 3 && trailingStopWords.has(selected[selected.length - 1].toLowerCase())) {
+    selected.pop();
+  }
+
+  return selected.join(" ").replace(/[,:;.\!?]+$/, "");
 }
 
 export function buildApacMapItems<T extends RegionalIncident>(
@@ -993,7 +1010,6 @@ export function buildApacMapItems<T extends RegionalIncident>(
     return {
       id: idCounter++,
       country,
-      flag: COUNTRY_FLAGS[country] ?? "",
       lat: representative.latitude!,
       lng: representative.longitude!,
       developments: items.map(item => {

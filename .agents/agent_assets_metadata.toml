@@ -1190,14 +1190,14 @@ content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.d
 id = "90krMonwu25PI9RHcfwJs"
 uri = "file://artifacts/workbench/screenshots/apac-weekly-review-2026-09-17.pdf"
 type = "pdf"
-title = "Open Polestar APAC Weekly PDF"
-description = "Validated four-page PDF. Click this card to open or download the report."
+title = "Polestar APAC Weekly — Text Callout Map"
+description = "Regenerated APAC Weekly report with the corrected map-only presentation."
 logical_id = "899bce96-9408-45bd-a262-e803009c4daa"
-content_hash = "sha256:2f01754aa3288bd0bf9f4c6d6f6b05013c843b51655ab36d1010f5cb829f486f"
-size = 1785286
-mtime_ms = 1789655039934
-storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/899bce96-9408-45bd-a262-e803009c4daa/23476721-d230-4c5c-94f9-2584f6e07047"
-storage_version_token = "1789655164519786"
+content_hash = "sha256:02d680782648dccac9d4ccfd564107a99e9fecc1ae379bbd3fe2459fc0a66c87"
+size = 1145660
+mtime_ms = 1789690466037
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/899bce96-9408-45bd-a262-e803009c4daa/c9b2e592-885f-455b-b8e4-3ea63088cd29"
+storage_version_token = "1789690501601594"
 content_type = "application/pdf"
 
 [[outputs]]
