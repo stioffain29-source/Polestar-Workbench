@@ -46,6 +46,19 @@ export default function RegionalReports() {
 
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
+    const issueDate = currentReportDate();
+    const existing = reports
+      .filter(
+        (report) =>
+          report.topic === topic &&
+          report.issueDate === issueDate &&
+          report.status === "draft",
+      )
+      .sort((a, b) => b.id - a.id)[0];
+    if (existing) {
+      setLocation(`/reports/${existing.id}`);
+      return;
+    }
     createBusy.current = true;
     setCreatingTopic(topic);
     const controller = new AbortController();
@@ -55,7 +68,7 @@ export default function RegionalReports() {
         {
           title: canonicalReportTitle(topic),
           topic,
-          issueDate: currentReportDate(),
+          issueDate,
           status: "draft",
         } as never,
         { signal: controller.signal },
@@ -109,6 +122,13 @@ export default function RegionalReports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {REGIONAL_REPORT_TOPICS.map((topic) => {
           const product = canonicalTopic(topic);
+          const currentIssueDate = currentReportDate();
+          const hasCurrentReport = reports.some(
+            (report) =>
+              report.topic === topic &&
+              report.issueDate === currentIssueDate &&
+              report.status === "draft",
+          );
           return (
             <section
               key={topic}
@@ -132,7 +152,11 @@ export default function RegionalReports() {
                 className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm shrink-0"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {creatingTopic === topic ? "Creating…" : "New Weekly Report"}
+                {creatingTopic === topic
+                  ? "Creating…"
+                  : hasCurrentReport
+                    ? "Open Current Report"
+                    : "New Weekly Report"}
               </Button>
             </section>
           );
