@@ -91,7 +91,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
-import { buildApacBusinessImplications, buildApacMapItems, buildApacWeeklyBluf, buildApacWeeklyDevelopments, buildApacWeeklyOutlook, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalWatchlist, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -922,8 +922,9 @@ function drawApacBusinessImplicationBlocks(
   ctx: Ctx,
   incidents: TopicReportIncident[],
   issueDate: string,
+  topic: RegionalWeeklyTopic = "apac_weekly",
 ): void {
-  const developments = buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly");
+  const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
   const blocks = buildApacBusinessImplications(developments);
   if (blocks.length === 0) return;
   drawApacCompactHeading(ctx, "Business Implications");
@@ -941,9 +942,10 @@ function drawApacBusinessImplicationGrid(
   ctx: Ctx,
   incidents: TopicReportIncident[],
   issueDate: string,
+  topic: RegionalWeeklyTopic = "apac_weekly",
 ): boolean {
   const blocks = buildApacBusinessImplications(
-    buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly"),
+    buildPdfRegionalDevelopments(incidents, issueDate, topic),
   );
   if (blocks.length === 0) return true;
   const gap = 7;
@@ -1195,6 +1197,8 @@ function drawApacPageTwo(
   incidents: TopicReportIncident[],
   issueDate: string,
   bluf: string,
+  topic: RegionalWeeklyTopic,
+  futureEvents: RegionalFutureEventInput[] = [],
 ): void {
   drawApacCompactHeading(ctx, "Regional Outlook");
   const blufLines = drawApacCompactText(ctx, bluf, 7.45, 8.8, 6);
@@ -1203,46 +1207,42 @@ function drawApacPageTwo(
   ctx.y += Math.max(8, blufLines > 0 ? 8 : 0);
 
   drawApacGeographicMap(ctx, incidents);
-  const developments = buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly");
-  const glance = buildRegionalGlanceItems(developments, "apac_weekly");
+  const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
+  const watchItems = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
+  const glance = buildApacGlanceMetrics(developments, watchItems);
   drawApacCompactHeading(ctx, "Week at a Glance");
-  for (const item of glance) {
+  const gap = 7;
+  const cardW = (ctx.CW - gap) / 2;
+  glance.forEach((item, index) => {
+    const col = index % 2;
+    const row = Math.floor(index / 2);
+    const x = ctx.MX + col * (cardW + gap);
+    const y = ctx.y + row * 31;
+    setFill(ctx.pdf, "#ffffff");
+    setStroke(ctx.pdf, POLAR);
+    ctx.pdf.rect(x, y, cardW, 24, "FD");
+    setFill(ctx.pdf, ELECTRIC);
+    ctx.pdf.rect(x, y, 2.5, 24, "F");
     setText(ctx.pdf, NAVY);
     setRoboto(ctx.pdf, "bold");
-    ctx.pdf.setFontSize(6.5);
-    ctx.pdf.text(item.category.toUpperCase(), ctx.MX, ctx.y + 7);
-    setText(ctx.pdf, DUSK);
-    setRoboto(ctx.pdf, "regular");
-    ctx.pdf.setFontSize(6.8);
-    const lines = ctx.pdf.splitTextToSize(sanitize(item.statement), ctx.CW - 105);
-    const glanceLineHeight = 7.8;
-    ctx.pdf.text(lines, ctx.MX + 105, ctx.y + 7, { lineHeightFactor: glanceLineHeight / 6.8 });
-    ctx.y += Math.max(15, lines.length * glanceLineHeight + 9);
-  }
-  ctx.y += 8;
-  // Keep the first page dense: the thematic read follows the glance when it
-  // fits, rather than reserving a mostly empty fixed page for it.
-  drawApacCompactHeading(ctx, "What Changed This Week");
-  const briefs = buildRegionalDomainBriefs(developments, "apac_weekly");
-  for (const brief of briefs) {
-    setText(ctx.pdf, NAVY);
-    setRoboto(ctx.pdf, "bold");
-    ctx.pdf.setFontSize(7.2);
-    ctx.pdf.text(sanitize(brief.heading.toUpperCase()), ctx.MX, ctx.y + 7);
-    ctx.y += 10;
-    drawApacCompactText(ctx, brief.assessment, 7.2, 8.3, 6);
-  }
+    ctx.pdf.setFontSize(6.3);
+    ctx.pdf.text(item.label.toUpperCase(), x + 8, y + 9);
+    ctx.pdf.setFontSize(12);
+    ctx.pdf.text(String(item.value), x + 8, y + 20);
+  });
+  ctx.y += Math.ceil(glance.length / 2) * 31 + 4;
 }
 
 function drawApacThemesPage(
   ctx: Ctx,
   incidents: TopicReportIncident[],
   issueDate: string,
+  topic: RegionalWeeklyTopic,
 ): void {
   drawApacCompactHeading(ctx, "What Changed This Week");
   const briefs = buildRegionalDomainBriefs(
-    buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly"),
-    "apac_weekly",
+    buildPdfRegionalDevelopments(incidents, issueDate, topic),
+    topic,
   );
   for (const brief of briefs) {
     setText(ctx.pdf, NAVY);
@@ -1252,6 +1252,15 @@ function drawApacThemesPage(
     ctx.y += 10;
     drawApacCompactText(ctx, brief.assessment, 7.2, 8.3, 6);
   }
+  const visual = buildRegionalVisualSummary(incidents, topic);
+  drawSimpleBarChart(ctx, "Developments by Type", visual.byCategory.map((row) => ({
+    label: row.label,
+    value: row.count,
+  })));
+  drawSimpleBarChart(ctx, "Developments by Market", visual.byCountry.map((row) => ({
+    label: row.label,
+    value: row.count,
+  })));
 }
 
 function drawApacDevelopmentPage(
@@ -1373,8 +1382,9 @@ function drawApacFinalPage(
   incidents: TopicReportIncident[],
   issueDate: string,
   futureEvents: RegionalFutureEventInput[] = [],
+  topic: RegionalWeeklyTopic = "apac_weekly",
 ): void {
-  const developments = buildPdfRegionalDevelopments(incidents, issueDate, "apac_weekly");
+  const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
   const items = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   drawApacCompactHeading(ctx, "7 Day Watch");
   if (futureEvents.length === 0) {
@@ -1396,7 +1406,7 @@ function drawApacFinalPage(
     drawApacCompactText(ctx, detail, 6.8, 7.8, 3);
   }
   ctx.y += 8;
-  const outlook = buildApacWeeklyOutlook(developments);
+  const outlook = buildStructuredRegionalOutlook(developments, topic);
   drawApacCompactHeading(ctx, "Polestar Outlook");
   drawApacCompactText(ctx, outlook, 7.35, 8.5, 4);
 }
@@ -1949,9 +1959,10 @@ export async function exportTopicReportPdf(
   // Every other topic keeps the AI narrative + template fallback stack.
   const execText =
     isRegionalWeekly
-      ? (data.topic === "apac_weekly"
-         ? buildApacWeeklyBluf(buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, data.topic))
-         : buildRegionalBluf(buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic)))
+      ? buildStructuredRegionalBluf(
+          buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
+          regionalTopic,
+        )
       : fuelEffective
       ? (fuelEffective.executiveSummary ?? "")
       : isCargo && cargoModel
@@ -1966,8 +1977,8 @@ export async function exportTopicReportPdf(
     show("executive-summary") &&
     execText.trim()
   ) {
-    if (data.topic === "apac_weekly") {
-      drawApacPageTwo(ctx, regionalPdfIncidents, data.issueDate, execText);
+    if (isRegionalWeekly) {
+      drawApacPageTwo(ctx, regionalPdfIncidents, data.issueDate, execText, regionalTopic, options.futureEvents);
     } else {
       drawSectionHeading(ctx, isRegionalWeekly ? "BLUF — Regional Outlook" : "Executive Summary");
       renderProse(ctx, execText);
@@ -1975,10 +1986,6 @@ export async function exportTopicReportPdf(
         renderProse(ctx, cargoModel.highSeverityNote);
       }
     }
-  }
-  if (isRegionalWeekly && data.topic !== "apac_weekly") {
-    drawRegionalHotspotMap(ctx, regionalPdfIncidents, regionalTopic);
-    drawRegionalGlance(ctx, regionalPdfIncidents, data.issueDate, regionalTopic);
   }
 
   const rawWindow = filterIncidentsToWindow(
@@ -2502,13 +2509,22 @@ export async function exportTopicReportPdf(
         drawFullAnnex(ctx, cargoModel.appendix);
       }
     } else if (isRegionalWeekly) {
-      if (regionalTopic === "apac_weekly") {
+      if (regionalTopic === "apac_weekly" || regionalTopic === "middle_east_weekly") {
         const apacDevelopments = buildApacWeeklyDevelopments(
-          regionalPdfIncidents,
+          regionalTopic === "apac_weekly"
+            ? regionalPdfIncidents
+            : curateRegionalWeeklyIncidents(regionalPdfIncidents, regionalTopic, data.issueDate),
           data.issueDate,
         );
+        newPage(ctx);
+        if (show("situation")) {
+          drawApacThemesPage(ctx, regionalPdfIncidents, data.issueDate, regionalTopic);
+        }
         const developmentPages = show("what-happened")
-          ? splitApacDevelopmentPages(ctx, apacDevelopments)
+          ? splitApacDevelopmentPages(
+              ctx,
+              buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
+            )
           : [];
         if (developmentPages.length > 0) {
           developmentPages.forEach((pageRows) => {
@@ -2523,6 +2539,7 @@ export async function exportTopicReportPdf(
             ctx,
             regionalPdfIncidents,
             data.issueDate,
+            regionalTopic,
           );
           if (!fit) {
             newPage(ctx);
@@ -2530,6 +2547,7 @@ export async function exportTopicReportPdf(
               ctx,
               regionalPdfIncidents,
               data.issueDate,
+              regionalTopic,
             );
           }
         }
@@ -2539,6 +2557,7 @@ export async function exportTopicReportPdf(
             regionalPdfIncidents,
             data.issueDate,
             options.futureEvents,
+            regionalTopic,
           );
         }
       } else {

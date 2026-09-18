@@ -1,0 +1,356 @@
+APAC WEEKLY CONTENT REBUILD ONLY.
+
+DO NOT TOUCH THE MAP.
+
+The map is frozen for now.
+
+DO NOT alter:
+- map code
+- map layout
+- cover
+- header/footer
+- PDF engine
+- Middle East Weekly
+- any other Polestar product
+
+The problem is now the REPORT CONTENT.
+
+The current report still reads like generated boilerplate.
+
+FIX ONLY THE APAC WEEKLY CONTENT GENERATION.
+
+==================================================
+1. REGIONAL OUTLOOK
+==================================================
+
+Rewrite this completely.
+
+Target:
+200–250 words.
+
+It must be an executive regional assessment.
+
+DO NOT list countries one after another.
+
+DO NOT write:
+"The operating picture shifted across..."
+"Selected evidence..."
+"Exposure remains location specific..."
+"Differentiated controls..."
+
+The Regional Outlook must explain:
+
+- the 2–4 dominant themes of the week
+- where conditions materially changed
+- what matters to business
+- where the main operational exposure lies
+- what is likely to matter next
+
+It must sound like an analyst wrote it.
+
+==================================================
+2. WEEK AT A GLANCE
+==================================================
+
+DELETE the current sentence-based format.
+
+Replace it with 4–6 factual metrics/cards.
+
+Example:
+
+MATERIAL DEVELOPMENTS        8
+MARKETS REQUIRING WATCH      6
+SECURITY / CONFLICT          2
+POLITICAL / REGULATORY       2
+OPERATIONAL DISRUPTIONS      3
+7-DAY WATCH ITEMS            5
+
+Use ONLY the curated report dataset.
+
+No generic explanatory prose in this section.
+
+==================================================
+3. WHAT CHANGED THIS WEEK
+==================================================
+
+Do NOT force generic categories.
+
+Select the 3–5 most important regional themes.
+
+Each theme:
+
+SHORT HEADING
+
+2–4 sentences explaining:
+- what changed
+- why it matters regionally or commercially
+
+Example:
+
+REGIONAL AVIATION DISRUPTION
+
+POLITICAL MOBILISATION IN THE PHILIPPINES
+
+REGULATORY CHANGE IN AUSTRALIA
+
+MYANMAR CONFLICT AND ACCESS
+
+Do not create an "Operating Posture" section.
+
+Do not use boilerplate.
+
+==================================================
+4. KEY DEVELOPMENTS
+==================================================
+
+Maximum:
+6 developments.
+
+Not 8.
+
+They must be the six most material developments.
+
+Correct the classification system.
+
+Use categories such as:
+
+Security
+Armed Conflict
+Terrorism
+Political
+Regulatory
+Weather & Natural Hazards
+Cyber
+Energy
+Operational Disruption
+
+Examples:
+
+Narathiwat armed attack:
+NOT Operational Disruption.
+Classify according to the actual security event.
+
+Arakan Army / junta clashes:
+NOT Operational Disruption.
+Use Armed Conflict.
+
+India fuel export duty:
+Regulatory or Energy.
+NOT Operational Disruption.
+
+China tariff / trade policy:
+Regulatory / Geopolitical.
+DO NOT describe it as public-order or transport action.
+
+Before generating text:
+validate that the category actually matches the event.
+
+==================================================
+5. KEY DEVELOPMENT WRITING
+==================================================
+
+Use:
+
+COUNTRY | TITLE
+
+Category
+Current Severity
+
+WHAT CHANGED
+2–3 sentences of specific factual synthesis.
+
+OPERATIONAL IMPACT
+Specific business consequence.
+
+POLESTAR VIEW
+Actual analytical judgement.
+
+OUTLOOK 7 DAYS
+Specific forward indicators.
+
+PROHIBITED:
+
+"High assessment:"
+"Moderate assessment:"
+"Low assessment:"
+
+Do not repeat severity in Polestar View.
+
+PROHIBITED GENERIC TEXT:
+
+"This is an immediate access constraint"
+"The assessment remains conditional"
+"Operators should maintain alternatives"
+"Exposure is location specific"
+
+unless the specific event genuinely requires that language.
+
+Every Polestar View must be written specifically for that development.
+
+==================================================
+6. BUSINESS IMPLICATIONS
+==================================================
+
+The current four boxes are generic filler.
+
+Replace them with concise conclusions.
+
+Use only the boxes that have meaningful content:
+
+PEOPLE & TRAVEL
+OPERATIONS & ASSETS
+SUPPLY CHAIN & LOGISTICS
+REGULATORY & MARKET ACCESS
+
+Maximum:
+70 words per box.
+
+DO NOT begin with:
+"The selected evidence links..."
+
+State the actual implication.
+
+Example:
+
+PEOPLE & TRAVEL
+Transport action in Manila and aviation disruption in Myanmar create localised movement constraints. Travellers should plan around confirmed service disruption rather than treating either issue as a countrywide travel restriction.
+
+That is the required style.
+
+==================================================
+7. ADD VISUAL DATA
+==================================================
+
+The report currently lacks useful charts.
+
+Add TWO additional visuals.
+
+Do not touch the existing regional map.
+
+VISUAL 1:
+DEVELOPMENTS BY TYPE
+
+Simple horizontal bar chart showing the curated developments by category.
+
+VISUAL 2:
+4-WEEK TREND
+
+Show a meaningful four-week trend using available structured data.
+
+Preferred metric:
+material incidents / disruptions by week.
+
+If reliable historical data is not available:
+DO NOT fabricate a trend chart.
+
+Instead use:
+DEVELOPMENTS BY MARKET
+or another factual chart based on the curated dataset.
+
+Charts must use real underlying data.
+
+==================================================
+8. 7 DAY WATCH
+==================================================
+
+Keep maximum:
+5 items.
+
+Present as a clean table or timeline.
+
+Fields:
+
+DATE
+LOCATION
+EVENT
+EXPECTED IMPACT
+CURRENT SEVERITY
+
+Do not repeat generic monitoring advice after every item.
+
+Do not automatically rate demonstrations High.
+
+Severity must reflect credible expected operational consequence.
+
+==================================================
+9. POLESTAR OUTLOOK
+==================================================
+
+Rewrite completely.
+
+Target:
+150–200 words.
+
+This must be forward-looking analytical judgement.
+
+Answer:
+
+- what is likely to drive APAC risk next week?
+- where is deterioration plausible?
+- what specific indicators matter?
+- what could materially alter the current assessment?
+
+Do not recap all six key developments.
+
+Do not write generic consultancy language.
+
+Do not say:
+"the exposure is not uniform"
+"selected developments"
+"assign these indicators to owners"
+"update controls when evidence changes"
+
+The Outlook must sound specific to THIS WEEK.
+
+==================================================
+10. LANGUAGE QUALITY CONTROL
+==================================================
+
+Before PDF generation, reject any paragraph containing obvious template mismatch.
+
+Example:
+
+A tariff story must never produce:
+"public-order or transport action"
+
+An armed attack must not be described as:
+"Operational Disruption"
+
+A regulatory change must not be described using protest or transport templates.
+
+If category and generated language do not match:
+regenerate that item before export.
+
+==================================================
+11. LENGTH
+==================================================
+
+Target final APAC Weekly:
+
+5–6 body pages plus cover.
+
+Do not compress everything into 3 dense pages.
+
+Use:
+- whitespace
+- charts
+- tables
+- clear visual hierarchy
+
+But do not add filler to create pages.
+
+==================================================
+12. IMPLEMENTATION CONTROL
+==================================================
+
+Change APAC Weekly content generation ONLY.
+
+DO NOT touch the map.
+
+DO NOT touch Middle East Weekly yet.
+
+Generate one new APAC Weekly PDF.
+
+STOP.
+
+I will review APAC before this logic is applied to Middle East.
