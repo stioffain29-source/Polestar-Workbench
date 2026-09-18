@@ -45,7 +45,9 @@ export function layoutCallouts(
   for (const input of inputs) {
     const { px, py, boxW, boxH } = input;
 
-    const gap = 34;
+    // Keep enough clear leader-line length between each incident marker and
+    // its callout for the relationship to remain obvious on pale basemaps.
+    const gap = 64;
     const candidates = [
       [px + gap, py - boxH / 2],
       [px - boxW - gap, py - boxH / 2],

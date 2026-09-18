@@ -699,8 +699,7 @@ export default function MapPage() {
                     radius={clusterRadius}
                     eventHandlers={{
                       click: (event) => {
-                        event.target._map.setView([p.lat, p.lng], Math.min(zoom + 2, 12));
-                        requestAnimationFrame(() => event.target.closePopup());
+                        event.target.openPopup();
                       },
                     }}
                     pathOptions={{
@@ -713,7 +712,7 @@ export default function MapPage() {
                     <LeafletTooltip permanent direction="center" className="map-cluster-label" opacity={1}>
                       {p.clusterSize}
                     </LeafletTooltip>
-                    {false && <LeafletPopup>
+                    <LeafletPopup>
                       <div style={{ fontFamily: "Roboto Condensed, sans-serif", maxWidth: 260 }}>
                         <div style={{ fontWeight: 700, color: "#0b0a3d", marginBottom: 4 }}>
                           {p.clusterSize} distinct developments in this area
@@ -725,7 +724,7 @@ export default function MapPage() {
                             : `All ${p.clusterSize} incidents are rated ${SEVERITY_LABELS[p.rating] ?? p.rating}.`}
                         </div>
                         <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 220, overflowY: "auto" }}>
-                          {members.slice(0, 10).map((m) => {
+                          {members.map((m) => {
                             // A stack can bury a brand-new incident among old
                             // ones with no per-row cue - mirror the single-
                             // marker "new" treatment (bold text + a small NEW
@@ -808,13 +807,8 @@ export default function MapPage() {
                             );
                           })}
                         </ul>
-                        {members.length > 10 && (
-                          <div style={{ fontSize: 10, color: "#666", marginTop: 6 }}>
-                            +{members.length - 10} more
-                          </div>
-                        )}
                       </div>
-                    </LeafletPopup>}
+                    </LeafletPopup>
                   </CircleMarker>
                   </Fragment>
                 );

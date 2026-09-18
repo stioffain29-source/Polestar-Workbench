@@ -334,10 +334,11 @@ export default function IncidentMap({
 
         const leader = document.createElement("div");
         leader.style.position = "absolute";
-        leader.style.height = "1px";
-        leader.style.background = "#888888";
+        leader.style.height = "2px";
+        leader.style.background = p.expandedCallout.severityColor;
+        leader.style.boxShadow = "0 0 0 1px rgba(255,255,255,0.9)";
         leader.style.transformOrigin = "0 0";
-        leader.style.zIndex = "400";
+        leader.style.zIndex = "800";
 
         if (isMobile) {
           co.style.display = "none";
