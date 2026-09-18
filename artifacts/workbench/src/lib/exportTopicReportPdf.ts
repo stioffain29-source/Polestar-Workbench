@@ -990,35 +990,41 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
   const mapRight = ctx.MX + ctx.CW - 4;
   const mapTop = ctx.y + 4;
   const mapBottom = ctx.y + mapH - 4;
-  const boxW = Math.min(190, ctx.CW * 0.43);
+  const boxW = Math.min(158, ctx.CW * 0.34);
   setRoboto(ctx.pdf, "regular");
   ctx.pdf.setFontSize(7);
   const prepared = items.map((item) => {
+    const severities = item.developments.map((development) => development.severity);
+    const severityRank = (severity: string) =>
+      ["insignificant", "low", "moderate", "high", "extreme"].indexOf(sevKey(severity));
+    const worstSeverity = severities.reduce((worst, current) =>
+      severityRank(current) > severityRank(worst) ? current : worst,
+      severities[0] || "Moderate",
+    );
+    const descriptionLines = ctx.pdf.splitTextToSize(item.developments[0]?.label ?? "", boxW - 10);
     const lines = [
       item.country.toUpperCase(),
-      ...item.developments.flatMap((development) =>
-        ctx.pdf.splitTextToSize(
-          `${development.label} — ${development.severity}`,
-          boxW - 10,
-        )),
+      `CURRENT SEVERITY: ${worstSeverity.toUpperCase()}`,
+      ...descriptionLines,
     ];
-    return { item, point: project(item.lng, item.lat), lines, height: 10 + lines.length * 8 };
+    return { item, point: project(item.lng, item.lat), lines, height: 13 + lines.length * 8, worstSeverity };
   });
   const lanes: Array<typeof prepared> = [[], []];
   prepared
     .sort((a, b) => a.point[1] - b.point[1] || a.point[0] - b.point[0])
-    .forEach((entry, index) => lanes[index % 2].push(entry));
+    .forEach((entry) => lanes[entry.point[0] < ctx.MX + ctx.CW * 0.43 ? 0 : 1].push(entry));
   lanes.forEach((lane, laneIndex) => {
     let nextTop = mapTop;
     for (const entry of lane) {
       const [px, py] = entry.point;
       const left = laneIndex === 0 ? mapLeft : mapRight - boxW;
-      const top = Math.min(nextTop, mapBottom - entry.height);
+      const preferredTop = py - entry.height / 2;
+      const top = Math.min(Math.max(preferredTop, nextTop), mapBottom - entry.height);
       const box = { left, top, right: left + boxW, bottom: top + entry.height };
       nextTop = box.bottom + 6;
       const anchorX = laneIndex === 0 ? box.right : box.left;
       const anchorY = Math.min(Math.max(py, box.top + 5), box.bottom - 5);
-      setStroke(ctx.pdf, SEV_COLOR[sevKey(entry.item.developments[0]?.severity)] ?? ELECTRIC);
+      setStroke(ctx.pdf, SEV_COLOR[sevKey(entry.worstSeverity)] ?? ELECTRIC);
     setFill(ctx.pdf, "#ffffff");
     ctx.pdf.setLineWidth(0.7);
       ctx.pdf.rect(box.left, box.top, boxW, entry.height, "FD");
@@ -1029,10 +1035,14 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
     setRoboto(ctx.pdf, "bold");
       ctx.pdf.setFontSize(8);
     ctx.pdf.text(entry.lines[0], box.left + 5, box.top + 8);
+    setText(ctx.pdf, SEV_COLOR[sevKey(entry.worstSeverity)] ?? ELECTRIC);
+    setRoboto(ctx.pdf, "bold");
+    ctx.pdf.setFontSize(6.5);
+    ctx.pdf.text(entry.lines[1], box.left + 5, box.top + 17);
     setText(ctx.pdf, DUSK);
     setRoboto(ctx.pdf, "regular");
     ctx.pdf.setFontSize(7);
-    entry.lines.slice(1).forEach((line, index) => ctx.pdf.text(line, box.left + 5, box.top + 17 + index * 8));
+    entry.lines.slice(2).forEach((line, index) => ctx.pdf.text(line, box.left + 5, box.top + 25 + index * 8));
     }
   });
   ctx.y += mapH + 7;

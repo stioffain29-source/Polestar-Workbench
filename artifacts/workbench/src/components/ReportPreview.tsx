@@ -471,7 +471,7 @@ export function ApacHotspotMap({
   const mapRight = APAC_MAP_CW - 4;
   const mapTop = 4;
   const mapBottom = APAC_MAP_H - 4;
-  const boxW = Math.min(190, APAC_MAP_CW * 0.43);
+  const boxW = Math.min(158, APAC_MAP_CW * 0.34);
 
   const prepared = items.map((item) => {
     const severities = item.developments.map((d) => d.severity);
@@ -517,7 +517,7 @@ export function ApacHotspotMap({
   const lanes: Array<typeof prepared> = [[], []];
   [...prepared]
     .sort((a, b) => a.point[1] - b.point[1] || a.point[0] - b.point[0])
-    .forEach((entry, index) => lanes[index % 2].push(entry));
+    .forEach((entry) => lanes[entry.point[0] < APAC_MAP_CW * 0.43 ? 0 : 1].push(entry));
 
   const boxes: Array<{
     left: number;
@@ -534,7 +534,8 @@ export function ApacHotspotMap({
     for (const entry of lane) {
       const [px, py] = entry.point;
       const left = laneIndex === 0 ? mapLeft : mapRight - boxW;
-      const top = Math.min(nextTop, mapBottom - entry.height);
+      const preferredTop = py - entry.height / 2;
+      const top = Math.min(Math.max(preferredTop, nextTop), mapBottom - entry.height);
       const box = { left, top, right: left + boxW, bottom: top + entry.height };
       nextTop = box.bottom + 6;
       const anchorX = laneIndex === 0 ? box.right : box.left;

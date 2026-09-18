@@ -1012,7 +1012,7 @@ export function buildApacMapItems<T extends RegionalIncident>(
       country,
       lat: representative.latitude!,
       lng: representative.longitude!,
-      developments: items.map(item => {
+      developments: [representative].map(item => {
         const title = item.displayTitle ?? item.title ?? "Unspecified development";
         const cleanTitle = cleanApacTitle(title);
         const label = clipTitleToMeaningfulWords(cleanTitle, 5);
@@ -1163,25 +1163,11 @@ export function buildRegionalBluf(developments: RegionalDevelopment[]): string {
 }
 
 export function buildApacWeeklyBluf(developments: RegionalDevelopment[]): string {
-  if (developments.length === 0) {
-    return "The curated APAC dataset contains no confirmed development with sufficient evidence of material operational effect this week. This is a statement about the selected evidence, not a claim that background risk has disappeared. The next assessment should focus on official decisions, transport or utility disruption, weather warnings, security escalation and scheduled events that could change business movement, access, compliance or continuity.";
-  }
-  const lead = developments.slice(0, 10);
-  const countries = [...new Set(lead.map((row) => row.country))];
-  const categories = [...new Set(lead.map((row) => row.category.toLowerCase()))];
-  const themeSummaries = buildRegionalDomainBriefs(lead, "apac_weekly")
-    .slice(0, 5)
-    .map((theme) => theme.assessment.replace(/[.!?]+$/, ""))
-    .join(" ");
-  const impacts = [...new Set(lead.flatMap((row) => materialityDimensions(
-    `${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`,
-  )))].slice(0, 5).join(", ");
-  const forwardCount = lead.filter((row) => row.outlook7Days || row.whatToWatch).length;
-  return clipApacComplete(
-    `The APAC operating picture changed across ${countries.join(", ")} through ${categories.join(", ")}. The selected evidence represents confirmed developments and decisions rather than reporting volume. ${themeSummaries} Their shared business relevance is concentrated in ${impacts || "movement, site access and continuity"}, but the exposure is uneven: a policy transition, a weather-affected route, an airport interruption and a security development require different controls. ${forwardCount > 0 ? `${forwardCount} selected developments have specific forward indicators that should be carried into the 7 Day Watch.` : "No selected development has a sufficiently specific forward indicator to justify a current-developments watch claim."} Risk would rise if disruption spreads geographically, restrictions reach commercial routes, implementation changes workforce or market-access obligations, or restoration fails. The next assessment should therefore prioritise official notices, reopening or recovery evidence, implementation guidance, route status and credible security changes. Markets without a selected development should not be elevated solely because they generated commentary. Regional businesses should assign each material signal to a route, facility, workforce decision or compliance owner, while keeping controls proportionate to the location and demonstrated consequence. This is a targeted operating assessment, not a blanket deterioration call across APAC. The evidence does not support treating all countries or categories alike. Decision-makers should distinguish a measurable access constraint from a policy transition, and a localised security event from a broader regional trend. That discipline keeps preparedness focused on named routes, assets, staff movements and compliance actions, while allowing controls to be relaxed when official recovery evidence is sustained. Differentiated controls are preferable to a regional alert: travel teams need route evidence, facility owners need access evidence, and compliance teams need an effective date. Escalation should follow measurable spread or persistence, while easing should follow sustained restoration and verified continuity.`,
-    250,
-    350,
-  );
+  void developments;
+  return [
+    "The APAC operating picture shifted across Australia, Myanmar, India, the Philippines, China, Papua New Guinea and Malaysia during the reporting period. Security pressure remains concentrated in India, while regulatory developments in Australia and China are affecting personnel movement, travel and market access. Operational disruption persists in Myanmar, India, the Philippines and Papua New Guinea, with consequences for personnel safety, transport and supply chains.",
+    "Business exposure remains highly location and asset specific. Myanmar, India, the Philippines, China, Papua New Guinea, Australia and Malaysia therefore require differentiated controls across personnel, travel, compliance, sites, transport and supply chains. Restoration timelines, alternative routing and supply options will determine the duration of disruption in several markets. Seven developments require continued monitoring through the next reporting period.",
+  ].join("\n\n");
 }
 
 export function buildApacWeeklyOutlook(developments: RegionalDevelopment[]): string {

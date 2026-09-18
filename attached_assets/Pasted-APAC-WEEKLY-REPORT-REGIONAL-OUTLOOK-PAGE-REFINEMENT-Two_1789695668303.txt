@@ -1,0 +1,72 @@
+APAC WEEKLY REPORT – REGIONAL OUTLOOK PAGE REFINEMENT
+
+Two changes are required to the Regional Outlook page:
+
+1. REWRITE THE OPENING REGIONAL OUTLOOK TEXT
+
+The current Regional Outlook is too dense, repetitive and visually heavy. Replace it with a much tighter executive summary.
+
+Use this copy:
+
+The APAC operating picture shifted across Australia, Myanmar, India, the Philippines, China, Papua New Guinea and Malaysia during the reporting period. Security pressure remains concentrated in India, while regulatory developments in Australia and China are affecting personnel movement, travel and market access. Operational disruption persists in Myanmar, India, the Philippines and Papua New Guinea, with consequences for personnel safety, transport and supply chains.
+
+Business exposure remains highly location and asset specific. Myanmar, India, the Philippines, China, Papua New Guinea, Australia and Malaysia therefore require differentiated controls across personnel, travel, compliance, sites, transport and supply chains. Restoration timelines, alternative routing and supply options will determine the duration of disruption in several markets. Seven developments require continued monitoring through the next reporting period.
+
+Formatting:
+- Keep as two short paragraphs.
+- Do not expand this into a long narrative.
+- Maintain the existing Regional Outlook heading and report typography.
+- The objective is to reduce the large grey text block and make the page easier to scan.
+
+2. REDESIGN THE REGIONAL MAP
+
+The current regional map is too abstract and confusing. The country callout boxes feel disconnected from the countries they relate to.
+
+Redesign it to work in the same way as the main-page map.
+
+Requirements:
+
+- Use a clear, recognisable APAC base map.
+- Position each country callout close to the relevant country.
+- Use a short, clean leader line from the callout directly to the relevant country.
+- Avoid long crossing lines running across the map.
+- Avoid multiple leader lines overlapping each other.
+- The relationship between country and callout must be immediately obvious at a glance.
+- Keep the map geographically recognisable rather than heavily stylised.
+- The map is an intelligence graphic, not a decorative illustration.
+
+Each callout should contain only:
+
+COUNTRY NAME
+CURRENT SEVERITY: [SEVERITY]
+One short description of the relevant development
+
+Example:
+
+INDIA
+CURRENT SEVERITY: LOW
+Illicit drug trafficking review
+
+AUSTRALIA
+CURRENT SEVERITY: HIGH
+Migration regulation changes
+
+Layout guidance:
+- Place callouts around the outer edges of the map where possible.
+- Keep callouts close to their country rather than grouping them purely for visual symmetry.
+- Use left and right sides of the map intelligently to prevent clutter.
+- Leader lines should be short and direct.
+- Do not allow leader lines to cross where this can reasonably be avoided.
+- Preserve sufficient whitespace around the map.
+- Do not reduce the map so much that individual countries become difficult to identify.
+
+Visual hierarchy:
+1. Country name
+2. Current severity
+3. Short issue description
+
+The country name and severity should be more prominent than the issue description.
+
+Keep the existing Polestar visual language and report colours.
+
+Do not redesign the Week at a Glance section. That section is working and should remain structurally unchanged.

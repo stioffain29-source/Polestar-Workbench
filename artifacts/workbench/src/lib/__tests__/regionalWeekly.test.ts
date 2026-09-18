@@ -529,9 +529,9 @@ describe("regional weekly products", () => {
       incident(3, "Myanmar", "high", "2026-09-17", "Drone activity shuts Mandalay airport"),
       incident(4, "Australia", "moderate", "2026-09-17", "Australia migration overhaul changes visa rules"),
     ], "2026-09-17");
-    const words = buildApacWeeklyBluf(developments).split(/\s+/).filter(Boolean);
-    expect(words.length).toBeGreaterThanOrEqual(250);
-    expect(words.length).toBeLessThanOrEqual(350);
+    const outlook = buildApacWeeklyBluf(developments);
+    expect(outlook.split("\n\n")).toHaveLength(2);
+    expect(outlook.split(/\s+/).filter(Boolean).length).toBeLessThan(150);
   });
 
   it("APAC rejects local egg-truck robbery and casualty aftermath without ongoing disruption", () => {
@@ -567,8 +567,8 @@ describe("regional weekly products", () => {
     ], "2026-09-17");
     const regionalOutlook = buildApacWeeklyBluf(developments);
     const finalOutlook = buildApacWeeklyOutlook(developments);
-    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(250);
-    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(350);
+    expect(regionalOutlook.split("\n\n")).toHaveLength(2);
+    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThan(150);
     expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(200);
     expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(300);
     expect(`${regionalOutlook} ${finalOutlook}`).not.toMatch(/recorded a operational|recorded a (?:security|regulatory|weather|operational)/i);
