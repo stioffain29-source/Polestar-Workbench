@@ -1,3 +1,6 @@
+import React from "react";
+import worldCompleteGeo from "@/assets/worldComplete.geo.json";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import {
   makeSectionGate,
   applyFastFactOverrides,
@@ -33,7 +36,7 @@ import {
   type RegionalFutureEventInput,
 } from "@/lib/regionalWeekly";
 import { pickRead } from "@/lib/pickRead";
-import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey } from "@/lib/pdfChrome";
+import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey, SEV_RANK } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
 import { computeTopicFastFacts, filterTopicReportIncidents, type TopicFastFactsIncident } from "@/lib/topicFastFacts";
 import { displayIncidentTitle } from "@/lib/incidentTitle";
@@ -413,7 +416,45 @@ function RegionalWatchlist({
   );
 }
 
-function ApacHotspotMap({
+
+const APAC_MAP_CW = 535;
+const APAC_MAP_H = 190;
+const APAC_MAP_MIN_LNG = 65;
+const APAC_MAP_MAX_LNG = 180;
+const APAC_MAP_MIN_LAT = -15;
+const APAC_MAP_MAX_LAT = 60;
+
+const projectApac = (lng: number, lat: number): [number, number] => [
+  8 + ((lng - APAC_MAP_MIN_LNG) / (APAC_MAP_MAX_LNG - APAC_MAP_MIN_LNG)) * (APAC_MAP_CW - 16),
+  6 + ((APAC_MAP_MAX_LAT - lat) / (APAC_MAP_MAX_LAT - APAC_MAP_MIN_LAT)) * (APAC_MAP_H - 12),
+];
+
+const apacMapPaths = (() => {
+  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
+  const pathD: string[] = [];
+  for (const feature of collection.features) {
+    const polygons = feature.geometry.type === "Polygon"
+      ? [feature.geometry.coordinates]
+      : feature.geometry.coordinates;
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        const mapped = ring
+          .filter(([lng, lat]) => lng >= APAC_MAP_MIN_LNG - 4 && lng <= APAC_MAP_MAX_LNG + 4 && lat >= APAC_MAP_MIN_LAT - 4 && lat <= APAC_MAP_MAX_LAT + 4)
+          .map(([lng, lat]) => projectApac(lng, lat));
+        if (mapped.length < 3) continue;
+        let d = `M ${mapped[0][0].toFixed(1)},${mapped[0][1].toFixed(1)} `;
+        for (let i = 1; i < mapped.length; i++) {
+           d += `L ${mapped[i][0].toFixed(1)},${mapped[i][1].toFixed(1)} `;
+        }
+        d += "Z";
+        pathD.push(d);
+      }
+    }
+  }
+  return pathD.join(" ");
+})();
+
+export function ApacHotspotMap({
   items,
 }: {
   items: ReturnType<typeof import("@/lib/regionalWeekly").buildApacMapItems>;
@@ -425,34 +466,132 @@ function ApacHotspotMap({
       </p>
     );
   }
+
+  const mapLeft = 4;
+  const mapRight = APAC_MAP_CW - 4;
+  const mapTop = 4;
+  const mapBottom = APAC_MAP_H - 4;
+  const boxW = Math.min(190, APAC_MAP_CW * 0.43);
+
+  const prepared = items.map((item) => {
+    const severities = item.developments.map((d) => d.severity);
+    const worstSevStr = severities.reduce((worst, current) => {
+      const wRank = SEV_RANK[sevKey(worst)] ?? 0;
+      const cRank = SEV_RANK[sevKey(current)] ?? 0;
+      return cRank > wRank ? current : worst;
+    }, severities[0] || "Moderate");
+
+    const severityColor = SEV_COLOR[sevKey(worstSevStr)] ?? ELECTRIC;
+
+    const lines = [
+      { text: item.country.toUpperCase(), isCountry: true },
+      { text: `CURRENT SEVERITY: ${worstSevStr.toUpperCase()}`, isSeverity: true, color: severityColor },
+      ...item.developments.flatMap((development) => {
+        const words = development.label.split(" ");
+        const out: Array<{ text: string, isCountry?: boolean, isSeverity?: boolean, color?: string }> = [];
+        let currentLine = "";
+        for (const word of words) {
+          if (!currentLine) {
+            currentLine = word;
+          } else if (currentLine.length + 1 + word.length > 45) {
+            out.push({ text: currentLine });
+            currentLine = word;
+          } else {
+            currentLine += " " + word;
+          }
+        }
+        if (currentLine) out.push({ text: currentLine });
+        return out;
+      }),
+    ];
+    return {
+      item,
+      point: projectApac(item.lng, item.lat),
+      lines,
+      height: 10 + lines.length * 8 + 3, // slightly extra height for the severity line
+      worstSevStr,
+      severityColor
+    };
+  });
+
+  const lanes: Array<typeof prepared> = [[], []];
+  [...prepared]
+    .sort((a, b) => a.point[1] - b.point[1] || a.point[0] - b.point[0])
+    .forEach((entry, index) => lanes[index % 2].push(entry));
+
+  const boxes: Array<{
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    entry: typeof prepared[0];
+    anchorX: number;
+    anchorY: number;
+  }> = [];
+
+  lanes.forEach((lane, laneIndex) => {
+    let nextTop = mapTop;
+    for (const entry of lane) {
+      const [px, py] = entry.point;
+      const left = laneIndex === 0 ? mapLeft : mapRight - boxW;
+      const top = Math.min(nextTop, mapBottom - entry.height);
+      const box = { left, top, right: left + boxW, bottom: top + entry.height };
+      nextTop = box.bottom + 6;
+      const anchorX = laneIndex === 0 ? box.right : box.left;
+      const anchorY = Math.min(Math.max(py, box.top + 5), box.bottom - 5);
+      boxes.push({ ...box, entry, anchorX, anchorY });
+    }
+  });
+
   return (
-    <div className="border border-[#d2d6e1] bg-[#f7f8fb] overflow-hidden w-full">
-      <IncidentMap
-        points={items.map(item => {
-          const worstSeverity = item.developments[0]?.severity ?? "Moderate";
-          return {
-            lat: item.lat,
-            lng: item.lng,
-            title: item.country,
-            severity: worstSeverity,
-            primary: false,
-            callout: {
-              country: item.country,
-              severityLabel: worstSeverity.toUpperCase(),
-              severityColor: SPOT_SEV_COLOR[worstSeverity.toLowerCase()] ?? DUSK,
-              developments: item.developments.map(d => d.label)
-            }
-          };
+    <div className="border border-[#d2d6e1] bg-[#f3f6fa] overflow-hidden w-full">
+      <svg viewBox={`0 0 ${APAC_MAP_CW} ${APAC_MAP_H}`} className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
+        {/* Background landmasses */}
+        <path d={apacMapPaths} fill="#dce5ef" stroke="#9cabbf" strokeWidth="0.4" strokeLinejoin="round" />
+
+        {/* Lines and Boxes */}
+        {boxes.map((box, i) => {
+          const entry = box.entry;
+          const [px, py] = entry.point;
+
+          return (
+            <g key={i}>
+              {/* Leader Line */}
+              <line x1={px} y1={py} x2={box.anchorX} y2={box.anchorY} stroke="#718096" strokeWidth="0.45" />
+
+              {/* Box */}
+              <rect x={box.left} y={box.top} width={boxW} height={entry.height} fill="#ffffff" stroke={entry.severityColor} strokeWidth="0.7" rx="1" />
+
+              {/* Text Lines */}
+              {entry.lines.map((line, lineIdx) => {
+                const yOffset = box.top + 8 + lineIdx * 8;
+                if (line.isCountry) {
+                  return (
+                    <text key={lineIdx} x={box.left + 5} y={yOffset} fill={NAVY} fontSize="8" fontWeight="bold" fontFamily="Roboto, sans-serif">
+                      {line.text}
+                    </text>
+                  );
+                } else if (line.isSeverity) {
+                  return (
+                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={line.color} fontSize="6.5" fontWeight="bold" fontFamily="Roboto, sans-serif">
+                      {line.text}
+                    </text>
+                  );
+                } else {
+                  return (
+                    <text key={lineIdx} x={box.left + 5} y={yOffset + 1} fill={DUSK} fontSize="7" fontFamily="Roboto, sans-serif">
+                      {line.text}
+                    </text>
+                  );
+                }
+              })}
+            </g>
+          );
         })}
-        height={450}
-        hideControls={true}
-        showLabels={false}
-        boundsPadding={[40, 180]}
-      />
+      </svg>
     </div>
   );
 }
-
 function RegionalHotspotMap({
   points,
 }: {
