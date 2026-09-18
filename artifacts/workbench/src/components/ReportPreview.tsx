@@ -718,16 +718,17 @@ function RegionalHotspotMap({
   return (
     <div className="border border-[#d2d6e1] bg-[#f7f8fb]">
       <IncidentMap
-        points={top3Points.map(p => ({
+        points={top3Points.map((p, index) => ({
           lat: p.lat,
           lng: p.lng,
           title: p.title,
           label: p.label,
           severity: p.severity,
           primary: false,
+          markerNumber: index + 1,
           expandedCallout: {
             id: p.title,
-            title: clipCalloutTitle(p.title),
+            title: `${index + 1}. ${clipCalloutTitle(p.title)}`,
             summary: clipCalloutSummary(p.summary),
             severityColor: SEV_COLOR[sevKey(p.severity)] ?? "#465bff"
           }
