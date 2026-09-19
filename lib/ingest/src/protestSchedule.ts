@@ -33,6 +33,22 @@ export const SEARCH_FEEDS: SearchFeed[] = [
   { country: "Taiwan", cities: ["Taipei", "Kaohsiung", "Taichung"], locale: "en-TW", gl: "TW" },
   { country: "Thailand", cities: ["Bangkok", "Chiang Mai", "Phuket", "Hat Yai"], locale: "en-TH", gl: "TH" },
   { country: "Vietnam", cities: ["Hanoi", "Ho Chi Minh City", "Da Nang"], locale: "en-VN", gl: "VN" },
+  { country: "Bahrain", cities: ["Manama"], locale: "en", gl: "BH" },
+  { country: "Egypt", cities: ["Cairo", "Alexandria", "Suez"], locale: "en", gl: "EG" },
+  { country: "Iran", cities: ["Tehran", "Mashhad", "Isfahan", "Tabriz"], locale: "en-US", gl: "US" },
+  { country: "Iraq", cities: ["Baghdad", "Basra", "Erbil"], locale: "en-US", gl: "US" },
+  { country: "Israel", cities: ["Jerusalem", "Tel Aviv", "Haifa"], locale: "en", gl: "IL" },
+  { country: "Jordan", cities: ["Amman", "Aqaba"], locale: "en", gl: "JO" },
+  { country: "Kuwait", cities: ["Kuwait City"], locale: "en", gl: "KW" },
+  { country: "Lebanon", cities: ["Beirut", "Tripoli", "Sidon"], locale: "en", gl: "LB" },
+  { country: "Oman", cities: ["Muscat", "Salalah", "Sohar"], locale: "en", gl: "OM" },
+  { country: "Palestine", cities: ["Ramallah", "Gaza City", "Nablus"], locale: "en-US", gl: "US" },
+  { country: "Qatar", cities: ["Doha"], locale: "en", gl: "QA" },
+  { country: "Saudi Arabia", cities: ["Riyadh", "Jeddah", "Dammam"], locale: "en", gl: "SA" },
+  { country: "Syria", cities: ["Damascus", "Aleppo", "Latakia"], locale: "en-US", gl: "US" },
+  { country: "Turkey", cities: ["Istanbul", "Ankara", "Izmir"], locale: "en", gl: "TR" },
+  { country: "United Arab Emirates", cities: ["Abu Dhabi", "Dubai", "Sharjah"], locale: "en", gl: "AE" },
+  { country: "Yemen", cities: ["Sanaa", "Aden", "Hodeidah"], locale: "en-US", gl: "US" },
 ];
 
 const PROTEST_TERMS = [

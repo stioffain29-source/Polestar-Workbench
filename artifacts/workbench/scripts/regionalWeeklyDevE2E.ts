@@ -18,7 +18,7 @@ process.env.DATABASE_URL = devUrl;
 
 const { db, incidentsTable, reportsTable, protestEventsTable } = await import("@workspace/db");
 const { and, eq, gte, lte, inArray } = await import("drizzle-orm");
-const { runRegionalWeeklyCollection } = await import("@workspace/ingest");
+const { runProtestScheduleIngest, runRegionalWeeklyCollection } = await import("@workspace/ingest");
 const {
   auditRegionalWeeklyCandidateFunnel,
   assertRegionalWeeklyReady,
@@ -67,6 +67,7 @@ try {
 
 const outDir = resolve(process.cwd(), "scripts/.regional-weekly-e2e");
 mkdirSync(outDir, { recursive: true });
+const forwardCollection = await runProtestScheduleIngest({ commit: true, now: endDate });
 const runs = {
   apac: await runRegionalWeeklyCollection("apac", { commit: true }),
   middle_east: await runRegionalWeeklyCollection("middle_east", { commit: true }),
@@ -111,10 +112,10 @@ for (const [region, topic] of [["APAC", "apac_weekly"], ["Middle East", "middle_
   const forward = {
     startedAt: run.startedAt,
     completedAt: new Date().toISOString(),
-    sourceNames: ["protest_events", "incident_advisories"],
-    itemsFetched: forwardCandidates.length + futureIncidentCandidates.length,
+    sourceNames: ["google_news_protest_schedule", "incident_advisories"],
+    itemsFetched: forwardCollection.itemsConsidered + futureIncidentCandidates.length,
     candidatesAccepted: forwardRows.length,
-    errors: [],
+    errors: forwardCollection.errors,
   };
   const coverage = { weather, cyber, forward };
   const regional = incidents.filter((row) => row.country != null);
@@ -123,7 +124,13 @@ for (const [region, topic] of [["APAC", "apac_weekly"], ["Middle East", "middle_
   assertRegionalWeeklyReady(funnel, { auditedTrueShortage: process.env.ALLOW_TRUE_SHORTAGE === "1" });
   const selected = selectRegionalKeyDevelopments(curated, topic);
   const developments = buildRegionalWeeklyDevelopments(selected, issueDate, topic);
-  const selectedSnapshot = selected;
+  const renderedEvidenceIds = new Set(
+    developments.flatMap((row) => row.evidenceIds ?? []).map(String),
+  );
+  const selectedSnapshot = selected.filter((row) => {
+    const members = (row as typeof row & { sourceMembers?: Array<{ id?: string | number }> }).sourceMembers ?? [row];
+    return members.some((member) => member.id !== undefined && renderedEvidenceIds.has(String(member.id)));
+  });
   const watch = buildApacWeeklyWatchlist(developments, forwardRows, issueDate);
   const errors = validateRegionalWeeklyAssessment(developments, topic);
   if (errors.length) throw new Error(`${region} validation failed: ${errors.join("; ")}`);
@@ -137,7 +144,9 @@ for (const [region, topic] of [["APAC", "apac_weekly"], ["Middle East", "middle_
     issueDate,
     executiveSummary: buildStructuredRegionalBluf(developments, topic),
     situation: buildStructuredRegionalOutlook(developments, topic),
-    whatHappened: JSON.stringify(developments),
+    // Regional development cards are rebuilt from the persisted evidence
+    // snapshot. Do not duplicate their full JSON payload into a prose column.
+    whatHappened: "",
     whatMatters: buildRegionalBusinessImplicationsNarrative(developments),
     watchNext: JSON.stringify(watch),
     hardNumbers: {

@@ -1269,3 +1269,31 @@ mtime_ms = 1789788736201
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/f2da6d3d-83da-47c2-b389-759e38ad3577/f5bf0188-2635-4918-b384-843ac4b6cc8d"
 storage_version_token = "1789788854143433"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "WDcG0oStJjfxl1RbijMv8"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/apac_weekly-72.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly — 19 September 2026"
+description = "Final repaired APAC Regional Weekly PDF."
+logical_id = "2817b9ae-9682-4247-bd65-0a5bd8a1d4e3"
+content_hash = "sha256:b5289b6195bc0472308d351c216d7a2642b6522771fa9bb9383af802f38d33ea"
+size = 1935022
+mtime_ms = 1789794605639
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/2817b9ae-9682-4247-bd65-0a5bd8a1d4e3/84ae142a-aa88-4dd9-ad36-ec1750ce42c4"
+storage_version_token = "1789794635671527"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "463w57SLT9eq1lyw1W9nA"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/middle_east_weekly-73.pdf"
+type = "pdf"
+title = "Polestar Middle East Weekly — 19 September 2026"
+description = "Final repaired Middle East Regional Weekly PDF."
+logical_id = "2e32cb29-4f16-4524-aedf-b7a6250d0c4c"
+content_hash = "sha256:eb712c21c503f5fe787abb2763d6bec79349773194151474e7a3f12d08824daf"
+size = 1715598
+mtime_ms = 1789794611923
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/2e32cb29-4f16-4524-aedf-b7a6250d0c4c/6a12a0d2-e3fd-49b9-b0c8-51a6bc5e68c4"
+storage_version_token = "1789794637116997"
+content_type = "application/pdf"
