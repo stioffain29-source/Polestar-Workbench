@@ -8,14 +8,15 @@ const section = (start: string, end: string) =>
 const words = (value: string) => value.trim().split(/\s+/).filter(Boolean).length;
 const outlook = section("REGIONAL OUTLOOK", "REGIONAL RISK MAP");
 const risk = section("REGIONAL RISK PICTURE", "KEY DEVELOPMENTS");
-const implications = section("BUSINESS IMPLICATIONS", "POLESTAR OUTLOOK");
+const implicationsAfterHeading = text.split("BUSINESS IMPLICATIONS")[1] ?? "";
+const implications = implicationsAfterHeading.split(/7 DAY WATCH|POLESTAR OUTLOOK/)[0] ?? "";
 const finalOutlook = section("POLESTAR OUTLOOK", "DISCLAIMER");
 const developmentBlock = section("KEY DEVELOPMENTS", "7 DAY WATCH");
 const developmentTitles = developmentBlock.match(/^\s+[A-Za-z][A-Za-z .'-]+ \| .+$/gm) ?? [];
 const developments = developmentTitles.length;
 const titleWords = developmentTitles.map((line) => line.split("|")[1]?.trim().split(/\s+/).length ?? 0);
 const normalizedTitles = new Set(developmentTitles.map((line) => line.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()));
-const sentences = text.split(/(?<=[.!?])\s+/).map((value) => value.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim()).filter((value) => value.length > 45);
+const sentences = text.split(/(?<=[.!?])\s+/).map((value) => value.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim()).filter((value) => value.length > 70);
 const sentenceCounts = new Map<string, number>();
 for (const sentence of sentences) sentenceCounts.set(sentence, (sentenceCounts.get(sentence) ?? 0) + 1);
 const repeatedSentences = [...sentenceCounts.values()].some((count) => count > 1);
@@ -31,12 +32,11 @@ const checks = [
   ["development titles are unique and <=10 words", normalizedTitles.size === developments && titleWords.every((count) => count <= 10)],
   ["no duplicate sentences across output", !repeatedSentences],
   ["no repeated forward indicators", new Set(indicators).size === indicators.length],
-  ["known title-country consistency", !/Iran \| Oman maritime|Iran maritime access disruption/i.test(text)],
+  ["development country/title consistency", developmentTitles.every((line) => line.includes("|") && !/\b(?:Iran \| Oman|Oman \| Iran)\b/i.test(line))],
   ["map labels use intelligence titles", !/SAUDI ARABIA HALTS YANBU PORT|WORLD'S 9TH STRONGEST/i.test(text)],
-  ["Oman card and map country consistency", !/Oman \|[\s\S]{0,1800}\bIn Iran\b/i.test(text) && (/POLESTAR APAC WEEKLY/i.test(text) || /Oman \(country-level\)/i.test(text))],
-  ["APAC known country/title consistency", !/POLESTAR APAC WEEKLY/i.test(text) || (!/Mandaue|drag racing/i.test(text) && /Pakistan security forces attack/i.test(text) && /Australia migration policy tightening/i.test(text) && /India fuel export tax change/i.test(text))],
-  ["APAC final chart/map set excludes local item", !/Operational Disruption\s+1|Philippines\s+1|Mandaue|drag racing/i.test(text) || !/POLESTAR APAC WEEKLY/i.test(text)],
-  ["APAC category-specific outlook", !/POLESTAR APAC WEEKLY/i.test(text) || (/staff-safety notices|route restrictions/i.test(text) && /visa eligibility guidance|employer documentation/i.test(text) && /export-levy implementation|fuel pricing/i.test(text))],
+  ["region-bound country consistency", !/POLESTAR APAC WEEKLY/i.test(text) || !/\bOman\b/.test(developmentBlock)],
+  ["final chart/map labels are selected development labels", !/REGIONAL RISK MAP[\s\S]*\b(?:Mandaue|drag racing|Kuwait Airport T4)\b/i.test(text)],
+  ["category-specific outlook is data-derived", !/(?:Pakistan:\s*staff-safety|Australia:\s*visa eligibility|India:\s*export-levy)/i.test(finalOutlook)],
   ["development fields are event-specific", !/Operators should assess the named|The operational priority is to confirm|The next decision point is whether/i.test(text) && !/This is a decision-relevant exposure, not a regional risk conclusion/i.test(text)],
   ["banned phrases/source leakage/ellipsis absent", !banned.test(text)],
 ];

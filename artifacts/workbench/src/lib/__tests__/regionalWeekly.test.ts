@@ -175,10 +175,22 @@ describe("regional weekly products", () => {
     expect(outlook).not.toContain("Nothing useful came through");
   });
 
-  it("uses the dedicated discovery-pass domain instead of relabelling headline keywords", () => {
+  it("does not trust a discovery label without cyber evidence", () => {
     const rows = curateRegionalWeeklyIncidents(
       [{
         ...incident(1, "Singapore", "moderate", "2026-09-17", "Government announces new obligations for cloud providers"),
+        analystNotes: "auto-scraped:regional-weekly:cyber:Regional Weekly APAC cyber",
+      }],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(buildRegionalDevelopments(rows)[0].category).toBe("Regulatory");
+  });
+
+  it("classifies explicit cyber evidence with operational consequence as Cyber", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [{
+        ...incident(2, "Singapore", "high", "2026-09-17", "Ransomware attack disrupts telecom network operations"),
         analystNotes: "auto-scraped:regional-weekly:cyber:Regional Weekly APAC cyber",
       }],
       "apac_weekly",
@@ -363,6 +375,24 @@ describe("regional weekly products", () => {
       location: "Manila",
       currentSeverity: "High",
     });
+  });
+
+  it("retains an in-region forward event even when its country has no Key Development", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "Australia", "moderate", "2026-09-17", "New visa rules change workforce access"),
+    ]);
+    const items = buildApacWeeklyWatchlist(
+      developments,
+      [{
+        date: "2026-09-21",
+        location: "Manila, Philippines",
+        trigger: "Scheduled transport strike",
+        whyItMatters: "The action may restrict employee movement and airport access.",
+        currentSeverity: "High",
+      }],
+      "2026-09-17",
+    );
+    expect(items.some((item) => item.location === "Manila, Philippines")).toBe(true);
   });
 
   it("keeps APAC development fields materially distinct for recurring report shapes", () => {
@@ -585,6 +615,25 @@ describe("regional weekly products", () => {
       summary: "A pickup loaded with eggs was robbed; goods were recovered and the local supply chain was unaffected.",
     }], "2026-09-17");
     expect(developments).toHaveLength(0);
+  });
+
+  it("keeps trivial truck/liquor incidents and off-region Manchester aviation out of APAC", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Bangladesh", "high", "2026-09-17", "Truck accident spills liquor; looters take bottles"),
+        incident(2, "India", "high", "2026-09-17", "Manchester airline emergency diverts flights"),
+        incident(3, "Oman", "high", "2026-09-17", "Cargo vessel struck off Oman coast; route access restricted"),
+      ],
+      "apac_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.id)).toEqual([]);
+    const oman = {
+      ...incident(4, "Oman", "high", "2026-09-17", "Cargo vessel struck off Oman coast; route access restricted"),
+      analystNotes: "auto-scraped:regional-weekly:cyber:Regional Weekly cyber",
+    };
+    expect(buildRegionalDevelopments([oman], "2026-09-17", "middle_east_weekly")[0]?.category)
+      .toBe("Operational Disruption");
   });
 
   it("APAC selected What Changed fields contain no reported or recorded category fallbacks", () => {

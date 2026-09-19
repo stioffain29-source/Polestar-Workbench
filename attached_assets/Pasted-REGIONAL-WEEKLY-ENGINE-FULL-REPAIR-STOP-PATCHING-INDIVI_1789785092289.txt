@@ -1,0 +1,484 @@
+REGIONAL WEEKLY ENGINE — FULL REPAIR
+
+STOP PATCHING INDIVIDUAL OUTPUT SECTIONS.
+
+Treat this exactly like the Fuel Watch repair:
+
+TRACE THE COMPLETE GENERATION PIPELINE
+→ identify the actual source data
+→ validate freshness
+→ deduplicate
+→ select current evidence
+→ derive themes from that evidence
+→ generate prose from those themes
+→ save
+→ reload
+→ render PDF
+→ run acceptance checks
+
+This applies to BOTH:
+
+POLESTAR APAC WEEKLY
+POLESTAR MIDDLE EAST WEEKLY
+
+Do not redesign either report.
+
+Do not change:
+cover
+branding
+header
+footer
+PDF styling
+map presentation
+other Polestar products
+
+==================================================
+1. TRACE THE ACTUAL PIPELINE FIRST
+==================================================
+
+Do not assume the current generator is receiving the correct data.
+
+Trace:
+
+source ingestion
+regional filtering
+date filtering
+deduplication
+classification
+severity assignment
+materiality ranking
+key-development selection
+map selection
+7-day watch generation
+regional outlook generation
+business implications
+Polestar Outlook
+save
+reload
+PDF render
+
+Show where each final report section gets its data.
+
+Find and remove:
+
+stale cached prose
+fallback text
+old period data
+raw article fragments
+duplicate events
+generic template fallbacks
+schema paths that drop fields
+selection logic that limits the report to too few stories
+generation paths that bypass curated evidence
+
+Do not patch the final PDF while the upstream dataset is wrong.
+
+==================================================
+2. CURRENT FAILURE TO FIX
+==================================================
+
+The current outputs prove the evidence pipeline is wrong.
+
+APAC currently produces only 3 material developments and 0 forward-watch items.
+
+Middle East currently produces only 2 material developments and 0 forward-watch items.
+
+This is not credible for two major regional weekly products.
+
+Do not solve this by inventing filler.
+
+Find out why qualifying evidence is being dropped.
+
+==================================================
+3. SOURCE COVERAGE MUST BE COMPLETE
+==================================================
+
+Every weekly cycle must actively collect and assess:
+
+SECURITY / CONFLICT
+POLITICAL / GEOPOLITICAL
+REGULATORY / POLICY
+BUSINESS / OPERATIONAL DISRUPTION
+ENERGY / UTILITIES
+WEATHER / NATURAL HAZARDS
+CYBER
+
+WEATHER must explicitly check:
+
+earthquakes
+typhoons
+cyclones
+storms
+flooding
+landslides
+wildfires
+haze
+volcanic activity
+tsunami warnings
+extreme heat
+drought
+
+CYBER must explicitly check:
+
+ransomware
+critical infrastructure incidents
+telecom disruption
+airport / port / logistics cyber incidents
+energy / utility cyber incidents
+major corporate or government cyber incidents
+major breaches with operational relevance
+
+Do not say:
+
+“weather/cyber reviewed and nothing material found”
+
+unless the system genuinely performed those checks.
+
+==================================================
+4. EVIDENCE FIRST
+==================================================
+
+The generator must work in this order:
+
+CURRENT SOURCE EVIDENCE
+→ DEDUPLICATE
+→ VALIDATE
+→ CLASSIFY
+→ ASSESS SEVERITY
+→ ASSESS MATERIALITY
+→ DERIVE REGIONAL THEMES
+→ WRITE REPORT
+
+NOT:
+
+generic themes
+→ search for stories to fit them
+
+Every generated statement must be grounded in selected current evidence.
+
+Retain evidence IDs through the pipeline so every Key Development and theme can be traced back to its sources.
+
+==================================================
+5. DEDUPLICATION
+==================================================
+
+ONE REAL-WORLD EVENT = ONE DEVELOPMENT.
+
+Five articles about one Philippines protest = one development.
+
+Five articles about one Indian fuel-tax decision = one development.
+
+Multiple reports of one Saudi pipeline attack = one development.
+
+Source volume must never inflate importance.
+
+==================================================
+6. MATERIALITY FILTER
+==================================================
+
+Reject stories that do not belong in a regional intelligence product.
+
+Normally exclude:
+
+routine police activity
+minor crime
+traffic enforcement
+minor accidents
+local community stories
+minor administrative issues
+low-consequence local events
+
+Example:
+
+Philippines drag-racing enforcement should never have survived into APAC Weekly as a major development.
+
+By contrast:
+
+a bombing or armed attack
+major protest
+transport shutdown
+significant regulatory change
+major natural hazard
+meaningful cyber incident
+major infrastructure disruption
+
+must receive proper weight.
+
+==================================================
+7. SEVERITY LOGIC
+==================================================
+
+Use only:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+Severity must reflect CURRENT OPERATIONAL CONSEQUENCE.
+
+Do not score from dramatic words or source tone.
+
+Examples:
+
+routine local enforcement
+→ Insignificant / Low
+
+immigration or visa inconvenience
+→ normally Low / Moderate unless there is major immediate operational impact
+
+localised protest with limited disruption
+→ Low / Moderate
+
+major transport disruption
+→ Moderate / High depending on scale
+
+bombing / armed attack
+→ assess casualties, target, location, persistence, access effect and wider threat
+
+major conflict escalation / widespread infrastructure failure
+→ High / Extreme
+
+==================================================
+8. REGIONAL THEMES MUST COME FROM THE DATA
+==================================================
+
+Do not force fixed themes.
+
+Derive 2–4 themes from the final evidence set.
+
+Examples only:
+
+conflict affecting access
+regulatory change affecting workforce
+weather affecting transport
+energy affecting costs
+cyber affecting continuity
+political mobilisation affecting travel
+
+If the evidence does not support a theme, do not generate it.
+
+==================================================
+9. KEY DEVELOPMENTS
+==================================================
+
+Target:
+
+4–6 genuinely material developments per regional weekly.
+
+Do not fill a quota.
+
+If only 4 are genuinely strong, publish 4.
+
+But do not collapse the report to 2 or 3 because the filtering pipeline accidentally discarded valid evidence.
+
+Each Key Development must contain:
+
+COUNTRY | SHORT TITLE
+
+Category
+
+Current Severity
+
+NARRATIVE
+specific factual synthesis
+
+POLESTAR VIEW
+specific analysis
+
+OUTLOOK
+specific forward indicators
+
+No raw source text.
+No media outlet names.
+No URLs.
+No stitched headlines.
+No generic fallback prose.
+
+==================================================
+10. MAP SELECTION
+==================================================
+
+Do not change the map design.
+
+Map items must be selected ONLY from the final curated Key Developments.
+
+Maximum 3.
+
+Select by:
+
+business consequence
+security significance
+regional importance
+forward relevance
+operational impact
+
+Do not select by:
+
+source count
+recency alone
+severity alone
+raw-feed order
+
+==================================================
+11. 7-DAY WATCH MUST BE A REAL FORWARD SEARCH
+==================================================
+
+This section cannot be built from the same backward-looking incident feed.
+
+Run a separate forward-looking collection for the NEXT 7 DAYS.
+
+Search for:
+
+scheduled protests
+strikes
+elections
+court decisions
+regulatory deadlines
+political deadlines
+military exercises
+major public events
+religious events
+typhoon / cyclone tracks
+flood warnings
+weather systems
+transport disruption
+border restrictions
+
+Target up to 5 useful watch items.
+
+If the result is 0, verify that the forward-search pipeline actually ran before publishing 0.
+
+==================================================
+12. REMOVE DUPLICATION
+==================================================
+
+The same story must not be rewritten in every section.
+
+REGIONAL OUTLOOK
+= regional judgement
+
+KEY DEVELOPMENTS
+= detailed evidence and analysis
+
+BUSINESS IMPLICATIONS
+= cross-regional synthesis
+
+POLESTAR OUTLOOK
+= forward-looking assessment
+
+Do not repeat full event summaries across all four.
+
+==================================================
+13. BUSINESS IMPLICATIONS
+==================================================
+
+Write one concise synthesis section.
+
+Do not use generic filler such as:
+
+“Review staff movement plans...”
+
+Explain what the selected developments mean for:
+
+people
+travel
+sites
+operations
+supply chains
+energy
+market access
+continuity
+
+Only include implications supported by the evidence.
+
+==================================================
+14. GENERATION QUALITY
+==================================================
+
+Remove generic repeated phrases.
+
+Do not output:
+
+“the assessment is anchored in...”
+“transmission into commercial activity...”
+“selected evidence...”
+“verified access status...”
+“event-specific recovery evidence...”
+“the distinct indicators are...”
+
+unless the wording is genuinely specific and natural.
+
+The report must read like an intelligence analyst wrote it.
+
+Not like a template.
+
+==================================================
+15. VALIDATION
+==================================================
+
+Before export, automatically fail and regenerate if:
+
+duplicate events remain
+a trivial local story outranks a materially stronger event
+severity is obviously disproportionate
+source names leak into prose
+raw headlines appear
+weather was not checked
+cyber was not checked
+7-day watch did not run
+map items are not drawn from final Key Developments
+Regional Outlook and Key Developments contradict each other
+generic fallback prose remains
+the report is built from fewer than expected qualifying items because of a pipeline error
+
+Warnings may remain non-fatal.
+
+Only genuine factual/evidence failures should block export.
+
+Do not allow validation itself to kill an otherwise valid report because of harmless stylistic warnings.
+
+==================================================
+16. END-TO-END ACCEPTANCE TEST
+==================================================
+
+After the repair:
+
+1. Generate APAC Weekly
+2. Save it
+3. Reload it
+4. Render PDF
+5. Verify all sections survived
+6. Verify map uses curated items
+7. Verify no duplicate events
+8. Verify weather/cyber checks ran
+9. Verify 7-day watch ran
+10. Verify no stale prose reappeared
+
+Then repeat the same process for Middle East Weekly.
+
+Do not declare the repair complete based on preview alone.
+
+Acceptance requires:
+
+GENERATION
+→ SAVE
+→ RELOAD
+→ PDF
+
+==================================================
+17. STOP CONDITION
+==================================================
+
+Do not make cosmetic changes.
+
+Do not redesign anything.
+
+Do not touch other reports.
+
+Repair the Regional Weekly engine end to end.
+
+Generate fresh APAC Weekly and Middle East Weekly PDFs.
+
+STOP and show me those two PDFs only.

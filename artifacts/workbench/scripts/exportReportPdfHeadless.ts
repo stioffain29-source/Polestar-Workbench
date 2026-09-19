@@ -58,9 +58,9 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   return origFetch(input as RequestInfo, init);
 }) as typeof fetch;
 
-const REPORT_ID_ENV = process.env.REPORT_ID?.trim();
-const TOPIC = (process.env.TOPIC ?? "flashpoint").toLowerCase();
-const OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`);
+let REPORT_ID_ENV = process.env.REPORT_ID?.trim();
+let TOPIC = (process.env.TOPIC ?? "flashpoint").toLowerCase();
+let OUT = resolvePath(process.cwd(), process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`);
 
 // Intercept pdf.save() across every exporter and divert to writeFileSync.
 (jsPDF.prototype as unknown as { save: (filename: string) => jsPDF }).save = function (this: jsPDF) {
@@ -111,7 +111,7 @@ async function main() {
   const {
     fetchTopicReport,
     fetchTopicIncidents,
-    fetchApacFutureEvents,
+    collectRegionalCoverage,
     fetchMaritimeMovement,
     fetchLatestTopicReportId,
   } = await import("./topicReportData");
@@ -120,7 +120,43 @@ async function main() {
     ? Number(REPORT_ID_ENV)
     : await fetchLatestTopicReportId(TOPIC);
   const report = (await fetchTopicReport(reportId)) as AnyReport;
-  const incidents = (await fetchTopicIncidents()) as unknown[];
+  let incidents = (await fetchTopicIncidents()) as unknown[];
+  let regionalFutureEvents: import("../src/lib/regionalWeekly").RegionalFutureEventInput[] = [];
+  // Regional acceptance reports carry the exact evidence snapshot used during
+  // generation.  Never recompute a PDF from the unrelated current dev feed:
+  // that can silently change the prose/map basis after save/reload.
+  if (TOPIC === "apac_weekly" || TOPIC === "middle_east_weekly") {
+    const hardNumbers = (report as AnyReport).hardNumbers as {
+      regionalEvidenceSnapshot?: unknown[];
+      regionalForwardSnapshot?: import("../src/lib/regionalWeekly").RegionalFutureEventInput[];
+      selectedEvidenceIds?: Array<string | number>;
+      regionalCollectorRun?: unknown;
+    } | null;
+    if (!hardNumbers?.regionalEvidenceSnapshot?.length) {
+      throw new Error(`Regional report ${reportId} has no persisted evidence snapshot; refusing recomputed PDF`);
+    }
+    if (!hardNumbers.selectedEvidenceIds?.length) {
+      throw new Error(`Regional report ${reportId} has no selected evidence ID basis; refusing PDF`);
+    }
+    const snapshotIds = hardNumbers.regionalEvidenceSnapshot.flatMap((row) => {
+      const value = row as { id?: string | number; sourceMembers?: Array<{ id?: string | number }> };
+      return (value.sourceMembers ?? [value]).map((member) => member.id).filter((id): id is string | number => id !== undefined);
+    }).map(String);
+    if (snapshotIds.join(",") !== hardNumbers.selectedEvidenceIds.map(String).join(",")) {
+      throw new Error(`Regional report ${reportId} selected evidence IDs do not match persisted snapshot`);
+    }
+    incidents = hardNumbers.regionalEvidenceSnapshot;
+    regionalFutureEvents = hardNumbers.regionalForwardSnapshot ?? [];
+  }
+  const regionalCoverage = TOPIC === "apac_weekly" || TOPIC === "middle_east_weekly"
+    ? collectRegionalCoverage(
+      incidents,
+      (report as AnyReport).issueDate,
+      TOPIC,
+      ((report as AnyReport).hardNumbers as { regionalCollectorRun?: import("./topicReportData").RegionalCollectorRunMetadata } | null)?.regionalCollectorRun,
+    )
+    : null;
+  if (regionalCoverage) console.info(`[regional-coverage] ${JSON.stringify(regionalCoverage)}`);
   // Optional ISSUE_DATE override so a headless export can reproduce the SAME
   // reporting window the in-editor preview renders. The editor advances a draft
   // to today and clamps to the latest record, so a verification run that wants
@@ -202,7 +238,7 @@ async function main() {
         sectionOverrides,
         marketPrices: marketPrices as never,
         ...(TOPIC === "apac_weekly" || TOPIC === "middle_east_weekly"
-          ? { futureEvents: await fetchApacFutureEvents(data.issueDate) }
+          ? { futureEvents: regionalFutureEvents }
           : {}),
       },
     );
@@ -210,4 +246,26 @@ async function main() {
   console.log(`Wrote ${OUT}`);
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+export async function runHeadlessReportExport(options?: {
+  reportId?: number;
+  topic?: string;
+  outPath?: string;
+}): Promise<void> {
+  REPORT_ID_ENV = options?.reportId != null
+    ? String(options.reportId)
+    : process.env.REPORT_ID?.trim();
+  TOPIC = (options?.topic ?? process.env.TOPIC ?? "flashpoint").toLowerCase();
+  OUT = resolvePath(
+    process.cwd(),
+    options?.outPath ?? process.env.OUT_PATH ?? `screenshots/${TOPIC}_report.pdf`,
+  );
+  await main();
+}
+
+const invokedPath = process.argv[1] ? resolvePath(process.argv[1]) : "";
+if (invokedPath === fileURLToPath(import.meta.url)) {
+  runHeadlessReportExport().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

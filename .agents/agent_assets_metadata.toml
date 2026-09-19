@@ -1241,3 +1241,31 @@ mtime_ms = 1789783156307
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/82e965d6-67d7-454f-8b05-721442b5582a/29b9ae35-03d8-47df-93de-88f6bf7f955d"
 storage_version_token = "1789783174325131"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "kY8Kke8qxOzOBDMWYWQxi"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/apac_weekly-59.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly"
+description = "Fresh validated Regional Weekly PDF generated after save and reload."
+logical_id = "db2d2bc8-3971-424c-8acd-e21a3d681bb6"
+content_hash = "sha256:99665078041197fd8df83fd7a5836d8e8a2d68e27c00ff9e6abdb90362e971ee"
+size = 1954469
+mtime_ms = 1789788729293
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/db2d2bc8-3971-424c-8acd-e21a3d681bb6/d80e4714-cdf6-4079-820e-1f1722308bf3"
+storage_version_token = "1789788852834089"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "vUyBUQXTVmsnfQN0kNggh"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/middle_east_weekly-60.pdf"
+type = "pdf"
+title = "Polestar Middle East Weekly"
+description = "Fresh validated Regional Weekly PDF generated after save and reload."
+logical_id = "f2da6d3d-83da-47c2-b389-759e38ad3577"
+content_hash = "sha256:11dedc4a1578be98e9bd3bd03981988056fc495663ff60a78788e902faa65188"
+size = 1733999
+mtime_ms = 1789788736201
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/f2da6d3d-83da-47c2-b389-759e38ad3577/f5bf0188-2635-4918-b384-843ac4b6cc8d"
+storage_version_token = "1789788854143433"
+content_type = "application/pdf"

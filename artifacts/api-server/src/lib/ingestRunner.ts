@@ -11,6 +11,7 @@ import {
   runConflictClustering,
   runIndonesiaLocalIngest,
   runApacLocalIngest,
+  runRegionalWeeklyCollection,
   runMarketPricesIngest,
   runMarketSnapshotIngest,
   runMaritimeMovementIngest,
@@ -72,6 +73,7 @@ import {
   type XSearchSummary,
   type TitleTranslationSummary,
   type ProtestScheduleSummary,
+  type RegionalWeeklyRun,
 } from "@workspace/ingest";
 import { logger } from "./logger";
 import { terminateAfterIngestLockLoss } from "./ingestLockSafety";
@@ -196,6 +198,8 @@ export type IngestRunResult =
       conflict: IngestSummary;
       indonesiaLocal: IngestSummary;
       apacLocal: IngestSummary;
+      regionalApac: RegionalWeeklyRun;
+      regionalMiddleEast: RegionalWeeklyRun;
       marketPrices: MarketPriceSummary;
       marketSnapshot: MarketSnapshotSummary;
       maritimeMovement: MaritimeMovementSummary;
@@ -741,6 +745,37 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
     const indonesiaLocal = await runIncidentIngest("indonesia_local", () =>
       runIndonesiaLocalIngest({ commit: true }),
     );
+    // Regional Weekly has two explicit country-isolated collection passes.
+    // Both weather and cyber lanes run every cadence; an empty accepted set is
+    // still a completed, source-health-backed check.
+    let regionalApac: RegionalWeeklyRun;
+    let regionalMiddleEast: RegionalWeeklyRun;
+    try {
+      markIngestStage("runRegionalWeeklyCollection:apac");
+      regionalApac = await runRegionalWeeklyCollection("apac", { commit: true });
+    } catch (err) {
+      logger.error({ err }, "APAC regional weekly collection failed");
+      regionalApac = {
+        region: "apac",
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        weather: { topic: "regional_weather", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
+        cyber: { topic: "regional_cyber", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
+      };
+    }
+    try {
+      markIngestStage("runRegionalWeeklyCollection:middle_east");
+      regionalMiddleEast = await runRegionalWeeklyCollection("middle_east", { commit: true });
+    } catch (err) {
+      logger.error({ err }, "Middle East regional weekly collection failed");
+      regionalMiddleEast = {
+        region: "middle_east",
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        weather: { topic: "regional_weather", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
+        cyber: { topic: "regional_cyber", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
+      };
+    }
     // Forward-looking protest schedule is an isolated context collector. It
     // intentionally runs outside every incident ingest and never touches the
     // incidents table.
@@ -1305,6 +1340,8 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       conflict,
       indonesiaLocal,
       apacLocal,
+      regionalApac,
+      regionalMiddleEast,
       marketPrices,
       marketSnapshot,
       maritimeMovement,

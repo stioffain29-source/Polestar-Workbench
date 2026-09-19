@@ -1107,7 +1107,7 @@ export const listIncidentsQueryDaysMax = 365;
 
 
 export const ListIncidentsQueryParams = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber']).optional(),
   "country": zod.coerce.string().optional(),
   "severity": zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']).optional(),
   "days": zod.coerce.number().min(1).max(listIncidentsQueryDaysMax).optional().describe('Limit to incidents within the past N days'),
@@ -1146,7 +1146,7 @@ export const listIncidentsResponseMaritimeSemanticOneConfidenceDateMax = 1;
 
 export const ListIncidentsResponseItem = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "eventClusterKey": zod.string().nullish(),
@@ -2312,7 +2312,7 @@ export const ListReportsResponse = zod.array(ListReportsResponseItem)
 
 export const CreateReportBody = zod.object({
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber']),
   "countrySlug": zod.string().optional(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),

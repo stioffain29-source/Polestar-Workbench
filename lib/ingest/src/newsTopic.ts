@@ -86,6 +86,13 @@ export type NewsTopicConfig = {
    * topics (energy / fertiliser / fuel) are not affected.
    */
   classifyConfidence?: (source: string) => "low" | "medium" | "high";
+  /**
+   * Optional domain-specific evidence gate. This runs after the inexpensive
+   * allow/deny filter and before geography attribution. It exists for feeds
+   * where an operational noun (airport, port, utility) is not itself evidence
+   * of the domain being collected.
+   */
+  evidenceGate?: (title: string, summary: string, defaultCountry: string) => boolean;
 };
 
 export function gnews(
@@ -444,6 +451,9 @@ function classify(
 
   const allowHit = cfg.allow.find((a) => hay.includes(a));
   if (!allowHit) return { kept: false, reason: "no-allowlist-match", country: null };
+  if (cfg.evidenceGate && !cfg.evidenceGate(title, summary, feed.defaultCountry)) {
+    return { kept: false, reason: "no-domain-evidence", country: null };
+  }
 
   // Land-based incidents are usually in the feed's country, so accept a country
   // match anywhere in title+summary then fall back to the per-feed default. Strip

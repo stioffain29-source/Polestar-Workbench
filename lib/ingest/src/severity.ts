@@ -64,7 +64,12 @@ export type SeverityTopic =
   | "conflict"
   | "indonesia_local"
   | "apac_local"
-  | "data_centres";
+  | "data_centres"
+  | "regional_weather"
+  | "regional_cyber";
+  // Regional weekly evidence lanes. These are deliberately separate from
+  // APAC/local products so a weather or cyber source cannot silently change
+  // another monitor's dataset.
 
 // Runtime mirror of the SeverityTopic union above — TS types vanish at
 // runtime, so anything that needs to iterate/filter "every topic this
@@ -82,6 +87,8 @@ export const ALL_SEVERITY_TOPICS: SeverityTopic[] = [
   "indonesia_local",
   "apac_local",
   "data_centres",
+  "regional_weather",
+  "regional_cyber",
 ];
 
 // Present-tense fatal headlines. News writes fatal attacks in the present tense

@@ -496,6 +496,10 @@ async function tick(reason: string): Promise<boolean> {
       durationMs: result.durationMs,
       flashpointLatest: result.flashpoint.latestRecord,
       ingestFailures: failures,
+      regionalWeekly: {
+        apac: result.regionalApac,
+        middleEast: result.regionalMiddleEast,
+      },
     };
     if (failures.hadFailures) {
       logger.warn(payload, "scheduled ingest finished with failures");

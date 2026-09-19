@@ -8,7 +8,9 @@ export type IngestTopic =
   | "data_centres"
   | "conflict"
   | "indonesia_local"
-  | "apac_local";
+  | "apac_local"
+  | "regional_weather"
+  | "regional_cyber";
 
 export type FeedStat = {
   name: string;

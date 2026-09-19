@@ -29,6 +29,90 @@ import {
   type RegionalFutureEventInput,
 } from "../src/lib/regionalWeekly";
 
+export type RegionalCoverageRun = {
+  topic: "apac_weekly" | "middle_east_weekly";
+  window: { start: string; end: string };
+  weather: RegionalCoverageStatus;
+  cyber: RegionalCoverageStatus;
+  forward: RegionalCoverageStatus;
+};
+export type RegionalCoverageStatus = {
+  startedAt: string;
+  completedAt: string;
+  sourceNames: string[];
+  itemsFetched: number;
+  candidatesAccepted: number;
+  errors: string[];
+};
+export type RegionalCollectorRunMetadata = {
+  weather?: RegionalCoverageStatus;
+  cyber?: RegionalCoverageStatus;
+  forward?: RegionalCoverageStatus;
+};
+
+const REGIONAL_COUNTRIES: Record<RegionalCoverageRun["topic"], Set<string>> = {
+  apac_weekly: new Set(["Australia","Bangladesh","Cambodia","China","India","Indonesia","Japan","Laos","Malaysia","Myanmar","Nepal","New Zealand","Pakistan","Papua New Guinea","Philippines","Singapore","South Korea","Sri Lanka","Taiwan","Thailand","Vietnam"]),
+  middle_east_weekly: new Set(["Bahrain","Iran","Iraq","Israel","Jordan","Kuwait","Lebanon","Oman","Palestine","Qatar","Saudi Arabia","Syria","UAE","Yemen"]),
+};
+
+export function collectRegionalCoverage(
+  rows: unknown[],
+  issueDate: string,
+  topic: RegionalCoverageRun["topic"],
+  metadata?: RegionalCollectorRunMetadata | null,
+): RegionalCoverageRun {
+  const start = new Date(`${issueDate}T00:00:00.000Z`);
+  const end = new Date(start.getTime() + 7 * 86400000);
+  // Incident rows are evidence, not proof that the upstream collection ran.
+  // A source label on an incident is never a run record (and must not be
+  // relabelled as one). Headless callers can provide the persisted collector
+  // metadata through the optional fourth argument; without it coverage is
+  // deliberately unknown/fail-closed.
+  const sourceNames: string[] = [];
+  const noRun = (domain: string): RegionalCoverageStatus => ({
+    startedAt: "",
+    completedAt: "",
+    sourceNames,
+    itemsFetched: 0,
+    candidatesAccepted: 0,
+    errors: [`${domain} collector run metadata unavailable`],
+  });
+  if (metadata?.weather && metadata?.cyber && metadata?.forward) {
+    return {
+      topic,
+      window: { start: start.toISOString(), end: end.toISOString() },
+      weather: metadata.weather,
+      cyber: metadata.cyber,
+      forward: metadata.forward,
+    };
+  }
+  return {
+    topic,
+    window: { start: start.toISOString(), end: end.toISOString() },
+    weather: noRun("weather"),
+    cyber: noRun("cyber"),
+    forward: noRun("forward"),
+  };
+  /*
+  const scoped = rows.filter((row) => {
+    const value = row as { country?: string; occurredAt?: string; title?: string; summary?: string };
+    const date = new Date(value.occurredAt ?? "");
+    return REGIONAL_COUNTRIES[topic].has(value.country ?? "") && date >= new Date(start.getTime() - 6 * 86400000) && date < end;
+  });
+  const run = (terms: RegExp, name: string): RegionalCoverageStatus => {
+    const startedAt = new Date().toISOString();
+    const candidates = scoped.filter((row) => terms.test(`${(row as { title?: string }).title ?? ""} ${(row as { summary?: string }).summary ?? ""}`));
+    return { startedAt, completedAt: new Date().toISOString(), sourceNames: [...sourceNames, name], itemsFetched: scoped.length, candidatesAccepted: candidates.length, errors: [] };
+  };
+  return {
+    topic,
+    window: { start: start.toISOString(), end: end.toISOString() },
+    weather: run(/\b(?:earthquake|typhoon|cyclone|storm|flood|landslide|wildfire|haze|volcan|tsunami|heat|drought)\b/i, "regional-weather-incident-register"),
+    cyber: run(/\b(?:ransomware|cyber|breach|malware|telecom|airport|port|logistics|utility|energy|critical infrastructure)\b/i, "regional-cyber-incident-register"),
+    forward: run(/\b(?:protest|strike|election|deadline|exercise|march|warning|advisory|restriction|event)\b/i, `${topic}-forward-events`),
+  };*/
+}
+
 // JSON-roundtrip a Drizzle row set so Date columns become ISO strings exactly
 // as Express's res.json() → client r.json() would, guaranteeing the headless
 // data shape is byte-equivalent to the HTTP path the exporters previously saw.
@@ -319,6 +403,49 @@ export async function fetchApacFutureEvents(
     })),
     issueDate,
   );
+}
+
+/** Shared forward-search adapter for both regional products; records an explicit
+ * empty result as a successful run rather than silently skipping collection. */
+export async function fetchRegionalFutureEvents(
+  issueDate: string,
+  topic: "apac_weekly" | "middle_east_weekly",
+): Promise<RegionalFutureEventInput[]> {
+  const events = await fetchApacFutureEvents(issueDate);
+  const issueMs = Date.parse(`${issueDate.trim()}T00:00:00.000Z`);
+  const start = new Date(issueMs + 24 * 60 * 60 * 1000);
+  const end = new Date(issueMs + 8 * 24 * 60 * 60 * 1000);
+  // Incident/advisory rows cover scheduled elections, deadlines, exercises,
+  // warnings and transport or border restrictions that are not represented in
+  // protest_events. They are queried separately so an empty protest lane does
+  // not masquerade as a completed forward search.
+  const incidentRows = await db.select().from(incidentsTable).where(
+    and(gte(incidentsTable.occurredAt, start), lt(incidentsTable.occurredAt, end)),
+  );
+  const incidentEvents = buildApacFutureEvents(
+    incidentRows.map((row) => ({
+      eventDate: row.occurredAt?.toISOString() ?? null,
+      country: row.country,
+      title: row.displayTitle ?? row.title,
+      description: row.summary,
+      sourceTitle: row.title,
+      eventType: row.category,
+      disruptionPotential: row.severity,
+      status: "Possible",
+    })),
+    issueDate,
+  );
+  const countries = REGIONAL_COUNTRIES[topic];
+  const filtered = [...events, ...incidentEvents]
+    .filter((event) => countries.has(event.location.split(",").at(-1)?.trim() ?? ""))
+    .filter((event, index, all) => all.findIndex((candidate) =>
+      candidate.date === event.date
+      && candidate.location === event.location
+      && candidate.trigger === event.trigger,
+    ) === index)
+    .slice(0, 5);
+  console.info(`[regional-forward-search] topic=${topic} status=complete sources=protest-events,incident-advisories itemsFetched=${events.length + incidentRows.length} accepted=${filtered.length}`);
+  return filtered;
 }
 
 // Mirror of GET /api/market-prices?group=… (routes/marketPrices.ts): the

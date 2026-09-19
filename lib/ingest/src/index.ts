@@ -44,10 +44,12 @@ export { runFlashpointUnknownReattribute } from "./flashpointUnknownReattribute"
 export type { FlashpointMastheadRelocateSummary } from "./flashpointMastheadRelocate";
 export { runCargoWatchIngest } from "./cargoWatch";
 export { runShippingIngest } from "./shipping";
-export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runDataCentresIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG, CONFLICT_CONFIG, ENERGY_CONFIG, FUEL_CONFIG, FERTILISER_CONFIG, COUNTRY_ALIASES, GLOBAL_EXTRA_ALIASES, GLOBAL_TOPIC_ALIASES } from "./topicConfigs";
+export { runEnergyIngest, runFertiliserIngest, runFuelIngest, runDataCentresIngest, runConflictIngest, runIndonesiaLocalIngest, runApacLocalIngest, runRegionalWeatherIngest, runRegionalCyberIngest, APAC_LOCAL_CONFIG, INDONESIA_LOCAL_CONFIG, CONFLICT_CONFIG, ENERGY_CONFIG, FUEL_CONFIG, FERTILISER_CONFIG, REGIONAL_WEATHER_CONFIG, REGIONAL_CYBER_CONFIG, APAC_REGIONAL_WEATHER_CONFIG, MIDDLE_EAST_REGIONAL_WEATHER_CONFIG, APAC_REGIONAL_CYBER_CONFIG, MIDDLE_EAST_REGIONAL_CYBER_CONFIG, COUNTRY_ALIASES, GLOBAL_EXTRA_ALIASES, GLOBAL_TOPIC_ALIASES } from "./topicConfigs";
 export { classifyNewsConfidence } from "./newsConfidence";
 export type { Confidence } from "./newsConfidence";
 export { runNewsTopicIngest, classifyNewsItem, detectCountry } from "./newsTopic";
+export { runRegionalWeeklyCollection } from "./regionalWeekly";
+export type { RegionalWeeklyRun, RegionalWeeklyRegion, RegionalDomainRun } from "./regionalWeekly";
 export type { NewsTopicConfig, TopicFeed, CountryAlias, Classified } from "./newsTopic";
 export {
   runXSearchIngest,

@@ -1223,3 +1223,118 @@ export function runIndonesiaLocalIngest(opts: IngestOptions = {}): Promise<Inges
 export function runApacLocalIngest(opts: IngestOptions = {}): Promise<IngestSummary> {
   return runNewsTopicIngest(APAC_LOCAL_CONFIG, opts);
 }
+
+// Regional Weekly evidence lanes. These are intentionally separate topic
+// records: the weekly products must be able to prove that weather and cyber
+// were actively checked, without borrowing rows from the incident register.
+const REGIONAL_APAC = [
+  "Australia", "Bangladesh", "China", "India", "Indonesia", "Japan",
+  "Malaysia", "Myanmar", "Nepal", "New Zealand", "Pakistan", "Philippines",
+  "Singapore", "South Korea", "Sri Lanka", "Thailand", "Vietnam",
+  "Cambodia", "Laos",
+];
+const REGIONAL_MIDDLE_EAST = [
+  "Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon",
+  "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria",
+  "United Arab Emirates", "Yemen",
+];
+const REGIONAL_TERMS = {
+  weather: `("weather warning" OR earthquake OR typhoon OR cyclone OR storm OR flooding OR landslide OR wildfire OR haze OR volcano OR tsunami OR "extreme heat" OR drought)`,
+  cyber: `(cyber OR ransomware OR malware OR breach OR "digital attack" OR "network attack" OR "system attack" OR "cyber attack")`,
+};
+function regionalFeeds(countries: string[], terms: string): TopicFeed[] {
+  return countries.map((country) => ({
+    label: `Regional Weekly — ${country}`,
+    q: `${terms} "${country}"`,
+    defaultCountry: country,
+    discoveryDomain: terms === REGIONAL_TERMS.weather ? "weather" : "cyber",
+  }));
+}
+const REGIONAL_ALIASES: CountryAlias[] = [
+  ...COUNTRY_ALIASES,
+  // Keep the regional gazetteer canonical: feeds and reports may use UAE,
+  // Emirates, or the constitutional name, but all resolve to one country.
+  { canonical: "United Arab Emirates", aliases: ["uae", "emirates", "united arab emirates", "emirati", "abu dhabi", "dubai", "fujairah", "sharjah"] },
+  { canonical: "Singapore", aliases: ["singapore", "singaporean"] },
+  { canonical: "Israel", aliases: ["israel", "israeli", "jerusalem", "tel aviv"] },
+  { canonical: "Jordan", aliases: ["jordan", "jordanian", "amman"] },
+  { canonical: "Lebanon", aliases: ["lebanon", "lebanese", "beirut"] },
+  { canonical: "Syria", aliases: ["syria", "syrian", "damascus"] },
+  { canonical: "Yemen", aliases: ["yemen", "yemeni", "sanaa", "aden"] },
+  { canonical: "Palestine", aliases: ["palestine", "palestinian", "gaza", "west bank"] },
+];
+const REGIONAL_DENY = [
+  ...COMMON_DENY, "forecast market", "sports", "match", "concert",
+  "celebrity", "travel tips", "lifestyle",
+];
+
+// Regional weekly lanes are evidence collectors, not generic operational-news
+// buckets. Keep these predicates deliberately conjunctive: an airport, port,
+// truck, airline, or vessel incident is not cyber evidence by itself.
+const REGIONAL_HAZARD = /\b(earthquake|typhoon|cyclone|storm|flood(?:ing)?|landslide|wildfire|haze|volcan(?:o|ic)|tsunami|heatwave|extreme heat|drought)\b/i;
+const REGIONAL_WEATHER_STATE = /\b(warning|watch|alert|advisory|evacuat(?:e|ion)|inundat(?:e|ed|ion)|damage|damaged|impact(?:ed)?|disrupt(?:ed|ion)|closed|killed|injured|residents? urged|current conditions?)\b/i;
+const REGIONAL_CYBER_EXPLICIT = /\b(cyber(?:attack|security|crime)?|ransomware|malware|phishing|data breach|breach of (?:the )?(?:network|system)|digital attack|digital outage|network attack|network outage|system attack|system outage|computer attack)\b/i;
+const REGIONAL_CYBER_CONSEQUENCE = /\b(outage|disrupt(?:ed|ion)|offline|shut(?:down)?|service interruption|systems? (?:were )?(?:compromised|disabled|inaccessible)|operations? (?:halted|disrupted)|data (?:stolen|exfiltrated|encrypted)|customers? (?:affected|unable)|critical infrastructure)\b/i;
+
+function hasRegionalLocation(text: string, defaultCountry: string): boolean {
+  const hay = text.toLowerCase();
+  if (defaultCountry !== "Unknown" && hay.includes(defaultCountry.toLowerCase())) return true;
+  return REGIONAL_ALIASES.some((entry) =>
+    entry.aliases.some((alias) => hay.includes(alias.toLowerCase())),
+  );
+}
+
+function regionalWeatherEvidence(title: string, summary: string, defaultCountry: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return REGIONAL_HAZARD.test(hay)
+    && REGIONAL_WEATHER_STATE.test(hay)
+    && hasRegionalLocation(hay, defaultCountry);
+}
+
+function regionalCyberEvidence(title: string, summary: string, _defaultCountry: string): boolean {
+  const hay = `${title}\n${summary}`;
+  return REGIONAL_CYBER_EXPLICIT.test(hay) && REGIONAL_CYBER_CONSEQUENCE.test(hay);
+}
+
+function regionalConfig(
+  topic: "regional_weather" | "regional_cyber",
+  countries: string[],
+): NewsTopicConfig {
+  const weather = topic === "regional_weather";
+  return {
+    topic,
+    feeds: regionalFeeds(countries, weather ? REGIONAL_TERMS.weather : REGIONAL_TERMS.cyber),
+    allow: weather
+      ? ["weather warning", "earthquake", "typhoon", "cyclone", "storm", "flood", "landslide", "wildfire", "haze", "volcan", "tsunami", "heat", "drought"]
+      : ["cyber", "ransomware", "cyberattack", "cyber attack", "malware", "data breach", "breach", "digital", "network", "system"],
+    deny: REGIONAL_DENY,
+    countryAliases: REGIONAL_ALIASES,
+    evidenceGate: weather ? regionalWeatherEvidence : regionalCyberEvidence,
+  };
+}
+export const REGIONAL_WEATHER_CONFIG: NewsTopicConfig = {
+  topic: "regional_weather",
+  feeds: [...regionalFeeds(REGIONAL_APAC, REGIONAL_TERMS.weather), ...regionalFeeds(REGIONAL_MIDDLE_EAST, REGIONAL_TERMS.weather)],
+  allow: ["weather warning", "earthquake", "typhoon", "cyclone", "storm", "flood", "landslide", "wildfire", "haze", "volcan", "tsunami", "heat", "drought"],
+  deny: REGIONAL_DENY,
+  countryAliases: REGIONAL_ALIASES,
+  evidenceGate: regionalWeatherEvidence,
+};
+export const REGIONAL_CYBER_CONFIG: NewsTopicConfig = {
+  topic: "regional_cyber",
+  feeds: [...regionalFeeds(REGIONAL_APAC, REGIONAL_TERMS.cyber), ...regionalFeeds(REGIONAL_MIDDLE_EAST, REGIONAL_TERMS.cyber)],
+  allow: ["cyber", "ransomware", "cyberattack", "cyber attack", "malware", "data breach", "breach", "digital", "network", "system"],
+  deny: REGIONAL_DENY,
+  countryAliases: REGIONAL_ALIASES,
+  evidenceGate: regionalCyberEvidence,
+};
+export const APAC_REGIONAL_WEATHER_CONFIG = regionalConfig("regional_weather", REGIONAL_APAC);
+export const MIDDLE_EAST_REGIONAL_WEATHER_CONFIG = regionalConfig("regional_weather", REGIONAL_MIDDLE_EAST);
+export const APAC_REGIONAL_CYBER_CONFIG = regionalConfig("regional_cyber", REGIONAL_APAC);
+export const MIDDLE_EAST_REGIONAL_CYBER_CONFIG = regionalConfig("regional_cyber", REGIONAL_MIDDLE_EAST);
+export function runRegionalWeatherIngest(opts: IngestOptions = {}, region: "apac" | "middle_east" = "apac"): Promise<IngestSummary> {
+  return runNewsTopicIngest(region === "apac" ? APAC_REGIONAL_WEATHER_CONFIG : MIDDLE_EAST_REGIONAL_WEATHER_CONFIG, opts);
+}
+export function runRegionalCyberIngest(opts: IngestOptions = {}, region: "apac" | "middle_east" = "apac"): Promise<IngestSummary> {
+  return runNewsTopicIngest(region === "apac" ? APAC_REGIONAL_CYBER_CONFIG : MIDDLE_EAST_REGIONAL_CYBER_CONFIG, opts);
+}
