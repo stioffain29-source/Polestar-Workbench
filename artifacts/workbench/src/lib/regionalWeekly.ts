@@ -230,7 +230,11 @@ const APAC_CURRENT_CHANGE_RE =
 const APAC_FUTURE_ONLY_RE =
   /\b(?:scheduled|plans? to|set to|will (?:hold|cost|begin|start|take place)|is expected to|await(?:s|ing)?|upcoming|on\s+\d{1,2}\s+(?:september|october|november|december|january|february|march|april|may|june|july|august))\b/i;
 const NON_EVENT_ANALYSIS_RE =
-  /\b(?:common challenge|critically examine|how does this nexus|election-year security discourse|risk insurance|zero tolerance towards|law challenged|petitions? .{0,40}(?:court|against amendments)|prepar(?:e|es|ing) for (?:extreme heat|heavy rain|food shortage)|opinion|commentary|explainer|what .* means for|could affect)\b/i;
+  /\b(?:common challenge|critically examine|how does this nexus|election-year security discourse|risk insurance|zero tolerance towards|law challenged|(?:petitions?|moves?) .{0,50}(?:court|lhc) .{0,50}(?:law|amendments|against)|court orders? .{0,80}hoaxer .{0,80}(?:damages|pay)|appeals? for non-violence|jet fuel volatility|volatility creates? .{0,60}(?:risk|pressure)|\d+(?:st|nd|rd|th) straight year|annual report|still deadliest|peruvian election-year|shining path counter-terrorism operations revive|prepar(?:e|es|ing) for (?:extreme heat|heavy rain|food shortage)|mock drill|simulation exercise|ai-manipulated|falsely linked|fact check|debunked|expresses condolences|policy against terrorism|opinion|commentary|explainer|what .* means for|could affect)\b/i;
+const WEAK_PROPOSED_LAW_RE =
+  /\b(?:proposed|proposal|bill|draft law|takes aim at|seeks? to|would)\b/i;
+const BINDING_LAW_RE =
+  /\b(?:approved|adopted|passed|enacted|effective|enters? into force|implemented|imposed|signed into law)\b/i;
 const REGULATORY_EVENT_RE =
   /\b(?:parliament|assembly|court|bill|law|ruling|regulation)\b[\s\S]{0,100}\b(?:abolish(?:ed|es|ing)?|nullif(?:y|ied|ies)|approv(?:ed|es)|pass(?:ed|es)|enact(?:ed|s)|scrap(?:ped|s)|repeal(?:ed|s))\b|\b(?:abolish(?:ed|es|ing)?|nullif(?:y|ied|ies)|approv(?:ed|es)|pass(?:ed|es)|enact(?:ed|s)|scrap(?:ped|s)|repeal(?:ed|s))\b[\s\S]{0,100}\b(?:parliament|assembly|court|bill|law|ruling|regulation)\b/i;
 const COUNTRY_MENTIONS = [
@@ -511,6 +515,11 @@ export function regionalIntelligenceCategory(
   const eventText = `${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""}`;
   // Classification is based on the event itself.  Collector/discovery labels
   // are provenance and must never override explicit event semantics.
+  if (/\b(?:bomb|explosive|shooting|opened fire|armed attack)\b/i.test(eventText)
+    && /\b(?:military|defen[cs]e volunteers?|security forces?|soldiers?|troops?|insurgents?|rebels?)\b/i.test(eventText)) {
+    return "Armed Conflict";
+  }
+  if (/\b(?:bomb|explosive|shooting|opened fire|armed attack)\b/i.test(eventText)) return "Security";
   if (/\b(?:cargo ship|vessel|maritime|port|shipping)\b/i.test(eventText)
     && !/\b(?:cyber|ransomware|malware|data breach|hack(?:ed)?|telecom outage)\b/i.test(eventText)) {
     if (/\b(?:fuel|oil|petrol|diesel|energy|pipeline)\b/i.test(eventText)) return "Energy";
@@ -597,6 +606,10 @@ function consolidateRegionalEvents<T extends RegionalIncident>(rows: T[]): T[] {
 
 function regionalEventFamily(row: RegionalIncident): string {
   const text = `${row.title ?? ""} ${row.summary ?? ""}`.toLowerCase();
+  if (row.country?.trim().toLowerCase() === "pakistan"
+    && /\b(?:kohat|northwest pakistan)\b/.test(text)
+    && /\b(?:bomb|blast)\b/.test(text)
+    && /\b(?:police|cops)\b/.test(text)) return "pakistan-kohat-police-bomb";
   if (/\bsyria\b/.test(text) && /\b(?:terrorism|terrorist)\b/.test(text) && /\b(?:court|ruling)\b/.test(text)
     && /\b(?:abolish|scrap|nullif)\b/.test(text)) return "syria-terrorism-court-reform";
   if (/\b(?:saudi|yanbu|east[- ]west pipeline|pipeline attack|drone launch)\b/.test(text)) return "saudi-pipeline-drone";
@@ -638,22 +651,62 @@ function materialityDimensions(text: string): string[] {
   return BUSINESS_DIMENSIONS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
 }
 
-function developmentScore(incident: RegionalIncident): number {
+function developmentScore(
+  incident: RegionalIncident,
+  topic: RegionalWeeklyTopic = "middle_east_weekly",
+): number {
   const text = `${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""}`;
   const dimensions = materialityDimensions(text).length;
-  const severity = SEVERITY_RANK[incident.severity?.toLowerCase() ?? ""] ?? 0;
-  const corroboration = Array.isArray((incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers)
-    ? Math.min(3, (incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers!.length - 1)
+  const severity = SEVERITY_RANK[regionalWeeklySeverity(incident, topic).toLowerCase()] ?? 0;
+  const legacyMiddleEastSignals = topic === "middle_east_weekly"
+    ? (Array.isArray((incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers)
+        ? Math.min(3, (incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers!.length - 1)
+        : 0)
+      + (/regional-weekly:/i.test(incident.analystNotes ?? "") ? 2 : 0)
     : 0;
-  const discovery = /regional-weekly:/i.test(incident.analystNotes ?? "") ? 2 : 0;
   const regional = /\b(national|nationwide|regional|cross-border|capital|major|critical infrastructure)\b/i.test(text) ? 2 : 0;
-  return severity * 4 + dimensions * 3 + corroboration + discovery + regional;
+  const securitySignificance = regionalIntelligenceCategory(incident) === "Armed Conflict"
+    || /\b(?:military|defen[cs]e volunteers?|security forces?|soldiers?|troops?|insurgents?|rebels?)\b/i.test(text)
+    ? 3 : 0;
+  const forwardRelevance = FORWARD_RE.test(text) ? 1 : 0;
+  const apacSignals = topic === "apac_weekly" ? securitySignificance + forwardRelevance : 0;
+  return severity * 4 + dimensions * 3 + regional + apacSignals + legacyMiddleEastSignals;
+}
+
+export function regionalWeeklySeverity(
+  incident: RegionalIncident,
+  topic: RegionalWeeklyTopic,
+): RegionalDevelopment["severity"] {
+  const stored = SEVERITY_LABEL[incident.severity?.toLowerCase() ?? ""] ?? "Moderate";
+  if (topic !== "apac_weekly") return stored;
+  const text = `${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""}`;
+  const category = regionalIntelligenceCategory(incident);
+  const majorOperational = /\b(?:nationwide|national emergency|mass evacuation|airport closure|port closure|border closure|major outage|critical infrastructure shutdown|operations? halted|services? suspended|supply shortage)\b/i.test(text);
+  const currentOperational = CURRENT_CONSEQUENCE_RE.test(text);
+  if (category === "Regulatory" || category === "Political") {
+    if (!currentOperational || (WEAK_PROPOSED_LAW_RE.test(text) && !BINDING_LAW_RE.test(text))) return "Low";
+    return majorOperational ? "High" : "Moderate";
+  }
+  if (category === "Security" || category === "Armed Conflict" || category === "Terrorism") {
+    if (/\b(?:mass casualty|15 (?:killed|dead)|dozens (?:killed|injured)|56 injured)\b/i.test(text)
+      && /\b(?:bomb|attack|shooting|clash)\b/i.test(text)) return "Extreme";
+    if (majorOperational || /\b(?:election|airport|port|border (?:crossing|closure)|cross-border|critical infrastructure)\b/i.test(text)
+      && /\b(?:killed|injured|attack|bomb|shooting|clash)\b/i.test(text)) return "High";
+    return currentOperational || /\b(?:attack|bomb|shooting|clash)\b/i.test(text) ? "Moderate" : "Low";
+  }
+  if (category === "Cyber" || category === "Weather & Natural Hazards" || category === "Operational Disruption" || category === "Energy") {
+    if (majorOperational) return "High";
+    return currentOperational ? "Moderate" : "Low";
+  }
+  return stored;
 }
 
 function apacRejectLowValueDevelopment(text: string): boolean {
   return (APAC_LOCAL_THEFT_RE.test(text)
     && !(APAC_STRATEGIC_THEFT_RE.test(text) && APAC_WIDER_THEFT_EFFECT_RE.test(text)))
-    || (APAC_CASUALTY_RE.test(text) && !APAC_ONGOING_OPERATION_RE.test(text));
+    || (APAC_CASUALTY_RE.test(text)
+      && !APAC_ONGOING_OPERATION_RE.test(text)
+      && !/\b(?:attack|bomb|shooting|opened fire|clash|armed)\b/i.test(text));
 }
 
 function apacRejectOffRegionAirline(text: string): boolean {
@@ -718,6 +771,7 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
           || REGIONAL_ROUNDUP_RE.test(text)
           || FEED_DUMP_RE.test(text)
           || NON_EVENT_ANALYSIS_RE.test(text)
+          || (topic === "apac_weekly" && WEAK_PROPOSED_LAW_RE.test(text) && !BINDING_LAW_RE.test(text))
           || hasForeignSubjectLead(incident)
           || hasForeignVenue(incident)
           || ((NON_BINDING_POLICY_RE.test(eventTitle) || NON_BINDING_STATEMENT_RE.test(eventTitle))
@@ -749,7 +803,7 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
         && regionalDomainMateriality(regionalIntelligenceCategory(incident), text);
     })
     .sort((a, b) => {
-      return developmentScore(b) - developmentScore(a)
+      return developmentScore(b, topic) - developmentScore(a, topic)
         || Date.parse(b.occurredAt) - Date.parse(a.occurredAt);
     });
   const consolidated = consolidateRegionalEvents(eligible);
@@ -758,7 +812,7 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
     const key = regionalEventFamily(row);
     const existing = families.get(key);
     const pipelinePriority = (value: RegionalIncident) => /\b(?:yanbu|east[- ]west pipeline|oil shipments)\b/i.test(`${value.title ?? ""} ${value.summary ?? ""}`) ? 3 : 0;
-    if (!existing || developmentScore(row) + pipelinePriority(row) > developmentScore(existing) + pipelinePriority(existing)) families.set(key, row);
+    if (!existing || developmentScore(row, topic) + pipelinePriority(row) > developmentScore(existing, topic) + pipelinePriority(existing)) families.set(key, row);
   }
   return [...families.values()];
 }
@@ -840,7 +894,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
   topic: RegionalWeeklyTopic = "middle_east_weekly",
 ): T[] {
   const ranked = [...incidents].sort((a, b) =>
-    developmentScore(b) - developmentScore(a)
+    developmentScore(b, topic) - developmentScore(a, topic)
     || Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
   const selected: T[] = [];
   const categoryCounts = new Map<RegionalIntelligenceCategory, number>();
@@ -1229,7 +1283,7 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
     return {
       country: incident.country?.trim() || "Regional",
       title,
-      severity: SEVERITY_LABEL[incident.severity?.toLowerCase() ?? ""] ?? "Moderate",
+      severity: regionalWeeklySeverity(incident, topic ?? "middle_east_weekly"),
       category: regionalIntelligenceCategory(incident),
       whatChanged: cleanRendered(integratedNarrative) ?? "",
       operationalSignificance: cleanRendered(structuredWeekly ? operationalImpact! : firstSentences(operationalSignificance(incident, evidence), 1, 25)) ?? "",

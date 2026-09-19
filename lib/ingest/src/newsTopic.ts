@@ -56,7 +56,7 @@ export type TopicFeed = {
    */
   sourceName?: string;
   /** Optional regional-weekly discovery domain retained in analystNotes. */
-  discoveryDomain?: "security" | "political" | "regulatory" | "weather" | "cyber" | "operational";
+  discoveryDomain?: "security" | "political" | "regulatory" | "weather" | "cyber" | "operational" | "energy";
 };
 
 export type NewsTopicConfig = {

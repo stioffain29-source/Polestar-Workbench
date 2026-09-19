@@ -1,0 +1,330 @@
+STOP GENERATING NEW REPORT VERSIONS.
+
+The Regional Weekly engine is still wrong upstream.
+
+Do NOT make another cosmetic or prose change.
+
+We are now treating APAC Weekly the same way Fuel Watch was repaired:
+
+TRACE THE COMPLETE PIPELINE
+IDENTIFY THE FIRST WRONG STAGE
+FIX THAT STAGE
+THEN TEST GENERATION → SAVE → RELOAD → PDF
+
+DO NOT REFACTOR UNRELATED CODE.
+
+==================================================
+PHASE 1 — TRACE THE PIPELINE
+==================================================
+
+Instrument the exact chain for APAC Weekly:
+
+SOURCE INGESTION
+→ DATE FILTER
+→ REGION FILTER
+→ NORMALISATION
+→ DEDUPLICATION
+→ CLASSIFICATION
+→ SEVERITY
+→ MATERIALITY
+→ KEY DEVELOPMENT SELECTION
+→ MAP SELECTION
+→ 7 DAY WATCH
+→ REPORT GENERATION
+→ SAVE
+→ RELOAD
+→ PDF RENDER
+
+For EACH stage show:
+
+INPUT COUNT
+OUTPUT COUNT
+WHAT WAS DROPPED
+WHY IT WAS DROPPED
+
+Do not change code until you can show where the bad judgement enters the chain.
+
+==================================================
+PHASE 2 — PROVE THESE CURRENT FAILURES
+==================================================
+
+Use the current APAC dataset and trace these exact examples:
+
+AUSTRALIA MIGRATION POLICY
+
+Why is this being rated HIGH?
+
+Show:
+source data
+classifier result
+severity inputs
+final severity decision
+
+This should NOT default to HIGH merely because it affects visa eligibility or employer paperwork.
+
+Unless there is evidence of major immediate operational disruption, this should normally be LOW or MODERATE.
+
+THAILAND NARATHIWAT ATTACK
+
+This was:
+bomb + small arms attack
+against territorial defence volunteers
+
+Why is it classified as OPERATIONAL DISRUPTION?
+
+It should be SECURITY / ARMED CONFLICT depending on taxonomy.
+
+Show exactly where the wrong category is assigned.
+
+PHILIPPINES DUPLICATION
+
+Show why multiple Philippines items survive independently.
+
+Confirm whether they are:
+genuinely separate material developments
+or weak/duplicative stories being promoted because of feed volume.
+
+SAGIP BATA BILL
+
+Explain why this is rated HIGH SECURITY.
+
+A proposed law does not become HIGH simply because the subject matter involves abuse, recruitment or shootings.
+
+==================================================
+PHASE 3 — VERIFY COVERAGE GAPS
+==================================================
+
+Show whether the engine actually performs separate searches for:
+
+WEATHER / NATURAL HAZARDS
+CYBER
+POLITICAL
+REGULATORY
+SECURITY
+OPERATIONAL
+ENERGY
+
+For WEATHER prove the system checks:
+
+earthquakes
+typhoons
+cyclones
+severe storms
+flooding
+landslides
+wildfires
+haze
+volcanoes
+tsunami warnings
+extreme heat
+
+For CYBER prove it checks:
+
+ransomware
+critical infrastructure
+telecommunications
+ports
+airports
+logistics
+energy
+utilities
+government systems
+major corporate incidents
+
+Do not tell me “nothing material found” unless you can show that these searches actually ran.
+
+==================================================
+PHASE 4 — FIX THE LOGIC
+==================================================
+
+After diagnostics, fix ONLY the first failing stages.
+
+RELEVANCE
+
+Reject:
+routine crime
+routine policing
+traffic enforcement
+minor local incidents
+weak legislation stories
+community stories
+events with no meaningful regional business relevance
+
+SEVERITY
+
+Use:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+Severity must reflect CURRENT OPERATIONAL CONSEQUENCE.
+
+Do not infer severity from:
+dramatic wording
+police involvement
+casualties alone
+article volume
+keyword hits
+
+CLASSIFICATION
+
+Bombing / armed attack
+→ Security / Armed Conflict
+
+Visa / migration rules
+→ Regulatory
+
+Fuel tax / export levy
+→ Energy / Regulatory
+
+Transport strike
+→ Operational Disruption
+
+Earthquake / storm / flood
+→ Weather & Natural Hazards
+
+Ransomware / infrastructure compromise
+→ Cyber
+
+MATERIALITY
+
+Rank by:
+
+business consequence
+people / travel impact
+site / asset impact
+security significance
+transport / logistics impact
+regulatory consequence
+energy / utility consequence
+weather impact
+cyber impact
+forward relevance
+
+Do NOT rank by source count or recency alone.
+
+==================================================
+PHASE 5 — DEDUPLICATION
+==================================================
+
+ONE REAL WORLD EVENT = ONE DEVELOPMENT.
+
+Multiple articles are supporting evidence.
+
+They must not become multiple report entries.
+
+Show the dedupe key used:
+
+country
+location
+date
+actors
+event
+policy decision
+operational consequence
+
+==================================================
+PHASE 6 — 7 DAY WATCH
+==================================================
+
+The 7 Day Watch must run as a SEPARATE FORWARD SEARCH.
+
+It must not depend only on the backward-looking incident feed.
+
+Search the next 7 days for:
+
+protests
+strikes
+elections
+court rulings
+regulatory deadlines
+political deadlines
+military exercises
+major events
+religious gatherings
+weather systems
+typhoons
+cyclones
+flood warnings
+transport action
+border restrictions
+
+If the result is 0 or 1 item, show the search results and why the others were excluded.
+
+==================================================
+PHASE 7 — ACCEPTANCE TEST
+==================================================
+
+Only after the above is fixed:
+
+Generate APAC Weekly.
+
+Then:
+
+SAVE
+RELOAD
+RENDER PDF
+
+Validate:
+
+Australia migration policy is not HIGH without evidence supporting HIGH.
+
+Thailand bombing is correctly classified.
+
+No trivial local story outranks a material security event.
+
+No duplicate Philippines stories.
+
+Weather search ran.
+
+Cyber search ran.
+
+7 Day Watch ran.
+
+Map uses only final curated developments.
+
+No raw source text leaks into prose.
+
+No source domain names appear.
+
+No generic fallback text appears.
+
+If any of these fail:
+
+STOP AND REPORT THE FAILED STAGE.
+
+Do not silently regenerate around the problem.
+
+==================================================
+SCOPE
+==================================================
+
+DO NOT change:
+
+cover
+branding
+map presentation
+PDF styling
+header
+footer
+other reports
+Middle East Weekly
+
+Fix APAC Weekly pipeline only.
+
+Do not declare success because the PDF renders.
+
+Success means:
+
+CORRECT EVIDENCE
+→ CORRECT CLASSIFICATION
+→ CORRECT SEVERITY
+→ CORRECT SELECTION
+→ CORRECT SAVE
+→ CORRECT RELOAD
+→ CORRECT PDF
+
+STOP after showing the APAC acceptance result.

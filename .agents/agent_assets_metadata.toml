@@ -1297,3 +1297,17 @@ mtime_ms = 1789794611923
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/2e32cb29-4f16-4524-aedf-b7a6250d0c4c/6a12a0d2-e3fd-49b9-b0c8-51a6bc5e68c4"
 storage_version_token = "1789794637116997"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "A9dkN-tfvb_j5MrprbyKx"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/apac_weekly-75.pdf"
+type = "pdf"
+title = "APAC Weekly Acceptance PDF"
+description = "APAC-only report generated after the upstream relevance, classification, severity, materiality, deduplication, coverage, save/reload, and PDF checks passed."
+logical_id = "31d4f0b6-d065-44b7-8ac0-bd7cc0055a28"
+content_hash = "sha256:3b23da1e620fdeca6021baa3c09b123c4dc71620a7fef746e5ec17172f8e2d61"
+size = 1933467
+mtime_ms = 1789801592368
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/31d4f0b6-d065-44b7-8ac0-bd7cc0055a28/b33399e1-32e1-4922-9f3b-3cde13310255"
+storage_version_token = "1789801638760543"
+content_type = "application/pdf"

@@ -1025,7 +1025,7 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
   { q: "", label: "Khaosod English", directUrl: "https://www.khaosodenglish.com/feed/", sourceName: "Khaosod English", defaultCountry: "Thailand" },
   // Regional security / terrorism desk (multi-country → Unknown default)
   { q: "", label: "BenarNews", directUrl: "https://www.benarnews.org/english/rss", sourceName: "BenarNews", defaultCountry: "Unknown" },
-  // Regional Weekly: six independent discovery domains across both report
+  // Regional Weekly: independent discovery domains across both report
   // regions. These are deliberately separate queries, not categories assigned
   // after a general incident scrape. The domain marker is persisted with each
   // source record and drives event synthesis downstream.
@@ -1040,6 +1040,7 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
   { label: "Regional Weekly APAC cyber", q: `(ransomware OR "cyber attack" OR "data breach" OR malware OR "network compromise" OR "cloud outage") (Asia OR ASEAN OR Australia OR India OR Japan OR China OR Singapore) (infrastructure OR telecom OR port OR airline OR logistics OR bank OR utility OR government) when:7d`, defaultCountry: "Unknown", discoveryDomain: "cyber" },
   { label: "Regional Weekly Middle East cyber", q: `(ransomware OR "cyber attack" OR "data breach" OR malware OR "network compromise" OR "cloud outage") ("Middle East" OR Gulf OR Israel OR Iran OR Saudi OR UAE OR Qatar) (infrastructure OR telecom OR port OR airline OR logistics OR bank OR utility OR government) when:7d`, defaultCountry: "Unknown", discoveryDomain: "cyber" },
   { label: "Regional Weekly APAC operational", q: `("airport closure" OR "port closure" OR "airspace closure" OR "border closure" OR "rail disruption" OR "power outage" OR "telecom outage" OR "industrial action" OR "supply chain disruption") (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines) when:7d`, defaultCountry: "Unknown", discoveryDomain: "operational" },
+  { label: "Regional Weekly APAC energy", q: `("fuel shortage" OR "power shortage" OR "energy disruption" OR "oil supply" OR "gas supply" OR "electricity outage" OR "fuel tax" OR "export levy") (Asia OR ASEAN OR Pacific OR Australia OR India OR Japan OR Indonesia OR Philippines OR China) when:7d`, defaultCountry: "Unknown", discoveryDomain: "energy" },
   { label: "Regional Weekly Middle East operational", q: `("airport closure" OR "port closure" OR "airspace closure" OR "border closure" OR "road disruption" OR "power outage" OR "telecom outage" OR "industrial action" OR "supply chain disruption") ("Middle East" OR Gulf OR Israel OR Iran OR Saudi OR UAE OR Yemen) when:7d`, defaultCountry: "Unknown", discoveryDomain: "operational" },
 ];
 

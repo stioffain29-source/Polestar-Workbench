@@ -93,7 +93,10 @@ const incidents = [...evidenceByKey.values()];
 if (!incidents.length) throw new Error("No development evidence in the current reporting window");
 
 const reportIds: number[] = [];
-for (const [region, topic] of [["APAC", "apac_weekly"], ["Middle East", "middle_east_weekly"]] as const) {
+const requestedTopic = process.env.REGIONAL_WEEKLY_ONLY;
+const reportRuns = ([["APAC", "apac_weekly"], ["Middle East", "middle_east_weekly"]] as const)
+  .filter(([, topic]) => !requestedTopic || requestedTopic === topic);
+for (const [region, topic] of reportRuns) {
   const key = region === "APAC" ? "apac" : "middle_east";
   const run = runs[key];
   const weather = { startedAt: run.startedAt, completedAt: run.completedAt, ...run.weather };
@@ -198,7 +201,7 @@ for (const [region, topic] of [["APAC", "apac_weekly"], ["Middle East", "middle_
   reportIds.push(saved.id);
 }
 
-for (const [index, topic] of ["apac_weekly", "middle_east_weekly"].entries()) {
+for (const [index, topic] of reportRuns.map(([, topic]) => topic).entries()) {
   const pdf = resolve(outDir, `${topic}-${reportIds[index]}.pdf`);
   await runHeadlessReportExport({
     reportId: reportIds[index],

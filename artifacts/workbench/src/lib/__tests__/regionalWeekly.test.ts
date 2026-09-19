@@ -385,6 +385,32 @@ describe("regional weekly products", () => {
     expect(buildApacWeeklyDevelopments(rows)[0].sourceEvidence).toHaveLength(2);
   });
 
+  it("APAC reassesses stored severity from current operational consequence", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "Australia", "high", "2026-09-17", "Australia tightens backpacker visa eligibility and employer paperwork"),
+      incident(2, "Thailand", "high", "2026-09-17", "Bomb and shooting attack targets territorial defence volunteers in Narathiwat in the southern border province; no casualties reported"),
+    ], "2026-09-17");
+    expect(developments.find((row) => row.country === "Australia")?.severity).toBe("Moderate");
+    expect(developments.find((row) => row.country === "Thailand")?.category).toBe("Armed Conflict");
+    expect(developments.find((row) => row.country === "Thailand")?.severity).toBe("Moderate");
+  });
+
+  it("APAC rejects a proposed bill without a binding operational effect", () => {
+    const rows = curateRegionalWeeklyIncidents([
+      incident(1, "Philippines", "high", "2026-09-17", "Proposed SAGIP BATA bill takes aim at online recruitment into violence"),
+    ], "apac_weekly", "2026-09-17");
+    expect(rows).toHaveLength(0);
+  });
+
+  it("APAC rejects drills, false event claims and terrorism speeches", () => {
+    const rows = curateRegionalWeeklyIncidents([
+      incident(1, "India", "low", "2026-09-17", "Airport conducts bomb threat mock drill"),
+      incident(2, "Myanmar", "low", "2026-09-17", "AI-manipulated image falsely linked to drone attack at airport"),
+      incident(3, "India", "low", "2026-09-17", "Prime minister states policy against terrorism and expresses condolences"),
+    ], "apac_weekly", "2026-09-17");
+    expect(rows).toHaveLength(0);
+  });
+
   it("APAC accepts externally supplied next-seven-day events without inventing past watch rows", () => {
     const items = buildApacWeeklyWatchlist(
       [],
