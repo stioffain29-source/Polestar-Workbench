@@ -141,7 +141,7 @@ export interface RegionalCanonicalReport {
   schemaVersion: "regional-weekly-canonical-v1";
   topic: RegionalWeeklyTopic;
   issueDate: string;
-  developments: RegionalVerifiedDevelopment[];
+  developments: RegionalDevelopment[];
   regionalOutlook: string;
   polestarOutlook: string;
   riskPicture: string;
@@ -163,7 +163,7 @@ export function regionalCanonicalReportFromHardNumbers(
   const value = (hardNumbers as { regionalCanonicalReport?: RegionalCanonicalReport }).regionalCanonicalReport;
   if (!value || value.schemaVersion !== "regional-weekly-canonical-v1" || value.topic !== topic) return null;
   if (issueDate && value.issueDate !== issueDate) return null;
-  if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
+  if (topic === "apac_weekly" && value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
   return value;
 }
 

@@ -44,3 +44,9 @@ The APAC canonical-object migration must preserve the established APAC geographi
 **Why:** A parity fix accidentally changed the visible map design even though the owner explicitly prohibited design changes.
 
 **How to apply:** Feed canonical points into the existing APAC map component. The PDF must mirror that component's APAC projection, aspect ratio, sea/land palette, pins and callouts; canonicalizing data is not permission to replace presentation.
+
+Regional report acceptance must inspect the exact environment and saved row the owner is viewing. A development PDF proves nothing about a newly created production row.
+
+**Why:** The Regional Reports create action saved empty production rows while a separate development acceptance harness produced a complete canonical row; identical titles hid the mismatch and led to false completion claims.
+
+**How to apply:** Trace the browser route/report ID and query that environment's row before debugging renderers. Report creation must persist the canonical object atomically; never create an empty regional row and expect the editor to reconstruct it later. Do not claim live-page parity from a development export.

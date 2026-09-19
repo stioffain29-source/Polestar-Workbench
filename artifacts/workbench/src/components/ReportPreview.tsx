@@ -1530,39 +1530,41 @@ export default function ReportPreview({
     report.topic === "apac_weekly" || report.topic === "middle_east_weekly"
       ? report.topic
       : null;
-  const apacCanonical = report.topic === "apac_weekly"
-    ? regionalCanonicalReportFromHardNumbers(report.hardNumbers, "apac_weekly", report.issueDate)
+  const regionalCanonical = regionalTopic
+    ? regionalCanonicalReportFromHardNumbers(report.hardNumbers, regionalTopic, report.issueDate)
     : null;
+  const apacCanonical = report.topic === "apac_weekly" ? regionalCanonical : null;
   const regionalCuratedIncidents = regionalTopic
     ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
     : [];
   const regionalDevelopments = isRegionalWeekly
-    ? report.topic === "apac_weekly"
-      ? (apacCanonical?.developments ?? [])
-      : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined, regionalTopic ?? "middle_east_weekly")
+    ? (regionalCanonical?.developments
+      ?? (report.topic === "apac_weekly"
+        ? []
+        : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined, regionalTopic ?? "middle_east_weekly")))
     : [];
   const regionalDomainBriefs = isRegionalWeekly
-    ? (apacCanonical?.domainBriefs ?? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined))
+    ? (regionalCanonical?.domainBriefs ?? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined))
     : [];
   const regionalBluf = isRegionalWeekly
-    ? (apacCanonical?.regionalOutlook ?? buildStructuredRegionalBluf(regionalDevelopments, regionalTopic ?? "apac_weekly"))
+    ? (regionalCanonical?.regionalOutlook ?? buildStructuredRegionalBluf(regionalDevelopments, regionalTopic ?? "apac_weekly"))
     : "";
   const regionalOutlook = isRegionalWeekly
-    ? (apacCanonical?.polestarOutlook ?? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly"))
+    ? (regionalCanonical?.polestarOutlook ?? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly"))
     : "";
   const regionalRiskPicture = isRegionalWeekly
-    ? (apacCanonical?.riskPicture ?? buildRegionalIntelligencePicture(regionalDevelopments))
+    ? (regionalCanonical?.riskPicture ?? buildRegionalIntelligencePicture(regionalDevelopments))
     : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalBusinessImplications = isRegionalWeekly
-    ? (apacCanonical?.businessImplicationsNarrative ?? buildRegionalBusinessImplicationsNarrative(regionalDevelopments))
+    ? (regionalCanonical?.businessImplicationsNarrative ?? buildRegionalBusinessImplicationsNarrative(regionalDevelopments))
     : "";
   const regionalWatchlist = isRegionalWeekly
-    ? (apacCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
+    ? (regionalCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
     : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly
-    ? (apacCanonical?.mapPoints ?? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined))
+    ? (regionalCanonical?.mapPoints ?? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined))
     : [];
   const apacMapItems = (() => {
     if (report.topic !== "apac_weekly" || !apacCanonical) return [];
@@ -1581,16 +1583,16 @@ export default function ReportPreview({
   })();
   const apacThemes = isRegionalWeekly ? regionalDomainBriefs.slice(0, 5) : [];
   const apacImplications = isRegionalWeekly
-    ? (apacCanonical?.businessImplications ?? buildApacBusinessImplications(regionalDevelopments))
+    ? (regionalCanonical?.businessImplications ?? buildApacBusinessImplications(regionalDevelopments))
     : [];
   const apacWatchlist = isRegionalWeekly
-    ? (apacCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
+    ? (regionalCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
     : [];
   const apacGlanceMetrics = isRegionalWeekly
-    ? (apacCanonical?.glanceMetrics ?? buildApacGlanceMetrics(regionalDevelopments, apacWatchlist))
+    ? (regionalCanonical?.glanceMetrics ?? buildApacGlanceMetrics(regionalDevelopments, apacWatchlist))
     : [];
   const apacVisualSummary = isRegionalWeekly
-    ? (apacCanonical?.visualSummary ?? buildRegionalVisualSummary(regionalCuratedIncidents, regionalTopic ?? "apac_weekly"))
+    ? (regionalCanonical?.visualSummary ?? buildRegionalVisualSummary(regionalCuratedIncidents, regionalTopic ?? "apac_weekly"))
     : { byCategory: [], byCountry: [] };
 
   const isEnergy = report.topic === "energy";

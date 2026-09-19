@@ -1808,8 +1808,8 @@ export async function exportTopicReportPdf(
   const regionalTopic: RegionalWeeklyTopic = data.topic === "apac_weekly"
     ? "apac_weekly"
     : "middle_east_weekly";
-  const regionalCanonical = data.topic === "apac_weekly"
-    ? regionalCanonicalReportFromHardNumbers(data.hardNumbers, "apac_weekly", data.issueDate)
+  const regionalCanonical = isRegionalWeeklyTopic(data.topic)
+    ? regionalCanonicalReportFromHardNumbers(data.hardNumbers, data.topic, data.issueDate)
     : null;
   if (data.topic === "apac_weekly" && !regionalCanonical) {
     throw new Error("APAC Weekly has no valid persisted canonical report object; refusing PDF regeneration");

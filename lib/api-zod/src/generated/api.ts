@@ -1261,7 +1261,7 @@ export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
 
 export const CreateIncidentBody = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber']),
   "title": zod.string().min(1),
   "summary": zod.string(),
   "country": zod.string(),
@@ -2312,7 +2312,7 @@ export const ListReportsResponse = zod.array(ListReportsResponseItem)
 
 export const CreateReportBody = zod.object({
   "title": zod.string(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
   "countrySlug": zod.string().optional(),
   "status": zod.enum(['draft', 'review', 'published']),
   "issueDate": zod.coerce.date(),
