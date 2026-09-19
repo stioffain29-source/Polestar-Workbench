@@ -38,3 +38,9 @@ APAC Weekly has one persisted canonical report object. Preview, saved reload and
 **Why:** Preview and PDF previously reconstructed the same report through different builders and inputs, so a saved report could visibly change between surfaces.
 
 **How to apply:** Build once after curation, persist the complete canonical object, validate it after reload and fail closed when it is absent or stale. Every Key Development must carry a verified actual event/policy date. Never substitute publication, scrape, ingestion or report dates; exclude unresolved DATE UNVERIFIED items. Keep the Middle East path unchanged unless separately requested.
+
+The APAC canonical-object migration must preserve the established APAC geographic map renderer. Do not replace it with the generic incident map or a differently projected PDF-only map.
+
+**Why:** A parity fix accidentally changed the visible map design even though the owner explicitly prohibited design changes.
+
+**How to apply:** Feed canonical points into the existing APAC map component. The PDF must mirror that component's APAC projection, aspect ratio, sea/land palette, pins and callouts; canonicalizing data is not permission to replace presentation.

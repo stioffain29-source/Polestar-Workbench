@@ -1036,9 +1036,9 @@ function drawApacGeographicMap(
     drawApacRegionalMapItems(ctx, items);
     return;
   }
-  const developments = topic === "apac_weekly"
+  const developments = canonical?.developments ?? (topic === "apac_weekly"
     ? buildApacWeeklyDevelopments(incidents)
-    : buildRegionalDevelopments(incidents, undefined, topic);
+    : buildRegionalDevelopments(incidents, undefined, topic));
   const selectedCountries = new Set(developments.map((row) => row.country));
   let items = canonical
     ? canonical.mapPoints.map((point, index) => ({
@@ -1077,15 +1077,14 @@ function drawApacGeographicMap(
     lng: point.lng,
     developments: [{ label: point.title, severity: point.severity ?? "moderate", fullTitle: point.title, summary: "Country-level centroid fallback." }],
   }))];
-  drawApacCompactHeading(ctx, "Regional Risk Map");
-  const mapH = 190;
-  const minLng = 65, maxLng = 180, minLat = -15, maxLat = 60;
+  const mapH = ctx.CW * (280 / 535);
+  const minLng = 67, maxLng = 178, minLat = -48, maxLat = 56;
   const project = (lng: number, lat: number): [number, number] => [
     ctx.MX + 8 + ((lng - minLng) / (maxLng - minLng)) * (ctx.CW - 16),
     ctx.y + 6 + ((maxLat - lat) / (maxLat - minLat)) * (mapH - 12),
   ];
-  setFill(ctx.pdf, "#f3f6fa");
-  setStroke(ctx.pdf, "#b8c4d5");
+  setFill(ctx.pdf, "#dfeaf3");
+  setStroke(ctx.pdf, "#bdc8d6");
   ctx.pdf.setLineWidth(0.4);
   ctx.pdf.rect(ctx.MX, ctx.y, ctx.CW, mapH, "FD");
   const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
@@ -1105,7 +1104,7 @@ function drawApacGeographicMap(
         // Keep the renderer export-safe: jsPDF.lines expects relative vectors
         // and rejects absolute coordinate tuples. Draw a conservative fan fill
         // plus explicit outline segments instead.
-        setFill(ctx.pdf, "#dce5ef");
+        setFill(ctx.pdf, "#f7f4ed");
         for (let index = 1; index < mapped.length - 1; index += 1) {
           ctx.pdf.triangle(
             mapped[0][0], mapped[0][1],
@@ -1114,7 +1113,7 @@ function drawApacGeographicMap(
             "F",
           );
         }
-        setStroke(ctx.pdf, "#9cabbf");
+        setStroke(ctx.pdf, "#8999aa");
         for (let index = 0; index < mapped.length; index += 1) {
           const [x1, y1] = mapped[index];
           const [x2, y2] = mapped[(index + 1) % mapped.length];

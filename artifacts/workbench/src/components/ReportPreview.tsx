@@ -1565,47 +1565,19 @@ export default function ReportPreview({
     ? (apacCanonical?.mapPoints ?? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined))
     : [];
   const apacMapItems = (() => {
-    if (report.topic !== "apac_weekly") return [];
-    const core = buildApacMapItems(regionalCuratedIncidents)
-      .filter((item) => APAC_OUTLOOK_MARKETS.includes(item.country as (typeof APAC_OUTLOOK_MARKETS)[number]))
-      .map((item) => {
-        const development = regionalDevelopments.find((row) => row.country === item.country);
-        if (!development) return item;
-        return {
-          ...item,
-          developments: item.developments.map((mapDevelopment) => ({
-            ...mapDevelopment,
-            label: clipTitleToMeaningfulWords(development.title, 5),
-            fullTitle: development.title,
-            summary: development.whatChanged,
-          })),
-        };
-      });
-    const present = new Set(core.map((item) => item.country));
-    const supplements = APAC_OUTLOOK_MARKETS.flatMap((country, index) => {
-      if (present.has(country)) return [];
-      const incident = regionalCuratedIncidents.find((row) => row.country?.trim() === country)
-        ?? incidents.find((row) => row.country?.trim() === country);
-      const development = regionalDevelopments.find((row) => row.country === country);
-      if (!incident && !development) return [];
-      const fullTitle = incident
-        ? displayIncidentTitle(incident.title, incident.displayTitle)
-        : development!.title;
-      const [lat, lng] = APAC_MARKET_COORDS[country];
-      return [{
-        id: -(index + 1),
-        country,
-        lat,
-        lng,
-        developments: [{
-          label: clipTitleToMeaningfulWords(development?.title ?? fullTitle, 5),
-          severity: development?.severity ?? SEV_LABEL[sevKey(incident?.severity)] ?? "Moderate",
-          fullTitle: development?.title ?? fullTitle,
-          summary: development?.whatChanged ?? incident?.summary ?? "",
-        }],
-      }];
-    });
-    return [...core, ...supplements];
+    if (report.topic !== "apac_weekly" || !apacCanonical) return [];
+    return apacCanonical.mapPoints.map((point, index) => ({
+      id: 1000 + index,
+      country: point.label.replace(/ \(country-level\)$/, ""),
+      lat: point.lat,
+      lng: point.lng,
+      developments: [{
+        label: clipTitleToMeaningfulWords(point.title, 5),
+        severity: point.severity ?? "Moderate",
+        fullTitle: point.title,
+        summary: `${format(parseISO(point.eventDate), "dd MMM").toUpperCase()} · ${point.summary}`,
+      }],
+    }));
   })();
   const apacThemes = isRegionalWeekly ? regionalDomainBriefs.slice(0, 5) : [];
   const apacImplications = isRegionalWeekly
@@ -1957,7 +1929,9 @@ export default function ReportPreview({
             </Section>
 
             <div style={{ marginTop: 24, marginBottom: 32 }}>
-              <RegionalHotspotMap points={regionalMapPoints} />
+              {report.topic === "apac_weekly"
+                ? <ApacHotspotMap items={apacMapItems} />
+                : <RegionalHotspotMap points={regionalMapPoints} />}
             </div>
 
             <Section hidden={!show("fast-facts")} title="Week at a Glance">
