@@ -237,8 +237,8 @@ const CATEGORY_RULES: Array<[RegionalIntelligenceCategory, RegExp]> = [
   ["Energy", /\b(aviation turbine fuel|diesel|energy market|export duty|fuel|oil|petrol|power market|windfall tax)\b/i],
   ["Regulatory", /\b(compliance|customs|export control|foreign ownership|immigration|legislation|regulat|sanction|tariff|visa)\b/i],
   ["Political", /\b(cabinet|diplomat|election|government change|interstate tension|political|policy decision)\b/i],
-  ["Security", /\b(armed attack|arson|attack|bomb|crime|curfew|kidnap|missile|shooting|security|violence)\b/i],
   ["Operational Disruption", /\b(airspace|airport|border|closure|disrupt|grid|industrial action|logistics|outage|port|road|shipping|strike|supply chain|telecom|transport|utility)\b/i],
+  ["Security", /\b(armed attack|arson|attack|bomb|crime|curfew|kidnap|missile|shooting|security|violence)\b/i],
 ];
 
 const SEVERITY_RANK: Record<string, number> = {
@@ -347,7 +347,7 @@ function futureEventMateriality(row: RegionalFutureEventSource): number {
 }
 
 /**
- * Shared APAC projection for the editor and headless exporter. It intentionally
+ * Shared regional projection for the editor and headless exporter. It intentionally
  * turns schedule rows into concise operating signals rather than copying a
  * headline into three fields. Minor community gatherings are rejected unless
  * the source contains a plausible access, transport or security effect.
@@ -603,7 +603,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     selected.push(incident);
     categoryCounts.set(category, 1);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 6) return selected;
+    if (selected.length === 4) return selected;
   }
   for (const incident of ranked) {
     if (selected.includes(incident)) continue;
@@ -611,16 +611,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     if ((countryCounts.get(country) ?? 0) >= 3) continue;
     selected.push(incident);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 6) break;
-  }
-  if (topic === "apac_weekly") return selected;
-  // Existing Middle East behaviour: if the real evidence is concentrated in
-  // one country/category, fill the remaining slots rather than suppressing
-  // distinct material events.
-  for (const incident of ranked) {
-    if (selected.includes(incident)) continue;
-    selected.push(incident);
-    if (selected.length === 6) break;
+    if (selected.length === 4) break;
   }
   return selected;
 }
@@ -746,7 +737,9 @@ function apacWhatChanged(incident: RegionalIncident, evidence: string): string |
     ? factual
     : "";
   if (isIndiaFuelPolicy(incident, text)) {
-    return usableEvidence || "India changed export-linked taxation on petrol, diesel or aviation turbine fuel, altering the levy applied to outbound shipments.";
+    const genericSummary = /^operational security and continuity impact reported\.?$/i.test(cleaned);
+    return (!genericSummary && usableEvidence)
+      || "India reduced export-linked fuel taxation, changing the levy applied to petrol, diesel and aviation turbine fuel exports.";
   }
   if (/\b(?:airstrike|artillery|battle|clash(?:es|ed)?|combat|insurgent|junta|military offensive|rebel|shelling)\b/i.test(text)) {
     return usableEvidence || `${country} recorded armed clashes or military activity with consequences for access in the affected area.`;
@@ -879,7 +872,7 @@ function apacOutlook7Days(incident: RegionalIncident, evidence: string, watchDat
 export function buildRegionalDevelopments<T extends RegionalIncident>(
   incidents: T[],
   issueDate?: string,
-  topic: RegionalWeeklyTopic = "middle_east_weekly",
+  topic?: RegionalWeeklyTopic,
 ): RegionalDevelopment[] {
   const eligible = topic === "apac_weekly"
     ? incidents.filter((incident) => {
@@ -894,10 +887,10 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
         && !apacRejectCommentary(text);
     })
     : incidents;
-  return selectRegionalKeyDevelopments(eligible, topic).flatMap((incident) => {
+  return selectRegionalKeyDevelopments(eligible, topic ?? "middle_east_weekly").flatMap((incident) => {
     const sourceTitle = (incident.displayTitle ?? incident.title ?? "Unspecified development").trim();
     const evidence = (incident.summary ?? "").trim() || sourceTitle;
-    const structuredWeekly = isRegionalWeeklyTopic(topic);
+    const structuredWeekly = topic != null && isRegionalWeeklyTopic(topic);
     const title = structuredWeekly ? cleanApacTitle(sourceTitle) : clip(sourceTitle, 90);
     const members = (incident as RegionalIncidentWithMembers).sourceMembers;
     const sourceCount = members?.length ?? 1;
@@ -934,6 +927,15 @@ export function buildApacWeeklyDevelopments<T extends RegionalIncident>(
   issueDate?: string,
 ): RegionalDevelopment[] {
   return buildRegionalDevelopments(incidents, issueDate, "apac_weekly");
+}
+
+/** Structured weekly developments for either regional weekly product. */
+export function buildRegionalWeeklyDevelopments<T extends RegionalIncident>(
+  incidents: T[],
+  issueDate?: string,
+  topic: RegionalWeeklyTopic = "middle_east_weekly",
+): RegionalDevelopment[] {
+  return buildRegionalDevelopments(incidents, issueDate, topic);
 }
 
 export interface ApacMapItem {
@@ -1098,9 +1100,9 @@ const DOMAIN_HEADING: Record<RegionalIntelligenceCategory, string> = {
 
 export function buildRegionalDomainBriefs(
   developments: RegionalDevelopment[],
-  topic: RegionalWeeklyTopic = "middle_east_weekly",
+  topic?: RegionalWeeklyTopic,
 ): RegionalDomainBrief[] {
-  if (isRegionalWeeklyTopic(topic)) {
+  if (topic && isRegionalWeeklyTopic(topic)) {
     const briefs = DOMAIN_ORDER.flatMap((domain) => {
       const rows = developments.filter((development) => development.category === domain);
       if (rows.length === 0) return [];
@@ -1205,7 +1207,7 @@ export function buildStructuredRegionalOutlook(
 ): string {
   const region = topic === "apac_weekly" ? "APAC" : "Middle East";
   if (developments.length === 0) {
-    return "The next seven days are unlikely to justify a broad APAC risk change on the selected evidence. Monitoring should remain focused on official security, weather, transport and regulatory notices that could create a demonstrable effect on people, sites, routes or market access. The assessment would change if an announced measure entered force, a closure extended into a commercial corridor, a warning escalated, or a security event affected an operating location.";
+    return `The next seven days are unlikely to justify a broad ${region} risk change on the selected evidence. Monitoring should remain focused on official security, weather, transport and regulatory notices that could create a demonstrable effect on people, sites, routes or market access. The assessment would change if an announced measure entered force, a closure extended into a commercial corridor, a warning escalated, or a security event affected an operating location.`;
   }
   const themes = buildRegionalDomainBriefs(developments, topic).slice(0, 3);
   const indicators = developments.map((row) => row.outlook7Days).filter(Boolean).slice(0, 3)
@@ -1295,14 +1297,6 @@ export function buildRegionalGlanceItems(
     ),
   }));
   if (topic === "apac_weekly") return items.slice(0, 6);
-  for (const domain of DOMAIN_ORDER) {
-    if (items.length === 5) break;
-    if (items.some((item) => item.category === domain)) continue;
-    items.push({
-      category: domain,
-      statement: `No material ${DOMAIN_HEADING[domain].toLowerCase()} change was identified this week.`,
-    });
-  }
   return items.slice(0, 5);
 }
 
@@ -1332,6 +1326,7 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
         typeof incident.longitude === "number" &&
         Number.isFinite(incident.longitude),
     )
+    .slice(0, 3)
     .map((incident) => ({
       lat: incident.latitude!,
       lng: incident.longitude!,
@@ -1343,7 +1338,7 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
 }
 
 export interface RegionalBusinessImplication {
-  heading: "People & Travel" | "Operations & Assets" | "Supply Chain & Logistics" | "Regulatory & Market Access";
+  heading: "People & Travel" | "Operations & Assets" | "Supply Chain & Logistics" | "Regulatory & Market Access" | "Business Continuity";
   body: string;
 }
 
@@ -1359,6 +1354,8 @@ export function buildApacBusinessImplications(
     ],
     ["Regulatory & Market Access", /\b(compliance|export|import|law|legislation|regulat|sanction|tariff|tax|visa|policy)\b/i,
     ],
+    ["Business Continuity", /\b(continuity|closure|disrupt|outage|shutdown|shortage|suspend|recovery|reopen)\b/i,
+    ],
   ];
   return blocks.flatMap(([heading, pattern]) => {
     const rows = developments.filter((row) => pattern.test(
@@ -1370,6 +1367,32 @@ export function buildApacBusinessImplications(
       .join(" ");
     return [{ heading, body: clipRegionalWords(body, 70, true) }];
   });
+}
+
+/** Business implications shared by APAC Weekly and Middle East Weekly. */
+export function buildRegionalBusinessImplications(
+  developments: RegionalDevelopment[],
+): RegionalBusinessImplication[] {
+  return buildApacBusinessImplications(developments);
+}
+
+/**
+ * Continuous cross-domain business read for the regional weekly products.
+ * This deliberately uses operational channels rather than repeating event
+ * titles, so the section complements (rather than duplicates) Key Developments.
+ */
+export function buildRegionalBusinessImplicationsNarrative(
+  developments: RegionalDevelopment[],
+): string {
+  if (developments.length === 0) {
+    return "No changed people, asset, logistics, regulatory or business-continuity exposure was identified in the selected evidence.";
+  }
+  const blocks = buildRegionalBusinessImplications(developments);
+  if (blocks.length === 0) {
+    return "The selected evidence does not establish a material change to people, assets, logistics, market access or business continuity.";
+  }
+  const bodies = blocks.map((block) => block.body.replace(/\s+/g, " ").trim()).filter(Boolean);
+  return `For regional operators, the combined exposure runs through ${blocks.map((block) => block.heading.toLowerCase()).join(", ")}. ${bodies.join(" ")}`;
 }
 
 export function validateApacWeeklyAssessment(
@@ -1436,7 +1459,7 @@ export function validateApacWeeklyAssessment(
 
 export function validateRegionalWeeklyAssessment(
   developments: RegionalDevelopment[],
-  topic: RegionalWeeklyTopic = "middle_east_weekly",
+  topic?: RegionalWeeklyTopic,
 ): string[] {
   if (topic === "apac_weekly") return validateApacWeeklyAssessment(developments);
   const errors: string[] = [];
@@ -1445,8 +1468,8 @@ export function validateRegionalWeeklyAssessment(
     developments.map((row) => row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
   );
   if (uniqueTitles.size !== developments.length) errors.push("Duplicate developments remain.");
-  if (buildRegionalDomainBriefs(developments).length !== 6) {
-    errors.push("All six intelligence-domain assessments are required.");
+  if (topic && buildRegionalDomainBriefs(developments, topic).length > 6) {
+    errors.push("More than six intelligence-domain assessments were produced.");
   }
   if (developments.some((row) => !row.operationalSignificance.trim())) {
     errors.push("Every development requires specific operational significance.");
@@ -1460,8 +1483,8 @@ export function validateRegionalWeeklyAssessment(
   if (buildRegionalOutlook(developments).split(/\s+/).length > 200) {
     errors.push("The Outlook exceeds 200 words.");
   }
-  if (buildRegionalGlanceItems(developments).length !== 5) {
-    errors.push("Exactly five Week at a Glance items are required.");
+  if (buildRegionalGlanceItems(developments, topic).length > 5) {
+    errors.push("More than five Week at a Glance items were produced.");
   }
   return errors;
 }
@@ -1469,7 +1492,7 @@ export function validateRegionalWeeklyAssessment(
 export function buildRegionalWatchlist(
   developments: RegionalDevelopment[],
 ): RegionalWatchItem[] {
-  return developments.filter((development) => development.watchDate && development.whatToWatch).slice(0, 8).map((development) => ({
+  return developments.filter((development) => development.watchDate && development.whatToWatch).slice(0, 5).map((development) => ({
     date: development.watchDate!,
     location: development.country,
     trigger: development.title,

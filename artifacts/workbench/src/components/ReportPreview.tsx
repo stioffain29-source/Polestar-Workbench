@@ -24,6 +24,7 @@ import {
   buildStructuredRegionalOutlook,
   buildRegionalIntelligencePicture,
   buildRegionalBusinessRisk,
+  buildRegionalBusinessImplicationsNarrative,
   buildRegionalTravelImplications,
   buildRegionalWatchlist,
   buildApacWeeklyWatchlist,
@@ -1527,7 +1528,7 @@ export default function ReportPreview({
   const regionalDevelopments = isRegionalWeekly
     ? report.topic === "apac_weekly"
       ? buildApacWeeklyDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined)
-      : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined)
+      : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined, regionalTopic ?? "middle_east_weekly")
     : [];
   const regionalDomainBriefs = isRegionalWeekly
     ? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined)
@@ -1539,6 +1540,9 @@ export default function ReportPreview({
     ? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly")
     : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
+  const regionalBusinessImplications = isRegionalWeekly
+    ? buildRegionalBusinessImplicationsNarrative(regionalDevelopments)
+    : "";
   const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
@@ -2014,18 +2018,18 @@ export default function ReportPreview({
           {/* Page 4: Key Developments */}
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
             <Section hidden={!show("what-happened")} title="Key Developments">
-              <RegionalDevelopmentCards developments={regionalDevelopments} />
+              <ApacDevelopmentCards developments={regionalDevelopments} />
             </Section>
           </div>
 
           {/* Page 5: 7-Day Watch & Travel */}
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("watch-next")} title="7-Day Watchlist">
+            <Section hidden={!show("watch-next")} title="7 Day Watch">
               <RegionalWatchlist items={regionalWatchlist} />
             </Section>
             <div style={{ marginTop: 40 }}>
-              <Section hidden={!show("implications")} title="Travel & Personnel">
-                <Paragraphs text={resolveRegionalNarrative(report.implications, aiProse?.implications, regionalTravelImplications)} />
+              <Section hidden={!show("implications")} title="Business Implications">
+                <Paragraphs text={resolveRegionalNarrative(report.implications, aiProse?.implications, regionalBusinessImplications)} />
               </Section>
             </div>
           </div>

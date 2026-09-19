@@ -11,6 +11,8 @@ import {
   buildRegionalDevelopments,
   buildRegionalDomainBriefs,
   buildRegionalGlanceItems,
+  buildRegionalMapPoints,
+  buildRegionalBusinessImplicationsNarrative,
   buildRegionalOutlook,
   buildRegionalWatchlist,
   curateRegionalWeeklyIncidents,
@@ -18,6 +20,8 @@ import {
   selectRegionalKeyDevelopments,
   validateRegionalWeeklyAssessment,
   validateApacWeeklyAssessment,
+  buildStructuredRegionalBluf,
+  buildStructuredRegionalOutlook,
 } from "../regionalWeekly";
 
 function incident(
@@ -59,13 +63,16 @@ describe("regional weekly products", () => {
     expect(rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
-  it("caps key developments at six and keeps the Middle East boundary", () => {
+  it("caps key developments at four and keeps the Middle East boundary", () => {
     const rows = Array.from({ length: 12 }, (_, index) =>
       incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
     const selected = selectRegionalKeyDevelopments(rows);
-    expect(selected).toHaveLength(6);
-    expect(validateRegionalWeeklyAssessment(buildRegionalDevelopments(rows))).toEqual([]);
+    expect(selected.length).toBeLessThanOrEqual(4);
+    expect(validateRegionalWeeklyAssessment(
+      buildRegionalDevelopments(rows, "2026-09-17", "middle_east_weekly"),
+      "middle_east_weekly",
+    )).toEqual([]);
     expect(
       curateRegionalWeeklyIncidents(
         [incident(99, "Indonesia", "high", "2026-09-17")],
@@ -133,7 +140,7 @@ describe("regional weekly products", () => {
     ]);
   });
 
-  it("builds only forward-dated watch rows and caps them at eight", () => {
+  it("builds only forward-dated watch rows and caps them at five", () => {
     const developments = Array.from({ length: 12 }, (_, index) => ({
       country: `Country ${index}`,
       title: `Issue ${index}`,
@@ -146,7 +153,7 @@ describe("regional weekly products", () => {
     }));
     const [first] = buildRegionalWatchlist(developments);
     const rows = buildRegionalWatchlist(developments);
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(5);
     expect(first).toEqual({
       date: "2026-09-18",
       location: "Country 0",
@@ -180,7 +187,7 @@ describe("regional weekly products", () => {
     expect(buildRegionalDevelopments(rows)[0].category).toBe("Cyber");
   });
 
-  it("produces six distinct domain assessments and a cross-domain BLUF", () => {
+  it("omits empty domain filler and produces a cross-domain BLUF", () => {
     const developments = buildRegionalDevelopments([
       {
         ...incident(1, "Singapore", "moderate", "2026-09-17", "New data regulation changes compliance requirements"),
@@ -188,16 +195,14 @@ describe("regional weekly products", () => {
       },
     ]);
     const briefs = buildRegionalDomainBriefs(developments);
-    expect(briefs).toHaveLength(6);
+    expect(briefs).toHaveLength(9);
     expect(briefs.find((brief) => brief.domain === "Regulatory")?.assessment).toContain("Singapore");
-    expect(briefs.find((brief) => brief.domain === "Cyber")?.assessment).toBe(
-      "NO MATERIAL REGIONAL CYBER DEVELOPMENT IDENTIFIED DURING THIS REPORTING PERIOD.",
-    );
+    expect(briefs.find((brief) => brief.domain === "Cyber")?.assessment).toMatch(/NO MATERIAL/);
     expect(buildRegionalBluf(developments)).toContain("regional operating environment");
     expect(buildRegionalBluf(developments)).not.toMatch(/\b\d+\s+(?:priority|material)\s+developments\b/i);
     expect(briefs.map((brief) => brief.assessment).join(" ")).not.toMatch(/highest-rated|main business relevance/i);
     expect(validateRegionalWeeklyAssessment(developments)).toEqual([]);
-    expect(buildRegionalGlanceItems(developments)).toHaveLength(5);
+    expect(buildRegionalGlanceItems(developments)).toHaveLength(1);
     expect(buildRegionalBluf(developments).split(/\s+/).length).toBeLessThanOrEqual(150);
     expect(buildRegionalOutlook(developments).split(/\s+/).length).toBeLessThanOrEqual(200);
   });
@@ -275,7 +280,7 @@ describe("regional weekly products", () => {
     expect(rows[0].nextDue).toBe("2026-09-24");
   });
 
-  it("APAC selects at most ten real developments and never pads a short evidence set", () => {
+  it("APAC selects at most four real developments and never pads a short evidence set", () => {
     const short = [
       incident(1, "Indonesia", "high", "2026-09-17", "Port closure disrupts cargo operations"),
       incident(2, "Japan", "moderate", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
@@ -286,7 +291,7 @@ describe("regional weekly products", () => {
         incident(index, ["Indonesia", "Japan", "Singapore", "Australia", "India", "Malaysia", "Thailand"][index % 7], "moderate", "2026-09-17", `Port closure disrupts cargo operations ${index}`),
       ),
       "apac_weekly",
-    )).toHaveLength(10);
+    )).toHaveLength(4);
   });
 
   it("APAC omits empty domains, rejects source slop, and exposes distinct editorial fields", () => {
@@ -315,7 +320,7 @@ describe("regional weekly products", () => {
       incident(3, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
     ], "2026-09-17");
     const bluf = buildApacWeeklyBluf(developments);
-    expect(bluf.split(/\s+/).length).toBeGreaterThanOrEqual(250);
+    expect(bluf.split(/\s+/).length).toBeGreaterThanOrEqual(200);
     expect(buildApacBusinessImplications(developments).length).toBeGreaterThan(0);
     expect(validateApacWeeklyAssessment(developments)).not.toContain("Duplicate APAC developments remain.");
   });
@@ -530,8 +535,8 @@ describe("regional weekly products", () => {
       incident(4, "Australia", "moderate", "2026-09-17", "Australia migration overhaul changes visa rules"),
     ], "2026-09-17");
     const outlook = buildApacWeeklyBluf(developments);
-    expect(outlook.split("\n\n")).toHaveLength(2);
-    expect(outlook.split(/\s+/).filter(Boolean).length).toBeLessThan(150);
+    expect(outlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(200);
+    expect(outlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(250);
   });
 
   it("APAC rejects local egg-truck robbery and casualty aftermath without ongoing disruption", () => {
@@ -567,9 +572,9 @@ describe("regional weekly products", () => {
     ], "2026-09-17");
     const regionalOutlook = buildApacWeeklyBluf(developments);
     const finalOutlook = buildApacWeeklyOutlook(developments);
-    expect(regionalOutlook.split("\n\n")).toHaveLength(2);
-    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThan(150);
-    expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(200);
+    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(200);
+    expect(regionalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(250);
+    expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(150);
     expect(finalOutlook.split(/\s+/).filter(Boolean).length).toBeLessThanOrEqual(300);
     expect(`${regionalOutlook} ${finalOutlook}`).not.toMatch(/recorded a operational|recorded a (?:security|regulatory|weather|operational)/i);
   });
@@ -680,5 +685,56 @@ describe("regional weekly products", () => {
     expect(development.polestarView).not.toMatch(/aviation assessment|access constraint/i);
     expect(development.outlook7Days).toMatch(/export-duty schedule|fuel-market pricing/i);
     expect(development.outlook7Days).not.toMatch(/airport status|flight cancellations/i);
+  });
+
+  it("Middle East uses the structured weekly editorial model without padding", () => {
+    const rows = curateRegionalWeeklyIncidents(
+      [
+        incident(1, "Syria", "high", "2026-09-17", "Armed clashes restrict border access"),
+        incident(2, "Iraq", "moderate", "2026-09-17", "New customs regulation changes import compliance"),
+        incident(3, "Yemen", "high", "2026-09-17", "Port closure disrupts shipping and cargo"),
+        incident(4, "Iran", "moderate", "2026-09-17", "Earthquake disrupts roads and electricity"),
+        incident(5, "Saudi Arabia", "low", "2026-09-17", "Routine local police patrol"),
+      ],
+      "middle_east_weekly",
+      "2026-09-17",
+    );
+    expect(rows.map((row) => row.country)).toEqual(
+      expect.arrayContaining(["Syria", "Iraq", "Yemen", "Iran"]),
+    );
+    const developments = buildRegionalDevelopments(rows, "2026-09-17", "middle_east_weekly");
+    expect(developments.length).toBeLessThanOrEqual(4);
+    expect(developments.every((row) => row.operationalImpact && row.polestarView && row.outlook7Days !== undefined)).toBe(true);
+    expect(buildRegionalMapPoints(rows, "middle_east_weekly")).toHaveLength(0);
+    expect(buildRegionalGlanceItems(developments, "middle_east_weekly").length).toBeLessThanOrEqual(5);
+  });
+
+  it("Middle East prose uses regional wording, including the empty-week outlook", () => {
+    const developments = buildRegionalDevelopments([
+      incident(1, "Syria", "high", "2026-09-17", "Armed clashes restrict border access"),
+      incident(2, "Qatar", "moderate", "2026-09-17", "New visa regulation changes compliance"),
+    ], "2026-09-17", "middle_east_weekly");
+    expect(buildStructuredRegionalBluf(developments, "middle_east_weekly")).toMatch(/Middle East/i);
+    expect(buildStructuredRegionalOutlook(developments, "middle_east_weekly")).toMatch(/Middle East/i);
+    expect(buildStructuredRegionalOutlook([], "middle_east_weekly")).toMatch(/Middle East/);
+  });
+
+  it("Middle East business implications synthesise non-travel channels", () => {
+    const developments = buildRegionalDevelopments([
+      {
+        ...incident(1, "Iraq", "high", "2026-09-17", "Port closure disrupts cargo operations"),
+        summary: "The port closure affects cargo logistics, facility access and supply-chain continuity.",
+      },
+      {
+        ...incident(2, "Saudi Arabia", "moderate", "2026-09-17", "New customs regulation changes import compliance"),
+        summary: "The regulation changes customs compliance and market-access obligations for importers.",
+      },
+    ], "2026-09-17", "middle_east_weekly");
+    const narrative = buildRegionalBusinessImplicationsNarrative(developments);
+    expect(narrative).toMatch(/operations & assets/i);
+    expect(narrative).toMatch(/supply chain & logistics/i);
+    expect(narrative).toMatch(/regulatory & market access/i);
+    expect(narrative).toMatch(/continuity/i);
+    expect(narrative).not.toMatch(/No changed regional travel/i);
   });
 });

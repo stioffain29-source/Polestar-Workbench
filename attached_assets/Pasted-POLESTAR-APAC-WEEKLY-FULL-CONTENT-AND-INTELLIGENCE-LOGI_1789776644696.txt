@@ -1,0 +1,889 @@
+POLESTAR APAC WEEKLY — FULL CONTENT AND INTELLIGENCE LOGIC RESET
+
+SCOPE
+
+Fix POLESTAR APAC WEEKLY only.
+
+Do not touch Middle East Weekly yet.
+
+Do not change:
+cover design
+branding
+header
+footer
+PDF engine
+website
+email
+existing map presentation style
+
+The problem is the intelligence selection, severity, writing, duplication, coverage and report structure.
+
+The current output reads like a collection of stories rather than an intelligence product.
+
+The objective is a CURATED REGIONAL INTELLIGENCE REPORT for business users.
+
+The finished report must answer:
+
+WHAT CHANGED?
+WHY DOES IT MATTER?
+WHAT DOES IT MEAN FOR BUSINESS?
+WHAT SHOULD WE WATCH NEXT?
+
+==================================================
+1. CORE EDITORIAL PRINCIPLE
+==================================================
+
+THE RAW FEED IS RESEARCH MATERIAL.
+
+THE RAW FEED IS NOT THE REPORT.
+
+Do not publish stories simply because they were collected.
+
+Do not select stories because:
+they are recent
+they have several sources
+they have dramatic headlines
+they contain security keywords
+they received a high automated severity score
+
+A regional reader does not need every incident.
+
+The report must demonstrate editorial judgement.
+
+==================================================
+2. REQUIRED COVERAGE
+==================================================
+
+EVERY WEEK the collection process must actively scan for developments across ALL of the following areas:
+
+SECURITY AND CONFLICT
+
+terrorism
+bombings
+shootings
+insurgent activity
+armed conflict
+civil unrest
+serious crime with business relevance
+maritime security
+security restrictions
+
+POLITICAL AND GEOPOLITICAL
+
+elections
+government instability
+major protests
+political mobilisation
+interstate tensions
+military developments
+significant diplomatic developments
+sanctions
+
+REGULATORY AND POLICY
+
+immigration
+visa rules
+labour regulation
+customs
+tariffs
+trade controls
+border regulation
+foreign investment rules
+energy regulation
+data regulation
+market access
+new compliance requirements
+
+WEATHER AND NATURAL HAZARDS
+
+typhoons
+cyclones
+severe storms
+flooding
+landslides
+earthquakes
+tsunami warnings
+volcanic activity
+wildfire
+haze
+drought
+extreme heat
+other natural hazards with operational consequences
+
+CYBER AND INFORMATION RISK
+
+major ransomware
+significant cyber attacks
+critical infrastructure compromise
+telecommunications disruption
+major data breaches
+cyber incidents affecting ports
+airports
+logistics
+energy
+utilities
+government services
+large companies where there is credible operational relevance
+
+BUSINESS AND OPERATIONAL DISRUPTION
+
+airports
+ports
+shipping
+road transport
+rail
+border crossings
+fuel
+energy
+electricity
+telecommunications
+supply chains
+site access
+labour action
+business continuity
+
+These categories must be actively searched every reporting cycle.
+
+Do not assume that because the main feed did not surface a weather, earthquake or cyber item that nothing happened.
+
+==================================================
+3. EDITORIAL RELEVANCE FILTER
+==================================================
+
+Before an item is allowed into the report ask:
+
+WOULD A REGIONAL SECURITY, RISK, RESILIENCE, OPERATIONS, LOGISTICS, TRAVEL OR COMMERCIAL LEADER REASONABLY NEED TO KNOW THIS?
+
+If NO:
+DROP IT.
+
+Normally exclude:
+
+routine traffic enforcement
+minor local crime
+minor accidents
+routine police activity
+local community stories
+small administrative actions
+minor enforcement stories
+isolated events with no wider operational consequence
+
+CURRENT FAILURE EXAMPLE:
+
+Philippines
+Local crackdown on illegal drag racing in Mandaue City
+
+This should NOT have appeared as a major APAC development.
+
+It has very limited regional business relevance.
+
+CURRENT FAILURE EXAMPLE:
+
+Thailand
+Bomb and small arms attack on a territorial defence volunteer vehicle in Narathiwat
+
+This is a genuine security development and should have been identified and assessed.
+
+The selection system must not allow a minor traffic enforcement story to outrank or displace a bombing and armed attack.
+
+==================================================
+4. DEDUPLICATION
+==================================================
+
+ONE EVENT = ONE DEVELOPMENT.
+
+Multiple articles about the same event are supporting sources.
+
+They are NOT separate developments.
+
+Cluster using:
+
+country
+location
+date
+actors
+underlying incident
+policy decision
+operational consequence
+
+Examples:
+
+Five Philippines stories about one protest = ONE development.
+
+Four Indian articles about one fuel duty change = ONE development.
+
+Six articles about one bombing = ONE development.
+
+Do not allow source volume to increase editorial importance.
+
+==================================================
+5. SEVERITY LOGIC
+==================================================
+
+Use CURRENT SEVERITY only.
+
+Use only:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+Severity is NOT the same as importance.
+
+Severity must reflect the CURRENT OPERATIONAL CONSEQUENCE.
+
+INSIGNIFICANT
+
+Minimal impact.
+No meaningful effect on business operations, people or access.
+
+LOW
+
+Limited local effect.
+Mostly inconvenience.
+Routine or isolated.
+Little or no wider operational consequence.
+
+MODERATE
+
+Credible local operational impact.
+May require travel, staffing, access, logistics or compliance adjustments.
+
+HIGH
+
+Significant violence, disruption, restriction or operational effect.
+Material consequence for people, operations, travel, assets, transport, supply chains or continuity.
+
+EXTREME
+
+Major or widespread disruption.
+Major conflict escalation.
+Mass casualty event.
+Severe infrastructure failure.
+Sustained or widespread operational consequences.
+
+==================================================
+6. SEVERITY MUST MAKE SENSE
+==================================================
+
+Do not assign HIGH because:
+police are involved
+the headline is dramatic
+the article uses words such as crackdown
+the event occurred on a road
+several outlets reported it
+
+The Mandaue drag racing story should never have been HIGH.
+
+It is at most a limited local issue and probably should have been excluded entirely.
+
+Australian immigration changes should not automatically be HIGH.
+
+A policy creating additional paperwork, eligibility restrictions or inconvenience is normally LOW or MODERATE unless there is evidence of major immediate operational disruption.
+
+No casualties are required for HIGH severity, but there must be a credible significant operational consequence.
+
+A bombing or armed attack must be assessed using:
+
+target
+location
+casualties
+intent
+wider threat
+access impact
+persistence
+security response
+potential for further attacks
+
+Do not treat a local enforcement story and an armed attack as broadly equivalent simply because both have been assigned the same severity.
+
+==================================================
+7. MATERIALITY RANKING
+==================================================
+
+After relevance filtering and severity assessment, rank developments using:
+
+1. actual operational consequence
+2. impact on people and travel
+3. impact on sites and assets
+4. conflict, terrorism or serious violence
+5. major political or regulatory consequence
+6. transport, logistics or supply chain effect
+7. energy or utilities effect
+8. significant natural hazard
+9. cyber impact
+10. forward relevance over the next seven days
+11. regional or cross border significance
+
+Severity is only ONE factor.
+
+A HIGH local incident can rank below a MODERATE regulatory, transport, energy or weather development if the latter has materially greater business consequences.
+
+==================================================
+8. MAP SELECTION LOGIC
+==================================================
+
+DO NOT CHANGE THE CURRENT MAP DESIGN.
+
+The map should show a maximum of THREE developments.
+
+Those three developments must come ONLY from the final curated report.
+
+Selection order:
+
+RAW FEEDS
+to
+DEDUPLICATION
+to
+RELEVANCE FILTER
+to
+SEVERITY ASSESSMENT
+to
+MATERIALITY RANKING
+to
+FINAL KEY DEVELOPMENTS
+to
+TOP THREE MAP ITEMS
+
+Do not select directly from raw feeds.
+
+Do not select the three highest severity scores.
+
+Do not select the three newest stories.
+
+Do not select based on source count.
+
+The three map items must represent the three developments that best explain the week's APAC operating picture.
+
+A local drag racing story must never appear on the map ahead of a materially more significant bombing, armed conflict, major protest, serious regulatory change, transport shutdown, natural hazard or cyber event.
+
+Map titles must be rewritten as short intelligence titles.
+
+No media outlet names.
+No URLs.
+No raw headlines.
+
+==================================================
+9. REPORT MUST NOT READ LIKE A LIST
+==================================================
+
+The current structure repeats the same stories again and again.
+
+STOP doing this.
+
+An event must not be fully rewritten in:
+
+Regional Outlook
+Map
+What Changed
+Key Developments
+Business Implications
+Polestar Outlook
+
+Each section must have a DIFFERENT PURPOSE.
+
+Reference developments where needed but do not repeat their details.
+
+==================================================
+10. REPORT STRUCTURE
+==================================================
+
+COVER
+
+Keep current cover.
+
+==================================================
+
+PAGE 1
+
+REGIONAL OUTLOOK
+
+250 to 300 words.
+
+Continuous analytical prose.
+
+Do not list headlines.
+
+Do not write:
+
+"This week's APAC assessment is defined by..."
+
+Do not write:
+
+"The most material developments were X, Y, Z..."
+
+Instead explain the regional picture.
+
+Identify:
+
+2 to 4 dominant themes
+where conditions changed
+what matters operationally
+what matters commercially
+where pressure is increasing
+where conditions remain localised
+what will shape the next seven days
+
+This should sound like an experienced analyst briefing a regional director.
+
+REGIONAL RISK MAP
+
+Maximum three developments.
+
+Use corrected selection logic above.
+
+WEEK AT A GLANCE
+
+Maximum four factual metrics:
+
+MATERIAL DEVELOPMENTS
+
+MARKETS REQUIRING WATCH
+
+HIGH OR EXTREME DEVELOPMENTS
+
+7 DAY WATCH ITEMS
+
+No prose inside these metrics.
+
+==================================================
+11. REGIONAL RISK PICTURE
+==================================================
+
+Create a narrative section called:
+
+REGIONAL RISK PICTURE
+
+Do not turn it into a list of incidents.
+
+Write approximately 300 to 400 words total.
+
+Synthesize the week's intelligence across the region.
+
+The underlying collection must include:
+
+security
+political
+regulatory
+weather and natural hazards
+cyber
+operational disruption
+
+If a category has a material development, integrate it into the analysis.
+
+Do not force an empty paragraph for every category.
+
+However:
+
+WEATHER AND NATURAL HAZARDS MUST BE ACTIVELY CHECKED EVERY WEEK.
+
+CYBER MUST BE ACTIVELY CHECKED EVERY WEEK.
+
+Do not omit them simply because the general news feed did not return anything.
+
+If there is a significant earthquake, typhoon, flooding, wildfire, volcanic event or other hazard with credible business consequences, it belongs in the regional picture.
+
+If there is a significant cyber incident with credible business consequences, it belongs in the regional picture.
+
+==================================================
+12. KEY DEVELOPMENTS
+==================================================
+
+Maximum FOUR key developments.
+
+Do not fill a quota.
+
+If only three genuinely matter, publish three.
+
+Each development must be materially useful to a regional reader.
+
+FORMAT:
+
+COUNTRY | SHORT INTELLIGENCE TITLE
+
+Category
+Current Severity
+
+NARRATIVE
+
+100 to 140 words.
+
+Write coherent prose covering:
+
+what happened
+what changed
+what the current situation is
+why it matters operationally
+
+Do not use separate repetitive fields for:
+
+What Changed
+Operational Impact
+
+Integrate them into proper prose.
+
+Then:
+
+POLESTAR VIEW
+
+40 to 60 words.
+
+This must be genuine analysis.
+
+Do not repeat severity.
+
+Do not write:
+
+"High assessment"
+"Moderate assessment"
+"Low assessment"
+
+Do not use generic boilerplate.
+
+Then:
+
+OUTLOOK 7 DAYS
+
+30 to 50 words.
+
+Identify specific forward indicators.
+
+No generic:
+
+"monitor for further developments"
+
+==================================================
+13. POLITICAL AND REGULATORY COVERAGE
+==================================================
+
+Political and regulatory developments must be included when they materially affect business.
+
+Examples:
+
+elections
+major policy changes
+visa changes
+labour rules
+tariffs
+customs
+border regulation
+sanctions
+foreign investment
+trade controls
+market access
+
+Do not overstate them.
+
+A new immigration rule causing additional compliance work is not automatically HIGH.
+
+Severity depends on actual operational consequence.
+
+==================================================
+14. WEATHER AND NATURAL HAZARDS
+==================================================
+
+Explicitly search for:
+
+earthquakes
+typhoons
+cyclones
+severe storms
+floods
+landslides
+wildfire
+haze
+volcanoes
+tsunami warnings
+extreme heat
+drought
+
+Only include developments with credible operational relevance.
+
+Where material, explain effects on:
+
+people
+travel
+airports
+ports
+roads
+utilities
+sites
+supply chains
+business continuity
+
+Do not treat weather as filler.
+
+==================================================
+15. CYBER
+==================================================
+
+Explicitly search for material APAC cyber developments every reporting cycle.
+
+Prioritise:
+
+critical infrastructure
+energy
+ports
+airports
+logistics
+telecommunications
+government services
+financial services
+large corporate ransomware
+major data breaches with operational consequences
+
+Do not include generic cyber commentary.
+
+Include only incidents with credible regional, national or sector business relevance.
+
+==================================================
+16. BUSINESS IMPLICATIONS
+==================================================
+
+Create ONE section:
+
+BUSINESS IMPLICATIONS
+
+Approximately 180 to 220 words.
+
+Write continuous analytical prose.
+
+Do not use four boxes repeating individual incidents.
+
+Synthesize the implications across:
+
+people and travel
+operations and assets
+supply chains and logistics
+regulation and market access
+business continuity
+
+Do not repeat Key Development descriptions.
+
+Explain what the combined picture means for regional operators.
+
+==================================================
+17. VISUALS
+==================================================
+
+Keep the regional map.
+
+Add useful charts only when they communicate real information.
+
+Do NOT generate:
+
+six bars all showing 1
+meaningless category counts
+charts simply because space exists
+
+Preferred visuals depend on the week's intelligence.
+
+Examples:
+
+four week incident trend
+weather track
+earthquake location map
+flood or wildfire exposure
+fuel price trend
+transport disruption timeline
+scheduled protest timeline
+port or airport disruption
+meaningful category trend
+
+If reliable historical data does not exist:
+
+DO NOT INVENT IT.
+
+Use a different factual visual or omit the chart.
+
+==================================================
+18. 7 DAY WATCH
+==================================================
+
+Actively research the NEXT SEVEN DAYS.
+
+Do not rely only on articles from the reporting period.
+
+Search for:
+
+scheduled protests
+elections
+court rulings
+strikes
+union action
+political deadlines
+regulatory implementation
+military exercises
+major public events
+religious gatherings
+weather systems
+typhoon tracks
+cyclone tracks
+flood warnings
+significant transport disruption
+
+Maximum five items.
+
+Use a clean timeline or table:
+
+DATE
+LOCATION
+EVENT
+POTENTIAL OPERATIONAL EFFECT
+CURRENT SEVERITY
+
+Do not automatically rate protests HIGH.
+
+Severity must reflect expected operational consequence.
+
+==================================================
+19. POLESTAR OUTLOOK
+==================================================
+
+150 to 200 words.
+
+Continuous analytical prose.
+
+Do not recap all Key Developments.
+
+Answer:
+
+What is most likely to drive APAC risk next week?
+
+Where could conditions deteriorate?
+
+Which specific indicators matter?
+
+What would materially change the assessment?
+
+This must be specific to the current reporting period.
+
+Do not use generic consultancy language.
+
+==================================================
+20. WRITING RULES
+==================================================
+
+British English.
+
+Write like an intelligence analyst.
+
+Do not write like a database.
+
+Do not write like a news aggregator.
+
+Do not concatenate headlines.
+
+Do not leak source text.
+
+Do not include:
+
+media outlet names
+URLs
+domains
+raw article fragments
+scraped ellipses
+READ:
+source boilerplate
+
+Do not repeat identical phrases across developments.
+
+Do not use phrases such as:
+
+"selected evidence"
+"the development is material only through"
+"the practical consequence is defined by"
+"rather than generalise the risk region wide"
+
+unless genuinely necessary.
+
+==================================================
+21. FINAL QUALITY CONTROL
+==================================================
+
+Before export automatically check:
+
+Is any trivial local story outranking a materially more important security, political, regulatory, weather, cyber or operational event?
+
+If YES:
+review selection.
+
+Is any routine local story rated HIGH?
+
+If YES:
+review severity.
+
+Has any event been duplicated?
+
+If YES:
+merge it.
+
+Are several Philippines stories actually the same underlying issue?
+
+If YES:
+cluster them.
+
+Was APAC weather and natural hazard reporting actively checked?
+
+If NO:
+do it before export.
+
+Was APAC cyber reporting actively checked?
+
+If NO:
+do it before export.
+
+Does the map show the three most material developments?
+
+If NO:
+reselect.
+
+Do the Regional Outlook, map and Key Developments tell the same overall story?
+
+If NO:
+reconcile them.
+
+Does the report read like a list?
+
+If YES:
+rewrite it into analytical prose.
+
+Are source names or article fragments visible?
+
+If YES:
+remove them.
+
+==================================================
+22. IMPLEMENTATION CONTROL
+==================================================
+
+Change ONLY APAC Weekly:
+
+collection coverage
+deduplication
+editorial relevance
+severity logic
+materiality ranking
+map selection logic
+content structure
+writing generation
+quality control
+
+DO NOT change:
+
+map presentation
+cover
+branding
+header
+footer
+PDF engine
+Middle East Weekly
+other Polestar reports
+
+Generate ONE revised APAC Weekly PDF.
+
+STOP.
+
+Do not apply this to Middle East Weekly until APAC has been reviewed and approved.

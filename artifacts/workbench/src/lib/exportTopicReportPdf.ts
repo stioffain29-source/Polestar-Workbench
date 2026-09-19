@@ -91,7 +91,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
-import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalBusinessImplicationsNarrative, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -668,9 +668,10 @@ function buildPdfRegionalDevelopments(
   issueDate: string,
   topic: RegionalWeeklyTopic,
 ) {
+  const curated = curateRegionalWeeklyIncidents(incidents, topic, issueDate);
   return topic === "apac_weekly"
-    ? buildApacWeeklyDevelopments(incidents, issueDate)
-    : buildRegionalDevelopments(incidents, issueDate, topic);
+    ? buildApacWeeklyDevelopments(curated, issueDate)
+    : buildRegionalDevelopments(curated, issueDate, topic);
 }
 
 function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string, topic: RegionalWeeklyTopic = "middle_east_weekly") {
@@ -694,7 +695,7 @@ function drawRegionalDevelopmentCards(ctx: Ctx, incidents: TopicReportIncident[]
       ctx.y += 13;
     }
     ctx.y += 3;
-    if (topic === "apac_weekly") {
+    if (isRegionalWeeklyTopic(topic)) {
       renderProse(
         ctx,
         `Category: ${development.category}\nCurrent Severity: ${development.severity}\nWhat Changed: ${development.whatChanged}\nOperational Impact: ${development.operationalImpact ?? development.operationalSignificance}\nPolestar View: ${development.polestarView ?? development.operationalSignificance}${development.outlook7Days ? `\nOutlook 7 Days: ${development.outlook7Days}` : ""}`,
@@ -2509,7 +2510,7 @@ export async function exportTopicReportPdf(
         drawFullAnnex(ctx, cargoModel.appendix);
       }
     } else if (isRegionalWeekly) {
-      if (regionalTopic === "apac_weekly" || regionalTopic === "middle_east_weekly") {
+      if (regionalTopic === "apac_weekly") {
         const apacDevelopments = buildApacWeeklyDevelopments(
           regionalTopic === "apac_weekly"
             ? regionalPdfIncidents
@@ -2580,14 +2581,14 @@ export async function exportTopicReportPdf(
           drawRegionalWatchlist(ctx, regionalPdfIncidents, data.issueDate, regionalTopic, options.futureEvents);
         }
         if (show("implications")) {
-          const travel = resolveRegionalNarrative(
+          const businessImplications = resolveRegionalNarrative(
             data.implications,
             aiProse?.implications,
-            buildRegionalTravelImplications(
+            buildRegionalBusinessImplicationsNarrative(
               buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
             ),
           );
-          if (travel.trim()) drawSectionWithProse(ctx, "Travel & Personnel", travel);
+          if (businessImplications.trim()) drawSectionWithProse(ctx, "Business Implications", businessImplications);
         }
 
         newPage(ctx);
