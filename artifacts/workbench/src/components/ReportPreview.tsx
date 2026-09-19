@@ -38,6 +38,7 @@ import {
   curateRegionalWeeklyIncidents,
   isRegionalWeeklyTopic,
   resolveRegionalNarrative,
+  regionalCanonicalReportFromHardNumbers,
   type RegionalDevelopment,
   type RegionalFutureEventInput,
 } from "@/lib/regionalWeekly";
@@ -237,8 +238,16 @@ function ApacDevelopmentCards({ developments }: { developments: RegionalDevelopm
             className="uppercase tracking-wide text-[13px] font-bold mb-2"
             style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
           >
-            {development.country} | {development.title}
+            {development.country} | {development.location}
           </h3>
+          {development.eventDate && (
+            <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: ELECTRIC, fontFamily: "Roboto, sans-serif" }}>
+              {format(parseISO(development.eventDate), "dd MMM yyyy")}
+            </p>
+          )}
+          <h4 className="text-[12px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
+            {development.title}
+          </h4>
           <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
             <p><strong>ASSESSMENT:</strong> {development.whatChanged}</p>
@@ -773,7 +782,7 @@ function RegionalHotspotMap({
                 </span>
               </div>
               <p className="mt-1.5 text-[9px] leading-[1.35]" style={{ color: "#4b5063" }}>
-                {clipCalloutSummary(point.summary)}
+                {point.eventDate && <><strong>{format(parseISO(point.eventDate), "dd MMM").toUpperCase()}</strong> · </>}{clipCalloutSummary(point.summary)}
               </p>
             </div>
           );
@@ -1521,35 +1530,40 @@ export default function ReportPreview({
     report.topic === "apac_weekly" || report.topic === "middle_east_weekly"
       ? report.topic
       : null;
+  const apacCanonical = report.topic === "apac_weekly"
+    ? regionalCanonicalReportFromHardNumbers(report.hardNumbers, "apac_weekly", report.issueDate)
+    : null;
   const regionalCuratedIncidents = regionalTopic
     ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
     : [];
   const regionalDevelopments = isRegionalWeekly
     ? report.topic === "apac_weekly"
-      ? buildApacWeeklyDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined)
+      ? (apacCanonical?.developments ?? [])
       : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined, regionalTopic ?? "middle_east_weekly")
     : [];
   const regionalDomainBriefs = isRegionalWeekly
-    ? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined)
+    ? (apacCanonical?.domainBriefs ?? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined))
     : [];
   const regionalBluf = isRegionalWeekly
-    ? buildStructuredRegionalBluf(regionalDevelopments, regionalTopic ?? "apac_weekly")
+    ? (apacCanonical?.regionalOutlook ?? buildStructuredRegionalBluf(regionalDevelopments, regionalTopic ?? "apac_weekly"))
     : "";
   const regionalOutlook = isRegionalWeekly
-    ? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly")
+    ? (apacCanonical?.polestarOutlook ?? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly"))
     : "";
   const regionalRiskPicture = isRegionalWeekly
-    ? buildRegionalIntelligencePicture(regionalDevelopments)
+    ? (apacCanonical?.riskPicture ?? buildRegionalIntelligencePicture(regionalDevelopments))
     : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalBusinessImplications = isRegionalWeekly
-    ? buildRegionalBusinessImplicationsNarrative(regionalDevelopments)
+    ? (apacCanonical?.businessImplicationsNarrative ?? buildRegionalBusinessImplicationsNarrative(regionalDevelopments))
     : "";
   const regionalWatchlist = isRegionalWeekly
-    ? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate)
+    ? (apacCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
     : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
-  const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
+  const regionalMapPoints = isRegionalWeekly
+    ? (apacCanonical?.mapPoints ?? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined))
+    : [];
   const apacMapItems = (() => {
     if (report.topic !== "apac_weekly") return [];
     const core = buildApacMapItems(regionalCuratedIncidents)
@@ -1594,13 +1608,17 @@ export default function ReportPreview({
     return [...core, ...supplements];
   })();
   const apacThemes = isRegionalWeekly ? regionalDomainBriefs.slice(0, 5) : [];
-  const apacImplications = isRegionalWeekly ? buildApacBusinessImplications(regionalDevelopments) : [];
-  const apacWatchlist = isRegionalWeekly ? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate) : [];
+  const apacImplications = isRegionalWeekly
+    ? (apacCanonical?.businessImplications ?? buildApacBusinessImplications(regionalDevelopments))
+    : [];
+  const apacWatchlist = isRegionalWeekly
+    ? (apacCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
+    : [];
   const apacGlanceMetrics = isRegionalWeekly
-    ? buildApacGlanceMetrics(regionalDevelopments, apacWatchlist)
+    ? (apacCanonical?.glanceMetrics ?? buildApacGlanceMetrics(regionalDevelopments, apacWatchlist))
     : [];
   const apacVisualSummary = isRegionalWeekly
-    ? buildRegionalVisualSummary(regionalCuratedIncidents, regionalTopic ?? "apac_weekly")
+    ? (apacCanonical?.visualSummary ?? buildRegionalVisualSummary(regionalCuratedIncidents, regionalTopic ?? "apac_weekly"))
     : { byCategory: [], byCountry: [] };
 
   const isEnergy = report.topic === "energy";

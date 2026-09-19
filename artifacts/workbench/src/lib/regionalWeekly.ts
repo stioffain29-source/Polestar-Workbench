@@ -20,6 +20,7 @@ type RegionalIncident = {
   longitude?: number | null;
   source?: string | null;
   occurredAt: string;
+  incidentDate?: string | null;
 };
 
 type RegionalIncidentWithMembers = RegionalIncident & {
@@ -39,6 +40,9 @@ export type RegionalIntelligenceCategory =
 
 export interface RegionalDevelopment {
   country: string;
+  location?: string;
+  eventDate?: string;
+  dateVerified?: true;
   title: string;
   severity: "Insignificant" | "Low" | "Moderate" | "High" | "Extreme";
   category: RegionalIntelligenceCategory;
@@ -58,6 +62,12 @@ export interface RegionalDevelopment {
   /** Source labels retained from every record in a consolidated event. */
   sourceEvidence?: string[];
 }
+
+export type RegionalVerifiedDevelopment = RegionalDevelopment & {
+  location: string;
+  eventDate: string;
+  dateVerified: true;
+};
 
 export interface RegionalVisualSummary {
   byCategory: Array<{ label: RegionalIntelligenceCategory; count: number }>;
@@ -124,6 +134,37 @@ export interface RegionalMapPoint {
   title: string;
   label: string;
   summary: string;
+  eventDate: string;
+}
+
+export interface RegionalCanonicalReport {
+  schemaVersion: "regional-weekly-canonical-v1";
+  topic: RegionalWeeklyTopic;
+  issueDate: string;
+  developments: RegionalVerifiedDevelopment[];
+  regionalOutlook: string;
+  polestarOutlook: string;
+  riskPicture: string;
+  domainBriefs: RegionalDomainBrief[];
+  businessImplications: RegionalBusinessImplication[];
+  businessImplicationsNarrative: string;
+  watchItems: RegionalWatchItem[];
+  glanceMetrics: RegionalMetric[];
+  mapPoints: RegionalMapPoint[];
+  visualSummary: RegionalVisualSummary;
+}
+
+export function regionalCanonicalReportFromHardNumbers(
+  hardNumbers: unknown,
+  topic: RegionalWeeklyTopic,
+  issueDate?: string,
+): RegionalCanonicalReport | null {
+  if (!hardNumbers || typeof hardNumbers !== "object") return null;
+  const value = (hardNumbers as { regionalCanonicalReport?: RegionalCanonicalReport }).regionalCanonicalReport;
+  if (!value || value.schemaVersion !== "regional-weekly-canonical-v1" || value.topic !== topic) return null;
+  if (issueDate && value.issueDate !== issueDate) return null;
+  if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
+  return value;
 }
 
 const APAC = [
@@ -1277,11 +1318,20 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
       ? clipApacComplete(outlook, 0, 55)
       : outlook;
     const cleanRendered = (value: string | undefined) => value?.replace(/\.{2,}|…/g, ".").trim();
+    const eventDate = incident.incidentDate
+      ?? (incident as RegionalIncidentWithMembers).sourceMembers?.map((member) => member.incidentDate).find(Boolean)
+      ?? null;
+    if (topic === "apac_weekly" && !eventDate) return [];
     const integratedNarrative = structuredWeekly
       ? clipApacComplete(whatChanged, 0, 95)
       : whatChanged;
     return {
       country: incident.country?.trim() || "Regional",
+      ...(topic === "apac_weekly" ? {
+        location: incident.location?.trim() || incident.country?.trim() || "Regional",
+        eventDate: eventDate!,
+        dateVerified: true as const,
+      } : {}),
       title,
       severity: regionalWeeklySeverity(incident, topic ?? "middle_east_weekly"),
       category: regionalIntelligenceCategory(incident),
@@ -1714,7 +1764,54 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
       title: intelligenceTitle(incident),
       label: fallback ? `${incident.country?.trim() || "Regional"} (country-level)` : (incident.country?.trim() || incident.location?.trim() || "Regional"),
       summary: incident.summary ?? "",
+      eventDate: incident.incidentDate ?? "",
     }));
+}
+
+export function buildRegionalCanonicalReport<T extends RegionalIncident>(
+  incidents: T[],
+  issueDate: string,
+  topic: RegionalWeeklyTopic,
+  futureEvents: RegionalFutureEventInput[] = [],
+): RegionalCanonicalReport {
+  const developments = buildRegionalWeeklyDevelopments(incidents, issueDate, topic);
+  if (topic === "apac_weekly" && developments.some((row) => !row.eventDate || row.dateVerified !== true)) {
+    throw new Error("APAC canonical report contains an unverified development date");
+  }
+  const verifiedDevelopments = developments as RegionalVerifiedDevelopment[];
+  const watchItems = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
+  const developmentIds = new Set(verifiedDevelopments.flatMap((row) => row.evidenceIds ?? []).map(String));
+  const datedIncidents = incidents.filter((row) => {
+    const members = (row as RegionalIncidentWithMembers).sourceMembers ?? [row];
+    return members.some((member) => member.id !== undefined && developmentIds.has(String(member.id)));
+  });
+  return {
+    schemaVersion: "regional-weekly-canonical-v1",
+    topic,
+    issueDate,
+    developments: verifiedDevelopments,
+    regionalOutlook: buildStructuredRegionalBluf(verifiedDevelopments, topic),
+    polestarOutlook: buildStructuredRegionalOutlook(verifiedDevelopments, topic),
+    riskPicture: buildRegionalIntelligencePicture(verifiedDevelopments),
+    domainBriefs: buildRegionalDomainBriefs(verifiedDevelopments, topic),
+    businessImplications: buildApacBusinessImplications(verifiedDevelopments),
+    businessImplicationsNarrative: buildRegionalBusinessImplicationsNarrative(verifiedDevelopments),
+    watchItems,
+    glanceMetrics: buildApacGlanceMetrics(developments, watchItems),
+    mapPoints: buildRegionalMapPoints(datedIncidents, topic)
+      .map((point) => {
+        const development = verifiedDevelopments.find((row) => row.title === point.title)
+          ?? verifiedDevelopments.find((row) => point.label.startsWith(row.country));
+        return {
+          ...point,
+          severity: development?.severity ?? point.severity,
+          title: development?.title ?? point.title,
+          summary: development?.whatChanged ?? point.summary,
+          eventDate: development?.eventDate ?? point.eventDate,
+        };
+      }),
+    visualSummary: buildRegionalVisualSummary(datedIncidents, topic),
+  };
 }
 
 export interface RegionalBusinessImplication {

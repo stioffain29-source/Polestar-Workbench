@@ -32,3 +32,9 @@ Collector coverage is valid only when real weather, cyber and forward-search run
 **Why:** Synthetic coverage metadata and trusted discovery labels admitted trivial airport/police stories as Cyber and made missing source checks look complete.
 
 **How to apply:** Audit the raw regional candidate funnel for drop reasons, then validate the final deduplicated developments for publication. Persist the exact selected evidence snapshot, evidence IDs, fingerprint and the complete region-wide forward-event snapshot. Save, reload and export from those persisted snapshots; never re-query live evidence during PDF rendering. The 7 Day Watch is region-wide and must not be limited to countries already represented in Key Developments.
+
+APAC Weekly has one persisted canonical report object. Preview, saved reload and PDF read that object directly; none may re-curate incidents or rebuild developments, maps, metrics, watch items or prose independently.
+
+**Why:** Preview and PDF previously reconstructed the same report through different builders and inputs, so a saved report could visibly change between surfaces.
+
+**How to apply:** Build once after curation, persist the complete canonical object, validate it after reload and fail closed when it is absent or stale. Every Key Development must carry a verified actual event/policy date. Never substitute publication, scrape, ingestion or report dates; exclude unresolved DATE UNVERIFIED items. Keep the Middle East path unchanged unless separately requested.

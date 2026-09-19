@@ -1311,3 +1311,17 @@ mtime_ms = 1789801592368
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/31d4f0b6-d065-44b7-8ac0-bd7cc0055a28/b33399e1-32e1-4922-9f3b-3cde13310255"
 storage_version_token = "1789801638760543"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "pXHSX0PULHSNyjryWo2KX"
+uri = "file://artifacts/workbench/scripts/.regional-weekly-e2e/apac_weekly-76.pdf"
+type = "pdf"
+title = "APAC Weekly — 19 September 2026"
+description = "The single APAC report generated after canonical preview/PDF parity and verified event-date validation."
+logical_id = "a613cecb-a6be-4017-8f76-f595a5406a98"
+content_hash = "sha256:3bbc26875dfa18abd3b8cfd6708514caeda0322c793746aeaecf50f5052d2280"
+size = 1930604
+mtime_ms = 1789807598485
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/a613cecb-a6be-4017-8f76-f595a5406a98/2f5488a9-eddf-4033-a549-ae989e9988fe"
+storage_version_token = "1789807732305856"
+content_type = "application/pdf"

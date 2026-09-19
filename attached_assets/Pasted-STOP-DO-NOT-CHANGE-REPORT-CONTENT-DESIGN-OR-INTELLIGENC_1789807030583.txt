@@ -1,0 +1,300 @@
+STOP.
+
+DO NOT CHANGE REPORT CONTENT, DESIGN OR INTELLIGENCE LOGIC YET.
+
+APAC WEEKLY ONLY.
+
+There are TWO critical failures that must be fixed before any further development:
+
+1. PREVIEW AND FINAL PDF ARE NOT USING THE SAME REPORT DATA
+2. KEY DEVELOPMENTS DO NOT SHOW VERIFIED INCIDENT / EVENT DATES
+
+FIX THESE TWO ISSUES TOGETHER.
+
+==================================================
+1. ONE CANONICAL REPORT OBJECT
+==================================================
+
+The preview and PDF must use ONE source of truth.
+
+Required architecture:
+
+SOURCE DATA
+→ CURATE / ANALYSE ONCE
+→ CREATE ONE CANONICAL REPORT OBJECT
+→ SAVE THAT REPORT OBJECT
+→ PREVIEW READS THAT EXACT SAVED OBJECT
+→ PDF READS THAT EXACT SAVED OBJECT
+
+There must NOT be separate generation paths for preview and PDF.
+
+The PDF must NOT:
+
+- regenerate report content
+- rerun AI generation
+- rerun severity logic
+- rerun materiality selection
+- rerun map selection
+- rerun Key Development selection
+- rerun 7 Day Watch
+- use different fallback text
+- reconstruct sections independently
+
+The preview must not have a separate generation path either.
+
+==================================================
+2. TRACE BOTH CURRENT PATHS
+==================================================
+
+Before changing code, trace:
+
+PREVIEW GENERATION PATH
+
+and
+
+FINAL PDF GENERATION PATH
+
+For each show:
+
+- source data used
+- report object used
+- Key Developments used
+- severity values used
+- event dates used
+- map items used
+- Week at a Glance values
+- 7 Day Watch items
+- Regional Outlook text
+- template used
+- fallback logic used
+- render function used
+
+Identify exactly where preview and PDF diverge.
+
+==================================================
+3. INCIDENT / EVENT DATES ARE MANDATORY
+==================================================
+
+Every Key Development must include a VERIFIED DATE.
+
+Required display:
+
+COUNTRY | LOCATION
+18 SEPTEMBER 2026
+
+SHORT DEVELOPMENT TITLE
+
+Then the development content.
+
+Example:
+
+PHILIPPINES | COTABATO CITY
+18 SEPTEMBER 2026
+
+BARMM Election Eve Clash
+
+==================================================
+4. USE THE ACTUAL EVENT DATE
+==================================================
+
+Do NOT automatically use:
+
+- article publication date
+- scrape date
+- ingestion date
+- report generation date
+- database creation date
+
+Use the actual date of:
+
+- incident
+- attack
+- protest
+- disruption
+- policy announcement
+- regulatory decision
+- weather event
+- cyber incident
+
+For regulatory or policy developments:
+
+Use the announcement date.
+
+If an effective date is operationally important, show both.
+
+Example:
+
+ANNOUNCED: 16 SEPTEMBER 2026
+EFFECTIVE: 1 OCTOBER 2026
+
+==================================================
+5. DATE VALIDATION
+==================================================
+
+No Key Development may be published without a verified event date.
+
+If the system cannot establish the event date:
+
+DO NOT silently substitute publication date.
+
+Mark the item as DATE UNVERIFIED during curation and prevent it from becoming a Key Development until resolved.
+
+The date must be retained through the whole pipeline:
+
+SOURCE
+→ NORMALISED EVENT
+→ CURATED DEVELOPMENT
+→ SAVED REPORT OBJECT
+→ PREVIEW
+→ PDF
+
+==================================================
+6. MAP DATES
+==================================================
+
+Do not redesign the map.
+
+Where the current map callout format allows, include the event date in compact form.
+
+Example:
+
+18 SEP
+THAILAND BOMB AND SHOOTING ATTACK
+
+Do not add large date blocks or change the map layout.
+
+==================================================
+7. PREVIEW / PDF PARITY TEST
+==================================================
+
+Generate APAC Weekly ONCE.
+
+Record:
+
+REPORT ID
+REPORTING PERIOD
+
+For every Key Development record:
+
+- title
+- country
+- location
+- event date
+- category
+- severity
+
+Also record:
+
+- Regional Outlook text
+- map selections
+- Week at a Glance counts
+- 7 Day Watch entries
+
+Then perform:
+
+GENERATE
+→ SAVE
+→ RELOAD
+→ PREVIEW
+→ PDF
+
+Compare all stages.
+
+They must match exactly.
+
+If preview contains:
+
+Thailand bombing
+18 September 2026
+Moderate
+
+then the saved report and PDF must contain:
+
+Thailand bombing
+18 September 2026
+Moderate
+
+No regeneration between stages.
+
+==================================================
+8. FAILURE HANDLING
+==================================================
+
+If any value differs between:
+
+GENERATED OBJECT
+SAVED OBJECT
+PREVIEW
+PDF
+
+STOP.
+
+Show:
+
+FIELD
+GENERATED VALUE
+SAVED VALUE
+PREVIEW VALUE
+PDF VALUE
+CODE PATH CAUSING THE DIFFERENCE
+
+Do not regenerate to hide the mismatch.
+
+Fix the path causing the mismatch.
+
+Run the parity test again.
+
+==================================================
+9. ACCEPTANCE CRITERIA
+==================================================
+
+This task is complete ONLY when:
+
+PREVIEW = SAVED REPORT = PDF
+
+for:
+
+- Key Development selection
+- titles
+- event dates
+- locations
+- categories
+- severity
+- map selections
+- Week at a Glance
+- 7 Day Watch
+- Regional Outlook
+- Polestar Outlook
+
+And:
+
+every Key Development has a verified event or policy date.
+
+==================================================
+10. SCOPE CONTROL
+==================================================
+
+DO NOT change:
+
+- report design
+- cover
+- branding
+- header
+- footer
+- map design
+- report prose style
+- severity logic
+- materiality logic
+- Middle East Weekly
+- any other Polestar product
+
+Fix ONLY:
+
+1. preview / saved report / PDF parity
+2. mandatory verified incident / event dates
+
+Once both pass:
+
+Generate ONE APAC Weekly report.
+
+STOP.

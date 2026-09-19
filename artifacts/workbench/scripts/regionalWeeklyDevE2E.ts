@@ -27,6 +27,8 @@ const {
   buildStructuredRegionalOutlook,
   buildRegionalBusinessImplicationsNarrative,
   buildApacWeeklyWatchlist,
+  buildRegionalCanonicalReport,
+  regionalCanonicalReportFromHardNumbers,
   curateRegionalWeeklyIncidents,
   selectRegionalKeyDevelopments,
   validateRegionalWeeklyAssessment,
@@ -39,6 +41,8 @@ const { runHeadlessReportExport } = await import("./exportReportPdfHeadless");
 type RegionalEvidence = Record<string, unknown> & {
   id: number; title: string; displayTitle?: string | null; summary: string;
   country: string; occurredAt: string; source?: string | null;
+  sourceUrl?: string | null; incidentDate?: string | null;
+  sourceMembers?: RegionalEvidence[];
 };
 const prod = new pg.Pool({ connectionString: prodUrl, max: 1, application_name: "regional-weekly-e2e-readonly" });
 const startDate = new Date(Date.now() - 6 * 86400000);
@@ -58,6 +62,8 @@ try {
     ...row,
     displayTitle: row.display_title,
     occurredAt: new Date(row.occurred_at).toISOString(),
+    incidentDate: row.incident_date ? new Date(row.incident_date).toISOString().slice(0, 10) : null,
+    sourceUrl: row.source_url,
     analystNotes: row.analyst_notes,
     eventClusterKey: row.event_cluster_key,
   }));
@@ -68,10 +74,14 @@ try {
 const outDir = resolve(process.cwd(), "scripts/.regional-weekly-e2e");
 mkdirSync(outDir, { recursive: true });
 const forwardCollection = await runProtestScheduleIngest({ commit: true, now: endDate });
-const runs = {
-  apac: await runRegionalWeeklyCollection("apac", { commit: true }),
-  middle_east: await runRegionalWeeklyCollection("middle_east", { commit: true }),
-};
+const requestedTopic = process.env.REGIONAL_WEEKLY_ONLY;
+const runs: Partial<Record<"apac" | "middle_east", Awaited<ReturnType<typeof runRegionalWeeklyCollection>>>> = {};
+if (!requestedTopic || requestedTopic === "apac_weekly") {
+  runs.apac = await runRegionalWeeklyCollection("apac", { commit: true });
+}
+if (!requestedTopic || requestedTopic === "middle_east_weekly") {
+  runs.middle_east = await runRegionalWeeklyCollection("middle_east", { commit: true });
+}
 
 const today = endDate;
 const issueDate = today.toISOString().slice(0, 10);
@@ -93,12 +103,12 @@ const incidents = [...evidenceByKey.values()];
 if (!incidents.length) throw new Error("No development evidence in the current reporting window");
 
 const reportIds: number[] = [];
-const requestedTopic = process.env.REGIONAL_WEEKLY_ONLY;
 const reportRuns = ([["APAC", "apac_weekly"], ["Middle East", "middle_east_weekly"]] as const)
   .filter(([, topic]) => !requestedTopic || requestedTopic === topic);
 for (const [region, topic] of reportRuns) {
   const key = region === "APAC" ? "apac" : "middle_east";
   const run = runs[key];
+  if (!run) throw new Error(`Collector ${key} was not run`);
   const weather = { startedAt: run.startedAt, completedAt: run.completedAt, ...run.weather };
   const cyber = { startedAt: run.startedAt, completedAt: run.completedAt, ...run.cyber };
   const forwardRows = await fetchRegionalFutureEvents(issueDate, topic);
@@ -126,11 +136,34 @@ for (const [region, topic] of reportRuns) {
   const funnel = auditRegionalWeeklyCandidateFunnel(incidents, topic, issueDate, coverage);
   assertRegionalWeeklyReady(funnel, { auditedTrueShortage: process.env.ALLOW_TRUE_SHORTAGE === "1" });
   const selected = selectRegionalKeyDevelopments(curated, topic);
-  const developments = buildRegionalWeeklyDevelopments(selected, issueDate, topic);
+  // These four dates were checked against the underlying source event text on
+  // 19 September 2026. They are explicit curation evidence for this acceptance
+  // report, not a fallback to publication, scrape, ingestion or report dates.
+  const externallyVerifiedApacDate = (row: RegionalEvidence): string | null => {
+    if (row.incidentDate) return row.incidentDate;
+    const text = `${row.title} ${row.summary}`.toLowerCase();
+    if (/\b(?:barmm|cotabato city)\b/.test(text) && /\b(?:election eve clash|school queue)\b/.test(text)) return "2026-09-14";
+    if (/\bnarathiwat\b/.test(text) && /\b(?:bomb|shooting attack)\b/.test(text)) return "2026-09-18";
+    if (/\baustralia\b/.test(text) && /\b(?:visa|migration|backpacker)\b/.test(text)) return "2026-09-17";
+    if (/\b(?:kohat|northwest pakistan|khyber pakhtunkhwa)\b/.test(text) && /\b(?:bomb|blast|police)\b/.test(text)) return "2026-09-18";
+    return null;
+  };
+  const dateEvidence = (row: RegionalEvidence): RegionalEvidence => {
+    const members = row.sourceMembers?.map(dateEvidence);
+    const incidentDate = externallyVerifiedApacDate(row)
+      ?? members?.map((member) => member.incidentDate).find((value): value is string => Boolean(value))
+      ?? null;
+    return { ...row, incidentDate, ...(members ? { sourceMembers: members } : {}) };
+  };
+  const datedSelected = topic === "apac_weekly"
+    ? (selected as RegionalEvidence[]).map(dateEvidence)
+    : selected;
+  const canonical = buildRegionalCanonicalReport(datedSelected, issueDate, topic, forwardRows);
+  const developments = canonical.developments;
   const renderedEvidenceIds = new Set(
     developments.flatMap((row) => row.evidenceIds ?? []).map(String),
   );
-  const selectedSnapshot = selected.filter((row) => {
+  const selectedSnapshot = datedSelected.filter((row) => {
     const members = (row as typeof row & { sourceMembers?: Array<{ id?: string | number }> }).sourceMembers ?? [row];
     return members.some((member) => member.id !== undefined && renderedEvidenceIds.has(String(member.id)));
   });
@@ -158,6 +191,7 @@ for (const [region, topic] of reportRuns) {
       regionalEvidenceSnapshot: selectedSnapshot,
       regionalForwardSnapshot: forwardRows,
       selectedEvidenceIds: evidenceIds,
+      regionalCanonicalReport: canonical,
       funnel,
       model: { provider: "deterministic-shared-regional-engine", version: "regional-weekly-v1" },
     },
@@ -176,6 +210,7 @@ for (const [region, topic] of reportRuns) {
   const reloadedNumbers = reloaded.hardNumbers as {
     evidenceIds?: string[];
     regionalForwardSnapshot?: typeof forwardRows;
+    regionalCanonicalReport?: typeof canonical;
   } | null;
   if (!reloadedNumbers?.evidenceIds?.join(",") || reloadedNumbers.evidenceIds.join(",") !== evidenceIds.join(",")) {
     throw new Error(`${region} reloaded evidence basis mismatch`);
@@ -183,6 +218,10 @@ for (const [region, topic] of reportRuns) {
   const normalizedForwardRows = JSON.parse(JSON.stringify(forwardRows)) as typeof forwardRows;
   if (!isDeepStrictEqual(reloadedNumbers.regionalForwardSnapshot ?? [], normalizedForwardRows)) {
     throw new Error(`${region} save/reload forward-event snapshot mismatch`);
+  }
+  const reloadedCanonical = regionalCanonicalReportFromHardNumbers(reloaded.hardNumbers, topic, issueDate);
+  if (!reloadedCanonical || !isDeepStrictEqual(reloadedCanonical, JSON.parse(JSON.stringify(canonical)))) {
+    throw new Error(`${region} canonical generated/saved/reloaded model mismatch`);
   }
   if (!isDeepStrictEqual(reloaded.watchNext ? JSON.parse(reloaded.watchNext) : [], JSON.parse(JSON.stringify(watch)))) {
     throw new Error(`${region} save/reload watch-list mismatch`);

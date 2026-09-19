@@ -36,6 +36,7 @@ function incident(
     country,
     severity,
     occurredAt,
+    incidentDate: occurredAt,
     title,
     summary: "Operational security and continuity impact reported.",
   };
