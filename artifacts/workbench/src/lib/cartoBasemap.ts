@@ -6,7 +6,7 @@ declare const __CARTO_BASEMAP_KEY__: string | undefined;
 const cartoBasemapKey =
   typeof __CARTO_BASEMAP_KEY__ === "string"
     ? __CARTO_BASEMAP_KEY__.trim()
-    : "";
+    : (typeof process !== "undefined" ? process.env.VITE_CARTO_BASEMAP_KEY?.trim() : "") ?? "";
 
 if (!cartoBasemapKey) {
   throw new Error(

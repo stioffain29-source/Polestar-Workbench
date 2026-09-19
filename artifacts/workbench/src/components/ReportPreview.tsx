@@ -241,8 +241,7 @@ function ApacDevelopmentCards({ developments }: { developments: RegionalDevelopm
           </h3>
           <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
-            <p><strong>WHAT CHANGED:</strong> {development.whatChanged}</p>
-            <p><strong>OPERATIONAL IMPACT:</strong> {development.operationalImpact || development.operationalSignificance}</p>
+            <p><strong>ASSESSMENT:</strong> {development.whatChanged}</p>
             {development.polestarView && <p><strong>POLESTAR VIEW:</strong> {development.polestarView}</p>}
             {development.outlook7Days && <p><strong>OUTLOOK 7 DAYS:</strong> {development.outlook7Days}</p>}
           </div>
@@ -1539,11 +1538,16 @@ export default function ReportPreview({
   const regionalOutlook = isRegionalWeekly
     ? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly")
     : "";
+  const regionalRiskPicture = isRegionalWeekly
+    ? buildRegionalIntelligencePicture(regionalDevelopments)
+    : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalBusinessImplications = isRegionalWeekly
     ? buildRegionalBusinessImplicationsNarrative(regionalDevelopments)
     : "";
-  const regionalWatchlist = isRegionalWeekly ? buildRegionalWatchlist(regionalDevelopments) : [];
+  const regionalWatchlist = isRegionalWeekly
+    ? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate)
+    : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly ? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined) : [];
   const apacMapItems = (() => {
@@ -2010,8 +2014,8 @@ export default function ReportPreview({
 
           {/* Page 3: What Changed */}
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("situation")} title="What Changed">
-              <RegionalDomainBriefs briefs={regionalDomainBriefs} />
+            <Section hidden={!show("situation")} title="Regional Risk Picture">
+              <Paragraphs text={regionalRiskPicture} />
             </Section>
           </div>
 

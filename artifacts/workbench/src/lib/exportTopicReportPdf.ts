@@ -858,9 +858,7 @@ function drawRegionalHotspotMap(ctx: Ctx, incidents: TopicReportIncident[], topi
 
 function drawRegionalTimeline(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string, topic: RegionalWeeklyTopic = "middle_east_weekly", futureEvents: RegionalFutureEventInput[] = []) {
   const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
-  const items = topic === "apac_weekly"
-    ? buildApacWeeklyWatchlist(developments, futureEvents, issueDate)
-    : buildRegionalWatchlist(developments);
+  const items = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   if (items.length === 0) return;
   const { pdf, MX, CW } = ctx;
   ensureSpace(ctx, 42);
@@ -882,27 +880,16 @@ function drawRegionalTimeline(ctx: Ctx, incidents: TopicReportIncident[], issueD
 }
 
 function drawRegionalDomainBriefs(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string, topic: RegionalWeeklyTopic = "middle_east_weekly") {
-  const briefs = buildRegionalDomainBriefs(buildPdfRegionalDevelopments(incidents, issueDate, topic), topic);
-  for (const brief of briefs) {
-    ensureSpace(ctx, 24);
-    setRoboto(ctx.pdf, "bold");
-    setText(ctx.pdf, NAVY);
-    ctx.pdf.setFontSize(8);
-    ctx.pdf.text(brief.heading.toUpperCase(), ctx.MX, ctx.y + 8);
-    ctx.y += 12;
-    renderProse(ctx, brief.assessment);
-  }
+  const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
+  ensureSpace(ctx, 60);
+  renderProse(ctx, buildRegionalIntelligencePicture(developments));
 }
 
 function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[], issueDate: string, topic: RegionalWeeklyTopic = "middle_east_weekly", futureEvents: RegionalFutureEventInput[] = []) {
   const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
-  const items = topic === "apac_weekly"
-    ? buildApacWeeklyWatchlist(developments, futureEvents, issueDate)
-    : buildRegionalWatchlist(developments);
+  const items = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   if (items.length === 0) {
-    if (topic !== "apac_weekly") {
-      renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
-    }
+    renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
     return;
   }
   for (const item of items) {
@@ -914,7 +901,7 @@ function drawRegionalWatchlist(ctx: Ctx, incidents: TopicReportIncident[], issue
     ctx.y += 14;
     renderProse(
       ctx,
-      `Date: ${item.date}\nLocation: ${item.location}\nTrigger / Event: ${item.trigger}\nWhy It Matters: ${item.whyItMatters}${topic === "apac_weekly" && item.currentSeverity ? `\nCurrent Severity: ${item.currentSeverity}` : ""}\nWhat To Watch: ${item.whatToWatch}`,
+      `Date: ${item.date}\nLocation: ${item.location}\nTrigger / Event: ${item.trigger}\nWhy It Matters: ${item.whyItMatters}${item.currentSeverity ? `\nCurrent Severity: ${item.currentSeverity}` : ""}\nWhat To Watch: ${item.whatToWatch}`,
     );
   }
 }
@@ -1026,21 +1013,52 @@ function drawApacCompactText(
   return lines.length;
 }
 
-function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void {
-  const developments = buildApacWeeklyDevelopments(incidents);
-  const items = buildApacMapItems(incidents).map((item) => {
+function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[], topic: RegionalWeeklyTopic = "apac_weekly"): void {
+  if (topic !== "apac_weekly") {
+    const regionalPoints = buildRegionalMapPoints(incidents, topic);
+    const items = regionalPoints.map((point) => ({
+      id: point.label,
+      country: point.label,
+      lat: point.lat,
+      lng: point.lng,
+      developments: [{
+        label: point.title,
+        severity: point.severity ?? "moderate",
+        fullTitle: point.title,
+        summary: point.summary,
+      }],
+    }));
+    drawApacRegionalMapItems(ctx, items);
+    return;
+  }
+  const developments = topic === "apac_weekly"
+    ? buildApacWeeklyDevelopments(incidents)
+    : buildRegionalDevelopments(incidents, undefined, topic);
+  const selectedCountries = new Set(developments.map((row) => row.country));
+  let items = buildApacMapItems(incidents).filter((item) => selectedCountries.has(item.country)).map((item) => {
     const development = developments.find((row) => row.country === item.country);
     if (!development) return item;
     return {
       ...item,
       developments: item.developments.map((mapDevelopment) => ({
         ...mapDevelopment,
-        label: clipTitleToMeaningfulWords(development.title, 5),
+        label: clipTitleToMeaningfulWords(development.title, 8),
         fullTitle: development.title,
         summary: development.whatChanged,
       })),
     };
   });
+  const fallbackPoints = buildRegionalMapPoints(incidents, topic)
+    .filter((point) => selectedCountries.has(point.label.replace(/ \(country-level\)$/, "")))
+    .filter((point) => !items.some((item) => item.country === point.label.replace(/ \(country-level\)$/, "")))
+    .slice(0, Math.max(0, 3 - items.length));
+  items = [...items, ...fallbackPoints.map((point) => ({
+    id: 900 + fallbackPoints.indexOf(point),
+    country: point.label,
+    lat: point.lat,
+    lng: point.lng,
+    developments: [{ label: point.title, severity: point.severity ?? "moderate", fullTitle: point.title, summary: "Country-level centroid fallback." }],
+  }))];
   drawApacCompactHeading(ctx, "Regional Risk Map");
   const mapH = 190;
   const minLng = 65, maxLng = 180, minLat = -15, maxLat = 60;
@@ -1193,6 +1211,26 @@ function drawApacGeographicMap(ctx: Ctx, incidents: TopicReportIncident[]): void
   ctx.y += mapH + 7;
 }
 
+function drawApacRegionalMapItems(ctx: Ctx, items: Array<{ country: string; lat: number; lng: number }>): void {
+  drawApacCompactHeading(ctx, "Regional Risk Map");
+  const mapH = 190;
+  const minLng = 35, maxLng = 65, minLat = 10, maxLat = 40;
+  const project = (lng: number, lat: number): [number, number] => [
+    ctx.MX + 8 + ((lng - minLng) / (maxLng - minLng)) * (ctx.CW - 16),
+    ctx.y + 20 + (1 - (lat - minLat) / (maxLat - minLat)) * (mapH - 35),
+  ];
+  for (const item of items) {
+    const [x, y] = project(item.lng, item.lat);
+    ctx.pdf.setFillColor(70, 91, 255);
+    ctx.pdf.circle(x, y, 3.2, "F");
+    setRoboto(ctx.pdf, "bold");
+    setText(ctx.pdf, NAVY);
+    ctx.pdf.setFontSize(6.5);
+    ctx.pdf.text(item.country, x + 5, y + 2);
+  }
+  ctx.y += mapH + 7;
+}
+
 function drawApacPageTwo(
   ctx: Ctx,
   incidents: TopicReportIncident[],
@@ -1207,7 +1245,7 @@ function drawApacPageTwo(
   // height, so the next heading cannot touch the final BLUF baseline.
   ctx.y += Math.max(8, blufLines > 0 ? 8 : 0);
 
-  drawApacGeographicMap(ctx, incidents);
+  drawApacGeographicMap(ctx, incidents, topic);
   const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
   const watchItems = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   const glance = buildApacGlanceMetrics(developments, watchItems);
@@ -1240,20 +1278,19 @@ function drawApacThemesPage(
   issueDate: string,
   topic: RegionalWeeklyTopic,
 ): void {
-  drawApacCompactHeading(ctx, "What Changed This Week");
-  const briefs = buildRegionalDomainBriefs(
-    buildPdfRegionalDevelopments(incidents, issueDate, topic),
-    topic,
+  drawApacCompactHeading(ctx, "Regional Risk Picture");
+  drawApacCompactText(
+    ctx,
+    buildRegionalIntelligencePicture(buildPdfRegionalDevelopments(incidents, issueDate, topic)),
+    7.2,
+    8.3,
+    6,
   );
-  for (const brief of briefs) {
-    setText(ctx.pdf, NAVY);
-    setRoboto(ctx.pdf, "bold");
-    ctx.pdf.setFontSize(7.2);
-    ctx.pdf.text(sanitize(brief.heading.toUpperCase()), ctx.MX, ctx.y + 7);
-    ctx.y += 10;
-    drawApacCompactText(ctx, brief.assessment, 7.2, 8.3, 6);
-  }
-  const visual = buildRegionalVisualSummary(incidents, topic);
+  const developments = buildPdfRegionalDevelopments(incidents, issueDate, topic);
+  const visual = {
+    byCategory: [...new Set(developments.map((row) => row.category))].map((label) => ({ label, count: developments.filter((row) => row.category === label).length })),
+    byCountry: [...new Set(developments.map((row) => row.country))].map((label) => ({ label, count: developments.filter((row) => row.country === label).length })),
+  };
   drawSimpleBarChart(ctx, "Developments by Type", visual.byCategory.map((row) => ({
     label: row.label,
     value: row.count,
@@ -1282,8 +1319,7 @@ function drawApacDevelopmentPage(
       const body = [
         `Category: ${development.category}`,
         `Current Severity: ${development.severity}`,
-        `What Changed: ${development.whatChanged}`,
-        `Operational Impact: ${development.operationalImpact ?? development.operationalSignificance}`,
+        `Assessment: ${development.whatChanged}`,
         `Polestar View: ${development.polestarView ?? development.operationalSignificance}`,
         ...(development.outlook7Days ? [`Outlook 7 Days: ${development.outlook7Days}`] : []),
       ].join("\n");
@@ -1320,8 +1356,7 @@ function drawApacDevelopmentPage(
       const body = [
         `Category: ${development.category}`,
         `Current Severity: ${development.severity}`,
-        `What Changed: ${development.whatChanged}`,
-        `Operational Impact: ${development.operationalImpact ?? development.operationalSignificance}`,
+        `Assessment: ${development.whatChanged}`,
         `Polestar View: ${development.polestarView ?? development.operationalSignificance}`,
         ...(development.outlook7Days ? [`Outlook 7 Days: ${development.outlook7Days}`] : []),
       ].join("\n");
@@ -2536,21 +2571,17 @@ export async function exportTopicReportPdf(
 
         newPage(ctx);
         if (show("implications")) {
-          const fit = drawApacBusinessImplicationGrid(
+          drawSectionWithProse(
             ctx,
-            regionalPdfIncidents,
-            data.issueDate,
-            regionalTopic,
+            "Business Implications",
+            resolveRegionalNarrative(
+              data.implications,
+              aiProse?.implications,
+              buildRegionalBusinessImplicationsNarrative(
+                buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
+              ),
+            ),
           );
-          if (!fit) {
-            newPage(ctx);
-            drawApacBusinessImplicationBlocks(
-              ctx,
-              regionalPdfIncidents,
-              data.issueDate,
-              regionalTopic,
-            );
-          }
         }
         if (show("watch-next") || show("polestar-view")) {
           drawApacFinalPage(
@@ -2563,15 +2594,17 @@ export async function exportTopicReportPdf(
         }
       } else {
         newPage(ctx);
-        drawSectionHeading(ctx, "What Changed");
+        drawSectionHeading(ctx, "Regional Risk Picture");
         if (show("situation")) {
           drawRegionalDomainBriefs(ctx, regionalPdfIncidents, data.issueDate, regionalTopic);
         }
 
         newPage(ctx);
         if (show("what-happened")) {
-          drawSectionHeading(ctx, "Key Developments");
-          drawRegionalDevelopmentCards(ctx, regionalPdfIncidents, data.issueDate, regionalTopic);
+          drawApacDevelopmentPage(
+            ctx,
+            buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
+          );
         }
 
         newPage(ctx);
@@ -2596,8 +2629,9 @@ export async function exportTopicReportPdf(
           const outlook = resolveRegionalNarrative(
             data.polestarView,
             aiProse?.polestarView,
-            buildRegionalOutlook(
+            buildStructuredRegionalOutlook(
               buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
+              regionalTopic,
             ),
           );
           if (outlook.trim()) drawSectionWithProse(ctx, "Polestar Outlook", outlook);

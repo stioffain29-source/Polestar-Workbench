@@ -9,6 +9,33 @@ import { fileURLToPath } from "node:url";
 import { resolve as resolvePath } from "node:path";
 import { jsPDF } from "jspdf";
 
+// Some shared regional data utilities are imported by the browser map layer.
+// Keep the headless production audit on the same code path without requiring a
+// real browser just to initialise Leaflet.
+if (typeof window === "undefined") {
+  const element = () => ({
+    style: {} as Record<string, string>,
+    children: [] as unknown[],
+    appendChild(child: unknown) { this.children.push(child); return child; },
+    removeChild() {},
+    setAttribute() {},
+    addEventListener() {},
+    removeEventListener() {},
+  });
+  const documentStub = {
+    documentElement: element(),
+    body: element(),
+    location: { href: "http://localhost/" },
+    createElement: element,
+    createElementNS: element,
+    getElementById: () => null,
+  };
+  Object.assign(globalThis, {
+    window: { document: documentStub, devicePixelRatio: 1, screen: { deviceXDPI: 96, logicalXDPI: 96 }, location: documentStub.location },
+    document: documentStub,
+  });
+}
+
 // Patch fetch to read file:// URLs from disk. The loader rewrites .ttf?url
 // imports to file:// URLs that point at the real Roboto TTFs in node_modules,
 // and pdfFonts.ts then fetches them — so we must serve those bytes here.
@@ -174,7 +201,7 @@ async function main() {
         hiddenSections,
         sectionOverrides,
         marketPrices: marketPrices as never,
-        ...(TOPIC === "apac_weekly"
+        ...(TOPIC === "apac_weekly" || TOPIC === "middle_east_weekly"
           ? { futureEvents: await fetchApacFutureEvents(data.issueDate) }
           : {}),
       },

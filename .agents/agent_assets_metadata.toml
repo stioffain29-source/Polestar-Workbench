@@ -1213,3 +1213,31 @@ mtime_ms = 1789687941213
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/b5c9b1fa-42a8-4758-9fe5-f9b4878f67b7/b5cdf837-2d28-46b0-8085-ef3808c09695"
 storage_version_token = "1789687956975871"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "oxf6iqh_e4WmzXdwC0Ai8"
+uri = "file://artifacts/workbench/generated/polestar-middle-east-weekly-2026-09-18.pdf"
+type = "pdf"
+title = "Corrected Polestar Middle East Weekly"
+description = "Production-backed regeneration of Middle East report 141, with event-family deduplication, corrected Oman attribution, final-set map coverage and evidence-specific analysis."
+logical_id = "3eb10ce4-5710-46d1-b8f3-cd085553b227"
+content_hash = "sha256:67754f85348ca15cd9e73f96d2fbc4bcca7234f3f49c2b50aa3980a84171dd0e"
+size = 1719051
+mtime_ms = 1789783156388
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/3eb10ce4-5710-46d1-b8f3-cd085553b227/f4ce51db-65f4-4530-8848-6580a7946d55"
+storage_version_token = "1789783175685036"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "NnPaF2nco_mgMZnsDKzIb"
+uri = "file://artifacts/workbench/generated/polestar-apac-weekly-2026-09-19.pdf"
+type = "pdf"
+title = "Corrected Polestar APAC Weekly"
+description = "Production-backed regeneration of APAC report 144, with final-set-only charts and map, material-development curation, cleaned watch items and evidence-specific analysis."
+logical_id = "82e965d6-67d7-454f-8b05-721442b5582a"
+content_hash = "sha256:dacc18f3abba0d9c59d026fa9499689b10b5153883121db340f99c948890627b"
+size = 1940960
+mtime_ms = 1789783156307
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/82e965d6-67d7-454f-8b05-721442b5582a/29b9ae35-03d8-47df-93de-88f6bf7f955d"
+storage_version_token = "1789783174325131"
+content_type = "application/pdf"
