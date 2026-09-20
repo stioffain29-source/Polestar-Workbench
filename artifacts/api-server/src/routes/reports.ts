@@ -208,6 +208,37 @@ router.post("/reports", async (req, res): Promise<void> => {
   }
   const { issueDate, hardNumbers, ...rest } = parsed.data;
   const normalizedIssueDate = dateToYmd(issueDate);
+  const isRegionalWeekly =
+    rest.topic === "apac_weekly" || rest.topic === "middle_east_weekly";
+  if (isRegionalWeekly && rest.status === "draft") {
+    const [existing] = await db
+      .select()
+      .from(reportsTable)
+      .where(
+        and(
+          eq(reportsTable.topic, rest.topic),
+          eq(reportsTable.issueDate, normalizedIssueDate),
+          eq(reportsTable.status, "draft"),
+        ),
+      )
+      .orderBy(
+        desc(sql`case when ${reportsTable.hardNumbers}->'regionalCanonicalReport' is not null then 1 else 0 end`),
+        desc(sql`coalesce(${reportsTable.updatedAt}, ${reportsTable.createdAt})`),
+        desc(reportsTable.id),
+      )
+      .limit(1);
+    if (existing) {
+      res.status(200).json(await hydrateLegacyProvenance(existing));
+      return;
+    }
+    if (hardNumbers === undefined) {
+      res.status(409).json({
+        error:
+          "Regional Weekly reports must be created with a persisted canonical report object.",
+      });
+      return;
+    }
+  }
   const insertValues: InsertReport = {
     ...rest,
     issueDate: normalizedIssueDate,
@@ -218,9 +249,9 @@ router.post("/reports", async (req, res): Promise<void> => {
   } else if (rest.topic === "fuel") {
     insertValues.hardNumbers = await fuelHardNumbersAsOf(normalizedIssueDate);
   }
-  // A POST explicitly means "new report". Double-submit prevention belongs
-  // to the client button; same-day topic/title matching must never reuse an
-  // existing analyst workspace or identity.
+  // Non-regional POSTs explicitly mean "new report". Regional Weekly is one
+  // canonical workspace per topic/date; the guard above reopens that workspace
+  // and refuses to create an empty shell.
   const [row] = await db.insert(reportsTable).values(insertValues).returning();
   res.status(201).json(row);
 });
