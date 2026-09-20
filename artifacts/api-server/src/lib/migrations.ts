@@ -50,6 +50,7 @@ import { logger } from "./logger";
 import { COUNTRY_BASELINE_SEEDS } from "./countryBaselineSeed";
 import { APAC_FLASHPOINT_BACKFILL } from "./seed/apacFlashpointBackfill";
 import { SEPTEMBER_2026_PROTEST_SCHEDULE } from "./seed/september2026ProtestSchedule";
+import { SEPTEMBER_2026_PROTEST_SCHEDULE_UPDATE } from "./seed/september2026ProtestScheduleUpdate";
 
 // Catalogued Flashpoint regional sources that the audit identified as
 // missing. Inserted idempotently on startup; existing rows are not
@@ -518,6 +519,36 @@ export async function runDataMigrations(): Promise<void> {
         logger.info(
           { inserted, expected: SEPTEMBER_2026_PROTEST_SCHEDULE.length, marker: markerKey },
           "Imported analyst-supplied Flashpoint protest schedule",
+        );
+      }
+    }
+
+    // Concise five-row forward schedule supplied on 20 September 2026.
+    {
+      const markerKey = "flashpoint_protest_schedule_sep2026_update_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const inserted = await db.transaction(async (tx) => {
+          const rows = await tx
+            .insert(protestEventsTable)
+            .values([...SEPTEMBER_2026_PROTEST_SCHEDULE_UPDATE])
+            .onConflictDoNothing({ target: protestEventsTable.dedupKey })
+            .returning({ id: protestEventsTable.id });
+          await tx.execute(sql`
+            INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+            ON CONFLICT (key) DO NOTHING
+          `);
+          return rows.length;
+        });
+        logger.info(
+          {
+            inserted,
+            expected: SEPTEMBER_2026_PROTEST_SCHEDULE_UPDATE.length,
+            marker: markerKey,
+          },
+          "Imported updated analyst-supplied Flashpoint protest schedule",
         );
       }
     }

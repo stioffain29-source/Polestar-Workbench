@@ -223,6 +223,43 @@ describe("protest schedule model", () => {
     expect(lines[1]).toMatch(/02 Aug 2026/);
   });
 
+  it("treats routine Tokyo demonstrations as attendance-led rather than inherently disruptive", () => {
+    const tokyo = {
+      ...event(60, "Planned", "2026-08-06T00:00:00Z"),
+      country: "Japan",
+      city: "Tokyo",
+      venue: "Public square",
+      disruptionPotential: "High" as const,
+      attendance: null,
+    };
+    const model = buildProtestScheduleModel({
+      confirmedPlanned: [tokyo],
+      possible: [],
+      searchCompletedAt: "2026-08-01T00:00:00Z",
+    });
+    const watchNext = buildProtestScheduleWatchNext(model);
+    expect(watchNext).toMatch(/normally orderly and localised/i);
+    expect(watchNext).toMatch(/attendance materially exceeds expectations/i);
+  });
+
+  it("contains Bangkok activity to established assembly areas unless turnout or routes spill over", () => {
+    const bangkok = {
+      ...event(61, "Planned", "2026-08-06T00:00:00Z"),
+      country: "Thailand",
+      city: "Bangkok",
+      venue: "Democracy Monument",
+      disruptionPotential: "High" as const,
+    };
+    const model = buildProtestScheduleModel({
+      confirmedPlanned: [bangkok],
+      possible: [],
+      searchCompletedAt: "2026-08-01T00:00:00Z",
+    });
+    const watchNext = buildProtestScheduleWatchNext(model);
+    expect(watchNext).toMatch(/established Bangkok assembly area/i);
+    expect(watchNext).toMatch(/do not infer wider city disruption/i);
+  });
+
   it("does not publish cancelled or postponed stale rows", () => {
     const cancelled = event(40, "Cancelled", "2026-08-03T00:00:00Z");
     const postponed = event(41, "Postponed", "2026-08-04T00:00:00Z");

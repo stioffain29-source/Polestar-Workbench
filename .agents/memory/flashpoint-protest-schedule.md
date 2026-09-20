@@ -8,3 +8,9 @@ Planned protests, demonstrations, rallies, marches, strikes and similar actions 
 **Why:** Incident reporting windows answer what happened. A protest schedule answers what is planned in the next seven days. Reusing incident dates caused upcoming events to disappear and risked inflating incident counts.
 
 **How to apply:** Keep event date separate from source publication date; filter schedule membership by event date and source currency independently. Show Confirmed/Planned chronologically, route Possible to a clearly labelled watchlist, and exclude or mark Cancelled/Postponed. Persist a successful search-completion timestamp separately from event rows so an empty query cannot falsely claim that a dedicated search completed. Preview, editor and PDF must consume one shared schedule model. Never invent attendance or missing event details.
+
+Forward assessment must apply city operating context. Tokyo demonstrations are normally orderly, so an event becomes material through high turnout or demonstrated route/access effects, not the gathering alone. Bangkok’s established assembly areas imply local site/route effects unless turnout or spillover reaches major roads or rail.
+
+**Why:** Generic “scheduled gathering” prose overstated routine Tokyo and Bangkok mobilisation and produced weak business-risk analysis.
+
+**How to apply:** Calibrate Watch Next and fallback prose by city. Never infer broad city disruption from incident volume, a capital-city venue or a declared assembly point.

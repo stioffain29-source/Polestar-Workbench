@@ -545,6 +545,21 @@ export function buildProtestScheduleWatchNext(
           timeZone: "UTC",
         }).format(new Date(row.eventDate))
       : "the next seven days";
+    const city = (row.city ?? "").trim().toLowerCase();
+    const text = `${row.venue ?? ""} ${rowText(row)}`;
+    const materialTurnout = turnoutRank(row) >= 3;
+    const explicitDisruption =
+      HIGH_IMPACT_WORDS.test(text) ||
+      /\b(?:closure|closed|blocked|blockade|shutdown|clash|arrests?|violence|damage)\b/i.test(text);
+    if (city === "tokyo" && !materialTurnout && !explicitDisruption) {
+      return `${activity}${place ? ` in ${place}` : ""} is scheduled for ${date}. Tokyo demonstrations are normally orderly and localised; this becomes operationally relevant if attendance materially exceeds expectations or crowd spillover affects a named transport route or access point.`;
+    }
+    const knownBangkokAssemblyArea =
+      city === "bangkok" &&
+      /\b(?:government house|parliament|kiakkai|democracy monument|royal plaza|victory monument|ratchaprasong|pathumwan|skywalk|din daeng)\b/i.test(text);
+    if (knownBangkokAssemblyArea) {
+      return `${activity}${place ? ` in ${place}` : ""} is scheduled for ${date}. This is an established Bangkok assembly area, so assess access immediately around the site and any announced march route; do not infer wider city disruption without high turnout or spillover onto major roads or rail.`;
+    }
     return row.status === "Possible"
       ? `${activity}${place ? ` in ${place}` : ""} remains possible; confirm the organiser, venue and route before changing movement plans.`
       : `${activity}${place ? ` in ${place}` : ""} is scheduled for ${date}; track any named assembly point, march route or transport disruption in the source reporting.`;
