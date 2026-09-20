@@ -737,8 +737,13 @@ function drawRegionalGlance(ctx: Ctx, incidents: TopicReportIncident[], issueDat
   }
 }
 
-function drawRegionalHotspotMap(ctx: Ctx, incidents: TopicReportIncident[], topic: RegionalWeeklyTopic = "middle_east_weekly") {
-  const points = buildRegionalMapPoints(incidents, topic);
+function drawRegionalHotspotMap(
+  ctx: Ctx,
+  incidents: TopicReportIncident[],
+  topic: RegionalWeeklyTopic = "middle_east_weekly",
+  canonicalPoints?: RegionalCanonicalReport["mapPoints"],
+) {
+  const points = canonicalPoints ?? buildRegionalMapPoints(incidents, topic);
   const { pdf, MX, CW } = ctx;
   const h = 105;
   ensureSpace(ctx, h + 22);
@@ -1263,7 +1268,11 @@ function drawApacPageTwo(
   // height, so the next heading cannot touch the final BLUF baseline.
   ctx.y += Math.max(8, blufLines > 0 ? 8 : 0);
 
-  drawApacGeographicMap(ctx, incidents, topic, canonical);
+  if (topic === "apac_weekly") {
+    drawApacGeographicMap(ctx, incidents, topic, canonical);
+  } else {
+    drawRegionalHotspotMap(ctx, incidents, topic, canonical?.mapPoints);
+  }
   const developments = canonical?.developments ?? buildPdfRegionalDevelopments(incidents, issueDate, topic);
   const watchItems = canonical?.watchItems ?? buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   const glance = canonical?.glanceMetrics ?? buildApacGlanceMetrics(developments, watchItems);
@@ -1811,16 +1820,17 @@ export async function exportTopicReportPdf(
   const regionalCanonical = isRegionalWeeklyTopic(data.topic)
     ? regionalCanonicalReportFromHardNumbers(data.hardNumbers, data.topic, data.issueDate)
     : null;
-  if (data.topic === "apac_weekly" && !regionalCanonical) {
-    throw new Error("APAC Weekly has no valid persisted canonical report object; refusing PDF regeneration");
+  if (isRegionalWeeklyTopic(data.topic) && !regionalCanonical) {
+    throw new Error(
+      `${data.topic === "apac_weekly" ? "APAC Weekly" : "Middle East Weekly"} has no valid persisted canonical report object; refusing PDF regeneration`,
+    );
   }
   const regionalPdfIncidents = isRegionalWeeklyTopic(data.topic)
     ? curateRegionalWeeklyIncidents(incidents, data.topic, data.issueDate)
     : incidents;
   if (isRegionalWeeklyTopic(data.topic)) {
     const regionalErrors = validateRegionalWeeklyAssessment(
-      regionalCanonical?.developments
-        ?? buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, data.topic),
+      regionalCanonical!.developments,
       data.topic,
     );
     if (regionalErrors.length > 0) {
@@ -2025,10 +2035,7 @@ export async function exportTopicReportPdf(
   // Every other topic keeps the AI narrative + template fallback stack.
   const execText =
     isRegionalWeekly
-      ? regionalCanonical?.regionalOutlook ?? buildStructuredRegionalBluf(
-          buildPdfRegionalDevelopments(regionalPdfIncidents, data.issueDate, regionalTopic),
-          regionalTopic,
-        )
+      ? regionalCanonical!.regionalOutlook
       : fuelEffective
       ? (fuelEffective.executiveSummary ?? "")
       : isCargo && cargoModel
@@ -2575,7 +2582,7 @@ export async function exportTopicReportPdf(
         drawFullAnnex(ctx, cargoModel.appendix);
       }
     } else if (isRegionalWeekly) {
-      if (regionalTopic === "apac_weekly") {
+      if (regionalTopic === "apac_weekly" || regionalCanonical) {
         const apacDevelopments = regionalCanonical!.developments;
         newPage(ctx);
         if (show("situation")) {

@@ -376,6 +376,45 @@ function emptyIncidentIngest(
   };
 }
 
+function emptyRegionalWeeklyRun(
+  region: "apac" | "middle_east",
+  error: unknown,
+): RegionalWeeklyRun {
+  const message = error instanceof Error ? error.message : String(error);
+  const domains = [
+    ["security", "terrorism bombings shootings insurgency armed conflict unrest maritime security restrictions"],
+    ["political", "elections instability mobilisation demonstrations strikes military activity sanctions diplomatic tensions"],
+    ["regulatory", "immigration visa labour customs tariffs trade controls border market access data energy regulation"],
+    ["operational", "airports ports shipping roads rail border crossings supply chains telecoms site access continuity"],
+    ["energy", "fuel oil gas electricity grid disruption energy policy supply shortages availability"],
+    ["weather", "earthquakes typhoons cyclones storms flooding landslides wildfires haze volcanoes tsunami heat drought"],
+    ["cyber", "ransomware critical infrastructure telecom port airport logistics energy government system attacks"],
+  ] as const;
+  const requiredGeographies = region === "apac"
+    ? ["Northeast Asia", "Southeast Asia", "South Asia", "Australia", "New Zealand", "Papua New Guinea", "Papua", "Pacific Islands"]
+    : ["Saudi Arabia", "UAE", "Qatar", "Kuwait", "Bahrain", "Oman", "Iran", "Iraq", "Israel", "Palestinian Territories", "Lebanon", "Syria", "Jordan", "Yemen", "Red Sea approaches"];
+  const now = new Date().toISOString();
+  return {
+    region,
+    startedAt: now,
+    completedAt: now,
+    weather: { domain: "weather", topic: "regional_weather", query: domains[5][1], status: "not_run", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [message] },
+    cyber: { domain: "cyber", topic: "regional_cyber", query: domains[6][1], status: "not_run", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [message] },
+    coverage: domains.map(([domain, query]) => ({
+      domain,
+      topic: domain === "weather" ? "regional_weather" : domain === "cyber" ? "regional_cyber" : "regional_intelligence",
+      query,
+      status: "not_run",
+      sourceNames: [],
+      itemsFetched: 0,
+      candidatesAccepted: 0,
+      errors: [message],
+    })),
+    requiredGeographies,
+    searchedGeographies: [],
+  };
+}
+
 async function runIncidentIngest(
   topic: IngestSummary["topic"],
   fn: () => Promise<IngestSummary>,
@@ -755,26 +794,14 @@ export async function runIngestOnce(): Promise<IngestRunResult> {
       regionalApac = await runRegionalWeeklyCollection("apac", { commit: true });
     } catch (err) {
       logger.error({ err }, "APAC regional weekly collection failed");
-      regionalApac = {
-        region: "apac",
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        weather: { topic: "regional_weather", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
-        cyber: { topic: "regional_cyber", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
-      };
+      regionalApac = emptyRegionalWeeklyRun("apac", err);
     }
     try {
       markIngestStage("runRegionalWeeklyCollection:middle_east");
       regionalMiddleEast = await runRegionalWeeklyCollection("middle_east", { commit: true });
     } catch (err) {
       logger.error({ err }, "Middle East regional weekly collection failed");
-      regionalMiddleEast = {
-        region: "middle_east",
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        weather: { topic: "regional_weather", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
-        cyber: { topic: "regional_cyber", sourceNames: [], itemsFetched: 0, candidatesAccepted: 0, errors: [String(err)] },
-      };
+      regionalMiddleEast = emptyRegionalWeeklyRun("middle_east", err);
     }
     // Forward-looking protest schedule is an isolated context collector. It
     // intentionally runs outside every incident ingest and never touches the

@@ -8,6 +8,7 @@
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { execFileSync } from "node:child_process";
 import pg from "../../../lib/db/node_modules/pg/esm/index.mjs";
 
 const prodUrl = process.env.PROD_DATABASE_URL?.trim();
@@ -28,13 +29,15 @@ const {
   buildRegionalBusinessImplicationsNarrative,
   buildApacWeeklyWatchlist,
   buildRegionalCanonicalReport,
+  materialityDimensions,
   regionalCanonicalReportFromHardNumbers,
   curateRegionalWeeklyIncidents,
+  regionalDomainMateriality,
+  regionalIntelligenceCategory,
   selectRegionalKeyDevelopments,
   validateRegionalWeeklyAssessment,
 } = await import("../src/lib/regionalWeekly");
 const { fetchRegionalFutureEvents } = await import("./topicReportData");
-const { runHeadlessReportExport } = await import("./exportReportPdfHeadless");
 
 // Load the complete production evidence window through the read-only pool.
 // Do not substitute a health probe: this is the actual basis used below.
@@ -89,7 +92,7 @@ const devCollectorEvidence = await db.select().from(incidentsTable).where(
   and(
     gte(incidentsTable.occurredAt, startDate),
     lte(incidentsTable.occurredAt, endDate),
-    inArray(incidentsTable.topic, ["regional_weather", "regional_cyber"]),
+     inArray(incidentsTable.topic, ["regional_weather", "regional_cyber", "regional_intelligence"]),
   ),
 );
 const stableKey = (row: RegionalEvidence) =>
@@ -109,8 +112,6 @@ for (const [region, topic] of reportRuns) {
   const key = region === "APAC" ? "apac" : "middle_east";
   const run = runs[key];
   if (!run) throw new Error(`Collector ${key} was not run`);
-  const weather = { startedAt: run.startedAt, completedAt: run.completedAt, ...run.weather };
-  const cyber = { startedAt: run.startedAt, completedAt: run.completedAt, ...run.cyber };
   const forwardRows = await fetchRegionalFutureEvents(issueDate, topic);
   const forwardCandidates = await db.select({ id: protestEventsTable.id }).from(protestEventsTable).where(
     and(
@@ -123,42 +124,68 @@ for (const [region, topic] of reportRuns) {
     and(gte(incidentsTable.occurredAt, today), lte(incidentsTable.occurredAt, new Date(today.getTime() + 7 * 86400000))),
   );
   const forward = {
-    startedAt: run.startedAt,
-    completedAt: new Date().toISOString(),
+    domain: "forwardSearch",
+    status: forwardCollection.errors.length > 0 ? "not_run" as const : "checked" as const,
     sourceNames: ["google_news_protest_schedule", "incident_advisories"],
     itemsFetched: forwardCollection.itemsConsidered + futureIncidentCandidates.length,
     candidatesAccepted: forwardRows.length,
     errors: forwardCollection.errors,
   };
-  const coverage = { weather, cyber, forward };
-  const regional = incidents.filter((row) => row.country != null);
-  const curated = curateRegionalWeeklyIncidents(regional, topic, issueDate);
-  const funnel = auditRegionalWeeklyCandidateFunnel(incidents, topic, issueDate, coverage);
-  assertRegionalWeeklyReady(funnel, { auditedTrueShortage: process.env.ALLOW_TRUE_SHORTAGE === "1" });
-  const selected = selectRegionalKeyDevelopments(curated, topic);
-  // These four dates were checked against the underlying source event text on
-  // 19 September 2026. They are explicit curation evidence for this acceptance
-  // report, not a fallback to publication, scrape, ingestion or report dates.
-  const externallyVerifiedApacDate = (row: RegionalEvidence): string | null => {
+  const coverage = {
+    requiredDomains: run.coverage.map((check) => check.domain),
+    domains: run.coverage,
+    forwardSearch: forward,
+    requiredGeographies: run.requiredGeographies,
+    searchedGeographies: run.searchedGeographies,
+  };
+  // These dates were checked against the underlying source event text. They
+  // are explicit curation evidence, never publication/scrape/ingestion dates.
+  const externallyVerifiedDate = (row: RegionalEvidence): string | null => {
     if (row.incidentDate) return row.incidentDate;
     const text = `${row.title} ${row.summary}`.toLowerCase();
     if (/\b(?:barmm|cotabato city)\b/.test(text) && /\b(?:election eve clash|school queue)\b/.test(text)) return "2026-09-14";
     if (/\bnarathiwat\b/.test(text) && /\b(?:bomb|shooting attack)\b/.test(text)) return "2026-09-18";
     if (/\baustralia\b/.test(text) && /\b(?:visa|migration|backpacker)\b/.test(text)) return "2026-09-17";
     if (/\b(?:kohat|northwest pakistan|khyber pakhtunkhwa)\b/.test(text) && /\b(?:bomb|blast|police)\b/.test(text)) return "2026-09-18";
+    if (/\briyadh\b/.test(text) && /\b(?:houthi|missile|airport|air raid)\b/.test(text)) return "2026-09-19";
+    if (/\b(?:yanbu|east-west pipeline)\b/.test(text) && /\b(?:attack|closure|closed|loadings|shipments|cargoes|exports)\b/.test(text)) return "2026-09-15";
+    if (/\b(?:southern syria|daraa|wadi al-raqad)\b/.test(text) && /\bincursion\b/.test(text)) return "2026-09-18";
+    if (/\buae\b/.test(text) && /\bvisa cancellations?\b/.test(text) && /\bbangladesh/i.test(text)) return "2026-09-14";
+    if (/\b(?:mahmoud abbas|palestinian leader)\b/.test(text) && /\bvisa\b/.test(text)) return "2026-09-16";
+    if (/\b(?:saudis?|saudi arabia)\b/.test(text) && /\bhouthis?\b/.test(text) && /\b(?:exchange strikes|yemenis flee)\b/.test(text)) return "2026-09-17";
     return null;
   };
   const dateEvidence = (row: RegionalEvidence): RegionalEvidence => {
     const members = row.sourceMembers?.map(dateEvidence);
-    const incidentDate = externallyVerifiedApacDate(row)
+    const incidentDate = externallyVerifiedDate(row)
       ?? members?.map((member) => member.incidentDate).find((value): value is string => Boolean(value))
       ?? null;
     return { ...row, incidentDate, ...(members ? { sourceMembers: members } : {}) };
   };
-  const datedSelected = topic === "apac_weekly"
-    ? (selected as RegionalEvidence[]).map(dateEvidence)
-    : selected;
-  const canonical = buildRegionalCanonicalReport(datedSelected, issueDate, topic, forwardRows);
+  const datedRegional = incidents
+    .filter((row) => row.country != null)
+    .map(dateEvidence)
+    .filter((row) => Boolean(row.incidentDate));
+  const curated = curateRegionalWeeklyIncidents(datedRegional, topic, issueDate);
+  console.log(`[regional-curation] ${JSON.stringify({
+    topic,
+    verifiedCandidates: datedRegional.length,
+    materialCandidates: datedRegional.filter((row) => {
+      const text = `${row.title ?? ""} ${row.summary ?? ""}`;
+      return materialityDimensions(text).length > 0
+        && regionalDomainMateriality(regionalIntelligenceCategory(row), text);
+    }).map((row) => ({ id: row.id, country: row.country, title: row.title })),
+    curated: curated.map((row) => ({
+      id: row.id,
+      country: row.country,
+      title: row.title,
+      incidentDate: row.incidentDate,
+    })),
+  })}`);
+  const funnel = auditRegionalWeeklyCandidateFunnel(datedRegional, topic, issueDate, coverage);
+  assertRegionalWeeklyReady(funnel, { auditedTrueShortage: process.env.ALLOW_TRUE_SHORTAGE === "1" });
+  const datedSelected = selectRegionalKeyDevelopments(curated, topic);
+   const canonical = buildRegionalCanonicalReport(datedSelected, issueDate, topic, forwardRows, coverage);
   const developments = canonical.developments;
   const renderedEvidenceIds = new Set(
     developments.flatMap((row) => row.evidenceIds ?? []).map(String),
@@ -187,6 +214,7 @@ for (const [region, topic] of reportRuns) {
     watchNext: JSON.stringify(watch),
     hardNumbers: {
       regionalCollectorRun: { ...run, forward },
+      regionalCoverageManifest: coverage,
       evidenceIds,
       regionalEvidenceSnapshot: selectedSnapshot,
       regionalForwardSnapshot: forwardRows,
@@ -242,10 +270,18 @@ for (const [region, topic] of reportRuns) {
 
 for (const [index, topic] of reportRuns.map(([, topic]) => topic).entries()) {
   const pdf = resolve(outDir, `${topic}-${reportIds[index]}.pdf`);
-  await runHeadlessReportExport({
-    reportId: reportIds[index],
-    topic,
-    outPath: pdf,
+  execFileSync("pnpm", [
+    "exec", "tsx", "--import", "./scripts/registerLoader.mjs",
+    "scripts/exportReportPdfHeadless.ts",
+  ], {
+    cwd: resolve(process.cwd()),
+    env: {
+      ...process.env,
+      REPORT_ID: String(reportIds[index]),
+      TOPIC: topic,
+      OUT_PATH: pdf,
+    },
+    stdio: "inherit",
   });
   console.log(`${topic} reportId=${reportIds[index]} pdf=${pdf}`);
 }

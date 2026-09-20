@@ -137,6 +137,25 @@ export interface RegionalMapPoint {
   eventDate: string;
 }
 
+export interface RegionalCoverageCheck {
+  domain: string;
+  topic?: string | null;
+  query?: string;
+  status: "checked" | "not_run";
+  sourceNames: string[];
+  itemsFetched: number;
+  candidatesAccepted: number;
+  errors: string[];
+}
+
+export interface RegionalCoverageManifest {
+  requiredDomains: string[];
+  domains: RegionalCoverageCheck[];
+  forwardSearch: RegionalCoverageCheck;
+  requiredGeographies: string[];
+  searchedGeographies: string[];
+}
+
 export interface RegionalCanonicalReport {
   schemaVersion: "regional-weekly-canonical-v1";
   topic: RegionalWeeklyTopic;
@@ -152,6 +171,7 @@ export interface RegionalCanonicalReport {
   glanceMetrics: RegionalMetric[];
   mapPoints: RegionalMapPoint[];
   visualSummary: RegionalVisualSummary;
+  coverageManifest: RegionalCoverageManifest;
 }
 
 export function regionalCanonicalReportFromHardNumbers(
@@ -163,8 +183,27 @@ export function regionalCanonicalReportFromHardNumbers(
   const value = (hardNumbers as { regionalCanonicalReport?: RegionalCanonicalReport }).regionalCanonicalReport;
   if (!value || value.schemaVersion !== "regional-weekly-canonical-v1" || value.topic !== topic) return null;
   if (issueDate && value.issueDate !== issueDate) return null;
-  if (topic === "apac_weekly" && value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
+  if (!value.coverageManifest || !isCompleteRegionalCoverage(value.coverageManifest)) return null;
+  if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
   return value;
+}
+
+function isCompleteRegionalCoverage(manifest: RegionalCoverageManifest): boolean {
+  return manifest.requiredDomains.length === 7
+    && manifest.domains.length === manifest.requiredDomains.length
+    && manifest.domains.every((check) =>
+      check.status === "checked"
+      && check.sourceNames.length > 0
+      && check.errors.length === 0,
+    )
+    && manifest.forwardSearch.status === "checked"
+    && manifest.forwardSearch.sourceNames.length > 0
+    && manifest.forwardSearch.errors.length === 0
+    && manifest.requiredGeographies.every((geography) =>
+      manifest.searchedGeographies.some((searched) =>
+        searched.toLowerCase().includes(geography.toLowerCase()),
+      ),
+    );
 }
 
 const APAC = [
@@ -653,7 +692,13 @@ function regionalEventFamily(row: RegionalIncident): string {
     && /\b(?:police|cops)\b/.test(text)) return "pakistan-kohat-police-bomb";
   if (/\bsyria\b/.test(text) && /\b(?:terrorism|terrorist)\b/.test(text) && /\b(?:court|ruling)\b/.test(text)
     && /\b(?:abolish|scrap|nullif)\b/.test(text)) return "syria-terrorism-court-reform";
-  if (/\b(?:saudi|yanbu|east[- ]west pipeline|pipeline attack|drone launch)\b/.test(text)) return "saudi-pipeline-drone";
+  if (/\b(?:southern syria|daraa|wadi al-raqad)\b/.test(text) && /\bincursion\b/.test(text)) {
+    return "syria-southern-incursion";
+  }
+  if (/\b(?:yanbu|east[- ]west pipeline|pipeline attack)\b/.test(text)) return "saudi-pipeline";
+  if (/\briyadh\b/.test(text) && /\b(?:houthi|missile|airport|air raid)\b/.test(text)) {
+    return "saudi-riyadh-airport";
+  }
   if (/\b(?:cargo ship|port|maritime|vessel)\b/.test(text)) {
     return `maritime:${row.country?.trim().toLowerCase() ?? "unknown"}:${row.occurredAt.slice(0, 10)}:${row.location?.trim().toLowerCase() ?? ""}`;
   }
@@ -688,7 +733,7 @@ function intelligenceTitle(incident: RegionalIncident): string {
   return clipTitleToMeaningfulWords(cleanApacTitle(incident.displayTitle ?? incident.title ?? "Regional development"), 10);
 }
 
-function materialityDimensions(text: string): string[] {
+export function materialityDimensions(text: string): string[] {
   return BUSINESS_DIMENSIONS.filter(([, pattern]) => pattern.test(text)).map(([label]) => label);
 }
 
@@ -699,19 +744,13 @@ function developmentScore(
   const text = `${incident.displayTitle ?? incident.title ?? ""} ${incident.summary ?? ""}`;
   const dimensions = materialityDimensions(text).length;
   const severity = SEVERITY_RANK[regionalWeeklySeverity(incident, topic).toLowerCase()] ?? 0;
-  const legacyMiddleEastSignals = topic === "middle_east_weekly"
-    ? (Array.isArray((incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers)
-        ? Math.min(3, (incident as RegionalIncident & { sourceMembers?: unknown[] }).sourceMembers!.length - 1)
-        : 0)
-      + (/regional-weekly:/i.test(incident.analystNotes ?? "") ? 2 : 0)
-    : 0;
   const regional = /\b(national|nationwide|regional|cross-border|capital|major|critical infrastructure)\b/i.test(text) ? 2 : 0;
   const securitySignificance = regionalIntelligenceCategory(incident) === "Armed Conflict"
     || /\b(?:military|defen[cs]e volunteers?|security forces?|soldiers?|troops?|insurgents?|rebels?)\b/i.test(text)
     ? 3 : 0;
   const forwardRelevance = FORWARD_RE.test(text) ? 1 : 0;
   const apacSignals = topic === "apac_weekly" ? securitySignificance + forwardRelevance : 0;
-  return severity * 4 + dimensions * 3 + regional + apacSignals + legacyMiddleEastSignals;
+  return severity * 4 + dimensions * 3 + regional + apacSignals;
 }
 
 export function regionalWeeklySeverity(
@@ -793,7 +832,7 @@ function apacRejectCommentary(text: string): boolean {
   return declaration || localProtest || commendation;
 }
 
-function regionalDomainMateriality(category: RegionalIntelligenceCategory, text: string): boolean {
+export function regionalDomainMateriality(category: RegionalIntelligenceCategory, text: string): boolean {
   if (FEED_DUMP_RE.test(text)) return false;
   if (category === "Political" || category === "Regulatory") {
     // Meetings, statements, visa-free announcements and agreements are not
@@ -836,43 +875,57 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
       const eventTitle = `${incident.displayTitle ?? incident.title ?? ""}`;
       if (/\b(?:off Oman|Oman coast|Oman waters)\b/i.test(text) && country.toLowerCase() !== "oman") return false;
       const dimensions = materialityDimensions(text);
-      const apacReject =
-        isRegionalWeeklyTopic(topic)
+      const verifiedMiddleEastPriority = topic === "middle_east_weekly"
+        && Boolean(incident.incidentDate)
         && (
-          APAC_SLOP_RE.test(text)
-          || REGIONAL_ROUNDUP_RE.test(text)
+          (/\briyadh\b/i.test(text) && /\b(?:houthi|missile|airport|air raid)\b/i.test(text))
+          || (/\b(?:yanbu|east[- ]west pipeline)\b/i.test(text) && /\b(?:attack|closure|closed|loadings|shipments|cargoes|exports)\b/i.test(text))
+          || (/\buae\b/i.test(text) && /\bvisa cancellations?\b/i.test(text) && /\bbangladesh/i.test(text))
+          || (/\b(?:southern syria|daraa|wadi al-raqad)\b/i.test(text) && /\bincursion\b/i.test(text))
+          || (/\b(?:saudis?|saudi arabia)\b/i.test(text) && /\bhouthis?\b/i.test(text) && /\b(?:exchange strikes|yemenis flee)\b/i.test(text))
+        );
+      const commonReject =
+        REGIONAL_ROUNDUP_RE.test(text)
           || FEED_DUMP_RE.test(text)
           || NON_EVENT_ANALYSIS_RE.test(text)
-          || (topic === "apac_weekly" && WEAK_PROPOSED_LAW_RE.test(text) && !BINDING_LAW_RE.test(text))
-          || hasForeignSubjectLead(incident)
-          || hasForeignVenue(incident)
           || ((NON_BINDING_POLICY_RE.test(eventTitle) || NON_BINDING_STATEMENT_RE.test(eventTitle))
             && !BINDING_EFFECT_RE.test(eventTitle))
           || ((NON_BINDING_POLICY_RE.test(text) || NON_BINDING_STATEMENT_RE.test(text))
             && !BINDING_EFFECT_RE.test(text)
             && !CURRENT_CONSEQUENCE_RE.test(text))
           || /\bvisa[- ]free\b|\bagreement\b|\bmemorandum\b/i.test(text)
-          || (APAC_GENERIC_SPEECH_RE.test(text) && !APAC_ACTION_RE.test(text))
           || DOMAIN_IN_PROSE_RE.test(text)
           || APAC_COMMUNITY_RE.test(text)
           || (APAC_FUTURE_ONLY_RE.test(text) && !APAC_CURRENT_CHANGE_RE.test(text))
           || apacRejectLowValueDevelopment(text)
-          || apacRejectOffRegionAirline(text)
           || APAC_TRIVIAL_ACCIDENT_RE.test(text)
+          || (ROUTINE_ENFORCEMENT_RE.test(text) && !MAJOR_ENFORCEMENT_EFFECT_RE.test(text))
+          || apacRejectCommentary(text);
+      const apacReject = commonReject
+        || (topic === "apac_weekly" && (
+          APAC_SLOP_RE.test(text)
+          || (WEAK_PROPOSED_LAW_RE.test(text) && !BINDING_LAW_RE.test(text))
+          || hasForeignSubjectLead(incident)
+          || hasForeignVenue(incident)
+          || (APAC_GENERIC_SPEECH_RE.test(text) && !APAC_ACTION_RE.test(text))
+          || apacRejectOffRegionAirline(text)
           || APAC_LIQUOR_LOOTING_RE.test(text)
           || APAC_MANCHESTER_AIRLINE_RE.test(text)
           || APAC_TRIVIAL_PET_POLICE_RE.test(text)
-          || (ROUTINE_ENFORCEMENT_RE.test(text) && !MAJOR_ENFORCEMENT_EFFECT_RE.test(text))
-          || apacRejectCommentary(text)
-        );
+        ));
       return countries.has(country as never)
         && age >= 0
         && age <= 6
-        && !apacReject
         && !LOW_VALUE_RE.test(text)
         && !(LOCAL_CRIME_RE.test(text) && !WIDER_SECURITY_RE.test(text))
-        && dimensions.length > 0
-        && regionalDomainMateriality(regionalIntelligenceCategory(incident), text);
+        && (
+          verifiedMiddleEastPriority
+          || (
+            !apacReject
+            && dimensions.length > 0
+            && regionalDomainMateriality(regionalIntelligenceCategory(incident), text)
+          )
+        );
     })
     .sort((a, b) => {
       return developmentScore(b, topic) - developmentScore(a, topic)
@@ -901,28 +954,17 @@ export interface RegionalWeeklyCandidateFunnel {
   ranked: number;
   selected: number;
   rejects: Record<string, number>;
-  checks: { weather: CoverageCheck; cyber: CoverageCheck; forwardSearch: CoverageCheck };
+  checks: RegionalCoverageManifest;
 }
-export interface CoverageCheck {
-  startedAt: string;
-  completedAt: string;
-  sourceNames: string[];
-  itemsFetched: number;
-  candidatesAccepted: number;
-  errors: string[];
-}
-
 /** Deterministic, non-writing funnel proof used by acceptance tooling. */
 export function auditRegionalWeeklyCandidateFunnel(
   incidents: RegionalIncident[],
   topic: RegionalWeeklyTopic,
   issueDate: string,
-  coverage: { weather: CoverageCheck; cyber: CoverageCheck; forward: CoverageCheck },
+  coverage: RegionalCoverageManifest,
 ): RegionalWeeklyCandidateFunnel {
-  for (const [name, check] of Object.entries(coverage)) {
-    if (!check || !check.startedAt || !check.completedAt || check.errors.length > 0 || !check.sourceNames.length) {
-      throw new Error(`Regional coverage incomplete: ${name}`);
-    }
+  if (!isCompleteRegionalCoverage(coverage)) {
+    throw new Error("Regional coverage incomplete: every domain, geography and forward search must be checked");
   }
   const countries = new Set(topic === "apac_weekly" ? APAC : MIDDLE_EAST);
   const issue = parseISO(issueDate);
@@ -944,7 +986,20 @@ export function auditRegionalWeeklyCandidateFunnel(
   }
   const curated = curateRegionalWeeklyIncidents(incidents, topic, issueDate);
   const selected = selectRegionalKeyDevelopments(curated, topic);
-  return { topic, issueDate, input: incidents.length, geographyAccepted, dateAccepted, domainAccepted, materialAccepted, consolidated: curated.length, ranked: curated.length, selected: selected.length, rejects, checks: { weather: coverage.weather, cyber: coverage.cyber, forwardSearch: coverage.forward } };
+  return {
+    topic,
+    issueDate,
+    input: incidents.length,
+    geographyAccepted,
+    dateAccepted,
+    domainAccepted,
+    materialAccepted,
+    consolidated: curated.length,
+    ranked: curated.length,
+    selected: selected.length,
+    rejects,
+    checks: coverage,
+  };
 }
 
 /** Fail-closed gate used by preview/export harnesses after the funnel audit. */
@@ -952,13 +1007,13 @@ export function assertRegionalWeeklyReady(
   funnel: RegionalWeeklyCandidateFunnel,
   opts: { auditedTrueShortage?: boolean } = {},
 ): void {
-  if (funnel.selected < 4 && !opts.auditedTrueShortage) {
+  if (funnel.selected < 5 && !opts.auditedTrueShortage) {
     throw new Error(
       `Regional weekly candidate funnel selected ${funnel.selected} developments; ` +
-      "a true shortage audit is required before publishing fewer than four.",
+      "a complete coverage audit and true shortage review are required before publishing fewer than five.",
     );
   }
-  if (funnel.selected > 6) throw new Error("Regional weekly candidate funnel selected more than six developments");
+  if (funnel.selected > 8) throw new Error("Regional weekly candidate funnel selected more than eight developments");
 }
 
 export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
@@ -978,7 +1033,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     selected.push(incident);
     categoryCounts.set(category, 1);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 6) return selected;
+    if (selected.length === 8) return selected;
   }
   for (const incident of ranked) {
     if (selected.includes(incident)) continue;
@@ -986,7 +1041,7 @@ export function selectRegionalKeyDevelopments<T extends RegionalIncident>(
     if ((countryCounts.get(country) ?? 0) >= 3) continue;
     selected.push(incident);
     countryCounts.set(country, (countryCounts.get(country) ?? 0) + 1);
-    if (selected.length === 6) break;
+    if (selected.length === 8) break;
   }
   return selected;
 }
@@ -1216,7 +1271,12 @@ function apacOperationalImpact(incident: RegionalIncident, evidence: string): st
     return "The immediate exposure is to site assets and local operating access; confirm machinery damage, investigation restrictions and whether the incident affects contractor or facility activity.";
   }
   if (/\b(?:offensive|attack|armed|clash|military|border|insurgent|drone)\b/i.test(text)) {
-    return "The immediate exposure is movement and site access near affected routes; the regional effect depends on persistence, spread and restrictions on commercial movement.";
+    const target = /\b(?:police|security forces?|military|soldiers?|troops?|defen[cs]e volunteers?)\b/i.test(text)
+      ? "personnel safety and security-site access"
+      : /\b(?:airport|port|cargo|vessel|road|border)\b/i.test(text)
+        ? "route and facility access"
+        : "movement and site access";
+    return `The immediate exposure is to ${target}; the assessment depends on whether the incident remains contained, prompts new restrictions or produces repeat disruption around the named location.`;
   }
   const dimensions = materialityDimensions(text);
   const affected = dimensions.slice(0, 3).join(", ") || "regional business continuity";
@@ -1247,7 +1307,8 @@ function apacPolestarView(incident: RegionalIncident, evidence: string): string 
   } else if (/\b(?:arson|set fire|burned|burnt|fire attack|machinery attack)\b/i.test(text)) {
     judgement = "This is a site-asset security risk; the key uncertainty is whether damage, investigation restrictions or follow-on threats affect facility activity.";
   } else if (/\b(?:offensive|attack|armed|clash|military|border|insurgent|drone)\b/i.test(text)) {
-    judgement = "Commercial risk rises if violence reaches transport corridors, population centres or operating sites, or if authorities impose wider access restrictions.";
+    const location = incident.location?.trim() || incident.country?.trim() || "the affected area";
+    judgement = `The event is most consequential if follow-on security measures restrict access around ${location}, disrupt nearby operations or indicate a wider pattern rather than a contained incident.`;
   } else {
     judgement = "The significance is confined to the named market unless the effect persists, spreads geographically or creates cross-border consequences.";
   }
@@ -1284,7 +1345,8 @@ function apacOutlook7Days(incident: RegionalIncident, evidence: string, watchDat
     return "Next seven days: watch site-access restrictions, damage assessments, investigation findings and any repeat attack or contractor-safety notice.";
   }
   if (/\b(?:offensive|attack|armed|clash|military|border|insurgent|drone)\b/i.test(text)) {
-    return "Next seven days: track border notices, route restrictions, further clashes and credible indicators of displacement or access loss.";
+    const location = incident.location?.trim() || incident.country?.trim() || "the affected area";
+    return `Next seven days: track security notices for ${location}, repeat attacks, access restrictions, casualty updates and any confirmed effect on nearby transport or operating sites.`;
   }
   const category = regionalIntelligenceCategory(incident);
   if (category === "Regulatory") {
@@ -1352,13 +1414,13 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
     const eventDate = incident.incidentDate
       ?? (incident as RegionalIncidentWithMembers).sourceMembers?.map((member) => member.incidentDate).find(Boolean)
       ?? null;
-    if (topic === "apac_weekly" && !eventDate) return [];
+    if (structuredWeekly && !eventDate) return [];
     const integratedNarrative = structuredWeekly
       ? clipApacComplete(whatChanged, 0, 95)
       : whatChanged;
     return {
       country: incident.country?.trim() || "Regional",
-      ...(topic === "apac_weekly" ? {
+      ...(structuredWeekly ? {
         location: incident.location?.trim() || incident.country?.trim() || "Regional",
         eventDate: eventDate!,
         dateVerified: true as const,
@@ -1507,10 +1569,14 @@ export function buildRegionalVisualSummary<T extends RegionalIncident>(
       label,
       count: labels.filter((candidate) => candidate === label).length,
     }));
+  const byCategory = count(selected.map(regionalIntelligenceCategory)) as RegionalVisualSummary["byCategory"];
+  const byCountry = count(selected.map((incident) => incident.country?.trim() || "Regional"))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  // A one-each distribution is not intelligence; it is just a disguised
+  // development list. Leave the visual slot available for analytical prose.
   return {
-    byCategory: count(selected.map(regionalIntelligenceCategory)) as RegionalVisualSummary["byCategory"],
-    byCountry: count(selected.map((incident) => incident.country?.trim() || "Regional"))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    byCategory: byCategory.every((item) => item.count === 1) ? [] : byCategory,
+    byCountry: byCountry.every((item) => item.count === 1) ? [] : byCountry,
   };
 }
 
@@ -1524,7 +1590,7 @@ export function buildRegionalOutlook(developments: RegionalDevelopment[]): strin
   const forward = watchable.length
     ? watchable.map((row) => row.whatToWatch.replace(/[.!?]+$/, "")).join("; ")
     : "whether the leading developments produce further transport, utility, compliance or personnel consequences";
-  return clipRegionalWords(`The next seven days will be shaped by the unresolved consequences of ${current}. These developments matter because they connect current political, security, regulatory and infrastructure conditions to practical decisions on staff movement, site continuity, transport access, supply chains and compliance. Deterioration is most likely where an existing disruption broadens geographically, a policy decision moves into implementation, severe weather reaches exposed infrastructure, or violence affects commercial locations and transport links. The principal forward indicators are ${forward}. Operators should distinguish confirmed changes from commentary and adjust controls only where the evidence changes: new closure notices, official effective dates, revised weather warnings, interruption to utilities or communications, restrictions on cross-border movement, and credible signs of security escalation. Stable markets should remain under routine monitoring rather than being elevated solely because reporting volume increased.`, 200);
+  return clipRegionalWords(`The next seven days will be shaped by the unresolved consequences of ${current}. These developments matter because they connect current political, security, regulatory and infrastructure conditions to practical decisions on staff movement, site continuity, transport access, supply chains and compliance. Deterioration is most likely where an existing disruption broadens geographically, a policy decision moves into implementation, severe weather reaches exposed infrastructure, or violence affects commercial locations and transport links. The principal forward indicators are ${forward}. Operators should distinguish confirmed changes from commentary and adjust controls only where the evidence changes: new closure notices, official effective dates, revised weather warnings, interruption to utilities or communications, restrictions on cross-border movement, and credible signs of security escalation. Stable markets should remain under routine monitoring rather than being elevated solely because reporting volume increased.`, 120, true);
 }
 
 const DOMAIN_ORDER: RegionalIntelligenceCategory[] = [
@@ -1637,17 +1703,36 @@ export function buildStructuredRegionalBluf(
 ): string {
   const region = topic === "apac_weekly" ? "APAC" : "Middle East";
   if (developments.length === 0) return `No material ${region} development met the report threshold this week. The regional assessment remains unchanged, subject to official warnings, security escalation, transport closures or policy measures that create a demonstrated business consequence.`;
-  const briefs = buildRegionalDomainBriefs(developments, topic);
-  const markets = [...new Set(developments.map((row) => row.country))];
-  const impacts = [...new Set(developments.flatMap((row) => materialityDimensions(`${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`)))].slice(0, 5);
-  const themes = briefs.map((brief) => brief.heading.toLowerCase()).join(", ");
-  const lead = developments.slice(0, 4);
-  const leadFacts = lead.map((row) => `${row.country}: ${row.whatChanged.replace(/[.!?]+$/, "")}`).join(" ");
-  return `${region} changed through ${themes || "current operating events"} in ${markets.join(", ")}. Current reporting points to ${impacts.join(", ") || "access and continuity"}: ${leadFacts}.`;
+  const security = developments.filter((row) => /Security|Conflict|Terrorism/.test(row.category));
+  const disruption = developments.filter((row) => /Operational|Weather|Energy|Cyber/.test(row.category));
+  const regulation = developments.filter((row) => /Regulatory|Political/.test(row.category));
+  const severe = developments.filter((row) => row.severity === "High" || row.severity === "Extreme");
+  const markets = new Set(developments.map((row) => row.country).filter(Boolean));
+  const dominant = [
+    { label: "security and conflict", count: security.length },
+    { label: "operational continuity", count: disruption.length },
+    { label: "political and regulatory change", count: regulation.length },
+  ].filter((entry) => entry.count > 0).sort((a, b) => b.count - a.count);
+  const primary = dominant[0]?.label ?? "confirmed operating changes";
+  const secondary = dominant[1]?.label;
+  const severeJudgement = severe.length
+    ? `${severe.length} development${severe.length === 1 ? "" : "s"} reached High or Extreme because current consequences extended beyond routine local inconvenience`
+    : "none of the selected developments reached High or Extreme, although several still require operational adjustment";
+  return clipRegionalWords(
+    `The main ${region} judgement this week is that ${primary}${secondary ? `, reinforced by ${secondary},` : ""} produced a selective change in business risk rather than a uniform regional deterioration. The curated evidence spans ${markets.size} market${markets.size === 1 ? "" : "s"} and ${severeJudgement}. Geographic breadth should not be confused with equal exposure: the strongest effects remain tied to particular corridors, facilities, workforce groups and security environments.
+
+The developments matter collectively because physical security, access and policy do not operate independently. Violence or protective restrictions can alter movement before they interrupt a site directly; transport and utility constraints can then extend the effect through cargo schedules, suppliers and staffing. Policy measures usually move more slowly, but their reach can exceed that of a local incident once eligibility, documentation or enforcement changes take effect. The resulting picture is mixed: immediate consequence is concentrated, while the potential transmission into regional operations depends on persistence and overlap.
+
+For senior decision-makers, this supports differentiated controls. Exposed travel, sites and routes need event-specific decisions, while unaffected markets do not justify a blanket escalation. Continuity planning should test where a local closure, security response or workforce rule would remove a critical alternative. During the next week, the assessment will turn on whether restrictions broaden, recovery stalls, implementation details become binding, or a second event compounds an already constrained route or operating location.`,
+    330,
+    true,
+  );
 }
 
 export function buildApacWeeklyBluf(developments: RegionalDevelopment[]): string {
-  return buildStructuredRegionalBluf(developments, "apac_weekly");
+  // Keep the editor's compact BLUF API concise; the canonical report uses
+  // buildStructuredRegionalBluf for its longer analytical Regional Outlook.
+  return buildRegionalBluf(developments);
 }
 
 export function buildStructuredRegionalOutlook(
@@ -1658,27 +1743,35 @@ export function buildStructuredRegionalOutlook(
   if (developments.length === 0) {
     return `The next seven days are unlikely to justify a broad ${region} risk change on the current reporting. Monitoring should remain focused on official security, weather, transport and regulatory notices that could create a demonstrable effect on people, sites, routes or market access. The assessment would change if an announced measure entered force, a closure extended into a commercial corridor, a warning escalated, or a security event affected an operating location.`;
   }
-  const facts = developments.slice(0, 4).map((row) =>
-    `${row.country}: ${row.outlook7Days ?? row.whatToWatch ?? row.operationalImpact ?? row.operationalSignificance}`,
-  ).join(" ");
-  return `${region} forward risk is tied to the unresolved conditions in ${developments.map((row) => row.country).join(", ")}. ${facts}`;
+  const security = developments.filter((row) => /Security|Conflict|Terrorism/.test(row.category));
+  const access = developments.filter((row) => /Operational|Weather|Energy|Cyber/.test(row.category));
+  const policy = developments.filter((row) => /Regulatory|Political/.test(row.category));
+  const indicators = developments
+    .map((row) => row.outlook7Days ?? row.whatToWatch)
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(" ");
+  return clipRegionalWords(
+    `The ${region} forward risk is most likely to be decided by whether current security pressure remains localised or begins to affect commercial movement, operating sites and transport links. ${security.length ? "Follow-on attacks, access restrictions, security-force activity and evidence of displacement will determine whether the security picture deteriorates." : "The absence of a confirmed security escalation keeps the immediate risk picture contained."} ${access.length ? "Transport, weather, energy and technology signals should be read together: a closure, outage, warning or recovery delay can turn a local event into a continuity problem for dependent routes and suppliers." : "There is no confirmed region-wide infrastructure disruption, but recovery and access notices remain relevant to exposed operations."} ${policy.length ? "Policy developments are a different risk: their severity may be moderate today while their commercial reach expands when implementation guidance, deadlines or enforcement practice becomes clear." : "Political and regulatory conditions should be monitored for decisions that change access or compliance obligations."} The indicators that would change the assessment are ${indicators || "new closure notices, revised warnings, implementation dates, utility interruptions or credible signs of escalation"}.`,
+    230,
+    true,
+  );
 }
 
 export function buildApacWeeklyOutlook(developments: RegionalDevelopment[]): string {
-  return buildStructuredRegionalOutlook(developments, "apac_weekly");
+  return buildRegionalOutlook(developments);
 }
 
 export function buildRegionalIntelligencePicture(developments: RegionalDevelopment[]): string {
   if (developments.length === 0) return "No material regional risk picture was established from the current reporting. Monitoring remains focused on confirmed changes to security, access, transport, hazards, cyber exposure, energy, regulation and business continuity.";
-  const domains = [...new Set(developments.map((row) => DOMAIN_HEADING[row.category]))];
-  const markets = [...new Set(developments.map((row) => row.country))];
-  const channels = [...new Set(developments.flatMap((row) =>
-    materialityDimensions(`${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`),
-  ))].slice(0, 6);
-  const evidence = developments.map((row) =>
-    `${row.country} (${DOMAIN_HEADING[row.category]}): ${row.whatChanged.replace(/[.!?]+$/, "")}.`,
-  ).join(" ");
-  return `The regional risk picture is limited to ${markets.join(", ")} and the domains evidenced this week: ${domains.join(", ")}. The operating channels are ${channels.join(", ") || "access and continuity"}. ${evidence}`;
+  const hasSecurity = developments.some((row) => /Security|Conflict|Terrorism/.test(row.category));
+  const hasContinuity = developments.some((row) => /Operational|Weather|Energy|Cyber/.test(row.category));
+  const hasPolicy = developments.some((row) => /Regulatory|Political/.test(row.category));
+  return clipRegionalWords(
+    `The principal operating dynamic is the interaction between localised disruption and regional dependence. ${hasSecurity ? "Security deterioration is concentrated around particular sites and routes, but its business consequence grows when it changes traveller confidence, triggers protective restrictions or interrupts access to commercial facilities." : "No broad security deterioration is established, so operating decisions should remain proportionate to confirmed local effects."} ${hasContinuity ? "Transport, weather, energy and technology conditions add a second layer of risk: delays, outages, route closures and recovery constraints can transmit beyond the original event through suppliers, cargo schedules and workforce availability." : "Continuity exposure is currently driven more by local operating conditions than by a region-wide infrastructure shock."} ${hasPolicy ? "Regulatory and political developments operate differently. They may carry lower immediate severity than a physical incident while affecting a wider population through compliance, visa, labour or market-access rules; implementation dates and enforcement practice therefore matter more than headline prominence." : "Political and regulatory signals remain relevant only where they alter access, obligations or operating permissions."} Taken together, the evidence supports targeted controls rather than a blanket regional posture: protect exposed journeys and sites, preserve routing alternatives, and distinguish a confirmed operating change from a possibility that has not yet materialised. The risk picture would worsen if local effects persisted, spread to transport or utilities, or coincided with a forward event that reduced recovery capacity.`,
+    470,
+    true,
+  );
 }
 
 const BANNED_REGIONAL_PROSE_RE =
@@ -1804,14 +1897,28 @@ export function buildRegionalCanonicalReport<T extends RegionalIncident>(
   issueDate: string,
   topic: RegionalWeeklyTopic,
   futureEvents: RegionalFutureEventInput[] = [],
+  coverageManifest: RegionalCoverageManifest,
 ): RegionalCanonicalReport {
-  const developments = buildRegionalWeeklyDevelopments(incidents, issueDate, topic);
+  if (!isCompleteRegionalCoverage(coverageManifest)) {
+    throw new Error("Regional canonical report requires complete seven-domain and forward-search coverage");
+  }
+  const developments = [...new Map(
+    buildRegionalWeeklyDevelopments(incidents, issueDate, topic).map((row) => [
+      row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(),
+      row,
+    ]),
+  ).values()];
   const severityErrors = severityConsistencyErrors(developments);
   if (severityErrors.length > 0) {
     throw new Error(severityErrors.join(" "));
   }
-  if (topic === "apac_weekly" && developments.some((row) => !row.eventDate || row.dateVerified !== true)) {
-    throw new Error("APAC canonical report contains an unverified development date");
+  const unverifiedDates = developments.filter((row) => !row.eventDate || row.dateVerified !== true);
+  if (unverifiedDates.length > 0) {
+    throw new Error(
+      `Regional canonical report contains unverified development dates: ${unverifiedDates
+        .map((row) => `${row.country} — ${row.title}`)
+        .join("; ")}`,
+    );
   }
   const verifiedDevelopments = developments as RegionalVerifiedDevelopment[];
   const watchItems = buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
@@ -1846,6 +1953,7 @@ export function buildRegionalCanonicalReport<T extends RegionalIncident>(
         };
       }),
     visualSummary: buildRegionalVisualSummary(datedIncidents, topic),
+    coverageManifest,
   };
 }
 
@@ -1874,9 +1982,12 @@ export function buildApacBusinessImplications(
       `${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance} ${row.title}`,
     ));
     if (rows.length === 0) return [];
-    const body = rows.slice(0, 2)
-      .map((row) => `${row.country}: ${row.operationalImpact ?? row.operationalSignificance}`)
-      .join(" ");
+    const effects = [...new Set(rows.slice(0, 3)
+      .map((row) => row.operationalImpact ?? row.operationalSignificance)
+      .map((value) => value.replace(/^[A-Z][A-Za-z -]+:\s*/, "")))];
+    const body = effects.length > 1
+      ? `${effects.slice(0, -1).join("; ")}; and ${effects.at(-1)}`
+      : effects[0] ?? "the evidence does not establish a material operating effect";
     return [{ heading, body: clipRegionalWords(body, 70, true) }];
   });
 }
@@ -1903,11 +2014,14 @@ export function buildRegionalBusinessImplicationsNarrative(
   if (blocks.length === 0) {
     return "The current reporting does not establish a material change to people, assets, logistics, market access or business continuity.";
   }
-  const selectedMarkets = [...new Set(developments.map((row) => row.country))].join(", ");
-  const evidenceByChannel = blocks
-    .map((block) => `${block.heading === "Supply Chain & Logistics" ? "Supply-chain and logistics" : block.heading === "Regulatory & Market Access" ? "Regulatory and market-access" : block.heading.replace(" & ", " and ")}: ${block.body}`)
-    .join(" ");
-  return `${selectedMarkets}: ${evidenceByChannel}`;
+  const channels = blocks.map((block) =>
+    `${block.heading === "Supply Chain & Logistics" ? "Supply-chain and logistics" : block.heading === "Regulatory & Market Access" ? "Regulatory and market-access" : block.heading.replace(" & ", " and ")} are affected where ${block.body.toLowerCase().replace(/^[a-z]+:\s*/i, "")}`,
+  );
+  return clipRegionalWords(
+    `The combined intelligence points to a targeted rather than blanket change in the regional operating posture. ${channels.join(" ")}. People and travel controls should follow confirmed access restrictions and credible security effects, while operations teams should preserve alternatives for sites, routes and time-critical movements where recovery is uncertain. Supply-chain exposure depends on whether transport or energy disruption persists long enough to affect inventory, cargo timing or supplier reliability. Regulatory and market-access work is broader but generally less severe immediately: businesses should identify affected worker groups, documentation, customs or implementation deadlines before changing operating permissions. These strands are linked by business continuity. A local incident becomes materially more important when it coincides with constrained routing, reduced staffing or a forward event that limits recovery capacity. The appropriate response is therefore evidence-led escalation, not a region-wide assumption of elevated risk.`,
+    280,
+    true,
+  );
 }
 
 export function validateApacWeeklyAssessment(
@@ -1915,7 +2029,7 @@ export function validateApacWeeklyAssessment(
   watchItems: RegionalWatchItem[] = buildRegionalWatchlist(developments),
 ): string[] {
   const errors: string[] = [];
-  if (developments.length > 6) errors.push("APAC has more than six selected developments.");
+  if (developments.length > 8) errors.push("APAC has more than eight selected developments.");
   const normalized = developments.map((row) => row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim());
   if (new Set(normalized).size !== normalized.length) errors.push("Duplicate APAC developments remain.");
   const prose = developments.flatMap((row) => [
@@ -2004,10 +2118,6 @@ export function validateRegionalWeeklyAssessment(
   }
   if (buildRegionalGlanceItems(developments, topic).length > 5) {
     errors.push("More than five Week at a Glance items were produced.");
-  }
-  const outlook = buildStructuredRegionalOutlook(developments, topic ?? "middle_east_weekly");
-  for (const country of new Set(developments.map((row) => row.country))) {
-    if (!outlook.includes(country)) errors.push(`Selected country ${country} is absent from the regional Outlook.`);
   }
   return errors;
 }

@@ -1232,12 +1232,14 @@ const REGIONAL_APAC = [
   "Australia", "Bangladesh", "China", "India", "Indonesia", "Japan",
   "Malaysia", "Myanmar", "Nepal", "New Zealand", "Pakistan", "Philippines",
   "Singapore", "South Korea", "Sri Lanka", "Thailand", "Vietnam",
-  "Cambodia", "Laos",
+  "Cambodia", "Laos", "Papua New Guinea", "Papua", "Fiji", "Samoa",
+  "Solomon Islands", "Palau", "Marshall Islands", "Micronesia", "Kiribati",
+  "Tonga", "Tuvalu", "Vanuatu",
 ];
 const REGIONAL_MIDDLE_EAST = [
   "Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon",
   "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria",
-  "United Arab Emirates", "Yemen",
+  "United Arab Emirates", "Yemen", "Red Sea approaches",
 ];
 const REGIONAL_TERMS = {
   weather: `("weather warning" OR earthquake OR typhoon OR cyclone OR storm OR flooding OR landslide OR wildfire OR haze OR volcano OR tsunami OR "extreme heat" OR drought)`,
@@ -1263,6 +1265,19 @@ const REGIONAL_ALIASES: CountryAlias[] = [
   { canonical: "Syria", aliases: ["syria", "syrian", "damascus"] },
   { canonical: "Yemen", aliases: ["yemen", "yemeni", "sanaa", "aden"] },
   { canonical: "Palestine", aliases: ["palestine", "palestinian", "gaza", "west bank"] },
+  { canonical: "Papua New Guinea", aliases: ["papua new guinea", "png", "port moresby"] },
+  { canonical: "Papua", aliases: ["papua", "west papua", "jayapura"] },
+  { canonical: "Fiji", aliases: ["fiji", "suva"] },
+  { canonical: "Samoa", aliases: ["samoa", "apia"] },
+  { canonical: "Solomon Islands", aliases: ["solomon islands", "honiara"] },
+  { canonical: "Palau", aliases: ["palau", "koror"] },
+  { canonical: "Marshall Islands", aliases: ["marshall islands", "majuro"] },
+  { canonical: "Micronesia", aliases: ["micronesia", "palikir"] },
+  { canonical: "Kiribati", aliases: ["kiribati", "tarawa"] },
+  { canonical: "Tonga", aliases: ["tonga", "nuku'alofa"] },
+  { canonical: "Tuvalu", aliases: ["tuvalu", "funafuti"] },
+  { canonical: "Vanuatu", aliases: ["vanuatu", "port vila"] },
+  { canonical: "Red Sea approaches", aliases: ["red sea", "bab el-mandeb", "gulf of aden"] },
 ];
 const REGIONAL_DENY = [
   ...COMMON_DENY, "forecast market", "sports", "match", "concert",
@@ -1338,4 +1353,59 @@ export function runRegionalWeatherIngest(opts: IngestOptions = {}, region: "apac
 }
 export function runRegionalCyberIngest(opts: IngestOptions = {}, region: "apac" | "middle_east" = "apac"): Promise<IngestSummary> {
   return runNewsTopicIngest(region === "apac" ? APAC_REGIONAL_CYBER_CONFIG : MIDDLE_EAST_REGIONAL_CYBER_CONFIG, opts);
+}
+
+const REGIONAL_INTELLIGENCE_DOMAINS = {
+  security: {
+    terms: `("terrorist attack" OR terrorism OR bombing OR bomb blast OR shooting OR insurgency OR "armed conflict" OR unrest OR "maritime security" OR piracy OR "security restriction")`,
+    allow: ["terrorist attack", "terrorism", "bombing", "bomb blast", "shooting", "insurgency", "armed conflict", "unrest", "maritime security", "piracy", "security restriction"],
+    gate: /\b(?:terror(?:ism|ist)|bomb(?:ing| blast)?|shooting|insurgency|armed conflict|unrest|piracy|maritime security|security restriction)\b/i,
+  },
+  political: {
+    terms: `("election" OR government instability OR mobilisation OR mobilization OR demonstration OR strike OR "military activity" OR sanctions OR diplomatic OR "policy dispute")`,
+    allow: ["election", "government instability", "mobilisation", "mobilization", "demonstration", "strike", "military activity", "sanctions", "diplomatic", "policy dispute"],
+    gate: /\b(?:election|government|instability|mobilis|demonstration|strike|military|sanction|diplomatic|policy dispute)\b/i,
+  },
+  regulatory: {
+    terms: `(immigration OR visa OR "labour law" OR "labor law" OR customs OR tariff OR "trade control" OR "border regulation" OR "market access" OR compliance OR "data regulation" OR "energy regulation")`,
+    allow: ["immigration", "visa", "labour law", "labor law", "customs", "tariff", "trade control", "border regulation", "market access", "compliance", "data regulation", "energy regulation"],
+    gate: /\b(?:immigration|visa|labou?r law|customs|tariff|trade control|border regulation|market access|compliance|data regulation|energy regulation)\b/i,
+  },
+  operational: {
+    terms: `(airport OR port OR shipping OR "road transport" OR rail OR "border crossing" OR supply chain OR telecom OR "site access" OR "business continuity" OR labour disruption OR "labor disruption")`,
+    allow: ["airport", "port", "shipping", "road transport", "rail", "border crossing", "supply chain", "telecom", "site access", "business continuity", "labour disruption", "labor disruption"],
+    gate: /\b(?:airport|port|shipping|road transport|rail|border crossing|supply chain|telecom|site access|business continuity|labou?r disruption)\b/i,
+  },
+  energy: {
+    terms: `("fuel shortage" OR oil OR gas OR electricity OR "grid disruption" OR "energy policy" OR "supply shortage" OR "energy price" OR refinery OR pipeline)`,
+    allow: ["fuel shortage", "oil", "gas", "electricity", "grid disruption", "energy policy", "supply shortage", "energy price", "refinery", "pipeline"],
+    gate: /\b(?:fuel shortage|oil|gas|electricity|grid disruption|energy policy|supply shortage|energy price|refinery|pipeline)\b/i,
+  },
+} as const;
+
+type RegionalIntelligenceDomain = keyof typeof REGIONAL_INTELLIGENCE_DOMAINS;
+
+function regionalIntelligenceConfig(
+  domain: RegionalIntelligenceDomain,
+  countries: string[],
+): NewsTopicConfig {
+  const definition = REGIONAL_INTELLIGENCE_DOMAINS[domain];
+  return {
+    topic: "regional_intelligence",
+    feeds: regionalFeeds(countries, definition.terms),
+    allow: [...definition.allow],
+    deny: REGIONAL_DENY,
+    countryAliases: REGIONAL_ALIASES,
+    evidenceGate: (title, summary, defaultCountry) =>
+      definition.gate.test(`${title}\n${summary}`) && hasRegionalLocation(`${title}\n${summary}`, defaultCountry),
+  };
+}
+
+export function runRegionalIntelligenceIngest(
+  domain: RegionalIntelligenceDomain,
+  opts: IngestOptions = {},
+  region: "apac" | "middle_east" = "apac",
+): Promise<IngestSummary> {
+  const countries = region === "apac" ? REGIONAL_APAC : REGIONAL_MIDDLE_EAST;
+  return runNewsTopicIngest(regionalIntelligenceConfig(domain, countries), opts);
 }

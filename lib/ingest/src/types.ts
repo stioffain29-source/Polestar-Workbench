@@ -10,7 +10,8 @@ export type IngestTopic =
   | "indonesia_local"
   | "apac_local"
   | "regional_weather"
-  | "regional_cyber";
+  | "regional_cyber"
+  | "regional_intelligence";
 
 export type FeedStat = {
   name: string;

@@ -1,0 +1,936 @@
+REGIONAL WEEKLY REPORTS — REBUILD THE PRODUCT PROPERLY
+
+This applies to BOTH:
+
+POLESTAR APAC WEEKLY
+POLESTAR MIDDLE EAST WEEKLY
+
+Stop making small cosmetic adjustments to the existing output.
+
+The reports are still not functioning as regional intelligence products.
+
+The problem is BOTH:
+
+1. insufficient and poorly selected intelligence
+2. the report writing and structure
+
+Fix them together.
+
+DO NOT redesign:
+cover
+branding
+header
+footer
+basic map presentation
+PDF styling
+
+The required change is the intelligence pipeline and the way the finished report is written.
+
+==================================================
+THE PRODUCT
+==================================================
+
+These are WEEKLY REGIONAL BUSINESS RISK INTELLIGENCE REPORTS.
+
+They are NOT:
+
+news digests
+incident lists
+collections of article summaries
+security-only reports
+automated country lists
+
+The target reader is a regional:
+
+security director
+risk director
+resilience lead
+operations leader
+travel manager
+supply-chain leader
+commercial leader
+senior executive
+
+The report must answer:
+
+WHAT CHANGED THIS WEEK?
+
+WHY DOES IT MATTER?
+
+WHAT DOES IT MEAN FOR BUSINESS?
+
+WHAT SHOULD I WATCH NEXT?
+
+Every page must contribute to answering those questions.
+
+==================================================
+1. COLLECTION MUST COME BEFORE WRITING
+==================================================
+
+Do not start writing the report from whatever happens to be in the general incident feed.
+
+Run a deliberate regional collection process FIRST.
+
+Every reporting cycle must search separately across:
+
+SECURITY AND CONFLICT
+
+terrorism
+bombings
+shootings
+insurgency
+armed conflict
+civil unrest
+serious organised crime where operationally relevant
+maritime security
+security restrictions
+
+POLITICAL AND GEOPOLITICAL
+
+elections
+government instability
+political mobilisation
+major demonstrations
+strikes with political consequence
+interstate tensions
+military activity
+sanctions
+diplomatic developments
+policy disputes affecting business
+
+REGULATORY AND POLICY
+
+immigration
+visa rules
+labour law
+customs
+tariffs
+trade controls
+border regulation
+foreign investment
+market access
+data regulation
+energy regulation
+new compliance obligations
+
+BUSINESS AND OPERATIONAL DISRUPTION
+
+airports
+ports
+shipping
+road transport
+rail
+border crossings
+supply chains
+telecommunications
+site access
+labour disruption
+business continuity
+
+ENERGY AND UTILITIES
+
+fuel
+oil
+gas
+electricity
+grid disruption
+energy policy
+supply shortages
+major price or availability changes with operational consequences
+
+WEATHER AND NATURAL HAZARDS
+
+earthquakes
+typhoons
+cyclones
+severe storms
+flooding
+landslides
+wildfires
+haze
+volcanic activity
+tsunami warnings
+extreme heat
+drought
+
+CYBER
+
+ransomware
+critical infrastructure attacks
+telecom disruption
+port cyber incidents
+airport cyber incidents
+logistics cyber incidents
+energy and utility attacks
+government-system disruption
+major corporate incidents with credible operational effect
+
+Every one of these domains must be CHECKED.
+
+They do not all need to appear in the final report.
+
+They must, however, be searched before the final evidence set is selected.
+
+==================================================
+2. REGIONAL COVERAGE
+==================================================
+
+APAC WEEKLY must deliberately search:
+
+Northeast Asia
+Southeast Asia
+South Asia
+Australia
+New Zealand
+Papua New Guinea
+Papua
+Pacific Islands
+
+MIDDLE EAST WEEKLY must deliberately search:
+
+Saudi Arabia
+UAE
+Qatar
+Kuwait
+Bahrain
+Oman
+Iran
+Iraq
+Israel
+Palestinian Territories where operationally relevant
+Lebanon
+Syria
+Jordan
+Yemen
+Red Sea approaches
+
+Also include developments outside these borders when they materially affect regional operations.
+
+DO NOT produce a Middle East Weekly based only on Saudi Arabia and Iran because those were the only items returned by one feed.
+
+The current Middle East report with 2 developments and zero 7-day watch items demonstrates inadequate collection.
+
+FIX THE COLLECTION.
+
+==================================================
+3. EVIDENCE PIPELINE
+==================================================
+
+Required pipeline:
+
+COLLECT
+→ NORMALISE
+→ TRANSLATE TO ENGLISH
+→ VERIFY EVENT DATE
+→ DEDUPLICATE
+→ CLASSIFY
+→ ASSESS RELEVANCE
+→ ASSESS SEVERITY
+→ ASSESS MATERIALITY
+→ CURATE FINAL EVIDENCE SET
+→ DERIVE REGIONAL THEMES
+→ GENERATE REPORT
+
+Do not generate prose before this process is complete.
+
+==================================================
+4. DEDUPLICATION
+==================================================
+
+ONE REAL-WORLD EVENT = ONE DEVELOPMENT.
+
+Multiple articles about the same event are corroborating sources.
+
+They are not separate developments.
+
+Do not allow a country to dominate because several outlets covered one incident.
+
+Source count may increase confidence.
+
+It must not increase materiality.
+
+==================================================
+5. EVENT DATES ARE MANDATORY
+==================================================
+
+Every Key Development must show:
+
+COUNTRY | LOCATION
+
+DATE
+
+TITLE
+
+Example:
+
+THAILAND | NARATHIWAT
+18 SEPTEMBER 2026
+
+Bomb and Small Arms Attack
+
+Use the ACTUAL EVENT DATE.
+
+Do not substitute:
+
+publication date
+scrape date
+ingestion date
+database creation date
+report generation date
+
+For regulatory issues show:
+
+ANNOUNCED: date
+
+and where relevant:
+
+EFFECTIVE: date
+
+If a reliable event date cannot be established, do not promote the item to Key Developments until verified.
+
+==================================================
+6. RELEVANCE FILTER
+==================================================
+
+Ask:
+
+WOULD A REGIONAL BUSINESS RISK READER REASONABLY NEED TO KNOW THIS?
+
+If no:
+
+DROP IT.
+
+Normally exclude:
+
+routine policing
+traffic enforcement
+minor local crime
+minor accidents
+community stories
+low-level administrative activity
+local incidents with no meaningful operational consequence
+
+Do not allow weak local stories to displace:
+
+bombings
+armed attacks
+major unrest
+significant regulatory changes
+transport shutdowns
+major weather events
+earthquakes
+critical infrastructure problems
+significant cyber incidents
+
+==================================================
+7. SEVERITY
+==================================================
+
+Use only:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+Severity means CURRENT CONSEQUENCE.
+
+It does NOT mean:
+
+media interest
+regional importance
+article volume
+dramatic headline
+political significance
+
+INSIGNIFICANT
+
+Negligible consequence.
+
+LOW
+
+Limited local inconvenience or minor consequence.
+
+MODERATE
+
+Credible operational impact requiring adjustment.
+
+HIGH
+
+Significant violence, disruption or restriction with material consequences for people, operations, travel, assets, logistics or continuity.
+
+EXTREME
+
+Major or widespread consequences, major conflict escalation, mass casualty event, severe infrastructure disruption or sustained large-scale effect.
+
+Security events must consider:
+
+attack method
+target
+fatalities
+injuries
+intent
+location
+follow-on threat
+security response
+access effect
+operational consequence
+
+Regulatory events must consider:
+
+number affected
+implementation date
+workforce effect
+compliance burden
+travel effect
+market-access effect
+actual operational disruption
+
+A visa-policy change must NOT receive the same severity treatment as a mass-casualty bombing merely because both matter to business.
+
+Regional significance and severity are separate judgements.
+
+==================================================
+8. MATERIALITY
+==================================================
+
+After severity is assessed, rank developments by:
+
+actual business consequence
+personnel effect
+travel effect
+asset / site effect
+security significance
+supply-chain effect
+transport effect
+energy effect
+regulatory effect
+political effect
+weather impact
+cyber impact
+forward relevance
+regional significance
+
+Do not rank solely by severity.
+
+Do not rank by source count.
+
+Do not rank by recency alone.
+
+==================================================
+9. NUMBER OF KEY DEVELOPMENTS
+==================================================
+
+Target:
+
+5 to 8 material developments per regional weekly
+
+ONLY where supported by real evidence.
+
+Do not invent filler to reach the target.
+
+However:
+
+If APAC produces only 3 or 4 items
+or
+Middle East produces only 2 items
+
+the engine must first verify that ALL required collection domains and regional markets were actually searched before accepting that result.
+
+A thin result must trigger a COVERAGE CHECK.
+
+It must not automatically become the final report.
+
+==================================================
+10. REPORT WRITING STYLE
+==================================================
+
+THIS IS CRITICAL.
+
+The final report must NOT read like:
+
+Philippines: event
+Australia: event
+Pakistan: event
+Thailand: event
+
+That is a list.
+
+The report must read as ANALYSIS.
+
+Individual incidents are evidence supporting the analysis.
+
+They are not the writing structure.
+
+Use British English.
+
+Use concise professional prose.
+
+Write like an experienced regional intelligence analyst briefing a senior business leader.
+
+Do not write like:
+
+a database
+a scraper
+an RSS feed
+a risk matrix
+an AI template
+
+==================================================
+11. PAGE 1 — REGIONAL OUTLOOK
+==================================================
+
+Target:
+
+250 to 350 words.
+
+This must be genuine regional analysis.
+
+Start with the most important regional judgement.
+
+Identify:
+
+2 to 4 dominant themes
+where the operating environment changed
+what is driving those changes
+what matters commercially
+where effects remain localised
+where wider consequences are plausible
+what will matter over the next seven days
+
+Do NOT simply list the Key Developments.
+
+Do NOT use:
+
+“APAC changed through...”
+
+“Middle East changed through...”
+
+“Current reporting points to...”
+
+followed by a country list.
+
+Write cohesive analytical prose.
+
+==================================================
+12. REGIONAL RISK MAP
+==================================================
+
+Keep the existing map presentation.
+
+Maximum:
+
+3 developments.
+
+Select the THREE developments that best explain the regional operating picture.
+
+They must come from the final curated Key Developments.
+
+Map callouts must include:
+
+DATE
+SHORT TITLE
+VERY SHORT EXPLANATION
+
+Do not select based only on severity.
+
+Do not put an administrative issue on the map ahead of a materially more important bombing, conflict event, natural hazard or major disruption.
+
+==================================================
+13. WEEK AT A GLANCE
+==================================================
+
+Keep four metrics:
+
+MATERIAL DEVELOPMENTS
+
+MARKETS REQUIRING WATCH
+
+HIGH OR EXTREME DEVELOPMENTS
+
+7 DAY WATCH ITEMS
+
+No explanatory prose.
+
+==================================================
+14. REGIONAL RISK PICTURE
+==================================================
+
+This must NOT repeat the Regional Outlook.
+
+Write approximately:
+
+350 to 500 words.
+
+This section should explain the principal operating dynamics across the region.
+
+It should naturally incorporate relevant themes such as:
+
+security
+politics
+regulation
+energy
+weather
+cyber
+operations
+
+Do not write one paragraph per category.
+
+Do not list every incident.
+
+Explain relationships and business consequences.
+
+Example concept:
+
+security deterioration may be localised while simultaneously interacting with transport disruption or political mobilisation.
+
+Regulatory change may have less immediate severity but broader commercial reach.
+
+Weather may create the week's most significant supply-chain exposure even where security conditions remain stable.
+
+THAT is the style required.
+
+==================================================
+15. VISUAL INTELLIGENCE
+==================================================
+
+The report needs useful visuals.
+
+Do not automatically create:
+
+DEVELOPMENTS BY MARKET
+
+where every country equals 1.
+
+That tells the reader nothing.
+
+Do not automatically create:
+
+DEVELOPMENTS BY TYPE
+
+where almost every category equals 1.
+
+Only create charts where the data says something.
+
+Useful examples:
+
+4-week trend
+conflict activity trend
+protest activity trend
+weather track
+rainfall / flood exposure
+earthquake location and magnitude
+energy-price movement
+port disruption
+aviation disruption
+scheduled events timeline
+cyber incidents by affected sector
+
+If no meaningful numerical dataset exists:
+
+do not generate a chart.
+
+Use the space for useful analysis.
+
+==================================================
+16. KEY DEVELOPMENTS
+==================================================
+
+Each development must use:
+
+COUNTRY | LOCATION
+
+DATE
+
+SHORT TITLE
+
+CATEGORY
+
+CURRENT SEVERITY
+
+ASSESSMENT
+
+Approximately 80 to 120 words.
+
+Explain:
+
+what happened
+what changed
+current situation
+actual operational consequence
+
+POLESTAR VIEW
+
+Approximately 40 to 60 words.
+
+Give specific analytical judgement.
+
+OUTLOOK 7 DAYS
+
+Approximately 30 to 50 words.
+
+Identify specific forward indicators.
+
+Do not use identical Polestar View text for several unrelated incidents.
+
+Do not use identical Outlook text for several unrelated incidents.
+
+A bombing in Thailand and political violence in the Philippines should NOT automatically receive the same generic paragraph about:
+
+“transport corridors, population centres and access restrictions.”
+
+Write about the actual event.
+
+==================================================
+17. BUSINESS IMPLICATIONS
+==================================================
+
+The current output is unacceptable.
+
+Do NOT write:
+
+“Review staff movement plans, journey plans...”
+
+Do NOT concatenate country summaries.
+
+Write approximately:
+
+200 to 300 words.
+
+This must be SYNTHESIS.
+
+Answer:
+
+What does the week's combined intelligence mean for regional businesses?
+
+Consider:
+
+People and travel
+
+Operations and assets
+
+Supply chains and logistics
+
+Regulation and market access
+
+Energy and utilities
+
+Business continuity
+
+Only discuss those genuinely affected.
+
+Do not repeat the Key Developments.
+
+==================================================
+18. 7 DAY WATCH
+==================================================
+
+Run a SEPARATE forward collection.
+
+Do not build this from the historical incident feed.
+
+Search the NEXT SEVEN DAYS for:
+
+protests
+strikes
+elections
+political deadlines
+court rulings
+regulatory implementation
+military exercises
+major public gatherings
+religious events
+typhoon tracks
+cyclone tracks
+severe weather
+flood warnings
+transport disruption
+border restrictions
+
+Target:
+
+up to 5 useful watch items.
+
+Each item:
+
+DATE
+LOCATION
+EVENT
+EXPECTED OPERATIONAL EFFECT
+CURRENT SEVERITY
+
+Do not automatically make demonstrations High.
+
+If the system returns 0 items:
+
+verify that the forward search actually ran.
+
+==================================================
+19. POLESTAR OUTLOOK
+==================================================
+
+Target:
+
+180 to 250 words.
+
+This must be analysis of WHAT COMES NEXT.
+
+Do not write:
+
+Philippines: monitor...
+Australia: monitor...
+Pakistan: monitor...
+Thailand: monitor...
+
+That is another list.
+
+Instead synthesise:
+
+principal drivers for the next week
+where deterioration is plausible
+what indicators matter
+what could materially change the assessment
+where conditions may stabilise
+
+The reader should finish this section understanding what Polestar believes deserves attention NEXT.
+
+==================================================
+20. WEATHER AND CYBER MUST NOT DISAPPEAR
+==================================================
+
+Before finalising each weekly, record internally:
+
+WEATHER SEARCH COMPLETED: YES / NO
+
+CYBER SEARCH COMPLETED: YES / NO
+
+If either is NO:
+
+DO NOT GENERATE THE REPORT.
+
+If checked and nothing material is found:
+
+do not create filler in the report.
+
+But the collection must have happened.
+
+==================================================
+21. PREVIEW AND PDF
+==================================================
+
+Use ONE canonical report object.
+
+Required:
+
+COLLECT
+→ ANALYSE
+→ GENERATE ONCE
+→ SAVE
+→ PREVIEW READS SAVED OBJECT
+→ PDF READS SAME SAVED OBJECT
+
+The PDF must not regenerate content.
+
+Preview and PDF must contain exactly the same:
+
+developments
+dates
+severity
+map selections
+watch items
+prose
+
+==================================================
+22. QUALITY CONTROL BEFORE EXPORT
+==================================================
+
+FAIL THE REPORT if:
+
+a Key Development has no verified date
+
+a routine local story outranks a significant event
+
+severity is clearly inconsistent
+
+duplicate developments remain
+
+weather collection did not run
+
+cyber collection did not run
+
+7 Day Watch collection did not run
+
+raw source text appears
+
+media outlet names leak into prose
+
+map items bypass final curation
+
+Regional Outlook reads like a country list
+
+Regional Risk Picture repeats the Outlook
+
+Business Implications repeats the Key Developments
+
+Polestar Outlook reads like monitoring instructions by country
+
+preview and PDF differ
+
+==================================================
+23. IMPLEMENTATION ORDER
+==================================================
+
+Do not attempt to fix everything through prompt wording alone.
+
+Inspect and correct:
+
+collection
+normalisation
+deduplication
+classification
+severity
+materiality
+curation
+generation
+save/reload
+rendering
+
+in that order.
+
+FIRST repair APAC Weekly and Middle East Weekly to this specification.
+
+Then generate both.
+
+Do not touch any other Polestar product.
+
+==================================================
+24. ACCEPTANCE STANDARD
+==================================================
+
+I do not want another report that merely renders successfully.
+
+The output must feel like:
+
+A CURATED REGIONAL INTELLIGENCE PRODUCT.
+
+Not:
+
+A LIST OF STORIES PLACED INTO A PDF.
+
+Before declaring completion ask:
+
+Would a regional director pay for this because it saves them time, explains what matters and tells them what to watch next?
+
+If the answer is no:
+
+the report is not finished.
+
+Generate:
+
+1. POLESTAR APAC WEEKLY
+2. POLESTAR MIDDLE EAST WEEKLY
+
+using this specification.
+
+STOP after producing those two outputs.

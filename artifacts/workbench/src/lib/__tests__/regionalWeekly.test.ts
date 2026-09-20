@@ -94,12 +94,12 @@ describe("regional weekly products", () => {
     expect(rows.map((row) => row.id)).toEqual([1, 2]);
   });
 
-  it("caps key developments at four and keeps the Middle East boundary", () => {
+  it("caps key developments at eight and keeps the Middle East boundary", () => {
     const rows = Array.from({ length: 12 }, (_, index) =>
       incident(index, "Iran", "moderate", "2026-09-17", `Port disruption affects cargo operations ${index}`),
     );
     const selected = selectRegionalKeyDevelopments(rows);
-    expect(selected.length).toBeLessThanOrEqual(6);
+    expect(selected.length).toBeLessThanOrEqual(8);
     expect(validateRegionalWeeklyAssessment(
       buildRegionalDevelopments(rows, "2026-09-17", "middle_east_weekly"),
       "middle_east_weekly",
@@ -357,7 +357,7 @@ describe("regional weekly products", () => {
     expect(rows[0].nextDue).toBe("2026-09-24");
   });
 
-  it("APAC selects at most four real developments and never pads a short evidence set", () => {
+  it("APAC selects at most eight real developments and never pads a short evidence set", () => {
     const short = [
       incident(1, "Indonesia", "high", "2026-09-17", "Port closure disrupts cargo operations"),
       incident(2, "Japan", "moderate", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
@@ -368,7 +368,7 @@ describe("regional weekly products", () => {
         incident(index, ["Indonesia", "Japan", "Singapore", "Australia", "India", "Malaysia", "Thailand"][index % 7], "moderate", "2026-09-17", `Port closure disrupts cargo operations ${index}`),
       ),
       "apac_weekly",
-    )).toHaveLength(6);
+    )).toHaveLength(8);
   });
 
   it("APAC omits empty domains, rejects source slop, and exposes distinct editorial fields", () => {

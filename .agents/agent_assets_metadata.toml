@@ -1325,3 +1325,31 @@ mtime_ms = 1789808745476
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/a613cecb-a6be-4017-8f76-f595a5406a98/ff5086b6-97c7-4b18-829f-dfb092dae7eb"
 storage_version_token = "1789808784657799"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "vyBeU7LOGo7h1PcUSQVl7"
+uri = "file://exports/Polestar_APAC_Weekly_2026-09-20.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly — 20 September 2026"
+description = "Final production-backed APAC regional business-risk intelligence report."
+logical_id = "431408a3-3ad9-42e7-9658-7029c5e04712"
+content_hash = "sha256:d3f09653cdc13e802386018ba2293cbdd6d6de40be53c747f57a33064ce9b4ce"
+size = 1979227
+mtime_ms = 1789878708427
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/431408a3-3ad9-42e7-9658-7029c5e04712/fa90aaff-45d8-4845-b605-025cfc80258f"
+storage_version_token = "1789878718166036"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "nVJCzJIx2NIT19-OlPnh4"
+uri = "file://exports/Polestar_Middle_East_Weekly_2026-09-20.pdf"
+type = "pdf"
+title = "Polestar Middle East Weekly — 20 September 2026"
+description = "Final production-backed Middle East regional business-risk intelligence report."
+logical_id = "8c2eaf7e-efa6-4abe-8964-3ad5714e5906"
+content_hash = "sha256:302b2c9abeefc9880f4b04c3f9b2c01b3892f7f43b0add664465c32840b43eb8"
+size = 1674039
+mtime_ms = 1789878708431
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/8c2eaf7e-efa6-4abe-8964-3ad5714e5906/bbe8142a-f109-4057-9d96-6cf823049841"
+storage_version_token = "1789878719580345"
+content_type = "application/pdf"

@@ -66,7 +66,8 @@ export type SeverityTopic =
   | "apac_local"
   | "data_centres"
   | "regional_weather"
-  | "regional_cyber";
+  | "regional_cyber"
+  | "regional_intelligence";
   // Regional weekly evidence lanes. These are deliberately separate from
   // APAC/local products so a weather or cyber source cannot silently change
   // another monitor's dataset.
@@ -89,6 +90,7 @@ export const ALL_SEVERITY_TOPICS: SeverityTopic[] = [
   "data_centres",
   "regional_weather",
   "regional_cyber",
+  "regional_intelligence",
 ];
 
 // Present-tense fatal headlines. News writes fatal attacks in the present tense

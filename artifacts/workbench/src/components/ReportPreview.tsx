@@ -1533,38 +1533,45 @@ export default function ReportPreview({
   const regionalCanonical = regionalTopic
     ? regionalCanonicalReportFromHardNumbers(report.hardNumbers, regionalTopic, report.issueDate)
     : null;
+  if (isRegionalWeekly && !regionalCanonical) {
+    return (
+      <div className="mx-auto max-w-3xl border border-[#e2e2e2] bg-white p-8 text-center">
+        <h2 className="text-lg font-bold text-[#0b0a3d]">Regional report unavailable</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This report has no valid persisted canonical report object. Generate and save the regional report before previewing or exporting it.
+        </p>
+      </div>
+    );
+  }
   const apacCanonical = report.topic === "apac_weekly" ? regionalCanonical : null;
   const regionalCuratedIncidents = regionalTopic
     ? curateRegionalWeeklyIncidents(incidents, regionalTopic, report.issueDate ?? "")
     : [];
   const regionalDevelopments = isRegionalWeekly
-    ? (regionalCanonical?.developments
-      ?? (report.topic === "apac_weekly"
-        ? []
-        : buildRegionalDevelopments(regionalCuratedIncidents, report.issueDate ?? undefined, regionalTopic ?? "middle_east_weekly")))
+    ? regionalCanonical!.developments
     : [];
   const regionalDomainBriefs = isRegionalWeekly
-    ? (regionalCanonical?.domainBriefs ?? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined))
+    ? regionalCanonical!.domainBriefs
     : [];
   const regionalBluf = isRegionalWeekly
-    ? (regionalCanonical?.regionalOutlook ?? buildStructuredRegionalBluf(regionalDevelopments, regionalTopic ?? "apac_weekly"))
+    ? regionalCanonical!.regionalOutlook
     : "";
   const regionalOutlook = isRegionalWeekly
-    ? (regionalCanonical?.polestarOutlook ?? buildStructuredRegionalOutlook(regionalDevelopments, regionalTopic ?? "apac_weekly"))
+    ? regionalCanonical!.polestarOutlook
     : "";
   const regionalRiskPicture = isRegionalWeekly
-    ? (regionalCanonical?.riskPicture ?? buildRegionalIntelligencePicture(regionalDevelopments))
+    ? regionalCanonical!.riskPicture
     : "";
   const regionalTravelImplications = isRegionalWeekly ? buildRegionalTravelImplications(regionalDevelopments) : "";
   const regionalBusinessImplications = isRegionalWeekly
-    ? (regionalCanonical?.businessImplicationsNarrative ?? buildRegionalBusinessImplicationsNarrative(regionalDevelopments))
+    ? regionalCanonical!.businessImplicationsNarrative
     : "";
   const regionalWatchlist = isRegionalWeekly
-    ? (regionalCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
+    ? regionalCanonical!.watchItems
     : [];
   const regionalGlanceItems = isRegionalWeekly ? buildRegionalGlanceItems(regionalDevelopments, regionalTopic ?? undefined) : [];
   const regionalMapPoints = isRegionalWeekly
-    ? (regionalCanonical?.mapPoints ?? buildRegionalMapPoints(regionalCuratedIncidents, regionalTopic ?? undefined))
+    ? regionalCanonical!.mapPoints
     : [];
   const apacMapItems = (() => {
     if (report.topic !== "apac_weekly" || !apacCanonical) return [];
@@ -1583,16 +1590,16 @@ export default function ReportPreview({
   })();
   const apacThemes = isRegionalWeekly ? regionalDomainBriefs.slice(0, 5) : [];
   const apacImplications = isRegionalWeekly
-    ? (regionalCanonical?.businessImplications ?? buildApacBusinessImplications(regionalDevelopments))
+    ? regionalCanonical!.businessImplications
     : [];
   const apacWatchlist = isRegionalWeekly
-    ? (regionalCanonical?.watchItems ?? buildApacWeeklyWatchlist(regionalDevelopments, futureEvents, report.issueDate))
+    ? regionalCanonical!.watchItems
     : [];
   const apacGlanceMetrics = isRegionalWeekly
-    ? (regionalCanonical?.glanceMetrics ?? buildApacGlanceMetrics(regionalDevelopments, apacWatchlist))
+    ? regionalCanonical!.glanceMetrics
     : [];
   const apacVisualSummary = isRegionalWeekly
-    ? (regionalCanonical?.visualSummary ?? buildRegionalVisualSummary(regionalCuratedIncidents, regionalTopic ?? "apac_weekly"))
+    ? regionalCanonical!.visualSummary
     : { byCategory: [], byCountry: [] };
 
   const isEnergy = report.topic === "energy";
@@ -1980,7 +1987,7 @@ export default function ReportPreview({
             </Section>
             <div style={{ marginTop: 40 }}>
               <Section hidden={!show("polestar-view")} title="Polestar Outlook">
-                <Paragraphs text={resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)} />
+                <Paragraphs text={regionalOutlook} />
               </Section>
             </div>
           </div>
@@ -2027,7 +2034,7 @@ export default function ReportPreview({
             </Section>
             <div style={{ marginTop: 40 }}>
               <Section hidden={!show("implications")} title="Business Implications">
-                <Paragraphs text={resolveRegionalNarrative(report.implications, aiProse?.implications, regionalBusinessImplications)} />
+                <Paragraphs text={regionalBusinessImplications} />
               </Section>
             </div>
           </div>
@@ -2035,7 +2042,7 @@ export default function ReportPreview({
           {/* Page 6: Polestar Outlook */}
           <div className="px-10 pt-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
             <Section hidden={!show("polestar-view")} title="Polestar Outlook">
-              <Paragraphs text={resolveRegionalNarrative(report.polestarView, aiProse?.polestarView, regionalOutlook)} />
+              <Paragraphs text={regionalOutlook} />
             </Section>
           </div>
         </div>
