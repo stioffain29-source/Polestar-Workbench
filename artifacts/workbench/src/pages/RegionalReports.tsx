@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   createReport as createReportRequest,
+  listIncidents,
   type Report,
   useDeleteReport,
   useListReports,
@@ -25,6 +26,10 @@ import {
   currentReportDate,
   splitReportsByLifecycle,
 } from "@/lib/reportLifecycle";
+import {
+  buildRegionalCanonicalReport,
+  type RegionalCoverageManifest,
+} from "@/lib/regionalWeekly";
 
 type RegionalTopic = Extract<ReportTopic, "apac_weekly" | "middle_east_weekly">;
 
@@ -50,14 +55,35 @@ export default function RegionalReports() {
     createBusy.current = true;
     setCreatingTopic(topic);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 15_000);
+    const timeout = window.setTimeout(() => controller.abort(), 120_000);
     try {
+      const coverageResponse = await fetch("/api/reports/regional-coverage", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, issueDate }),
+        signal: controller.signal,
+      });
+      if (!coverageResponse.ok) {
+        const payload = await coverageResponse.json().catch(() => null) as { error?: string } | null;
+        throw new Error(payload?.error || `Regional source collection failed (${coverageResponse.status}).`);
+      }
+      const coverage = await coverageResponse.json() as RegionalCoverageManifest;
+      const incidents = await listIncidents({ days: 14 }, { signal: controller.signal });
+      const regionalCanonicalReport = buildRegionalCanonicalReport(
+        incidents as never[],
+        issueDate,
+        topic,
+        [],
+        coverage,
+      );
       const report = await createReportRequest(
         {
           title: canonicalReportTitle(topic),
           topic,
           issueDate,
           status: "draft",
+          hardNumbers: { regionalCanonicalReport },
         } as never,
         { signal: controller.signal },
       );
@@ -68,10 +94,11 @@ export default function RegionalReports() {
       setLocation(`/reports/${report.id}`);
     } catch (error) {
       const timedOut = error instanceof DOMException && error.name === "AbortError";
+      const message = error instanceof Error ? error.message : "Unknown error";
       toast.error(
         timedOut
-          ? "Report creation timed out. The request was stopped; please try again."
-          : "Report creation failed. Please try again.",
+          ? "Report creation timed out while collecting regional sources."
+          : `Report creation failed: ${message}`,
       );
     } finally {
       window.clearTimeout(timeout);

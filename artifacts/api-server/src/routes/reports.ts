@@ -21,6 +21,7 @@ import {
   mergeReportProvenance,
   REPORT_PROSE_KEYS,
 } from "../lib/reportProvenance";
+import { runRegionalWeeklyCollection } from "@workspace/ingest";
 
 async function hydrateLegacyProvenance(
   report: Report,
@@ -211,26 +212,6 @@ router.post("/reports", async (req, res): Promise<void> => {
   const isRegionalWeekly =
     rest.topic === "apac_weekly" || rest.topic === "middle_east_weekly";
   if (isRegionalWeekly && rest.status === "draft") {
-    const [existing] = await db
-      .select()
-      .from(reportsTable)
-      .where(
-        and(
-          eq(reportsTable.topic, rest.topic),
-          eq(reportsTable.issueDate, normalizedIssueDate),
-          eq(reportsTable.status, "draft"),
-        ),
-      )
-      .orderBy(
-        desc(sql`case when ${reportsTable.hardNumbers}->'regionalCanonicalReport' is not null then 1 else 0 end`),
-        desc(sql`coalesce(${reportsTable.updatedAt}, ${reportsTable.createdAt})`),
-        desc(reportsTable.id),
-      )
-      .limit(1);
-    if (existing) {
-      res.status(200).json(await hydrateLegacyProvenance(existing));
-      return;
-    }
     if (hardNumbers === undefined) {
       res.status(409).json({
         error:
@@ -249,11 +230,48 @@ router.post("/reports", async (req, res): Promise<void> => {
   } else if (rest.topic === "fuel") {
     insertValues.hardNumbers = await fuelHardNumbersAsOf(normalizedIssueDate);
   }
-  // Non-regional POSTs explicitly mean "new report". Regional Weekly is one
-  // canonical workspace per topic/date; the guard above reopens that workspace
-  // and refuses to create an empty shell.
+  // Every POST explicitly means "new report". Regional Weekly additionally
+  // refuses to create an empty shell: its canonical object is persisted in the
+  // same insert so the new row is immediately renderable.
   const [row] = await db.insert(reportsTable).values(insertValues).returning();
   res.status(201).json(row);
+});
+
+router.post("/reports/regional-coverage", async (req, res): Promise<void> => {
+  const topic = req.body?.topic;
+  if (topic !== "apac_weekly" && topic !== "middle_east_weekly") {
+    res.status(400).json({ error: "A valid regional report topic is required." });
+    return;
+  }
+  const run = await runRegionalWeeklyCollection(
+    topic === "apac_weekly" ? "apac" : "middle_east",
+    { commit: true },
+  );
+  const failed = run.coverage.filter(
+    (check) => check.status !== "checked" || check.errors.length > 0,
+  );
+  if (failed.length > 0) {
+    res.status(503).json({
+      error: `Regional source collection failed: ${failed
+        .map((check) => `${check.domain}: ${check.errors.join(", ") || "no source completed"}`)
+        .join("; ")}`,
+    });
+    return;
+  }
+  res.json({
+    requiredDomains: run.coverage.map((check) => check.domain),
+    domains: run.coverage,
+    forwardSearch: {
+      domain: "forwardSearch",
+      status: "checked",
+      sourceNames: ["protest_events", "incident_advisories"],
+      itemsFetched: 0,
+      candidatesAccepted: 0,
+      errors: [],
+    },
+    requiredGeographies: run.requiredGeographies,
+    searchedGeographies: run.searchedGeographies,
+  });
 });
 
 router.patch("/reports/:id", async (req, res): Promise<void> => {
