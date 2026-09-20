@@ -39,11 +39,11 @@ Each Regional Weekly has one persisted canonical report object. Preview, saved r
 
 **How to apply:** Verify actual event/policy dates BEFORE curation, then build once, persist the complete canonical object, validate it after reload and fail closed when absent or stale. Never substitute publication, scrape, ingestion or report dates; exclude unresolved DATE UNVERIFIED items. Event-family keys must describe the actual event, never just a country: same-country events such as a capital missile attack and a pipeline shutdown remain separate, while variant headlines for one cross-border incursion collapse together.
 
-Both products use the same deterministic regional-map design: a fixed region-specific geographic frame drawn from bundled world geometry, no incident-derived zoom, at most three numbered pins, and a separate label rail outside the geography.
+Regional Weekly reports do not render an incident map. The owner rejected the map as analytical slop; location belongs in the development heading and narrative.
 
-**Why:** Greedy callouts over a tiny blank or unstable plot produced overlapping cards, unlabeled pins and misleading maps. A fixed basemap plus an external label rail makes overlap structurally impossible.
+**Why:** Even the fixed basemap and external label rail consumed scarce page space without adding decision-useful analysis.
 
-**How to apply:** Choose map points only from the final canonical developments, balancing security, continuity and policy where evidence permits. Never draw cards over geography, never add an unlabeled point, and never change the extent based on the selected incidents. Preview and PDF must use the same canonical points.
+**How to apply:** Omit the map in preview and PDF. Keep canonical points only for data compatibility; do not use them to justify a visual. Use the saved space for the Regional Outlook and Risk Picture.
 
 Technical validity is not editorial acceptance. A Regional Weekly fails if it is a sparse incident digest padded into multiple pages, recycles the same boilerplate across sections or regions, hides evidence behind source counts, or substitutes generic “verify and monitor” instructions for a specific business-risk judgement.
 

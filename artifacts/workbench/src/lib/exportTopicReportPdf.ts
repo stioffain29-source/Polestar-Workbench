@@ -1329,31 +1329,6 @@ export async function exportTopicReportPdf(
     if (isRegionalWeekly) {
       drawSectionHeading(ctx, "Regional Outlook");
       renderProse(ctx, execText);
-      ctx.y += 12;
-      drawRegionalHotspotMap(ctx, regionalPdfIncidents, regionalTopic, regionalCanonical?.mapPoints);
-      if (regionalCanonical && regionalCanonical.domainBriefs.length > 0) {
-        ensureSpace(ctx, 40);
-        ctx.y += 10;
-        for (const brief of regionalCanonical.domainBriefs) {
-          ensureSpace(ctx, 30);
-          setRoboto(ctx.pdf, "bold");
-          setText(ctx.pdf, NAVY);
-          ctx.pdf.setFontSize(9);
-          ctx.pdf.text(brief.heading.toUpperCase() + " — ", ctx.MX, ctx.y + 10);
-          const headingW = ctx.pdf.getTextWidth(brief.heading.toUpperCase() + " — ");
-          setRoboto(ctx.pdf, "regular");
-          setText(ctx.pdf, DUSK);
-          const lines = ctx.pdf.splitTextToSize(brief.assessment, ctx.CW - headingW);
-          for (let i = 0; i < lines.length; i++) {
-             if (i === 0) {
-               ctx.pdf.text(lines[i], ctx.MX + headingW, ctx.y + 10);
-             } else {
-               ctx.pdf.text(lines[i], ctx.MX, ctx.y + 10 + i * 13);
-             }
-          }
-          ctx.y += lines.length * 13 + 5;
-        }
-      }
     } else {
       drawSectionHeading(ctx, "Executive Summary");
       renderProse(ctx, execText);
@@ -1894,63 +1869,62 @@ export async function exportTopicReportPdf(
       if (show("what-happened")) {
         drawSectionHeading(ctx, "Key Developments");
         for (const development of regionalCanonical.developments) {
-          ensureSpace(ctx, 40);
+          const sourceLine = development.sourceEvidence?.join("; ") ?? "";
+          const meta = `${development.category} · ${development.severity}${development.eventDate ? ` · ${format(parseISO(development.eventDate), "dd MMM yyyy")}` : ""}`;
+          const titleLines = ctx.pdf.splitTextToSize(sanitize(development.title.toUpperCase()), ctx.CW - 20);
+          const metaLines = ctx.pdf.splitTextToSize(sanitize(meta), ctx.CW - 20);
+          const assessmentLines = ctx.pdf.splitTextToSize(sanitize(`ASSESSMENT: ${development.whatChanged}`), ctx.CW - 20);
+          const viewLines = ctx.pdf.splitTextToSize(
+            sanitize(`POLESTAR VIEW: ${development.polestarView || development.operationalImpact || development.operationalSignificance}`),
+            ctx.CW - 20,
+          );
+          const outlookLines = ctx.pdf.splitTextToSize(
+            sanitize(`7-DAY INDICATOR: ${development.outlook7Days || development.whatToWatch}`),
+            ctx.CW - 20,
+          );
+          const sourceLines = sourceLine
+            ? ctx.pdf.splitTextToSize(sanitize(`SOURCES: ${sourceLine}`), ctx.CW - 20)
+            : [];
+          const totalLines = titleLines.length + metaLines.length + assessmentLines.length + viewLines.length + outlookLines.length + sourceLines.length;
+          const cardHeight = 36 + totalLines * 9.4;
+          ensureSpace(ctx, cardHeight + 8);
+          const cardTop = ctx.y;
+          setStroke(ctx.pdf, POLAR);
+          ctx.pdf.setLineWidth(0.5);
+          ctx.pdf.rect(ctx.MX, cardTop, ctx.CW, cardHeight, "S");
+          setFill(ctx.pdf, ELECTRIC);
+          ctx.pdf.rect(ctx.MX, cardTop, 3, cardHeight, "F");
           setRoboto(ctx.pdf, "bold");
           setText(ctx.pdf, NAVY);
-          ctx.pdf.setFontSize(10);
+          ctx.pdf.setFontSize(8.2);
           const locationPart = development.location && development.location.toLowerCase() !== development.country.toLowerCase()
             ? ` | ${development.location}`
-            : " | NATIONAL";
+            : "";
           const titleLine = `${development.country}${locationPart}`.toUpperCase();
-          ctx.pdf.text(titleLine, ctx.MX, ctx.y + 10);
-          ctx.y += 14;
-
-          if (development.eventDate) {
-            setText(ctx.pdf, ELECTRIC);
-            ctx.pdf.setFontSize(8.5);
-            ctx.pdf.text(format(parseISO(development.eventDate), "dd MMMM yyyy").toUpperCase(), ctx.MX, ctx.y + 8);
-            ctx.y += 12;
-          }
-
+          ctx.pdf.text(sanitize(titleLine), ctx.MX + 10, ctx.y + 11);
+          ctx.y += 13;
           setText(ctx.pdf, NAVY);
-          ctx.pdf.setFontSize(10);
-          const titleLines = ctx.pdf.splitTextToSize(development.title.toUpperCase(), ctx.CW);
-          for (const line of titleLines) {
-            ctx.pdf.text(line, ctx.MX, ctx.y + 10);
-            ctx.y += 13;
+          ctx.pdf.setFontSize(9);
+          ctx.pdf.text(titleLines, ctx.MX + 10, ctx.y + 8);
+          ctx.y += titleLines.length * 9.4 + 3;
+          setText(ctx.pdf, ELECTRIC);
+          ctx.pdf.setFontSize(7.1);
+          ctx.pdf.text(metaLines, ctx.MX + 10, ctx.y + 8);
+          ctx.y += metaLines.length * 9.4 + 3;
+          setRoboto(ctx.pdf, "regular");
+          setText(ctx.pdf, DUSK);
+          ctx.pdf.setFontSize(7.5);
+          for (const lines of [assessmentLines, viewLines, outlookLines]) {
+            ctx.pdf.text(lines, ctx.MX + 10, ctx.y + 8);
+            ctx.y += lines.length * 9.4 + 3;
           }
-          ctx.y += 3;
-
-          renderProse(
-            ctx,
-            `Category: ${development.category}\nCurrent Severity: ${development.severity}\n\nAssessment:\n${development.whatChanged}\n\nPolestar View:\n${development.polestarView || development.operationalImpact || development.operationalSignificance}\n\nOutlook 7 Days:\n${development.outlook7Days || development.whatToWatch}`
-          );
-
-          if (development.sourceEvidence && development.sourceEvidence.length > 0) {
-            ensureSpace(ctx, 20);
-            setStroke(ctx.pdf, POLAR);
-            ctx.pdf.setLineWidth(0.5);
-            ctx.pdf.line(ctx.MX, ctx.y + 2, ctx.MX + ctx.CW, ctx.y + 2);
-            ctx.y += 10;
-            setRoboto(ctx.pdf, "bold");
-            setText(ctx.pdf, NAVY);
-            ctx.pdf.setFontSize(8);
-            ctx.pdf.text("SOURCES", ctx.MX, ctx.y + 8);
-            ctx.y += 12;
+          if (sourceLines.length) {
             setRoboto(ctx.pdf, "italic");
-            setText(ctx.pdf, DUSK);
-            ctx.pdf.setFontSize(8);
-            for (const src of development.sourceEvidence) {
-               const srcLines = ctx.pdf.splitTextToSize(src, ctx.CW);
-               for (const l of srcLines) {
-                 ctx.pdf.text(l, ctx.MX, ctx.y + 8);
-                 ctx.y += 11;
-               }
-            }
-            ctx.y += 4;
-            setRoboto(ctx.pdf, "regular");
+            ctx.pdf.setFontSize(6.7);
+            ctx.pdf.text(sourceLines, ctx.MX + 10, ctx.y + 8);
           }
-          ctx.y += 12;
+          setRoboto(ctx.pdf, "regular");
+          ctx.y = cardTop + cardHeight + 8;
         }
       }
       newPage(ctx);
@@ -1965,37 +1939,20 @@ export async function exportTopicReportPdf(
           renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
         } else {
           for (const item of regionalCanonical.watchItems) {
-            ensureSpace(ctx, 30);
+            ensureSpace(ctx, 22);
             const titleLoc = item.location && item.location.trim() ? item.location.toUpperCase() : "NATIONAL";
             setRoboto(ctx.pdf, "bold");
             setText(ctx.pdf, NAVY);
-            ctx.pdf.setFontSize(10.5);
-            ctx.pdf.text(titleLoc, ctx.MX + 10, ctx.y + 10);
-            ctx.y += 15;
-
-            ctx.pdf.setFontSize(9.5);
-            const triggerLines = ctx.pdf.splitTextToSize(item.trigger, ctx.CW - 10);
-            for (const l of triggerLines) {
-               ctx.pdf.text(l, ctx.MX + 10, ctx.y + 10);
-               ctx.y += 13;
-            }
-            ctx.y += 2;
-
-            let storedY = ctx.y - 15 - triggerLines.length * 13;
-
+            ctx.pdf.setFontSize(8.2);
+            const headingLines = ctx.pdf.splitTextToSize(`${titleLoc} — ${item.trigger}`, ctx.CW - 12);
+            ctx.pdf.text(headingLines, ctx.MX + 8, ctx.y + 8);
+            ctx.y += headingLines.length * 10 + 1;
             setRoboto(ctx.pdf, "regular");
             setText(ctx.pdf, DUSK);
-            const bodyLines = ctx.pdf.splitTextToSize(`${item.whyItMatters}\n\nCurrent Severity: ${item.currentSeverity ?? "—"}\n\nWatch:\n${item.whatToWatch}`, ctx.CW - 10);
-            for (const l of bodyLines) {
-               ctx.pdf.text(l, ctx.MX + 10, ctx.y + 10);
-               ctx.y += 13;
-            }
-
-            setStroke(ctx.pdf, ELECTRIC);
-            ctx.pdf.setLineWidth(1.5);
-            ctx.pdf.line(ctx.MX + 3, storedY, ctx.MX + 3, ctx.y);
-
-            ctx.y += 10;
+            ctx.pdf.setFontSize(7.6);
+            const bodyLines = ctx.pdf.splitTextToSize(`Watch: ${item.whatToWatch}`, ctx.CW - 12);
+            ctx.pdf.text(bodyLines, ctx.MX + 8, ctx.y + 8);
+            ctx.y += bodyLines.length * 9.6 + 6;
           }
         }
       }

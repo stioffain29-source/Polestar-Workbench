@@ -228,23 +228,31 @@ function NarrativeSection({ title, text, hidden }: { title: string; text?: strin
 
 function RegionalDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {developments.map((development, index) => (
         <article
           key={`${development.country}-${development.title}-${index}`}
-          className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-4"
+          className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-3 break-inside-avoid"
         >
           <h3
-            className="uppercase tracking-wide text-[13px] font-bold mb-2"
+            className="uppercase tracking-wide text-[11px] font-bold mb-1.5"
             style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
           >
-            {development.country} | {development.title}
+            {development.country}{development.location && development.location.toLowerCase() !== development.country.toLowerCase() ? ` | ${development.location}` : ""}
           </h3>
-          <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
-            <p><strong>What Changed:</strong> {development.whatChanged}</p>
-            <p><strong>Why It Matters:</strong> {development.operationalSignificance}</p>
-            {development.whatToWatch && <p><strong>What To Watch:</strong> {development.whatToWatch}</p>}
+          <h4 className="text-[12px] leading-[1.3] font-bold mb-2" style={{ color: NAVY }}>
+            {development.title}
+          </h4>
+          <div className="space-y-1.5 text-[10.5px] leading-[1.4]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
+            <p><strong>{development.category} · {development.severity}</strong>{development.eventDate ? ` · ${development.eventDate}` : ""}</p>
+            <p><strong>Assessment:</strong> {development.whatChanged}</p>
+            <p><strong>Polestar View:</strong> {development.polestarView || development.operationalSignificance}</p>
+            {development.whatToWatch && <p><strong>7-day indicator:</strong> {development.whatToWatch}</p>}
+            {!!development.sourceEvidence?.length && (
+              <p className="pt-1 border-t border-[#e2e2e2] text-[9px] italic">
+                <strong>Sources:</strong> {development.sourceEvidence.join("; ")}
+              </p>
+            )}
           </div>
         </article>
       ))}
@@ -1610,21 +1618,11 @@ export default function ReportPreview({
               <Paragraphs text={regionalBluf} />
             </Section>
 
-            <div style={{ marginTop: 40, marginBottom: 24 }}>
+            <div style={{ marginTop: 28, marginBottom: 18 }}>
               <Section hidden={!show("situation")} title="Regional Risk Picture">
                 <Paragraphs text={regionalRiskPicture} />
               </Section>
             </div>
-
-            <div style={{ marginTop: 24, marginBottom: 24 }}>
-              <RegionalHotspotMap points={regionalMapPoints} topic={report.topic} />
-            </div>
-
-            {regionalDomainBriefs.length > 0 && (
-              <div style={{ marginTop: 24 }}>
-                <RegionalDomainBriefs briefs={regionalDomainBriefs} />
-              </div>
-            )}
           </div>
 
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
