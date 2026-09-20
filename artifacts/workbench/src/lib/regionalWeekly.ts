@@ -174,6 +174,37 @@ export interface RegionalCanonicalReport {
   coverageManifest: RegionalCoverageManifest;
 }
 
+export const REQUIRED_REGIONAL_REPORT_DOMAINS = [
+  "Security",
+  "Political",
+  "Regulatory",
+  "Weather & Natural Hazards",
+  "Cyber",
+  "Operational Disruption",
+] as const satisfies readonly RegionalIntelligenceCategory[];
+
+export function validateRegionalCanonicalStructure(
+  report: RegionalCanonicalReport,
+): string[] {
+  const errors: string[] = [];
+  const domains = new Set(report.domainBriefs.map((brief) => brief.domain));
+  for (const domain of REQUIRED_REGIONAL_REPORT_DOMAINS) {
+    if (!domains.has(domain)) errors.push(`Missing required intelligence domain: ${domain}.`);
+  }
+  if (report.domainBriefs.length !== REQUIRED_REGIONAL_REPORT_DOMAINS.length) {
+    errors.push("Regional report must contain exactly six intelligence-domain assessments.");
+  }
+  if (report.domainBriefs.some((brief) => !brief.assessment.trim())) {
+    errors.push("Every intelligence domain requires an assessment or an explicit no-material-change statement.");
+  }
+  if (report.mapPoints.length === 0) errors.push("Regional report requires a risk map with at least one verified point.");
+  if (report.developments.length === 0) errors.push("Regional report requires key developments.");
+  if (!report.businessImplicationsNarrative.trim()) errors.push("Regional report requires business implications.");
+  if (report.watchItems.length === 0) errors.push("Regional report requires a 7 Day Watch.");
+  if (!report.polestarOutlook.trim()) errors.push("Regional report requires a Polestar Outlook.");
+  return errors;
+}
+
 export function regionalCanonicalReportFromHardNumbers(
   hardNumbers: unknown,
   topic: RegionalWeeklyTopic,
@@ -185,7 +216,12 @@ export function regionalCanonicalReportFromHardNumbers(
   if (issueDate && value.issueDate !== issueDate) return null;
   if (!value.coverageManifest || !isCompleteRegionalCoverage(value.coverageManifest)) return null;
   if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
-  return value;
+  const normalized = {
+    ...value,
+    domainBriefs: buildRegionalDomainBriefs(value.developments, topic),
+  };
+  if (validateRegionalCanonicalStructure(normalized).length > 0) return null;
+  return normalized;
 }
 
 function isCompleteRegionalCoverage(manifest: RegionalCoverageManifest): boolean {
@@ -1672,6 +1708,19 @@ const DOMAIN_ORDER: RegionalIntelligenceCategory[] = [
   "Operational Disruption",
 ];
 
+// The report presents six durable intelligence lenses. Armed conflict and
+// terrorism roll into Security & Conflict; energy consequences roll into
+// Operational Disruption. This keeps every requested domain visible without
+// fragmenting one operating issue across near-duplicate cards.
+const REPORT_DOMAIN_ORDER: RegionalIntelligenceCategory[] = [
+  "Security",
+  "Political",
+  "Regulatory",
+  "Weather & Natural Hazards",
+  "Cyber",
+  "Operational Disruption",
+];
+
 const DOMAIN_HEADING: Record<RegionalIntelligenceCategory, string> = {
   Security: "Security & Conflict",
   "Armed Conflict": "Armed Conflict and Access",
@@ -1689,16 +1738,28 @@ export function buildRegionalDomainBriefs(
   topic?: RegionalWeeklyTopic,
 ): RegionalDomainBrief[] {
   if (topic && isRegionalWeeklyTopic(topic)) {
-    const briefs = DOMAIN_ORDER.flatMap((domain) => {
-      const rows = developments.filter((development) => development.category === domain);
-      if (rows.length === 0) return [];
-      return [{
+    return REPORT_DOMAIN_ORDER.map((domain) => {
+      const acceptedDomains = domain === "Security"
+        ? new Set<RegionalIntelligenceCategory>(["Security", "Armed Conflict", "Terrorism"])
+        : domain === "Operational Disruption"
+          ? new Set<RegionalIntelligenceCategory>(["Operational Disruption", "Energy"])
+          : new Set<RegionalIntelligenceCategory>([domain]);
+      const rows = developments.filter((development) => acceptedDomains.has(development.category));
+      if (rows.length === 0) {
+        return {
+          domain,
+          heading: DOMAIN_HEADING[domain],
+          assessment: domain === "Cyber"
+            ? "No material regional cyber development was identified during this reporting period."
+            : `No material ${domain.toLowerCase()} development was identified during this reporting period.`,
+        };
+      }
+      return {
         domain,
         heading: DOMAIN_HEADING[domain],
         assessment: apacThemeAssessment(domain, rows),
-      }];
+      };
     });
-    return briefs.slice(0, 5);
   }
   return DOMAIN_ORDER.map((domain) => {
     const rows = developments.filter((development) => development.category === domain);
@@ -2245,8 +2306,16 @@ export function validateRegionalWeeklyAssessment(
     developments.map((row) => row.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()),
   );
   if (uniqueTitles.size !== developments.length) errors.push("Duplicate developments remain.");
-  if (topic && buildRegionalDomainBriefs(developments, topic).length > 6) {
-    errors.push("More than six intelligence-domain assessments were produced.");
+  if (topic) {
+    const domains = buildRegionalDomainBriefs(developments, topic);
+    if (domains.length !== REQUIRED_REGIONAL_REPORT_DOMAINS.length) {
+      errors.push("Exactly six intelligence-domain assessments are required.");
+    }
+    for (const required of REQUIRED_REGIONAL_REPORT_DOMAINS) {
+      if (!domains.some((brief) => brief.domain === required)) {
+        errors.push(`Missing required intelligence domain: ${required}.`);
+      }
+    }
   }
   if (developments.some((row) => !row.operationalSignificance.trim())) {
     errors.push("Every development requires specific operational significance.");

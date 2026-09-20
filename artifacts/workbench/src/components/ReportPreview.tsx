@@ -1233,7 +1233,7 @@ export default function ReportPreview({
     ? regionalCanonical!.developments
     : [];
   const regionalDomainBriefs = isRegionalWeekly
-    ? regionalCanonical!.domainBriefs
+    ? buildRegionalDomainBriefs(regionalDevelopments, regionalTopic ?? undefined)
     : [];
   const regionalBluf = isRegionalWeekly
     ? regionalCanonical!.regionalOutlook
@@ -1618,32 +1618,49 @@ export default function ReportPreview({
               <Paragraphs text={regionalBluf} />
             </Section>
 
-            <div style={{ marginTop: 28, marginBottom: 18 }}>
-              <Section hidden={!show("situation")} title="Regional Risk Picture">
-                <Paragraphs text={regionalRiskPicture} />
-              </Section>
+            <div data-regional-required="risk-map" style={{ marginTop: 24, marginBottom: 18 }}>
+              <RegionalHotspotMap points={regionalMapPoints} topic={report.topic} />
             </div>
           </div>
 
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <div data-regional-required="intelligence-domains">
+            <Section hidden={!show("situation")} title="Regional Intelligence by Domain">
+              <RegionalDomainBriefs briefs={regionalDomainBriefs} />
+            </Section>
+            </div>
+          </div>
+
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <div data-regional-required="key-developments">
             <Section hidden={!show("what-happened")} title="Key Developments">
               <RegionalDevelopmentCards developments={regionalDevelopments} />
             </Section>
+            </div>
           </div>
 
           <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
+            <div data-regional-required="business-implications">
             <Section hidden={!show("implications")} title="Business Implications">
               <Paragraphs text={regionalBusinessImplications} />
             </Section>
+            </div>
             <div style={{ marginTop: 32 }}>
+              <div data-regional-required="seven-day-watch">
               <Section hidden={!show("watch-next")} title="7 Day Watch">
                 <RegionalWatchlist items={regionalWatchlist} />
               </Section>
+              </div>
             </div>
+          </div>
+
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
             <div style={{ marginTop: 32 }}>
+              <div data-regional-required="polestar-outlook">
               <Section hidden={!show("polestar-view")} title="Polestar Outlook">
                 <Paragraphs text={regionalOutlook} />
               </Section>
+              </div>
             </div>
           </div>
         </div>

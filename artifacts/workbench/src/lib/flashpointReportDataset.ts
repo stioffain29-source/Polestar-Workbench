@@ -4310,8 +4310,8 @@ export function resolveFlashpointRenderedModel(args: {
       : "No specific effect on movement, access, transport, facilities or continuity is established by the accepted evidence.",
     watchNext: fallbackWatchNext,
     polestarView: activityPresent
-      ? `Flashpoint conditions are ${weeklyPosture} overall, despite a highest single-incident severity of ${severityCeiling}.${peakCountry && peakCountry !== leadCountry ? ` The sharpest individual exposure sits in ${peakCountry}, which is a different measure from incident volume.` : " Incident volume and severity answer different operational questions and should not be treated as interchangeable."}${hasBangkokActivity ? " Bangkok volume is not a deterioration signal on its own because demonstrations commonly use established gathering areas." : ""} The principal operational exposure is local disruption to movement, transport, access and individual facilities rather than a broad regional deterioration.\n\nThe near-term assessment would increase if turnout materially exceeds expectations, activity expands beyond announced locations, persists, disrupts major routes or produces wider forceful enforcement. It would reduce if mobilisation remains contained and no material transport, facility or personnel effects follow.`
-      : `No specific operational exposure is established by the accepted record.`,
+      ? `No region-wide deterioration is established. Apply local movement and access controls only where reporting confirms disruption.${hasBangkokActivity ? " In Bangkok, established assembly areas require wider controls only when turnout affects named roads or rail." : ""}${peakTargetsFacility ? " The targeted facility requires site-specific security measures." : ""} Escalate for verified major-route closures, facility targeting, violence or forceful enforcement.`
+      : "No change to regional controls is supported by the accepted record.",
   });
   assertFlashpointRenderedModelValid(groundedRecovery);
   return Object.freeze(groundedRecovery);

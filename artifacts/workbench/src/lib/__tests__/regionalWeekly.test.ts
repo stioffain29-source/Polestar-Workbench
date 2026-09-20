@@ -19,6 +19,7 @@ import {
   isRegionalWeeklyTopic,
   selectRegionalKeyDevelopments,
   validateRegionalWeeklyAssessment,
+  validateRegionalCanonicalStructure,
   validateApacWeeklyAssessment,
   buildStructuredRegionalBluf,
   buildStructuredRegionalOutlook,
@@ -371,7 +372,7 @@ describe("regional weekly products", () => {
     )).toHaveLength(8);
   });
 
-  it("APAC omits empty domains, rejects source slop, and exposes distinct editorial fields", () => {
+  it("APAC keeps all six intelligence domains visible, rejects source slop, and exposes distinct editorial fields", () => {
     const rows = curateRegionalWeeklyIncidents(
       [
         incident(1, "Australia", "high", "2026-09-17", "Australia migration policy changes visa compliance for employers"),
@@ -386,8 +387,57 @@ describe("regional weekly products", () => {
     expect(rows.map((row) => row.id)).toEqual([3, 1, 2]);
     const developments = buildApacWeeklyDevelopments(rows, "2026-09-17");
     expect(buildRegionalDomainBriefs(developments, "apac_weekly").every((brief) => brief.assessment.trim())).toBe(true);
-    expect(buildRegionalDomainBriefs(developments, "apac_weekly")).toHaveLength(2);
+    const domains = buildRegionalDomainBriefs(developments, "apac_weekly");
+    expect(domains).toHaveLength(6);
+    expect(domains.map((brief) => brief.domain)).toEqual([
+      "Security",
+      "Political",
+      "Regulatory",
+      "Weather & Natural Hazards",
+      "Cyber",
+      "Operational Disruption",
+    ]);
+    expect(domains.find((brief) => brief.domain === "Cyber")?.assessment).toMatch(
+      /No material regional cyber development/i,
+    );
     expect(developments.every((row) => row.operationalImpact && row.polestarView && row.outlook7Days !== undefined)).toBe(true);
+  });
+
+  it("fails closed when a required regional section or map is missing", () => {
+    const developments = buildApacWeeklyDevelopments([
+      incident(1, "Japan", "high", "2026-09-17", "Typhoon closes airport and disrupts power supply"),
+    ], "2026-09-17");
+    const base = {
+      schemaVersion: "regional-weekly-canonical-v1" as const,
+      topic: "apac_weekly" as const,
+      issueDate: "2026-09-17",
+      developments,
+      regionalOutlook: "Regional outlook.",
+      polestarOutlook: "Polestar outlook.",
+      riskPicture: "Risk picture.",
+      domainBriefs: buildRegionalDomainBriefs(developments, "apac_weekly"),
+      businessImplications: [],
+      businessImplicationsNarrative: "Business implications.",
+      watchItems: [{
+        date: "2026-09-18",
+        location: "Japan",
+        trigger: "Typhoon",
+        whyItMatters: "Airport access may be affected.",
+        whatToWatch: "Official closure notices.",
+      }],
+      glanceMetrics: [],
+      mapPoints: [{ lat: 35, lng: 139, label: "Japan", title: "Typhoon", severity: "High" as const, eventDate: "2026-09-17", summary: "Airport closure." }],
+      visualSummary: { byCategory: [], byCountry: [] },
+      coverageManifest: {} as never,
+    };
+    expect(validateRegionalCanonicalStructure(base)).toEqual([]);
+    expect(validateRegionalCanonicalStructure({ ...base, mapPoints: [] })).toContain(
+      "Regional report requires a risk map with at least one verified point.",
+    );
+    expect(validateRegionalCanonicalStructure({
+      ...base,
+      domainBriefs: base.domainBriefs.filter((brief) => brief.domain !== "Cyber"),
+    })).toContain("Missing required intelligence domain: Cyber.");
   });
 
   it("APAC metrics and business implication blocks derive from the selected set", () => {
