@@ -22,6 +22,7 @@ import {
   validateApacWeeklyAssessment,
   buildStructuredRegionalBluf,
   buildStructuredRegionalOutlook,
+  regionalWeeklySeverity,
 } from "../regionalWeekly";
 
 function incident(
@@ -43,6 +44,35 @@ function incident(
 }
 
 describe("regional weekly products", () => {
+  it("rates deliberate armed attacks by consequence rather than geographic reach", () => {
+    const pakistan = {
+      ...incident(1, "Pakistan", "moderate", "2026-09-17", "Car-bomb attack targets security personnel near police facility"),
+      summary: "A deliberate car bomb killed three security personnel near a police facility.",
+    };
+    const thailand = {
+      ...incident(2, "Thailand", "moderate", "2026-09-17", "Bombing and small-arms attack targets security checkpoint"),
+      summary: "Attackers detonated a bomb and opened fire with small arms at the checkpoint.",
+    };
+    expect(regionalWeeklySeverity(pakistan, "apac_weekly")).toBe("High");
+    expect(regionalWeeklySeverity(thailand, "apac_weekly")).toBe("High");
+  });
+
+  it("rates a mass-casualty attack Extreme when the toll follows the casualty verb", () => {
+    const pakistan = {
+      ...incident(1, "Pakistan", "moderate", "2026-09-18", "Car-bomb attack targets police headquarters"),
+      summary: "The death toll from the attack rose to 31 and earlier reporting said the blast injured 56.",
+    };
+    expect(regionalWeeklySeverity(pakistan, "apac_weekly")).toBe("Extreme");
+  });
+
+  it("does not equate routine migration administration with a major armed attack", () => {
+    const australia = {
+      ...incident(1, "Australia", "moderate", "2026-09-17", "Migration policy changes visa eligibility and documentation rules"),
+      summary: "The binding rules change compliance requirements for affected visa applicants and employers.",
+    };
+    expect(regionalWeeklySeverity(australia, "apac_weekly")).toBe("Moderate");
+  });
+
   it("recognizes both first-class regional topics and keeps weekly cadence", () => {
     expect(isRegionalWeeklyTopic("apac_weekly")).toBe(true);
     expect(isRegionalWeeklyTopic("middle_east_weekly")).toBe(true);
@@ -393,7 +423,12 @@ describe("regional weekly products", () => {
     ], "2026-09-17");
     expect(developments.find((row) => row.country === "Australia")?.severity).toBe("Moderate");
     expect(developments.find((row) => row.country === "Thailand")?.category).toBe("Armed Conflict");
-    expect(developments.find((row) => row.country === "Thailand")?.severity).toBe("Moderate");
+    expect(developments.find((row) => row.country === "Thailand")?.severity).toBe("High");
+    expect(
+      validateApacWeeklyAssessment(developments).some((error) =>
+        /armed attack severity requires review/i.test(error),
+      ),
+    ).toBe(false);
   });
 
   it("APAC rejects a proposed bill without a binding operational effect", () => {

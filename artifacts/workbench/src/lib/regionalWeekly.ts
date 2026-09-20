@@ -729,17 +729,48 @@ export function regionalWeeklySeverity(
     return majorOperational ? "High" : "Moderate";
   }
   if (category === "Security" || category === "Armed Conflict" || category === "Terrorism") {
-    if (/\b(?:mass casualty|15 (?:killed|dead)|dozens (?:killed|injured)|56 injured)\b/i.test(text)
-      && /\b(?:bomb|attack|shooting|clash)\b/i.test(text)) return "Extreme";
-    if (majorOperational || /\b(?:election|airport|port|border (?:crossing|closure)|cross-border|critical infrastructure)\b/i.test(text)
-      && /\b(?:killed|injured|attack|bomb|shooting|clash)\b/i.test(text)) return "High";
-    return currentOperational || /\b(?:attack|bomb|shooting|clash)\b/i.test(text) ? "Moderate" : "Low";
+    const deliberateAttack = /\b(?:attack(?:ed|s)?|car[- ]bomb|bomb(?:ing|ed)?|blast|ied|improvised explosive|shooting|opened fire|small[- ]arms?|gunfire|clash(?:ed|es)?|ambush(?:ed)?)\b/i.test(text);
+    const confirmedFatalities = !/\b(?:no|without)\s+(?:reported\s+)?(?:fatalit(?:y|ies)|deaths?|one\s+killed|casualties)\b/i.test(text)
+      && /\b(?:\d+\s+(?:people\s+|officers?\s+|personnel\s+)?(?:killed|dead)|fatalit(?:y|ies)|deaths?|died|killed)\b/i.test(text);
+    const confirmedInjuries = !/\b(?:no|without)\s+(?:reported\s+)?(?:injur(?:y|ies)|casualties)\b/i.test(text)
+      && /\b(?:\d+\s+(?:people\s+|officers?\s+|personnel\s+)?(?:injured|wounded)|injur(?:y|ies)|wounded)\b/i.test(text);
+    const targetedSecuritySite = /\b(?:police|security (?:forces?|personnel)|military|soldiers?|troops?|checkpoint|police (?:station|facility|vehicle|convoy))\b/i.test(text);
+    const compoundAttack = /\b(?:bomb|blast|ied|explosive)\b/i.test(text)
+      && /\b(?:small[- ]arms?|gunfire|shooting|opened fire)\b/i.test(text);
+    const massConsequences = /\b(?:mass casualt(?:y|ies)|dozens (?:killed|dead|injured|wounded)|[2-9]\d+\s+(?:people\s+)?(?:killed|dead|injured|wounded)|(?:kills?|injures?|wounds?)\s+(?:at least\s+)?[2-9]\d+|(?:death|casualty) toll[\s\S]{0,40}\b[2-9]\d+|major conflict escalation|sustained large-scale)\b/i.test(text);
+    if (deliberateAttack && massConsequences) return "Extreme";
+    if (majorOperational || (deliberateAttack && (confirmedFatalities || confirmedInjuries || targetedSecuritySite || compoundAttack))) return "High";
+    return currentOperational || deliberateAttack ? "Moderate" : "Low";
   }
   if (category === "Cyber" || category === "Weather & Natural Hazards" || category === "Operational Disruption" || category === "Energy") {
     if (majorOperational) return "High";
     return currentOperational ? "Moderate" : "Low";
   }
   return stored;
+}
+
+function severityConsistencyErrors(developments: RegionalDevelopment[]): string[] {
+  const rank = (severity: RegionalDevelopment["severity"]) =>
+    SEVERITY_RANK[severity.toLowerCase()] ?? 0;
+  const armedAttacks = developments.filter((row) => {
+    const text = `${row.title} ${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`;
+    return (row.category === "Security" || row.category === "Armed Conflict" || row.category === "Terrorism")
+      && /\b(?:bomb|blast|ied|explosive|shooting|small[- ]arms?|opened fire|armed attack|ambush)\b/i.test(text);
+  });
+  const routineRegulatory = developments.filter((row) => {
+    const text = `${row.title} ${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`;
+    return (row.category === "Regulatory" || row.category === "Political")
+      && !/\b(?:operations? halted|services? suspended|airport closure|port closure|border closure|major outage|critical infrastructure shutdown|mass evacuation|national emergency)\b/i.test(text);
+  });
+  const errors: string[] = [];
+  for (const attack of armedAttacks) {
+    for (const regulatory of routineRegulatory) {
+      if (rank(attack.severity) <= rank(regulatory.severity)) {
+        errors.push(`Armed attack severity requires review against routine regulatory development: ${attack.title}.`);
+      }
+    }
+  }
+  return errors;
 }
 
 function apacRejectLowValueDevelopment(text: string): boolean {
@@ -1775,6 +1806,10 @@ export function buildRegionalCanonicalReport<T extends RegionalIncident>(
   futureEvents: RegionalFutureEventInput[] = [],
 ): RegionalCanonicalReport {
   const developments = buildRegionalWeeklyDevelopments(incidents, issueDate, topic);
+  const severityErrors = severityConsistencyErrors(developments);
+  if (severityErrors.length > 0) {
+    throw new Error(severityErrors.join(" "));
+  }
   if (topic === "apac_weekly" && developments.some((row) => !row.eventDate || row.dateVerified !== true)) {
     throw new Error("APAC canonical report contains an unverified development date");
   }
@@ -1917,6 +1952,7 @@ export function validateApacWeeklyAssessment(
       errors.push(`Invalid current severity for ${row.title}.`);
     }
   }
+  errors.push(...severityConsistencyErrors(developments));
   const bluf = buildApacWeeklyBluf(developments);
   const blufWords = bluf.split(/\s+/).filter(Boolean).length;
   if (blufWords > 300) {

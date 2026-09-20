@@ -1,0 +1,116 @@
+FIX REGIONAL WEEKLY SEVERITY LOGIC.
+
+Do NOT hard-code a severity for the Pakistan incident.
+
+The current severity engine is still wrong.
+
+CURRENT EXAMPLE:
+
+Pakistan car-bomb attack against security personnel near a police facility
+= MODERATE
+
+Australia migration / visa policy change
+= MODERATE
+
+These are not equivalent operational events.
+
+The severity engine must assess the ACTUAL CONSEQUENCE AND CHARACTER OF EACH DEVELOPMENT.
+
+Use ONLY:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+SEVERITY DEFINITIONS
+
+INSIGNIFICANT
+Negligible operational consequence.
+No meaningful effect on people, access, operations or continuity.
+
+LOW
+Limited inconvenience or localised effect.
+Little operational adjustment required.
+
+MODERATE
+Credible disruption or threat requiring operational adjustment.
+May affect movement, access, staffing, compliance or services in a defined area.
+
+HIGH
+Significant violence, disruption or restriction with material consequences for:
+people
+operations
+travel
+assets
+transport
+supply chains
+continuity
+
+EXTREME
+Major or widespread consequences involving:
+mass casualties
+major conflict escalation
+severe infrastructure disruption
+sustained large-scale operational impact
+
+FOR SECURITY INCIDENTS assess:
+
+intent
+weapon / attack method
+target
+fatalities
+injuries
+location
+follow-on threat
+security response
+access restrictions
+effect on commercial movement
+potential operational consequence
+
+DO NOT reduce severity simply because an incident is geographically localised.
+
+A LOCAL bombing can still be HIGH.
+
+Regional significance and incident severity are TWO DIFFERENT THINGS.
+
+FOR REGULATORY ITEMS assess:
+
+scale of affected population
+effective date
+business compliance burden
+workforce impact
+travel impact
+market-access impact
+whether operations are actually disrupted
+
+Administrative inconvenience must not automatically become HIGH.
+
+MANDATORY TEST CASES
+
+Pakistan car-bomb attack:
+reassess from the underlying incident facts.
+If confirmed fatalities and deliberate targeting of security personnel are supported by the evidence, MODERATE requires explicit justification.
+
+Thailand bombing and small-arms attack:
+assess as a deliberate security attack, not simply by geographic reach.
+
+Australia migration policy:
+assess according to actual operational consequence, not the importance of the policy headline.
+
+VALIDATION
+
+Before report generation compare severity assignments across all selected developments.
+
+If a major armed attack receives the same or lower severity than a routine administrative or regulatory change, review both assessments automatically.
+
+Do not change:
+report design
+map design
+report structure
+PDF layout
+
+Fix the severity assessment logic for ALL Regional Weekly developments.
+
+Then regenerate APAC Weekly and STOP.
