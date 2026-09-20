@@ -62,3 +62,9 @@ Regional report acceptance must inspect the exact environment and saved row the 
 **Why:** The Regional Reports create action saved empty production rows while a separate development acceptance harness produced a complete canonical row; identical titles hid the mismatch and led to false completion claims.
 
 **How to apply:** Trace the browser route/report ID and query that environment's row before debugging renderers. Report creation must persist the canonical object atomically; never create an empty regional row and expect the editor to reconstruct it later. Do not claim live-page parity from a development export.
+
+The Regional Reports landing page must always keep “Create Report” available, even when a current draft exists; “Open Current Report” is a separate action.
+
+**Why:** Replacing creation with opening prevented analysts from starting the next report while an existing draft remained current.
+
+**How to apply:** Show both actions when a current report exists. The create handler must create a new row rather than redirecting to the current one.

@@ -47,11 +47,6 @@ export default function RegionalReports() {
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
     const issueDate = currentReportDate();
-    const existingCurrent = currentReports.find((report) => report.topic === topic);
-    if (existingCurrent) {
-      setLocation(`/reports/${existingCurrent.id}`);
-      return;
-    }
     createBusy.current = true;
     setCreatingTopic(topic);
     const controller = new AbortController();
@@ -134,21 +129,23 @@ export default function RegionalReports() {
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2">
+                {currentReport && (
+                  <Button asChild variant="outline" className="rounded-sm">
+                    <Link href={`/reports/${currentReport.id}`}>
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                      Open Current Report
+                    </Link>
+                  </Button>
+                )}
                 <Button
                   onClick={() => createRegionalReport(topic)}
                   disabled={creatingTopic !== null}
                   className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
                 >
-                  {currentReport ? (
-                    <ArrowRight className="w-4 h-4 mr-2" />
-                  ) : (
-                    <Plus className="w-4 h-4 mr-2" />
-                  )}
+                  <Plus className="w-4 h-4 mr-2" />
                   {creatingTopic === topic
                     ? "Creating…"
-                    : currentReport
-                      ? "Open Current Report"
-                      : "New Weekly Report"}
+                    : "Create Report"}
                 </Button>
               </div>
             </section>
