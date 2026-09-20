@@ -45,6 +45,12 @@ Both products use the same deterministic regional-map design: a fixed region-spe
 
 **How to apply:** Choose map points only from the final canonical developments, balancing security, continuity and policy where evidence permits. Never draw cards over geography, never add an unlabeled point, and never change the extent based on the selected incidents. Preview and PDF must use the same canonical points.
 
+Technical validity is not editorial acceptance. A Regional Weekly fails if it is a sparse incident digest padded into multiple pages, recycles the same boilerplate across sections or regions, hides evidence behind source counts, or substitutes generic “verify and monitor” instructions for a specific business-risk judgement.
+
+**Why:** The owner rejected technically valid exports because large blank pages, trivial count charts, clipped map labels, repetitive prose and unsupported headline-level claims made them look unfinished and analytically weak.
+
+**How to apply:** Review the rendered PDF as a client deliverable. Every section must add a distinct layer of judgement; recommendations must identify the exposed business function, trigger and decision; sources must be auditable; charts must show a meaningful comparison or trend; and page composition must not use whitespace to disguise thin evidence.
+
 Regional report acceptance must inspect the exact environment and saved row the owner is viewing. A development PDF proves nothing about a newly created production row.
 
 **Why:** The Regional Reports create action saved empty production rows while a separate development acceptance harness produced a complete canonical row; identical titles hid the mismatch and led to false completion claims.
