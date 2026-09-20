@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   createReport as createReportRequest,
@@ -28,30 +28,6 @@ import {
 
 type RegionalTopic = Extract<ReportTopic, "apac_weekly" | "middle_east_weekly">;
 
-function hasRegionalCanonicalReport(report: Report): boolean {
-  const hardNumbers = report.hardNumbers;
-  if (!hardNumbers || typeof hardNumbers !== "object") return false;
-  const canonical = (hardNumbers as Record<string, unknown>).regionalCanonicalReport;
-  return !!canonical && typeof canonical === "object";
-}
-
-function collapseRegionalReportDuplicates(rows: Report[]): Report[] {
-  const selected = new Map<string, Report>();
-  for (const report of rows) {
-    const key = `${report.topic}|${report.issueDate}|${report.status ?? "draft"}`;
-    const current = selected.get(key);
-    if (
-      !current ||
-      (hasRegionalCanonicalReport(report) && !hasRegionalCanonicalReport(current)) ||
-      (hasRegionalCanonicalReport(report) === hasRegionalCanonicalReport(current) &&
-        report.id > current.id)
-    ) {
-      selected.set(key, report);
-    }
-  }
-  return [...selected.values()];
-}
-
 export default function RegionalReports() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
@@ -59,15 +35,11 @@ export default function RegionalReports() {
   const regionalReports = reports.filter((report) =>
     (REGIONAL_REPORT_TOPICS as readonly string[]).includes(report.topic),
   );
-  const visibleRegionalReports = useMemo(
-    () => collapseRegionalReportDuplicates(regionalReports),
-    [regionalReports],
-  );
   const {
     current: currentReports,
     older: olderReports,
     completed: completedReports,
-  } = splitReportsByLifecycle(visibleRegionalReports);
+  } = splitReportsByLifecycle(regionalReports);
   const del = useDeleteReport();
   const createBusy = useRef(false);
   const [creatingTopic, setCreatingTopic] = useState<RegionalTopic | null>(null);
@@ -75,7 +47,7 @@ export default function RegionalReports() {
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
     const issueDate = currentReportDate();
-    const existingCurrent = visibleRegionalReports
+    const existingCurrent = regionalReports
       .filter(
         (report) =>
           report.topic === topic &&
@@ -151,7 +123,7 @@ export default function RegionalReports() {
         {REGIONAL_REPORT_TOPICS.map((topic) => {
           const product = canonicalTopic(topic);
           const currentIssueDate = currentReportDate();
-          const currentReport = visibleRegionalReports
+          const currentReport = regionalReports
             .filter(
               (report) =>
                 report.topic === topic &&
@@ -200,7 +172,7 @@ export default function RegionalReports() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {visibleRegionalReports.length === 0 && (
+        {regionalReports.length === 0 && (
           <div className="col-span-full border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
             No regional reports yet. Create the current APAC or Middle East weekly report above.
           </div>
