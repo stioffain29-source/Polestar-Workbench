@@ -541,6 +541,29 @@ describe("regional weekly products", () => {
     expect(items.some((item) => item.location === "Manila, Philippines")).toBe(true);
   });
 
+  it("does not repeat current developments in the 7 Day Watch or publish an unqualified National location", () => {
+    const developments = buildApacWeeklyDevelopments([
+      {
+        ...incident(1, "Pakistan", "high", "2026-09-17", "Attack affects police headquarters"),
+        summary: "Further attacks remain possible.",
+      },
+    ], "2026-09-17");
+    developments[0].watchDate = "2026-09-20";
+    developments[0].whatToWatch = "Track further attacks.";
+    const items = buildApacWeeklyWatchlist(
+      developments,
+      [{
+        date: "2026-09-20",
+        location: "National",
+        trigger: "Temporary migration rules tighten",
+        whyItMatters: "Hiring assumptions may change.",
+        currentSeverity: "Moderate",
+      }],
+      "2026-09-17",
+    );
+    expect(items).toEqual([]);
+  });
+
   it("keeps APAC development fields materially distinct for recurring report shapes", () => {
     const developments = buildApacWeeklyDevelopments([
       {

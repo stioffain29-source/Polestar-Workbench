@@ -414,10 +414,12 @@ export function RegionalHotspotMap({
   const bounds = topic === "apac_weekly"
     ? { minLng: 60, maxLng: 180, minLat: -50, maxLat: 55 }
     : { minLng: 25, maxLng: 65, minLat: 10, maxLat: 42 };
+  const mapWidth = bounds.maxLng - bounds.minLng;
+  const mapHeight = bounds.maxLat - bounds.minLat;
 
   const project = (lng: number, lat: number): [number, number] => [
-    ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100,
-    ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * 100,
+    lng - bounds.minLng,
+    bounds.maxLat - lat,
   ];
 
   const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon, { name?: string }>;
@@ -441,29 +443,63 @@ export function RegionalHotspotMap({
   }
 
   return (
-    <div className="border border-[#bdc8d6] bg-[#dfeaf3] flex flex-col md:flex-row h-auto md:h-[320px] relative overflow-hidden">
-      <div className="w-full md:w-[58%] h-[240px] md:h-full relative shrink-0">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full block">
+    <div className="border border-[#bdc8d6] bg-white overflow-hidden">
+      <div className="w-full h-[255px] bg-[#dfeaf3]">
+        <svg
+          viewBox={`-3 -3 ${mapWidth + 6} ${mapHeight + 6}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-full block"
+          role="img"
+          aria-label="Regional risk map showing the three leading verified developments"
+        >
           {features.map((feature) => (
-            <path key={feature.name} d={feature.d} fill="#f7f4ed" stroke="#8999aa" strokeWidth="0.2" strokeLinejoin="round" />
+            <path key={feature.name} d={feature.d} fill="#f7f4ed" stroke="#8999aa" strokeWidth="0.32" strokeLinejoin="round" />
           ))}
           {top3Points.map((pt, i) => {
             const [cx, cy] = project(pt.lng, pt.lat);
             return (
-              <circle key={`pin-${i}`} cx={cx} cy={cy} r="1.5" fill={SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC} stroke="#ffffff" strokeWidth="0.5" />
+              <g key={`pin-${i}`}>
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r="3.3"
+                  fill={SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC}
+                  stroke="#ffffff"
+                  strokeWidth="0.9"
+                />
+                <text
+                  x={cx}
+                  y={cy + 1.15}
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontFamily="Roboto, sans-serif"
+                  fontWeight="700"
+                  fontSize="3.2"
+                >
+                  {i + 1}
+                </text>
+              </g>
             );
           })}
         </svg>
       </div>
-      <div className="w-full md:w-[42%] h-full bg-white border-t md:border-t-0 md:border-l border-[#bdc8d6] p-4 flex flex-col gap-4 overflow-y-auto">
+      <div className="grid grid-cols-1 md:grid-cols-3 border-t border-[#bdc8d6]">
         {top3Points.map((pt, index) => (
-          <div key={index} className="flex gap-3">
-            <div className="mt-1 w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC }} />
+          <div
+            key={index}
+            className={`flex gap-2.5 p-3 ${index > 0 ? "border-t md:border-t-0 md:border-l border-[#d9e0e8]" : ""}`}
+          >
+            <div
+              className="mt-0.5 w-5 h-5 rounded-full shrink-0 text-white text-[10px] font-bold flex items-center justify-center"
+              style={{ backgroundColor: SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC }}
+            >
+              {index + 1}
+            </div>
             <div>
-              <h4 className="text-[11px] font-bold uppercase tracking-wide leading-tight mb-1" style={{ color: NAVY }}>
+              <h4 className="text-[10px] font-bold uppercase tracking-wide leading-[1.25] mb-1" style={{ color: NAVY }}>
                 {pt.label}
               </h4>
-              <p className="text-[10px] leading-[1.4] m-0" style={{ color: DUSK }}>
+              <p className="text-[9.5px] leading-[1.35] m-0" style={{ color: DUSK }}>
                 {pt.summary}
               </p>
             </div>

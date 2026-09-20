@@ -200,7 +200,6 @@ export function validateRegionalCanonicalStructure(
   if (report.mapPoints.length === 0) errors.push("Regional report requires a risk map with at least one verified point.");
   if (report.developments.length === 0) errors.push("Regional report requires key developments.");
   if (!report.businessImplicationsNarrative.trim()) errors.push("Regional report requires business implications.");
-  if (report.watchItems.length === 0) errors.push("Regional report requires a 7 Day Watch.");
   if (!report.polestarOutlook.trim()) errors.push("Regional report requires a Polestar Outlook.");
   return errors;
 }
@@ -2352,16 +2351,17 @@ export function buildApacWeeklyWatchlist(
   futureEvents: RegionalFutureEventInput[] = [],
   issueDate?: string,
 ): RegionalWatchItem[] {
-  const developmentItems = buildRegionalWatchlist(developments).map((item) => ({
-    ...item,
-    currentSeverity: developments.find((row) => row.country === item.location && row.title === item.trigger)?.severity,
-  }));
+  // The 7 Day Watch is forward-looking. Current developments already appear in
+  // Key Developments and must not be repeated here with monitoring prose.
+  void developments;
   const issue = issueDate ? parseISO(issueDate) : null;
   const supplied = futureEvents.filter((event) => {
     const date = parseISO(event.date);
+    const location = event.location.trim();
     return isValid(date)
       && (!issue || (!isAfter(date, addDays(issue, 7)) && isAfter(date, issue)))
-      && event.location.trim()
+      && location
+      && !/^(?:national|nationwide|regional|countrywide)$/i.test(location)
       && event.trigger.trim()
       && event.whyItMatters.trim();
   }).map((event) => {
@@ -2381,7 +2381,7 @@ export function buildApacWeeklyWatchlist(
     };
   }).filter((event) => event.trigger.length >= 8 && !/\b(?:followed by|and then|and)\s*$/i.test(event.trigger));
   const seen = new Set<string>();
-  return [...developmentItems, ...supplied]
+  return supplied
     .filter((item) => {
       const key = `${item.date}|${item.location.toLowerCase()}|${item.trigger.toLowerCase()}`;
       if (seen.has(key)) return false;
