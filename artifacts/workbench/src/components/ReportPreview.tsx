@@ -226,117 +226,6 @@ function NarrativeSection({ title, text, hidden }: { title: string; text?: strin
   );
 }
 
-function ApacDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
-  return (
-    <div className="space-y-4">
-      {developments.map((development, index) => (
-        <article
-          key={`${development.country}-${development.title}-${index}`}
-          className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-4"
-        >
-          <h3
-            className="uppercase tracking-wide text-[13px] font-bold mb-2"
-            style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}
-          >
-            {development.country} | {development.location}
-          </h3>
-          {development.eventDate && (
-            <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: ELECTRIC, fontFamily: "Roboto, sans-serif" }}>
-              {format(parseISO(development.eventDate), "dd MMM yyyy")}
-            </p>
-          )}
-          <h4 className="text-[12px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-            {development.title}
-          </h4>
-          <div className="space-y-2 text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            <p><strong>Category:</strong> {development.category} &nbsp; <strong>Current Severity:</strong> {development.severity}</p>
-            <p><strong>ASSESSMENT:</strong> {development.whatChanged}</p>
-            {development.polestarView && <p><strong>POLESTAR VIEW:</strong> {development.polestarView}</p>}
-            {development.outlook7Days && <p><strong>OUTLOOK 7 DAYS:</strong> {development.outlook7Days}</p>}
-          </div>
-        </article>
-      ))}
-      {developments.length === 0 && (
-        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
-          No qualifying developments were identified in the reporting period.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ApacThemes({ themes }: { themes: ReturnType<typeof buildRegionalDomainBriefs> }) {
-  return (
-    <div className="space-y-4">
-      {themes.map((theme) => (
-        <div key={theme.heading} className="border-l-[3px] border-l-[#465bff] bg-[#f7f8fb] p-4">
-          <h3 className="uppercase tracking-wide text-[13px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-            {theme.heading}
-          </h3>
-          <p className="text-[12px] leading-[1.55]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-            {theme.assessment}
-          </p>
-        </div>
-      ))}
-      {themes.length === 0 && (
-        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
-          No major regional themes were identified in the reporting period.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ApacBarVisual({
-  title,
-  rows,
-}: {
-  title: string;
-  rows: Array<{ label: string; count: number }>;
-}) {
-  const max = Math.max(1, ...rows.map((row) => row.count));
-  return (
-    <div className="border border-[#e2e2e2] bg-white p-4">
-      <h3 className="uppercase tracking-wide text-[12px] font-bold mb-4" style={{ color: NAVY }}>
-        {title}
-      </h3>
-      <div className="space-y-3">
-        {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[150px_1fr_24px] items-center gap-3">
-            <span className="text-[10px] uppercase font-bold" style={{ color: DUSK }}>{row.label}</span>
-            <div className="h-3 bg-[#eef0f4]">
-              <div className="h-full bg-[#465bff]" style={{ width: `${Math.max(8, (row.count / max) * 100)}%` }} />
-            </div>
-            <span className="text-[11px] font-bold text-right" style={{ color: NAVY }}>{row.count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ApacBusinessImplications({ blocks }: { blocks: ReturnType<typeof buildApacBusinessImplications> }) {
-  return (
-    <div className="space-y-6">
-      {blocks.map((block, i) => (
-        <div key={i} className="border border-[#e2e2e2] bg-white p-4 shadow-sm">
-           <h3 className="uppercase tracking-wide text-[13px] font-bold mb-2" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>
-             {block.heading}
-           </h3>
-           <p className="text-[12px] leading-[1.55] m-0" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
-             {block.body}
-           </p>
-        </div>
-      ))}
-      {blocks.length === 0 && (
-        <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
-          No specific regional business implications were identified.
-        </p>
-      )}
-    </div>
-  );
-}
-
 function RegionalDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
   return (
     <div className="space-y-4">
@@ -383,33 +272,6 @@ function RegionalDomainBriefs({
           <p className="text-[12px] leading-[1.55] m-0" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>
             {brief.assessment}
           </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ApacWatchlist({
-  items,
-}: {
-  items: ReturnType<typeof buildApacWeeklyWatchlist>;
-}) {
-  if (items.length === 0) {
-    return (
-      <p className="text-[12px] text-muted-foreground" style={{ fontFamily: "Roboto, sans-serif" }}>
-        No qualifying watch items were identified in the reporting period.
-      </p>
-    );
-  }
-  return (
-    <div className="overflow-hidden border border-[#e2e2e2]">
-      <div className="grid grid-cols-[90px_110px_1.25fr_1.6fr_90px] bg-[#f2f4f7] px-3 py-2 text-[9px] font-bold uppercase tracking-wide" style={{ color: NAVY }}>
-        <span>Date</span><span>Location</span><span>Event</span><span>Expected Impact</span><span>Current Severity</span>
-      </div>
-      {items.map((item, index) => (
-        <div key={`${item.date}-${item.location}-${index}`} className="grid grid-cols-[90px_110px_1.25fr_1.6fr_90px] gap-0 border-t border-[#e2e2e2] px-3 py-3 text-[10px] leading-[1.45]" style={{ color: DUSK }}>
-          <span>{item.date}</span><span className="font-bold">{item.location}</span><span>{item.trigger}</span>
-          <span>{item.whyItMatters}</span><span>{item.currentSeverity ?? "—"}</span>
         </div>
       ))}
     </div>
@@ -526,214 +388,12 @@ const APAC_MARKET_COORDS: Record<(typeof APAC_OUTLOOK_MARKETS)[number], [number,
   Malaysia: [4.2, 102.0],
 };
 
-export function ApacHotspotMap({
-  items,
-}: {
-  items: ReturnType<typeof import("@/lib/regionalWeekly").buildApacMapItems>;
-}) {
-  const [activeMobileCallout, setActiveMobileCallout] = useState<string | null>(null);
-
-  if (items.length === 0) {
-    return (
-      <p className="text-[12px] text-muted-foreground italic" style={{ fontFamily: "Roboto, sans-serif" }}>
-        No selected development has a verified plottable location.
-      </p>
-    );
-  }
-
-  const boxW = 148;
-  const wrapSvgLines = (text: string, maxChars: number, maxLines: number): string[] => {
-    const words = text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
-    const lines: string[] = [];
-    let line = "";
-    for (const word of words) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (candidate.length <= maxChars) {
-        line = candidate;
-      } else {
-        if (line) lines.push(line);
-        line = word;
-        if (lines.length === maxLines) break;
-      }
-    }
-    if (line && lines.length < maxLines) lines.push(line);
-    if (lines.length === maxLines && words.join(" ").length > lines.join(" ").length) {
-      lines[maxLines - 1] = `${lines[maxLines - 1].replace(/[.,;:!?]?$/, "")}…`;
-    }
-    return lines;
-  };
-
-  const allIncidents = items.flatMap(i => i.developments.map((d, index) => ({
-    ...d,
-    id: `${i.country}-${index}`,
-    lat: i.lat,
-    lng: i.lng,
-    country: i.country,
-  })));
-
-  allIncidents.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-  const top3 = allIncidents.slice(0, 3);
-
-  const prepared = top3.map((entry, index) => {
-    const point = projectApac(entry.lng, entry.lat);
-    const title = entry.label.toUpperCase();
-    const summary = clipCalloutSummary(entry.summary || entry.fullTitle);
-    const severityColor = SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC;
-    const titleLines = wrapSvgLines(title, 25, 2);
-    const summaryLines = wrapSvgLines(summary, 36, 3);
-    const height = 10 + titleLines.length * 10 + 3 + summaryLines.length * 9 + 8;
-
-    return {
-      id: String(index),
-      point,
-      titleLines,
-      summaryLines,
-      height,
-      severityColor
-    };
-  });
-
-  const inputs = prepared.map(p => ({
-    id: p.id,
-    px: p.point[0],
-    py: p.point[1],
-    boxW,
-    boxH: p.height
-  }));
-
-  const placements = layoutCallouts(APAC_MAP_CW, APAC_MAP_H, inputs);
-  const mobileEntry = allIncidents.find((entry) => entry.id === activeMobileCallout);
-  const mobilePrepared = mobileEntry ? {
-    id: mobileEntry.id,
-    point: projectApac(mobileEntry.lng, mobileEntry.lat),
-    titleLines: wrapSvgLines(mobileEntry.label.toUpperCase(), 25, 2),
-    summaryLines: wrapSvgLines(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle), 36, 3),
-    height: 10
-      + wrapSvgLines(mobileEntry.label.toUpperCase(), 25, 2).length * 10
-      + 3
-      + wrapSvgLines(clipCalloutSummary(mobileEntry.summary || mobileEntry.fullTitle), 36, 3).length * 9
-      + 8,
-    severityColor: SEV_COLOR[sevKey(mobileEntry.severity)] ?? ELECTRIC,
-  } : null;
-  const mobilePlacement = mobilePrepared
-    ? layoutCallouts(APAC_MAP_CW, APAC_MAP_H, [{
-        id: mobilePrepared.id,
-        px: mobilePrepared.point[0],
-        py: mobilePrepared.point[1],
-        boxW,
-        boxH: mobilePrepared.height,
-      }])[0]
-    : null;
-
-  return (
-    <div className="border border-[#bdc8d6] bg-[#dfeaf3] overflow-hidden w-full relative">
-      <svg viewBox={`0 0 ${APAC_MAP_CW} ${APAC_MAP_H}`} className="w-full h-auto block" preserveAspectRatio="xMidYMid meet">
-        <rect width={APAC_MAP_CW} height={APAC_MAP_H} fill="#dfeaf3" />
-        {apacMapFeatures.map((feature) => (
-          <path
-            key={feature.name}
-            d={feature.d}
-            fill="#f7f4ed"
-            stroke="#8999aa"
-            strokeWidth="0.5"
-            strokeLinejoin="round"
-          />
-        ))}
-
-        <g className="hidden md:block">
-          {placements.map((pos, i) => (
-            <line
-              key={`leader-${i}`}
-              x1={pos.leaderX1}
-              y1={pos.leaderY1}
-              x2={pos.leaderX2}
-              y2={pos.leaderY2}
-              stroke="#888888"
-              strokeWidth="0.8"
-            />
-          ))}
-
-          {placements.map((pos, i) => {
-            const entry = prepared.find(p => p.id === pos.id)!;
-            return (
-              <g key={i}>
-                <rect x={pos.boxX} y={pos.boxY} width={boxW} height={entry.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
-                <rect x={pos.boxX} y={pos.boxY} width="3" height={entry.height} fill={entry.severityColor} rx="1" />
-                <text x={pos.boxX + 9} y={pos.boxY + 13} fill={NAVY} fontFamily="Roboto, sans-serif" fontSize="8.5" fontWeight="700">
-                  {entry.titleLines.map((line, lineIndex) => (
-                    <tspan key={line} x={pos.boxX + 9} dy={lineIndex === 0 ? 0 : 10}>{line}</tspan>
-                  ))}
-                </text>
-                <text x={pos.boxX + 9} y={pos.boxY + 16 + entry.titleLines.length * 10} fill={DUSK} fontFamily="Roboto, sans-serif" fontSize="7.8" fontWeight="400">
-                  {entry.summaryLines.map((line, lineIndex) => (
-                    <tspan key={line} x={pos.boxX + 9} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
-                  ))}
-                </text>
-              </g>
-            );
-          })}
-        </g>
-
-        {mobilePrepared && mobilePlacement && (
-          <g className="md:hidden">
-            <line
-              x1={mobilePlacement.leaderX1}
-              y1={mobilePlacement.leaderY1}
-              x2={mobilePlacement.leaderX2}
-              y2={mobilePlacement.leaderY2}
-              stroke="#888888"
-              strokeWidth="0.8"
-            />
-            <g>
-              <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width={boxW} height={mobilePrepared.height} fill="#ffffff" fillOpacity="0.96" stroke={POLAR} strokeWidth="0.9" rx="2" />
-              <rect x={mobilePlacement.boxX} y={mobilePlacement.boxY} width="3" height={mobilePrepared.height} fill={mobilePrepared.severityColor} rx="1" />
-              <text x={mobilePlacement.boxX + 9} y={mobilePlacement.boxY + 13} fill={NAVY} fontFamily="Roboto, sans-serif" fontSize="8.5" fontWeight="700">
-                {mobilePrepared.titleLines.map((line, lineIndex) => (
-                  <tspan key={line} x={mobilePlacement.boxX + 9} dy={lineIndex === 0 ? 0 : 10}>{line}</tspan>
-                ))}
-              </text>
-              <text x={mobilePlacement.boxX + 9} y={mobilePlacement.boxY + 16 + mobilePrepared.titleLines.length * 10} fill={DUSK} fontFamily="Roboto, sans-serif" fontSize="7.8" fontWeight="400">
-                {mobilePrepared.summaryLines.map((line, lineIndex) => (
-                  <tspan key={line} x={mobilePlacement.boxX + 9} dy={lineIndex === 0 ? 0 : 9}>{line}</tspan>
-                ))}
-              </text>
-            </g>
-          </g>
-        )}
-
-        {allIncidents.map((entry) => {
-          const point = projectApac(entry.lng, entry.lat);
-          return (
-            <circle
-              key={`pin-${entry.id}`}
-              cx={point[0]}
-              cy={point[1]}
-              r={3.5}
-              fill={SEV_COLOR[sevKey(entry.severity)] ?? ELECTRIC}
-              stroke="#ffffff"
-              strokeWidth="1.5"
-              className="cursor-pointer"
-              role="button"
-              tabIndex={0}
-              aria-label={`Show ${entry.country} incident callout`}
-              onClick={() => setActiveMobileCallout(entry.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setActiveMobileCallout(entry.id);
-                }
-              }}
-            />
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-function RegionalHotspotMap({
+export function RegionalHotspotMap({
   points,
+  topic,
 }: {
-  points: ReturnType<typeof buildRegionalMapPoints>;
+  points: ReturnType<typeof import("@/lib/regionalWeekly").buildRegionalMapPoints>;
+  topic: string | undefined;
 }) {
   if (points.length === 0) {
     return (
@@ -742,51 +402,65 @@ function RegionalHotspotMap({
       </p>
     );
   }
-  // buildRegionalMapPoints preserves the curated materiality order from
-  // selectRegionalKeyDevelopments. The map is intentionally limited to the
-  // first three issues that matter most, rather than re-ranking by severity.
   const top3Points = points.slice(0, 3);
+  const bounds = topic === "apac_weekly"
+    ? { minLng: 60, maxLng: 180, minLat: -50, maxLat: 55 }
+    : { minLng: 25, maxLng: 65, minLat: 10, maxLat: 42 };
+
+  const project = (lng: number, lat: number): [number, number] => [
+    ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100,
+    ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * 100,
+  ];
+
+  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon, { name?: string }>;
+  const features: Array<{ name: string; d: string }> = [];
+  for (const feature of collection.features) {
+    const pathD: string[] = [];
+    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        const mapped = ring
+          .filter(([lng, lat]) => lng >= bounds.minLng - 3 && lng <= bounds.maxLng + 3 && lat >= bounds.minLat - 3 && lat <= bounds.maxLat + 3)
+          .map(([lng, lat]) => project(lng, lat));
+        if (mapped.length < 3 || mapped.some(([x,y]) => !Number.isFinite(x) || !Number.isFinite(y))) continue;
+        let d = `M ${mapped[0][0].toFixed(2)} ${mapped[0][1].toFixed(2)}`;
+        for (let i = 1; i < mapped.length; i++) d += ` L ${mapped[i][0].toFixed(2)} ${mapped[i][1].toFixed(2)}`;
+        d += " Z";
+        pathD.push(d);
+      }
+    }
+    if (pathD.length > 0) features.push({ name: feature.properties?.name ?? "", d: pathD.join(" ") });
+  }
 
   return (
-    <div className="border border-[#d2d6e1] bg-[#f7f8fb]">
-      <IncidentMap
-        points={top3Points.map((p, index) => ({
-          lat: p.lat,
-          lng: p.lng,
-          title: p.title,
-          label: p.label,
-          severity: p.severity,
-          primary: false,
-          markerNumber: index + 1,
-        }))}
-        height={320}
-        showLabels={false}
-      />
-      <div
-        className="grid grid-cols-3 gap-px border-t border-[#d2d6e1] bg-[#d2d6e1]"
-        style={{ fontFamily: "Roboto, sans-serif" }}
-      >
-        {top3Points.map((point, index) => {
-          const severityColor = SEV_COLOR[sevKey(point.severity)] ?? "#465bff";
-          return (
-            <div key={`${point.title}-${index}`} className="bg-white px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: severityColor }}
-                >
-                  {index + 1}
-                </span>
-                <span className="text-[10px] font-bold uppercase leading-tight" style={{ color: NAVY }}>
-                  {clipCalloutTitle(point.title)}
-                </span>
-              </div>
-              <p className="mt-1.5 text-[9px] leading-[1.35]" style={{ color: "#4b5063" }}>
-                {point.eventDate && <><strong>{format(parseISO(point.eventDate), "dd MMM").toUpperCase()}</strong> · </>}{clipCalloutSummary(point.summary)}
+    <div className="border border-[#bdc8d6] bg-[#dfeaf3] flex flex-col md:flex-row h-auto md:h-[320px] relative overflow-hidden">
+      <div className="w-full md:w-[58%] h-[240px] md:h-full relative shrink-0">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full block">
+          {features.map((feature) => (
+            <path key={feature.name} d={feature.d} fill="#f7f4ed" stroke="#8999aa" strokeWidth="0.2" strokeLinejoin="round" />
+          ))}
+          {top3Points.map((pt, i) => {
+            const [cx, cy] = project(pt.lng, pt.lat);
+            return (
+              <circle key={`pin-${i}`} cx={cx} cy={cy} r="1.5" fill={SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC} stroke="#ffffff" strokeWidth="0.5" />
+            );
+          })}
+        </svg>
+      </div>
+      <div className="w-full md:w-[42%] h-full bg-white border-t md:border-t-0 md:border-l border-[#bdc8d6] p-4 flex flex-col gap-4 overflow-y-auto">
+        {top3Points.map((pt, index) => (
+          <div key={index} className="flex gap-3">
+            <div className="mt-1 w-3 h-3 rounded-full shrink-0 border border-white shadow-sm" style={{ backgroundColor: SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC }} />
+            <div>
+              <h4 className="text-[11px] font-bold uppercase tracking-wide leading-tight mb-1" style={{ color: NAVY }}>
+                {pt.label}
+              </h4>
+              <p className="text-[10px] leading-[1.4] m-0" style={{ color: DUSK }}>
+                {pt.summary}
               </p>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1931,119 +1605,48 @@ export default function ReportPreview({
 
       {isRegionalWeekly ? (
         <div className="regional-weekly-body">
-          {/* Page 2: Regional Outlook & Week at a Glance */}
-          <div className="px-10 py-10">
+          <div className="px-10 py-10 report-page" style={{ position: "relative" }}>
             <Section hidden={!show("executive-summary")} title="Regional Outlook">
               <Paragraphs text={regionalBluf} />
             </Section>
 
-            <div style={{ marginTop: 24, marginBottom: 32 }}>
-              {report.topic === "apac_weekly"
-                ? <ApacHotspotMap items={apacMapItems} />
-                : <RegionalHotspotMap points={regionalMapPoints} />}
+            <div style={{ marginTop: 40, marginBottom: 24 }}>
+              <Section hidden={!show("situation")} title="Regional Risk Picture">
+                <Paragraphs text={regionalRiskPicture} />
+              </Section>
             </div>
 
-            <Section hidden={!show("fast-facts")} title="Week at a Glance">
-              <div className="grid grid-cols-2 gap-3 mt-2">
-                {apacGlanceMetrics.map((item, i) => (
-                  <div key={i} className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-3 flex flex-col justify-center gap-1">
-                    <span className="uppercase text-[10px] font-bold tracking-wide" style={{ color: NAVY }}>{item.label}</span>
-                    <span className="text-[18px] font-bold leading-[1.1]" style={{ color: NAVY, fontFamily: "Roboto, sans-serif" }}>{item.value}</span>
-                  </div>
-                ))}
+            <div style={{ marginTop: 24, marginBottom: 24 }}>
+              <RegionalHotspotMap points={regionalMapPoints} topic={report.topic} />
+            </div>
+
+            {regionalDomainBriefs.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <RegionalDomainBriefs briefs={regionalDomainBriefs} />
               </div>
-            </Section>
+            )}
           </div>
 
-          {/* Page 3: What Changed This Week */}
-          <div className="px-10 pb-10">
-            <Section hidden={!show("situation")} title="What Changed This Week">
-              <ApacThemes themes={apacThemes} />
-            </Section>
-            <div className="grid grid-cols-2 gap-5 mt-8">
-              <ApacBarVisual title="Developments by Type" rows={apacVisualSummary.byCategory} />
-              <ApacBarVisual title="Developments by Market" rows={apacVisualSummary.byCountry} />
-            </div>
-          </div>
-
-          {/* Page 4-5: Key Developments */}
-          <div className="px-10 pb-10">
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
             <Section hidden={!show("what-happened")} title="Key Developments">
-              <ApacDevelopmentCards developments={regionalDevelopments} />
+              <RegionalDevelopmentCards developments={regionalDevelopments} />
             </Section>
           </div>
 
-          {/* Page 6: Business Implications */}
-          <div className="px-10 pb-10">
+          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
             <Section hidden={!show("implications")} title="Business Implications">
-              <ApacBusinessImplications blocks={apacImplications} />
+              <Paragraphs text={regionalBusinessImplications} />
             </Section>
-          </div>
-
-          {/* Page 7: 7-Day Watch & Polestar Outlook */}
-          <div className="px-10 pb-10">
-            <Section hidden={!show("watch-next")} title="7 Day Watch">
-              <ApacWatchlist items={apacWatchlist} />
-            </Section>
-            <div style={{ marginTop: 40 }}>
+            <div style={{ marginTop: 32 }}>
+              <Section hidden={!show("watch-next")} title="7 Day Watch">
+                <RegionalWatchlist items={regionalWatchlist} />
+              </Section>
+            </div>
+            <div style={{ marginTop: 32 }}>
               <Section hidden={!show("polestar-view")} title="Polestar Outlook">
                 <Paragraphs text={regionalOutlook} />
               </Section>
             </div>
-          </div>
-        </div>
-      ) : isRegionalWeekly ? (
-        <div className="regional-weekly-body">
-          {/* Page 2: Week at a Glance */}
-          <div className="px-10 py-10 report-page" style={{ position: "relative" }}>
-            <Section hidden={!show("executive-summary")} title="Week at a Glance">
-              <h3 style={{ color: NAVY, fontFamily: "Roboto, sans-serif", fontWeight: 700, fontSize: 13, marginBottom: 8, textTransform: "uppercase" }}>BLUF — Regional Outlook</h3>
-              <Paragraphs text={regionalBluf} />
-              <div style={{ marginTop: 24, marginBottom: 24 }}>
-                <RegionalHotspotMap points={regionalMapPoints} />
-              </div>
-              <div className="grid grid-cols-1 gap-3 mt-6">
-                {regionalGlanceItems.map((item, i) => (
-                  <div key={i} className="border border-[#e2e2e2] border-l-[3px] border-l-[#465bff] bg-white p-3 flex items-center gap-4">
-                    <span className="uppercase text-[11px] font-bold min-w-[150px]" style={{ color: NAVY }}>{item.category}</span>
-                    <span className="text-[12px] leading-[1.45]" style={{ color: DUSK, fontFamily: "Roboto, sans-serif" }}>{item.statement}</span>
-                  </div>
-                ))}
-              </div>
-            </Section>
-          </div>
-
-          {/* Page 3: What Changed */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("situation")} title="Regional Risk Picture">
-              <Paragraphs text={regionalRiskPicture} />
-            </Section>
-          </div>
-
-          {/* Page 4: Key Developments */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("what-happened")} title="Key Developments">
-              <ApacDevelopmentCards developments={regionalDevelopments} />
-            </Section>
-          </div>
-
-          {/* Page 5: 7-Day Watch & Travel */}
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("watch-next")} title="7 Day Watch">
-              <RegionalWatchlist items={regionalWatchlist} />
-            </Section>
-            <div style={{ marginTop: 40 }}>
-              <Section hidden={!show("implications")} title="Business Implications">
-                <Paragraphs text={regionalBusinessImplications} />
-              </Section>
-            </div>
-          </div>
-
-          {/* Page 6: Polestar Outlook */}
-          <div className="px-10 pt-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <Section hidden={!show("polestar-view")} title="Polestar Outlook">
-              <Paragraphs text={regionalOutlook} />
-            </Section>
           </div>
         </div>
       ) : (

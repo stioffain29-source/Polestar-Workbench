@@ -1,0 +1,254 @@
+POLESTAR MIDDLE EAST WEEKLY
+REPORTING PERIOD: 14 SEPTEMBER 2026 TO 20 SEPTEMBER 2026
+
+
+REGIONAL OUTLOOK
+
+Middle East risk this week was driven by renewed pressure on Saudi Arabia, constrained regional shipping and continuing disruption to critical infrastructure. A Houthi ballistic missile targeting Riyadh was intercepted on 19 September, while attacks and damage affecting Saudi energy infrastructure increased concern over export resilience. Commercial traffic through the Strait of Hormuz remained sharply below normal as Houthi territorial gains also increased pressure around Bab el Mandeb. Elsewhere, fuel price increases triggered protests across Syria before the government introduced cheaper diesel for households and productive sectors. Digital resilience remained an issue following continuing AWS outages in Bahrain and the UAE, while authorities also warned of Iranian linked spyware activity. Heavy rain warnings across southwestern Saudi Arabia created additional local travel and flooding concerns.
+
+
+REGIONAL RISK PICTURE
+
+Saudi Arabia experienced the most significant change in the regional security environment. The attempted ballistic missile attack against Riyadh demonstrated that the current Houthi campaign can threaten the Kingdom’s principal political, aviation and commercial centre. No casualties were reported from the intercepted missile, but repeated attacks or air raid alerts around Riyadh would carry direct implications for aviation, executive travel and business continuity.
+
+Energy infrastructure remains part of the same problem. Saudi Arabia’s East West pipeline has been significantly affected by drone damage and is expected to operate at reduced capacity while repairs continue. The route is strategically important because it allows Saudi crude to move from eastern production areas to Yanbu on the Red Sea, bypassing the Strait of Hormuz.
+
+That redundancy matters because Hormuz remains heavily constrained. Only four commodity vessels transited the Strait on 17 September compared with a recent ten day average of approximately 16. Bab el Mandeb is also under pressure following Houthi gains along Yemen’s Red Sea coastline. Businesses therefore face simultaneous uncertainty around the Gulf and Red Sea approaches rather than disruption at a single chokepoint.
+
+Syria produced a different type of operational risk. A sharp increase in diesel prices triggered demonstrations and road disruption before the government introduced cheaper fuel for heating, agriculture and productive sectors. The immediate protest pressure may reduce, but fuel affordability remains directly connected to transport, power generation and public order.
+
+Digital infrastructure also remains exposed to the wider conflict. AWS confirmed that services in Bahrain and one UAE availability zone remain inaccessible following earlier war damage. Separately, the UK, United States and Netherlands issued a warning concerning Iranian state linked spyware targeting individuals through deceptive messages and files.
+
+Weather remained a local rather than regional driver. Saudi authorities issued multiple red alerts for heavy rainfall across Asir and Jazan on 19 September, with risks including flooding, hail, lightning and poor visibility.
+
+
+KEY DEVELOPMENTS
+
+
+SAUDI ARABIA | RIYADH
+19 SEPTEMBER 2026
+
+HOUTHI BALLISTIC MISSILE TARGETS RIYADH
+
+Category: Security
+Current Severity: High
+
+Assessment:
+Saudi Arabia confirmed that a Houthi ballistic missile targeting Riyadh was intercepted on 19 September. Saudi authorities also reported attempted attacks against Yanbu, Taif, Baysh and Farasan. No casualties or confirmed damage resulted from the Riyadh interception.
+
+Polestar View:
+The significance lies in the target rather than the casualty count. Riyadh is the Kingdom’s primary political, aviation and commercial centre. Repeated attacks or sustained air raid alerts would have direct consequences for aviation, staff movement, executive travel and business continuity.
+
+Outlook 7 Days:
+Monitor further missile and drone launches, civil defence warnings, airport operating status and any confirmed damage to major infrastructure.
+
+
+SAUDI ARABIA | EAST WEST PIPELINE
+DISRUPTION CONTINUING DURING REPORTING PERIOD
+
+PIPELINE DAMAGE REDUCES SAUDI EXPORT REDUNDANCY
+
+Category: Energy and Infrastructure
+Current Severity: High
+
+Assessment:
+The East West pipeline remains significantly affected following drone damage and is expected to operate at reduced capacity for several weeks. The pipeline moves crude from eastern Saudi Arabia to Yanbu and is one of the Kingdom’s principal alternatives to shipping through the Strait of Hormuz.
+
+Polestar View:
+The significance is greater because Hormuz is already constrained. Reduced pipeline capacity removes part of Saudi Arabia’s export redundancy and increases reliance on fewer functioning routes.
+
+Outlook 7 Days:
+Track confirmed repair progress, pipeline throughput, Yanbu loading activity and changes to Saudi crude export schedules.
+
+
+STRAIT OF HORMUZ | GULF
+18 SEPTEMBER 2026
+
+COMMERCIAL SHIPPING REMAINS SHARPLY REDUCED
+
+Category: Maritime and Operational Disruption
+Current Severity: High
+
+Assessment:
+Four commodity vessels transited the Strait of Hormuz on 17 September, down from six the previous day and well below the recent ten day average of approximately 16. Commercial traffic remains significantly below normal amid continuing regional conflict and navigation concerns.
+
+Polestar View:
+The principal business impact is persistence rather than total closure. Reduced vessel traffic creates higher freight and insurance costs, lower schedule reliability and greater pressure on alternative routes and ports.
+
+Outlook 7 Days:
+Monitor vessel numbers, insurer guidance, port congestion, shipping suspensions and any improvement or deterioration in commercial access.
+
+
+YEMEN | RED SEA COAST AND BAB EL MANDEB
+15 TO 18 SEPTEMBER 2026
+
+HOUTHI GAINS INCREASE PRESSURE ON RED SEA SHIPPING
+
+Category: Armed Conflict and Maritime Security
+Current Severity: High
+
+Assessment:
+Houthi forces expanded control along Yemen’s Red Sea coastline and captured strategically important territory and islands near Bab el Mandeb. The fighting has increased Houthi proximity to one of the region’s most important maritime routes while Saudi forces have responded with further airstrikes.
+
+Polestar View:
+This is more than a local battlefield development. Greater control of coastal territory improves the Houthis’ ability to monitor, threaten or disrupt commercial shipping passing through Bab el Mandeb.
+
+Outlook 7 Days:
+Watch for further territorial gains, vessel threats, Saudi counter action and changes to commercial shipping patterns through the southern Red Sea.
+
+
+SYRIA | NATIONAL
+17 SEPTEMBER 2026
+
+GOVERNMENT EASES DIESEL PRICES AFTER PROTESTS
+
+Category: Political and Economic
+Current Severity: Moderate
+
+Assessment:
+A 40 per cent increase in standard diesel prices triggered protests across several parts of Syria. The government subsequently introduced cheaper diesel for heating, agriculture and productive sectors and announced measures intended to increase domestic fuel production.
+
+Polestar View:
+Fuel pricing is directly connected to transport costs, power generation, agriculture and household expenditure. The policy adjustment may ease immediate protest pressure but does not remove the underlying economic strain.
+
+Outlook 7 Days:
+Monitor further demonstrations, road blockages, fuel availability and implementation of the revised pricing system.
+
+
+BAHRAIN AND UAE | CLOUD INFRASTRUCTURE
+15 SEPTEMBER 2026
+
+AWS SERVICES REMAIN UNAVAILABLE AFTER WAR DAMAGE
+
+Category: Digital Infrastructure
+Current Severity: Moderate
+
+Assessment:
+Amazon Web Services confirmed that it remains unable to restore access to its Bahrain cloud region and one availability zone in the UAE following damage sustained during earlier regional conflict. Most affected customers have moved workloads to alternative regions.
+
+Polestar View:
+The disruption demonstrates that digital resilience in the Gulf is also a physical infrastructure issue. Businesses relying on regional cloud services should consider geographic concentration, backup location and cross region recovery arrangements as part of continuity planning.
+
+Outlook 7 Days:
+Monitor AWS recovery updates, further customer migrations and any additional disruption affecting Gulf data centres or telecommunications infrastructure.
+
+
+IRAN | REGIONAL
+15 SEPTEMBER 2026
+
+AUTHORITIES WARN OF IRAN LINKED SPYWARE ACTIVITY
+
+Category: Cyber and Information Risk
+Current Severity: Moderate
+
+Assessment:
+The United Kingdom, United States and Netherlands issued a joint advisory concerning Iranian state linked cyber actors deploying spyware through spear phishing campaigns on platforms including WhatsApp and Telegram. The malware can access communications, contacts, screens and device microphones.
+
+Polestar View:
+The immediate exposure is targeted rather than indiscriminate. Executives, journalists, activists and individuals dealing with sensitive regional information should assume that trusted messaging platforms may be used as the initial attack vector.
+
+Outlook 7 Days:
+Monitor additional government advisories, newly identified targeting and attempts using fabricated documents or impersonation of trusted contacts.
+
+
+SAUDI ARABIA | ASIR AND JAZAN
+19 SEPTEMBER 2026
+
+HEAVY RAIN AND FLOOD WARNINGS
+
+Category: Weather and Natural Hazards
+Current Severity: Moderate
+
+Assessment:
+Saudi Arabia’s National Center for Meteorology issued multiple red alerts for heavy rainfall across Asir and Jazan. Forecast hazards included heavy rain, flash flooding, hail, lightning and reduced visibility.
+
+Polestar View:
+The weather does not materially change the national Saudi risk picture but may cause significant short notice disruption to road movement, local site access and journeys in affected areas.
+
+Outlook 7 Days:
+Monitor further warnings, flood reports, road closures and changes to conditions affecting travel in southwestern Saudi Arabia.
+
+
+BUSINESS IMPLICATIONS
+
+The principal Middle East business issue is the interaction between security and logistics. Saudi missile and drone threats, reduced East West pipeline capacity, restricted Hormuz traffic and growing Houthi control around Bab el Mandeb affect different parts of the same regional supply chain.
+
+Companies dependent on Gulf shipping should identify which cargo can tolerate delays and where alternative ports, overland routes or additional stock may be required. Higher insurance costs and reduced vessel availability may remain important even if neither maritime chokepoint closes completely.
+
+Saudi Arabia remains commercially functional, but repeated alerts around Riyadh or further attacks on energy infrastructure would justify tighter travel and continuity measures.
+
+Syria presents a more local economic and public order problem. Businesses should monitor fuel availability and transport disruption rather than treating the current protests as evidence of uniform national instability.
+
+Digital continuity should also be considered alongside physical security. The AWS outage demonstrates that cloud services can become direct casualties of regional conflict, while Iranian linked spyware activity reinforces the need for secure communications and stronger verification of files and messages.
+
+Heavy rainfall in southwestern Saudi Arabia remains a local travel and access issue and should be managed through journey planning rather than a wider change in regional posture.
+
+
+7 DAY WATCH
+
+SAUDI ARABIA
+Houthi missile and drone campaign
+
+Further attacks against Riyadh, airports or energy infrastructure could produce immediate aviation, travel and continuity consequences.
+
+Current Severity: High
+
+Watch:
+Missile and drone launches
+Civil defence alerts
+Airport disruption
+Energy infrastructure damage
+
+
+STRAIT OF HORMUZ AND BAB EL MANDEB
+Regional maritime access
+
+Commercial shipping remains under pressure at both major regional chokepoints.
+
+Current Severity: High
+
+Watch:
+Vessel transit numbers
+Insurer guidance
+Shipping suspensions
+Port congestion
+Houthi maritime activity
+
+
+SYRIA
+Fuel pricing and protests
+
+The government’s revised diesel pricing may reduce immediate pressure, but further demonstrations or road blockages would indicate continuing dissatisfaction.
+
+Current Severity: Moderate
+
+Watch:
+Demonstrations
+Road closures
+Fuel shortages
+Further government concessions
+
+
+SAUDI ARABIA
+Heavy rain and flooding
+
+Further severe weather could affect road movement and site access in southwestern regions.
+
+Current Severity: Moderate
+
+Watch:
+Red weather alerts
+Flash flooding
+Road closures
+Visibility restrictions
+
+
+POLESTAR OUTLOOK
+
+Middle East risk over the next seven days will depend primarily on whether attacks against Saudi Arabia remain intermittent and successfully intercepted or begin producing sustained disruption to airports, energy infrastructure or major population centres.
+
+Maritime pressure remains the second major concern. Hormuz, Bab el Mandeb and the Saudi East West pipeline should be viewed as parts of the same regional logistics system. Continued deterioration across more than one route would increase freight costs, transit delays and supply chain uncertainty.
+
+Syria remains the main public order watchpoint following the government’s partial reversal of diesel price increases. Renewed demonstrations would indicate that economic dissatisfaction extends beyond the immediate fuel issue.
+
+Cyber and digital infrastructure risks are likely to remain persistent rather than acute. Regional businesses should maintain geographic redundancy for critical systems and strengthen controls around targeted phishing and messaging based attacks.
