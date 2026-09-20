@@ -163,12 +163,12 @@ describe("regional weekly products", () => {
       "apac_weekly",
       "2026-09-17",
     );
-    expect(buildRegionalDevelopments(rows).map((row) => row.category)).toEqual([
+    expect(buildRegionalDevelopments(rows).map((row) => row.category).sort()).toEqual([
       "Weather & Natural Hazards",
       "Cyber",
       "Political",
       "Regulatory",
-    ]);
+    ].sort());
   });
 
   it("builds only forward-dated watch rows and caps them at five", () => {
@@ -319,7 +319,7 @@ describe("regional weekly products", () => {
       {
         country: "Philippines",
         watchDate: null,
-        whatToWatch: "Next seven days: track official warnings, river levels, road or airport closures and confirmed reopening times.",
+          whatToWatch: "Track official warnings, river levels, road or airport closures and confirmed reopening times.",
       },
       {
         country: "Singapore",

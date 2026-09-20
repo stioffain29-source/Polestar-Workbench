@@ -1353,3 +1353,31 @@ mtime_ms = 1789878708431
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/8c2eaf7e-efa6-4abe-8964-3ad5714e5906/bbe8142a-f109-4057-9d96-6cf823049841"
 storage_version_token = "1789878719580345"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "Y6neNSoESRH2hbpzIsNsY"
+uri = "file://artifacts/workbench/exports/Polestar-APAC-Weekly-2026-09-20.pdf"
+type = "pdf"
+title = "Polestar APAC Weekly — 20 September 2026"
+description = "Rebuilt production report with three distinct evidence-backed developments and a fixed regional basemap."
+logical_id = "cb80e261-90a2-4bab-84d2-bf0562e1da5e"
+content_hash = "sha256:7b50a3bd5d9340b29620f13a0437a74318a158b973f97e67924f5f64d491d782"
+size = 2006453
+mtime_ms = 1789880176567
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/cb80e261-90a2-4bab-84d2-bf0562e1da5e/e66ea4f9-c000-449b-81a0-9eee950c9c23"
+storage_version_token = "1789880268176099"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "JxQWUyyTBjbLog55llxpe"
+uri = "file://artifacts/workbench/exports/Polestar-Middle-East-Weekly-2026-09-20.pdf"
+type = "pdf"
+title = "Polestar Middle East Weekly — 20 September 2026"
+description = "Rebuilt production report with five reclassified, evidence-backed developments and a fixed regional basemap."
+logical_id = "1b3044ec-5ddb-4f51-9aad-d00e591e83a4"
+content_hash = "sha256:35705c5cc72337b8ac5eb457f774e132556171bd529fe9e0a2beae8ee3f772bb"
+size = 1989746
+mtime_ms = 1789880204035
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/1b3044ec-5ddb-4f51-9aad-d00e591e83a4/90aa5661-4056-4731-a46a-4af126cd5181"
+storage_version_token = "1789880269725150"
+content_type = "application/pdf"

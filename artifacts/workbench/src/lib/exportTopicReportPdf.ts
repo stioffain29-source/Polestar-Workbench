@@ -745,119 +745,90 @@ function drawRegionalHotspotMap(
 ) {
   const points = canonicalPoints ?? buildRegionalMapPoints(incidents, topic);
   const { pdf, MX, CW } = ctx;
-  const h = 105;
+  const h = 180;
   ensureSpace(ctx, h + 22);
   drawSectionHeading(ctx, "Regional Hotspot Map");
-  pdf.setFillColor(247, 248, 251);
-  pdf.setDrawColor(210, 214, 225);
-  pdf.rect(MX, ctx.y, CW, h, "FD");
+  const gap = 10;
+  const mapW = CW * 0.58;
+  const railX = MX + mapW + gap;
+  const railW = CW - mapW - gap;
+  const bounds = topic === "apac_weekly"
+    ? { minLng: 60, maxLng: 180, minLat: -50, maxLat: 55 }
+    : { minLng: 25, maxLng: 65, minLat: 10, maxLat: 42 };
+  const project = (lng: number, lat: number): [number, number] => [
+    MX + 7 + ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * (mapW - 14),
+    ctx.y + 7 + ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * (h - 14),
+  ];
+  setFill(pdf, "#dfeaf3");
+  setStroke(pdf, "#bdc8d6");
+  pdf.setLineWidth(0.4);
+  pdf.rect(MX, ctx.y, mapW, h, "FD");
+  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
+  for (const feature of collection.features) {
+    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+    for (const polygon of polygons) {
+      for (const ring of polygon) {
+        const mapped = ring
+          .filter(([lng, lat]) => lng >= bounds.minLng - 3 && lng <= bounds.maxLng + 3 && lat >= bounds.minLat - 3 && lat <= bounds.maxLat + 3)
+          .map(([lng, lat]) => project(lng, lat));
+        if (mapped.length < 3 || mapped.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) continue;
+        setFill(pdf, "#f7f4ed");
+        for (let index = 1; index < mapped.length - 1; index += 1) {
+          pdf.triangle(mapped[0][0], mapped[0][1], mapped[index][0], mapped[index][1], mapped[index + 1][0], mapped[index + 1][1], "F");
+        }
+        setStroke(pdf, "#8999aa");
+        for (let index = 0; index < mapped.length - 1; index += 1) {
+          pdf.line(mapped[index][0], mapped[index][1], mapped[index + 1][0], mapped[index + 1][1]);
+        }
+      }
+    }
+  }
+  setFill(pdf, "#f7f8fb");
+  setStroke(pdf, "#d2d6e1");
+  pdf.rect(railX, ctx.y, railW, h, "FD");
   if (points.length === 0) {
     setRoboto(pdf, "regular");
     setText(pdf, DUSK);
     pdf.setFontSize(8);
-    pdf.text("No selected development has a verified plottable location.", MX + 12, ctx.y + 20);
+    pdf.text("No selected development has a verified plottable location.", railX + 10, ctx.y + 20);
     ctx.y += h + 8;
     return;
   }
-  const lats = points.map((point) => point.lat);
-  const lngs = points.map((point) => point.lng);
-  const minLat = Math.min(...lats) - 3;
-  const maxLat = Math.max(...lats) + 3;
-  const minLng = Math.min(...lngs) - 5;
-  const maxLng = Math.max(...lngs) + 5;
-
-  const sortedPoints = [...points].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
-  const top3Ids = new Set(sortedPoints.slice(0, 3).map(p => p.title));
-
-  const boxW = Math.min(140, CW * 0.4);
-
-  const prepared = points.filter(p => top3Ids.has(p.title)).map((point, index) => {
-    // Project to local coordinates
-    const px = 12 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (CW - 24);
-    const py = 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
-    const title = clipCalloutTitle(point.title);
-    const summary = clipCalloutSummary(point.summary || point.label);
-    const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
-
-    pdf.setFontSize(7.5);
-    const titleLines = pdf.splitTextToSize(sanitize(title), boxW - 12);
-    pdf.setFontSize(7);
-    const summaryLines = pdf.splitTextToSize(sanitize(summary), boxW - 12);
-
-    const height = 6 + (titleLines.length * 9) + 4 + (summaryLines.length * 8) + 6;
-
-    return {
-      id: String(index),
-      point: [px, py],
-      titleLines,
-      summaryLines,
-      height,
-      severityColor
-    };
-  });
-
-  const inputs = prepared.map(p => ({
-    id: p.id,
-    px: p.point[0],
-    py: p.point[1],
-    boxW,
-    boxH: p.height
-  }));
-
-  const placements = layoutCallouts(CW, h, inputs);
-
-  const mapTop = ctx.y;
-
-  // Draw leaders first
-  setStroke(pdf, "#888888");
-  pdf.setLineWidth(0.4);
-  for (const pos of placements) {
-    pdf.line(MX + pos.leaderX1, mapTop + pos.leaderY1, MX + pos.leaderX2, mapTop + pos.leaderY2);
-  }
-
-  // Draw pins above leaders but below boxes
-  for (const point of points) {
-    const x = MX + 12 + ((point.lng - minLng) / Math.max(1, maxLng - minLng)) * (CW - 24);
-    const y = mapTop + 10 + ((maxLat - point.lat) / Math.max(1, maxLat - minLat)) * (h - 20);
+  const selected = [...points]
+    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title))
+    .slice(0, 3);
+  selected.forEach((point, index) => {
+    const [x, y] = project(point.lng, point.lat);
     const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
     setFill(pdf, severityColor);
     setStroke(pdf, "#ffffff");
     pdf.setLineWidth(1);
-    pdf.circle(x, y, 3.5, "FD");
-  }
-
-  // Draw boxes
-  for (const pos of placements) {
-    const entry = prepared.find(p => p.id === pos.id)!;
-    const boxX = MX + pos.boxX;
-    const boxY = mapTop + pos.boxY;
-
-    // Shadow
-    setFill(pdf, "#000000");
-    pdf.setGState(new (pdf.GState as any)({ opacity: 0.1 }));
-    pdf.rect(boxX + 1, boxY + 1, boxW, entry.height, "F");
-    pdf.setGState(new (pdf.GState as any)({ opacity: 1.0 }));
-
-    setFill(pdf, "#ffffff");
-    setStroke(pdf, POLAR);
-    pdf.setLineWidth(0.5);
-    pdf.rect(boxX, boxY, boxW, entry.height, "FD");
-
-    setFill(pdf, entry.severityColor);
-    pdf.rect(boxX, boxY, 3, entry.height, "F");
-
-    setText(pdf, NAVY);
+    pdf.circle(x, y, 7, "FD");
+    setText(pdf, "#ffffff");
     setRoboto(pdf, "bold");
     pdf.setFontSize(7.5);
-    pdf.text(entry.titleLines, boxX + 8, boxY + 9);
-
-    const summaryStartY = boxY + 9 + (entry.titleLines.length * 9) - 1;
+    pdf.text(String(index + 1), x, y + 2.5, { align: "center" });
+    const cardY = ctx.y + 8 + index * 56;
+    setFill(pdf, "#ffffff");
+    setStroke(pdf, "#c8cfda");
+    pdf.setLineWidth(0.5);
+    pdf.rect(railX + 7, cardY, railW - 14, 48, "FD");
+    setFill(pdf, severityColor);
+    pdf.rect(railX + 7, cardY, 4, 48, "F");
+    setText(pdf, NAVY);
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(8);
+    pdf.text(`${index + 1}  ${sanitize(point.label.toUpperCase())}`, railX + 16, cardY + 11);
+    pdf.setFontSize(7.3);
+    const titleLines = pdf.splitTextToSize(sanitize(clipCalloutTitle(point.title)), railW - 30).slice(0, 2);
+    pdf.text(titleLines, railX + 16, cardY + 21);
     setText(pdf, DUSK);
     setRoboto(pdf, "regular");
-    pdf.setFontSize(7);
-    pdf.text(entry.summaryLines, boxX + 8, summaryStartY);
-  }
-
+    pdf.setFontSize(6.8);
+    const detail = `${point.eventDate ? `${format(parseISO(point.eventDate), "d MMM")} · ` : ""}${clipCalloutSummary(point.summary || "")}`;
+    const detailLines = pdf.splitTextToSize(sanitize(detail), railW - 30).slice(0, 2);
+    pdf.text(detailLines, railX + 16, cardY + 37);
+  });
   ctx.y += h + 8;
 }
 
@@ -1268,11 +1239,7 @@ function drawApacPageTwo(
   // height, so the next heading cannot touch the final BLUF baseline.
   ctx.y += Math.max(8, blufLines > 0 ? 8 : 0);
 
-  if (topic === "apac_weekly") {
-    drawApacGeographicMap(ctx, incidents, topic, canonical);
-  } else {
-    drawRegionalHotspotMap(ctx, incidents, topic, canonical?.mapPoints);
-  }
+  drawRegionalHotspotMap(ctx, incidents, topic, canonical?.mapPoints);
   const developments = canonical?.developments ?? buildPdfRegionalDevelopments(incidents, issueDate, topic);
   const watchItems = canonical?.watchItems ?? buildApacWeeklyWatchlist(developments, futureEvents, issueDate);
   const glance = canonical?.glanceMetrics ?? buildApacGlanceMetrics(developments, watchItems);
@@ -1323,10 +1290,12 @@ function drawApacThemesPage(
     label: row.label,
     value: row.count,
   })));
-  drawSimpleBarChart(ctx, "Developments by Market", visual.byCountry.map((row) => ({
-    label: row.label,
-    value: row.count,
-  })));
+  if (visual.byCountry.length > 0) {
+    drawSimpleBarChart(ctx, "Developments by Market", visual.byCountry.map((row) => ({
+      label: row.label,
+      value: row.count,
+    })));
+  }
 }
 
 function drawApacDevelopmentPage(
@@ -1458,7 +1427,7 @@ function drawApacFinalPage(
   if (futureEvents.length === 0) {
     drawApacCompactText(
       ctx,
-      "No verified scheduled event was returned for the APAC issue-date window.",
+      `The separate forward search returned no verified scheduled ${topic === "apac_weekly" ? "APAC" : "Middle East"} event for the next seven days.`,
       6.8,
       7.8,
       3,
