@@ -28,7 +28,9 @@ import {
 } from "@/lib/reportLifecycle";
 import {
   buildRegionalCanonicalReport,
+  regionalCanonicalReportFromHardNumbers,
   type RegionalCoverageManifest,
+  validateRegionalCanonicalStructure,
 } from "@/lib/regionalWeekly";
 
 type RegionalTopic = Extract<ReportTopic, "apac_weekly" | "middle_east_weekly">;
@@ -77,6 +79,10 @@ export default function RegionalReports() {
         [],
         coverage,
       );
+      const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);
+      if (canonicalErrors.length > 0) {
+        throw new Error(`Regional report validation failed: ${canonicalErrors.join(" ")}`);
+      }
       const report = await createReportRequest(
         {
           title: canonicalReportTitle(topic),
@@ -87,6 +93,9 @@ export default function RegionalReports() {
         } as never,
         { signal: controller.signal },
       );
+      if (!regionalCanonicalReportFromHardNumbers(report.hardNumbers, topic, issueDate)) {
+        throw new Error("The server did not persist the canonical regional report payload.");
+      }
       await Promise.all([
         qc.invalidateQueries({ queryKey: getListReportsQueryKey() }),
         qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),

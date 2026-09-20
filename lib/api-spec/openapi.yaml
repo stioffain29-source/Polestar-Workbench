@@ -2798,6 +2798,11 @@ components:
     # `prices`/`supply`/`policy`/`routes`/`jetFuel`/`jetFuelTrajectory`).
     FuelHardNumbers:
       type: object
+      # The reports.hard_numbers JSONB column also stores topic-specific
+      # canonical payloads (for example regionalCanonicalReport). Preserve
+      # those keys through create/update validation instead of silently
+      # stripping them as unknown FuelHardNumbers properties.
+      additionalProperties: true
       properties:
         cards:
           type: array
@@ -2810,6 +2815,9 @@ components:
         policy: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
         routes: { type: array, items: { $ref: "#/components/schemas/FuelDataCard" } }
         jetFuel: { $ref: "#/components/schemas/JetFuelSnapshot" }
+        regionalCanonicalReport:
+          type: object
+          additionalProperties: true
 
     ReportInput:
       type: object

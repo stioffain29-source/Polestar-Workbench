@@ -330,7 +330,8 @@ export const GetDashboardOverviewResponse = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -1107,7 +1108,7 @@ export const listIncidentsQueryDaysMax = 365;
 
 
 export const ListIncidentsQueryParams = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber', 'regional_intelligence']).optional(),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']).optional(),
   "country": zod.coerce.string().optional(),
   "severity": zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']).optional(),
   "days": zod.coerce.number().min(1).max(listIncidentsQueryDaysMax).optional().describe('Limit to incidents within the past N days'),
@@ -1146,7 +1147,7 @@ export const listIncidentsResponseMaritimeSemanticOneConfidenceDateMax = 1;
 
 export const ListIncidentsResponseItem = zod.object({
   "id": zod.number(),
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber', 'regional_intelligence']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
   "title": zod.string(),
   "displayTitle": zod.string().nullish(),
   "eventClusterKey": zod.string().nullish(),
@@ -1261,7 +1262,7 @@ export const ListIncidentsResponse = zod.array(ListIncidentsResponseItem)
 
 
 export const CreateIncidentBody = zod.object({
-  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime', 'regional_weather', 'regional_cyber', 'regional_intelligence']),
+  "topic": zod.enum(['fuel', 'flashpoint', 'protests', 'fertiliser', 'energy', 'shipping', 'cargo_watch', 'conflict', 'data_centres', 'apac_weekly', 'middle_east_weekly', 'apac_local', 'crime']),
   "title": zod.string().min(1),
   "summary": zod.string(),
   "country": zod.string(),
@@ -2243,7 +2244,8 @@ export const ListReportsResponseItem = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -2436,7 +2438,8 @@ export const CreateReportBody = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -2598,7 +2601,8 @@ export const GetReportResponse = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -2794,7 +2798,8 @@ export const UpdateReportBody = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),
@@ -2980,7 +2985,8 @@ export const UpdateReportResponse = zod.object({
   "latestValue": zod.number().optional(),
   "asOf": zod.string().optional(),
   "change": zod.string().optional()
-}).optional()
+}).optional(),
+  "regionalCanonicalReport": zod.record(zod.string(), zod.unknown()).optional()
 }),zod.array(zod.object({
   "label": zod.string(),
   "value": zod.string(),

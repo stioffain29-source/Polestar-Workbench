@@ -105,6 +105,7 @@ export * from './fuelAnalyticalProvenance';
 export * from './fuelDataCard';
 export * from './fuelFastFacts';
 export * from './fuelHardNumbers';
+export * from './fuelHardNumbersRegionalCanonicalReport';
 export * from './fuelSectionsProvenance';
 export * from './gdeltLane';
 export * from './gdeltStructuredItem';

@@ -7,6 +7,7 @@
  */
 import type { FuelDataCard } from './fuelDataCard';
 import type { FuelFastFacts } from './fuelFastFacts';
+import type { FuelHardNumbersRegionalCanonicalReport } from './fuelHardNumbersRegionalCanonicalReport';
 import type { JetFuelSnapshot } from './jetFuelSnapshot';
 import type { JetFuelTrajectory } from './jetFuelTrajectory';
 import type { KpiCard } from './kpiCard';
@@ -21,4 +22,6 @@ export interface FuelHardNumbers {
   policy?: FuelDataCard[];
   routes?: FuelDataCard[];
   jetFuel?: JetFuelSnapshot;
-}
+  regionalCanonicalReport?: FuelHardNumbersRegionalCanonicalReport;
+  [key: string]: unknown;
+ }

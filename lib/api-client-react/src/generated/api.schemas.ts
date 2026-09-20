@@ -739,6 +739,8 @@ export interface JetFuelSnapshot {
   change?: string;
 }
 
+export type FuelHardNumbersRegionalCanonicalReport = { [key: string]: unknown };
+
 export interface FuelHardNumbers {
   cards?: KpiCard[];
   jetFuelTrajectory?: JetFuelTrajectory;
@@ -749,7 +751,9 @@ export interface FuelHardNumbers {
   policy?: FuelDataCard[];
   routes?: FuelDataCard[];
   jetFuel?: JetFuelSnapshot;
-}
+  regionalCanonicalReport?: FuelHardNumbersRegionalCanonicalReport;
+  [key: string]: unknown;
+ }
 
 export type ReportProseProvenanceEntryKind = typeof ReportProseProvenanceEntryKind[keyof typeof ReportProseProvenanceEntryKind];
 
