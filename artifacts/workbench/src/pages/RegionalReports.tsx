@@ -47,14 +47,7 @@ export default function RegionalReports() {
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
     const issueDate = currentReportDate();
-    const existingCurrent = regionalReports
-      .filter(
-        (report) =>
-          report.topic === topic &&
-          report.issueDate === issueDate &&
-          report.status === "draft",
-      )
-      .sort((a, b) => b.id - a.id)[0];
+    const existingCurrent = currentReports.find((report) => report.topic === topic);
     if (existingCurrent) {
       setLocation(`/reports/${existingCurrent.id}`);
       return;
@@ -122,15 +115,7 @@ export default function RegionalReports() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {REGIONAL_REPORT_TOPICS.map((topic) => {
           const product = canonicalTopic(topic);
-          const currentIssueDate = currentReportDate();
-          const currentReport = regionalReports
-            .filter(
-              (report) =>
-                report.topic === topic &&
-                report.issueDate === currentIssueDate &&
-                report.status === "draft",
-            )
-            .sort((a, b) => b.id - a.id)[0];
+          const currentReport = currentReports.find((report) => report.topic === topic);
           return (
             <section
               key={topic}
