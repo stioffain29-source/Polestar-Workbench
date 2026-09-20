@@ -100,6 +100,38 @@ describe("Flashpoint shared publication architecture", () => {
     expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("WATCH_NEXT_UNGROUNDED");
   });
 
+  it("uses the current publication window, removes older incidents, and keeps the conclusion plain", () => {
+    const bundle = finalizeFlashpointPublication({
+      incidents: [
+        incident("Mob targeted TU Cricket Ground during Gen Z protests", {
+          id: 9001,
+          country: "Nepal",
+          location: "Kathmandu",
+          occurredAt: "2026-09-09T09:24:59Z",
+          summary: "A crowd approached the cricket ground during earlier protests.",
+        }),
+        incident("Bangkok march affects a named road", {
+          id: 9002,
+          country: "Thailand",
+          location: "Bangkok",
+          occurredAt: "2026-09-14T10:00:00Z",
+          summary: "A protest temporarily restricted access on a named road in Bangkok.",
+        }),
+      ],
+      issueDate: "2026-09-20",
+    });
+    const renderedTitles = [
+      ...bundle.model.dataset.activismRows,
+      ...bundle.model.dataset.unrestRows,
+    ].map((row) => row.title);
+    expect(bundle.model.dataset.reportingPeriodLong).toMatch(/14 September 2026.*20 September 2026/i);
+    expect(renderedTitles).not.toContain("Mob targeted TU Cricket Ground during Gen Z protests");
+    expect(bundle.model.prose.whatMatters).toMatch(/main concern this week|Most reported activity|No single country/i);
+    expect(bundle.model.prose.whatMatters).not.toMatch(/accepted activity by volume|operational relevance|mixed environment/i);
+    expect(bundle.model.prose.polestarView).toMatch(/Keep normal regional operations/i);
+    expect(bundle.model.prose.polestarView).not.toMatch(/No region-wide deterioration is established/i);
+  });
+
   it("fails closed when persisted prose uses file/table narration", () => {
     const built = finalizeFlashpointPublication({
       incidents: [incident("Workers march in Delhi over wages")],

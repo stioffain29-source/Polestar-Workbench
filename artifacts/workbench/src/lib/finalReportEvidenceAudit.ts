@@ -773,6 +773,9 @@ export function auditFinalReportEvidence(
 
     if (section.toLowerCase() === "watchnext") {
       for (const item of text.split(/\n+|(?<=[.;!?])\s+/).filter((s) => words(s).length)) {
+        if (/^No confirmed (?:protest|strike|march|forward|upcoming|scheduled)/i.test(item.trim())) {
+          continue;
+        }
         // A canonical generator may carry an exact evidence binding even when
         // the shared lexical watch heuristic cannot infer the theme from the
         // rendered sentence. Treat that binding as verified only when its

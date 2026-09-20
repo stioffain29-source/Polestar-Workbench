@@ -552,6 +552,13 @@ export default function ReportEditor() {
   } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const effectiveFlashpointIssueDate =
+    (form.topic === "flashpoint" || form.topic === "protests")
+      && (form.status ?? "draft") === "draft"
+      && form.issueDate < todayUtc
+      ? todayUtc
+      : form.issueDate;
   const [flashpointProseDirty, setFlashpointProseDirty] = useState(false);
   const [flashpointEditBasisFingerprint, setFlashpointEditBasisFingerprint] =
     useState<string | null>(null);
@@ -1267,9 +1274,9 @@ export default function ReportEditor() {
     return buildFlashpointReportDataset(
       incidentsForExport,
       form.topic,
-      form.issueDate,
+      effectiveFlashpointIssueDate,
     );
-  }, [form.topic, form.issueDate, incidentsForExport, incidentWindowReady]);
+  }, [form.topic, effectiveFlashpointIssueDate, incidentsForExport, incidentWindowReady]);
 
   // Conflict prose must use the exact final current-window canonical set that
   // drives Fast Facts, activity areas and deterministic sections. Never send
@@ -1750,7 +1757,11 @@ export default function ReportEditor() {
         title: form.title,
         topic: form.topic,
         issueDate:
-          form.topic === "fuel" ? fuelExportIssueDate : form.issueDate,
+          form.topic === "fuel"
+            ? fuelExportIssueDate
+            : form.topic === "flashpoint" || form.topic === "protests"
+              ? effectiveFlashpointIssueDate
+              : form.issueDate,
         author: form.author,
         executiveSummary: form.executiveSummary,
         situation: form.situation,
@@ -1926,6 +1937,7 @@ export default function ReportEditor() {
     // separately in the data-status strip. Other topics keep the incident
     // clamp. resolveFuelPeriodEnd falls back to that clamp when a fresh draft
     // has no market data yet.
+    const isLiveWindowTopic = topic === "flashpoint" || topic === "protests";
     const issueDate =
       topic === "fuel"
         ? resolveFuelPeriodEnd(
@@ -1933,11 +1945,13 @@ export default function ReportEditor() {
             effectiveFuelHardNumbers,
             incidents ?? [],
           )
-        : clampIssueDateToLatestRecord(
-            renderIssueDate,
-            incidents ?? [],
-            dataTopic,
-          );
+        : isLiveWindowTopic
+          ? renderIssueDate
+          : clampIssueDateToLatestRecord(
+              renderIssueDate,
+              incidents ?? [],
+              dataTopic,
+            );
     const seedFuelBasis =
       topic === "fuel"
         ? buildFuelWatchReportData(
@@ -4388,7 +4402,7 @@ export default function ReportEditor() {
             />
           ) : form.topic === "flashpoint" || form.topic === "protests" ? (
             <FlashpointReportPreview
-              report={form}
+              report={{ ...form, issueDate: effectiveFlashpointIssueDate }}
               incidents={incidentsForExport}
               aiProse={aiProseSections}
               hiddenSections={hiddenSections}

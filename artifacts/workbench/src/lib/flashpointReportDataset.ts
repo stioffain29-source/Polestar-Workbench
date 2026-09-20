@@ -605,6 +605,8 @@ const GENERIC_FLASHPOINT_PROSE: string[] = [
   "watch for confirmed mobilisation",
   "enforcement notices, transport disruption",
   "changes to access conditions",
+  "thailand leads the accepted activity by volume",
+  "no region-wide deterioration is established",
 ];
 
 /** Saved AI/editor analyst prose that predates FP-14 voice rules. */
@@ -2878,6 +2880,9 @@ function buildForecastRead(opts: {
     lines.push(`The near-term outlook is for continued quiet, with little fresh protest or civil-unrest activity. That could change if a named movement announces a fresh protest schedule.`);
     return lines.join("\n\n");
   }
+  if (!hasFutureTable && !hasUnconfirmedSignals) {
+    return lines.join("\n\n");
+  }
   const allRows = [...activismRows, ...unrestRows];
   // The ONE shared top-severity incident (same as Fast Facts / Exec Summary),
   // falling back to a local computation only when the caller cannot supply it.
@@ -3001,7 +3006,6 @@ function buildRegionalCountryRead(opts: {
     return `Few events could be tied to a specific country this week, even where there is clearly activity happening. That usually reflects gaps in reporting rather than a real absence of street-level activity.`;
   }
   const lead = countryRows[0];
-  const volumePhrase = volumeLeadPhrase(countryRows, "has");
   const spread = subregionSpread(countryRows);
   // Name each region once and each leading country once. The old form
   // repeated "(led by X)" after every region, which read as boilerplate
@@ -3015,7 +3019,7 @@ function buildRegionalCountryRead(opts: {
     .slice(0, 3)
     .map((r) => r.label);
   const headline = spread.regions.length >= 2
-    ? `Protest pressure runs across ${joinList(spread.regions)}. ${volumePhrase}${otherBusy.length > 0 ? `, with ${joinList(otherBusy)} also reporting multiple events` : ""}. Plan market-by-market — there is no evidence of one coordinated regional campaign.`
+    ? `Reported activity spans ${joinList(spread.regions)}${otherBusy.length > 0 ? `, including repeated reports in ${joinList(otherBusy)}` : ""}. Plan market by market; the reports do not show a coordinated regional campaign.`
     : `Activity clusters in ${lead.label}; other APAC markets were quieter in this reporting window.`;
   const byCountry = new Map<string, EnrichedIncident[]>();
   for (const r of enriched) {
@@ -3037,21 +3041,14 @@ function buildRegionalCountryRead(opts: {
     const ranked = sortRowsForTable(rows);
     const leadRow = ranked[0];
     if (!leadRow) return "Street-level detail is thin.";
-    const label = tableLeadPhrase(leadRow);
-    const city = extractCityLabel(leadRow);
-    const where = city && city.toLowerCase() !== country.toLowerCase() ? ` in ${city}` : "";
     const sev = SEV_RANK[sevKey(leadRow.severity)] ?? 0;
-    const impact =
+    return (
       sev >= 4
         ? "Allow for same-day transport and site-access disruption."
         : sev >= 3
           ? "Expect local traffic and venue friction around confirmed gatherings."
-          : "Monitor for escalation; no major disruption signal yet.";
-    const second = ranked.slice(1).find((r) => signalKey(tableLeadPhrase(r)) !== signalKey(label));
-    if (!second) {
-      return `Lead item: ${label}${where}. ${impact}`;
-    }
-    return `Lead item: ${label}${where}; ${tableLeadPhrase(second)} also reported. ${impact}`;
+          : "Monitor locally; no major disruption is confirmed."
+    );
   };
   const topThree = countryRows.slice(0, 3);
   const countryParas: string[] = [];
@@ -3333,7 +3330,7 @@ function whatMattersParagraphFor(r: EnrichedIncident): string | null {
   const city = extractCityLabel(r);
   if ((SEV_RANK[sevKey(r.severity)] ?? 0) >= 3 && (country || city)) {
     const where = city && country ? `${city}, ${country}` : country || city;
-    return `${tableLeadPhrase(r)} in ${where} (${SEV_LABEL[sevKey(r.severity)] ?? "High"} severity) is the week's sharpest access-and-movement concern in that market.`;
+    return `${tableLeadPhrase(r)} in ${where} is the main concern this week. Check nearby roads, public transport and building access before travel.`;
   }
   return null;
 }
@@ -3377,7 +3374,7 @@ function buildWhatMatters(ctx: AutoCtx): string {
   for (const r of sortBySignificance(all)) {
     const para = whatMattersParagraphFor(r);
     if (!para || seen.has(para)) continue;
-    if (/access-and-movement concern in that market/i.test(para)) {
+    if (/access-and-movement concern in that market|main concern this week/i.test(para)) {
       if (genericTrackCount >= 1) continue;
       genericTrackCount++;
     }
@@ -3542,33 +3539,14 @@ function buildWatchNextFromSignals(ctx: AutoCtx): string {
   // section is never a single thin line when only one future item exists
   // (the previous behaviour, which the client flagged as weak).
   const lead = ctx.countryRows[0];
-  // The ONE shared top-severity incident — same object the Fast Facts card
-  // and Exec Summary use, never recomputed over a subset.
-  const sevInc = ctx.topSeverity;
-  const sevCountry = (sevInc?.country ?? "").trim();
-  const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
-
-  // Watch Next lists only NAMED, dated or specifically-reported items — the
-  // confirmed future-dated signals in the file, plus follow-through on the
-  // single most serious incident actually reported. No generic standing
-  // triggers or invented windows: if nothing is scheduled, the section says so.
+  // Watch Next lists only named future signals. Current incidents already
+  // appear in the report tables and must not be repeated here as vague
+  // "follow-through" items.
   void lead;
   const bullets: string[] = [];
   for (const r of future) {
     const where = r.country ? `${r.country} — ` : "";
     bullets.push(`${where}${shortSignalLabel(r)}: ${operationalMeaningFor(r)}`);
-  }
-  // Never describe a forecast/announcement item as "the most serious
-  // incident reported this week" — the follow-through line only fires when
-  // the top-severity record is an incident that has actually occurred, not
-  // one of the future-dated signals above.
-  // The suppression universe must match the universe topSeverity was
-  // computed over (full enriched set), not just the activism/unrest subset.
-  const futureSignalIds = new Set(extractFutureSignals(ctx.enriched).map((r) => r.id));
-  if (sevInc && sevCountry && sevElevated && !futureSignalIds.has(sevInc.id)) {
-    bullets.push(
-      `${sevCountry} — follow-through after ${tableLeadPhrase(sevInc)}, the most serious incident reported this week: watch for further developments in the days that follow.`,
-    );
   }
   // De-dupe on the leading clause so a future signal and the severity
   // follow-through about the same country/theme do not both appear.
@@ -3613,6 +3591,9 @@ function containedVenueNote(r: EnrichedIncident): string | null {
 
 function buildPolestarView(ctx: AutoCtx): string {
   const all = [...ctx.activismRows, ...ctx.unrestRows];
+  if (all.length === 0) {
+    return "Keep normal regional operations. No additional controls are required.";
+  }
   const activeCountries = ctx.countryRows.slice(0, 6).map((r) => r.label);
   const countryLine =
     activeCountries.length > 0
@@ -3623,23 +3604,10 @@ function buildPolestarView(ctx: AutoCtx): string {
   const hasPakistanStrike = all.some(
     (r) => (r.country ?? "").includes("Pakistan") && /\b(strike|transporter|transport)\b/i.test(text(r)),
   );
-  const others = activeCountries.filter((c) => c !== "Pakistan");
-  const movementLead = hasPakistanStrike
-    ? others.length > 0
-      ? `Confirm freight and last-mile timing in Pakistan before tight delivery commitments; keep journey plans flexible around live or scheduled protest locations in ${joinList(others)}.`
-      : `Confirm freight and last-mile timing in Pakistan before tight delivery commitments.`
-    : `Keep journey plans flexible in ${countryLine} and validate transport availability close to departure.`;
-
-  const futureMobilisation = extractFutureSignals(ctx.usableEnriched)
-    .filter((r) => !isWeakOperational(r) && !isWeakNovelty(r) && !forecastDateHasPassed(r, ctx.forecastAsOf));
-  const hasDatedFuture = futureMobilisation.some((r) => !!explicitForecastDate(r));
-  const watchClause = hasDatedFuture
-    ? `Treat Watch Next as operational indicators for site access, not as a week-long elevation or a calendar of dates.`
-    : futureMobilisation.length > 0
-      ? `Treat Watch Next as monitor-only indicators until a date or court outcome firms up.`
-      : `Refresh movement plans if new protest announcements land mid-week.`;
-
-  return `${movementLead} ${watchClause}`;
+  const freight = hasPakistanStrike
+    ? " Confirm freight and delivery times in Pakistan before making tight commitments."
+    : "";
+  return `Keep normal regional operations. Check staff routes and site access in ${countryLine} before travel.${freight} Use extra controls only where roads, rail services or building access are disrupted. Escalate if a major route closes, violence occurs or police use force.`;
 }
 
 // Auto-generated Executive Summary. Used by the exporter and preview
@@ -4286,7 +4254,7 @@ export function resolveFlashpointRenderedModel(args: {
     : "The accepted record does not support a country comparison.";
   const fallbackWatchNext =
     buildProtestScheduleWatchNext(protestSchedule) ||
-    "No scheduled event currently establishes a major operational threat. The forward assessment would worsen if new mobilisation expands beyond announced assembly points, disrupts transport, persists longer than planned or produces arrests, confrontation or damage.";
+    "No confirmed protest, strike or march is scheduled in the next seven days.";
   const groundedRecovery = makeModel({
     executiveSummary: activityPresent
       ? `${regionalConcentration} The overall weekly posture is ${weeklyPosture}, while the highest individual incident is ${severityCeiling}${peakCountry ? ` in ${peakCountry}` : ""}. The principal exposure is short-notice disruption to movement, transport, site access and facilities close to gatherings or enforcement activity. Conditions are mixed rather than broadly deteriorating because the most serious effects remain localised.`
@@ -4303,15 +4271,15 @@ export function resolveFlashpointRenderedModel(args: {
     ),
     regionalCountryRead: `${regionalComparison} Bar length represents accepted incident volume and colour represents each country's highest assessed severity; neither measure by itself establishes nationwide disruption.`,
     whatMatters: activityPresent
-      ? `${leadCountry ? hasBangkokActivity && leadCountry === "Thailand" ? "Thailand leads the accepted activity by volume, but that does not by itself indicate a broader deterioration. In Bangkok, demonstrations commonly concentrate at established assembly points; the operating issue is turnout and spillover onto named roads, rail stations or nearby access, not the gathering alone." : `${leadCountry} carries the main concentration of accepted activity, with operational relevance limited to demonstrated access, traffic or site effects around gathering locations.` : "No single country dominates the accepted activity."}${peakCountry && peakCountry !== leadCountry ? ` ${peakCountry} presents the sharper individual exposure because it contains the highest-rated incident${peakTargetsFacility ? " and a direct threat to a specific facility" : ""}.` : ""}${hasLabourOrTransport ? " Labour and transport mobilisation broadens the exposure beyond street gatherings to commuting, workforce attendance and service continuity." : ""}\n\nTogether, these developments indicate a mixed environment: mobilisation is geographically dispersed, while serious direct effects remain concentrated in a small number of locations.`
-      : "The accepted evidence does not identify a material development for this reporting period.",
+      ? `${leadCountry ? hasBangkokActivity && leadCountry === "Thailand" ? "Most reported activity is in Thailand. In Bangkok, change travel or site plans only when a gathering blocks a named road, rail station or building entrance." : `Most reported activity is in ${leadCountry}. Adjust local travel or site access only where disruption is confirmed.` : "No single country accounts for most reported activity."}${peakCountry && peakCountry !== leadCountry ? ` The most serious incident is in ${peakCountry}${peakTargetsFacility ? ", where a specific facility was threatened" : ""}.` : ""}${hasLabourOrTransport ? " Labour or transport action may delay commuting and local services." : ""} Elsewhere, normal monitoring is sufficient.`
+      : "No material public-order development was confirmed during this reporting period.",
     implications: activityPresent
       ? `The main business consequence is short-notice, localised disruption rather than broad regional interruption.${hasBangkokActivity ? " In Bangkok, routine activity at established protest sites should be treated as a local access issue unless attendance or a march route causes wider road or rail effects." : ""} Gatherings near diplomatic sites, government institutions, transport nodes and central roads can affect staff movement, customer access, deliveries and scheduled activity at nearby facilities.${hasLabourOrTransport ? " Labour and transport action can also reduce commuting availability, delay workforce attendance and interrupt local services." : ""}${peakTargetsFacility ? " The direct targeting of a facility in the highest-rated incident also creates a distinct risk of closure, damage or personnel exposure at the affected site." : ""}`
       : "No specific effect on movement, access, transport, facilities or continuity is established by the accepted evidence.",
     watchNext: fallbackWatchNext,
     polestarView: activityPresent
-      ? `No region-wide deterioration is established. Apply local movement and access controls only where reporting confirms disruption.${hasBangkokActivity ? " In Bangkok, established assembly areas require wider controls only when turnout affects named roads or rail." : ""}${peakTargetsFacility ? " The targeted facility requires site-specific security measures." : ""} Escalate for verified major-route closures, facility targeting, violence or forceful enforcement.`
-      : "No change to regional controls is supported by the accepted record.",
+      ? `Keep normal regional operations. Use local travel or site controls only where a protest is disrupting access.${hasBangkokActivity ? " In Bangkok, widen controls only if named roads or rail services are affected." : ""}${peakTargetsFacility ? " Increase security at the threatened facility." : ""} Escalate if a major route closes, violence occurs or police use force.`
+      : "Keep normal regional operations. No additional controls are required.",
   });
   assertFlashpointRenderedModelValid(groundedRecovery);
   return Object.freeze(groundedRecovery);
