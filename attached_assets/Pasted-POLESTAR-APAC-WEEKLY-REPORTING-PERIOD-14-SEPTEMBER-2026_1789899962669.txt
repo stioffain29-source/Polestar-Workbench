@@ -1,0 +1,211 @@
+POLESTAR APAC WEEKLY
+REPORTING PERIOD: 14 SEPTEMBER 2026 TO 20 SEPTEMBER 2026
+
+
+REGIONAL OUTLOOK
+
+APAC risk this week was driven by concentrated security incidents rather than broad regional deterioration. Pakistan recorded the most serious event, with a mass casualty attack on a police compound in Kohat. Southern Thailand also saw a significant IED and small arms ambush, while election related violence affected Cotabato City in the Philippines. Elsewhere, Australian migration changes created a lower severity but potentially wider workforce issue. Cyber enabled bomb hoaxes in India demonstrated how malicious digital activity can generate physical disruption. Weather risk is rising in Japan as Typhoon Dujuan approaches Kanto, while a magnitude 5.9 earthquake near Halmahera produced no tsunami threat. The coming week requires close attention to Pakistan, southern Thailand and weather related disruption in Japan.
+
+
+REGIONAL RISK PICTURE
+
+Security deterioration remains geographically concentrated. Pakistan presents the most serious current exposure following the attack on a police compound in Kohat. The combination of a vehicle borne explosive device, armed assault, mass casualties and a prolonged security operation distinguishes this from routine militant activity. The immediate commercial impact is localised, but heightened security activity across Khyber Pakhtunkhwa may affect road movement, access around government facilities and journey planning.
+
+Southern Thailand presents a different operating challenge. An IED struck a truck carrying Volunteer Defence Corps personnel in Sukhirin district, Narathiwat, before attackers opened fire from roadside cover. Two personnel were killed and 16 wounded. The attack demonstrates continued insurgent capability to conduct prepared attacks against moving government targets. The risk remains concentrated in the Deep South rather than indicating deterioration across Thailand nationally.
+
+Election related violence in Cotabato City killed three people and wounded 15 immediately ahead of the first BARMM parliamentary election. The wider vote proceeded, but the incident highlights the continuing potential for local political competition to escalate into armed confrontation.
+
+Regulatory developments were less severe but potentially broader in commercial reach. Australia announced tighter controls affecting international students, working holiday makers and overstayers. Businesses reliant on temporary labour, particularly agriculture, tourism and hospitality, may face additional workforce and compliance pressure as the measures are implemented.
+
+Cyber risk also produced a material development. Indian police uncovered more than 500,000 fraudulent Gmail accounts during an investigation into bomb hoax messages. The significance for business lies in the ability of cyber enabled activity to trigger evacuations, police responses and operational downtime without directly compromising corporate systems.
+
+Natural hazards remained active. A magnitude 5.9 earthquake struck near Halmahera on 14 September but generated no tsunami threat and limited reported disruption. Typhoon Dujuan is the more immediate concern, with the strong system forecast to approach Kanto on 21 September, bringing heavy rain, strong winds and potential transport disruption.
+
+
+KEY DEVELOPMENTS
+
+
+PAKISTAN | KOHAT
+18 SEPTEMBER 2026
+
+MASS CASUALTY ATTACK ON POLICE COMPOUND
+
+Category: Security
+Current Severity: Extreme
+
+Assessment:
+A vehicle borne suicide bomber struck a police compound in Kohat before armed attackers entered the complex. At least 21 people were killed and more than 100 injured. Security forces subsequently fought militants inside the compound during an operation lasting around 20 hours.
+
+Polestar View:
+This was a high consequence attack against a hardened security target. The immediate exposure is centred on Kohat, but the scale and method reinforce the wider militant threat across Khyber Pakhtunkhwa and increase the likelihood of heightened security measures around government and police facilities.
+
+Outlook 7 Days:
+Monitor follow on attacks, counter terrorism operations, road restrictions and increased security around police, military and government sites.
+
+
+THAILAND | SUKHIRIN, NARATHIWAT
+18 SEPTEMBER 2026
+
+IED AND SMALL ARMS ATTACK ON DEFENCE VOLUNTEERS
+
+Category: Security
+Current Severity: High
+
+Assessment:
+An improvised explosive device struck a six wheel truck carrying Volunteer Defence Corps personnel before attackers opened fire from concealed roadside positions. Two personnel were killed and 16 wounded. Reporting indicated that the explosive incorporated a large cooking gas cylinder buried beneath the road.
+
+Polestar View:
+The attack demonstrates continued capability to conduct complex roadside attacks against government movement in Thailand’s Deep South. The risk is geographically contained but significant for personnel using rural routes in Narathiwat.
+
+Outlook 7 Days:
+Watch for increased checkpoints, security operations and further attacks against patrols or government linked transport.
+
+
+PHILIPPINES | COTABATO CITY
+14 SEPTEMBER 2026
+
+BARMM ELECTION RELATED SHOOTING
+
+Category: Political Violence
+Current Severity: High
+
+Assessment:
+Three people were killed and 15 wounded when rival political supporters exchanged gunfire outside a school being used during preparations for the BARMM parliamentary election. Election authorities subsequently reported four deaths and 19 injuries across election related incidents.
+
+Polestar View:
+The principal exposure is local political violence rather than wider national instability. Political mobilisation, disputes and factional competition remain credible triggers for further incidents within BARMM.
+
+Outlook 7 Days:
+Monitor political gatherings, election disputes and changes to local security deployments across Cotabato City and other BARMM centres.
+
+
+AUSTRALIA | NATIONAL
+17 SEPTEMBER 2026
+
+MIGRATION AND VISA CONTROLS TIGHTENED
+
+Category: Regulatory
+Current Severity: Moderate
+
+Assessment:
+The government announced tighter migration controls affecting international students, working holiday makers and visa overstayers. Measures include tighter rules around repeat working holiday visas, student visa conditions and increased compliance activity.
+
+Polestar View:
+This is a workforce and compliance issue rather than a security crisis. Agriculture, tourism, hospitality and other sectors dependent on temporary labour may face recruitment pressure as the measures take effect.
+
+Outlook 7 Days:
+Watch for implementation guidance, effective dates, sector exemptions and clarification of working holiday arrangements.
+
+
+INDIA | GUJARAT
+15 SEPTEMBER 2026
+
+LARGE SCALE FAKE ACCOUNT NETWORK LINKED TO BOMB HOAXES
+
+Category: Cyber and Information Risk
+Current Severity: Moderate
+
+Assessment:
+Police investigating bomb hoax activity uncovered a network involving 513,847 fraudulent Gmail accounts. The accounts and associated credentials had been used for false bomb threats and other criminal activity, with some reportedly sold to overseas buyers.
+
+Polestar View:
+The importance lies in the ability of cyber enabled criminal activity to create real world security disruption. False threats can force evacuations, consume police and security resources and make verification of genuine threats more difficult.
+
+Outlook 7 Days:
+Monitor further arrests, additional hoax campaigns and any evidence of targeting against businesses, transport infrastructure or other commercial facilities.
+
+
+JAPAN | KANTO AND IZU ISLANDS
+20 SEPTEMBER 2026
+
+TYPHOON DUJUAN APPROACHES EASTERN JAPAN
+
+Category: Weather and Natural Hazards
+Current Severity: Moderate
+
+Assessment:
+Typhoon Dujuan remained a strong system south of Japan on 20 September and was forecast to approach Kanto on 21 September. Heavy rain was already affecting parts of the region, with strong winds, rough seas and further rainfall expected as the system moves closer.
+
+Polestar View:
+The principal exposure is transport and continuity rather than widespread structural damage. Rail, aviation, road movement and coastal operations may experience disruption even if the strongest part of the storm remains offshore.
+
+Outlook 7 Days:
+Track official weather warnings, rail suspensions, flight cancellations, road closures and any evacuation instructions as the storm passes eastern Japan.
+
+
+NATURAL HAZARD NOTE
+
+INDONESIA | NORTH MALUKU
+14 SEPTEMBER 2026
+
+A magnitude 5.9 earthquake struck northeast of Pulau Doi in North Maluku at a depth of approximately 147 kilometres. Indonesian authorities confirmed that the earthquake did not present a tsunami threat. No significant operational disruption was reported.
+
+Current Severity: Low
+
+
+BUSINESS IMPLICATIONS
+
+The week does not justify a blanket increase in security posture across APAC. The principal security exposures are localised and require market specific responses. Pakistan, Narathiwat and parts of BARMM warrant tighter journey management, route verification and monitoring of local security restrictions.
+
+Australia presents a slower moving business issue. Companies reliant on temporary or migrant labour should establish which worker groups may be affected and monitor implementation rather than treating the announcement as an immediate operating crisis.
+
+The Indian fake account investigation reinforces the need for credible threat verification procedures. Security teams should be able to distinguish cyber intrusion from malicious digital activity designed to generate physical disruption.
+
+Weather may become the most immediate continuity issue during the coming week. Businesses with travel, logistics, events or staff movement in eastern Japan should prepare for possible rail, aviation and road disruption as Typhoon Dujuan approaches.
+
+
+7 DAY WATCH
+
+JAPAN
+Typhoon Dujuan
+
+Heavy rain, strong winds and rough seas may affect Kanto and the Izu Islands as the storm approaches on 21 September.
+
+Current Severity: Moderate
+
+Watch:
+Rail disruption
+Flight cancellations
+Road closures
+Flooding
+Evacuation instructions
+
+
+PAKISTAN
+Khyber Pakhtunkhwa security response
+
+Security operations following the Kohat attack may affect movement and access around government and security facilities.
+
+Current Severity: High
+
+Watch:
+Follow on attacks
+Counter terrorism operations
+Checkpoints
+Road restrictions
+Security alerts
+
+
+PHILIPPINES
+BARMM post election environment
+
+Political disputes and local mobilisation remain capable of producing short notice violence or access disruption.
+
+Current Severity: Moderate
+
+Watch:
+Political gatherings
+Result disputes
+Security deployments
+Localised armed incidents
+
+
+POLESTAR OUTLOOK
+
+The main APAC concern over the next seven days is whether this week’s serious security incidents remain geographically contained. Pakistan requires the closest attention following the scale of the Kohat attack. Further mass casualty attacks or militant activity affecting major transport or commercial centres would materially worsen the operating picture.
+
+In southern Thailand, the Narathiwat attack reinforces a persistent route security threat rather than indicating broader national deterioration. BARMM also remains sensitive as the immediate election period gives way to political disputes and mobilisation.
+
+Weather is likely to become more prominent as Typhoon Dujuan approaches eastern Japan. Transport disruption may become more significant than security risk for businesses operating in the affected area.
+
+Australia’s migration changes and India’s cyber investigation are lower in immediate severity but broader in potential business relevance. Both require monitoring for second order operational consequences.

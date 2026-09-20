@@ -51,6 +51,12 @@ Technical validity is not editorial acceptance. A Regional Weekly fails if it is
 
 **How to apply:** Review the rendered PDF as a client deliverable. Every section must add a distinct layer of judgement; recommendations must identify the exposed business function, trigger and decision; sources must be auditable; charts must show a meaningful comparison or trend; and page composition must not use whitespace to disguise thin evidence.
 
+The owner’s APAC reference standard is a concise, edited regional narrative with broad domain coverage: six material developments plus a lower-severity hazard note, specific casualty/impact facts, market and subnational geography, distinct Polestar judgement, and a multi-item forward watch.
+
+**Why:** This breadth makes the report a regional operating picture rather than a padded digest of whatever few incidents survived the pipeline.
+
+**How to apply:** Use the reference’s content model, not its wording: Regional Outlook synthesises the week; Risk Picture explains each exposure; Key Developments carry verified facts, interpretation and seven-day indicators; Business Implications separates decisions by function; 7 Day Watch lists concrete triggers; Outlook ranks what matters next. Verify every claim and do not invent breadth.
+
 Regional report acceptance must inspect the exact environment and saved row the owner is viewing. A development PDF proves nothing about a newly created production row.
 
 **Why:** The Regional Reports create action saved empty production rows while a separate development acceptance harness produced a complete canonical row; identical titles hid the mismatch and led to false completion claims.
