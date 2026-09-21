@@ -34,6 +34,7 @@ import {
 } from "@/lib/regionalWeekly";
 
 type RegionalTopic = Extract<ReportTopic, "apac_weekly" | "middle_east_weekly">;
+type CreationStage = "collecting" | "building" | "opening";
 
 export default function RegionalReports() {
   const qc = useQueryClient();
@@ -50,14 +51,16 @@ export default function RegionalReports() {
   const del = useDeleteReport();
   const createBusy = useRef(false);
   const [creatingTopic, setCreatingTopic] = useState<RegionalTopic | null>(null);
+  const [creationStage, setCreationStage] = useState<CreationStage | null>(null);
 
   const createRegionalReport = async (topic: RegionalTopic) => {
     if (createBusy.current) return;
     const issueDate = currentReportDate();
     createBusy.current = true;
     setCreatingTopic(topic);
+    setCreationStage("collecting");
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 120_000);
+    const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const coverageResponse = await fetch("/api/reports/regional-coverage", {
         method: "POST",
@@ -71,7 +74,16 @@ export default function RegionalReports() {
         throw new Error(payload?.error || `Regional source collection failed (${coverageResponse.status}).`);
       }
       const coverage = await coverageResponse.json() as RegionalCoverageManifest;
-      const incidents = await listIncidents({ days: 14 }, { signal: controller.signal });
+      setCreationStage("building");
+      // The canonical selector only admits the issue date and prior six days.
+      // Fetching 14 days doubled the synchronous browser workload for rows the
+      // selector would always reject.
+      const incidents = await listIncidents({ days: 7 }, { signal: controller.signal });
+      // Let React paint the stage change before the deterministic synchronous
+      // build starts, so the control never appears frozen on a generic spinner.
+      await new Promise<void>((resolve) =>
+        window.requestAnimationFrame(() => resolve()),
+      );
       const regionalCanonicalReport = buildRegionalCanonicalReport(
         incidents as never[],
         issueDate,
@@ -83,6 +95,7 @@ export default function RegionalReports() {
       if (canonicalErrors.length > 0) {
         throw new Error(`Regional report validation failed: ${canonicalErrors.join(" ")}`);
       }
+      setCreationStage("opening");
       const report = await createReportRequest(
         {
           title: canonicalReportTitle(topic),
@@ -113,6 +126,7 @@ export default function RegionalReports() {
       window.clearTimeout(timeout);
       createBusy.current = false;
       setCreatingTopic(null);
+      setCreationStage(null);
     }
   };
 
@@ -173,16 +187,22 @@ export default function RegionalReports() {
                     </Link>
                   </Button>
                 )}
-                <Button
-                  onClick={() => createRegionalReport(topic)}
-                  disabled={creatingTopic !== null}
-                  className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  {creatingTopic === topic
-                    ? "Creating…"
-                    : "Create Report"}
-                </Button>
+                {!currentReport && (
+                  <Button
+                    onClick={() => createRegionalReport(topic)}
+                    disabled={creatingTopic !== null}
+                    className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    {creatingTopic === topic
+                      ? creationStage === "building"
+                        ? "Building report…"
+                        : creationStage === "opening"
+                          ? "Opening report…"
+                          : "Collecting sources…"
+                      : "Create Report"}
+                  </Button>
+                )}
               </div>
             </section>
           );
