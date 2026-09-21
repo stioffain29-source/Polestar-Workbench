@@ -1,8 +1,5 @@
-import { useRef, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
-  createReport as createReportRequest,
-  listIncidents,
   type Report,
   useDeleteReport,
   useListReports,
@@ -14,7 +11,6 @@ import { format, parseISO } from "date-fns";
 import { ArrowRight, Globe2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { reportStatusClass } from "@/lib/topics";
 import {
   canonicalTopic,
@@ -22,23 +18,12 @@ import {
   REGIONAL_REPORT_TOPICS,
   type ReportTopic,
 } from "@/lib/reportNaming";
-import {
-  currentReportDate,
-  splitReportsByLifecycle,
-} from "@/lib/reportLifecycle";
-import {
-  buildRegionalCanonicalReport,
-  regionalCanonicalReportFromHardNumbers,
-  type RegionalCoverageManifest,
-  validateRegionalCanonicalStructure,
-} from "@/lib/regionalWeekly";
+import { splitReportsByLifecycle } from "@/lib/reportLifecycle";
 
 type RegionalTopic = Extract<ReportTopic, "apac_weekly" | "middle_east_weekly">;
-type CreationStage = "collecting" | "building" | "opening";
 
 export default function RegionalReports() {
   const qc = useQueryClient();
-  const [, setLocation] = useLocation();
   const { data: reports = [] } = useListReports();
   const regionalReports = reports.filter((report) =>
     (REGIONAL_REPORT_TOPICS as readonly string[]).includes(report.topic),
@@ -49,86 +34,6 @@ export default function RegionalReports() {
     completed: completedReports,
   } = splitReportsByLifecycle(regionalReports);
   const del = useDeleteReport();
-  const createBusy = useRef(false);
-  const [creatingTopic, setCreatingTopic] = useState<RegionalTopic | null>(null);
-  const [creationStage, setCreationStage] = useState<CreationStage | null>(null);
-
-  const createRegionalReport = async (topic: RegionalTopic) => {
-    if (createBusy.current) return;
-    const issueDate = currentReportDate();
-    createBusy.current = true;
-    setCreatingTopic(topic);
-    setCreationStage("collecting");
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 60_000);
-    try {
-      const coverageResponse = await fetch("/api/reports/regional-coverage", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, issueDate }),
-        signal: controller.signal,
-      });
-      if (!coverageResponse.ok) {
-        const payload = await coverageResponse.json().catch(() => null) as { error?: string } | null;
-        throw new Error(payload?.error || `Regional source collection failed (${coverageResponse.status}).`);
-      }
-      const coverage = await coverageResponse.json() as RegionalCoverageManifest;
-      setCreationStage("building");
-      // The canonical selector only admits the issue date and prior six days.
-      // Fetching 14 days doubled the synchronous browser workload for rows the
-      // selector would always reject.
-      const incidents = await listIncidents({ days: 7 }, { signal: controller.signal });
-      // Let React paint the stage change before the deterministic synchronous
-      // build starts, so the control never appears frozen on a generic spinner.
-      await new Promise<void>((resolve) =>
-        window.requestAnimationFrame(() => resolve()),
-      );
-      const regionalCanonicalReport = buildRegionalCanonicalReport(
-        incidents as never[],
-        issueDate,
-        topic,
-        [],
-        coverage,
-      );
-      const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);
-      if (canonicalErrors.length > 0) {
-        throw new Error(`Regional report validation failed: ${canonicalErrors.join(" ")}`);
-      }
-      setCreationStage("opening");
-      const report = await createReportRequest(
-        {
-          title: canonicalReportTitle(topic),
-          topic,
-          issueDate,
-          status: "draft",
-          hardNumbers: { regionalCanonicalReport },
-        } as never,
-        { signal: controller.signal },
-      );
-      if (!regionalCanonicalReportFromHardNumbers(report.hardNumbers, topic, issueDate)) {
-        throw new Error("The server did not persist the canonical regional report payload.");
-      }
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: getListReportsQueryKey() }),
-        qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
-      ]);
-      setLocation(`/reports/${report.id}`);
-    } catch (error) {
-      const timedOut = error instanceof DOMException && error.name === "AbortError";
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast.error(
-        timedOut
-          ? "Report creation timed out while collecting regional sources."
-          : `Report creation failed: ${message}`,
-      );
-    } finally {
-      window.clearTimeout(timeout);
-      createBusy.current = false;
-      setCreatingTopic(null);
-      setCreationStage(null);
-    }
-  };
 
   const deleteReport = (report: Report) => {
     if (!confirm(`Delete ${canonicalTopic(report.topic).title}?`)) return;
@@ -187,22 +92,15 @@ export default function RegionalReports() {
                     </Link>
                   </Button>
                 )}
-                {!currentReport && (
-                  <Button
-                    onClick={() => createRegionalReport(topic)}
-                    disabled={creatingTopic !== null}
-                    className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
-                  >
+                <Button
+                  asChild
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-sm"
+                >
+                  <Link href={`/regional-reports/create/${topic}`}>
                     <Plus className="w-4 h-4 mr-2" />
-                    {creatingTopic === topic
-                      ? creationStage === "building"
-                        ? "Building report…"
-                        : creationStage === "opening"
-                          ? "Opening report…"
-                          : "Collecting sources…"
-                      : "Create Report"}
-                  </Button>
-                )}
+                    Create Report
+                  </Link>
+                </Button>
               </div>
             </section>
           );

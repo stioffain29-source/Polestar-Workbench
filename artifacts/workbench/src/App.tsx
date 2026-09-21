@@ -28,6 +28,7 @@ import Countries from "./pages/Countries";
 import CountryReport from "./pages/CountryReport";
 import Reports from "./pages/Reports";
 import RegionalReports from "./pages/RegionalReports";
+import RegionalReportCreate from "./pages/RegionalReportCreate";
 import ReportEditor from "./pages/ReportEditor";
 import SpotReports from "./pages/SpotReports";
 import SpotReportEditor from "./pages/SpotReportEditor";
@@ -227,6 +228,7 @@ function Router() {
         <Route path="/countries" component={Countries} />
         <Route path="/countries/:slug" component={CountryReport} />
         <Route path="/reports" component={Reports} />
+        <Route path="/regional-reports/create/:topic" component={RegionalReportCreate} />
         <Route path="/regional-reports" component={RegionalReports} />
         <Route path="/reports/:id" component={ReportEditorRoute} />
         <Route path="/spot-reports" component={SpotReports} />

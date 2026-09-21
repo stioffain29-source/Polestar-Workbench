@@ -68,3 +68,9 @@ The Regional Reports landing page must always keep “Create Report” available
 **Why:** Replacing creation with opening prevented analysts from starting the next report while an existing draft remained current.
 
 **How to apply:** Show both actions when a current report exists. The create handler must create a new row rather than redirecting to the current one.
+
+The landing-page Create control must be a real link to a dedicated creation route, not a long-running async click handler on the report grid. The creation route owns collection, canonical assembly, persistence and redirect, with visible stages and an in-page retryable error.
+
+**Why:** repeated inline implementations appeared frozen during 20–30 second source collection/build work, encouraged repeat clicks and duplicate drafts, and once failed to send any request at all.
+
+**How to apply:** navigate immediately on click, show Collecting/Building/Opening states on the destination, enforce a bounded timeout, persist the canonical object atomically, and only then redirect to the editor. Keep Create available beside Open Current Report.
