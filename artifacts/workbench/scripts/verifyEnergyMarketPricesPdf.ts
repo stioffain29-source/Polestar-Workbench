@@ -26,7 +26,11 @@ import {
   marketPricesTable,
   reportProseTable,
 } from "@workspace/db";
-import { fetchTopicReport, fetchTopicIncidents } from "./topicReportData";
+import {
+  fetchFlashpointProtestSchedule,
+  fetchTopicReport,
+  fetchTopicIncidents,
+} from "./topicReportData";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKBENCH = resolve(HERE, "..");
@@ -301,6 +305,14 @@ async function main() {
     (incident) => isRecord(incident) && incident.topic === TOPIC,
   );
   const marketPrices = await fetchGroupMarketPrices();
+  const reportIssueDate =
+    isRecord(report) && typeof report.issueDate === "string"
+      ? report.issueDate
+      : "unknown";
+  const protestSchedule =
+    TOPIC === "flashpoint"
+      ? await fetchFlashpointProtestSchedule(reportIssueDate)
+      : undefined;
   const savedAiProse = await fetchSavedAiProse(reportId);
   const savedSectionOverrides = isRecord(report)
     ? report.sectionOverrides
@@ -313,10 +325,6 @@ async function main() {
     isRecord(sectionOverrides) && Array.isArray(sectionOverrides.hiddenSections)
       ? sectionOverrides.hiddenSections
       : undefined;
-  const reportIssueDate =
-    isRecord(report) && typeof report.issueDate === "string"
-      ? report.issueDate
-      : "unknown";
   console.log(
     `SAVED DEVELOPMENT REPORT · ${TOPIC} · id=${reportId} · issueDate=${reportIssueDate}`,
   );
@@ -355,6 +363,7 @@ async function main() {
           aiProse: savedAiProse,
           hiddenSections,
           sectionOverrides,
+          protestSchedule,
         },
       ] as const,
     );

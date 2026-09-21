@@ -11,6 +11,11 @@
 import { jsPDF } from "jspdf";
 import { exportTopicReportPdf } from "../src/lib/exportTopicReportPdf";
 import { exportFlashpointReportPdf } from "../src/lib/exportFlashpointReportPdf";
+import {
+  buildFlashpointReportDataset,
+  resolveFlashpointRenderedModel,
+} from "../src/lib/flashpointReportDataset";
+import { buildProtestScheduleModel } from "../src/lib/protestScheduleModel";
 import { TOPIC_LABELS } from "../src/lib/topics";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -36,6 +41,7 @@ interface VerifyData {
   sectionOverrides?: unknown;
   hiddenSections?: string[];
   aiProse?: unknown;
+  protestSchedule?: unknown;
 }
 
 declare global {
@@ -95,11 +101,24 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
     aiProse,
     hiddenSections,
     sectionOverrides,
+    protestSchedule,
   } =
     window.__VERIFY_DATA__;
   let err: string | null = null;
   try {
     if (report.topic === "protests" || report.topic === "flashpoint") {
+      const renderedModel = resolveFlashpointRenderedModel({
+        dataset: buildFlashpointReportDataset(
+          incidents as Parameters<typeof buildFlashpointReportDataset>[0],
+          "flashpoint",
+          report.issueDate,
+        ),
+        report: report as Parameters<typeof resolveFlashpointRenderedModel>[0]["report"],
+        ai: aiProse as Parameters<typeof resolveFlashpointRenderedModel>[0]["ai"],
+        protestSchedule: buildProtestScheduleModel(
+          protestSchedule as Parameters<typeof buildProtestScheduleModel>[0],
+        ),
+      });
       await exportFlashpointReportPdf(
         {
           ...report,
@@ -110,6 +129,7 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
         aiProse as Parameters<typeof exportFlashpointReportPdf>[3],
         hiddenSections,
         sectionOverrides as Parameters<typeof exportFlashpointReportPdf>[5],
+        renderedModel,
       );
     } else {
       await exportTopicReportPdf(

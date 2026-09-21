@@ -9,11 +9,16 @@ function row(
   description: string,
   startTime: string,
   status: "Planned" | "Possible" = "Planned",
+  source?: {
+    name: string;
+    title: string;
+    url: string;
+  },
 ) {
   return {
-    sourceName: "analyst_schedule_upload",
-    sourceUrl: "",
-    sourceTitle: description,
+    sourceName: source?.name ?? "analyst_schedule_upload",
+    sourceUrl: source?.url ?? "",
+    sourceTitle: source?.title ?? description,
     sourcePublishedAt: suppliedAt,
     eventDate: new Date(`${eventDate}T00:00:00Z`),
     country,
@@ -42,8 +47,14 @@ export const SEPTEMBER_2026_PROTEST_SCHEDULE_UPDATE = [
     "Philippines",
     "Manila",
     "Central Manila and EDSA",
-    "Martial Law anniversary demonstrations and a transport strike.",
+    "Martial Law anniversary demonstrations and a transport strike. More than 17,000 police personnel are deployed nationwide, including 8,553 NCRPO personnel in Metro Manila.",
     "From 00:01",
+    "Planned",
+    {
+      name: "Philippine Daily Inquirer",
+      title: "PNP on alert as protests commemorate martial law",
+      url: "https://newsinfo.inquirer.net/2308558/pnp-on-alert-as-protests-commemorate-martial-law",
+    },
   ),
   row(
     "pakistan_islamabad_21",

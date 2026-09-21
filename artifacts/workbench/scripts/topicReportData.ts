@@ -22,6 +22,7 @@ import {
   maritimeMovementTable,
   marketPricesTable,
   protestEventsTable,
+  protestScheduleStateTable,
 } from "@workspace/db";
 import { currentMaritimeSemanticProjectionCondition } from "../../api-server/src/lib/relevanceFilter";
 import {
@@ -358,6 +359,50 @@ export async function fetchMaritimeMovement(
 // this returns the full relevance-filtered set ordered by occurredAt desc).
 export async function fetchTopicIncidents(): Promise<unknown[]> {
   return loadIncidents();
+}
+
+/** Exact Flashpoint schedule payload for a saved report's issue-date horizon.
+ * Includes issue-date activity because operational posture already in force
+ * that day (for example, deployed police) belongs in the report forecast. */
+export async function fetchFlashpointProtestSchedule(
+  issueDate: string,
+): Promise<{
+  confirmedPlanned: unknown[];
+  possible: unknown[];
+  searchCompletedAt: string | null;
+}> {
+  const issueMs = Date.parse(`${issueDate.trim()}T00:00:00.000Z`);
+  if (!Number.isFinite(issueMs)) {
+    return { confirmedPlanned: [], possible: [], searchCompletedAt: null };
+  }
+  const start = new Date(issueMs);
+  const end = new Date(issueMs + 8 * 24 * 60 * 60 * 1000);
+  const [rows, state] = await Promise.all([
+    db
+      .select()
+      .from(protestEventsTable)
+      .where(
+        and(
+          gte(protestEventsTable.eventDate, start),
+          lt(protestEventsTable.eventDate, end),
+          inArray(protestEventsTable.status, ["Confirmed", "Planned", "Possible"]),
+        ),
+      )
+      .orderBy(protestEventsTable.eventDate, protestEventsTable.id),
+    db
+      .select({ searchCompletedAt: protestScheduleStateTable.searchCompletedAt })
+      .from(protestScheduleStateTable)
+      .where(eq(protestScheduleStateTable.key, "singleton"))
+      .limit(1),
+  ]);
+  const jsonRows = asJson<Array<{ status: string }>>(rows);
+  return {
+    confirmedPlanned: jsonRows.filter(
+      (row) => row.status === "Confirmed" || row.status === "Planned",
+    ),
+    possible: jsonRows.filter((row) => row.status === "Possible"),
+    searchCompletedAt: state[0]?.searchCompletedAt?.toISOString() ?? null,
+  };
 }
 
 /**
