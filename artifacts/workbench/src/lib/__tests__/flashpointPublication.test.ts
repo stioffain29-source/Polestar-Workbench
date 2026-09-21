@@ -54,8 +54,90 @@ describe("Flashpoint shared publication architecture", () => {
     const card = bundle.model.fastFacts.find((item) => item.label === "Most Affected Country")?.value ?? "";
     expect(card).toMatch(/South Korea/);
     expect(card).toMatch(/Bangladesh/);
-    expect(bundle.model.dataset.autoExecutiveSummary).toMatch(/share the heaviest volume|share the lead on volume|clustered in/);
+    expect(bundle.model.dataset.autoExecutiveSummary).toMatch(/geographically dispersed across APAC/i);
+    expect(bundle.model.dataset.autoExecutiveSummary).toMatch(/South Korea/);
+    expect(bundle.model.dataset.autoExecutiveSummary).toMatch(/Bangladesh/);
+    expect(bundle.model.dataset.autoExecutiveSummary).not.toMatch(/clusters in|dominant/i);
     expect(bundle.auditIssues.map((issue) => issue.code)).not.toContain("RANKING_TIE");
+  });
+
+  it("synthesises the complete regional spread, mobilisation forms and operational effects", () => {
+    const bundle = finalizeFlashpointPublication({
+      incidents: [
+        incident("Students demonstrate in Sydney over One Nation", {
+          country: "Australia",
+          location: "Sydney",
+          summary: "Students marched through central Sydney.",
+        }),
+        incident("POSCO workers begin partial strike in Pohang", {
+          country: "South Korea",
+          location: "Pohang",
+          summary: "Union members began industrial action over wages and conditions.",
+        }),
+        incident("Customers stage sit-in in central Dhaka", {
+          country: "Bangladesh",
+          location: "Dhaka",
+          summary: "The demonstration restricted access around Motijheel.",
+        }),
+        incident("University students hold walkout in Los Baños", {
+          country: "Philippines",
+          location: "Los Baños",
+          summary: "Students and staff joined a campus walkout.",
+        }),
+        incident("Political protest march heads towards Islamabad", {
+          country: "Pakistan",
+          location: "Islamabad",
+          summary: "The march created temporary road disruption and a police presence.",
+        }),
+      ],
+      issueDate: ISSUE,
+    });
+    const summary = bundle.model.dataset.autoExecutiveSummary;
+    for (const country of ["Australia", "Bangladesh", "Pakistan", "Philippines", "South Korea"]) {
+      expect(summary).toContain(country);
+    }
+    expect(summary).toMatch(/student demonstrations/i);
+    expect(summary).toMatch(/organised labour action/i);
+    expect(summary).toMatch(/political marches/i);
+    expect(summary).toMatch(/transport disruption/i);
+    expect(summary).toMatch(/increased security presence/i);
+    expect(summary).toMatch(/multiple separate domestic issues/i);
+    expect(summary).not.toMatch(/last reported incident|clusters in|dominant/i);
+    expect(summary.split(/\n\n/)).toHaveLength(2);
+  });
+
+  it("does not let generated AI prose replace the canonical whole-dataset Executive Summary", () => {
+    const rows = [
+      incident("Students demonstrate in Sydney", {
+        country: "Australia",
+        location: "Sydney",
+      }),
+      incident("Workers begin a strike in Pohang", {
+        country: "South Korea",
+        location: "Pohang",
+      }),
+    ];
+    const canonical = finalizeFlashpointPublication({
+      incidents: rows,
+      issueDate: ISSUE,
+    });
+    const bundle = finalizeFlashpointPublication({
+      incidents: rows,
+      issueDate: ISSUE,
+      ai: {
+        datasetFingerprint: canonical.model.fingerprint,
+        executiveSummary:
+          "Reporting is concentrated entirely in South Korea around one labour dispute.",
+      },
+    });
+    expect(bundle.model.prose.executiveSummary).toBe(
+      canonical.model.dataset.autoExecutiveSummary,
+    );
+    expect(bundle.model.prose.executiveSummary).toMatch(/Australia/);
+    expect(bundle.model.prose.executiveSummary).toMatch(/South Korea/);
+    expect(bundle.model.prose.executiveSummary).not.toMatch(
+      /concentrated entirely/i,
+    );
   });
 
   it("names the unrest table's max severity, not a lower-severity geography", () => {
@@ -130,6 +212,34 @@ describe("Flashpoint shared publication architecture", () => {
     expect(bundle.model.prose.whatMatters).not.toMatch(/accepted activity by volume|operational relevance|mixed environment/i);
     expect(bundle.model.prose.polestarView).toMatch(/Keep normal regional operations/i);
     expect(bundle.model.prose.polestarView).not.toMatch(/No region-wide deterioration is established/i);
+  });
+
+  it("does not count planned future activity as an occurred incident", () => {
+    const planned = incident("Bus union plans a strike on 16 September", {
+      id: 9010,
+      country: "South Korea",
+      location: "Seoul",
+      occurredAt: "2026-09-11T08:00:00Z",
+      summary: "The union said it would strike on 16 September if talks failed.",
+    });
+    const bundle = finalizeFlashpointPublication({
+      incidents: [{
+        ...planned,
+        validityGates: {
+          ...planned.validityGates!,
+          eventOccurred: true,
+          eventDate: "2026-09-16",
+          currentness: "future",
+        },
+      }],
+      issueDate: "2026-09-20",
+    });
+    expect(bundle.model.dataset.canonical.periodRows).toHaveLength(0);
+    expect(bundle.model.dataset.canonical.rejected).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reason: "future_planned_activity_not_occurred" }),
+      ]),
+    );
   });
 
   it("fails closed when persisted prose uses file/table narration", () => {

@@ -1,0 +1,36 @@
+UPDATE THE FLASHPOINT EXECUTIVE SUMMARY LOGIC
+
+The current Executive Summary is too narrow and treats APAC as though it is one location. Do not write statements such as “the last reported incident was five days ago” or focus the regional summary on a single country unless activity genuinely occurred in only one country.
+
+The Executive Summary must synthesise ALL protest, demonstration, strike, sit in, march and significant activist activity recorded across APAC during the seven day reporting period.
+
+For the current reporting period, activity was geographically dispersed. Relevant activity included student demonstrations in Australia, industrial action in South Korea, demonstrations in Bangladesh, student and political mobilisation in the Philippines, protest activity in New Zealand and a major protest march in Pakistan. South Korea must therefore NOT be presented as the sole or dominant regional story unless the underlying data supports that conclusion.
+
+Use this wording for the current Executive Summary:
+
+“Protest and activist activity was geographically dispersed across APAC during the reporting period, with notable mobilisation recorded in Australia, Bangladesh, the Philippines, Pakistan and South Korea. Activity included student demonstrations, organised labour action, political marches and issue based protests.
+
+Most activity remained localised, but several events created potential for temporary transport disruption, restricted access and increased security presence around protest locations. The regional picture remains one of multiple separate domestic issues rather than a single coordinated trend.”
+
+GOING FORWARD
+
+Generate the Executive Summary from the complete seven day dataset, not from the most recent incident or the country with the highest severity.
+
+The summary should:
+1. Identify the geographic spread of activity.
+2. Identify the main forms of mobilisation.
+3. Highlight meaningful operational disruption.
+4. Mention countries only when supported by recorded events.
+5. Distinguish current severity from overall regional risk.
+6. Avoid declaring a “dominant” country or theme unless the underlying data clearly supports it.
+7. Avoid filler such as “last incident X days ago” at regional level.
+8. Avoid repetitive statements that simply restate the Fast Facts section.
+9. Keep the Executive Summary to two short paragraphs.
+10. Write for a corporate security and business continuity audience.
+
+The Executive Summary must answer:
+What happened across the region?
+Where was activity concentrated?
+What could affect business operations?
+
+Do not turn individual incident logic into a regional assessment.

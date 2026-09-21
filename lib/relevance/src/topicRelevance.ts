@@ -2235,6 +2235,11 @@ const FLASHPOINT_AMBIGUOUS_RE =
 // crackdown").
 const FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE =
   /\b(demonstration(s)?|demonstrators?|sit[- ]?in|picket(s|ing|ed)?|walkout|stoppage(?!s?[ -]time)|hartal|bandh|gherao|chakka jam|wheel[- ]?jam|shutter[- ]?down|industrial action|strike notice|civil unrest|public disorder|gen[- ]?z protest)\b/i;
+// Named civic marches often omit "protest" entirely. Require both a mass-
+// turnout phrase and "march" in the headline so event names such as "March
+// for Nature" qualify without admitting calendar-month or military-march noise.
+const FLASHPOINT_MASS_MARCH_TITLE_RE =
+  /\b(?:hundreds?|thousands?|crowds?)\s+(?:turn(?:ed|s|ing)?\s+out|gather(?:ed|s|ing)?|join(?:ed|s|ing)?|attend(?:ed|s|ing)?).{0,80}\bmarch\b/i;
 
 // ---- Negative-sense gate for the polysemous words "protest" / "crackdown" ----
 // "protest" is kept by default (high recall) UNLESS it is used in a non-civil-
@@ -2548,7 +2553,10 @@ export function hitsSlopExclude(topic: string, i: RelevanceInput): RelevanceResu
     if (FP_EDITORIAL_FORMAT_RE.test(titleHaystack(i))) {
       return { relevant: false, reason: "slop: editorial format (photo feature/listicle/think-piece)" };
     }
-    if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
+    if (
+      FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i)) ||
+      FLASHPOINT_MASS_MARCH_TITLE_RE.test(titleHaystack(i))
+    ) {
       return { relevant: true, reason: "kept: unmistakable public-order phrase in headline (title-rescue)" };
     }
     const m = firstMatch(text, FLASHPOINT_EXCLUDE);
@@ -3055,7 +3063,10 @@ export function explainRelevance(topic: string, i: RelevanceInput): RelevanceRes
     if (FP_COURT_PROCESS_RE.test(titleHaystack(i)) && !FP_COURT_UNREST_KEEP_RE.test(text)) {
       return { relevant: false, reason: "excluded: court/judicial process (legal outcome, not a civil-unrest event)" };
     }
-    if (FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i))) {
+    if (
+      FLASHPOINT_TITLE_RESCUE_UNAMBIG_RE.test(titleHaystack(i)) ||
+      FLASHPOINT_MASS_MARCH_TITLE_RE.test(titleHaystack(i))
+    ) {
       // The headline itself is an unmistakable public-order event. The
       // absolute general-news exclude already ran above, so keep it here —
       // this both rescues genuine protests from the body-scanning context

@@ -1,0 +1,189 @@
+FIX FLASHPOINT DATA COLLECTION AND BACKFILL MISSED EVENTS
+
+This is not only an Executive Summary problem. The underlying Flashpoint collection has missed multiple significant protests and industrial actions across APAC during the current seven day reporting period.
+
+The system must NOT generate a regional assessment until the entire APAC collection has been checked.
+
+BACKFILL THE CURRENT REPORTING PERIOD
+
+The existing dataset has failed to capture activity including:
+
+AUSTRALIA
+17 September
+Student demonstrations took place in multiple Australian cities including Sydney, Melbourne and Brisbane opposing Pauline Hanson and One Nation.
+
+SOUTH KOREA
+16 September onward
+POSCO workers began a planned 120 hour partial strike at the Pohang and Gwangyang steel plants as part of an ongoing wage and conditions dispute.
+
+BANGLADESH
+16 September
+Separate demonstrations and sit ins involving Islami Bank customers and dismissed employees took place around Dilkusha, Motijheel and central Dhaka.
+
+19 September
+An opposition alliance began a Dhaka to Rangpur long march involving political, economic and public service demands including electricity, fuel, gas and fertiliser shortages.
+
+PHILIPPINES
+18 September
+Around 6,000 students, staff and officials participated in a walkout at the University of the Philippines Los Baños over education funding, corruption and the proposed Pax Silica initiative.
+
+20 September
+Youth, student and civil society groups marched in Metro Manila ahead of the Martial Law anniversary. Activity included marches towards EDSA Shrine and separate mobilisation near the Supreme Court.
+
+NEW ZEALAND
+19 September
+A major March for Nature took place in Auckland opposing the Conservation Amendment Bill.
+
+PAKISTAN
+20 September
+Jamaat i Islami launched a protest march towards Islamabad opposing the petroleum levy, including mobilisation originating from Karachi.
+
+IMPORTANT
+
+These are examples of activity the current Flashpoint collection missed. Do not simply hard code these incidents. Fix the collection process that allowed them to be missed.
+
+CHANGE THE COLLECTION LOGIC
+
+Flashpoint must search for ACTUAL protest and public order activity across the whole APAC region country by country.
+
+Do not rely on one generic search such as:
+“APAC protests this week”
+
+That approach is inadequate.
+
+For every reporting cycle, search each relevant country using multiple activity terms including:
+
+protest
+demonstration
+rally
+march
+long march
+strike
+walkout
+sit in
+road blockade
+picket
+student protest
+labour dispute
+union action
+activist demonstration
+anti government rally
+political rally
+public gathering
+civil unrest
+clashes
+riot
+police dispersal
+arrests during protest
+
+SEARCH COUNTRY BY COUNTRY
+
+The collection must cover:
+
+Australia
+Bangladesh
+Cambodia
+China
+Hong Kong
+India
+Indonesia
+Japan
+Laos
+Malaysia
+Myanmar
+Nepal
+New Zealand
+Pakistan
+Papua New Guinea
+Philippines
+Singapore
+South Korea
+Sri Lanka
+Taiwan
+Thailand
+Vietnam
+
+and other APAC locations already included within the Flashpoint geographic scope.
+
+Do not assume absence of results from a regional search means absence of protest activity.
+
+DATE CONTROL
+
+For a seven day report:
+
+Only include activity which ACTUALLY OCCURRED within the reporting window.
+
+Distinguish between:
+
+OCCURRED
+An event which took place during the reporting period.
+
+ONGOING
+An event which began previously but remained active during the reporting period.
+
+PLANNED
+A future event which has not yet occurred.
+
+Planned activity must NOT be counted as an occurred incident.
+
+Publication date is not the incident date. Extract and validate the actual event date.
+
+DEDUPLICATION
+
+The same demonstration may appear in numerous news reports.
+
+Do not create multiple incidents for the same event.
+
+Deduplicate using:
+country
+city
+date
+organiser
+issue
+event type
+
+COLLECTION QUALITY CONTROL
+
+Before generating the weekly Flashpoint report, run a coverage check.
+
+Ask:
+
+Have all APAC countries been searched?
+Were labour and union sources checked?
+Were student demonstrations captured?
+Were marches and sit ins captured?
+Were road blockades captured?
+Were local language or national news sources checked where appropriate?
+Were major demonstrations reported by local media but absent from international news feeds captured?
+Were events incorrectly classified as general news rather than activism?
+Were publication dates confused with incident dates?
+
+If significant events are found during this quality control stage, add them to the incident dataset BEFORE calculating severity, Fast Facts or the Executive Summary.
+
+EXECUTIVE SUMMARY
+
+Only generate the Executive Summary after collection and quality control are complete.
+
+It must describe the complete regional picture rather than the most recent incident.
+
+It should answer:
+
+What happened across APAC?
+Where did meaningful mobilisation occur?
+What types of activity were recorded?
+Was there violence or significant security force intervention?
+What were the practical effects on transport, access, personnel or operations?
+
+Do not produce statements such as:
+
+“The last reported incident was five days ago.”
+
+That logic is meaningless for a multi country regional product.
+
+Do not say:
+
+“Activity clusters in South Korea”
+
+when the database contains significant events in several countries.
+
+The Executive Summary must be generated from the complete seven day APAC dataset, not from whichever country happens to contain the highest severity incident.

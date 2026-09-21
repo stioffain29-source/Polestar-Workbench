@@ -34,3 +34,11 @@ The fail-closed prose validator must assign counts to the section and qualifier 
 
 Recovery prose must name accepted incidents and their locations; it may not fall back to generic travel, routing or posture advice.
 **Why:** a canonical validation failure exposed generic recovery copy as the published What Matters, Implications and Polestar View.
+
+## Executive Summary authority
+
+The Flashpoint Executive Summary is canonical dataset prose. A current analyst edit may replace it, but generated AI prose may not; all preview and PDF paths must resolve it from the complete seven-day canonical incident set.
+
+**Why:** production report 159 had a fingerprint-accepted generated summary that described one South Korean transport dispute even though the canonical period covered six countries. The stale-looking prose survived until the real browser PDF export exposed it.
+
+**How to apply:** keep the Executive Summary selection distinct from other AI-assisted sections: current analyst edit first, canonical auto-summary second. Verify this rule with an exact saved production report and the API-filtered production incident loader, not raw rows or development fixtures.

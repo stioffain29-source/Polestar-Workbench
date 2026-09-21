@@ -1842,6 +1842,7 @@ function enrich(rows: FlashpointReportIncident[]): EnrichedIncident[] {
         displayIncidentTitle(r.title, r.displayTitle),
       );
       const displayTitle = normalizeWestPapuaRegionInTitle(cleanedTitle, country);
+      if (!displayTitle.trim()) return [];
       const location = /^west papua$/i.test(physicalLocation)
         ? "West Papua, Indonesia"
         : physicalLocation;
@@ -2185,6 +2186,15 @@ export function selectFlashpointUsable(
   for (const r of rawWindow) {
     const status = (r.validityStatus ?? "").trim().toLowerCase();
     const gates = r.validityGates;
+    if (gates?.currentness === "future") {
+      semanticValidityDropped++;
+      reject(
+        "semantic-validity",
+        r,
+        "future_planned_activity_not_occurred",
+      );
+      continue;
+    }
     const contract = gates
       ? validateFlashpointSemanticContract(gates as FlashpointSemanticGates)
       : { valid: false, failures: ["missing_semantic_gates"] };
@@ -3627,42 +3637,45 @@ function buildAutoExecutiveSummary(ctx: ExecCtx): string {
   if (total === 0) {
     return `This briefing covers activism, protest and civil unrest across APAC for ${windowLabel}. Little was reported this week — maintain standing monitoring rather than assuming risk has eased.`;
   }
-  const lead = ctx.countryRows[0];
-  const volumeLeadersRows = volumeLeaders(ctx.countryRows);
-  const volumeHas = volumeLeadPhrase(ctx.countryRows, "has");
-  const volumeLeads = volumeLeadPhrase(ctx.countryRows, "leads");
-  const spread = subregionSpread(ctx.countryRows);
   const allRows = [...ctx.activismRows, ...ctx.unrestRows];
+  const countries = ctx.countryRows.map((row) => row.label).filter(Boolean);
+  const countryLine = countries.length > 6
+    ? `${joinList(countries.slice(0, 6))} and ${countries.length - 6} other APAC ${countries.length - 6 === 1 ? "market" : "markets"}`
+    : joinList(countries);
+  const text = allRows.map((row) => `${row.title ?? ""} ${row.summary ?? ""}`).join(" ");
+  const forms = [
+    /\b(student|students|campus|university|faculty)\b/i.test(text)
+      ? "student demonstrations"
+      : null,
+    /\b(strike|walkout|industrial action|labou?r dispute|union action|picket|stoppage)\b/i.test(text)
+      ? "organised labour action"
+      : null,
+    /\b(political|opposition|long march|march(?:ed|es|ing)?|mobilisation|mobilization)\b/i.test(text)
+      ? "political marches"
+      : null,
+    /\b(protest|rally|demonstration|sit[- ]?in|activist)\b/i.test(text)
+      ? "issue-based protests"
+      : null,
+  ].filter((value): value is string => Boolean(value));
   const hasEnforcement = hasEnforcementSignal(allRows);
+  const hasSecurityPresence = hasEnforcement ||
+    /\b(police presence|security presence|police deployed|security forces? deployed)\b/i.test(text);
   const hs = flashpointPeakSeverity(ctx.enriched);
-  const sevInc = ctx.topSeverity;
-  const sevCountry = (sevInc?.country ?? "").trim();
-  const sevElevated = (SEV_RANK[sevKey(sevInc?.severity)] ?? 0) >= 3;
-  const tieN = topSeverityTieCount(ctx.enriched, sevInc);
-
-  let opener: string;
-  const severityOutsideVolumeLead =
-    Boolean(lead && sevInc && sevCountry && sevElevated) &&
-    !volumeLeadersRows.some((row) => row.label === sevCountry);
-  if (severityOutsideVolumeLead && sevInc) {
-    opener = tieN > 1
-      ? `${volumeLeads}, but the sharper operational concern is ${tieN} ${hs.label}-severity incidents including ${tableLeadPhrase(sevInc)} in ${sevCountry}.`
-      : `${volumeLeads}, but the sharper operational concern is ${tableLeadPhrase(sevInc)} in ${sevCountry} (${hs.label}).`;
-  } else if (lead && spread.regions.length >= 2) {
-    opener = `Protest pressure spans ${joinList(spread.regions)}; ${volumeHas}.`;
-  } else if (lead) {
-    opener = volumeLeadersRows.length > 1
-      ? `Activity this week is clustered in ${joinList(volumeLeadersRows.map((row) => row.label))}.`
-      : `Activity clusters in ${lead.label} this week.`;
-  } else {
-    opener = `Protest activity is scattered across APAC with no clear volume leader.`;
-  }
-
-  const bottom = hasEnforcement
-    ? `Police action is already affecting some gatherings — plan for same-day movement disruption rather than a quiet week.`
-    : `No broad crackdown pattern is evident; disruption risk is mainly from localised or scheduled gatherings.`;
-
-  return `${opener}\n\n${bottom}`;
+  const geographicallyDispersed = countries.length > 1;
+  const opener = geographicallyDispersed
+    ? `Protest and activist activity was geographically dispersed across APAC during the reporting period, with notable mobilisation recorded in ${countryLine}.`
+    : `Protest and activist activity during the reporting period was concentrated in ${countryLine}.`;
+  const formsLine = forms.length > 0
+    ? ` Activity included ${joinList(forms)}.`
+    : "";
+  const operationalSignals = /\b(road|rail|transport|traffic|airport|port|access|blockade|walkout|strike|march|police|security forces?|tear gas|arrest|dispersal)\b/i.test(text);
+  const operationalLine = operationalSignals
+    ? `Most activity remained localised, but recorded events created potential for temporary transport disruption, restricted access${hasSecurityPresence ? " and increased security presence" : ""} around protest locations.`
+    : `Most activity remained localised, with no broad pattern of transport or access disruption recorded across the region.`;
+  const riskLine = geographicallyDispersed
+    ? ` Current event severity peaked at ${hs.label}, while the overall regional picture remained multiple separate domestic issues rather than a coordinated trend.`
+    : ` Current event severity peaked at ${hs.label}; this reflects the recorded local activity rather than a coordinated regional trend.`;
+  return `${opener}${formsLine}\n\n${operationalLine}${riskLine}`;
 }
 
 export const FLASHPOINT_SEV_LABEL = SEV_LABEL;
@@ -4120,7 +4133,6 @@ export function resolveFlashpointRenderedModel(args: {
     : {};
   const executiveSummary =
     (report.executiveSummary ?? "").trim() ||
-    (ai.executiveSummary ?? "").trim() ||
     ds.autoExecutiveSummary;
   const protestSchedule =
     args.protestSchedule ?? {
@@ -4147,23 +4159,51 @@ export function resolveFlashpointRenderedModel(args: {
           ...scheduleWatchNext.split(/\n+/).map((line) => line.trim()).filter(Boolean),
         ])].join("\n")
       : resolvedWatchNext;
+  const resolvedForecastRead = reconcileProtestForecastRead(
+    pickFlashpointRead(report.forecastRead, ds.forecastRead),
+    protestSchedule,
+  );
+  const resolvedWhatMatters = resolveFlashpointAnalystProse(
+    report.whatMatters,
+    ai.whatMatters,
+    ds.autoWhatMatters,
+  );
+  const forecastSentences = new Set(
+    resolvedForecastRead
+      .split(/(?<=[.!?])\s+/)
+      .map((sentence) => sentence.trim().replace(/\s+/g, " ").toLowerCase())
+      .filter((sentence) => sentence.length >= 50),
+  );
+  const dedupedWhatMatters = resolvedWhatMatters
+    .split(/(?<=[.!?])\s+/)
+    .filter(
+      (sentence) => {
+        const normalized = sentence.trim().replace(/\s+/g, " ").toLowerCase();
+        if (forecastSentences.has(normalized)) return false;
+        const concernLead = normalized.match(
+          /^(.{30,}?)\s+is the main concern this week\b/,
+        )?.[1];
+        return !(
+          concernLead &&
+          resolvedForecastRead
+            .replace(/\s+/g, " ")
+            .toLowerCase()
+            .includes(concernLead)
+        );
+      },
+    )
+    .join(" ")
+    .trim();
   const prose = {
     executiveSummary,
     activismRead: pickFlashpointRead(report.activismRead, ds.activismRead),
     civilUnrestRead: pickFlashpointRead(report.civilUnrestRead, ds.civilUnrestRead),
-    forecastRead: reconcileProtestForecastRead(
-      pickFlashpointRead(report.forecastRead, ds.forecastRead),
-      protestSchedule,
-    ),
+    forecastRead: resolvedForecastRead,
     regionalCountryRead: pickFlashpointRead(
       report.regionalCountryRead,
       ds.regionalCountryRead,
     ),
-    whatMatters: resolveFlashpointAnalystProse(
-      report.whatMatters,
-      ai.whatMatters,
-      ds.autoWhatMatters,
-    ),
+    whatMatters: dedupedWhatMatters || ds.autoWhatMatters,
     implications: resolveFlashpointAnalystProse(
       report.implications,
       ai.implications,
@@ -4512,7 +4552,10 @@ export function validateFlashpointRenderedModel(
         errors.push(`${section} leaks rejected incident title "${title.slice(0, 80)}"`);
       }
     }
-    sentenceCountErrors(section, text);
+    // Regional/Country Read already has a dedicated country-by-country count
+    // audit above. The generic nearest-noun scanner can bind a chart count to a
+    // later word such as "protests" and reject an otherwise exact paragraph.
+    if (section !== "regionalCountryRead") sentenceCountErrors(section, text);
     // Watch Next may be grounded in the separate forward-looking protest
     // schedule. Those countries/dates are not incident evidence and therefore
     // must not be rejected by the canonical incident-country/date gate.

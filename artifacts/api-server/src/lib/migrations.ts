@@ -57,13 +57,139 @@ import { SEPTEMBER_2026_PROTEST_SCHEDULE_UPDATE } from "./seed/september2026Prot
 // touched. Keep the names stable — the scrape:flashpoint script joins on
 // `name` to attribute records to a source row and to update
 // last_success_at / last_failure_at.
-const FLASHPOINT_REGIONAL_SOURCES: Array<{
+type FlashpointRegionalSourceSeed = {
   name: string;
   url: string;
   sourceType: string;
   reliability: number;
   notes: string;
-}> = [
+};
+
+const FLASHPOINT_COUNTRY_SEARCH_TARGETS = [
+  { country: "Australia", anchors: ["Australia", "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide"], hl: "en-AU", gl: "AU", ceid: "AU:en" },
+  { country: "Bangladesh", anchors: ["Bangladesh", "Dhaka", "Motijheel", "Dilkusha", "Rangpur"], hl: "en-BD", gl: "BD", ceid: "BD:en" },
+  { country: "Cambodia", anchors: ["Cambodia", "Phnom Penh", "Siem Reap"], hl: "en", gl: "KH", ceid: "KH:en" },
+  { country: "China", anchors: ["China", "Beijing", "Shanghai", "Guangzhou", "Shenzhen"], hl: "en-US", gl: "US", ceid: "US:en" },
+  { country: "Hong Kong", anchors: ["Hong Kong", "Kowloon"], hl: "en-HK", gl: "HK", ceid: "HK:en" },
+  { country: "India", anchors: ["India", "Delhi", "Mumbai", "Kolkata", "Bengaluru"], hl: "en-IN", gl: "IN", ceid: "IN:en" },
+  { country: "Indonesia", anchors: ["Indonesia", "Jakarta", "Surabaya", "Bandung", "Medan"], hl: "en-ID", gl: "ID", ceid: "ID:en" },
+  { country: "Japan", anchors: ["Japan", "Tokyo", "Osaka", "Yokohama"], hl: "en-JP", gl: "JP", ceid: "JP:en" },
+  { country: "Laos", anchors: ["Laos", "Vientiane", "Luang Prabang", "Savannakhet"], hl: "en", gl: "LA", ceid: "LA:en" },
+  { country: "Malaysia", anchors: ["Malaysia", "Kuala Lumpur", "Putrajaya", "Penang", "Johor"], hl: "en-MY", gl: "MY", ceid: "MY:en" },
+  { country: "Myanmar", anchors: ["Myanmar", "Yangon", "Mandalay", "Naypyidaw"], hl: "en-US", gl: "US", ceid: "US:en" },
+  { country: "Nepal", anchors: ["Nepal", "Kathmandu", "Pokhara"], hl: "en-NP", gl: "NP", ceid: "NP:en" },
+  { country: "New Zealand", anchors: ["New Zealand", "Auckland", "Wellington", "Christchurch"], hl: "en-NZ", gl: "NZ", ceid: "NZ:en" },
+  { country: "Pakistan", anchors: ["Pakistan", "Islamabad", "Karachi", "Lahore", "Rawalpindi"], hl: "en-PK", gl: "PK", ceid: "PK:en" },
+  { country: "Papua New Guinea", anchors: ["Papua New Guinea", "Port Moresby", "Lae", "Mount Hagen"], hl: "en-PG", gl: "PG", ceid: "PG:en" },
+  { country: "Philippines", anchors: ["Philippines", "Manila", "EDSA", "Los Baños", "Quezon City"], hl: "en-PH", gl: "PH", ceid: "PH:en" },
+  { country: "Singapore", anchors: ["Singapore"], hl: "en-SG", gl: "SG", ceid: "SG:en" },
+  { country: "South Korea", anchors: ["South Korea", "Seoul", "Pohang", "Gwangyang", "Busan"], hl: "en-US", gl: "US", ceid: "US:en" },
+  { country: "Sri Lanka", anchors: ["Sri Lanka", "Colombo", "Kandy", "Jaffna"], hl: "en-LK", gl: "LK", ceid: "LK:en" },
+  { country: "Taiwan", anchors: ["Taiwan", "Taipei", "Kaohsiung"], hl: "en-US", gl: "US", ceid: "US:en" },
+  { country: "Thailand", anchors: ["Thailand", "Bangkok", "Chiang Mai"], hl: "en-TH", gl: "TH", ceid: "TH:en" },
+  { country: "Vietnam", anchors: ["Vietnam", "Hanoi", "Ho Chi Minh City"], hl: "en-VN", gl: "VN", ceid: "VN:en" },
+] as const;
+
+const FLASHPOINT_PUBLIC_ORDER_TERMS = [
+  "protest", "demonstration", "rally", "march", "long march", "sit in",
+  "road blockade", "public gathering", "civil unrest", "clashes", "riot",
+  "police dispersal", "arrests during protest",
+] as const;
+const FLASHPOINT_LABOUR_STUDENT_TERMS = [
+  "strike", "walkout", "picket", "student protest", "labour dispute",
+  "union action", "activist demonstration", "anti government rally",
+  "political rally", "industrial action",
+] as const;
+
+function flashpointCountrySearchUrl(
+  target: (typeof FLASHPOINT_COUNTRY_SEARCH_TARGETS)[number],
+  terms: readonly string[],
+  days = 14,
+): string {
+  const quote = (value: string) => value.includes(" ") ? `"${value}"` : value;
+  const query = `(${target.anchors.map(quote).join(" OR ")}) (${terms.map(quote).join(" OR ")}) when:${days}d`;
+  const params = new URLSearchParams({
+    q: query,
+    hl: target.hl,
+    gl: target.gl,
+    ceid: target.ceid,
+  });
+  return `https://news.google.com/rss/search?${params.toString()}`;
+}
+
+const FLASHPOINT_COUNTRY_SEARCH_SOURCES: FlashpointRegionalSourceSeed[] =
+  FLASHPOINT_COUNTRY_SEARCH_TARGETS.flatMap((target) => [
+    {
+      name: `Google News — ${target.country} (Flashpoint Public Order)`,
+      url: flashpointCountrySearchUrl(target, FLASHPOINT_PUBLIC_ORDER_TERMS),
+      sourceType: "rss",
+      reliability: 3,
+      notes: `Country-by-country Flashpoint public-order search for ${target.country}; required weekly coverage lane, last 14 days.`,
+    },
+    {
+      name: `Google News — ${target.country} (Flashpoint Labour & Student)`,
+      url: flashpointCountrySearchUrl(target, FLASHPOINT_LABOUR_STUDENT_TERMS),
+      sourceType: "rss",
+      reliability: 3,
+      notes: `Country-by-country Flashpoint labour, union and student-mobilisation search for ${target.country}; required weekly coverage lane, last 14 days.`,
+    },
+  ]);
+
+const FLASHPOINT_CURRENT_COVERAGE_QC: FlashpointRegionalSourceSeed[] = [
+  ["Australia", ["students", "protest", "demonstration"]],
+  ["Bangladesh", ["sit in", "sit-in", "long march", "customers protest", "employee protest"]],
+  ["New Zealand", ["protest march", "demonstration"]],
+  ["Pakistan", ["protest march", "long march"]],
+  ["Philippines", ["students", "walkout", "march", "demonstration"]],
+  ["South Korea", ["strike", "union", "walkout", "industrial action"]],
+].map(([country, terms]) => {
+  const target = FLASHPOINT_COUNTRY_SEARCH_TARGETS.find(
+    (candidate) => candidate.country === country,
+  );
+  if (!target) throw new Error(`Missing Flashpoint country target: ${country}`);
+  return {
+    name: `Google News — ${country} (Flashpoint Coverage QC)`,
+    url: flashpointCountrySearchUrl(target, terms as string[], 7),
+    sourceType: "rss",
+    reliability: 3,
+    notes: `Narrow seven-day Flashpoint coverage-control lane for ${country}; prevents lower-volume student, labour, march and sit-in activity being displaced by rank-capped broad feeds.`,
+  };
+});
+
+const FLASHPOINT_SPECIALIST_COVERAGE_QC: FlashpointRegionalSourceSeed[] = [
+  {
+    country: "Bangladesh",
+    label: "Institutional Sit-ins",
+    terms: ["sit in", "sit-in", "customers protest", "employee protest"],
+  },
+  {
+    country: "Philippines",
+    label: "Campus Action",
+    terms: ["walkout", "campus protest", "university protest", "students protest"],
+  },
+  {
+    country: "Philippines",
+    label: "Civic Marches",
+    terms: ["civil society march", "youth march", "student march", "protest march"],
+  },
+].map(({ country, label, terms }) => {
+  const target = FLASHPOINT_COUNTRY_SEARCH_TARGETS.find(
+    (candidate) => candidate.country === country,
+  );
+  if (!target) throw new Error(`Missing Flashpoint country target: ${country}`);
+  return {
+    name: `Google News — ${country} (Flashpoint Coverage QC: ${label})`,
+    url: flashpointCountrySearchUrl(target, terms, 7),
+    sourceType: "rss",
+    reliability: 3,
+    notes: `Narrow seven-day ${label.toLowerCase()} coverage-control lane for ${country}; complements the rank-capped general country searches.`,
+  };
+});
+
+const FLASHPOINT_REGIONAL_SOURCES: FlashpointRegionalSourceSeed[] = [
+  ...FLASHPOINT_COUNTRY_SEARCH_SOURCES,
+  ...FLASHPOINT_CURRENT_COVERAGE_QC,
+  ...FLASHPOINT_SPECIALIST_COVERAGE_QC,
   // Direct publisher RSS, verified live from the Replit container.
   { name: "Malaysiakini",           url: "https://www.malaysiakini.com/rss/en/news.rss",            sourceType: "rss", reliability: 4, notes: "Owner: SE Asia desk. Malaysia — independent national, protest and labour coverage." },
   { name: "Free Malaysia Today",    url: "https://www.freemalaysiatoday.com/feed/",                 sourceType: "rss", reliability: 3, notes: "Owner: SE Asia desk. Malaysia — secondary national." },
@@ -4041,7 +4167,21 @@ export async function runDataMigrations(): Promise<void> {
           .select({ id: sourcesTable.id })
           .from(sourcesTable)
           .where(eq(sourcesTable.name, seed.name));
-        if (existing) continue;
+        if (existing) {
+          if (seed.name.includes("(Flashpoint ")) {
+            await db
+              .update(sourcesTable)
+              .set({
+                url: seed.url,
+                sourceType: seed.sourceType,
+                status: "operational",
+                reliability: seed.reliability,
+                notes: seed.notes,
+              })
+              .where(eq(sourcesTable.id, existing.id));
+          }
+          continue;
+        }
         await db.insert(sourcesTable).values({
           name: seed.name,
           topic: "flashpoint",

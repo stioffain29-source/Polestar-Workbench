@@ -13,6 +13,7 @@ import { extractWestPapuaItem, deriveWestPapuaIncidentDate } from "./westPapuaEx
 import { validateFlashpointEvent, FLASHPOINT_VALIDITY_VERSION } from "./flashpointValidity";
 import { backfillFlashpointValidity } from "./backfillFlashpointValidity";
 import { flashpointContentFingerprint } from "./flashpointFingerprint";
+import { isGoogleNewsRedirect, resolveGoogleNewsUrl } from "./googleNewsUrl";
 import type { FeedStat, IngestOptions, IngestSummary, PngIngestDiagnostics } from "./types";
 
 // Feed fetching is centralised in feedFetch.ts: a real browser User-Agent,
@@ -50,6 +51,70 @@ type Rejected = {
   reason: string;
   feedLabel: string;
 };
+
+function decodeArticleText(value: string): string {
+  return value
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;|&#34;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_match, value) =>
+      String.fromCodePoint(Number(value)),
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function enrichCoverageQcCandidate(a: Accepted): Promise<Accepted> {
+  if (
+    !a.feedLabel.includes("(Flashpoint Coverage QC") ||
+    !isGoogleNewsRedirect(a.sourceUrl)
+  ) {
+    return a;
+  }
+  try {
+    const publisherUrl = await resolveGoogleNewsUrl(a.sourceUrl);
+    if (!publisherUrl) return a;
+    const resolved = { ...a, sourceUrl: publisherUrl };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(publisherUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (PolestarWorkbench FlashpointScraper)",
+        },
+      });
+      if (!response.ok) return resolved;
+      const html = await response.text();
+      const descriptions = [
+        ...html.matchAll(
+          /<meta\b[^>]*(?:name|property)=["'](?:description|og:description)["'][^>]*content=["']([^"']+)["'][^>]*>/gi,
+        ),
+      ].map((match) => decodeArticleText(match[1]));
+      const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+        .map((match) => decodeArticleText(match[1]))
+        .filter((text) => text.length >= 45)
+        .slice(0, 8);
+      const articleEvidence = [...descriptions, ...paragraphs]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 4_000);
+      return articleEvidence.length > a.summary.length + 40
+        ? { ...resolved, summary: articleEvidence }
+        : resolved;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return a;
+  }
+}
 
 // Required Flashpoint cues. Mirror of REQUIRED.flashpoint in
 // artifacts/workbench/src/lib/topicRelevance.ts. At least one must hit
@@ -106,6 +171,11 @@ const WWII_ORDNANCE_DENY_RE =
 const ERW_CASUALTY_SIGNAL =
   /\b(killed|kills|dead|deaths?|wounded|injured|casualt(?:y|ies)|fatalit(?:y|ies)|tewas|meninggal|luka(?:-luka)?|terluka|korban)\b/i;
 
+const COMMERCIAL_COMMENTARY_DENY =
+  /\b(share price|stock price|earnings|quarterly (result|results|report)|dividend|buyback|ipo|market cap|futures contract|hedge fund|analyst (note|target|forecast)|price target|upgrade rating|downgrade rating)\b/i;
+const EXPLICIT_LABOUR_ACTION =
+  /\b(?:workers?|employees?|staff|labou?r|trade union|union)\b.{0,70}\b(?:strike|strikes|striking|walkout|walk out|stoppage|industrial action)\b|\b(?:strike|strikes|striking|walkout|walk out|stoppage|industrial action)\b.{0,70}\b(?:workers?|employees?|staff|labou?r|trade union|union)\b/i;
+
 const FLASHPOINT_DENY: RegExp[] = [
   // Kinetic armed conflict — foreign signatures only (insurgent/armed-group
   // kinetic is handled conditionally in classify() so Pacific stays in scope).
@@ -115,7 +185,7 @@ const FLASHPOINT_DENY: RegExp[] = [
   // Cargo / freight noise (handled by cargo_watch)
   /\b(cargo theft|truck hijack|warehouse theft|container theft|freight theft|depot theft|cargo robbery|seal tamper)\b/i,
   // Commercial / market commentary
-  /\b(share price|stock price|earnings|quarterly (result|results|report)|dividend|buyback|ipo|market cap|futures contract|hedge fund|analyst (note|target|forecast)|price target|upgrade rating|downgrade rating)\b/i,
+  COMMERCIAL_COMMENTARY_DENY,
   /\b(oil futures|crude futures|brent futures|wti futures|petrol price today|diesel price today|fuel price today)\b/i,
   // Shared exclusions from topicRelevance.ts EXCLUDE_PHRASES
   /\bnews live\b/i,
@@ -264,7 +334,7 @@ const PNG_OPERATIONAL: RegExp =
 // DISTINCTIVE (no out-of-region namesake) to avoid mis-attribution.
 const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   { canonical: "Australia",         aliases: ["australia", "australian", "australians", "sydney", "melbourne", "brisbane", "canberra", "perth", "adelaide"] },
-  { canonical: "Bangladesh",        aliases: ["bangladesh", "bangladeshi", "bangladeshis", "dhaka", "chittagong", "chattogram", "comilla", "cumilla", "rangpur", "sylhet", "khulna", "rajshahi", "barisal", "barishal", "mymensingh", "gazipur", "narayanganj"] },
+  { canonical: "Bangladesh",        aliases: ["bangladesh", "bangladeshi", "bangladeshis", "dhaka", "dilkusha", "motijheel", "chittagong", "chattogram", "comilla", "cumilla", "rangpur", "sylhet", "khulna", "rajshahi", "barisal", "barishal", "mymensingh", "gazipur", "narayanganj"] },
   { canonical: "Hong Kong",         aliases: ["hong kong", "hongkonger", "hongkongers", "kowloon", "new territories"] },
   { canonical: "China",             aliases: ["china", "beijing", "shanghai", "guangzhou", "shenzhen", "wuhan", "chengdu"] },
   { canonical: "India",             aliases: ["india", "indian", "indians", "delhi", "mumbai", "chennai", "bengaluru", "kolkata", "hyderabad", "imphal", "guwahati", "lucknow", "patna", "manipur"] },
@@ -278,8 +348,8 @@ const COUNTRY_ALIASES: Array<{ canonical: string; aliases: string[] }> = [
   // NOTE: Papua New Guinea and Indonesian West Papua are resolved by
   // resolvePapuaPng() (below), NOT by this alias table, because they share
   // the ambiguous word "papua". Do not re-add a "papua"/"png" alias here.
-  { canonical: "Philippines",       aliases: ["philippines", "philippine", "filipino", "filipina", "filipinos", "filipinas", "manila", "cebu", "davao", "quezon city", "mindanao", "iloilo", "baguio", "zamboanga", "pnp"] },
-  { canonical: "South Korea",       aliases: ["south korea", "south korean", "south koreans", "seoul", "busan", "incheon", "daegu"] },
+  { canonical: "Philippines",       aliases: ["philippines", "philippine", "filipino", "filipina", "filipinos", "filipinas", "manila", "metro manila", "los baños", "los banos", "edsa", "cebu", "davao", "quezon city", "mindanao", "iloilo", "baguio", "zamboanga", "pnp"] },
+  { canonical: "South Korea",       aliases: ["south korea", "south korean", "south koreans", "seoul", "busan", "incheon", "daegu", "pohang", "gwangyang"] },
   { canonical: "Sri Lanka",         aliases: ["sri lanka", "sri lankan", "sri lankans", "colombo", "kandy", "jaffna", "galle", "negombo"] },
   { canonical: "Thailand",          aliases: ["thailand", "thai", "thais", "bangkok", "chiang mai", "phuket"] },
   { canonical: "Vietnam",           aliases: ["vietnam", "viet nam", "vietnamese", "hanoi", "ho chi minh", "haiphong"] },
@@ -450,6 +520,9 @@ function classify(title: string, summary: string, feedCountry?: string | null): 
   const hay = `${title}\n${summary}`;
 
   for (const re of FLASHPOINT_DENY) {
+    if (re === COMMERCIAL_COMMENTARY_DENY && EXPLICIT_LABOUR_ACTION.test(hay)) {
+      continue;
+    }
     if (re.test(hay)) return { kept: false, reason: `deny:${re.source.slice(0, 30)}`, country: null };
   }
 
@@ -658,11 +731,19 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     .from(sourcesTable)
     .where(eq(sourcesTable.topic, "flashpoint"));
 
+  const sourceFilter = (process.env.FLASHPOINT_SOURCE_FILTER ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
   const fetchable = sources.filter(
     (s) =>
       !!s.url &&
       (s.sourceType === "rss" || s.sourceType === "news") &&
-      /^https?:\/\//.test(s.url),
+      /^https?:\/\//.test(s.url) &&
+      (
+        sourceFilter.length === 0 ||
+        sourceFilter.some((needle) => s.name.toLowerCase().includes(needle))
+      ),
   );
 
   log(`Catalogued flashpoint sources: ${sources.length}, fetchable: ${fetchable.length}`);
@@ -692,12 +773,22 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     // Authoritative country for a single-country local outlet feed (used as a
     // fallback when an item's title carries no in-gazetteer place and no
     // recognisable masthead, e.g. a direct outlet RSS feed with bare titles).
-    const feedCountry = authoritativeFeedCountry(s.url);
+    const generatedCountryMatch = s.name.match(
+      /^Google News — (.+?) \(Flashpoint /,
+    );
+    const feedCountry =
+      authoritativeFeedCountry(s.url) ??
+      generatedCountryMatch?.[1] ??
+      null;
     try {
       const parsed = await fetchFeed(parser, s.url!, { stagger: true });
       const items = parsed.items ?? [];
       perFeed[s.name].found = items.length;
-      for (const item of items) {
+      const requestedLimit = Number(process.env.FLASHPOINT_MAX_ITEMS_PER_FEED ?? "");
+      const processingLimit = Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? Math.floor(requestedLimit)
+        : items.length;
+      for (const item of items.slice(0, processingLimit)) {
         const title = cleanText(item.title);
         const summary = cleanText(item.contentSnippet || item.content || "");
         const when = parseDate(item.isoDate || item.pubDate) ?? new Date();
@@ -830,6 +921,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const existing = await db
     .select({
+      id: incidentsTable.id,
       title: incidentsTable.title,
       occurredAt: incidentsTable.occurredAt,
       country: incidentsTable.country,
@@ -842,12 +934,19 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
 
   const existingKeys = new Set<string>();
   const existingUrls = new Set<string>();
+  const existingByUrl = new Map<string, { id: number; topic: string }>();
   // Event-signature index of existing flashpoint rows, so a freshly-dated
   // aggregator item that re-runs a months-old event ("15 killed in riots")
   // can be rejected instead of poisoning the rolling window with stale news.
   const existingSignatures: { ms: number; country: string; sig: Set<string>; title: string }[] = [];
   for (const row of existing) {
-    if (row.sourceUrl) existingUrls.add(row.sourceUrl);
+    if (row.sourceUrl) {
+      existingUrls.add(row.sourceUrl);
+      const current = existingByUrl.get(row.sourceUrl);
+      if (!current || row.topic === "flashpoint") {
+        existingByUrl.set(row.sourceUrl, { id: row.id, topic: row.topic });
+      }
+    }
     if (row.topic === "flashpoint" && row.validityStatus === "valid") {
       existingKeys.add(dedupeKey(row.title, row.occurredAt, row.country));
       const sig = eventSignatureTrigrams(row.title);
@@ -891,12 +990,21 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
   let dupeInDb = 0;
   let rehashSkipped = 0;
   for (const a of uniqueAccepted) {
-    if (existingUrls.has(a.sourceUrl)) {
+    const existingUrlRow = existingByUrl.get(a.sourceUrl);
+    if (existingUrlRow && existingUrlRow.topic !== "apac_local") {
       dupeInDb++;
       if (a.isPng) pngRejectedDuplicates++;
       continue;
     }
     toInsert.push(a);
+  }
+  const enrichedToInsert: Accepted[] = [];
+  for (let i = 0; i < toInsert.length; i += 8) {
+    enrichedToInsert.push(
+      ...await Promise.all(
+        toInsert.slice(i, i + 8).map(enrichCoverageQcCandidate),
+      ),
+    );
   }
 
   const fingerprint = (a: Accepted) => flashpointContentFingerprint({
@@ -907,7 +1015,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     incidentDate: null,
   });
   const prior = new Map<string, (typeof incidentValidityAuditTable.$inferSelect)>();
-  const urls = toInsert.map((a) => a.sourceUrl).filter(Boolean);
+  const urls = enrichedToInsert.map((a) => a.sourceUrl).filter(Boolean);
   if (urls.length) {
     const rows = await db.select().from(incidentValidityAuditTable)
       .where(and(
@@ -930,8 +1038,17 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     }
   }
   const validity: Array<{ item: Accepted; result: Awaited<ReturnType<typeof validateFlashpointEvent>> }> = [];
-  for (let i = 0; i < toInsert.length; i += 4) {
-    const batch = await Promise.all(toInsert.slice(i, i + 4).map(async (a) => ({
+  const requestedValidationConcurrency = Number(
+    process.env.FLASHPOINT_VALIDATION_CONCURRENCY ?? "",
+  );
+  const validationConcurrency =
+    Number.isFinite(requestedValidationConcurrency) &&
+    requestedValidationConcurrency > 0
+      ? Math.min(20, Math.floor(requestedValidationConcurrency))
+      : 4;
+  for (let i = 0; i < enrichedToInsert.length; i += validationConcurrency) {
+    const batch = await Promise.all(
+      enrichedToInsert.slice(i, i + validationConcurrency).map(async (a) => ({
       item: a,
       result: prior.get(`${a.sourceUrl}|${fingerprint(a)}`)?.gates
         ? prior.get(`${a.sourceUrl}|${fingerprint(a)}`)!.gates as Awaited<ReturnType<typeof validateFlashpointEvent>>
@@ -948,7 +1065,8 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
             // than treating the RSS publication timestamp as event evidence.
             candidateEventDate: null,
           }),
-    })));
+      })),
+    );
     validity.push(...batch);
   }
   if (commit && validity.length) {
@@ -1075,7 +1193,7 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
 
   let geocoded = 0;
   const ungeocoded: string[] = [];
-  const rows: (typeof incidentsTable.$inferInsert)[] = semanticallyValid.map((a) => {
+  const preparedRows = semanticallyValid.map((a) => {
     const semantic = validityByUrl.get(a.sourceUrl)!;
     const geo = geocode(a.country, stripAttributionMentions(`${a.title} ${a.summary}`));
     if (geo) geocoded++;
@@ -1101,12 +1219,15 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       : isWp
         ? extractWestPapuaItem(a.title, a.summary, geo?.location ?? null)
         : null;
+    const semanticIncidentDate = semantic.eventDate
+      ? new Date(`${semantic.eventDate}T12:00:00.000Z`)
+      : null;
     const incidentDate = a.isPng
       ? derivePngIncidentDate(`${a.title} ${a.summary}`, a.occurredAt)
       : isWp
         ? deriveWestPapuaIncidentDate(`${a.title} ${a.summary}`, a.occurredAt)
-        : null;
-    return {
+        : semanticIncidentDate;
+    const row: typeof incidentsTable.$inferInsert = {
       topic: "flashpoint",
       title: a.title,
       summary: a.summary,
@@ -1138,7 +1259,15 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
       validityEvaluatedAt: new Date(),
       validityGates: semantic,
     };
+    return {
+      row,
+      promotionId:
+        existingByUrl.get(a.sourceUrl)?.topic === "apac_local"
+          ? existingByUrl.get(a.sourceUrl)!.id
+          : null,
+    };
   });
+  const rows = preparedRows.map(({ row }) => row);
 
   log(`\nGeocoded ${geocoded}/${rows.length} new rows.`);
   if (ungeocoded.length > 0) {
@@ -1146,9 +1275,25 @@ export async function runFlashpointIngest(opts: IngestOptions = {}): Promise<Ing
     for (const u of ungeocoded) log(`    - ${u}`);
   }
 
-  await db.insert(incidentsTable).values(rows);
+  const inserts = preparedRows
+    .filter(({ promotionId }) => promotionId === null)
+    .map(({ row }) => row);
+  const promotions = preparedRows.filter(
+    ({ promotionId }) => promotionId !== null,
+  );
+  if (inserts.length > 0) {
+    await db.insert(incidentsTable).values(inserts);
+  }
+  for (const { row, promotionId } of promotions) {
+    await db
+      .update(incidentsTable)
+      .set(row)
+      .where(eq(incidentsTable.id, promotionId!));
+  }
   const stats = await topicStats();
-  log(`\nInserted ${rows.length} rows. flashpoint total now: ${stats.totalAfter}`);
+  log(
+    `\nInserted ${inserts.length} rows and promoted ${promotions.length} apac_local rows. flashpoint total now: ${stats.totalAfter}`,
+  );
 
   return { ...summaryBase, inserted: rows.length, ...stats, logLines };
 }

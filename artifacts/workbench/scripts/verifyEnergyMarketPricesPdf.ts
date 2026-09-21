@@ -56,6 +56,8 @@ function mergeSectionOverrides(
 }
 
 async function fetchLatestReportId(): Promise<number> {
+  const requested = Number(process.env.REPORT_ID ?? "");
+  if (Number.isInteger(requested) && requested > 0) return requested;
   const [row] = await db
     .select({ id: reportsTable.id })
     .from(reportsTable)
@@ -194,6 +196,11 @@ const PDF_HEADINGS = new Map(
     "WATCH NEXT",
     "POLESTAR VIEW",
     "RELATED INCIDENTS",
+    "EXECUTIVE SUMMARY",
+    "ACTIVISM AND PROTEST READ",
+    "CIVIL UNREST AND PUBLIC ORDER READ",
+    "PROTEST FORECAST — NEXT 7 DAYS",
+    "REGIONAL AND COUNTRY VIEW",
     "DISCLAIMER",
   ].map((heading) => [heading, heading]),
 );
@@ -316,7 +323,7 @@ async function main() {
   console.log(
     `incidents=${incidents.length}; ${TOPIC} market prices=${marketPrices.length}; savedAiProse=${savedAiProse ? "yes" : "no"}`,
   );
-  if (marketPrices.length === 0) {
+  if ((TOPIC === "energy" || TOPIC === "fertiliser") && marketPrices.length === 0) {
     throw new Error(`No ${TOPIC} market prices — cannot verify card rendering.`);
   }
   if (OVERRIDES) console.log("Applying requested section overrides on top of saved overrides.");
@@ -374,7 +381,9 @@ async function main() {
     }
     const out = resolve(
       OUTPUT_DIR,
-      `${TOPIC === "energy" ? "EnergyWatch" : "FertiliserWatch"}_MarketPrices_verify.pdf`,
+      TOPIC === "flashpoint"
+        ? `Flashpoint_report_${reportId}_production_verify.pdf`
+        : `${TOPIC === "energy" ? "EnergyWatch" : "FertiliserWatch"}_MarketPrices_verify.pdf`,
     );
     writeFileSync(out, Buffer.from(result.base64, "base64"));
     console.log(`Wrote ${out} (${(result.base64.length * 0.75 / 1024).toFixed(0)} KB)`);

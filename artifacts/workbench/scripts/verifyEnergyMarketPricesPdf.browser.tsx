@@ -10,6 +10,7 @@
 // to resolve a promise instead of triggering a browser download).
 import { jsPDF } from "jspdf";
 import { exportTopicReportPdf } from "../src/lib/exportTopicReportPdf";
+import { exportFlashpointReportPdf } from "../src/lib/exportFlashpointReportPdf";
 import { TOPIC_LABELS } from "../src/lib/topics";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -98,18 +99,32 @@ window.__runVerify__ = async function runVerify(): Promise<string> {
     window.__VERIFY_DATA__;
   let err: string | null = null;
   try {
-    await exportTopicReportPdf(
-      report as Parameters<typeof exportTopicReportPdf>[0],
-      incidents as Parameters<typeof exportTopicReportPdf>[1],
-      TOPIC_LABELS,
-      "market_prices_verify.pdf",
-      {
-        marketPrices: marketPrices as Parameters<typeof exportTopicReportPdf>[4]["marketPrices"],
-        aiProse: aiProse as Parameters<typeof exportTopicReportPdf>[4]["aiProse"],
+    if (report.topic === "protests" || report.topic === "flashpoint") {
+      await exportFlashpointReportPdf(
+        {
+          ...report,
+          topic: "flashpoint",
+        } as Parameters<typeof exportFlashpointReportPdf>[0],
+        incidents as Parameters<typeof exportFlashpointReportPdf>[1],
+        "flashpoint_report_verify.pdf",
+        aiProse as Parameters<typeof exportFlashpointReportPdf>[3],
         hiddenSections,
-        sectionOverrides: sectionOverrides as Parameters<typeof exportTopicReportPdf>[4]["sectionOverrides"],
-      },
-    );
+        sectionOverrides as Parameters<typeof exportFlashpointReportPdf>[5],
+      );
+    } else {
+      await exportTopicReportPdf(
+        report as Parameters<typeof exportTopicReportPdf>[0],
+        incidents as Parameters<typeof exportTopicReportPdf>[1],
+        TOPIC_LABELS,
+        "market_prices_verify.pdf",
+        {
+          marketPrices: marketPrices as Parameters<typeof exportTopicReportPdf>[4]["marketPrices"],
+          aiProse: aiProse as Parameters<typeof exportTopicReportPdf>[4]["aiProse"],
+          hiddenSections,
+          sectionOverrides: sectionOverrides as Parameters<typeof exportTopicReportPdf>[4]["sectionOverrides"],
+        },
+      );
+    }
   } catch (e) {
     err = (e as Error)?.stack || String(e);
   }
