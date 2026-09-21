@@ -45,6 +45,17 @@ function incident(
 }
 
 describe("regional weekly products", () => {
+  it("uses the source occurrence date when no separate incident date was extracted", () => {
+    const row = incident(1, "Iraq", "high", "2026-09-17", "Port closure disrupts cargo operations");
+    const [development] = buildRegionalDevelopments(
+      [{ ...row, incidentDate: null }],
+      "2026-09-17",
+      "middle_east_weekly",
+    );
+    expect(development.eventDate).toBe("2026-09-17");
+    expect(development.dateVerified).toBe(true);
+  });
+
   it("rates deliberate armed attacks by consequence rather than geographic reach", () => {
     const pakistan = {
       ...incident(1, "Pakistan", "moderate", "2026-09-17", "Car-bomb attack targets security personnel near police facility"),
@@ -924,7 +935,7 @@ describe("regional weekly products", () => {
     const developments = buildRegionalDevelopments(rows, "2026-09-17", "middle_east_weekly");
     expect(developments.length).toBeLessThanOrEqual(6);
     expect(developments.every((row) => row.operationalImpact && row.polestarView && row.outlook7Days !== undefined)).toBe(true);
-    expect(buildRegionalMapPoints(rows, "middle_east_weekly").length).toBeLessThanOrEqual(3);
+    expect(buildRegionalMapPoints(rows, "middle_east_weekly")).toHaveLength(rows.length);
     expect(buildRegionalGlanceItems(developments, "middle_east_weekly").length).toBeLessThanOrEqual(5);
   });
 

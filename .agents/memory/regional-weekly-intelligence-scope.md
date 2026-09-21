@@ -80,3 +80,9 @@ Regional creation must be one server-owned request. The browser must not downloa
 **Why:** splitting collection, synchronous browser assembly and persistence across separate requests made the button appear frozen and left failure and duplicate-click windows between stages.
 
 **How to apply:** the authenticated create endpoint collects sources, queries current relevant incidents, builds and validates the canonical object, inserts the complete row in one transaction, and returns that row. The client only shows progress and redirects using the returned ID.
+
+Regional reports use the source occurrence timestamp when a distinct incident date was not extracted, and the map plots every selected, plottable development rather than an arbitrary top three.
+
+**Why:** incident rows are designed for consumers to fall back to occurredAt, but the regional builder instead dropped every null incidentDate row; this collapsed a healthy evidence set to one card and one map dot. The three-point map cap then hid valid evidence even in healthy reports.
+
+**How to apply:** preserve explicit incidentDate when present; otherwise use occurredAt as the evidence date. Curate to the requested region before canonical assembly, require at least five selected developments, and pass all selected coordinate/fallback points to preview and PDF renderers.

@@ -721,8 +721,9 @@ function drawRegionalHotspotMap(
     return;
   }
   const selected = [...points]
-    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title))
-    .slice(0, 3);
+    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title));
+  const cardGap = 4;
+  const cardH = Math.min(48, (h - 16 - cardGap * Math.max(0, selected.length - 1)) / selected.length);
   selected.forEach((point, index) => {
     const [x, y] = project(point.lng, point.lat);
     const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
@@ -734,13 +735,13 @@ function drawRegionalHotspotMap(
     setRoboto(pdf, "bold");
     pdf.setFontSize(7.5);
     pdf.text(String(index + 1), x, y + 2.5, { align: "center" });
-    const cardY = ctx.y + 8 + index * 56;
+    const cardY = ctx.y + 8 + index * (cardH + cardGap);
     setFill(pdf, "#ffffff");
     setStroke(pdf, "#c8cfda");
     pdf.setLineWidth(0.5);
-    pdf.rect(railX + 7, cardY, railW - 14, 48, "FD");
+    pdf.rect(railX + 7, cardY, railW - 14, cardH, "FD");
     setFill(pdf, severityColor);
-    pdf.rect(railX + 7, cardY, 4, 48, "F");
+    pdf.rect(railX + 7, cardY, 4, cardH, "F");
     setText(pdf, NAVY);
     setRoboto(pdf, "bold");
     pdf.setFontSize(8);

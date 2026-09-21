@@ -3,6 +3,7 @@ import {
   db,
   incidentsTable,
   marketPricesTable,
+  protestEventsTable,
   reportProseTable,
   reportsTable,
 } from "@workspace/db";
@@ -12,7 +13,7 @@ import type {
   Report,
   ReportProse,
 } from "@workspace/db";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import {
   CreateReportBody,
   UpdateReportBody,
@@ -26,6 +27,10 @@ import { runRegionalWeeklyCollection } from "@workspace/ingest";
 import { defaultRelevanceCondition } from "../lib/relevanceFilter";
 import {
   buildRegionalCanonicalReport,
+  buildApacFutureEvents,
+  auditRegionalWeeklyCandidateFunnel,
+  assertRegionalWeeklyReady,
+  curateRegionalWeeklyIncidents,
   validateRegionalCanonicalStructure,
   type RegionalCoverageManifest,
   type RegionalWeeklyTopic,
@@ -272,6 +277,39 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
       });
       return;
     }
+    const issueStart = new Date(`${issueDate}T00:00:00.000Z`);
+    const watchStart = new Date(issueStart.getTime() + 86_400_000);
+    const watchEnd = new Date(issueStart.getTime() + 7 * 86_400_000);
+    const regionalCountries = new Set(topic === "apac_weekly"
+      ? ["Australia", "Bangladesh", "Bhutan", "Brunei", "Cambodia", "China", "East Timor", "Fiji", "Hong Kong", "India", "Indonesia", "Japan", "Laos", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal", "New Zealand", "North Korea", "Pakistan", "Papua New Guinea", "Philippines", "Singapore", "South Korea", "Sri Lanka", "Taiwan", "Thailand", "Timor-Leste", "Vietnam"]
+      : ["Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon", "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria", "UAE", "United Arab Emirates", "Yemen"]);
+    const futureRows = await db
+      .select()
+      .from(protestEventsTable)
+      .where(and(
+        gte(protestEventsTable.eventDate, watchStart),
+        lte(protestEventsTable.eventDate, watchEnd),
+        inArray(protestEventsTable.status, ["Confirmed", "Planned", "Possible"]),
+      ));
+    const regionalFutureRows = futureRows.filter((event) => regionalCountries.has(event.country ?? ""));
+    const futureEvents = buildApacFutureEvents(
+      regionalFutureRows.map((event) => ({
+        eventDate: event.eventDate?.toISOString() ?? null,
+        country: event.country,
+        city: event.city,
+        venue: event.venue,
+        eventType: event.eventType,
+        issue: event.issue,
+        organiser: event.organiser,
+        description: event.description,
+        sourceTitle: event.sourceTitle,
+        disruptionPotential: event.disruptionPotential,
+        confidence: event.confidence,
+        status: event.status,
+        attendance: event.attendance,
+      })),
+      issueDate,
+    );
     const coverageManifest: RegionalCoverageManifest = {
       requiredDomains: run.coverage.map((check) => check.domain),
       domains: run.coverage,
@@ -279,8 +317,8 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
         domain: "forwardSearch",
         status: "checked",
         sourceNames: ["protest_events", "incident_advisories"],
-        itemsFetched: 0,
-        candidatesAccepted: 0,
+        itemsFetched: futureRows.length,
+        candidatesAccepted: futureEvents.length,
         errors: [],
       },
       requiredGeographies: run.requiredGeographies,
@@ -293,16 +331,29 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
       .from(incidentsTable)
       .where(and(gte(incidentsTable.occurredAt, since), defaultRelevanceCondition()))
       .orderBy(desc(incidentsTable.occurredAt));
-    const regionalCanonicalReport = buildRegionalCanonicalReport(
-      incidents.map((incident) => ({
+    const regionalIncidents = incidents.map((incident) => ({
         ...incident,
         occurredAt: incident.occurredAt.toISOString(),
         incidentDate: incident.incidentDate?.toISOString() ?? null,
         summary: incident.summary ?? "",
-      })),
+      }));
+    const funnel = auditRegionalWeeklyCandidateFunnel(
+      regionalIncidents,
+      topic as RegionalWeeklyTopic,
+      issueDate,
+      coverageManifest,
+    );
+    assertRegionalWeeklyReady(funnel);
+    const curatedIncidents = curateRegionalWeeklyIncidents(
+      regionalIncidents,
+      topic as RegionalWeeklyTopic,
+      issueDate,
+    );
+    const regionalCanonicalReport = buildRegionalCanonicalReport(
+      curatedIncidents,
       issueDate,
       topic as RegionalWeeklyTopic,
-      [],
+      futureEvents,
       coverageManifest,
     );
     const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);

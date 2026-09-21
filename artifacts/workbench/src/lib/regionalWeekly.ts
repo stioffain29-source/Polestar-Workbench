@@ -1515,6 +1515,7 @@ export function buildRegionalDevelopments<T extends RegionalIncident>(
     const cleanRendered = (value: string | undefined) => value?.replace(/\.{2,}|…/g, ".").trim();
     const eventDate = incident.incidentDate
       ?? (incident as RegionalIncidentWithMembers).sourceMembers?.map((member) => member.incidentDate).find(Boolean)
+      ?? incident.occurredAt
       ?? null;
     if (structuredWeekly && !eventDate) return [];
     const integratedNarrative = structuredWeekly
@@ -1790,24 +1791,15 @@ function apacThemeAssessment(
   domain: RegionalIntelligenceCategory,
   rows: RegionalDevelopment[],
 ): string {
-  const countries = [...new Set(rows.map((row) => row.country))];
-  const locations = countries.length === 1 ? countries[0] : `${countries.slice(0, -1).join(", ")} and ${countries.at(-1)}`;
-  const channel = [...new Set(rows.flatMap((row) => materialityDimensions(
-    `${row.whatChanged} ${row.operationalImpact ?? row.operationalSignificance}`,
-  )))].slice(0, 3).join(", ");
-  const count = rows.length === 1 ? "one selected development" : `${rows.length} selected developments`;
-  const wording: Record<RegionalIntelligenceCategory, string> = {
-    Security: `Security pressure is concentrated in ${locations}, where ${count} affect ${channel || "movement and access"}. The immediate decision point is whether restrictions or violence spread beyond the reported locations.`,
-    "Armed Conflict": `Armed conflict in ${locations} changed access conditions around the reported locations. Commercial exposure will increase if fighting spreads towards transport corridors, airports, border crossings or operating sites.`,
-    Terrorism: `Terrorism-related activity in ${locations} creates a specific security exposure around the reported locations. The regional significance depends on follow-on attacks, wider security restrictions or disruption to commercial movement.`,
-    Political: `Political developments in ${locations} matter where they alter public access, official controls or business operating conditions. The current reporting points to ${channel || "targeted political exposure"}, not a region-wide shift.`,
-    Regulatory: `Regulatory change in ${locations} is moving through ${channel || "market-access and compliance channels"}. Businesses should separate announced policy from the implementation guidance that determines practical exposure.`,
-    "Weather & Natural Hazards": `Weather and hazard exposure in ${locations} is relevant to ${channel || "transport and continuity"}. The key operational question is whether warnings, closures or recovery activity extend into commercial routes.`,
-    Cyber: `Cyber exposure is concentrated in ${locations}; the current reporting is material because it affects ${channel || "data, communications or continuity"}. Further assessment depends on confirmed service impact and recovery status.`,
-    Energy: `Energy policy or supply conditions changed in ${locations}, affecting ${channel || "pricing and procurement"}. The commercial effect will be set by implementation, market transmission and any change to physical supply.`,
-    "Operational Disruption": `Operational disruption in ${locations} affects ${channel || "access and continuity"}. The regional implication is route- and asset-specific, with persistence determined by restoration, rerouting or supply alternatives.`,
-  };
-  return wording[domain];
+  const lead = rows.slice(0, 2);
+  const facts = lead.map((row) => `${row.country}: ${row.whatChanged}`);
+  const impacts = lead.map((row) => row.operationalImpact ?? row.operationalSignificance);
+  const indicator = lead.map((row) => row.outlook7Days ?? row.whatToWatch).find(Boolean);
+  return clipRegionalWords(
+    `${sentenceJoinRegionalClauses(facts)} ${sentenceJoinRegionalClauses(impacts)}${indicator ? ` ${indicator}` : ""}`,
+    110,
+    true,
+  );
 }
 
 export function buildRegionalBluf(developments: RegionalDevelopment[]): string {
@@ -2050,7 +2042,6 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
       (typeof incident.latitude === "number" && Number.isFinite(incident.latitude)
         && typeof incident.longitude === "number" && Number.isFinite(incident.longitude)) || fallback,
     )
-    .slice(0, 3)
     .map(({ incident, fallback }) => ({
       lat: incident.latitude ?? fallback!.latitude,
       lng: incident.longitude ?? fallback!.longitude,
@@ -2058,7 +2049,7 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
       title: intelligenceTitle(incident),
       label: fallback ? `${incident.country?.trim() || "Regional"} (country-level)` : (incident.country?.trim() || incident.location?.trim() || "Regional"),
       summary: incident.summary ?? "",
-      eventDate: incident.incidentDate ?? "",
+      eventDate: incident.incidentDate ?? incident.occurredAt,
     }));
 }
 
@@ -2066,18 +2057,7 @@ function buildCanonicalRegionalMapPoints<T extends RegionalIncident>(
   incidents: T[],
   developments: RegionalVerifiedDevelopment[],
 ): RegionalMapPoint[] {
-  const conflict = developments.find((row) => /Security|Conflict|Terrorism/.test(row.category));
-  const continuity = developments.find((row) => /Operational|Weather|Energy|Cyber/.test(row.category));
-  const policy = developments.find((row) => /Regulatory|Political/.test(row.category));
-  const ordered = [conflict, continuity, policy, ...developments]
-    .filter((row): row is RegionalVerifiedDevelopment => Boolean(row));
-  const chosen: RegionalVerifiedDevelopment[] = [];
-  for (const row of ordered) {
-    if (chosen.some((existing) => existing.title === row.title)) continue;
-    chosen.push(row);
-    if (chosen.length === 3) break;
-  }
-  return chosen.flatMap((development) => {
+  return developments.flatMap((development) => {
     const evidenceIds = new Set((development.evidenceIds ?? []).map(String));
     const incident = incidents.find((row) => row.id !== undefined && evidenceIds.has(String(row.id)))
       ?? incidents.find((row) => row.country?.trim() === development.country);
@@ -2212,18 +2192,16 @@ export function buildRegionalBusinessImplicationsNarrative(
   const security = developments.filter((row) => /Security|Conflict|Terrorism/.test(row.category));
   const logistics = developments.filter((row) => /Operational|Weather|Energy|Cyber/.test(row.category));
   const policy = developments.filter((row) => /Regulatory|Political/.test(row.category));
-  const securityPlaces = [...new Set(security.map((row) => row.country))];
-  const logisticsPlaces = [...new Set(logistics.map((row) => row.country))];
-  const policyPlaces = [...new Set(policy.map((row) => row.country))];
+  const evidenceRead = (rows: RegionalDevelopment[]) =>
+    sentenceJoinRegionalClauses(rows.slice(0, 2).map((row) =>
+      `${row.country}: ${row.operationalImpact ?? row.operationalSignificance}`));
   return clipRegionalWords(
-    `The combined evidence calls for targeted changes, not a region-wide escalation. ${security.length ? `For people and travel, the immediate exposure is in ${securityPlaces.join(" and ")}. Journey approval, local movement and site-security decisions should reflect the named attack or military areas; the current evidence does not support treating every airport, border or city in those markets as disrupted.` : "No selected development requires a security-driven change to regional travel controls."}
+    `${security.length ? `People and travel: ${evidenceRead(security)}` : "No selected development requires a security-driven change to travel controls."}
 
-${logistics.length ? `For operations and assets, and for supply-chain and logistics planning, ${logisticsPlaces.join(" and ")} require verification of the affected asset or service. Teams should confirm restoration, loading, routing and substitute capacity before changing cargo plans. The business consequence grows if a suspension persists long enough to consume inventory buffers or if diversion concentrates traffic on a single alternative.` : "No selected development establishes a new logistics, utility, weather or cyber constraint."}
+${logistics.length ? `Operations and assets; supply-chain and logistics continuity: ${evidenceRead(logistics)}` : "No selected development establishes a new logistics, utility, weather or cyber constraint."}
 
-${policy.length ? `For regulatory and market-access decisions, the changes in ${policyPlaces.join(" and ")} should be applied only to the affected visa, nationality, worker or compliance groups. HR and mobility teams need the effective date, treatment of existing permissions and employer documentation requirements before remobilising staff or changing hiring assumptions.` : "No binding policy development requires a new compliance response."}
-
-Business-continuity planning should connect these exposures rather than count them. The practical stress point is where a local security event removes a route while staffing or regulatory constraints reduce the ability to recover. Current reporting does not establish that compound failure, but it identifies the locations and cohorts where it could emerge. Decision-makers should therefore assign owners to verify each operating fact, maintain alternatives for time-critical movements and escalate only when a verified closure, repeated attack or binding rule broadens the consequence.`,
-    280,
+${policy.length ? `Regulatory and market-access: ${evidenceRead(policy)}` : "No binding policy development requires a new compliance response."}`,
+    190,
     true,
   );
 }
