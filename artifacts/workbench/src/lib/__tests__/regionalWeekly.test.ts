@@ -484,7 +484,9 @@ describe("regional weekly products", () => {
     ], "2026-09-17");
     expect(developments.find((row) => row.country === "Australia")?.severity).toBe("Moderate");
     expect(developments.find((row) => row.country === "Thailand")?.category).toBe("Armed Conflict");
-    expect(developments.find((row) => row.country === "Thailand")?.severity).toBe("High");
+    // A deliberate attack with explicitly no casualties must not inherit a
+    // High rating merely because "deaths" appears in the negative statement.
+    expect(developments.find((row) => row.country === "Thailand")?.severity).toBe("Moderate");
     expect(
       validateApacWeeklyAssessment(developments).some((error) =>
         /armed attack severity requires review/i.test(error),
@@ -644,7 +646,7 @@ describe("regional weekly products", () => {
     expect(event).toMatchObject({
       date: "2026-09-21",
       location: "Manila, Philippines",
-      trigger: "Metro Manila transport strike",
+      trigger: "Planned transport strike",
       currentSeverity: "High",
     });
     expect(event.whyItMatters).not.toBe(event.trigger);
@@ -681,9 +683,44 @@ describe("regional weekly products", () => {
       }],
       "2026-09-17",
     );
-    expect(event.trigger).toBe("Maratha reservation mobilisation and campaign");
+    expect(event.trigger).toBe("Planned reservation march");
     expect(event.trigger).not.toMatch(/Related actions|The scheduled|concentrate in Mumbai/i);
     expect(event.trigger).not.toContain("...");
+  });
+
+  it("extracts banking-strike facts without copying an advisory headline", () => {
+    const [event] = buildApacFutureEvents([{
+      eventDate: "2026-09-28T00:00:00Z",
+      country: "India",
+      eventType: "strike",
+      sourceTitle: "Bank Strike September 28-30: SBI Issues Advisory, Check Services That Will Remain Available - NDTV",
+      description: "Bank strike planned for September 28-30.",
+      disruptionPotential: "Moderate",
+      confidence: "Moderate",
+      status: "Planned",
+    }], "2026-09-21");
+    expect(event.trigger).toBe("Planned banking strike");
+    expect(event.date).toBe("2026-09-28");
+    expect(JSON.stringify(event)).not.toMatch(/NDTV|Issues Advisory|Check Services That Will Remain Available|SBI/);
+    expect(event.whyItMatters).toMatch(/Branch and transaction services/);
+    expect(event.whatToWatch).toMatch(/payment-service advisories/);
+  });
+
+  it("keeps unrelated generic gatherings while collapsing a named party's same march", () => {
+    const base = {
+      eventDate: "2026-09-27T00:00:00Z",
+      country: "Pakistan", city: "Islamabad", eventType: "Protest",
+      disruptionPotential: "High", confidence: "High", status: "Planned",
+    };
+    const events = buildApacFutureEvents([
+      { ...base, sourceTitle: "PTI nationwide protest and long march to Islamabad." },
+      { ...base, sourceTitle: "PTI announces march on Islamabad for September 27 - UA.NEWS" },
+      { ...base, sourceTitle: "Workers gather to oppose pay cuts at parliament." },
+      { ...base, sourceTitle: "Students demonstrate against tuition increases at the campus." },
+    ], "2026-09-21");
+    expect(events).toHaveLength(3);
+    expect(events.filter((event) => event.trigger === "Planned PTI protest march")).toHaveLength(1);
+    expect(events.filter((event) => event.trigger === "Planned demonstration")).toHaveLength(2);
   });
 
   it("APAC excludes polling-place human-interest items and future-only protest commentary", () => {

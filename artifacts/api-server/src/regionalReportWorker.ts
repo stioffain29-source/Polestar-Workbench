@@ -1,8 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, pool, regionalReportJobsTable, reportsTable } from "@workspace/db";
 import { buildRegionalReport } from "./lib/regionalReportBuild";
 import { logger } from "./lib/logger";
 import { installRegionalReportWorkerLifetime } from "./lib/regionalReportWorkerLifetime";
+import {
+  buildRegionalRebuildValues,
+  getRegionalCoverageManifest,
+  matchesExpectedReportVersion,
+} from "./lib/regionalReportRebuild";
 
 const jobId = process.argv[2] ?? "";
 const runToken = process.argv[3] ?? "";
@@ -19,6 +24,26 @@ async function main(): Promise<void> {
   if (!job) return;
   logger.info({ jobId }, "regional report build started");
   try {
+    const target = job.targetReportId
+      ? (await db.select().from(reportsTable)
+          .where(eq(reportsTable.id, job.targetReportId)))[0]
+      : undefined;
+    if (job.targetReportId && !target) {
+      throw new Error("The regional report selected for refresh no longer exists.");
+    }
+    if (target && job.expectedUpdatedAt && !matchesExpectedReportVersion(target.updatedAt, job.expectedUpdatedAt)) {
+      throw new Error("The report changed before analysis refresh began. Reload it before trying again.");
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const historicalRebuild = !!target && job.issueDate !== today;
+    const priorCoverageManifest = target
+      ? getRegionalCoverageManifest(target.hardNumbers)
+      : null;
+    if (historicalRebuild && !priorCoverageManifest) {
+      throw new Error(
+        "This historical report has no saved coverage manifest and cannot be safely refreshed without using current-day discovery.",
+      );
+    }
     const values = await buildRegionalReport(
       job.topic as "apac_weekly" | "middle_east_weekly",
       job.issueDate,
@@ -33,9 +58,32 @@ async function main(): Promise<void> {
         )).returning({ id: regionalReportJobsTable.id });
         if (updated.length === 0) throw new Error("Regional report job ownership was lost.");
       },
+      historicalRebuild
+        ? { collect: false, coverageManifest: priorCoverageManifest! }
+        : undefined,
     );
     await db.transaction(async (tx) => {
-      const [report] = await tx.insert(reportsTable).values(values).returning();
+      let report: { id: number };
+      if (target && job.expectedUpdatedAt) {
+        const updateValues = buildRegionalRebuildValues(target, values);
+        const [updated] = await tx.update(reportsTable).set(updateValues).where(and(
+          eq(reportsTable.id, target.id),
+          // The API/JS version is millisecond-precision; PostgreSQL may retain
+          // microseconds. Compare at the same precision, still inside the
+          // atomic report/job transaction and run-token fence.
+          sql`date_trunc('milliseconds', ${reportsTable.updatedAt}) = ${job.expectedUpdatedAt.toISOString()}`,
+        )).returning({ id: reportsTable.id });
+        if (!updated) {
+          throw new Error(
+            "The report changed while analysis was refreshing. No analyst edits were overwritten; reload and retry.",
+          );
+        }
+        report = updated;
+      } else {
+        [report] = await tx.insert(reportsTable).values(values).returning({
+          id: reportsTable.id,
+        });
+      }
       const completed = await tx.update(regionalReportJobsTable).set({
         status: "completed",
         stage: "completed",

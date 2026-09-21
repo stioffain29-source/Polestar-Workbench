@@ -1,10 +1,12 @@
 import { addDays, differenceInCalendarDays, format, isAfter, isValid, parse, parseISO } from "date-fns";
 import { consolidateCountryStories } from "./countrySameStory";
 import { incidentMapFallback } from "./incidentMapFallback";
+import { REGIONAL_EDITORIAL_VERSION, validateRegionalEditorialReport } from "./regionalEditorial";
+import { cleanRegionalSourceText } from "./regionalSourceText";
 
 export type RegionalWeeklyTopic = "apac_weekly" | "middle_east_weekly";
 
-type RegionalIncident = {
+export type RegionalIncident = {
   id?: string | number;
   country?: string | null;
   title?: string | null;
@@ -39,6 +41,10 @@ export type RegionalIntelligenceCategory =
   | "Operational Disruption";
 
 export interface RegionalDevelopment {
+  /** Semantic identity and verified facts, never an article headline as prose. */
+  eventKey?: string;
+  confirmedFacts?: string[];
+  dateBasis?: "event" | "reported";
   country: string;
   location?: string;
   eventDate?: string;
@@ -158,6 +164,8 @@ export interface RegionalCoverageManifest {
 
 export interface RegionalCanonicalReport {
   schemaVersion: "regional-weekly-canonical-v1";
+  editorialVersion?: string;
+  evidenceFingerprint?: string;
   topic: RegionalWeeklyTopic;
   issueDate: string;
   developments: RegionalDevelopment[];
@@ -188,20 +196,25 @@ export function validateRegionalCanonicalStructure(
 ): string[] {
   const errors: string[] = [];
   const domains = new Set(report.domainBriefs.map((brief) => brief.domain));
-  for (const domain of REQUIRED_REGIONAL_REPORT_DOMAINS) {
-    if (!domains.has(domain)) errors.push(`Missing required intelligence domain: ${domain}.`);
+  // Legacy snapshots used an explicit six-domain schema. New factual reports
+  // omit unsupported domains rather than manufacturing "no change" paragraphs.
+  if (report.editorialVersion !== REGIONAL_EDITORIAL_VERSION) {
+    for (const domain of REQUIRED_REGIONAL_REPORT_DOMAINS) {
+      if (!domains.has(domain)) errors.push(`Missing required intelligence domain: ${domain}.`);
+    }
   }
-  if (report.domainBriefs.length !== REQUIRED_REGIONAL_REPORT_DOMAINS.length) {
-    errors.push("Regional report must contain exactly six intelligence-domain assessments.");
+  if (domains.size !== report.domainBriefs.length
+    || report.domainBriefs.some((brief) => !REQUIRED_REGIONAL_REPORT_DOMAINS.includes(brief.domain as never))) {
+    errors.push("Regional intelligence domains must be distinct and supported.");
   }
   if (report.domainBriefs.some((brief) => !brief.assessment.trim())) {
-    errors.push("Every intelligence domain requires an assessment or an explicit no-material-change statement.");
+    errors.push("Omit unsupported domains rather than padding them with empty assessments.");
   }
   if (report.mapPoints.length === 0) errors.push("Regional report requires a risk map with at least one verified point.");
   if (report.developments.length === 0) errors.push("Regional report requires key developments.");
   if (!report.businessImplicationsNarrative.trim()) errors.push("Regional report requires business implications.");
   if (!report.polestarOutlook.trim()) errors.push("Regional report requires a Polestar Outlook.");
-  return errors;
+  return [...errors, ...validateRegionalEditorialReport(report)];
 }
 
 export function regionalCanonicalReportFromHardNumbers(
@@ -215,12 +228,8 @@ export function regionalCanonicalReportFromHardNumbers(
   if (issueDate && value.issueDate !== issueDate) return null;
   if (!value.coverageManifest || !isCompleteRegionalCoverage(value.coverageManifest)) return null;
   if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
-  const normalized = {
-    ...value,
-    domainBriefs: buildRegionalDomainBriefs(value.developments, topic),
-  };
-  if (validateRegionalCanonicalStructure(normalized).length > 0) return null;
-  return normalized;
+  if (validateRegionalCanonicalStructure(value).length > 0) return null;
+  return value;
 }
 
 function isCompleteRegionalCoverage(manifest: RegionalCoverageManifest): boolean {
@@ -275,7 +284,7 @@ const CURRENT_CONSEQUENCE_RE =
   /\b(?:attack(?:ed|s)?|struck|hits?|missing|closed|closure|suspended|shutdown|outage|offline|disrupt(?:ed|ion)?|blocked|halted|cancel(?:led|ed)|rerout(?:ed|ing)|evacuat(?:e|ed|es|ion)|damage(?:d)?|destroyed|injured|killed|detained|arrested|restriction|restricted|warning|advisory|landfall|effective|implemented|enacted|imposed|banned|requirements?|obligations?|eligib(?:ility|le)|cost|shortage|lost access|service impact|operational impact|continuity impact|affected|crackdown|overhaul|tighten(?:ed|s)?)\b/i;
 
 const OPERATIONAL_RE =
-  /\b(airline|airspace|airport|asset|border|business|cargo|compliance|continuity|customs|data|energy|export|fuel|grid|import|infrastructure|logistics|personnel|port|regulat(?:ion|ory|e|ed|es)?|road|sanction|shipping|site|supply chain|tariff|telecom|transport|travel|utilities?|visa|workforce)\b/i;
+  /\b(airline|airspace|airport|asset|border|business|cargo|compliance|continuity|customs|data|energy|export|fuel|grid|import|infrastructure|liquefied petroleum gas|logistics|lpg|personnel|port|regulat(?:ion|ory|e|ed|es)?|road|sanction|shipping|site|supply chain|tariff|telecom|transport|travel|utilities?|visa|workforce)\b/i;
 
 const LOW_VALUE_RE =
   /\b(9\/11|anniversary|commemorati|fundrais|charity|donation|opinion|editorial|historical retrospective|years ago|religious (?:ceremony|youth rally)|routine (?:patrol|police)|police blotter|body (?:was |is )?(?:found|discovered)|bodies (?:were |are )?(?:found|discovered)|human.interest|social media repost|visa (?:fraud|extortion)|criminal investigation)\b/i;
@@ -340,6 +349,8 @@ const CYBER_SEMANTIC_RE =
   /\b(?:cyber|ransomware|malware|data breach|network attack|system attack|digital attack|hack(?:ed|ing)?|telecom outage)\b/i;
 const CYBER_CONSEQUENCE_RE =
   /\b(?:disrupt(?:ed|ion)?|outage|offline|shutdown|service impact|operat(?:ions?|ional)|critical infrastructure|compromis|affected|lost access)\b/i;
+const CYBER_GENERIC_INFORMATION_RE =
+  /^\s*(?:cyber(?:security)?\s+)?(?:advisory|explainer|guide|research|study|survey|tips?|white ?paper)\b|\bhow to (?:avoid|prevent|protect|respond)\b/i;
 const APAC_CURRENT_CHANGE_RE =
   /\b(?:held|staged|clashed|clashes|arrested|detained|injured|killed|blocked|closed|disrupted|deployed|restricted|banned|cancelled|canceled|outage|shutdown|attack(?:ed)?|strike(?:s|d)?|effective|implemented|approved|enacted)\b/i;
 const APAC_FUTURE_ONLY_RE =
@@ -377,9 +388,32 @@ function firstNamedCountry(text: string): string | null {
 
 function hasForeignSubjectLead(incident: RegionalIncident): boolean {
   const title = incident.displayTitle ?? incident.title ?? "";
+  const assigned = canonicalCountry(incident.country?.trim() ?? "");
+  // Some feeds assign US presidential/immigration policy to the country whose
+  // search collected it. These cues identify the policy jurisdiction without
+  // treating every incidental mention of the US as a mismatch.
+  if (assigned !== "united states"
+    && /\b(?:Trump(?:'s)?|U\.?S\.?\s+presiden(?:t|cy|tial))\b/i.test(title)
+    && /\b(?:H-?1B|visa (?:fee|payment|requirement)|immigration policy|executive order)\b/i.test(title)) {
+    return true;
+  }
+  if (assigned !== "united states"
+    && /\bH-?1B\b/i.test(title)
+    && (/\b(?:USD|\$)\s*100[,\s]?000\b/i.test(title)
+      || /\b(?:fee|payment|requirement)\b/i.test(title))) {
+    return true;
+  }
   const first = firstNamedCountry(title);
-  const assigned = incident.country?.trim();
-  return Boolean(first && assigned && canonicalCountry(first) !== canonicalCountry(assigned));
+  if (!first || !assigned || canonicalCountry(first) === assigned) return false;
+  const assignedLabel = incident.country?.trim();
+  if (assignedLabel) {
+    const assignedPattern = new RegExp(`\\b${assignedLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+    if (assignedPattern.test(title)) return false;
+  }
+  // A country name is only a subject lead when it starts the headline. This
+  // preserves genuine local/cross-border effects that merely mention the US.
+  const firstPattern = new RegExp(`^\\s*(?:the\\s+)?${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
+  return firstPattern.test(title);
 }
 
 function hasForeignVenue(incident: RegionalIncident): boolean {
@@ -425,18 +459,18 @@ const BUSINESS_DIMENSIONS: Array<[string, RegExp]> = [
   ["personnel and travel", /\b(people|personnel|workforce|travel|airport|airline|road|rail|movement|access)\b/i],
   ["sites and assets", /\b(site|asset|facility|office|factory|manufactur|commercial)\b/i],
   ["transport and supply chains", /\b(port|airport|airspace|border|cargo|customs|logistics|shipping|supply chain|transport)\b/i],
-  ["energy and utilities", /\b(electricity|energy|fuel|grid|power|telecom|utilities?)\b/i],
+  ["energy and utilities", /\b(electricity|energy|fuel|grid|liquefied petroleum gas|lpg|power|telecom|utilities?)\b/i],
   ["compliance and market access", /\b(compliance|export control|foreign ownership|import|law|legislation|licen[cs]|regulat|sanction|tariff|tax|visa)\b/i],
   ["political exposure", /\b(cabinet|coalition|diplomat|election|government|interstate|parliament|political|policy)\b/i],
   ["business continuity", /\b(business|continuity|disrupt|closure|outage|shortage|strike)\b/i],
 ];
 
 const CATEGORY_RULES: Array<[RegionalIntelligenceCategory, RegExp]> = [
-  ["Weather & Natural Hazards", /\b(cyclone|drought|earthquake|extreme heat|flood|landslide|storm|typhoon|volcan|wildfire)\b/i],
+  ["Weather & Natural Hazards", /\b(cyclones?|drought|earthquakes?|extreme heat|flood(?:s|ed|ing)?|landslides?|storms?|typhoons?|volcan(?:o|ic)?|wildfires?)\b/i],
   ["Cyber", /\b(cyber|data breach|malware|ransomware|state-linked hack)\b/i],
   ["Terrorism", /\b(terror(?:ism|ist)?|suicide bomb|ied|improvised explosive)\b/i],
   ["Armed Conflict", /\b(armed conflict|airstrike|artillery|battle|clash(?:es|ed)?|combat|insurgent|junta|military offensive|rebel|shelling|territorial control)\b/i],
-  ["Energy", /\b(aviation turbine fuel|diesel|energy market|export duty|fuel|oil|petrol|power market|windfall tax)\b/i],
+  ["Energy", /\b(aviation turbine fuel|diesel|energy market|export duty|fuel|liquefied petroleum gas|lpg|oil|petrol|power market|windfall tax)\b/i],
   ["Regulatory", /\b(compliance|customs|export control|foreign ownership|immigration|legislation|obligations?|regulat|sanction|tariff|visa)\b/i],
   ["Political", /\b(cabinet|diplomat|election|government change|interstate tension|political|policy decision)\b/i],
   ["Operational Disruption", /\b(airspace|airport|border|closure|disrupt|grid|industrial action|logistics|outage|port|road|shipping|strike|supply chain|telecom|transport|utility)\b/i],
@@ -466,16 +500,6 @@ const FUTURE_EVENT_COMMUNITY_RE =
 const FUTURE_EVENT_MATERIAL_RE =
   /\b(?:blockade|general strike|mass|national strike|road closure|roadblock|shutdown|walkout)\b/i;
 
-function futureEventWords(value: string | null | undefined): Set<string> {
-  return new Set(
-    (value ?? "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .split(/\s+/)
-      .filter((word) => word.length > 3 && !NARRATIVE_STOPWORDS.has(word)),
-  );
-}
-
 function futureEventSeverity(
   row: RegionalFutureEventSource,
 ): RegionalDevelopment["severity"] {
@@ -497,34 +521,48 @@ function futureEventSeverity(
 }
 
 function cleanFutureEventName(row: RegionalFutureEventSource): string {
-  const raw =
-    row.eventName?.trim() ||
-    row.title?.trim() ||
-    row.sourceTitle?.trim() ||
-    row.eventType?.trim() ||
-    row.issue?.trim() ||
-    "Scheduled mobilisation";
-  const cleaned = raw
-    .replace(/^(?:breaking|update|latest|planned|scheduled)\s*[:|-]\s*/i, "")
-    .replace(/^[A-Z][A-Za-z .'-]{2,35},\s+[A-Z][A-Za-z .'-]{2,35}\s*[-:]\s*/u, "")
-    .replace(/\s+\|\s+(?:reuters|ap|bbc|cnn|afp|abc)\s*$/i, "")
-    .replace(/\s+-\s+(?:reuters|ap|bbc|cnn|afp|abc)\s*$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const withoutFollowOnProse = cleaned.replace(
-    /\s+(?:the scheduled|the planned|related actions?|organ(?:is|iz)ers?|supporters?)\b[\s\S]*$/i,
-    "",
-  );
-  const firstSentence = withoutFollowOnProse.match(/^(.+?[.!?])(?:\s|$)/)?.[1]
-    ?? withoutFollowOnProse;
-  return firstSentence
-    .replace(/[.!?]+$/u, "")
-    .split(/\s+/u)
-    .filter(Boolean)
-    .slice(0, 14)
-    .join(" ")
-    .replace(/\s+(?:and|or|the|a)$/i, "")
-    .trim() || "Scheduled mobilisation";
+  // Extract a bounded event label; a clipped headline is still a headline.
+  // Source wording is used for classification only, never returned as prose.
+  const sources = [row.eventName, row.title, row.description, row.sourceTitle].filter(Boolean) as string[];
+  const text = [row.eventType, row.issue, ...sources].filter(Boolean).join(" ");
+  const type = row.eventType ?? "";
+  const isStrike = /\b(?:strike|walkout|industrial action)\b/i.test(type) ||
+    /\b(?:bank(?:ing)?|transport|rail(?:way)?|general|national|labour|labor|union)\s+(?:strike|walkout)\b/i.test(text);
+  const isMarch = /\bmarch\b/i.test(type) ||
+    /\b(?:protest|long|labour|labor|political)\s+march\b|\bmarch\s+(?:to|on|through)\b/i.test(text);
+  let action = "";
+  if (isStrike) {
+    action = /\bbank(?:ing)?\s+(?:strike|walkout)\b|\b(?:strike|walkout)\s+(?:by\s+)?bank\s+(?:staff|workers|employees)\b/i.test(text)
+      ? "banking strike"
+      : /\btransport\s+(?:strike|walkout)\b/i.test(text)
+        ? "transport strike"
+        : "strike";
+  } else if (isMarch) {
+    action = /\breservation\b/i.test(text) ? "reservation march" : "protest march";
+  } else if (/\b(?:protest|rally|demonstration)\b/i.test(type)) {
+    action = /\bemployment[\s-]+bill\b/i.test(text)
+      ? "employment-bill demonstration"
+      : /\bfarmers?['’]?\s+day\b/i.test(text)
+        ? "Farmers' Day demonstrations"
+        : "demonstration";
+  } else if (/\bblockade\b/i.test(type)) {
+    action = "blockade";
+  }
+  if (!action) return "";
+
+  let organiser = (row.organiser ?? "").trim();
+  if (organiser.split(/\s+/).length > 8 || /[|:;\n]/.test(organiser)) organiser = "";
+  if (!organiser) {
+    for (const source of sources) {
+      const match = source.match(/^(?:[Cc]onditional\s+)?([A-Z][A-Z0-9-]{1,14})\s+(.+)/);
+      if (match && /^(?:announc\w*|plans?|calls?|nationwide\s+(?:protest|march)|employment bill)\b/i.test(match[2])) {
+        organiser = match[1];
+        break;
+      }
+    }
+  }
+  const qualification = /\b(?:possible|conditional|unconfirmed)\b/i.test(row.status ?? "") ? "Possible" : "Planned";
+  return [qualification, organiser, action].filter(Boolean).join(" ");
 }
 
 function futureEventMateriality(row: RegionalFutureEventSource): number {
@@ -557,11 +595,12 @@ function futureEventMateriality(row: RegionalFutureEventSource): number {
 export function buildApacFutureEvents(
   rows: RegionalFutureEventSource[],
   issueDate: string,
+  topic: RegionalWeeklyTopic = "apac_weekly",
 ): RegionalFutureEventInput[] {
   const issue = parseISO(issueDate);
   if (!isValid(issue)) return [];
   const end = addDays(issue, 7);
-  const countries = new Set(regionalCountryQuery("apac_weekly").split(",").map((country) => country.toLowerCase()));
+  const countries = new Set(regionalCountryQuery(topic).split(",").map((country) => country.toLowerCase()));
   const candidates = rows
     .filter((row) => {
       if (!row.eventDate || !row.country || !countries.has(row.country.trim().toLowerCase())) return false;
@@ -575,33 +614,31 @@ export function buildApacFutureEvents(
     })
     .sort((a, b) => futureEventMateriality(b) - futureEventMateriality(a));
   const projected: RegionalFutureEventInput[] = [];
+  const projectedEvidence: { sourceIdentity: string; venue: string }[] = [];
   for (const row of candidates) {
     const date = format(parseISO(row.eventDate!), "yyyy-MM-dd");
     const location = [row.city, row.country].map((value) => value?.trim()).filter(Boolean).join(", ");
     if (!location) continue;
-    let trigger = cleanFutureEventName(row);
-    const text = [row.eventType, row.issue, row.description, row.sourceTitle].filter(Boolean).join(" ");
+    const trigger = cleanFutureEventName(row);
+    if (!trigger) continue;
+    const text = trigger;
+    const banking = /\bbanking strike\b/i.test(trigger);
     const route = /\b(?:route|road|highway|motorway|airport|port|station|transport|traffic|march|convoy)\b/i.test(text);
     const strike = /\b(?:strike|walkout|shutdown|blockade)\b/i.test(text);
-    const whyItMatters = route
+    const whyItMatters = banking
+      ? `Branch and transaction services in ${location} may be affected by the planned banking strike.`
+      : route
       ? `Movement and access in ${location} may be affected by the scheduled activity.`
       : strike
         ? `The scheduled labour action may affect transport, staffing or site access in ${location}.`
         : `The planned gathering may affect access or security around ${location}.`;
-    const whatToWatch = route
+    const whatToWatch = banking
+      ? "Check banks' branch and payment-service advisories before time-sensitive transactions."
+      : route
       ? `Track route and venue advisories, transport changes and police restrictions.`
       : strike
         ? `Track organiser confirmation, transport changes and cancellation or postponement notices.`
         : `Track venue advisories, organiser confirmation and any police restrictions.`;
-    const whyStart = whyItMatters.split(/\s+/).slice(0, 4).join(" ").toLowerCase();
-    if (trigger.toLowerCase().startsWith(whyStart)) {
-      trigger = cleanFutureEventName({
-        ...row,
-        eventName: null,
-        title: null,
-        sourceTitle: row.eventType || row.issue || "Scheduled mobilisation",
-      });
-    }
     const input: RegionalFutureEventInput = {
       date,
       location,
@@ -610,15 +647,24 @@ export function buildApacFutureEvents(
       currentSeverity: futureEventSeverity(row),
       whatToWatch,
     };
-    const triggerWords = futureEventWords(trigger);
-    const duplicate = projected.some((existing) => {
+    const sourceIdentity = (row.sourceTitle || row.eventName || row.title || row.description || "")
+      .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const venue = (row.venue ?? "").trim().toLowerCase();
+    const genericLabel = /^(?:Planned|Possible) (?:banking strike|transport strike|strike|reservation march|protest march|employment-bill demonstration|Farmers' Day demonstrations|demonstration|blockade)$/i.test(trigger);
+    const duplicate = projected.some((existing, index) => {
       if (existing.date !== input.date || existing.location.toLowerCase() !== input.location.toLowerCase()) return false;
-      const existingWords = futureEventWords(existing.trigger);
-      let overlap = 0;
-      for (const word of triggerWords) if (existingWords.has(word)) overlap += 1;
-      return overlap >= 2 || (triggerWords.size === 1 && existingWords.has([...triggerWords][0]));
+      if (existing.trigger !== input.trigger) return false;
+      const evidence = projectedEvidence[index];
+      if (venue && evidence.venue && venue !== evidence.venue) return false;
+      // A named organiser + activity + date + city can identify one event.
+      // Generic labels cannot: retain distinct source events rather than
+      // merging unrelated demonstrations just because their labels agree.
+      return !genericLabel || (!!sourceIdentity && sourceIdentity === evidence.sourceIdentity);
     });
-    if (!duplicate) projected.push(input);
+    if (!duplicate) {
+      projected.push(input);
+      projectedEvidence.push({ sourceIdentity, venue });
+    }
     if (projected.length === 5) break;
   }
   return projected;
@@ -639,6 +685,9 @@ export function regionalIntelligenceCategory(
     return "Armed Conflict";
   }
   if (/\b(?:bomb|explosive|shooting|opened fire|armed attack)\b/i.test(eventText)) return "Security";
+  if (/\b(?:flood(?:s|ed|ing)?|typhoons?|cyclones?|landslides?|earthquakes?|wildfires?)\b/i.test(eventText)) {
+    return "Weather & Natural Hazards";
+  }
   if (/\b(?:cargo ship|vessel|maritime|port|shipping)\b/i.test(eventText)
     && !/\b(?:cyber|ransomware|malware|data breach|hack(?:ed)?|telecom outage)\b/i.test(eventText)) {
     if (/\b(?:fuel|oil|petrol|diesel|energy|pipeline)\b/i.test(eventText)) return "Energy";
@@ -685,6 +734,10 @@ function consolidateRegionalEvents<T extends RegionalIncident>(rows: T[]): T[] {
                   && /\b(?:windfall tax|export duty|fuel tax|tax on|duty on|levy|government cuts?|centre slashes?|cuts?)\b/.test(text)
                     && /\b(?:petrol|diesel|atf|aviation turbine fuel|export)\b/.test(text)
                      ? `${scopedCountry}:india-fuel-tax-policy`
+                : scopedCountry === "nepal"
+                  && /\b(?:lpg|lp gas|liquefied petroleum gas|cooking gas|gas bullets?)\b/.test(text)
+                  && /\b(?:shortage|scarcity|supply|distribution|import|queue|unavailable)\b/.test(text)
+                    ? `${scopedCountry}:weekly-lpg-shortage`
               : null;
       if (inferredKey) inferred.set(inferredKey, [...(inferred.get(inferredKey) ?? []), row]);
       else unclustered.push(row);
@@ -697,10 +750,9 @@ function consolidateRegionalEvents<T extends RegionalIncident>(rows: T[]): T[] {
           ? row
           : best;
       });
-      const summaries = [...new Set(members.map((member) => member.summary?.trim()).filter(Boolean))];
       return {
         ...representative,
-        summary: summaries.join(" "),
+        summary: representative.summary,
         sourceMembers: members,
       } as T;
     });
@@ -715,8 +767,10 @@ function consolidateRegionalEvents<T extends RegionalIncident>(rows: T[]): T[] {
         const members = (member as T & { sourceMembers?: T[] }).sourceMembers;
         return members ?? [member];
       });
+      const representativeMember = sourceMembers.find((member) => member.id === row.id) ?? sourceMembers[0];
       return {
         ...row,
+        summary: representativeMember?.summary ?? row.summary,
         sourceMembers,
       } as T;
     });
@@ -812,15 +866,16 @@ export function regionalWeeklySeverity(
   }
   if (category === "Security" || category === "Armed Conflict" || category === "Terrorism") {
     const deliberateAttack = /\b(?:attack(?:ed|s)?|car[- ]bomb|bomb(?:ing|ed)?|blast|ied|improvised explosive|shooting|opened fire|small[- ]arms?|gunfire|clash(?:ed|es)?|ambush(?:ed)?|missile|airstrike|incursion|exchange strikes)\b/i.test(text);
-    const confirmedFatalities = !/\b(?:no|without)\s+(?:reported\s+)?(?:fatalit(?:y|ies)|deaths?|one\s+killed|casualties)\b/i.test(text)
+    const noCasualties = /\b(?:no (?:injuries (?:or|and) deaths|deaths (?:or|and) injuries|casualties)|without casualties)\b/i.test(text);
+    const confirmedFatalities = !noCasualties && !/\b(?:no|without)\s+(?:reported\s+)?(?:fatalit(?:y|ies)|deaths?|one\s+killed|casualties)\b/i.test(text)
       && /\b(?:\d+\s+(?:people\s+|officers?\s+|personnel\s+)?(?:killed|dead)|fatalit(?:y|ies)|deaths?|died|killed)\b/i.test(text);
-    const confirmedInjuries = !/\b(?:no|without)\s+(?:reported\s+)?(?:injur(?:y|ies)|casualties)\b/i.test(text)
+    const confirmedInjuries = !noCasualties && !/\b(?:no|without)\s+(?:reported\s+)?(?:injur(?:y|ies)|casualties)\b/i.test(text)
       && /\b(?:\d+\s+(?:people\s+|officers?\s+|personnel\s+)?(?:injured|wounded)|injur(?:y|ies)|wounded)\b/i.test(text);
     const compoundAttack = /\b(?:bomb|blast|ied|explosive)\b/i.test(text)
       && /\b(?:small[- ]arms?|gunfire|shooting|opened fire)\b/i.test(text);
     const massConsequences = /\b(?:mass casualt(?:y|ies)|dozens (?:killed|dead|injured|wounded)|[2-9]\d+\s+(?:people\s+)?(?:killed|dead|injured|wounded)|(?:kills?|injures?|wounds?)\s+(?:at least\s+)?[2-9]\d+|(?:death|casualty) toll[\s\S]{0,40}\b[2-9]\d+|major conflict escalation|sustained large-scale)\b/i.test(text);
     if (deliberateAttack && massConsequences) return "Extreme";
-    if (majorOperational || (deliberateAttack && (confirmedFatalities || confirmedInjuries || compoundAttack))) return "High";
+    if (majorOperational || (deliberateAttack && (confirmedFatalities || confirmedInjuries || (compoundAttack && !noCasualties)))) return "High";
     if (/\b(?:flee|fled|displaced|evacuat)\b/i.test(text) && deliberateAttack) return "Moderate";
     return currentOperational || deliberateAttack ? "Moderate" : "Low";
   }
@@ -847,7 +902,7 @@ function severityConsistencyErrors(developments: RegionalDevelopment[]): string[
   const errors: string[] = [];
   for (const attack of armedAttacks) {
     for (const regulatory of routineRegulatory) {
-      if (rank(attack.severity) <= rank(regulatory.severity)) {
+      if (rank(attack.severity) < rank(regulatory.severity)) {
         errors.push(`Armed attack severity requires review against routine regulatory development: ${attack.title}.`);
       }
     }
@@ -894,7 +949,9 @@ export function regionalDomainMateriality(category: RegionalIntelligenceCategory
         || /\b(?:warning|advisory|evacuat|closure|damage|disrupt|airport|port|route|infrastructure|fatal)\b/i.test(text));
   }
   if (category === "Cyber") {
-    return CYBER_SEMANTIC_RE.test(text) && CYBER_CONSEQUENCE_RE.test(text);
+    return !CYBER_GENERIC_INFORMATION_RE.test(text)
+      && CYBER_SEMANTIC_RE.test(text)
+      && CYBER_CONSEQUENCE_RE.test(text);
   }
   if (category === "Security" || category === "Armed Conflict" || category === "Terrorism") {
     return CURRENT_CONSEQUENCE_RE.test(text)
@@ -910,7 +967,17 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
 ): T[] {
   const countries = new Set(topic === "apac_weekly" ? APAC : MIDDLE_EAST);
   const issue = parseISO(issueDate);
-  const eligible = incidents
+  const cleanedIncidents = incidents.map((incident) => ({
+    ...incident,
+    title: cleanRegionalSourceText(incident.title, incident.source),
+    displayTitle: incident.displayTitle
+      ? cleanRegionalSourceText(incident.displayTitle, incident.source)
+      : incident.displayTitle,
+    summary: incident.summary
+      ? cleanRegionalSourceText(incident.summary, incident.source)
+      : incident.summary,
+  } as T));
+  const eligible = cleanedIncidents
     .filter((incident) => {
       const country = incident.country?.trim() ?? "";
       const age = differenceInCalendarDays(issue, parseISO(incident.occurredAt));
@@ -944,12 +1011,20 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
           || APAC_TRIVIAL_ACCIDENT_RE.test(text)
           || (ROUTINE_ENFORCEMENT_RE.test(text) && !MAJOR_ENFORCEMENT_EFFECT_RE.test(text))
           || apacRejectCommentary(text);
+      const jurisdictionMismatch = hasForeignSubjectLead(incident) || hasForeignVenue(incident);
+      const category = regionalIntelligenceCategory(incident);
+      const confirmedSeriousSecurity = (
+        category === "Security"
+        || category === "Armed Conflict"
+        || category === "Terrorism"
+      )
+        && /\b(?:attack(?:ed)?|bomb(?:ing|ed)?|blast|missile|airstrike|shooting|opened fire|incursion)\b/i.test(text)
+        && /\b(?:killed|dead|injured|wounded|damaged|destroyed|closed|closure|shutdown|security forces?|military|police)\b/i.test(text);
       const apacReject = commonReject
+        || jurisdictionMismatch
         || (topic === "apac_weekly" && (
           APAC_SLOP_RE.test(text)
           || (WEAK_PROPOSED_LAW_RE.test(text) && !BINDING_LAW_RE.test(text))
-          || hasForeignSubjectLead(incident)
-          || hasForeignVenue(incident)
           || (APAC_GENERIC_SPEECH_RE.test(text) && !APAC_ACTION_RE.test(text))
           || apacRejectOffRegionAirline(text)
           || APAC_LIQUOR_LOOTING_RE.test(text)
@@ -965,8 +1040,8 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
           verifiedMiddleEastPriority
           || (
             !apacReject
-            && dimensions.length > 0
-            && regionalDomainMateriality(regionalIntelligenceCategory(incident), text)
+             && (dimensions.length > 0 || category === "Cyber" || confirmedSeriousSecurity)
+             && regionalDomainMateriality(category, text)
           )
         );
     })
@@ -989,7 +1064,24 @@ export function curateRegionalWeeklyIncidents<T extends RegionalIncident>(
     const key = regionalEventFamily(row);
     const existing = families.get(key);
     const pipelinePriority = (value: RegionalIncident) => /\b(?:yanbu|east[- ]west pipeline|oil shipments)\b/i.test(`${value.title ?? ""} ${value.summary ?? ""}`) ? 3 : 0;
-    if (!existing || developmentScore(row, topic) + pipelinePriority(row) > developmentScore(existing, topic) + pipelinePriority(existing)) families.set(key, row);
+    if (!existing) {
+      families.set(key, row);
+      continue;
+    }
+    const preferred = developmentScore(row, topic) + pipelinePriority(row) > developmentScore(existing, topic) + pipelinePriority(existing)
+      ? row
+      : existing;
+    const allMembers = [
+      ...((existing as RegionalIncidentWithMembers).sourceMembers ?? [existing]),
+      ...((row as RegionalIncidentWithMembers).sourceMembers ?? [row]),
+    ];
+    const sourceMembers = [...new Map(allMembers.map((member) => [
+      member.id === undefined
+        ? `${member.occurredAt}:${member.title ?? ""}`
+        : String(member.id),
+      member,
+    ])).values()];
+    families.set(key, { ...preferred, sourceMembers } as T);
   }
   return [...families.values()];
 }
@@ -2053,7 +2145,7 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
     }));
 }
 
-function buildCanonicalRegionalMapPoints<T extends RegionalIncident>(
+export function buildCanonicalRegionalMapPoints<T extends RegionalIncident>(
   incidents: T[],
   developments: RegionalVerifiedDevelopment[],
 ): RegionalMapPoint[] {

@@ -7,9 +7,11 @@ import { SEV_COLOR, sevKey, ELECTRIC, DUSK, NAVY } from "@/lib/pdfChrome";
 interface RegionalReportMapProps {
   points: RegionalMapPoint[];
   topic: string | undefined;
+  /** Put the key beside the unchanged map on report-width surfaces. */
+  compact?: boolean;
 }
 
-export function RegionalReportMap({ points, topic }: RegionalReportMapProps) {
+export function RegionalReportMap({ points, topic, compact = false }: RegionalReportMapProps) {
   const mapWidth = 680;
   const mapHeight = 560;
 
@@ -43,8 +45,12 @@ export function RegionalReportMap({ points, topic }: RegionalReportMapProps) {
       className="border border-[#bdc8d6] bg-white overflow-hidden flex flex-col font-sans" 
       data-regional-map-root
       data-report-raster-scale
+      style={compact ? { flexDirection: "row", flexWrap: "wrap" } : undefined}
     >
-      <div className="relative bg-[#e5e5e5] w-full">
+      <div
+        className="relative bg-[#e5e5e5] w-full"
+        style={compact ? { flex: "1 1 400px", minWidth: 0 } : undefined}
+      >
         <div style={{ position: "relative", width: "100%", paddingBottom: `${(layout.height / layout.width) * 100}%`, overflow: "hidden" }}>
           
           {/* Tiles Layer */}
@@ -249,14 +255,24 @@ export function RegionalReportMap({ points, topic }: RegionalReportMapProps) {
         </div>
       </div>
 
-      <div style={{ backgroundColor: "#ffffff" }}>
+      <div style={{
+        backgroundColor: "#ffffff",
+        ...(compact ? {
+          flex: "1 1 250px",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column" as const,
+          borderLeft: "1px solid #bdc8d6",
+        } : {}),
+      }}>
         <div 
           style={{ 
             display: "grid", 
             gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", 
             gap: "1px", 
             backgroundColor: "#d9e0e8", 
-            borderTop: "1px solid #bdc8d6" 
+            borderTop: compact ? undefined : "1px solid #bdc8d6",
+            flex: compact ? 1 : undefined,
           }}
         >
           {layout.markers.map((marker) => {
@@ -267,7 +283,7 @@ export function RegionalReportMap({ points, topic }: RegionalReportMapProps) {
                 style={{ 
                   display: "flex", 
                   gap: "10px", 
-                  padding: "12px", 
+                  padding: compact ? "8px 10px" : "12px",
                   backgroundColor: "#ffffff",
                   boxSizing: "border-box" 
                 }}

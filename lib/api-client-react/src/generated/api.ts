@@ -3312,7 +3312,7 @@ export const getStartRegionalReportUrl = () => {
 }
 
 /**
- * Returns immediately. The same requestId always refers to the same creation attempt and completed report; a new explicit Create action uses a new requestId, including for the same topic and date.
+ * Returns immediately. The same requestId always refers to the same creation or same-ID rebuild attempt. A new explicit Create action uses a new requestId. Rebuilds require targetReportId and the report's expectedUpdatedAt value so concurrent analyst edits are never replaced.
 
  * @summary Start or resume one regional report creation job
  */

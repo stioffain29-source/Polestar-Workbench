@@ -2471,17 +2471,20 @@ export const CreateReportBody = zod.object({
 
 
 /**
- * Returns immediately. The same requestId always refers to the same creation attempt and completed report; a new explicit Create action uses a new requestId, including for the same topic and date.
+ * Returns immediately. The same requestId always refers to the same creation or same-ID rebuild attempt. A new explicit Create action uses a new requestId. Rebuilds require targetReportId and the report's expectedUpdatedAt value so concurrent analyst edits are never replaced.
 
  * @summary Start or resume one regional report creation job
  */
 export const startRegionalReportBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
 
 
+
 export const StartRegionalReportBody = zod.object({
   "requestId": zod.string().uuid(),
   "topic": zod.enum(['apac_weekly', 'middle_east_weekly']),
-  "issueDate": zod.string().regex(startRegionalReportBodyIssueDateRegExp).describe('Calendar date, kept as a YYYY-MM-DD string in all clients.')
+  "issueDate": zod.string().regex(startRegionalReportBodyIssueDateRegExp).describe('Calendar date, kept as a YYYY-MM-DD string in all clients.'),
+  "targetReportId": zod.number().min(1).optional().describe('Existing regional report to rebuild in place.'),
+  "expectedUpdatedAt": zod.coerce.date().optional().describe('Required with targetReportId for optimistic concurrency.')
 })
 
 

@@ -29,6 +29,7 @@ import {
 import {
   createOrResumeRegionalReportJob,
   getRegionalReportJob,
+  RegionalReportJobInputError,
   toRegionalReportJob,
 } from "../lib/regionalReportJobService";
 
@@ -202,7 +203,13 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { requestId, topic, issueDate }: RegionalReportJobInput = parsed.data;
+  const {
+    requestId,
+    topic,
+    issueDate,
+    targetReportId,
+    expectedUpdatedAt,
+  }: RegionalReportJobInput = parsed.data;
   const parsedDate = new Date(`${issueDate}T00:00:00.000Z`);
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(issueDate) ||
@@ -217,6 +224,8 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
       requestId,
       topic,
       issueDate,
+      targetReportId,
+      expectedUpdatedAt,
     });
     if (result.conflict) {
       res.status(409).json({ error: "requestId is already used for different report inputs." });
@@ -227,6 +236,10 @@ router.post("/reports/regional-create", async (req, res): Promise<void> => {
     );
     res.status(202).json(response);
   } catch (cause) {
+    if (cause instanceof RegionalReportJobInputError) {
+      res.status(cause.status).json({ error: cause.message });
+      return;
+    }
     req.log?.error?.({ err: cause, requestId }, "Regional report job submission failed");
     res.status(500).json({ error: "Regional report job submission failed." });
   }

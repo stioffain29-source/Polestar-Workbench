@@ -191,10 +191,23 @@ function Paragraphs({ text }: { text?: string | null }) {
   );
 }
 
-function Section({ title, children, hidden }: { title: string; children: React.ReactNode; hidden?: boolean }) {
+function Section({
+  title,
+  children,
+  hidden,
+  allowBreak = false,
+}: {
+  title: string;
+  children: React.ReactNode;
+  hidden?: boolean;
+  allowBreak?: boolean;
+}) {
   if (hidden) return null;
   return (
-    <div className="report-section mb-8">
+    <div
+      className="report-section mb-8"
+      style={allowBreak ? { breakInside: "auto", pageBreakInside: "auto" } : undefined}
+    >
       <h2
         className="uppercase pb-2 mb-4 tracking-wide"
         data-pdf-keep-with-next="true"
@@ -226,7 +239,10 @@ function NarrativeSection({ title, text, hidden }: { title: string; text?: strin
   );
 }
 
-function RegionalDevelopmentCards({ developments }: { developments: RegionalDevelopment[] }) {
+function RegionalDevelopmentCards({ developments, showSources = true }: {
+  developments: RegionalDevelopment[];
+  showSources?: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {developments.map((development, index) => (
@@ -248,7 +264,7 @@ function RegionalDevelopmentCards({ developments }: { developments: RegionalDeve
             <p><strong>Assessment:</strong> {development.whatChanged}</p>
             <p><strong>Polestar View:</strong> {development.polestarView || development.operationalSignificance}</p>
             {development.whatToWatch && <p><strong>7-day indicator:</strong> {development.whatToWatch}</p>}
-            {!!development.sourceEvidence?.length && (
+            {showSources && !!development.sourceEvidence?.length && (
               <p className="pt-1 border-t border-[#e2e2e2] text-[9px] italic">
                 <strong>Sources:</strong> {development.sourceEvidence.join("; ")}
               </p>
@@ -405,7 +421,7 @@ export function RegionalHotspotMap({
   points: ReturnType<typeof import("@/lib/regionalWeekly").buildRegionalMapPoints>;
   topic: string | undefined;
 }) {
-  return <RegionalReportMap points={points} topic={topic} />;
+  return <RegionalReportMap points={points} topic={topic} compact />;
 }
 
 interface KpiPreviewCard {
@@ -420,12 +436,14 @@ interface KpiPreviewCard {
 function FastFactsGrid({
   cards,
   compact = false,
+  columns = 3,
 }: {
   cards: KpiPreviewCard[];
   compact?: boolean;
+  columns?: 3 | 4;
 }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className={columns === 4 ? "grid grid-cols-2 md:grid-cols-4 gap-3" : "grid grid-cols-2 md:grid-cols-3 gap-3"}>
       {cards.map((c, i) => {
         const sevK = c.severity ? sevKey(c.severity) : "";
         const accent = sevK && SEV_COLOR[sevK] ? SEV_COLOR[sevK] : ELECTRIC;
@@ -1552,48 +1570,59 @@ export default function ReportPreview({
               <Paragraphs text={regionalBluf} />
             </Section>
 
-            <div data-regional-required="risk-map" style={{ marginTop: 24, marginBottom: 18 }}>
+            <Section title="Week at a Glance">
+              <FastFactsGrid
+                compact
+                columns={4}
+                cards={apacGlanceMetrics.map((metric) => ({
+                  label: metric.label,
+                  value: String(metric.value),
+                }))}
+              />
+            </Section>
+
+            <div
+              data-regional-required="risk-map"
+              style={{
+                width: "100%",
+                margin: "18px auto 24px",
+                breakInside: "avoid",
+                pageBreakInside: "avoid",
+              }}
+            >
               <RegionalHotspotMap points={regionalMapPoints} topic={report.topic} />
             </div>
-          </div>
 
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <div data-regional-required="intelligence-domains">
-            <Section hidden={!show("situation")} title="Regional Intelligence by Domain">
-              <RegionalDomainBriefs briefs={regionalDomainBriefs} />
-            </Section>
-            </div>
-          </div>
-
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <div data-regional-required="key-developments">
-            <Section hidden={!show("what-happened")} title="Key Developments">
-              <RegionalDevelopmentCards developments={regionalDevelopments} />
-            </Section>
-            </div>
-          </div>
-
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <div data-regional-required="business-implications">
-            <Section hidden={!show("implications")} title="Business Implications">
-              <Paragraphs text={regionalBusinessImplications} />
-            </Section>
-            </div>
-            <div style={{ marginTop: 32 }}>
-              <div data-regional-required="seven-day-watch">
-              <Section hidden={!show("watch-next")} title="7 Day Watch">
-                <RegionalWatchlist items={regionalWatchlist} />
+            <div data-regional-required="risk-picture">
+              <Section hidden={!show("situation")} title="Regional Risk Picture">
+                <Paragraphs text={regionalRiskPicture} />
               </Section>
+            </div>
+
+            <div data-regional-required="key-developments">
+              <Section hidden={!show("what-happened")} title="Key Developments" allowBreak>
+                <RegionalDevelopmentCards developments={regionalDevelopments} showSources={!regionalCanonical?.editorialVersion} />
+              </Section>
+            </div>
+
+            <div data-regional-required="business-implications">
+              <Section hidden={!show("implications")} title="Business Implications">
+                <Paragraphs text={regionalBusinessImplications} />
+              </Section>
+            </div>
+            <div style={{ marginTop: 24 }}>
+              <div data-regional-required="seven-day-watch">
+                <Section hidden={!show("watch-next")} title="7 Day Watch" allowBreak>
+                  <RegionalWatchlist items={regionalWatchlist} />
+                </Section>
               </div>
             </div>
-          </div>
 
-          <div className="px-10 py-10 report-page" style={{ pageBreakBefore: "always", position: "relative" }}>
-            <div style={{ marginTop: 32 }}>
+            <div style={{ marginTop: 24 }}>
               <div data-regional-required="polestar-outlook">
-              <Section hidden={!show("polestar-view")} title="Polestar Outlook">
-                <Paragraphs text={regionalOutlook} />
-              </Section>
+                <Section hidden={!show("polestar-view")} title="Polestar Outlook">
+                  <Paragraphs text={regionalOutlook} />
+                </Section>
               </div>
             </div>
           </div>

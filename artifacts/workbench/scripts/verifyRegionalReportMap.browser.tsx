@@ -22,7 +22,7 @@ window.renderRegionalVerification = async (report, mapOnly = false) => {
   const points = (report.hardNumbers as { regionalCanonicalReport: { mapPoints: Parameters<typeof RegionalReportMap>[0]["points"] } })
     .regionalCanonicalReport.mapPoints;
   flushSync(() => root.render(mapOnly
-    ? <RegionalReportMap points={points} topic={report.topic} />
+    ? <RegionalReportMap points={points} topic={report.topic} compact />
     : <ReportPreview report={report} />));
   await document.fonts.ready;
   await waitForRegionalMapTiles(host);

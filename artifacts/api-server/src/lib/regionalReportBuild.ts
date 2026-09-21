@@ -9,18 +9,22 @@ import { and, desc, gte, inArray, lte } from "drizzle-orm";
 import { runRegionalWeeklyCollection } from "@workspace/ingest";
 import { defaultRelevanceCondition } from "./relevanceFilter";
 import {
-  buildRegionalCanonicalReport,
   buildApacFutureEvents,
   auditRegionalWeeklyCandidateFunnel,
   assertRegionalWeeklyReady,
-  curateRegionalWeeklyIncidents,
+  regionalCountryQuery,
   validateRegionalCanonicalStructure,
   type RegionalCoverageManifest,
   type RegionalWeeklyTopic,
 } from "../../../workbench/src/lib/regionalWeekly";
+import { buildRegionalEditorialReport } from "./regionalReportEditorial";
 
 export type RegionalReportTopic = "apac_weekly" | "middle_east_weekly";
 export type RegionalReportBuildStage = "collecting" | "building" | "saving";
+export interface RegionalReportBuildOptions {
+  collect?: boolean;
+  coverageManifest?: RegionalCoverageManifest;
+}
 
 function normalizeHardNumbers(value: unknown): FuelHardNumbers {
   return JSON.parse(JSON.stringify(value)) as FuelHardNumbers;
@@ -30,13 +34,15 @@ export async function buildRegionalReport(
   topic: RegionalReportTopic,
   issueDate: string,
   setStage: (stage: RegionalReportBuildStage) => Promise<void>,
+  options?: RegionalReportBuildOptions,
 ): Promise<InsertReport> {
   await setStage("collecting");
-  const run = await runRegionalWeeklyCollection(
-    topic === "apac_weekly" ? "apac" : "middle_east",
-    { commit: true },
-  );
-  const failed = run.coverage.filter(
+  if (options?.collect === false && !options.coverageManifest) {
+    throw new Error("Historical report refresh requires its saved source-coverage audit.");
+  }
+  const run = options?.collect === false ? null : await runRegionalWeeklyCollection(
+    topic === "apac_weekly" ? "apac" : "middle_east", { commit: true });
+  const failed = (run?.coverage ?? options!.coverageManifest!.domains).filter(
     (check) => check.status !== "checked" || check.errors.length > 0,
   );
   if (failed.length > 0) {
@@ -49,9 +55,7 @@ export async function buildRegionalReport(
   const issueStart = new Date(`${issueDate}T00:00:00.000Z`);
   const watchStart = new Date(issueStart.getTime() + 86_400_000);
   const watchEnd = new Date(issueStart.getTime() + 7 * 86_400_000);
-  const regionalCountries = new Set(topic === "apac_weekly"
-    ? ["Australia", "Bangladesh", "Bhutan", "Brunei", "Cambodia", "China", "East Timor", "Fiji", "Hong Kong", "India", "Indonesia", "Japan", "Laos", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal", "New Zealand", "North Korea", "Pakistan", "Papua New Guinea", "Philippines", "Singapore", "South Korea", "Sri Lanka", "Taiwan", "Thailand", "Timor-Leste", "Vietnam"]
-    : ["Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon", "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria", "UAE", "United Arab Emirates", "Yemen"]);
+  const regionalCountries = new Set(regionalCountryQuery(topic).split(","));
   const futureRows = await db.select().from(protestEventsTable).where(and(
     gte(protestEventsTable.eventDate, watchStart),
     lte(protestEventsTable.eventDate, watchEnd),
@@ -76,8 +80,9 @@ export async function buildRegionalReport(
       attendance: event.attendance,
     })),
     issueDate,
+    topic,
   );
-  const coverageManifest: RegionalCoverageManifest = {
+  const coverageManifest: RegionalCoverageManifest = run ? {
     requiredDomains: run.coverage.map((check) => check.domain),
     domains: run.coverage,
     forwardSearch: {
@@ -90,11 +95,13 @@ export async function buildRegionalReport(
     },
     requiredGeographies: run.requiredGeographies,
     searchedGeographies: run.searchedGeographies,
-  };
-  const since = new Date(`${issueDate}T23:59:59.999Z`);
-  since.setUTCDate(since.getUTCDate() - 7);
+  } : options!.coverageManifest!;
+  const since = new Date(issueStart);
+  since.setUTCDate(since.getUTCDate() - 6);
+  const issueEnd = new Date(`${issueDate}T23:59:59.999Z`);
   const incidents = await db.select().from(incidentsTable).where(and(
     gte(incidentsTable.occurredAt, since),
+    lte(incidentsTable.occurredAt, issueEnd),
     defaultRelevanceCondition(),
   )).orderBy(desc(incidentsTable.occurredAt));
   const regionalIncidents = incidents.map((incident) => ({
@@ -106,8 +113,8 @@ export async function buildRegionalReport(
   const funnel = auditRegionalWeeklyCandidateFunnel(
     regionalIncidents, topic, issueDate, coverageManifest);
   assertRegionalWeeklyReady(funnel);
-  const canonical = buildRegionalCanonicalReport(
-    curateRegionalWeeklyIncidents(regionalIncidents, topic, issueDate),
+  const { canonical, evidenceSnapshot } = await buildRegionalEditorialReport(
+    regionalIncidents,
     issueDate,
     topic as RegionalWeeklyTopic,
     futureEvents,
@@ -123,7 +130,10 @@ export async function buildRegionalReport(
     topic,
     issueDate,
     status: "draft",
-    hardNumbers: normalizeHardNumbers({ regionalCanonicalReport: canonical }),
+    hardNumbers: normalizeHardNumbers({
+      regionalCanonicalReport: canonical,
+      regionalEvidenceSnapshot: evidenceSnapshot,
+    }),
     updatedAt: new Date(),
   };
 }

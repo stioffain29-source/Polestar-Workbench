@@ -5,11 +5,13 @@ import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import {
   db,
   regionalReportJobsTable,
+  reportsTable,
   type RegionalReportJobRow,
 } from "@workspace/db";
 import { logger } from "./logger";
 import type { RegionalReportTopic } from "./regionalReportBuild";
 import type { RegionalReportJob } from "@workspace/api-zod";
+import { matchesExpectedReportVersion } from "./regionalReportRebuild";
 
 export function toRegionalReportJob(row: RegionalReportJobRow): RegionalReportJob {
   return {
@@ -153,15 +155,64 @@ export async function createOrResumeRegionalReportJob(input: {
   requestId: string;
   topic: RegionalReportTopic;
   issueDate: string;
+  targetReportId?: number;
+  expectedUpdatedAt?: Date;
 }): Promise<{ job: RegionalReportJobRow; conflict: boolean }> {
+  if ((input.targetReportId === undefined) !== (input.expectedUpdatedAt === undefined)) {
+    throw new RegionalReportJobInputError(
+      400,
+      "targetReportId and expectedUpdatedAt must be supplied together.",
+    );
+  }
+  const existingJob = await getRegionalReportJob(input.requestId);
+  const sameInputs = (job: RegionalReportJobRow) =>
+    job.topic === input.topic &&
+    job.issueDate === input.issueDate &&
+    job.targetReportId === (input.targetReportId ?? null) &&
+    (job.expectedUpdatedAt?.getTime() ?? null) ===
+      (input.expectedUpdatedAt?.getTime() ?? null);
+  // Idempotency check comes before reading the mutable target. A retry of a
+  // completed POST must still return its job after that job updated the target.
+  if (existingJob && !sameInputs(existingJob)) {
+    return { job: existingJob, conflict: true };
+  }
+  if (!existingJob && input.targetReportId !== undefined) {
+    const [target] = await db.select({
+      id: reportsTable.id,
+      topic: reportsTable.topic,
+      issueDate: reportsTable.issueDate,
+      updatedAt: reportsTable.updatedAt,
+    }).from(reportsTable).where(eq(reportsTable.id, input.targetReportId));
+    if (!target) {
+      throw new RegionalReportJobInputError(404, "The report to refresh was not found.");
+    }
+    if (
+      (target.topic !== "apac_weekly" && target.topic !== "middle_east_weekly") ||
+      target.topic !== input.topic ||
+      target.issueDate !== input.issueDate
+    ) {
+      throw new RegionalReportJobInputError(
+        409,
+        "The refresh target must be a regional report with the same topic and issue date.",
+      );
+    }
+    if (!matchesExpectedReportVersion(target.updatedAt, input.expectedUpdatedAt!)) {
+      throw new RegionalReportJobInputError(
+        409,
+        "This report changed after the refresh was requested. Reload it before trying again.",
+      );
+    }
+  }
   await db.insert(regionalReportJobsTable).values({
     id: input.requestId,
     topic: input.topic,
     issueDate: input.issueDate,
+    targetReportId: input.targetReportId,
+    expectedUpdatedAt: input.expectedUpdatedAt,
   }).onConflictDoNothing();
-  let job = await getRegionalReportJob(input.requestId);
+  let job = existingJob ?? await getRegionalReportJob(input.requestId);
   if (!job) throw new Error("Regional report job could not be created.");
-  if (job.topic !== input.topic || job.issueDate !== input.issueDate) {
+  if (!sameInputs(job)) {
     return { job, conflict: true };
   }
   if (job.status === "failed" && job.reportId === null) {
@@ -184,6 +235,16 @@ export async function createOrResumeRegionalReportJob(input: {
     });
   }
   return { job, conflict: false };
+}
+
+export class RegionalReportJobInputError extends Error {
+  constructor(
+    public readonly status: 400 | 404 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RegionalReportJobInputError";
+  }
 }
 
 export async function recoverRegionalReportJobs(): Promise<void> {

@@ -671,8 +671,15 @@ async function drawRegionalHotspotMap(
   // or sort saved points here: numbering and overlapping markers must agree.
   const rendered = await embedReactChartInPdf(
     ctx,
-    createElement(RegionalReportMap, { points, topic }),
-    { useCssPixelUnits: true, fitRemaining: false },
+    createElement(
+      "div",
+      { style: { width: "100%", margin: "0 auto" } },
+      createElement(RegionalReportMap, { points, topic, compact: true }),
+    ),
+    // Permit the shared embedder's bounded (minimum 75%) fit-to-remaining
+    // behaviour. This keeps the complete map, numbered markers and key together
+    // beneath the outlook/glance material instead of creating a map-only page.
+    { useCssPixelUnits: true },
   );
   if (!rendered) {
     throw new Error("The regional map could not be exported. Use Download PDF in the report editor with the basemap loaded.");
@@ -1144,7 +1151,7 @@ export async function exportTopicReportPdf(
     ),
     fuelGulf: fuelData?.incidentData.gulfChokepointWatch ?? null,
   });
-  if (!isFuel) {
+  if (!isFuel && !isRegionalWeekly) {
     assertFinalReportSectionsDistinct({
       executiveSummary: resolveSimpleProse(data.executiveSummary, aiProse?.executiveSummary, proseDraft.executiveSummary),
       situation: resolveSimpleProse(data.situation, aiProse?.situation, proseDraft.situation),
@@ -1260,7 +1267,18 @@ export async function exportTopicReportPdf(
   }
 
   if (isRegionalWeekly && regionalCanonical) {
-    ctx.y += 14;
+    ensureSpace(ctx, 118);
+    drawSectionHeading(ctx, "Week at a Glance");
+    drawFastFactsKpiCards(
+      ctx,
+      regionalCanonical.glanceMetrics.map((metric) => ({
+        label: metric.label,
+        value: String(metric.value),
+      })),
+      true,
+      4,
+    );
+    ctx.y += 8;
     await drawRegionalHotspotMap(ctx, regionalCanonical.mapPoints, regionalTopic);
   }
 
@@ -1797,14 +1815,23 @@ export async function exportTopicReportPdf(
         drawSectionHeading(ctx, "Regional Risk Picture");
         renderProse(ctx, regionalCanonical.riskPicture);
       }
-      newPage(ctx);
       if (show("what-happened")) {
+        ensureSpace(ctx, 110);
         drawSectionHeading(ctx, "Key Developments");
         for (const development of regionalCanonical.developments) {
-          const sourceLine = development.sourceEvidence?.join("; ") ?? "";
+          // New editorial reports keep source material in the evidence archive,
+          // not inside the reader-facing development cards.
+          const sourceLine = regionalCanonical.editorialVersion ? "" : development.sourceEvidence?.join("; ") ?? "";
           const meta = `${development.category} · ${development.severity}${development.eventDate ? ` · ${format(parseISO(development.eventDate), "dd MMM yyyy")}` : ""}`;
+          // Measurement must use the exact font used below. Inheriting the
+          // preceding narrative's 11pt font made the first card much taller.
+          setRoboto(ctx.pdf, "bold");
+          ctx.pdf.setFontSize(9);
           const titleLines = ctx.pdf.splitTextToSize(sanitize(development.title.toUpperCase()), ctx.CW - 20);
+          ctx.pdf.setFontSize(7.1);
           const metaLines = ctx.pdf.splitTextToSize(sanitize(meta), ctx.CW - 20);
+          setRoboto(ctx.pdf, "regular");
+          ctx.pdf.setFontSize(7.5);
           const assessmentLines = ctx.pdf.splitTextToSize(sanitize(`ASSESSMENT: ${development.whatChanged}`), ctx.CW - 20);
           const viewLines = ctx.pdf.splitTextToSize(
             sanitize(`POLESTAR VIEW: ${development.polestarView || development.operationalImpact || development.operationalSignificance}`),
@@ -1814,6 +1841,8 @@ export async function exportTopicReportPdf(
             sanitize(`7-DAY INDICATOR: ${development.outlook7Days || development.whatToWatch}`),
             ctx.CW - 20,
           );
+          setRoboto(ctx.pdf, "italic");
+          ctx.pdf.setFontSize(6.7);
           const sourceLines = sourceLine
             ? ctx.pdf.splitTextToSize(sanitize(`SOURCES: ${sourceLine}`), ctx.CW - 20)
             : [];
@@ -1859,32 +1888,50 @@ export async function exportTopicReportPdf(
           ctx.y = cardTop + cardHeight + 8;
         }
       }
-      newPage(ctx);
       if (show("implications")) {
         drawSectionWithProse(ctx, "Business Implications", regionalCanonical.businessImplicationsNarrative);
       }
       if (show("watch-next")) {
-        ensureSpace(ctx, 60);
-        ctx.y += 14;
+        const watchRows = regionalCanonical.watchItems.map((item) => {
+          const titleLoc = item.location && item.location.trim() ? item.location.toUpperCase() : "NATIONAL";
+          setRoboto(ctx.pdf, "bold");
+          ctx.pdf.setFontSize(9);
+          const headingLines = ctx.pdf.splitTextToSize(
+            `${format(parseISO(item.date), "dd MMM yyyy")} | ${titleLoc} — ${item.trigger}`,
+            ctx.CW - 12,
+          );
+          setRoboto(ctx.pdf, "regular");
+          ctx.pdf.setFontSize(9);
+          const whyLines = ctx.pdf.splitTextToSize(`Why it matters: ${item.whyItMatters}`, ctx.CW - 12);
+          const watchLines = ctx.pdf.splitTextToSize(`Watch: ${item.whatToWatch}`, ctx.CW - 12);
+          const height = headingLines.length * 11 + 1 + (whyLines.length + watchLines.length) * 11.5 + 11;
+          return { headingLines, whyLines, watchLines, height };
+        });
+        // The short watch list fits on one page; do not strand its first row
+        // at the previous page foot. Date and both fields match the preview.
+        ensureSpace(ctx, Math.min(
+          ctx.H - ctx.TOP - ctx.BOTTOM,
+          Math.max(100, 50 + watchRows.reduce((height, row) => height + row.height, 0)),
+        ));
         drawSectionHeading(ctx, "7 Day Watch");
         if (regionalCanonical.watchItems.length === 0) {
           renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
         } else {
-          for (const item of regionalCanonical.watchItems) {
-            ensureSpace(ctx, 22);
-            const titleLoc = item.location && item.location.trim() ? item.location.toUpperCase() : "NATIONAL";
+          for (const row of watchRows) {
+            ensureSpace(ctx, row.height);
             setRoboto(ctx.pdf, "bold");
             setText(ctx.pdf, NAVY);
-            ctx.pdf.setFontSize(8.2);
-            const headingLines = ctx.pdf.splitTextToSize(`${titleLoc} — ${item.trigger}`, ctx.CW - 12);
-            ctx.pdf.text(headingLines, ctx.MX + 8, ctx.y + 8);
-            ctx.y += headingLines.length * 10 + 1;
+            ctx.pdf.setFontSize(9);
+            ctx.pdf.text(row.headingLines, ctx.MX + 8, ctx.y + 9);
+            ctx.y += row.headingLines.length * 11 + 1;
             setRoboto(ctx.pdf, "regular");
             setText(ctx.pdf, DUSK);
-            ctx.pdf.setFontSize(7.6);
-            const bodyLines = ctx.pdf.splitTextToSize(`Watch: ${item.whatToWatch}`, ctx.CW - 12);
-            ctx.pdf.text(bodyLines, ctx.MX + 8, ctx.y + 8);
-            ctx.y += bodyLines.length * 9.6 + 6;
+            ctx.pdf.setFontSize(9);
+            for (const lines of [row.whyLines, row.watchLines]) {
+              ctx.pdf.text(lines, ctx.MX + 8, ctx.y + 9);
+              ctx.y += lines.length * 11.5 + 3;
+            }
+            ctx.y += 5;
           }
         }
       }

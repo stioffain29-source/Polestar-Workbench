@@ -21,7 +21,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const WORKBENCH = resolve(HERE, "..");
 const SRC = resolve(WORKBENCH, "src");
 const ASSETS = resolve(WORKBENCH, "../../attached_assets");
-const OUT = resolve(WORKBENCH, "../../screenshots/regional-map-fix");
+const OUT = resolve(
+  WORKBENCH,
+  `../../screenshots/${process.env.REGIONAL_VERIFY_OUTPUT_DIR || "regional-map-fix"}`,
+);
 const require = createRequire(import.meta.url);
 const { build } = await import(createRequire(require.resolve("vite")).resolve("esbuild"));
 const input = process.argv[2];

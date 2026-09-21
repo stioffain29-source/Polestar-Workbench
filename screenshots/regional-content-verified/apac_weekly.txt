@@ -1,0 +1,201 @@
+POLESTAR APAC WEEKLY
+POLESTAR INSIGHTS
+REPORTING PERIOD: 15 SEPTEMBER 2026 - 21 SEPTEMBER 2026
+
+
+
+
+POLESTAR-ADVISORY.COM
+                                                                                                POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL OUTLOOK
+
+     Eastern Japan is this week's clearest business exposure because Typhoon Dujuan is already bringing heavy
+     rain and transport disruption into a large operating market. That creates immediate friction for staff
+     movement, deliveries and time-sensitive services even before any wider knock-on effects are known.
+
+     A different operating strain is emerging in Nepal, where a severe LPG shortage linked to import failures
+     points to a slower but broader constraint on fuel-dependent activity. By contrast, the Kohat
+     police-headquarters attack in Pakistan is the week's sharpest security signal, but any spillover into
+     commercial access or wider operations remains unconfirmed from the reported facts.
+
+
+
+     WEEK AT A GLANCE
+
+
+        MATERIAL DEVELOPMENTS      MARKETS REQUIRING WATCH        HIGH OR EXTREME           7-DAY WATCH ITEMS
+                                                                  DEVELOPMENTS
+        6                          6                                                        4
+                                                                  1
+
+
+
+
+polestar-advisory.com                             info@polestar-advisory.com                                    Page 1 of 4
+                                                                                                                                  POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL RISK PICTURE
+
+     The most direct transmission into business activity comes from weather-linked transport disruption. In
+     eastern Japan, heavy rain and disrupted transport can immediately delay commuting, field activity and
+     scheduled cargo movements. Sri Lanka's landslide and flooding on Thailand's Highway 401 show the same
+     mechanism on a narrower geographic scale: road access is curtailed, so journey times, routing and site
+     reachability become operational issues.
+
+     Nepal's LPG shortage works differently. It is not a sudden closure event, but a fuel-availability problem tied
+     to import failures, which can constrain routine operations and distribution if the planned daily gas-bullet
+     imports do not ease supply.
+
+     Cyber and security exposures are more conditional this week. The LTFRB platform outage confirms digital
+     service disruption and a possible data-exposure issue, but it does not establish wider transport stoppages.
+     The Kohat attack demonstrates acute security risk at a police site; any business-access disruption beyond
+     that would need separate confirmation.
+
+
+
+     KEY DEVELOPMENTS
+
+        PAKISTAN | KOHAT
+        KOHAT POLICE HEADQUARTERS ATTACKED
+        Security · Extreme · 18 Sep 2026
+        ASSESSMENT: An explosion and gun attack hit a police headquarters in Kohat, and the death toll rose to at least 31 including 16 police personnel.
+        Fighting was still ongoing when the toll was reported.
+        POLESTAR VIEW: The attack shows acute local security stress. Broader commercial disruption remains a contingent risk, not an established
+        operating outcome from the confirmed reporting.
+        7-DAY INDICATOR: Watch for official confirmation of any cordons, access restrictions or service suspensions beyond the police-headquarters area.
+
+
+
+        JAPAN | EASTERN JAPAN
+        TYPHOON DUJUAN DISRUPTS EASTERN TRANSPORT
+        Weather & Natural Hazards · Moderate · 21 Sep 2026
+        ASSESSMENT: Typhoon Dujuan was approaching eastern Japan with heavy rain and transport disruption.
+        POLESTAR VIEW: This is the week's most direct regional business disruption because transport impacts are already reported. The scale of prolonged
+        interruption is still unresolved.
+        7-DAY INDICATOR: Watch for reports of broader transport suspensions or evidence that disruption remains limited despite the approaching typhoon.
+
+
+
+        NEPAL
+        NEPAL LPG SHORTAGE PERSISTS
+        Energy · Moderate · 20 Sep 2026
+        ASSESSMENT: Nepal is facing a severe LPG shortage linked to import failures. Nepal plans to import 160 gas bullets daily to ease the shortage.
+        POLESTAR VIEW: The shortage is a direct operating constraint, but the planned daily gas-bullet imports could ease pressure if implementation is
+        visible.
+        7-DAY INDICATOR: Watch for evidence that the planned 160 daily gas-bullet imports are being executed and improving availability.
+
+
+
+
+polestar-advisory.com                                              info@polestar-advisory.com                                                               Page 2 of 4
+                                                                                                                                   POLESTAR APAC WEEKLY
+
+
+
+
+        PHILIPPINES
+        LTFRB PLATFORM GOES OFFLINE
+        Cyber · Moderate · 19 Sep 2026
+        ASSESSMENT: LTFRB is probing a data breach after its platform went offline.
+        POLESTAR VIEW: Confirmed impact is platform downtime during a breach probe. Data exposure and wider transport-service effects remain
+        unconfirmed from the supplied facts.
+        7-DAY INDICATOR: Watch for restoration of the LTFRB platform or official clarification on the scope of compromised data.
+
+
+
+        SRI LANKA | HATTON BOGAWANTALAWA ROUTE
+        LANDSLIDE CUTS HATTON BOGAWANTALAWA ROUTE
+        Weather & Natural Hazards · Moderate · 21 Sep 2026
+        ASSESSMENT: A landslide cut off the Hatton Bogawantalawa Route and disrupted Hill Country journeys.
+        POLESTAR VIEW: The disruption is clearly local but directly affects overland movement. Duration will determine whether it stays a scheduling issue
+        or becomes a service bottleneck.
+        7-DAY INDICATOR: Watch for official reopening updates or confirmation that alternate routes are carrying traffic.
+
+
+
+        THAILAND
+        FLOODING BLOCKS HIGHWAY 401
+        Weather & Natural Hazards · Moderate · 19 Sep 2026
+        ASSESSMENT: Heavy rain caused flooding along Highway 401 in Surat Thani, leaving the road impassable for small vehicles. Authorities evacuated
+        Thai and foreign tourists from the affected area.
+        POLESTAR VIEW: The business effect is a specific road-access problem. Broader disruption depends on whether flooding spreads or persists
+        beyond the affected corridor.
+        7-DAY INDICATOR: Watch for reopening of Highway 401 to small vehicles or reports of continuing impassability.
+
+
+
+
+     BUSINESS IMPLICATIONS
+
+     Operations teams should prepare temporary schedule compression and remote-work substitutions where
+     travel depends on disrupted transport or blocked roads. That decision is grounded in Typhoon Dujuan's
+     impact in eastern Japan, the Hatton Bogawantalawa route cutoff in Sri Lanka and flooding that left small
+     vehicles unable to use Highway 401 in Surat Thani.
+
+     Logistics managers should review fuel-dependent delivery plans and prioritize essential loads if Nepal's
+     LPG shortage persists. The trigger is the confirmed severe shortage linked to import failures, while the
+     planned 160 daily gas-bullet imports are the main near-term sign of relief rather than proof of
+     normalization.
+
+     IT and compliance teams should route any LTFRB-dependent transactions through manual contingencies
+     and assess exposure to delayed regulatory processing while the platform remains offline. The immediate
+     trigger is the confirmed outage during a data-breach probe; wider effects on transport activity or data
+     compromise are still uncertain.
+
+
+
+
+polestar-advisory.com                                              info@polestar-advisory.com                                                            Page 3 of 4
+                                                                                                                 POLESTAR APAC WEEKLY
+
+
+
+
+     7 DAY WATCH
+
+       27 Sep 2026 | ISLAMABAD, PAKISTAN — Planned PTI protest march
+       Why it matters: Movement and access in Islamabad, Pakistan may be affected by the scheduled activity.
+       Watch: Track route and venue advisories, transport changes and police restrictions.
+
+       24 Sep 2026 | JAKARTA, INDONESIA — Planned Farmers' Day demonstrations
+       Why it matters: The planned gathering may affect access or security around Jakarta, Indonesia.
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       24 Sep 2026 | JAKARTA, INDONESIA — Possible KSPSI employment-bill demonstration
+       Why it matters: The planned gathering may affect access or security around Jakarta, Indonesia.
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       28 Sep 2026 | INDIA — Planned banking strike
+       Why it matters: Branch and transaction services in India may be affected by the planned banking strike.
+       Watch: Check banks' branch and payment-service advisories before time-sensitive transactions.
+
+
+
+
+     POLESTAR OUTLOOK
+
+     The most important unresolved risk is whether Japan's current transport disruption broadens beyond
+     short-term delays into sustained operational interruption. The decision would change if authorities report
+     wider service suspensions or, conversely, if transport disruption remains limited despite the heavy rain.
+
+
+
+     DISCLAIMER
+
+     Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. The information in this report is based on open
+     sources and is assessed as accurate at the time of writing. It is provided for general informational purposes only and does not
+     constitute advice or a comprehensive assessment of all risks. No reliance should be placed on this information for operational
+     decision-making without further independent verification.
+
+
+
+
+polestar-advisory.com                                     info@polestar-advisory.com                                                   Page 4 of 4
+

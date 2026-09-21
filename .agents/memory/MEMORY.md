@@ -151,4 +151,4 @@
 - [PDF asset waits](pdf-asset-waits.md) — font and cover-image requests must be time-bounded; Flashpoint falls back rather than leaving Download stuck indefinitely.
 - [Report footer standard](report-footer-standard.md) — every report keeps page numbering in the footer; never move, suppress or duplicate it in body-page headers.
 - [Map incident identity](map-incident-identity.md) — map markers represent distinct events, not source articles; preserve all corroborating links on the single event marker.
-- [Regional weekly intelligence scope](regional-weekly-intelligence-scope.md) — APAC/ME weekly reports are business-operating briefs across six risk categories, with event-level dedup and evidence-backed visuals.
+- [Regional weekly intelligence scope](regional-weekly-intelligence-scope.md) — APAC/ME business briefs use checked facts, not headline templates; one saved report for preview/PDF.

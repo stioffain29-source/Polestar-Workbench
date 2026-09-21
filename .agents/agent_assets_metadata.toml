@@ -1437,3 +1437,17 @@ mtime_ms = 1789974072896
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/d7867b2f-c334-495e-a170-160c8f57f49e/018b2593-f391-4603-ac0a-c2ac29b73873"
 storage_version_token = "1789974286181512"
 content_type = "image/png"
+
+[[outputs]]
+id = "3xPDUFFiq8RtPjuYpnDsZ"
+uri = "file://screenshots/regional-content-verified/apac_weekly.pdf"
+type = "pdf"
+title = "Corrected APAC Weekly — verification copy"
+description = "Five-page PDF rebuilt from the 21 September production-data snapshot using the corrected engine. The live saved report has not been refreshed."
+logical_id = "9635c184-6eea-4b96-8468-4ce2687c8b0a"
+content_hash = "sha256:2a18ca81e635d6894b3f1997535f9ea8a212155746e72229251b59a3415f2b33"
+size = 1358604
+mtime_ms = 1789981225930
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/9635c184-6eea-4b96-8468-4ce2687c8b0a/3e291463-4623-4029-afa4-77d2850b4703"
+storage_version_token = "1789981739403056"
+content_type = "application/pdf"

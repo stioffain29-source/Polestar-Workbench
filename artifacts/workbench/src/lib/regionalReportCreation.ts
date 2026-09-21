@@ -37,6 +37,76 @@ export function regionalCreationInput(
   return input;
 }
 
+/** Persist a same-row refresh identity before POSTing, for the same durability
+ * guarantees as creation without reusing a creation request accidentally. */
+export function regionalRebuildInput(
+  topic: RegionalReportJobInput["topic"],
+  issueDate: string,
+  targetReportId: number,
+  expectedUpdatedAt: string,
+): RegionalReportJobInput {
+  const url = new URL(window.location.href);
+  const savedId = url.searchParams.get("rebuildRequestId");
+  const savedTarget = Number(url.searchParams.get("rebuildTargetReportId"));
+  const savedExpected = url.searchParams.get("rebuildExpectedUpdatedAt");
+  if (
+    savedId &&
+    (!UUID_RE.test(savedId) ||
+      savedTarget !== targetReportId ||
+      !savedExpected ||
+      Number.isNaN(new Date(savedExpected).getTime()))
+  ) {
+    throw new RegionalCreationError(
+      "This refresh link belongs to different report inputs. Reload the report before retrying.",
+      "report",
+    );
+  }
+  const input: RegionalReportJobInput = {
+    requestId: savedId ?? crypto.randomUUID(),
+    topic,
+    issueDate,
+    targetReportId,
+    expectedUpdatedAt: savedExpected ?? expectedUpdatedAt,
+  };
+  url.searchParams.set("rebuildRequestId", input.requestId);
+  url.searchParams.set("rebuildTargetReportId", String(targetReportId));
+  url.searchParams.set(
+    "rebuildExpectedUpdatedAt",
+    input.expectedUpdatedAt!,
+  );
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+  return input;
+}
+
+export function clearRegionalRebuildInput(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("rebuildRequestId");
+  url.searchParams.delete("rebuildTargetReportId");
+  url.searchParams.delete("rebuildExpectedUpdatedAt");
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+}
+
+export function regionalRefreshDisabled(input: {
+  hasUpdatedAt: boolean;
+  hasUnsavedEdits: boolean;
+  status?: RegionalReportJob["status"];
+}): boolean {
+  return (
+    !input.hasUpdatedAt ||
+    input.hasUnsavedEdits ||
+    input.status === "queued" ||
+    input.status === "running"
+  );
+}
+
 function httpStatus(error: unknown): number | undefined {
   return error && typeof error === "object" && "status" in error
     ? Number(error.status)

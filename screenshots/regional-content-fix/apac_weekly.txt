@@ -1,0 +1,216 @@
+POLESTAR APAC WEEKLY
+POLESTAR INSIGHTS
+REPORTING PERIOD: 15 SEPTEMBER 2026 - 21 SEPTEMBER 2026
+
+
+
+
+POLESTAR-ADVISORY.COM
+                                                                                                 POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL OUTLOOK
+
+     The week's most consequential exposure is the attack on the police headquarters in Kohat, where fatalities
+     rose and fighting was still ongoing when reported. The immediate business risk is not a proven wider
+     commercial shutdown, but an acute security shock around a state site that can interrupt staff movement,
+     local site access and decision-making while conditions remain unsettled.
+
+     A separate operating issue is the cluster of weather and infrastructure disruptions in Japan, Sri Lanka and
+     Thailand, which directly affect transport reliability rather than security conditions. Nepal's LPG shortage and
+     the Philippine regulator's offline platform add slower-moving friction through fuel availability and
+     administrative processing, but with less evidence so far of broad service stoppage.
+
+
+
+     WEEK AT A GLANCE
+
+
+        MATERIAL DEVELOPMENTS                MARKETS REQUIRING WATCH               HIGH OR EXTREME DEVELOPMENTS
+
+        6                                    6                                     1
+
+        7-DAY WATCH ITEMS
+
+        4
+
+
+
+
+polestar-advisory.com                             info@polestar-advisory.com                                      Page 1 of 5
+                                                                                               POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL RISK PICTURE
+
+     Direct disruption this week comes through two different channels. In Kohat, the confirmed attack and
+     ongoing fighting create an immediate local security constraint for employers with people, deliveries or
+     public-facing activity near the affected area. That is a direct access and duty-of-care problem, not
+     confirmed evidence of wider transport closure.
+
+
+
+
+polestar-advisory.com                            info@polestar-advisory.com                                    Page 2 of 5
+                                                                                                                                   POLESTAR APAC WEEKLY
+
+
+
+
+     Elsewhere, business interruption is being transmitted through transport corridors and public systems.
+     Typhoon-related disruption in eastern Japan, a landslide on the Hatton Bogawantalawa Route and flooding
+     that left part of Highway 401 impassable for small vehicles all slow staff movement and time-sensitive
+     distribution where alternative routing is limited.
+
+     The more contingent exposures are administrative and energy frictions. The LTFRB platform outage after a
+     data breach can delay transactions that depend on the system, while Nepal's LPG shortage can constrain
+     fuel-dependent operations if planned imports fail to ease availability.
+
+
+
+     KEY DEVELOPMENTS
+
+        PAKISTAN | KOHAT
+        KOHAT POLICE HEADQUARTERS ATTACKED
+        Security · Extreme · 18 Sep 2026
+        ASSESSMENT: An explosion and gun attack hit a police headquarters in Kohat,
+        and the death toll rose to at least 31 including 16 police personnel. Fighting
+        was still ongoing when the toll was reported.
+        POLESTAR VIEW: Known: a severe local security incident is active. Unproven:
+        wider commercial transport disruption beyond the immediate area.
+        7-DAY INDICATOR: Watch for official confirmation that fighting has ended and
+        whether access controls around Kohat are tightened or lifted.
+        SOURCES: Ratopati; Sahara Reporters; ; thepamphlet.in; Pragativadi; The
+        Hindu; kashmirlife.net; Kashmir Life; malaysiasun.com; Bangkok Post;
+        Revoi.in; Onlinekhabar English; Business Recorder
+
+
+
+        JAPAN | EASTERN JAPAN
+        TYPHOON DUJUAN DISRUPTS EASTERN TRANSPORT
+        Weather & Natural Hazards · Moderate · 21 Sep 2026
+        ASSESSMENT: Typhoon Dujuan was approaching eastern Japan with heavy rain and transport disruption.
+        POLESTAR VIEW: Known: transport reliability is already degraded. Conditional: business interruption depends on which services or corridors are actually curtailed.
+        7-DAY INDICATOR: Watch for reports identifying affected lines, roads or airports as the typhoon approaches eastern Japan.
+        SOURCES: SuaraGarut.ID
+
+
+
+        NEPAL
+        NEPAL LPG SHORTAGE PERSISTS
+        Energy · Moderate · 20 Sep 2026
+        ASSESSMENT: Nepal is facing a severe LPG shortage linked to import failures. Nepal plans to import 160 gas bullets daily to ease the shortage.
+        POLESTAR VIEW: Known: shortage persists and extra imports are planned. Conditional: operational stress eases only if daily gas-bullet imports improve distribution.
+        7-DAY INDICATOR: Watch whether the planned 160 daily gas-bullet imports begin and are reported to ease shortages.
+        SOURCES: Ratopati; Nepalnews.com
+
+
+
+        PHILIPPINES
+        LTFRB PLATFORM GOES OFFLINE
+        Cyber · Moderate · 19 Sep 2026
+        ASSESSMENT: LTFRB is probing a data breach after its platform went offline.
+        POLESTAR VIEW: Known: platform downtime followed a reported breach probe. Unknown: scale of data exposure and whether processing delays become material.
+        7-DAY INDICATOR: Watch for official updates on platform restoration or confirmation that submissions are being handled through alternatives.
+        SOURCES: Inquirer.net
+
+
+
+
+polestar-advisory.com                                                     info@polestar-advisory.com                                                       Page 3 of 5
+                                                                                                                                 POLESTAR APAC WEEKLY
+
+
+
+
+        SRI LANKA | HATTON BOGAWANTALAWA ROUTE
+        LANDSLIDE CUTS HATTON BOGAWANTALAWA ROUTE
+        Weather & Natural Hazards · Moderate · 21 Sep 2026
+        ASSESSMENT: A landslide cut off the Hatton Bogawantalawa Route and disrupted Hill Country journeys.
+        POLESTAR VIEW: Known: a specific route disruption is affecting Hill Country journeys. Conditional: broader commercial impact depends on closure duration and
+        available alternates.
+        7-DAY INDICATOR: Watch for clearance updates or confirmation that traffic is being diverted onto workable alternate routes.
+        SOURCES: nomadlawyer.org
+
+
+
+        THAILAND
+        FLOODING BLOCKS HIGHWAY 401
+        Weather & Natural Hazards · Moderate · 19 Sep 2026
+        ASSESSMENT: Heavy rain caused flooding along Highway 401 in Surat Thani, leaving the road impassable for small vehicles. Authorities evacuated Thai and foreign
+        tourists from the affected area.
+        POLESTAR VIEW: Known: flooding has made part of the route impassable for small vehicles. Unclear: whether larger vehicles or alternate corridors can absorb traffic
+        7-DAY INDICATOR: Watch for water-level changes and official notice that Highway 401 has reopened to small vehicles.
+        SOURCES: Khaosod English
+
+
+
+
+     BUSINESS IMPLICATIONS
+
+     Security and weather disruptions both require near-term movement decisions. In and around Kohat,
+     employers should defer non-essential staff movement or meetings if operations touch the affected area
+     while fighting remains ongoing. In eastern Japan and on disrupted routes in Sri Lanka and southern
+     Thailand, transport teams should switch to route-by-route confirmation before dispatch or staff travel
+     where heavy rain, landslide damage or flooding has already interrupted journeys.
+
+     Road and fuel constraints warrant targeted continuity choices. Logistics managers with exposure to
+     Highway 401 or the Hatton Bogawantalawa corridor should reroute loads that cannot tolerate local delays,
+     triggered by confirmed impassability for small vehicles and route cut-off. In Nepal, fuel-dependent
+     operators should review local LPG coverage and prioritise critical consumption only if the planned daily
+     imports do not materially improve availability.
+
+     The LTFRB platform outage creates a systems dependency issue rather than a proven transport stoppage.
+     Firms needing regulator-facing submissions or platform-based transactions should identify any
+     backlog-sensitive tasks and hold manual workarounds ready, triggered by continued offline status or
+     confirmation that breach remediation is delaying access beyond routine interruption.
+
+
+
+
+     7 DAY WATCH
+
+       ISLAMABAD, PAKISTAN — PTI nationwide protest and long march to Islamabad
+       Watch: Track route and venue advisories, transport changes and police restrictions.
+
+       JAKARTA, INDONESIA — National Farmers Day, Semanggi II and Black September demonstrations
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       JAKARTA, INDONESIA — Conditional KSPSI Employment Bill labour demonstration
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       INDIA — Bank Strike September 28-30: SBI Issues Advisory, Check Services That Will Remain Available
+       Watch: Track organiser confirmation, transport changes and cancellation or postponement notices.
+
+
+
+polestar-advisory.com                                              info@polestar-advisory.com                                                            Page 4 of 5
+                                                                                                                POLESTAR APAC WEEKLY
+
+
+
+
+     POLESTAR OUTLOOK
+
+     The top unresolved risk is whether the Kohat attack remains a tightly localised security incident or
+     continues to impede nearby business activity. The key decision signals are whether fighting is declared
+     over and whether any new official access restrictions around the area are reported.
+
+
+
+     DISCLAIMER
+
+     Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. The information in this report is based on open
+     sources and is assessed as accurate at the time of writing. It is provided for general informational purposes only and does not
+     constitute advice or a comprehensive assessment of all risks. No reliance should be placed on this information for operational
+     decision-making without further independent verification.
+
+
+
+
+polestar-advisory.com                                     info@polestar-advisory.com                                                   Page 5 of 5
+

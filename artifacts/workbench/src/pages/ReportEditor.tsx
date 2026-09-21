@@ -46,7 +46,14 @@ import {
   type CargoPatternModelInput,
 } from "@/lib/cargoPatternModel";
 import { downloadCargoRegisterCsv } from "@/lib/cargoRegisterExport";
-import { ArrowLeft, Download, FileSpreadsheet, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Loader2, RefreshCw, Save } from "lucide-react";
+import {
+  clearRegionalRebuildInput,
+  regionalRebuildInput,
+  regionalRefreshDisabled,
+  waitForRegionalReport,
+} from "@/lib/regionalReportCreation";
+import type { RegionalReportJob } from "@workspace/api-client-react";
 import {
   exportElementToPdf,
   formatExportTimestampForFilename,
@@ -552,6 +559,10 @@ export default function ReportEditor() {
   } = useGetReport(id);
   const update = useUpdateReport();
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const [rebuildJob, setRebuildJob] = useState<RegionalReportJob | null>(null);
+  const [rebuildError, setRebuildError] = useState<string | null>(null);
+  const rebuildAbort = useRef<AbortController | null>(null);
   const todayUtc = new Date().toISOString().slice(0, 10);
   const effectiveFlashpointIssueDate =
     (form.topic === "flashpoint" || form.topic === "protests")
@@ -2282,6 +2293,7 @@ export default function ReportEditor() {
   }, [report, marketPriceRows, marketPricesFetched]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+    setEditorDirty(true);
     if (REPORT_PROSE_EDIT_KEYS.has(k)) {
       dirtyProseSections.current.add(String(k));
     }
@@ -2552,6 +2564,7 @@ export default function ReportEditor() {
             setFlashpointEditBasisFingerprint(null);
           }
           dirtyProseSections.current.clear();
+          setEditorDirty(false);
         },
       },
     );
@@ -2564,6 +2577,7 @@ export default function ReportEditor() {
   // current live payload so that editing a single Brent field after
   // Load Sample doesn't silently drop the rest of the sample.
   const applyFuelForm = (next: FuelMarketFormState) => {
+    setEditorDirty(true);
     setFuelForm(next);
     setExportError(null);
     setSampleAutoSeeded(false);
@@ -2673,6 +2687,52 @@ export default function ReportEditor() {
   const loadingTopicLabel =
     TOPIC_LABELS[pendingTopic ?? report?.topic ?? form.topic] ?? "report";
 
+  useEffect(() => {
+    return () => rebuildAbort.current?.abort();
+  }, [id]);
+
+  const refreshRegionalAnalysis = async () => {
+    if (
+      !report ||
+      !isRegionalWeeklyTopic(report.topic) ||
+      !report.updatedAt ||
+      editorDirty
+    ) return;
+    rebuildAbort.current?.abort();
+    const controller = new AbortController();
+    rebuildAbort.current = controller;
+    setRebuildError(null);
+    try {
+      const input = regionalRebuildInput(
+        report.topic,
+        report.issueDate,
+        report.id,
+        report.updatedAt,
+      );
+      const refreshedId = await waitForRegionalReport(input, {
+        signal: controller.signal,
+        onProgress: setRebuildJob,
+        onReconnecting: () => undefined,
+        retryFailed: true,
+      });
+      if (refreshedId !== report.id) {
+        throw new Error("The refresh returned a different report.");
+      }
+      clearRegionalRebuildInput();
+      seededForId.current = null;
+      setSeededId(null);
+      await qc.invalidateQueries({ queryKey: getGetReportQueryKey(report.id) });
+      await qc.invalidateQueries({ queryKey: getListReportsQueryKey() });
+      setRebuildJob(null);
+    } catch (cause) {
+      if (!controller.signal.aborted) {
+        setRebuildError(
+          cause instanceof Error ? cause.message : "Report refresh failed.",
+        );
+      }
+    }
+  };
+
   // Once the report row exists, keep the editor shell mounted while incident-
   // dependent prose/details seed. The right-hand preview already has its own
   // reportDetailsLoading state. Blocking the whole route here turned any slow
@@ -2714,6 +2774,20 @@ export default function ReportEditor() {
   const reportListLabel = isRegionalWeeklyTopic(form.topic)
     ? "Back to Regional Reports"
     : "Back to All Reports";
+  const regionalCanonical =
+    report.hardNumbers && typeof report.hardNumbers === "object" &&
+    "regionalCanonicalReport" in report.hardNumbers
+      ? (report.hardNumbers.regionalCanonicalReport as
+          | Record<string, unknown>
+          | undefined)
+      : undefined;
+  const regionalAnalysisCurrent =
+    regionalCanonical?.editorialVersion === "regional-facts-v2";
+  const sectionOverridesDirty =
+    JSON.stringify(sectionOverrides) !==
+    JSON.stringify((report.sectionOverrides as TopicSectionOverrides | null) ?? {});
+  const hasUnsavedRegionalEdits =
+    editorDirty || sectionOverridesDirty || hardNumbersEdited !== undefined;
   // The rating a card pull would derive if the analyst leaves the override
   // blank: worst credible tier among scoped incidents, else the prose
   // heuristic. Built from the live form so it tracks topic / issue-date /
@@ -2866,6 +2940,66 @@ export default function ReportEditor() {
           </Button>
         </div>
       </div>
+
+      {isRegionalWeeklyTopic(report.topic) && (
+        <section
+          className={`no-print border p-4 ${
+            regionalAnalysisCurrent
+              ? "border-[#cfd3ff] bg-[#f7f7ff]"
+              : "border-amber-400 bg-amber-50"
+          }`}
+          aria-live="polite"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-[#0b0a3d]">
+                {regionalAnalysisCurrent
+                  ? "Regional analysis is current"
+                  : "Updated regional analysis is available"}
+              </h2>
+              <p className="mt-1 text-xs text-[#4b4b60]">
+                {rebuildJob
+                  ? `Refresh status: ${rebuildJob.stage.replaceAll("_", " ")}. This report will keep ID ${report.id}.`
+                  : !report.updatedAt
+                    ? "This legacy report has no concurrency timestamp and cannot be safely refreshed in place."
+                  : hasUnsavedRegionalEdits
+                    ? "Save or discard your unsaved editor changes before refreshing. Refresh is disabled so local edits cannot be lost."
+                    : regionalAnalysisCurrent
+                      ? "You can explicitly rebuild the analysis in place without creating another report."
+                      : "Refresh this report in place with the corrected facts-based content engine. Its URL and report ID will not change."}
+              </p>
+              {rebuildError && (
+                <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+                  Refresh failed — {rebuildError} Your report was not replaced; retry below.
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              onClick={() => void refreshRegionalAnalysis()}
+              disabled={
+                regionalRefreshDisabled({
+                  hasUpdatedAt: !!report.updatedAt,
+                  hasUnsavedEdits: hasUnsavedRegionalEdits,
+                  status: rebuildJob?.status,
+                })
+              }
+              className="shrink-0 rounded-[2px] bg-[#0b0a3d] px-5 text-white hover:bg-[#25245c]"
+            >
+              {rebuildJob?.status === "queued" || rebuildJob?.status === "running" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {rebuildJob?.status === "queued" || rebuildJob?.status === "running"
+                ? `Refreshing: ${rebuildJob.stage}`
+                : rebuildError
+                  ? "Retry refresh"
+                  : "Refresh report analysis"}
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Save outcome, right where the button is. A blocked or failed save
           used to be completely silent here (validation errors render far down

@@ -15,4 +15,11 @@ export interface RegionalReportJobInput {
      * @pattern ^\d{4}-\d{2}-\d{2}$
      */
   issueDate: string;
+  /**
+     * Existing regional report to rebuild in place.
+     * @minimum 1
+     */
+  targetReportId?: number;
+  /** Required with targetReportId for optimistic concurrency. */
+  expectedUpdatedAt?: Date;
 }

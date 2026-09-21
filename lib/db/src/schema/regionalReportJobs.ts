@@ -10,6 +10,10 @@ export const regionalReportJobsTable = pgTable("regional_report_jobs", {
   reportId: integer("report_id").references(() => reportsTable.id, {
     onDelete: "set null",
   }),
+  targetReportId: integer("target_report_id").references(() => reportsTable.id, {
+    onDelete: "set null",
+  }),
+  expectedUpdatedAt: timestamp("expected_updated_at", { withTimezone: true }),
   error: text("error"),
   runToken: uuid("run_token"),
   attempt: integer("attempt").notNull().default(0),

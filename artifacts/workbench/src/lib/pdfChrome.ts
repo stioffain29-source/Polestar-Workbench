@@ -437,10 +437,11 @@ export function drawFastFactsKpiCards(
   ctx: Ctx,
   cards: KpiCardData[],
   compact = false,
+  columns: 3 | 4 = 3,
 ) {
   if (cards.length === 0) return;
   const { pdf, MX, CW } = ctx;
-  const cols = 3;
+  const cols = columns;
   const gap = 8;
   const cardW = (CW - gap * (cols - 1)) / cols;
   const STRIP_W = 3;
@@ -458,7 +459,15 @@ export function drawFastFactsKpiCards(
   const LABEL_VALUE_GAP = 3;
   const VALUE_NOTE_GAP = 6;
 
+  function labelLines(c: KpiCardData): string[] {
+    setRoboto(pdf, "bold");
+    pdf.setFontSize(LABEL_SIZE);
+    const label = sanitize(c.label.toUpperCase());
+    return cols === 4 ? pdf.splitTextToSize(label, innerW) : [label];
+  }
+
   function calcCardHeight(c: KpiCardData): number {
+    const labelH = labelLines(c).length * LABEL_H;
     pdf.setFontSize(VALUE_SIZE);
     const valueLines: string[] = pdf.splitTextToSize(sanitize(c.value), innerW);
     const valueH = Math.min(valueLines.length, 3) * VALUE_LINE_H;
@@ -474,7 +483,7 @@ export function drawFastFactsKpiCards(
     const srcH = c.source ? NOTE_LINE_H + 4 : 0;
 
     return (
-      PAD_V + LABEL_H + LABEL_VALUE_GAP + valueH + noteH + asOfH + srcH + PAD_V
+      PAD_V + labelH + LABEL_VALUE_GAP + valueH + noteH + asOfH + srcH + PAD_V
     );
   }
 
@@ -525,8 +534,9 @@ export function drawFastFactsKpiCards(
     setText(pdf, DUSK);
     setRoboto(pdf, "bold");
     pdf.setFontSize(LABEL_SIZE);
-    pdf.text(sanitize(c.label.toUpperCase()), x + PAD_L, curY + 7);
-    curY += LABEL_H + LABEL_VALUE_GAP;
+    const labels = labelLines(c);
+    labels.forEach((line, index) => pdf.text(line, x + PAD_L, curY + 7 + index * LABEL_H));
+    curY += labels.length * LABEL_H + LABEL_VALUE_GAP;
 
     // Value
     setText(pdf, NAVY);

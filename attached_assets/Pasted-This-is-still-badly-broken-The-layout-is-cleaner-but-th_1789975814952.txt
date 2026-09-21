@@ -1,0 +1,14 @@
+This is still badly broken. The layout is cleaner, but the content engine is mangling the intelligence.
+
+Regional Outlook is far too long again and raw headlines/source names are leaking straight into the prose: “Ratopati”, “SuaraGarut.ID”, “The New Indian Express”. That should never appear in the finished analytical copy.
+New Zealand is completely wrong. It says “Migration policy changes workforce access”, but the underlying assessment is Trump’s USD 100,000 H-1B visa payment requirement. That is a US policy story somehow assigned to New Zealand.
+Nepal is duplicated. The LPG shortage appears twice as separate Key Developments and twice on the map. That means deduplication is still failing.
+Pakistan text is malformed. “reporting placed the casualties at Killed, 80 Injured in Vehicle Bomb Blast” is obviously scraped headline debris, not analysis.
+The map is not selecting the most useful six items. It contains Nepal twice and the bogus New Zealand item, while genuinely useful material is displaced. Visually it is now Carto style, which is an improvement, but the selection logic is still crap.
+Cyber has disappeared again. There is no cyber development anywhere in the report.
+The Regional Risk Picture is still machine prose. Phrases such as “The development is relevant to compliance and market access, business continuity” and “Their regional importance comes from what could follow” read like stitched templates rather than analyst judgement.
+Business Implications is the same problem. It is literally concatenated country templates rather than a business assessment.
+The Outlook is still too long and repetitive, and starts restating every indicator from the Key Developments instead of giving a crisp forward judgement.
+Pagination is better than the earlier mess, but page 2 is now basically just a map and page 3 is a wall of prose. So the balance is still poor even though nothing is orphaned.
+
+The biggest issue now is crystal clear: Replit is still feeding raw article titles into the report object and then templating around them. Until that is stopped, no amount of prompt polishing is going to fix this
