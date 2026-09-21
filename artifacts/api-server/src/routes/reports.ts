@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   db,
+  incidentsTable,
   marketPricesTable,
   reportProseTable,
   reportsTable,
@@ -11,7 +12,7 @@ import type {
   Report,
   ReportProse,
 } from "@workspace/db";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import {
   CreateReportBody,
   UpdateReportBody,
@@ -22,6 +23,13 @@ import {
   REPORT_PROSE_KEYS,
 } from "../lib/reportProvenance";
 import { runRegionalWeeklyCollection } from "@workspace/ingest";
+import { defaultRelevanceCondition } from "../lib/relevanceFilter";
+import {
+  buildRegionalCanonicalReport,
+  validateRegionalCanonicalStructure,
+  type RegionalCoverageManifest,
+  type RegionalWeeklyTopic,
+} from "../../../workbench/src/lib/regionalWeekly";
 
 async function hydrateLegacyProvenance(
   report: Report,
@@ -237,41 +245,91 @@ router.post("/reports", async (req, res): Promise<void> => {
   res.status(201).json(row);
 });
 
-router.post("/reports/regional-coverage", async (req, res): Promise<void> => {
+router.post("/reports/regional-create", async (req, res): Promise<void> => {
   const topic = req.body?.topic;
+  const issueDate = typeof req.body?.issueDate === "string" ? req.body.issueDate : "";
   if (topic !== "apac_weekly" && topic !== "middle_east_weekly") {
     res.status(400).json({ error: "A valid regional report topic is required." });
     return;
   }
-  const run = await runRegionalWeeklyCollection(
-    topic === "apac_weekly" ? "apac" : "middle_east",
-    { commit: true },
-  );
-  const failed = run.coverage.filter(
-    (check) => check.status !== "checked" || check.errors.length > 0,
-  );
-  if (failed.length > 0) {
-    res.status(503).json({
-      error: `Regional source collection failed: ${failed
-        .map((check) => `${check.domain}: ${check.errors.join(", ") || "no source completed"}`)
-        .join("; ")}`,
-    });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) {
+    res.status(400).json({ error: "A valid report issue date is required." });
     return;
   }
-  res.json({
-    requiredDomains: run.coverage.map((check) => check.domain),
-    domains: run.coverage,
-    forwardSearch: {
-      domain: "forwardSearch",
-      status: "checked",
-      sourceNames: ["protest_events", "incident_advisories"],
-      itemsFetched: 0,
-      candidatesAccepted: 0,
-      errors: [],
-    },
-    requiredGeographies: run.requiredGeographies,
-    searchedGeographies: run.searchedGeographies,
-  });
+  try {
+    const run = await runRegionalWeeklyCollection(
+      topic === "apac_weekly" ? "apac" : "middle_east",
+      { commit: true },
+    );
+    const failed = run.coverage.filter(
+      (check) => check.status !== "checked" || check.errors.length > 0,
+    );
+    if (failed.length > 0) {
+      res.status(503).json({
+        error: `Regional source collection failed: ${failed
+          .map((check) => `${check.domain}: ${check.errors.join(", ") || "no source completed"}`)
+          .join("; ")}`,
+      });
+      return;
+    }
+    const coverageManifest: RegionalCoverageManifest = {
+      requiredDomains: run.coverage.map((check) => check.domain),
+      domains: run.coverage,
+      forwardSearch: {
+        domain: "forwardSearch",
+        status: "checked",
+        sourceNames: ["protest_events", "incident_advisories"],
+        itemsFetched: 0,
+        candidatesAccepted: 0,
+        errors: [],
+      },
+      requiredGeographies: run.requiredGeographies,
+      searchedGeographies: run.searchedGeographies,
+    };
+    const since = new Date(`${issueDate}T23:59:59.999Z`);
+    since.setUTCDate(since.getUTCDate() - 7);
+    const incidents = await db
+      .select()
+      .from(incidentsTable)
+      .where(and(gte(incidentsTable.occurredAt, since), defaultRelevanceCondition()))
+      .orderBy(desc(incidentsTable.occurredAt));
+    const regionalCanonicalReport = buildRegionalCanonicalReport(
+      incidents.map((incident) => ({
+        ...incident,
+        occurredAt: incident.occurredAt.toISOString(),
+        incidentDate: incident.incidentDate?.toISOString() ?? null,
+        summary: incident.summary ?? "",
+      })),
+      issueDate,
+      topic as RegionalWeeklyTopic,
+      [],
+      coverageManifest,
+    );
+    const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);
+    if (canonicalErrors.length > 0) {
+      res.status(422).json({ error: canonicalErrors.join(" ") });
+      return;
+    }
+    const [row] = await db.transaction(async (tx) =>
+      tx
+        .insert(reportsTable)
+        .values({
+          title: topic === "apac_weekly" ? "Polestar APAC Weekly" : "Polestar Middle East Weekly",
+          topic,
+          issueDate,
+          status: "draft",
+          hardNumbers: normalizeHardNumbers({ regionalCanonicalReport }),
+          updatedAt: new Date(),
+        })
+        .returning(),
+    );
+    res.status(201).json(row);
+  } catch (cause) {
+    req.log?.error?.({ err: cause, topic, issueDate }, "Regional report creation failed");
+    res.status(500).json({
+      error: cause instanceof Error ? cause.message : "Regional report creation failed.",
+    });
+  }
 });
 
 router.patch("/reports/:id", async (req, res): Promise<void> => {

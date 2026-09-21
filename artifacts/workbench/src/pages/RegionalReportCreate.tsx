@@ -1,22 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import {
-  createReport,
-  listIncidents,
   getGetDashboardOverviewQueryKey,
   getListReportsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { canonicalReportTitle } from "@/lib/reportNaming";
 import { currentReportDate } from "@/lib/reportLifecycle";
-import {
-  buildRegionalCanonicalReport,
-  regionalCanonicalReportFromHardNumbers,
-  type RegionalCoverageManifest,
-  validateRegionalCanonicalStructure,
-} from "@/lib/regionalWeekly";
 
 type RegionalTopic = "apac_weekly" | "middle_east_weekly";
 type Stage = "collecting" | "building" | "saving";
@@ -55,7 +46,7 @@ export default function RegionalReportCreate() {
     }
     const generation = ++runGeneration.current;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 60_000);
+    const timeout = window.setTimeout(() => controller.abort(), 120_000);
     const active = () => generation === runGeneration.current;
 
     void (async () => {
@@ -63,50 +54,20 @@ export default function RegionalReportCreate() {
         setError(null);
         setStage("collecting");
         const issueDate = currentReportDate();
-        const coverageResponse = await fetch("/api/reports/regional-coverage", {
+        const response = await fetch("/api/reports/regional-create", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic, issueDate }),
           signal: controller.signal,
         });
-        if (!coverageResponse.ok) {
-          const payload = await coverageResponse.json().catch(() => null) as { error?: string } | null;
-          throw new Error(payload?.error || `Regional source collection failed (${coverageResponse.status}).`);
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(payload?.error || `Report creation failed (${response.status}).`);
         }
-        const coverage = await coverageResponse.json() as RegionalCoverageManifest;
+        const report = await response.json() as { id: number | string };
         if (!active()) return;
-
-        setStage("building");
-        const incidents = await listIncidents({ days: 7 }, { signal: controller.signal });
-        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-        const regionalCanonicalReport = buildRegionalCanonicalReport(
-          incidents as never[],
-          issueDate,
-          topic,
-          [],
-          coverage,
-        );
-        const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);
-        if (canonicalErrors.length > 0) {
-          throw new Error(canonicalErrors.join(" "));
-        }
-        if (!active()) return;
-
         setStage("saving");
-        const report = await createReport(
-          {
-            title: canonicalReportTitle(topic),
-            topic,
-            issueDate,
-            status: "draft",
-            hardNumbers: { regionalCanonicalReport },
-          } as never,
-          { signal: controller.signal },
-        );
-        if (!regionalCanonicalReportFromHardNumbers(report.hardNumbers, topic, issueDate)) {
-          throw new Error("The server did not persist the validated regional report.");
-        }
         await Promise.all([
           qc.invalidateQueries({ queryKey: getListReportsQueryKey() }),
           qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
@@ -117,7 +78,7 @@ export default function RegionalReportCreate() {
         const timedOut = cause instanceof DOMException && cause.name === "AbortError";
         setError(
           timedOut
-            ? "Report creation timed out. No report was created."
+            ? "Report creation timed out before the server responded. Return to Regional Reports before trying again."
             : cause instanceof Error
               ? cause.message
               : "Report creation failed.",

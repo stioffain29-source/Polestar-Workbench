@@ -74,3 +74,9 @@ The landing-page Create control must be a real link to a dedicated creation rout
 **Why:** repeated inline implementations appeared frozen during 20–30 second source collection/build work, encouraged repeat clicks and duplicate drafts, and once failed to send any request at all.
 
 **How to apply:** navigate immediately on click, show Collecting/Building/Opening states on the destination, enforce a bounded timeout, persist the canonical object atomically, and only then redirect to the editor. Keep Create available beside Open Current Report.
+
+Regional creation must be one server-owned request. The browser must not download the incident set, build the canonical report, then issue a second save request.
+
+**Why:** splitting collection, synchronous browser assembly and persistence across separate requests made the button appear frozen and left failure and duplicate-click windows between stages.
+
+**How to apply:** the authenticated create endpoint collects sources, queries current relevant incidents, builds and validates the canonical object, inserts the complete row in one transaction, and returns that row. The client only shows progress and redirects using the returned ID.

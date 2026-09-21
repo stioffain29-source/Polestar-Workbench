@@ -1,6 +1,6 @@
 import { addDays, differenceInCalendarDays, format, isAfter, isValid, parse, parseISO } from "date-fns";
-import { consolidateCountryStories } from "@/lib/countrySameStory";
-import { incidentMapFallback } from "@/lib/incidentMapFallback";
+import { consolidateCountryStories } from "./countrySameStory";
+import { incidentMapFallback } from "./incidentMapFallback";
 
 export type RegionalWeeklyTopic = "apac_weekly" | "middle_east_weekly";
 
