@@ -2470,6 +2470,39 @@ export const CreateReportBody = zod.object({
 })
 
 
+/**
+ * Returns immediately. The same requestId always refers to the same creation attempt and completed report; a new explicit Create action uses a new requestId, including for the same topic and date.
+
+ * @summary Start or resume one regional report creation job
+ */
+export const startRegionalReportBodyIssueDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const StartRegionalReportBody = zod.object({
+  "requestId": zod.string().uuid(),
+  "topic": zod.enum(['apac_weekly', 'middle_east_weekly']),
+  "issueDate": zod.string().regex(startRegionalReportBodyIssueDateRegExp).describe('Calendar date, kept as a YYYY-MM-DD string in all clients.')
+})
+
+
+/**
+ * @summary Read regional report creation progress and its saved report
+ */
+export const GetRegionalReportJobParams = zod.object({
+  "jobId": zod.coerce.string().uuid()
+})
+
+export const GetRegionalReportJobResponse = zod.object({
+  "id": zod.string().uuid(),
+  "topic": zod.enum(['apac_weekly', 'middle_east_weekly']),
+  "issueDate": zod.string(),
+  "status": zod.enum(['queued', 'running', 'completed', 'failed']),
+  "stage": zod.enum(['queued', 'collecting', 'building', 'saving', 'completed', 'failed']),
+  "reportId": zod.number().nullable(),
+  "error": zod.string().nullable()
+})
+
+
 export const GetReportParams = zod.object({
   "id": zod.coerce.number()
 })

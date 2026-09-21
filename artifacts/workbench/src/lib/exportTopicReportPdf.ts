@@ -6,8 +6,7 @@ import { buildFuelCoverageSummary } from "@/lib/fuelCoverage";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
-import worldCompleteGeo from "@/assets/worldComplete.geo.json";
-import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import { RegionalReportMap } from "@/components/RegionalReportMap";
 import type { MarketPrice } from "@workspace/api-client-react";
 import {
   buildCargoPatternModel,
@@ -663,100 +662,21 @@ function drawRelatedIncidents(
   void reportCadence(topic);
 }
 
-function drawRegionalHotspotMap(
+async function drawRegionalHotspotMap(
   ctx: Ctx,
-  incidents: TopicReportIncident[],
+  points: RegionalCanonicalReport["mapPoints"],
   topic: RegionalWeeklyTopic = "middle_east_weekly",
-  canonicalPoints?: RegionalCanonicalReport["mapPoints"],
 ) {
-  const points = canonicalPoints ?? buildRegionalMapPoints(incidents, topic);
-  const { pdf, MX, CW } = ctx;
-  const h = 180;
-  ensureSpace(ctx, h + 22);
-  drawSectionHeading(ctx, "Regional Hotspot Map");
-  const gap = 10;
-  const mapW = CW * 0.58;
-  const railX = MX + mapW + gap;
-  const railW = CW - mapW - gap;
-  const bounds = topic === "apac_weekly"
-    ? { minLng: 60, maxLng: 180, minLat: -50, maxLat: 55 }
-    : { minLng: 25, maxLng: 65, minLat: 10, maxLat: 42 };
-  const project = (lng: number, lat: number): [number, number] => [
-    MX + 7 + ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * (mapW - 14),
-    ctx.y + 7 + ((bounds.maxLat - lat) / (bounds.maxLat - bounds.minLat)) * (h - 14),
-  ];
-  setFill(pdf, "#dfeaf3");
-  setStroke(pdf, "#bdc8d6");
-  pdf.setLineWidth(0.4);
-  pdf.rect(MX, ctx.y, mapW, h, "FD");
-  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon>;
-  for (const feature of collection.features) {
-    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
-    for (const polygon of polygons) {
-      for (const ring of polygon) {
-        const mapped = ring
-          .filter(([lng, lat]) => lng >= bounds.minLng - 3 && lng <= bounds.maxLng + 3 && lat >= bounds.minLat - 3 && lat <= bounds.maxLat + 3)
-          .map(([lng, lat]) => project(lng, lat));
-        if (mapped.length < 3 || mapped.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) continue;
-        setFill(pdf, "#f7f4ed");
-        for (let index = 1; index < mapped.length - 1; index += 1) {
-          pdf.triangle(mapped[0][0], mapped[0][1], mapped[index][0], mapped[index][1], mapped[index + 1][0], mapped[index + 1][1], "F");
-        }
-        setStroke(pdf, "#8999aa");
-        for (let index = 0; index < mapped.length - 1; index += 1) {
-          pdf.line(mapped[index][0], mapped[index][1], mapped[index + 1][0], mapped[index + 1][1]);
-        }
-      }
-    }
+  // The same static tile/marker/key component as ReportPreview. Do not rebuild
+  // or sort saved points here: numbering and overlapping markers must agree.
+  const rendered = await embedReactChartInPdf(
+    ctx,
+    createElement(RegionalReportMap, { points, topic }),
+    { useCssPixelUnits: true, fitRemaining: false },
+  );
+  if (!rendered) {
+    throw new Error("The regional map could not be exported. Use Download PDF in the report editor with the basemap loaded.");
   }
-  setFill(pdf, "#f7f8fb");
-  setStroke(pdf, "#d2d6e1");
-  pdf.rect(railX, ctx.y, railW, h, "FD");
-  if (points.length === 0) {
-    setRoboto(pdf, "regular");
-    setText(pdf, DUSK);
-    pdf.setFontSize(8);
-    pdf.text("No selected development has a verified plottable location.", railX + 10, ctx.y + 20);
-    ctx.y += h + 8;
-    return;
-  }
-  const selected = [...points]
-    .sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title));
-  const cardGap = 4;
-  const cardH = Math.min(48, (h - 16 - cardGap * Math.max(0, selected.length - 1)) / selected.length);
-  selected.forEach((point, index) => {
-    const [x, y] = project(point.lng, point.lat);
-    const severityColor = SEV_COLOR[sevKey(point.severity)] ?? ELECTRIC;
-    setFill(pdf, severityColor);
-    setStroke(pdf, "#ffffff");
-    pdf.setLineWidth(1);
-    pdf.circle(x, y, 7, "FD");
-    setText(pdf, "#ffffff");
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(7.5);
-    pdf.text(String(index + 1), x, y + 2.5, { align: "center" });
-    const cardY = ctx.y + 8 + index * (cardH + cardGap);
-    setFill(pdf, "#ffffff");
-    setStroke(pdf, "#c8cfda");
-    pdf.setLineWidth(0.5);
-    pdf.rect(railX + 7, cardY, railW - 14, cardH, "FD");
-    setFill(pdf, severityColor);
-    pdf.rect(railX + 7, cardY, 4, cardH, "F");
-    setText(pdf, NAVY);
-    setRoboto(pdf, "bold");
-    pdf.setFontSize(8);
-    pdf.text(`${index + 1}  ${sanitize(point.label.toUpperCase())}`, railX + 16, cardY + 11);
-    pdf.setFontSize(7.3);
-    const titleLines = pdf.splitTextToSize(sanitize(clipCalloutTitle(point.title)), railW - 30).slice(0, 2);
-    pdf.text(titleLines, railX + 16, cardY + 21);
-    setText(pdf, DUSK);
-    setRoboto(pdf, "regular");
-    pdf.setFontSize(6.8);
-    const detail = `${point.eventDate ? `${format(parseISO(point.eventDate), "d MMM")} · ` : ""}${clipCalloutSummary(point.summary || "")}`;
-    const detailLines = pdf.splitTextToSize(sanitize(detail), railW - 30).slice(0, 2);
-    pdf.text(detailLines, railX + 16, cardY + 37);
-  });
-  ctx.y += h + 8;
 }
 
 function cargoPlaceLine(row: CargoAppendixRow): string {
@@ -1339,6 +1259,11 @@ export async function exportTopicReportPdf(
     }
   }
 
+  if (isRegionalWeekly && regionalCanonical) {
+    ctx.y += 14;
+    await drawRegionalHotspotMap(ctx, regionalCanonical.mapPoints, regionalTopic);
+  }
+
     const rawWindow = filterIncidentsToWindow(
     incidents,
     data.topic,
@@ -1861,7 +1786,13 @@ export async function exportTopicReportPdf(
       }
     } else if (isRegionalWeekly && regionalCanonical) {
       if (show("situation")) {
-        ensureSpace(ctx, 56);
+        // The map may fill the preceding page. Keep this heading with its first
+        // paragraph; renderProse moves intact paragraphs using 17pt line height.
+        setRoboto(ctx.pdf, "light");
+        ctx.pdf.setFontSize(11);
+        const firstRiskParagraph = sanitize(regionalCanonical.riskPicture).split(/\n+/).find((part) => part.trim()) ?? "";
+        const firstRiskHeight = ctx.pdf.splitTextToSize(firstRiskParagraph, ctx.CW).length * 17 + 14;
+        ensureSpace(ctx, Math.min(ctx.H - ctx.TOP - ctx.BOTTOM, firstRiskHeight + 70));
         ctx.y += 14;
         drawSectionHeading(ctx, "Regional Risk Picture");
         renderProse(ctx, regionalCanonical.riskPicture);

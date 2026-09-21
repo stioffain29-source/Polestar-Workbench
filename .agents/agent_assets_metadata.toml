@@ -1423,3 +1423,17 @@ mtime_ms = 1789950071164
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/43d46d09-79f7-443d-86f5-66a93e3c5dcc/baf6a707-5e08-4741-9b63-abde3976da2e"
 storage_version_token = "1789950118909599"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "X5PCZpDopjjMxrtLN0Pxk"
+uri = "file://screenshots/regional-map-fix/apac_weekly-preview.png"
+type = "image"
+title = "Updated regional report map"
+description = "Rendered from your saved APAC report: all six markers visible, overlapping Nepal markers separated, and the same map verified in the PDF export."
+logical_id = "d7867b2f-c334-495e-a170-160c8f57f49e"
+content_hash = "sha256:0f72e3e28ef81973c92fce129449cd1920f55c669153445b36570918845e09c7"
+size = 130744
+mtime_ms = 1789974072896
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/d7867b2f-c334-495e-a170-160c8f57f49e/018b2593-f391-4603-ac0a-c2ac29b73873"
+storage_version_token = "1789974286181512"
+content_type = "image/png"

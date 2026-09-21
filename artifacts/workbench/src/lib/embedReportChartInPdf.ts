@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { ReactElement } from "react";
 import { ensureSpace, drawSectionHeading, setRoboto, setText, type Ctx } from "./pdfChrome";
+import { waitForRegionalMapTiles } from "./regionalReportMapAssets";
 
 /** Optional section heading kept together with the chart image (see below). */
 export interface EmbedChartOptions {
@@ -100,6 +101,24 @@ function makeCentredLabelCanvas(opts: {
  * rasterisation. Scoped to the data attributes, so nothing else is touched.
  */
 function rasteriseChipsToCanvas(host: HTMLElement): void {
+  // Keep the positioned marker wrapper intact; replacing it would lose the
+  // Mercator coordinates. Only its text is rasterised for a centred PDF label.
+  host.querySelectorAll<HTMLElement>("[data-regional-map-marker]").forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    const cs = getComputedStyle(node);
+    const label = node.textContent?.trim();
+    if (!label || rect.width < 1 || rect.height < 1) return;
+    const w = rect.width - toNum(cs.borderLeftWidth, 0) - toNum(cs.borderRightWidth, 0);
+    const h = rect.height - toNum(cs.borderTopWidth, 0) - toNum(cs.borderBottomWidth, 0);
+    const canvas = makeCentredLabelCanvas({
+      text: label, w, h, bg: "rgba(0,0,0,0)", fg: cs.color,
+      fontPx: toNum(cs.fontSize, 12), fontWeight: cs.fontWeight,
+      letterSpacingPx: 0, radius: 0, circle: true,
+    });
+    canvas.style.display = "block";
+    canvas.style.flex = "0 0 auto";
+    node.replaceChildren(canvas);
+  });
   host.querySelectorAll<HTMLElement>("[data-raster-chip]").forEach((node) => {
     const rect = node.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return;
@@ -327,6 +346,8 @@ export async function embedChartMarkupInPdf(
 
   try {
     await waitForFonts();
+    const isRegionalMap = !!host.querySelector("[data-regional-map-root]");
+    if (isRegionalMap) await waitForRegionalMapTiles(host);
     // Force layout so percentage-width SVGs resolve before capture.
     void host.offsetHeight;
     await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
@@ -347,6 +368,8 @@ export async function embedChartMarkupInPdf(
       scale: host.querySelector("[data-report-raster-scale]") ? 4 : 1.5,
       backgroundColor: "#ffffff",
       logging: false,
+      useCORS: isRegionalMap,
+      imageTimeout: isRegionalMap ? 10_000 : 15_000,
       width: widthCss,
       windowWidth: widthCss,
     });

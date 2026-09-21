@@ -18,6 +18,7 @@ async function buildAll() {
     entryPoints: [
       path.resolve(artifactDir, "src/index.ts"),
       path.resolve(artifactDir, "src/ingestWorker.ts"),
+      path.resolve(artifactDir, "src/regionalReportWorker.ts"),
     ],
     platform: "node",
     bundle: true,

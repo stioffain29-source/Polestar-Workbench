@@ -7,7 +7,7 @@ APAC Weekly and Middle East Weekly are regional business-operating intelligence 
 
 **Why:** The owner amended both products to provide a complete regional operating picture while retaining the existing cover, branding and export workflow. APAC was rebuilt first; the owner subsequently approved repeating the same model for Middle East Weekly.
 
-**How to apply:** BOTH products run independent discovery passes for security/conflict, political, regulatory, business/operational disruption, energy/utilities, weather/hazards and cyber. Persist the discovery domain with each source record; do not infer report structure from a general incident feed. Cluster sources by underlying event before selecting by operational materiality, never article volume; preserve corroborating evidence. Target five to eight genuinely distinct developments (fewer only after a complete seven-domain/geography/forward-search audit proves a true shortage), and map no more than three items from that final set. Reject commentary, declarations without binding action, weak proposed laws, minor local crime/community stories, drills/false claims, aftermath-only incidents and events without demonstrated operating consequence. Keep preview/PDF parity.
+**How to apply:** BOTH products run independent discovery passes for security/conflict, political, regulatory, business/operational disruption, energy/utilities, weather/hazards and cyber. Persist the discovery domain with each source record; do not infer report structure from a general incident feed. Cluster sources by underlying event before selecting by operational materiality, never article volume; preserve corroborating evidence. Target five to eight genuinely distinct developments (fewer only after a complete seven-domain/geography/forward-search audit proves a true shortage), and map every selected, plottable development. Reject commentary, declarations without binding action, weak proposed laws, minor local crime/community stories, drills/false claims, aftermath-only incidents and events without demonstrated operating consequence. Keep preview/PDF parity.
 
 Both Regional Weeklies reassess severity from the underlying facts at report time; inherited labels, dramatic wording and source volume do not control it. Consequences, intent, method, casualties and verified operating effects do. Bombing, missile and military-incursion semantics classify before transport or energy words, so a nearby airport, vehicle or pipeline reference cannot override the event itself.
 
@@ -15,7 +15,7 @@ Both Regional Weeklies reassess severity from the underlying facts at report tim
 
 **How to apply:** Use the reassessed severity in ranking, rendered output and map points. A deliberate attack without verified casualties, damage or closure can remain Moderate; compound attacks with casualties can be High; mass-casualty attacks can be Extreme. Regulatory changes without immediate material disruption remain Low or Moderate. Before canonical generation, compare armed attacks with routine regulatory items and block inconsistent ordering for review. A locality described as a “border province” is not evidence of border closure or cross-border disruption.
 
-Both reports use content-aware pagination rather than a fixed page allocation: avoid sparse section-only pages, flow related sections together, and never clip text. Their risk maps are intelligence visuals built only from final curated Key Developments, capped at three items and aligned with Week at a Glance and Key Developments. Keep the analytical Regional Outlook, concise factual metrics, non-empty risk themes, five to eight Key Developments where evidence supports them, continuous Business Implications, genuine dated 7 Day Watch capped at five, Polestar Outlook and disclaimer. Empty categories are omitted, not filled with “no material development” prose. Preserve the existing cover, branding, header, footer and jsPDF architecture.
+Both reports use content-aware pagination rather than a fixed page allocation: avoid sparse section-only pages, flow related sections together, and never clip text. Their risk maps are intelligence visuals built only from final curated Key Developments, showing every plottable selected item and aligned with Week at a Glance and Key Developments. Keep the analytical Regional Outlook, concise factual metrics, non-empty risk themes, five to eight Key Developments where evidence supports them, continuous Business Implications, genuine dated 7 Day Watch capped at five, Polestar Outlook and disclaimer. Empty categories are omitted, not filled with “no material development” prose. Preserve the existing cover, branding, header, footer and jsPDF architecture.
 
 The export quality gate, preview, charts, BLUF, domain synthesis and watchlist must all receive the same region/window-filtered and event-clustered evidence before selecting the final developments. Never validate raw source rows: article volume and duplicate source coverage will falsely block a valid assessment.
 
@@ -39,11 +39,11 @@ Each Regional Weekly has one persisted canonical report object. Preview, saved r
 
 **How to apply:** Verify actual event/policy dates BEFORE curation, then build once, persist the complete canonical object, validate it after reload and fail closed when absent or stale. Never substitute publication, scrape, ingestion or report dates; exclude unresolved DATE UNVERIFIED items. Event-family keys must describe the actual event, never just a country: same-country events such as a capital missile attack and a pipeline shutdown remain separate, while variant headlines for one cross-border incursion collapse together.
 
-Regional Weekly reports do not render an incident map. The owner rejected the map as analytical slop; location belongs in the development heading and narrative.
+Regional Weekly maps must appear in both preview and the actual Download PDF path. The owner's later request to replace the map supersedes the earlier no-map direction.
 
-**Why:** Even the fixed basemap and external label rail consumed scarce page space without adding decision-useful analysis.
+**Why:** An old drawing function still existed but was never called by the active PDF branch; its presence in source was not proof of export parity. Effect-driven map libraries also cannot populate an immediately captured static HTML snapshot.
 
-**How to apply:** Omit the map in preview and PDF. Keep canonical points only for data compatibility; do not use them to justify a visual. Use the saved space for the Regional Outlook and Risk Picture.
+**How to apply:** Use the same static-renderable map in both surfaces. Separate overlapping numbered badges without changing geographic anchors or saved points. Await remote basemap tiles under a bounded deadline and stop export on tile failure rather than shipping blank geography. Verify the actual browser-generated PDF visually, not just extracted text.
 
 Technical validity is not editorial acceptance. A Regional Weekly fails if it is a sparse incident digest padded into multiple pages, recycles the same boilerplate across sections or regions, hides evidence behind source counts, or substitutes generic “verify and monitor” instructions for a specific business-risk judgement.
 
@@ -69,20 +69,26 @@ The Regional Reports landing page must always keep “Create Report” available
 
 **How to apply:** Show both actions when a current report exists. The create handler must create a new row rather than redirecting to the current one.
 
-The landing-page Create control must be a real link to a dedicated creation route, not a long-running async click handler on the report grid. The creation route owns collection, canonical assembly, persistence and redirect, with visible stages and an in-page retryable error.
+The landing-page Create control must be a real link to a dedicated creation route, not a long-running async click handler on the report grid. That page follows the server-owned creation job and redirects after persistence, with visible stages and an in-page retryable error.
 
 **Why:** repeated inline implementations appeared frozen during 20–30 second source collection/build work, encouraged repeat clicks and duplicate drafts, and once failed to send any request at all.
 
-**How to apply:** navigate immediately on click, show Collecting/Building/Opening states on the destination, enforce a bounded timeout, persist the canonical object atomically, and only then redirect to the editor. Keep Create available beside Open Current Report.
+**How to apply:** navigate immediately on click, show real Collecting/Building/Opening progress on the destination, preserve the creation identity through refresh/reconnection, persist the canonical object atomically, and only then redirect to the editor. Keep Create available beside Open Current Report.
 
-Regional creation must be one server-owned request. The browser must not download the incident set, build the canonical report, then issue a second save request.
+Regional creation must be one durable server-owned job, not one long-lived HTTP request. The browser must not download the incident set, build the canonical report, then issue a second save request.
 
-**Why:** splitting collection, synchronous browser assembly and persistence across separate requests made the button appear frozen and left failure and duplicate-click windows between stages.
+**Why:** splitting collection, synchronous browser assembly and persistence made the button appear frozen. Moving all work into a single awaited HTTP request still left no recovery identity when the browser reported “Failed to fetch.” The precise transport cause was unproven; missing completion logs alone do not establish that a request never reached the app.
 
-**How to apply:** the authenticated create endpoint collects sources, queries current relevant incidents, builds and validates the canonical object, inserts the complete row in one transaction, and returns that row. The client only shows progress and redirects using the returned ID.
+**How to apply:** use short authenticated submission/status calls. Retries and refreshes must resume the same attempt; each explicit Create remains a new report even on the same topic/date. Persist the complete canonical report and successful job result together before opening the editor. Collection runs outside the HTTP process with actual termination on its deadline or parent loss, not merely a rejected timeout promise. Never present a development route-harness check as proof of the private production browser flow.
 
 Regional reports use the source occurrence timestamp when a distinct incident date was not extracted, and the map plots every selected, plottable development rather than an arbitrary top three.
 
 **Why:** incident rows are designed for consumers to fall back to occurredAt, but the regional builder instead dropped every null incidentDate row; this collapsed a healthy evidence set to one card and one map dot. The three-point map cap then hid valid evidence even in healthy reports.
 
 **How to apply:** preserve explicit incidentDate when present; otherwise use occurredAt as the evidence date. Curate to the requested region before canonical assembly, require at least five selected developments, and pass all selected coordinate/fallback points to preview and PDF renderers.
+
+A marker-coverage fix is not a visual map replacement. Do not explain an unchanged map as a stale saved report without checking the newest production snapshot and both visible renderers.
+
+**Why:** the newest saved report already contained the expanded marker set while the preview still used the previous map design and the active PDF path omitted the map. Recommending another creation or publish without changing those renderers would not address the owner's visual complaint.
+
+**How to apply:** establish whether the request concerns design, geography or marker coverage; verify that specific change in the actual preview and PDF. Keep saved analytical facts intact when changing presentation.

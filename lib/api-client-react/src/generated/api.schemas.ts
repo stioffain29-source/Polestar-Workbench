@@ -670,6 +670,66 @@ export interface SourceHealth {
   byStatus: SourceHealthBucket[];
 }
 
+export type RegionalReportJobInputTopic = typeof RegionalReportJobInputTopic[keyof typeof RegionalReportJobInputTopic];
+
+
+export const RegionalReportJobInputTopic = {
+  apac_weekly: 'apac_weekly',
+  middle_east_weekly: 'middle_east_weekly',
+} as const;
+
+export interface RegionalReportJobInput {
+  requestId: string;
+  topic: RegionalReportJobInputTopic;
+  /**
+     * Calendar date, kept as a YYYY-MM-DD string in all clients.
+     * @pattern ^\d{4}-\d{2}-\d{2}$
+     */
+  issueDate: string;
+}
+
+export type RegionalReportJobTopic = typeof RegionalReportJobTopic[keyof typeof RegionalReportJobTopic];
+
+
+export const RegionalReportJobTopic = {
+  apac_weekly: 'apac_weekly',
+  middle_east_weekly: 'middle_east_weekly',
+} as const;
+
+export type RegionalReportJobStatus = typeof RegionalReportJobStatus[keyof typeof RegionalReportJobStatus];
+
+
+export const RegionalReportJobStatus = {
+  queued: 'queued',
+  running: 'running',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export type RegionalReportJobStage = typeof RegionalReportJobStage[keyof typeof RegionalReportJobStage];
+
+
+export const RegionalReportJobStage = {
+  queued: 'queued',
+  collecting: 'collecting',
+  building: 'building',
+  saving: 'saving',
+  completed: 'completed',
+  failed: 'failed',
+} as const;
+
+export interface RegionalReportJob {
+  id: string;
+  topic: RegionalReportJobTopic;
+  issueDate: string;
+  status: RegionalReportJobStatus;
+  stage: RegionalReportJobStage;
+  /** @nullable */
+  reportId: number | null;
+  /** @nullable */
+  error: string | null;
+}
+
 /**
  * @nullable
  */

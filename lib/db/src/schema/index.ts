@@ -7,6 +7,7 @@ export * from "./gdeltStructuredItems";
 export * from "./strikes";
 export * from "./sources";
 export * from "./reports";
+export * from "./regionalReportJobs";
 export * from "./spotReports";
 export * from "./specialReports";
 export * from "./dataCentreFacilities";

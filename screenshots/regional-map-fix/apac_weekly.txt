@@ -1,0 +1,243 @@
+POLESTAR APAC WEEKLY
+POLESTAR INSIGHTS
+REPORTING PERIOD: 15 SEPTEMBER 2026 - 21 SEPTEMBER 2026
+
+
+
+
+POLESTAR-ADVISORY.COM
+                                                                                                 POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL OUTLOOK
+
+     The principal APAC changes this week were the Kohat police-facility bombing and nepal Faces Severe LPG
+     Gas Shortage Amidst Import Failures. A car bomb struck a police facility in Kohat, Khyber Pakhtunkhwa;
+     reporting placed the casualties at Killed, 80 Injured in Vehicle Bomb Blast ; and attackers detonated a bomb
+     and opened fire on a vehicle carrying territorial defence volunteers in Narathiwat on 18 September. The
+     High or Extreme assessments are confined to the Kohat police-facility bombing and the
+     bomb-and-shooting attack in Narathiwat; they do not establish the same operating condition across the
+     region. The main continuity issue is nepal Faces Severe LPG Gas Shortage Amidst Import Failures Ratopati;
+     and typhoon Dujuan Approaches Eastern Japan Bringing Heavy Rain and Transport Disruption
+     SuaraGarut.ID. The lower-severity but potentially broader business change is trump extends USD 100,000
+     H-1B visa payment requirement for another year The New Indian Express. This distinction matters: violent
+     events require location-specific movement and security decisions, while energy, transport or workforce
+     measures can spread through cargo schedules, staffing and compliance even when their immediate
+     physical severity is lower. The business response should therefore be selective. Security and travel teams
+     should tighten controls only around the named attack or military locations and avoid converting strategic
+     concern into unsupported closure claims. Operations teams should verify the status of any affected airport,
+     terminal, pipeline or route before rerouting. Workforce and compliance teams should identify the employee
+     groups actually caught by the reported policy change. A broader regional escalation would require evidence
+     that one of these local effects is spreading into a major transport corridor, operating site or critical supply
+     chain; absent that transmission, the report supports local controls rather than a general change in regional
+     posture.
+
+
+
+
+polestar-advisory.com                             info@polestar-advisory.com                                      Page 1 of 6
+                                                     POLESTAR APAC WEEKLY
+
+
+
+
+polestar-advisory.com   info@polestar-advisory.com                Page 2 of 6
+                                                                                                POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL RISK PICTURE
+
+     The week's risk picture has two different scales. Physical-security events are acute but geographically
+     narrow. Pakistan: The immediate exposure is to personnel safety and security-site access; the assessment
+     depends on whether the incident remains contained, prompts new restrictions or produces repeat
+     disruption around the named location; and thailand: The immediate exposure is to personnel safety and
+     security-site access; the assessment depends on whether the incident remains contained, prompts new
+     restrictions or produces repeat disruption around the named location Their regional importance comes
+     from what could follow, not from an assumption that the first incident already disrupted every nearby
+     business. A repeat attack, a wider security cordon or restrictions on a transport node would convert a local
+     threat into an operating constraint; without that evidence, exposure remains concentrated around the
+     named locations. Continuity developments have a different transmission path. Nepal: The development is
+     relevant to compliance and market access, business continuity; its significance depends on whether the
+     named access, continuity or compliance effect persists; japan: Flood exposure can interrupt roads, border
+     crossings, sites and local supply routes; continuity plans should be tied to official warnings and reopening
+     notices; and nepal: The development is relevant to transport and supply chains, business continuity; its
+     significance depends on whether the named access, continuity or compliance effect persists These events
+     matter when a damaged asset or suspended service removes an alternative used by cargo, travellers or
+     suppliers. Duration is therefore more important than headline intensity. A short suspension with available
+     rerouting is manageable; prolonged loss of capacity, congestion at the substitute route or an unresolved
+     repair schedule would spread the effect. Policy exposure is broader but normally slower. New Zealand: The
+     measure changes workforce eligibility, documentation or travel planning; the practical effect depends on
+     the effective rule and affected worker categories The affected population, implementation timetable and
+     treatment of existing permissions determine the real business burden. Companies should avoid applying a
+     nationality-, visa- or market-specific rule to unaffected staff or operations. Across the selected evidence,
+     there is no basis for one regional risk level. Security controls should follow the attack geography; logistics
+     controls should follow verified service status and available alternatives; workforce controls should follow
+     the exact scope of the rule. The cross-domain risk is highest where these pressures overlap-for example, a
+     security event that closes the only practical route, or a workforce restriction that reduces recovery capacity
+     during a disruption. That overlap is not yet established across the region, but it is the threshold that would
+     change the assessment.
+
+
+
+
+polestar-advisory.com                             info@polestar-advisory.com                                        Page 3 of 6
+                                                                                                                                       POLESTAR APAC WEEKLY
+
+
+
+
+     KEY DEVELOPMENTS
+
+        PAKISTAN
+        PAKISTAN SECURITY FORCES ATTACK
+        Armed Conflict · Extreme · 18 Sep 2026
+        ASSESSMENT: A car bomb struck a police facility in Kohat, Khyber
+        Pakhtunkhwa; reporting placed the casualties at Killed, 80 Injured in Vehicle
+        Bomb Blast .
+        POLESTAR VIEW: The event is most consequential if follow-on security
+        measures restrict access around Pakistan, disrupt nearby operations or
+        indicate a wider pattern rather than a contained incident.
+        7-DAY INDICATOR: Track security notices for Pakistan, repeat attacks, access
+        restrictions, casualty updates and any confirmed effect on nearby transport or
+        operating sites.
+        SOURCES: Ratopati; thepamphlet.in; Pragativadi; Bangkok Post; Revoi.in
+
+
+
+        NEPAL
+        NEPAL FACES SEVERE LPG GAS SHORTAGE AMIDST IMPORT FAILURES
+        Operational Disruption · Moderate · 20 Sep 2026
+        ASSESSMENT: Nepal Faces Severe LPG Gas Shortage Amidst Import Failures Ratopati
+        POLESTAR VIEW: The significance is confined to the named market unless the effect persists, spreads geographically or creates cross-border consequences.
+        7-DAY INDICATOR:
+        SOURCES: Ratopati
+
+
+
+        JAPAN
+        SEVERE WEATHER DISRUPTS CRITICAL INFRASTRUCTURE
+        Weather & Natural Hazards · Moderate · 21 Sep 2026
+        ASSESSMENT: Typhoon Dujuan Approaches Eastern Japan Bringing Heavy Rain and Transport Disruption SuaraGarut.ID
+        POLESTAR VIEW: This is a geographically concentrated continuity risk; the assessment would worsen if river levels, road closures or warnings extend into commercia
+        corridors.
+        7-DAY INDICATOR: Track official warnings, river levels, road or airport closures and confirmed reopening times.
+        SOURCES: SuaraGarut.ID
+
+
+
+        NEW ZEALAND
+        MIGRATION POLICY CHANGES WORKFORCE ACCESS
+        Regulatory · Moderate · 19 Sep 2026
+        ASSESSMENT: Trump extends USD 100,000 H-1B visa payment requirement for another year The New Indian Express
+        POLESTAR VIEW: This is a transition risk: the business effect will be set by the implementation timetable and the practical interpretation of new eligibility rules.
+        7-DAY INDICATOR: Watch official implementation guidance, employer-facing instructions and any change to the effective timetable.
+        SOURCES: The New Indian Express
+
+
+
+        THAILAND | NARATHIWAT
+        BOMB, SHOOTING ATTACK ON DEFENCE VOLUNTEER TRUCK IN NARATHIWAT
+        Armed Conflict · High · 18 Sep 2026
+        ASSESSMENT: Attackers detonated a bomb and opened fire on a vehicle carrying territorial defence volunteers in Narathiwat on 18 September.
+        POLESTAR VIEW: The event is most consequential if follow-on security measures restrict access around Narathiwat, disrupt nearby operations or indicate a wider
+        pattern rather than a contained incident.
+        7-DAY INDICATOR: Track security notices for Narathiwat, repeat attacks, access restrictions, casualty updates and any confirmed effect on nearby transport or
+        operating sites.
+        SOURCES: Bangkok Post
+
+
+
+        NEPAL
+        NEPAL FACES LP GAS SHORTAGE AMIDST SUPPLY CHAIN QUESTIONS
+        Operational Disruption · Moderate · 18 Sep 2026
+        ASSESSMENT: Nepal Faces LP Gas Shortage Amidst Supply Chain Questions Ratopati
+        POLESTAR VIEW: The significance is confined to the named market unless the effect persists, spreads geographically or creates cross-border consequences.
+        7-DAY INDICATOR:
+        SOURCES: Ratopati
+
+
+
+
+polestar-advisory.com                                                     info@polestar-advisory.com                                                           Page 4 of 6
+                                                                                                          POLESTAR APAC WEEKLY
+
+
+
+
+     BUSINESS IMPLICATIONS
+
+     People and travel: Pakistan: The immediate exposure is to personnel safety and security-site access; the
+     assessment depends on whether the incident remains contained, prompts new restrictions or produces
+     repeat disruption around the named location; and thailand: The immediate exposure is to personnel safety
+     and security-site access; the assessment depends on whether the incident remains contained, prompts
+     new restrictions or produces repeat disruption around the named location. Operations and assets;
+     supply-chain and logistics continuity: Nepal: The development is relevant to compliance and market access,
+     business continuity; its significance depends on whether the named access, continuity or compliance effect
+     persists; and japan: Flood exposure can interrupt roads, border crossings, sites and local supply routes;
+     continuity plans should be tied to official warnings and reopening notices. Regulatory and market-access:
+     New Zealand: The measure changes workforce eligibility, documentation or travel planning; the practical
+     effect depends on the effective rule and affected worker categories.
+
+
+
+
+     7 DAY WATCH
+
+       ISLAMABAD, PAKISTAN — PTI nationwide protest and long march to Islamabad
+       Watch: Track route and venue advisories, transport changes and police restrictions.
+
+       JAKARTA, INDONESIA — National Farmers Day, Semanggi II and Black September demonstrations
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       JAKARTA, INDONESIA — Conditional KSPSI Employment Bill labour demonstration
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       INDIA — Bank strike from September 28: SBI issues advisory on possible service disruptions
+       Watch: Track organiser confirmation, transport changes and cancellation or postponement notices.
+
+
+
+
+polestar-advisory.com                                             info@polestar-advisory.com                           Page 5 of 6
+                                                                                                                POLESTAR APAC WEEKLY
+
+
+
+
+     POLESTAR OUTLOOK
+
+     The next-week judgement is not that APAC faces uniform deterioration. The question is whether the current
+     events remain bounded to their reported locations or begin to affect the systems businesses depend on. In
+     Pakistan and Thailand, repeat attacks, new checkpoints, displacement or official access restrictions would
+     be the first evidence of escalation beyond the incidents already recorded. Continuity risk is concentrated in
+     Nepal and Japan. Verified restoration, loading, routing or service notices will show whether the disruption is
+     clearing; sustained suspension or diversion would justify a stronger logistics response. In New Zealand, the
+     important signal is implementation: affected eligibility classes, effective dates and employer obligations
+     matter more than further political commentary. The specific indicators are Track security notices for
+     Pakistan, repeat attacks, access restrictions, casualty updates and any confirmed effect on nearby
+     transport or operating sites; track official warnings, river levels, road or airport closures and confirmed
+     reopening times; official implementation guidance, employer-facing instructions and any change to the
+     effective timetable; and track security notices for Narathiwat, repeat attacks, access restrictions, casualty
+     updates and any confirmed effect on nearby transport or operating sites. Stabilisation would be indicated
+     by restored operations, no repeat attack, and narrowly scoped implementation guidance. Deterioration
+     would require the opposite: repeated violence near operating nodes, a disruption extending into a major
+     route, or a policy measure broadening to additional workforce or market-access groups.
+
+
+
+     DISCLAIMER
+
+     Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. The information in this report is based on open
+     sources and is assessed as accurate at the time of writing. It is provided for general informational purposes only and does not
+     constitute advice or a comprehensive assessment of all risks. No reliance should be placed on this information for operational
+     decision-making without further independent verification.
+
+
+
+
+polestar-advisory.com                                     info@polestar-advisory.com                                                   Page 6 of 6
+

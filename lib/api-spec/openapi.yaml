@@ -927,6 +927,59 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Report" }
 
+  /reports/regional-create:
+    post:
+      operationId: startRegionalReport
+      tags: [reports]
+      summary: Start or resume one regional report creation job
+      description: >
+        Returns immediately. The same requestId always refers to the same
+        creation attempt and completed report; a new explicit Create action
+        uses a new requestId, including for the same topic and date.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegionalReportJobInput" }
+      responses:
+        "202":
+          description: Job accepted or resumed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegionalReportJob" }
+        "400":
+          description: Invalid creation request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "409":
+          description: Request identifier already belongs to different inputs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /reports/regional-create/{jobId}:
+    get:
+      operationId: getRegionalReportJob
+      tags: [reports]
+      summary: Read regional report creation progress and its saved report
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current job status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegionalReportJob" }
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
   /reports/{id}:
     get:
       operationId: getReport
@@ -2642,6 +2695,29 @@ components:
         byStatus:
           type: array
           items: { $ref: "#/components/schemas/SourceHealthBucket" }
+
+    RegionalReportJobInput:
+      type: object
+      required: [requestId, topic, issueDate]
+      properties:
+        requestId: { type: string, format: uuid }
+        topic: { type: string, enum: [apac_weekly, middle_east_weekly] }
+        issueDate:
+          type: string
+          pattern: '^\d{4}-\d{2}-\d{2}$'
+          description: Calendar date, kept as a YYYY-MM-DD string in all clients.
+
+    RegionalReportJob:
+      type: object
+      required: [id, topic, issueDate, status, stage, reportId, error]
+      properties:
+        id: { type: string, format: uuid }
+        topic: { type: string, enum: [apac_weekly, middle_east_weekly] }
+        issueDate: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        stage: { type: string, enum: [queued, collecting, building, saving, completed, failed] }
+        reportId: { type: ["integer", "null"] }
+        error: { type: ["string", "null"] }
 
     Report:
       type: object

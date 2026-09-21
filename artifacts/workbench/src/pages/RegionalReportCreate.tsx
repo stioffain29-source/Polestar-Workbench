@@ -3,16 +3,27 @@ import { Link, useLocation, useRoute } from "wouter";
 import {
   getGetDashboardOverviewQueryKey,
   getListReportsQueryKey,
+  type RegionalReportJob,
+  type RegionalReportJobInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { currentReportDate } from "@/lib/reportLifecycle";
+import {
+  regionalCreationInput,
+  RegionalCreationError,
+  waitForRegionalReport,
+} from "@/lib/regionalReportCreation";
 
-type RegionalTopic = "apac_weekly" | "middle_east_weekly";
-type Stage = "collecting" | "building" | "saving";
+type RegionalTopic = RegionalReportJobInput["topic"];
+type Stage = RegionalReportJob["stage"];
 
 const STAGE_COPY: Record<Stage, { title: string; detail: string }> = {
+  queued: {
+    title: "Starting your report",
+    detail: "Your creation request is saved. Preparing the regional source checks.",
+  },
   collecting: {
     title: "Collecting regional sources",
     detail: "Checking the required security, political, regulatory, operational, energy, weather and cyber sources.",
@@ -22,8 +33,16 @@ const STAGE_COPY: Record<Stage, { title: string; detail: string }> = {
     detail: "Selecting and validating the current seven-day evidence set.",
   },
   saving: {
+    title: "Saving the report",
+    detail: "Saving the complete, validated report before opening its editor.",
+  },
+  completed: {
     title: "Opening the report",
-    detail: "Saving the validated report and opening its editor.",
+    detail: "Your report is saved. Opening its editor.",
+  },
+  failed: {
+    title: "Report creation failed",
+    detail: "The report could not be completed.",
   },
 };
 
@@ -35,62 +54,53 @@ export default function RegionalReportCreate() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
   const runGeneration = useRef(0);
+  const inputRef = useRef<RegionalReportJobInput | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [stage, setStage] = useState<Stage>("collecting");
-  const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("queued");
+  const [reconnecting, setReconnecting] = useState(false);
+  const [error, setError] = useState<RegionalCreationError | null>(null);
 
   useEffect(() => {
     if (!topic) {
-      setError("Unknown regional report type.");
+      setError(new RegionalCreationError("Unknown regional report type.", "report"));
       return;
     }
     const generation = ++runGeneration.current;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 120_000);
     const active = () => generation === runGeneration.current;
 
     void (async () => {
       try {
         setError(null);
-        setStage("collecting");
-        const issueDate = currentReportDate();
-        const response = await fetch("/api/reports/regional-create", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic, issueDate }),
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null) as { error?: string } | null;
-          throw new Error(payload?.error || `Report creation failed (${response.status}).`);
+        setReconnecting(false);
+        if (!inputRef.current || inputRef.current.topic !== topic) {
+          inputRef.current = regionalCreationInput(topic, currentReportDate());
         }
-        const report = await response.json() as { id: number | string };
+        const reportId = await waitForRegionalReport(inputRef.current, {
+          signal: controller.signal,
+          retryFailed: attempt > 0,
+          onProgress: (job) => { if (active()) setStage(job.stage); },
+          onReconnecting: (value) => { if (active()) setReconnecting(value); },
+        });
         if (!active()) return;
-        setStage("saving");
-        await Promise.all([
-          qc.invalidateQueries({ queryKey: getListReportsQueryKey() }),
-          qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
-        ]);
-        if (active()) setLocation(`/reports/${report.id}`);
+        setStage("completed");
+        // A failed background list refresh must never hide an already-saved
+        // report or keep its editor from opening.
+        void qc.invalidateQueries({ queryKey: getListReportsQueryKey(), refetchType: "none" });
+        void qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: "none" });
+        setLocation(`/reports/${reportId}`);
       } catch (cause) {
         if (!active()) return;
-        const timedOut = cause instanceof DOMException && cause.name === "AbortError";
         setError(
-          timedOut
-            ? "Report creation timed out before the server responded. Return to Regional Reports before trying again."
-            : cause instanceof Error
-              ? cause.message
-              : "Report creation failed.",
+          cause instanceof RegionalCreationError
+            ? cause
+            : new RegionalCreationError("Report creation could not be started. Please try again.", "report"),
         );
-      } finally {
-        window.clearTimeout(timeout);
       }
     })();
 
     return () => {
       runGeneration.current += 1;
-      window.clearTimeout(timeout);
       controller.abort();
     };
   }, [attempt, qc, setLocation, topic]);
@@ -101,19 +111,26 @@ export default function RegionalReportCreate() {
       <section className="w-full rounded-sm border border-border bg-card p-10 text-center">
         {error ? (
           <>
-            <h1 className="font-serif text-2xl font-bold text-primary">Report creation failed</h1>
-            <p className="mt-3 text-sm text-muted-foreground">{error}</p>
-            <div className="mt-6 flex justify-center gap-3">
+            <h1 className="font-serif text-2xl font-bold text-primary">
+              {error.kind === "connection" ? "Connection interrupted" : error.kind === "session" ? "Refresh your session" : "Report creation failed"}
+            </h1>
+            <p role="alert" className="mt-3 text-sm text-muted-foreground">{error.message}</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button variant="outline" asChild>
                 <Link href="/regional-reports">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to reports
                 </Link>
               </Button>
-              {topic && (
+              {topic && error.kind !== "session" && (
                 <Button onClick={() => setAttempt((value) => value + 1)}>
                   <RotateCw className="mr-2 h-4 w-4" />
-                  Try again
+                  {error.kind === "connection" ? "Reconnect" : "Try again"}
+                </Button>
+              )}
+              {(error.kind === "connection" || error.kind === "session") && (
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Reload page
                 </Button>
               )}
             </div>
@@ -121,10 +138,16 @@ export default function RegionalReportCreate() {
         ) : (
           <>
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-accent" />
-            <h1 className="mt-5 font-serif text-2xl font-bold text-primary">{copy.title}</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{copy.detail}</p>
+            <div role="status" aria-live="polite">
+              <h1 className="mt-5 font-serif text-2xl font-bold text-primary">
+                {reconnecting ? "Reconnecting to your report" : copy.title}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {reconnecting ? "Checking the same creation request. No duplicate report will be created." : copy.detail}
+              </p>
+            </div>
             <p className="mt-5 text-xs uppercase tracking-widest text-muted-foreground">
-              This page will open the editor automatically.
+              The editor will open automatically. Refreshing this page is safe.
             </p>
           </>
         )}

@@ -396,6 +396,8 @@ const APAC_MARKET_COORDS: Record<(typeof APAC_OUTLOOK_MARKETS)[number], [number,
   Malaysia: [4.2, 102.0],
 };
 
+import { RegionalReportMap } from "@/components/RegionalReportMap";
+
 export function RegionalHotspotMap({
   points,
   topic,
@@ -403,111 +405,7 @@ export function RegionalHotspotMap({
   points: ReturnType<typeof import("@/lib/regionalWeekly").buildRegionalMapPoints>;
   topic: string | undefined;
 }) {
-  if (points.length === 0) {
-    return (
-      <p className="text-[12px] text-muted-foreground italic" style={{ fontFamily: "Roboto, sans-serif" }}>
-        No selected development has a verified plottable location.
-      </p>
-    );
-  }
-  const plottedPoints = points;
-  const bounds = topic === "apac_weekly"
-    ? { minLng: 60, maxLng: 180, minLat: -50, maxLat: 55 }
-    : { minLng: 25, maxLng: 65, minLat: 10, maxLat: 42 };
-  const mapWidth = bounds.maxLng - bounds.minLng;
-  const mapHeight = bounds.maxLat - bounds.minLat;
-
-  const project = (lng: number, lat: number): [number, number] => [
-    lng - bounds.minLng,
-    bounds.maxLat - lat,
-  ];
-
-  const collection = worldCompleteGeo as unknown as FeatureCollection<Polygon | MultiPolygon, { name?: string }>;
-  const features: Array<{ name: string; d: string }> = [];
-  for (const feature of collection.features) {
-    const pathD: string[] = [];
-    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
-    for (const polygon of polygons) {
-      for (const ring of polygon) {
-        const mapped = ring
-          .filter(([lng, lat]) => lng >= bounds.minLng - 3 && lng <= bounds.maxLng + 3 && lat >= bounds.minLat - 3 && lat <= bounds.maxLat + 3)
-          .map(([lng, lat]) => project(lng, lat));
-        if (mapped.length < 3 || mapped.some(([x,y]) => !Number.isFinite(x) || !Number.isFinite(y))) continue;
-        let d = `M ${mapped[0][0].toFixed(2)} ${mapped[0][1].toFixed(2)}`;
-        for (let i = 1; i < mapped.length; i++) d += ` L ${mapped[i][0].toFixed(2)} ${mapped[i][1].toFixed(2)}`;
-        d += " Z";
-        pathD.push(d);
-      }
-    }
-    if (pathD.length > 0) features.push({ name: feature.properties?.name ?? "", d: pathD.join(" ") });
-  }
-
-  return (
-    <div className="border border-[#bdc8d6] bg-white overflow-hidden">
-      <div className="w-full h-[255px] bg-[#dfeaf3]">
-        <svg
-          viewBox={`-3 -3 ${mapWidth + 6} ${mapHeight + 6}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="w-full h-full block"
-          role="img"
-          aria-label="Regional risk map showing all verified key developments"
-        >
-          {features.map((feature) => (
-            <path key={feature.name} d={feature.d} fill="#f7f4ed" stroke="#8999aa" strokeWidth="0.32" strokeLinejoin="round" />
-          ))}
-          {plottedPoints.map((pt, i) => {
-            const [cx, cy] = project(pt.lng, pt.lat);
-            return (
-              <g key={`pin-${i}`}>
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r="3.3"
-                  fill={SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC}
-                  stroke="#ffffff"
-                  strokeWidth="0.9"
-                />
-                <text
-                  x={cx}
-                  y={cy + 1.15}
-                  textAnchor="middle"
-                  fill="#ffffff"
-                  fontFamily="Roboto, sans-serif"
-                  fontWeight="700"
-                  fontSize="3.2"
-                >
-                  {i + 1}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 border-t border-[#bdc8d6]">
-        {plottedPoints.map((pt, index) => (
-          <div
-            key={index}
-            className={`flex gap-2.5 p-3 border-[#d9e0e8] ${index >= 2 ? "border-t" : ""} ${index % 2 === 1 ? "md:border-l" : ""}`}
-          >
-            <div
-              className="mt-0.5 w-5 h-5 rounded-full shrink-0 text-white text-[10px] font-bold flex items-center justify-center"
-              style={{ backgroundColor: SEV_COLOR[sevKey(pt.severity)] ?? ELECTRIC }}
-            >
-              {index + 1}
-            </div>
-            <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-wide leading-[1.25] mb-1" style={{ color: NAVY }}>
-                {pt.label}
-              </h4>
-              <p className="text-[9.5px] leading-[1.35] m-0" style={{ color: DUSK }}>
-                {pt.summary}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <RegionalReportMap points={points} topic={topic} />;
 }
 
 interface KpiPreviewCard {

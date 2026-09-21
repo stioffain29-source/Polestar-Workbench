@@ -8,6 +8,7 @@ import {
   convergeMaritimeSemantic,
   startMaritimeSemanticConvergence,
 } from "./lib/maritimeSemanticConvergence";
+import { recoverRegionalReportJobs } from "./lib/regionalReportJobService";
 
 loadDevEnv();
 
@@ -45,6 +46,11 @@ app.listen(port, "0.0.0.0", (err) => {
         "data migrations failed; ingest scheduler not started",
       );
       return;
+    }
+    try {
+      await recoverRegionalReportJobs();
+    } catch (jobRecoveryErr) {
+      logger.error({ err: jobRecoveryErr }, "regional report job recovery failed");
     }
     // Converge the newest semantic rows before launching the much larger
     // multi-topic ingest. This prevents a semantic-version publish from leaving

@@ -1,9 +1,7 @@
 import { Router, type IRouter } from "express";
 import {
   db,
-  incidentsTable,
   marketPricesTable,
-  protestEventsTable,
   reportProseTable,
   reportsTable,
 } from "@workspace/db";
@@ -13,28 +11,26 @@ import type {
   Report,
   ReportProse,
 } from "@workspace/db";
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   CreateReportBody,
   UpdateReportBody,
   ListReportsQueryParams,
+  StartRegionalReportBody,
+  GetRegionalReportJobParams,
+  GetRegionalReportJobResponse,
+  type RegionalReportJobInput,
+  type RegionalReportJob,
 } from "@workspace/api-zod";
 import {
   mergeReportProvenance,
   REPORT_PROSE_KEYS,
 } from "../lib/reportProvenance";
-import { runRegionalWeeklyCollection } from "@workspace/ingest";
-import { defaultRelevanceCondition } from "../lib/relevanceFilter";
 import {
-  buildRegionalCanonicalReport,
-  buildApacFutureEvents,
-  auditRegionalWeeklyCandidateFunnel,
-  assertRegionalWeeklyReady,
-  curateRegionalWeeklyIncidents,
-  validateRegionalCanonicalStructure,
-  type RegionalCoverageManifest,
-  type RegionalWeeklyTopic,
-} from "../../../workbench/src/lib/regionalWeekly";
+  createOrResumeRegionalReportJob,
+  getRegionalReportJob,
+  toRegionalReportJob,
+} from "../lib/regionalReportJobService";
 
 async function hydrateLegacyProvenance(
   report: Report,
@@ -200,6 +196,60 @@ router.get("/reports", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
+router.post("/reports/regional-create", async (req, res): Promise<void> => {
+  const parsed = StartRegionalReportBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { requestId, topic, issueDate }: RegionalReportJobInput = parsed.data;
+  const parsedDate = new Date(`${issueDate}T00:00:00.000Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(issueDate) ||
+    Number.isNaN(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== issueDate
+  ) {
+    res.status(400).json({ error: "A valid report issue date is required." });
+    return;
+  }
+  try {
+    const result = await createOrResumeRegionalReportJob({
+      requestId,
+      topic,
+      issueDate,
+    });
+    if (result.conflict) {
+      res.status(409).json({ error: "requestId is already used for different report inputs." });
+      return;
+    }
+    const response: RegionalReportJob = GetRegionalReportJobResponse.parse(
+      toRegionalReportJob(result.job),
+    );
+    res.status(202).json(response);
+  } catch (cause) {
+    req.log?.error?.({ err: cause, requestId }, "Regional report job submission failed");
+    res.status(500).json({ error: "Regional report job submission failed." });
+  }
+});
+
+router.get("/reports/regional-create/:jobId", async (req, res): Promise<void> => {
+  const parsed = GetRegionalReportJobParams.safeParse(req.params);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { jobId } = parsed.data;
+  const job = await getRegionalReportJob(jobId);
+  if (!job) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const response: RegionalReportJob = GetRegionalReportJobResponse.parse(
+    toRegionalReportJob(job),
+  );
+  res.json(response);
+});
+
 router.get("/reports/:id", async (req, res): Promise<void> => {
   const id = parseId(req.params.id);
   const [row] = await db.select().from(reportsTable).where(eq(reportsTable.id, id));
@@ -248,139 +298,6 @@ router.post("/reports", async (req, res): Promise<void> => {
   // same insert so the new row is immediately renderable.
   const [row] = await db.insert(reportsTable).values(insertValues).returning();
   res.status(201).json(row);
-});
-
-router.post("/reports/regional-create", async (req, res): Promise<void> => {
-  const topic = req.body?.topic;
-  const issueDate = typeof req.body?.issueDate === "string" ? req.body.issueDate : "";
-  if (topic !== "apac_weekly" && topic !== "middle_east_weekly") {
-    res.status(400).json({ error: "A valid regional report topic is required." });
-    return;
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(issueDate)) {
-    res.status(400).json({ error: "A valid report issue date is required." });
-    return;
-  }
-  try {
-    const run = await runRegionalWeeklyCollection(
-      topic === "apac_weekly" ? "apac" : "middle_east",
-      { commit: true },
-    );
-    const failed = run.coverage.filter(
-      (check) => check.status !== "checked" || check.errors.length > 0,
-    );
-    if (failed.length > 0) {
-      res.status(503).json({
-        error: `Regional source collection failed: ${failed
-          .map((check) => `${check.domain}: ${check.errors.join(", ") || "no source completed"}`)
-          .join("; ")}`,
-      });
-      return;
-    }
-    const issueStart = new Date(`${issueDate}T00:00:00.000Z`);
-    const watchStart = new Date(issueStart.getTime() + 86_400_000);
-    const watchEnd = new Date(issueStart.getTime() + 7 * 86_400_000);
-    const regionalCountries = new Set(topic === "apac_weekly"
-      ? ["Australia", "Bangladesh", "Bhutan", "Brunei", "Cambodia", "China", "East Timor", "Fiji", "Hong Kong", "India", "Indonesia", "Japan", "Laos", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal", "New Zealand", "North Korea", "Pakistan", "Papua New Guinea", "Philippines", "Singapore", "South Korea", "Sri Lanka", "Taiwan", "Thailand", "Timor-Leste", "Vietnam"]
-      : ["Bahrain", "Iran", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon", "Oman", "Palestine", "Qatar", "Saudi Arabia", "Syria", "UAE", "United Arab Emirates", "Yemen"]);
-    const futureRows = await db
-      .select()
-      .from(protestEventsTable)
-      .where(and(
-        gte(protestEventsTable.eventDate, watchStart),
-        lte(protestEventsTable.eventDate, watchEnd),
-        inArray(protestEventsTable.status, ["Confirmed", "Planned", "Possible"]),
-      ));
-    const regionalFutureRows = futureRows.filter((event) => regionalCountries.has(event.country ?? ""));
-    const futureEvents = buildApacFutureEvents(
-      regionalFutureRows.map((event) => ({
-        eventDate: event.eventDate?.toISOString() ?? null,
-        country: event.country,
-        city: event.city,
-        venue: event.venue,
-        eventType: event.eventType,
-        issue: event.issue,
-        organiser: event.organiser,
-        description: event.description,
-        sourceTitle: event.sourceTitle,
-        disruptionPotential: event.disruptionPotential,
-        confidence: event.confidence,
-        status: event.status,
-        attendance: event.attendance,
-      })),
-      issueDate,
-    );
-    const coverageManifest: RegionalCoverageManifest = {
-      requiredDomains: run.coverage.map((check) => check.domain),
-      domains: run.coverage,
-      forwardSearch: {
-        domain: "forwardSearch",
-        status: "checked",
-        sourceNames: ["protest_events", "incident_advisories"],
-        itemsFetched: futureRows.length,
-        candidatesAccepted: futureEvents.length,
-        errors: [],
-      },
-      requiredGeographies: run.requiredGeographies,
-      searchedGeographies: run.searchedGeographies,
-    };
-    const since = new Date(`${issueDate}T23:59:59.999Z`);
-    since.setUTCDate(since.getUTCDate() - 7);
-    const incidents = await db
-      .select()
-      .from(incidentsTable)
-      .where(and(gte(incidentsTable.occurredAt, since), defaultRelevanceCondition()))
-      .orderBy(desc(incidentsTable.occurredAt));
-    const regionalIncidents = incidents.map((incident) => ({
-        ...incident,
-        occurredAt: incident.occurredAt.toISOString(),
-        incidentDate: incident.incidentDate?.toISOString() ?? null,
-        summary: incident.summary ?? "",
-      }));
-    const funnel = auditRegionalWeeklyCandidateFunnel(
-      regionalIncidents,
-      topic as RegionalWeeklyTopic,
-      issueDate,
-      coverageManifest,
-    );
-    assertRegionalWeeklyReady(funnel);
-    const curatedIncidents = curateRegionalWeeklyIncidents(
-      regionalIncidents,
-      topic as RegionalWeeklyTopic,
-      issueDate,
-    );
-    const regionalCanonicalReport = buildRegionalCanonicalReport(
-      curatedIncidents,
-      issueDate,
-      topic as RegionalWeeklyTopic,
-      futureEvents,
-      coverageManifest,
-    );
-    const canonicalErrors = validateRegionalCanonicalStructure(regionalCanonicalReport);
-    if (canonicalErrors.length > 0) {
-      res.status(422).json({ error: canonicalErrors.join(" ") });
-      return;
-    }
-    const [row] = await db.transaction(async (tx) =>
-      tx
-        .insert(reportsTable)
-        .values({
-          title: topic === "apac_weekly" ? "Polestar APAC Weekly" : "Polestar Middle East Weekly",
-          topic,
-          issueDate,
-          status: "draft",
-          hardNumbers: normalizeHardNumbers({ regionalCanonicalReport }),
-          updatedAt: new Date(),
-        })
-        .returning(),
-    );
-    res.status(201).json(row);
-  } catch (cause) {
-    req.log?.error?.({ err: cause, topic, issueDate }, "Regional report creation failed");
-    res.status(500).json({
-      error: cause instanceof Error ? cause.message : "Regional report creation failed.",
-    });
-  }
 });
 
 router.patch("/reports/:id", async (req, res): Promise<void> => {

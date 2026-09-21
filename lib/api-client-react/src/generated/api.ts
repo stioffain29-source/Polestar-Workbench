@@ -106,6 +106,8 @@ import type {
   ProtestEventUpdate,
   ProtestEventsResponse,
   ProtestScheduleSummary,
+  RegionalReportJob,
+  RegionalReportJobInput,
   ReliefWebReport,
   Report,
   ReportIncidentSummariesResult,
@@ -3300,6 +3302,156 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       > => {
       return useMutation(getCreateReportMutationOptions(options));
     }
+
+export const getStartRegionalReportUrl = () => {
+
+
+
+
+  return `/api/reports/regional-create`
+}
+
+/**
+ * Returns immediately. The same requestId always refers to the same creation attempt and completed report; a new explicit Create action uses a new requestId, including for the same topic and date.
+
+ * @summary Start or resume one regional report creation job
+ */
+export const startRegionalReport = async (regionalReportJobInput: RegionalReportJobInput, options?: RequestInit): Promise<RegionalReportJob> => {
+
+  return customFetch<RegionalReportJob>(getStartRegionalReportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      regionalReportJobInput,)
+  }
+);}
+
+
+
+
+export const getStartRegionalReportMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startRegionalReport>>, TError,{data: BodyType<RegionalReportJobInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startRegionalReport>>, TError,{data: BodyType<RegionalReportJobInput>}, TContext> => {
+
+const mutationKey = ['startRegionalReport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startRegionalReport>>, {data: BodyType<RegionalReportJobInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  startRegionalReport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartRegionalReportMutationResult = NonNullable<Awaited<ReturnType<typeof startRegionalReport>>>
+    export type StartRegionalReportMutationBody = BodyType<RegionalReportJobInput>
+    export type StartRegionalReportMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Start or resume one regional report creation job
+ */
+export const useStartRegionalReport = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startRegionalReport>>, TError,{data: BodyType<RegionalReportJobInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startRegionalReport>>,
+        TError,
+        {data: BodyType<RegionalReportJobInput>},
+        TContext
+      > => {
+      return useMutation(getStartRegionalReportMutationOptions(options));
+    }
+
+export const getGetRegionalReportJobUrl = (jobId: string,) => {
+
+
+
+
+  return `/api/reports/regional-create/${jobId}`
+}
+
+/**
+ * @summary Read regional report creation progress and its saved report
+ */
+export const getRegionalReportJob = async (jobId: string, options?: RequestInit): Promise<RegionalReportJob> => {
+
+  return customFetch<RegionalReportJob>(getGetRegionalReportJobUrl(jobId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetRegionalReportJobQueryKey = (jobId: string,) => {
+    return [
+    `/api/reports/regional-create/${jobId}`
+    ] as const;
+    }
+
+
+export const getGetRegionalReportJobQueryOptions = <TData = Awaited<ReturnType<typeof getRegionalReportJob>>, TError = ErrorType<ErrorEnvelope>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRegionalReportJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetRegionalReportJobQueryKey(jobId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getRegionalReportJob>>> = ({ signal }) => getRegionalReportJob(jobId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(jobId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getRegionalReportJob>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetRegionalReportJobQueryResult = NonNullable<Awaited<ReturnType<typeof getRegionalReportJob>>>
+export type GetRegionalReportJobQueryError = ErrorType<ErrorEnvelope>
+
+
+/**
+ * @summary Read regional report creation progress and its saved report
+ */
+
+export function useGetRegionalReportJob<TData = Awaited<ReturnType<typeof getRegionalReportJob>>, TError = ErrorType<ErrorEnvelope>>(
+ jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getRegionalReportJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetRegionalReportJobQueryOptions(jobId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetReportUrl = (id: number,) => {
 
