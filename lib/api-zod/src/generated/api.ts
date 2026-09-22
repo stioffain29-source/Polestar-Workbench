@@ -6726,3 +6726,2109 @@ export const LogoutMobileSessionResponse = zod.object({
 })
 
 
+
+export const listDbPortsEditionsResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const listDbPortsEditionsResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const listDbPortsEditionsResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const listDbPortsEditionsResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const listDbPortsEditionsResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const listDbPortsEditionsResponseQualitySelectedCountMin = 0;
+
+export const listDbPortsEditionsResponseQualityWatchCountMin = 0;
+
+export const listDbPortsEditionsResponseQualityHeldCountMin = 0;
+
+export const listDbPortsEditionsResponseQualityInboxCountMin = 0;
+
+export const listDbPortsEditionsResponseQualityRejectedCountMin = 0;
+
+export const listDbPortsEditionsResponseQualityTotalMinutesMin = 0;
+
+export const listDbPortsEditionsResponseQualityCorrectionsMin = 0;
+
+export const listDbPortsEditionsResponseQualityMissedSignalsMin = 0;
+
+export const listDbPortsEditionsResponseQualitySourceFailuresMin = 0;
+
+
+
+export const ListDbPortsEditionsResponseItem = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(listDbPortsEditionsResponseStartDateRegExp),
+  "endDate": zod.string().regex(listDbPortsEditionsResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "createdAt": zod.string().regex(listDbPortsEditionsResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(listDbPortsEditionsResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(listDbPortsEditionsResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(listDbPortsEditionsResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(listDbPortsEditionsResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(listDbPortsEditionsResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(listDbPortsEditionsResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(listDbPortsEditionsResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(listDbPortsEditionsResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(listDbPortsEditionsResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(listDbPortsEditionsResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(listDbPortsEditionsResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+export const ListDbPortsEditionsResponse = zod.array(ListDbPortsEditionsResponseItem)
+
+
+export const createDbPortsEditionBodyEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const CreateDbPortsEditionBody = zod.object({
+  "endDate": zod.string().regex(createDbPortsEditionBodyEndDateRegExp),
+  "title": zod.string().optional()
+})
+
+
+
+
+
+export const GetDbPortsEditionParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+export const getDbPortsEditionResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getDbPortsEditionResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const getDbPortsEditionResponseItemsItemOneHeadlineMax = 500;
+
+export const getDbPortsEditionResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getDbPortsEditionResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const getDbPortsEditionResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const getDbPortsEditionResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const getDbPortsEditionResponseItemsItemOneOutlookMax = 4000;
+
+export const getDbPortsEditionResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const getDbPortsEditionResponseItemsItemOneMissingInfoMax = 4000;
+
+export const getDbPortsEditionResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const getDbPortsEditionResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const getDbPortsEditionResponseItemsItemOneEvidenceMax = 12;
+
+
+export const getDbPortsEditionResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseItemsMax = 200;
+
+
+export const getDbPortsEditionResponseWorklogItemMinutesMin = 0;
+export const getDbPortsEditionResponseWorklogItemMinutesMax = 2400;
+
+export const getDbPortsEditionResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseWorklogMax = 500;
+
+
+export const getDbPortsEditionResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsEditionResponseQualitySelectedCountMin = 0;
+
+export const getDbPortsEditionResponseQualityWatchCountMin = 0;
+
+export const getDbPortsEditionResponseQualityHeldCountMin = 0;
+
+export const getDbPortsEditionResponseQualityInboxCountMin = 0;
+
+export const getDbPortsEditionResponseQualityRejectedCountMin = 0;
+
+export const getDbPortsEditionResponseQualityTotalMinutesMin = 0;
+
+export const getDbPortsEditionResponseQualityCorrectionsMin = 0;
+
+export const getDbPortsEditionResponseQualityMissedSignalsMin = 0;
+
+export const getDbPortsEditionResponseQualitySourceFailuresMin = 0;
+
+
+
+export const GetDbPortsEditionResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(getDbPortsEditionResponseStartDateRegExp),
+  "endDate": zod.string().regex(getDbPortsEditionResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(getDbPortsEditionResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(getDbPortsEditionResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(getDbPortsEditionResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(getDbPortsEditionResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(getDbPortsEditionResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(getDbPortsEditionResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(getDbPortsEditionResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(getDbPortsEditionResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(getDbPortsEditionResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(getDbPortsEditionResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(getDbPortsEditionResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(getDbPortsEditionResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(getDbPortsEditionResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(getDbPortsEditionResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(getDbPortsEditionResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(getDbPortsEditionResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(getDbPortsEditionResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(getDbPortsEditionResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(getDbPortsEditionResponseWorklogItemMinutesMin).max(getDbPortsEditionResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(getDbPortsEditionResponseWorklogItemCreatedAtRegExp)
+})).max(getDbPortsEditionResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(getDbPortsEditionResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(getDbPortsEditionResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(getDbPortsEditionResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(getDbPortsEditionResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(getDbPortsEditionResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(getDbPortsEditionResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(getDbPortsEditionResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(getDbPortsEditionResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(getDbPortsEditionResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(getDbPortsEditionResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(getDbPortsEditionResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(getDbPortsEditionResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(getDbPortsEditionResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(getDbPortsEditionResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const UpdateDbPortsEditionParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+export const UpdateDbPortsEditionBody = zod.object({
+  "revision": zod.number().min(1),
+  "title": zod.string().optional(),
+  "overview": zod.string().optional(),
+  "status": zod.enum(['draft', 'in_review', 'approved']).optional()
+})
+
+
+export const updateDbPortsEditionResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsEditionResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const updateDbPortsEditionResponseItemsItemOneHeadlineMax = 500;
+
+export const updateDbPortsEditionResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsEditionResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const updateDbPortsEditionResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const updateDbPortsEditionResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const updateDbPortsEditionResponseItemsItemOneOutlookMax = 4000;
+
+export const updateDbPortsEditionResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const updateDbPortsEditionResponseItemsItemOneMissingInfoMax = 4000;
+
+export const updateDbPortsEditionResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const updateDbPortsEditionResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const updateDbPortsEditionResponseItemsItemOneEvidenceMax = 12;
+
+
+export const updateDbPortsEditionResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseItemsMax = 200;
+
+
+export const updateDbPortsEditionResponseWorklogItemMinutesMin = 0;
+export const updateDbPortsEditionResponseWorklogItemMinutesMax = 2400;
+
+export const updateDbPortsEditionResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseWorklogMax = 500;
+
+
+export const updateDbPortsEditionResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsEditionResponseQualitySelectedCountMin = 0;
+
+export const updateDbPortsEditionResponseQualityWatchCountMin = 0;
+
+export const updateDbPortsEditionResponseQualityHeldCountMin = 0;
+
+export const updateDbPortsEditionResponseQualityInboxCountMin = 0;
+
+export const updateDbPortsEditionResponseQualityRejectedCountMin = 0;
+
+export const updateDbPortsEditionResponseQualityTotalMinutesMin = 0;
+
+export const updateDbPortsEditionResponseQualityCorrectionsMin = 0;
+
+export const updateDbPortsEditionResponseQualityMissedSignalsMin = 0;
+
+export const updateDbPortsEditionResponseQualitySourceFailuresMin = 0;
+
+
+
+export const UpdateDbPortsEditionResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(updateDbPortsEditionResponseStartDateRegExp),
+  "endDate": zod.string().regex(updateDbPortsEditionResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(updateDbPortsEditionResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(updateDbPortsEditionResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(updateDbPortsEditionResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(updateDbPortsEditionResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(updateDbPortsEditionResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(updateDbPortsEditionResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(updateDbPortsEditionResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(updateDbPortsEditionResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(updateDbPortsEditionResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(updateDbPortsEditionResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(updateDbPortsEditionResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(updateDbPortsEditionResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(updateDbPortsEditionResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(updateDbPortsEditionResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(updateDbPortsEditionResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(updateDbPortsEditionResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(updateDbPortsEditionResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(updateDbPortsEditionResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(updateDbPortsEditionResponseWorklogItemMinutesMin).max(updateDbPortsEditionResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(updateDbPortsEditionResponseWorklogItemCreatedAtRegExp)
+})).max(updateDbPortsEditionResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(updateDbPortsEditionResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(updateDbPortsEditionResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(updateDbPortsEditionResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(updateDbPortsEditionResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(updateDbPortsEditionResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(updateDbPortsEditionResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(updateDbPortsEditionResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(updateDbPortsEditionResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(updateDbPortsEditionResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(updateDbPortsEditionResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(updateDbPortsEditionResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(updateDbPortsEditionResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(updateDbPortsEditionResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(updateDbPortsEditionResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const DeleteDbPortsEditionParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+export const DeleteDbPortsEditionBody = zod.object({
+  "revision": zod.number().min(1)
+})
+
+
+
+
+
+export const ImportDbPortsCandidatesParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+export const ImportDbPortsCandidatesBody = zod.object({
+  "revision": zod.number().min(1)
+})
+
+
+export const importDbPortsCandidatesResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const importDbPortsCandidatesResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const importDbPortsCandidatesResponseItemsItemOneHeadlineMax = 500;
+
+export const importDbPortsCandidatesResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const importDbPortsCandidatesResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const importDbPortsCandidatesResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const importDbPortsCandidatesResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const importDbPortsCandidatesResponseItemsItemOneOutlookMax = 4000;
+
+export const importDbPortsCandidatesResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const importDbPortsCandidatesResponseItemsItemOneMissingInfoMax = 4000;
+
+export const importDbPortsCandidatesResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const importDbPortsCandidatesResponseItemsItemOneEvidenceMax = 12;
+
+
+export const importDbPortsCandidatesResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseItemsMax = 200;
+
+
+export const importDbPortsCandidatesResponseWorklogItemMinutesMin = 0;
+export const importDbPortsCandidatesResponseWorklogItemMinutesMax = 2400;
+
+export const importDbPortsCandidatesResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseWorklogMax = 500;
+
+
+export const importDbPortsCandidatesResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const importDbPortsCandidatesResponseQualitySelectedCountMin = 0;
+
+export const importDbPortsCandidatesResponseQualityWatchCountMin = 0;
+
+export const importDbPortsCandidatesResponseQualityHeldCountMin = 0;
+
+export const importDbPortsCandidatesResponseQualityInboxCountMin = 0;
+
+export const importDbPortsCandidatesResponseQualityRejectedCountMin = 0;
+
+export const importDbPortsCandidatesResponseQualityTotalMinutesMin = 0;
+
+export const importDbPortsCandidatesResponseQualityCorrectionsMin = 0;
+
+export const importDbPortsCandidatesResponseQualityMissedSignalsMin = 0;
+
+export const importDbPortsCandidatesResponseQualitySourceFailuresMin = 0;
+
+
+
+export const ImportDbPortsCandidatesResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(importDbPortsCandidatesResponseStartDateRegExp),
+  "endDate": zod.string().regex(importDbPortsCandidatesResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(importDbPortsCandidatesResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(importDbPortsCandidatesResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(importDbPortsCandidatesResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(importDbPortsCandidatesResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(importDbPortsCandidatesResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(importDbPortsCandidatesResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(importDbPortsCandidatesResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(importDbPortsCandidatesResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(importDbPortsCandidatesResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(importDbPortsCandidatesResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(importDbPortsCandidatesResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(importDbPortsCandidatesResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(importDbPortsCandidatesResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(importDbPortsCandidatesResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(importDbPortsCandidatesResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(importDbPortsCandidatesResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(importDbPortsCandidatesResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(importDbPortsCandidatesResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(importDbPortsCandidatesResponseWorklogItemMinutesMin).max(importDbPortsCandidatesResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(importDbPortsCandidatesResponseWorklogItemCreatedAtRegExp)
+})).max(importDbPortsCandidatesResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(importDbPortsCandidatesResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(importDbPortsCandidatesResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(importDbPortsCandidatesResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(importDbPortsCandidatesResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(importDbPortsCandidatesResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(importDbPortsCandidatesResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(importDbPortsCandidatesResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(importDbPortsCandidatesResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(importDbPortsCandidatesResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(importDbPortsCandidatesResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(importDbPortsCandidatesResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(importDbPortsCandidatesResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(importDbPortsCandidatesResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(importDbPortsCandidatesResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const AddDbPortsItemParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+export const addDbPortsItemBodyItemHeadlineMax = 500;
+
+export const addDbPortsItemBodyItemEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemBodyItemConfirmedFactsMax = 8000;
+
+export const addDbPortsItemBodyItemUnverifiedClaimsMax = 4000;
+
+export const addDbPortsItemBodyItemOperationalImplicationsMax = 4000;
+
+export const addDbPortsItemBodyItemOutlookMax = 4000;
+
+export const addDbPortsItemBodyItemMaterialityReasonMax = 2000;
+
+export const addDbPortsItemBodyItemMissingInfoMax = 4000;
+
+export const addDbPortsItemBodyItemAnalystNotesMax = 4000;
+
+
+
+export const addDbPortsItemBodyItemEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const addDbPortsItemBodyItemEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemBodyItemEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemBodyItemEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemBodyItemEvidenceItemExcerptMax = 800;
+
+export const addDbPortsItemBodyItemEvidenceItemOriginalTitleMax = 1000;
+
+export const addDbPortsItemBodyItemEvidenceMax = 12;
+
+
+
+export const AddDbPortsItemBody = zod.object({
+  "revision": zod.number().min(1),
+  "item": zod.object({
+  "headline": zod.string().max(addDbPortsItemBodyItemHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(addDbPortsItemBodyItemEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(addDbPortsItemBodyItemConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(addDbPortsItemBodyItemUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(addDbPortsItemBodyItemOperationalImplicationsMax),
+  "outlook": zod.string().max(addDbPortsItemBodyItemOutlookMax),
+  "materialityReason": zod.string().max(addDbPortsItemBodyItemMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(addDbPortsItemBodyItemMissingInfoMax),
+  "analystNotes": zod.string().max(addDbPortsItemBodyItemAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(addDbPortsItemBodyItemEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(addDbPortsItemBodyItemEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(addDbPortsItemBodyItemEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(addDbPortsItemBodyItemEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(addDbPortsItemBodyItemEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(addDbPortsItemBodyItemEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(addDbPortsItemBodyItemEvidenceMax)
+})
+})
+
+
+export const addDbPortsItemResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const addDbPortsItemResponseItemsItemOneHeadlineMax = 500;
+
+export const addDbPortsItemResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const addDbPortsItemResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const addDbPortsItemResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const addDbPortsItemResponseItemsItemOneOutlookMax = 4000;
+
+export const addDbPortsItemResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const addDbPortsItemResponseItemsItemOneMissingInfoMax = 4000;
+
+export const addDbPortsItemResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const addDbPortsItemResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const addDbPortsItemResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsItemResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const addDbPortsItemResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const addDbPortsItemResponseItemsItemOneEvidenceMax = 12;
+
+
+export const addDbPortsItemResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseItemsMax = 200;
+
+
+export const addDbPortsItemResponseWorklogItemMinutesMin = 0;
+export const addDbPortsItemResponseWorklogItemMinutesMax = 2400;
+
+export const addDbPortsItemResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseWorklogMax = 500;
+
+
+export const addDbPortsItemResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsItemResponseQualitySelectedCountMin = 0;
+
+export const addDbPortsItemResponseQualityWatchCountMin = 0;
+
+export const addDbPortsItemResponseQualityHeldCountMin = 0;
+
+export const addDbPortsItemResponseQualityInboxCountMin = 0;
+
+export const addDbPortsItemResponseQualityRejectedCountMin = 0;
+
+export const addDbPortsItemResponseQualityTotalMinutesMin = 0;
+
+export const addDbPortsItemResponseQualityCorrectionsMin = 0;
+
+export const addDbPortsItemResponseQualityMissedSignalsMin = 0;
+
+export const addDbPortsItemResponseQualitySourceFailuresMin = 0;
+
+
+
+export const AddDbPortsItemResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(addDbPortsItemResponseStartDateRegExp),
+  "endDate": zod.string().regex(addDbPortsItemResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(addDbPortsItemResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(addDbPortsItemResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(addDbPortsItemResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(addDbPortsItemResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(addDbPortsItemResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(addDbPortsItemResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(addDbPortsItemResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(addDbPortsItemResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(addDbPortsItemResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(addDbPortsItemResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(addDbPortsItemResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(addDbPortsItemResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(addDbPortsItemResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(addDbPortsItemResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(addDbPortsItemResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(addDbPortsItemResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(addDbPortsItemResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(addDbPortsItemResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(addDbPortsItemResponseWorklogItemMinutesMin).max(addDbPortsItemResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(addDbPortsItemResponseWorklogItemCreatedAtRegExp)
+})).max(addDbPortsItemResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(addDbPortsItemResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(addDbPortsItemResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(addDbPortsItemResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(addDbPortsItemResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(addDbPortsItemResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(addDbPortsItemResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(addDbPortsItemResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(addDbPortsItemResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(addDbPortsItemResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(addDbPortsItemResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(addDbPortsItemResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(addDbPortsItemResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(addDbPortsItemResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(addDbPortsItemResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+
+export const UpdateDbPortsItemParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "itemId": zod.coerce.string().min(1)
+})
+
+
+export const updateDbPortsItemBodyItemHeadlineMax = 500;
+
+export const updateDbPortsItemBodyItemEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemBodyItemConfirmedFactsMax = 8000;
+
+export const updateDbPortsItemBodyItemUnverifiedClaimsMax = 4000;
+
+export const updateDbPortsItemBodyItemOperationalImplicationsMax = 4000;
+
+export const updateDbPortsItemBodyItemOutlookMax = 4000;
+
+export const updateDbPortsItemBodyItemMaterialityReasonMax = 2000;
+
+export const updateDbPortsItemBodyItemMissingInfoMax = 4000;
+
+export const updateDbPortsItemBodyItemAnalystNotesMax = 4000;
+
+
+
+export const updateDbPortsItemBodyItemEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsItemBodyItemEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemBodyItemEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemBodyItemEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemBodyItemEvidenceItemExcerptMax = 800;
+
+export const updateDbPortsItemBodyItemEvidenceItemOriginalTitleMax = 1000;
+
+export const updateDbPortsItemBodyItemEvidenceMax = 12;
+
+
+
+export const UpdateDbPortsItemBody = zod.object({
+  "revision": zod.number().min(1),
+  "item": zod.object({
+  "headline": zod.string().max(updateDbPortsItemBodyItemHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(updateDbPortsItemBodyItemEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(updateDbPortsItemBodyItemConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(updateDbPortsItemBodyItemUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(updateDbPortsItemBodyItemOperationalImplicationsMax),
+  "outlook": zod.string().max(updateDbPortsItemBodyItemOutlookMax),
+  "materialityReason": zod.string().max(updateDbPortsItemBodyItemMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(updateDbPortsItemBodyItemMissingInfoMax),
+  "analystNotes": zod.string().max(updateDbPortsItemBodyItemAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(updateDbPortsItemBodyItemEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(updateDbPortsItemBodyItemEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(updateDbPortsItemBodyItemEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(updateDbPortsItemBodyItemEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(updateDbPortsItemBodyItemEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(updateDbPortsItemBodyItemEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(updateDbPortsItemBodyItemEvidenceMax)
+})
+})
+
+
+export const updateDbPortsItemResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const updateDbPortsItemResponseItemsItemOneHeadlineMax = 500;
+
+export const updateDbPortsItemResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const updateDbPortsItemResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const updateDbPortsItemResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const updateDbPortsItemResponseItemsItemOneOutlookMax = 4000;
+
+export const updateDbPortsItemResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const updateDbPortsItemResponseItemsItemOneMissingInfoMax = 4000;
+
+export const updateDbPortsItemResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const updateDbPortsItemResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const updateDbPortsItemResponseItemsItemOneEvidenceMax = 12;
+
+
+export const updateDbPortsItemResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseItemsMax = 200;
+
+
+export const updateDbPortsItemResponseWorklogItemMinutesMin = 0;
+export const updateDbPortsItemResponseWorklogItemMinutesMax = 2400;
+
+export const updateDbPortsItemResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseWorklogMax = 500;
+
+
+export const updateDbPortsItemResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsItemResponseQualitySelectedCountMin = 0;
+
+export const updateDbPortsItemResponseQualityWatchCountMin = 0;
+
+export const updateDbPortsItemResponseQualityHeldCountMin = 0;
+
+export const updateDbPortsItemResponseQualityInboxCountMin = 0;
+
+export const updateDbPortsItemResponseQualityRejectedCountMin = 0;
+
+export const updateDbPortsItemResponseQualityTotalMinutesMin = 0;
+
+export const updateDbPortsItemResponseQualityCorrectionsMin = 0;
+
+export const updateDbPortsItemResponseQualityMissedSignalsMin = 0;
+
+export const updateDbPortsItemResponseQualitySourceFailuresMin = 0;
+
+
+
+export const UpdateDbPortsItemResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(updateDbPortsItemResponseStartDateRegExp),
+  "endDate": zod.string().regex(updateDbPortsItemResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(updateDbPortsItemResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(updateDbPortsItemResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(updateDbPortsItemResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(updateDbPortsItemResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(updateDbPortsItemResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(updateDbPortsItemResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(updateDbPortsItemResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(updateDbPortsItemResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(updateDbPortsItemResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(updateDbPortsItemResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(updateDbPortsItemResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(updateDbPortsItemResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(updateDbPortsItemResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(updateDbPortsItemResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(updateDbPortsItemResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(updateDbPortsItemResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(updateDbPortsItemResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(updateDbPortsItemResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(updateDbPortsItemResponseWorklogItemMinutesMin).max(updateDbPortsItemResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(updateDbPortsItemResponseWorklogItemCreatedAtRegExp)
+})).max(updateDbPortsItemResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(updateDbPortsItemResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(updateDbPortsItemResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(updateDbPortsItemResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(updateDbPortsItemResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(updateDbPortsItemResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(updateDbPortsItemResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(updateDbPortsItemResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(updateDbPortsItemResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(updateDbPortsItemResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(updateDbPortsItemResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(updateDbPortsItemResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(updateDbPortsItemResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(updateDbPortsItemResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(updateDbPortsItemResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const MergeDbPortsItemsParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+
+
+export const MergeDbPortsItemsBody = zod.object({
+  "revision": zod.number().min(1),
+  "sourceItemId": zod.string().min(1),
+  "targetItemId": zod.string().min(1)
+})
+
+
+export const mergeDbPortsItemsResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const mergeDbPortsItemsResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const mergeDbPortsItemsResponseItemsItemOneHeadlineMax = 500;
+
+export const mergeDbPortsItemsResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const mergeDbPortsItemsResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const mergeDbPortsItemsResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const mergeDbPortsItemsResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const mergeDbPortsItemsResponseItemsItemOneOutlookMax = 4000;
+
+export const mergeDbPortsItemsResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const mergeDbPortsItemsResponseItemsItemOneMissingInfoMax = 4000;
+
+export const mergeDbPortsItemsResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const mergeDbPortsItemsResponseItemsItemOneEvidenceMax = 12;
+
+
+export const mergeDbPortsItemsResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseItemsMax = 200;
+
+
+export const mergeDbPortsItemsResponseWorklogItemMinutesMin = 0;
+export const mergeDbPortsItemsResponseWorklogItemMinutesMax = 2400;
+
+export const mergeDbPortsItemsResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseWorklogMax = 500;
+
+
+export const mergeDbPortsItemsResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const mergeDbPortsItemsResponseQualitySelectedCountMin = 0;
+
+export const mergeDbPortsItemsResponseQualityWatchCountMin = 0;
+
+export const mergeDbPortsItemsResponseQualityHeldCountMin = 0;
+
+export const mergeDbPortsItemsResponseQualityInboxCountMin = 0;
+
+export const mergeDbPortsItemsResponseQualityRejectedCountMin = 0;
+
+export const mergeDbPortsItemsResponseQualityTotalMinutesMin = 0;
+
+export const mergeDbPortsItemsResponseQualityCorrectionsMin = 0;
+
+export const mergeDbPortsItemsResponseQualityMissedSignalsMin = 0;
+
+export const mergeDbPortsItemsResponseQualitySourceFailuresMin = 0;
+
+
+
+export const MergeDbPortsItemsResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(mergeDbPortsItemsResponseStartDateRegExp),
+  "endDate": zod.string().regex(mergeDbPortsItemsResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(mergeDbPortsItemsResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(mergeDbPortsItemsResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(mergeDbPortsItemsResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(mergeDbPortsItemsResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(mergeDbPortsItemsResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(mergeDbPortsItemsResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(mergeDbPortsItemsResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(mergeDbPortsItemsResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(mergeDbPortsItemsResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(mergeDbPortsItemsResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(mergeDbPortsItemsResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(mergeDbPortsItemsResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(mergeDbPortsItemsResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(mergeDbPortsItemsResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(mergeDbPortsItemsResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(mergeDbPortsItemsResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(mergeDbPortsItemsResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(mergeDbPortsItemsResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(mergeDbPortsItemsResponseWorklogItemMinutesMin).max(mergeDbPortsItemsResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(mergeDbPortsItemsResponseWorklogItemCreatedAtRegExp)
+})).max(mergeDbPortsItemsResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(mergeDbPortsItemsResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(mergeDbPortsItemsResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(mergeDbPortsItemsResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(mergeDbPortsItemsResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(mergeDbPortsItemsResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(mergeDbPortsItemsResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(mergeDbPortsItemsResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(mergeDbPortsItemsResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(mergeDbPortsItemsResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(mergeDbPortsItemsResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(mergeDbPortsItemsResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(mergeDbPortsItemsResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(mergeDbPortsItemsResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(mergeDbPortsItemsResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const AddDbPortsWorklogParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+export const addDbPortsWorklogBodyMinutesMin = 0;
+export const addDbPortsWorklogBodyMinutesMax = 2400;
+
+
+
+export const AddDbPortsWorklogBody = zod.object({
+  "revision": zod.number().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(addDbPortsWorklogBodyMinutesMin).max(addDbPortsWorklogBodyMinutesMax),
+  "notes": zod.string()
+})
+
+
+export const addDbPortsWorklogResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsWorklogResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const addDbPortsWorklogResponseItemsItemOneHeadlineMax = 500;
+
+export const addDbPortsWorklogResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsWorklogResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const addDbPortsWorklogResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const addDbPortsWorklogResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const addDbPortsWorklogResponseItemsItemOneOutlookMax = 4000;
+
+export const addDbPortsWorklogResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const addDbPortsWorklogResponseItemsItemOneMissingInfoMax = 4000;
+
+export const addDbPortsWorklogResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const addDbPortsWorklogResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const addDbPortsWorklogResponseItemsItemOneEvidenceMax = 12;
+
+
+export const addDbPortsWorklogResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseItemsMax = 200;
+
+
+export const addDbPortsWorklogResponseWorklogItemMinutesMin = 0;
+export const addDbPortsWorklogResponseWorklogItemMinutesMax = 2400;
+
+export const addDbPortsWorklogResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseWorklogMax = 500;
+
+
+export const addDbPortsWorklogResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const addDbPortsWorklogResponseQualitySelectedCountMin = 0;
+
+export const addDbPortsWorklogResponseQualityWatchCountMin = 0;
+
+export const addDbPortsWorklogResponseQualityHeldCountMin = 0;
+
+export const addDbPortsWorklogResponseQualityInboxCountMin = 0;
+
+export const addDbPortsWorklogResponseQualityRejectedCountMin = 0;
+
+export const addDbPortsWorklogResponseQualityTotalMinutesMin = 0;
+
+export const addDbPortsWorklogResponseQualityCorrectionsMin = 0;
+
+export const addDbPortsWorklogResponseQualityMissedSignalsMin = 0;
+
+export const addDbPortsWorklogResponseQualitySourceFailuresMin = 0;
+
+
+
+export const AddDbPortsWorklogResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(addDbPortsWorklogResponseStartDateRegExp),
+  "endDate": zod.string().regex(addDbPortsWorklogResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(addDbPortsWorklogResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(addDbPortsWorklogResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(addDbPortsWorklogResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(addDbPortsWorklogResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(addDbPortsWorklogResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(addDbPortsWorklogResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(addDbPortsWorklogResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(addDbPortsWorklogResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(addDbPortsWorklogResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(addDbPortsWorklogResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(addDbPortsWorklogResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(addDbPortsWorklogResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(addDbPortsWorklogResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(addDbPortsWorklogResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(addDbPortsWorklogResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(addDbPortsWorklogResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(addDbPortsWorklogResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(addDbPortsWorklogResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(addDbPortsWorklogResponseWorklogItemMinutesMin).max(addDbPortsWorklogResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(addDbPortsWorklogResponseWorklogItemCreatedAtRegExp)
+})).max(addDbPortsWorklogResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(addDbPortsWorklogResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(addDbPortsWorklogResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(addDbPortsWorklogResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(addDbPortsWorklogResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(addDbPortsWorklogResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(addDbPortsWorklogResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(addDbPortsWorklogResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(addDbPortsWorklogResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(addDbPortsWorklogResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(addDbPortsWorklogResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(addDbPortsWorklogResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(addDbPortsWorklogResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(addDbPortsWorklogResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(addDbPortsWorklogResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+
+export const DeleteDbPortsWorklogParams = zod.object({
+  "id": zod.coerce.number().min(1),
+  "entryId": zod.coerce.string().min(1)
+})
+
+
+
+
+export const DeleteDbPortsWorklogBody = zod.object({
+  "revision": zod.number().min(1)
+})
+
+
+export const deleteDbPortsWorklogResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const deleteDbPortsWorklogResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const deleteDbPortsWorklogResponseItemsItemOneHeadlineMax = 500;
+
+export const deleteDbPortsWorklogResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const deleteDbPortsWorklogResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneOutlookMax = 4000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneMissingInfoMax = 4000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const deleteDbPortsWorklogResponseItemsItemOneEvidenceMax = 12;
+
+
+export const deleteDbPortsWorklogResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseItemsMax = 200;
+
+
+export const deleteDbPortsWorklogResponseWorklogItemMinutesMin = 0;
+export const deleteDbPortsWorklogResponseWorklogItemMinutesMax = 2400;
+
+export const deleteDbPortsWorklogResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseWorklogMax = 500;
+
+
+export const deleteDbPortsWorklogResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const deleteDbPortsWorklogResponseQualitySelectedCountMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityWatchCountMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityHeldCountMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityInboxCountMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityRejectedCountMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityTotalMinutesMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityCorrectionsMin = 0;
+
+export const deleteDbPortsWorklogResponseQualityMissedSignalsMin = 0;
+
+export const deleteDbPortsWorklogResponseQualitySourceFailuresMin = 0;
+
+
+
+export const DeleteDbPortsWorklogResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(deleteDbPortsWorklogResponseStartDateRegExp),
+  "endDate": zod.string().regex(deleteDbPortsWorklogResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(deleteDbPortsWorklogResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(deleteDbPortsWorklogResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(deleteDbPortsWorklogResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(deleteDbPortsWorklogResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(deleteDbPortsWorklogResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(deleteDbPortsWorklogResponseWorklogItemMinutesMin).max(deleteDbPortsWorklogResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(deleteDbPortsWorklogResponseWorklogItemCreatedAtRegExp)
+})).max(deleteDbPortsWorklogResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(deleteDbPortsWorklogResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(deleteDbPortsWorklogResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(deleteDbPortsWorklogResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(deleteDbPortsWorklogResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(deleteDbPortsWorklogResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(deleteDbPortsWorklogResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(deleteDbPortsWorklogResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(deleteDbPortsWorklogResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(deleteDbPortsWorklogResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(deleteDbPortsWorklogResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(deleteDbPortsWorklogResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(deleteDbPortsWorklogResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(deleteDbPortsWorklogResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(deleteDbPortsWorklogResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+
+
+
+export const RecordDbPortsCoverageParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+
+export const RecordDbPortsCoverageBody = zod.object({
+  "revision": zod.number().min(1),
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "notes": zod.string()
+})
+
+
+export const recordDbPortsCoverageResponseStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const recordDbPortsCoverageResponseEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const recordDbPortsCoverageResponseItemsItemOneHeadlineMax = 500;
+
+export const recordDbPortsCoverageResponseItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const recordDbPortsCoverageResponseItemsItemOneConfirmedFactsMax = 8000;
+
+export const recordDbPortsCoverageResponseItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const recordDbPortsCoverageResponseItemsItemOneOperationalImplicationsMax = 4000;
+
+export const recordDbPortsCoverageResponseItemsItemOneOutlookMax = 4000;
+
+export const recordDbPortsCoverageResponseItemsItemOneMaterialityReasonMax = 2000;
+
+export const recordDbPortsCoverageResponseItemsItemOneMissingInfoMax = 4000;
+
+export const recordDbPortsCoverageResponseItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const recordDbPortsCoverageResponseItemsItemOneEvidenceMax = 12;
+
+
+export const recordDbPortsCoverageResponseItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseItemsMax = 200;
+
+
+export const recordDbPortsCoverageResponseWorklogItemMinutesMin = 0;
+export const recordDbPortsCoverageResponseWorklogItemMinutesMax = 2400;
+
+export const recordDbPortsCoverageResponseWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseWorklogMax = 500;
+
+
+export const recordDbPortsCoverageResponseCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const recordDbPortsCoverageResponseQualitySelectedCountMin = 0;
+
+export const recordDbPortsCoverageResponseQualityWatchCountMin = 0;
+
+export const recordDbPortsCoverageResponseQualityHeldCountMin = 0;
+
+export const recordDbPortsCoverageResponseQualityInboxCountMin = 0;
+
+export const recordDbPortsCoverageResponseQualityRejectedCountMin = 0;
+
+export const recordDbPortsCoverageResponseQualityTotalMinutesMin = 0;
+
+export const recordDbPortsCoverageResponseQualityCorrectionsMin = 0;
+
+export const recordDbPortsCoverageResponseQualityMissedSignalsMin = 0;
+
+export const recordDbPortsCoverageResponseQualitySourceFailuresMin = 0;
+
+
+
+export const RecordDbPortsCoverageResponse = zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(recordDbPortsCoverageResponseStartDateRegExp),
+  "endDate": zod.string().regex(recordDbPortsCoverageResponseEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(recordDbPortsCoverageResponseItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(recordDbPortsCoverageResponseItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(recordDbPortsCoverageResponseItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(recordDbPortsCoverageResponseItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(recordDbPortsCoverageResponseItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(recordDbPortsCoverageResponseItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(recordDbPortsCoverageResponseItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(recordDbPortsCoverageResponseItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(recordDbPortsCoverageResponseItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(recordDbPortsCoverageResponseItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(recordDbPortsCoverageResponseItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(recordDbPortsCoverageResponseItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(recordDbPortsCoverageResponseItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(recordDbPortsCoverageResponseItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(recordDbPortsCoverageResponseItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(recordDbPortsCoverageResponseItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(recordDbPortsCoverageResponseItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(recordDbPortsCoverageResponseItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(recordDbPortsCoverageResponseWorklogItemMinutesMin).max(recordDbPortsCoverageResponseWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(recordDbPortsCoverageResponseWorklogItemCreatedAtRegExp)
+})).max(recordDbPortsCoverageResponseWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(recordDbPortsCoverageResponseCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(recordDbPortsCoverageResponseHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(recordDbPortsCoverageResponseCreatedAtRegExp),
+  "updatedAt": zod.string().regex(recordDbPortsCoverageResponseUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(recordDbPortsCoverageResponseApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(recordDbPortsCoverageResponseQualitySelectedCountMin),
+  "watchCount": zod.number().min(recordDbPortsCoverageResponseQualityWatchCountMin),
+  "heldCount": zod.number().min(recordDbPortsCoverageResponseQualityHeldCountMin),
+  "inboxCount": zod.number().min(recordDbPortsCoverageResponseQualityInboxCountMin),
+  "rejectedCount": zod.number().min(recordDbPortsCoverageResponseQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(recordDbPortsCoverageResponseQualityTotalMinutesMin),
+  "corrections": zod.number().min(recordDbPortsCoverageResponseQualityCorrectionsMin),
+  "missedSignals": zod.number().min(recordDbPortsCoverageResponseQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(recordDbPortsCoverageResponseQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+})
+
+
+export const getDbPortsSettingsResponseRevisionMin = 0;
+
+
+
+export const getDbPortsSettingsResponseSourcesItemUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const getDbPortsSettingsResponseSourcesItemExpectedCadenceMax = 200;
+
+export const getDbPortsSettingsResponseSourcesItemLastSuccessfulCheckAtOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const getDbPortsSettingsResponseSourcesItemLastRelevantItemDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const getDbPortsSettingsResponseSourcesItemLastRelevantItemUrlOneRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const getDbPortsSettingsResponseSourcesMax = 150;
+
+
+
+export const getDbPortsSettingsResponseWatchlistMax = 150;
+
+export const getDbPortsSettingsResponseUpdatedAtOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+
+
+export const GetDbPortsSettingsResponse = zod.object({
+  "revision": zod.number().min(getDbPortsSettingsResponseRevisionMin),
+  "sources": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "url": zod.string().regex(getDbPortsSettingsResponseSourcesItemUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "themes": zod.array(zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory'])),
+  "language": zod.string(),
+  "accessMode": zod.enum(['manual', 'rss', 'api']),
+  "status": zod.enum(['pending', 'approved', 'paused']),
+  "notes": zod.string(),
+  "expectedCadence": zod.string().max(getDbPortsSettingsResponseSourcesItemExpectedCadenceMax).optional(),
+  "reliability": zod.enum(['unassessed', 'consistent', 'intermittent', 'unavailable']).optional(),
+  "manualReviewRequired": zod.boolean().optional(),
+  "lastSuccessfulCheckAt": zod.union([zod.string().regex(getDbPortsSettingsResponseSourcesItemLastSuccessfulCheckAtOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemDate": zod.union([zod.string().regex(getDbPortsSettingsResponseSourcesItemLastRelevantItemDateOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemUrl": zod.union([zod.string().regex(getDbPortsSettingsResponseSourcesItemLastRelevantItemUrlOneRegExp),zod.null()]).optional()
+})).max(getDbPortsSettingsResponseSourcesMax),
+  "watchlist": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "kind": zod.enum(['port', 'terminal', 'corridor', 'market']),
+  "aliases": zod.array(zod.string()),
+  "confirmedClientAsset": zod.boolean(),
+  "active": zod.boolean()
+})).max(getDbPortsSettingsResponseWatchlistMax),
+  "notes": zod.string(),
+  "updatedAt": zod.union([zod.string().regex(getDbPortsSettingsResponseUpdatedAtOneRegExp),zod.null()])
+})
+
+
+export const updateDbPortsSettingsBodyRevisionMin = 0;
+
+
+
+export const updateDbPortsSettingsBodySourcesItemUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsSettingsBodySourcesItemExpectedCadenceMax = 200;
+
+export const updateDbPortsSettingsBodySourcesItemLastSuccessfulCheckAtOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsSettingsBodySourcesItemLastRelevantItemDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsSettingsBodySourcesItemLastRelevantItemUrlOneRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsSettingsBodySourcesMax = 150;
+
+
+
+export const updateDbPortsSettingsBodyWatchlistMax = 150;
+
+
+
+export const UpdateDbPortsSettingsBody = zod.object({
+  "revision": zod.number().min(updateDbPortsSettingsBodyRevisionMin),
+  "sources": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "url": zod.string().regex(updateDbPortsSettingsBodySourcesItemUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "themes": zod.array(zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory'])),
+  "language": zod.string(),
+  "accessMode": zod.enum(['manual', 'rss', 'api']),
+  "status": zod.enum(['pending', 'approved', 'paused']),
+  "notes": zod.string(),
+  "expectedCadence": zod.string().max(updateDbPortsSettingsBodySourcesItemExpectedCadenceMax).optional(),
+  "reliability": zod.enum(['unassessed', 'consistent', 'intermittent', 'unavailable']).optional(),
+  "manualReviewRequired": zod.boolean().optional(),
+  "lastSuccessfulCheckAt": zod.union([zod.string().regex(updateDbPortsSettingsBodySourcesItemLastSuccessfulCheckAtOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemDate": zod.union([zod.string().regex(updateDbPortsSettingsBodySourcesItemLastRelevantItemDateOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemUrl": zod.union([zod.string().regex(updateDbPortsSettingsBodySourcesItemLastRelevantItemUrlOneRegExp),zod.null()]).optional()
+})).max(updateDbPortsSettingsBodySourcesMax),
+  "watchlist": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "kind": zod.enum(['port', 'terminal', 'corridor', 'market']),
+  "aliases": zod.array(zod.string()),
+  "confirmedClientAsset": zod.boolean(),
+  "active": zod.boolean()
+})).max(updateDbPortsSettingsBodyWatchlistMax),
+  "notes": zod.string()
+})
+
+export const updateDbPortsSettingsResponseRevisionMin = 0;
+
+
+
+export const updateDbPortsSettingsResponseSourcesItemUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsSettingsResponseSourcesItemExpectedCadenceMax = 200;
+
+export const updateDbPortsSettingsResponseSourcesItemLastSuccessfulCheckAtOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const updateDbPortsSettingsResponseSourcesItemLastRelevantItemDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const updateDbPortsSettingsResponseSourcesItemLastRelevantItemUrlOneRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const updateDbPortsSettingsResponseSourcesMax = 150;
+
+
+
+export const updateDbPortsSettingsResponseWatchlistMax = 150;
+
+export const updateDbPortsSettingsResponseUpdatedAtOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+
+
+export const UpdateDbPortsSettingsResponse = zod.object({
+  "revision": zod.number().min(updateDbPortsSettingsResponseRevisionMin),
+  "sources": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "url": zod.string().regex(updateDbPortsSettingsResponseSourcesItemUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "themes": zod.array(zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory'])),
+  "language": zod.string(),
+  "accessMode": zod.enum(['manual', 'rss', 'api']),
+  "status": zod.enum(['pending', 'approved', 'paused']),
+  "notes": zod.string(),
+  "expectedCadence": zod.string().max(updateDbPortsSettingsResponseSourcesItemExpectedCadenceMax).optional(),
+  "reliability": zod.enum(['unassessed', 'consistent', 'intermittent', 'unavailable']).optional(),
+  "manualReviewRequired": zod.boolean().optional(),
+  "lastSuccessfulCheckAt": zod.union([zod.string().regex(updateDbPortsSettingsResponseSourcesItemLastSuccessfulCheckAtOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemDate": zod.union([zod.string().regex(updateDbPortsSettingsResponseSourcesItemLastRelevantItemDateOneRegExp),zod.null()]).optional(),
+  "lastRelevantItemUrl": zod.union([zod.string().regex(updateDbPortsSettingsResponseSourcesItemLastRelevantItemUrlOneRegExp),zod.null()]).optional()
+})).max(updateDbPortsSettingsResponseSourcesMax),
+  "watchlist": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "name": zod.string().min(1),
+  "country": zod.string(),
+  "kind": zod.enum(['port', 'terminal', 'corridor', 'market']),
+  "aliases": zod.array(zod.string()),
+  "confirmedClientAsset": zod.boolean(),
+  "active": zod.boolean()
+})).max(updateDbPortsSettingsResponseWatchlistMax),
+  "notes": zod.string(),
+  "updatedAt": zod.union([zod.string().regex(updateDbPortsSettingsResponseUpdatedAtOneRegExp),zod.null()])
+})
+
+
+
+
+
+export const PrepareDbPortsExportParams = zod.object({
+  "id": zod.coerce.number().min(1)
+})
+
+
+
+
+export const PrepareDbPortsExportBody = zod.object({
+  "revision": zod.number().min(1),
+  "mode": zod.enum(['working', 'reviewed'])
+})
+
+
+export const prepareDbPortsExportResponseEditionStartDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const prepareDbPortsExportResponseEditionEndDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+export const prepareDbPortsExportResponseEditionItemsItemOneHeadlineMax = 500;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneEventDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const prepareDbPortsExportResponseEditionItemsItemOneConfirmedFactsMax = 8000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneUnverifiedClaimsMax = 4000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneOperationalImplicationsMax = 4000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneOutlookMax = 4000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneMaterialityReasonMax = 2000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneMissingInfoMax = 4000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneAnalystNotesMax = 4000;
+
+
+
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemSourceUrlRegExp = new RegExp('^https?:\/\/[^ \\t\\r\\n]+$');
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemPublishedDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemSourceDateOneRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemRetrievedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemExcerptMax = 800;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemOriginalTitleMax = 1000;
+
+export const prepareDbPortsExportResponseEditionItemsItemOneEvidenceMax = 12;
+
+
+export const prepareDbPortsExportResponseEditionItemsItemTwoUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionItemsMax = 200;
+
+
+export const prepareDbPortsExportResponseEditionWorklogItemMinutesMin = 0;
+export const prepareDbPortsExportResponseEditionWorklogItemMinutesMax = 2400;
+
+export const prepareDbPortsExportResponseEditionWorklogItemCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionWorklogMax = 500;
+
+
+export const prepareDbPortsExportResponseEditionCoverageItemCheckedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionHistoryItemAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionCreatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionUpdatedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionApprovedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+export const prepareDbPortsExportResponseEditionQualitySelectedCountMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityWatchCountMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityHeldCountMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityInboxCountMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityRejectedCountMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityTotalMinutesMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityCorrectionsMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualityMissedSignalsMin = 0;
+
+export const prepareDbPortsExportResponseEditionQualitySourceFailuresMin = 0;
+
+export const prepareDbPortsExportResponseGeneratedAtRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$');
+
+
+export const PrepareDbPortsExportResponse = zod.object({
+  "edition": zod.object({
+  "id": zod.number().min(1),
+  "title": zod.string(),
+  "startDate": zod.string().regex(prepareDbPortsExportResponseEditionStartDateRegExp),
+  "endDate": zod.string().regex(prepareDbPortsExportResponseEditionEndDateRegExp),
+  "overview": zod.string(),
+  "status": zod.enum(['draft', 'in_review', 'approved']),
+  "revision": zod.number().min(1),
+  "items": zod.array(zod.object({
+  "headline": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneHeadlineMax),
+  "country": zod.string(),
+  "location": zod.string(),
+  "assets": zod.array(zod.string()),
+  "eventDate": zod.union([zod.string().regex(prepareDbPortsExportResponseEditionItemsItemOneEventDateOneRegExp),zod.null()]),
+  "theme": zod.enum(['security', 'cargo', 'operations', 'geopolitical', 'hazards', 'regulatory']),
+  "disposition": zod.enum(['inbox', 'selected', 'watch', 'hold', 'rejected']),
+  "severity": zod.union([zod.literal('Insignificant'),zod.literal('Low'),zod.literal('Moderate'),zod.literal('High'),zod.literal('Extreme'),zod.literal(null)]).nullable(),
+  "confidence": zod.enum(['unverified', 'single_source', 'corroborated', 'official']),
+  "confirmedFacts": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneConfirmedFactsMax),
+  "unverifiedClaims": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneUnverifiedClaimsMax),
+  "operationalImplications": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneOperationalImplicationsMax),
+  "outlook": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneOutlookMax),
+  "materialityReason": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneMaterialityReasonMax),
+  "impactAreas": zod.array(zod.enum(['personnel', 'port_operations', 'cargo_assets', 'landside_access', 'maritime_access', 'supply_chain', 'compliance', 'business_continuity'])),
+  "missingInfo": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneMissingInfoMax),
+  "analystNotes": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneAnalystNotesMax),
+  "reviewed": zod.boolean(),
+  "reviewer": zod.string(),
+  "secondReviewer": zod.string(),
+  "secondReviewNote": zod.string(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "sourceName": zod.string().min(1),
+  "sourceUrl": zod.string().regex(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemSourceUrlRegExp),
+  "sourceType": zod.enum(['official', 'specialist', 'news', 'discovery']),
+  "publishedDate": zod.union([zod.string().regex(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemPublishedDateOneRegExp),zod.null()]),
+  "sourceDate": zod.union([zod.string().regex(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemSourceDateOneRegExp),zod.null()]),
+  "retrievedAt": zod.string().regex(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemRetrievedAtRegExp),
+  "excerpt": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemExcerptMax),
+  "originalTitle": zod.string().max(prepareDbPortsExportResponseEditionItemsItemOneEvidenceItemOriginalTitleMax),
+  "sourceRecord": zod.string().nullable(),
+  "verified": zod.boolean()
+})).max(prepareDbPortsExportResponseEditionItemsItemOneEvidenceMax)
+}).and(zod.object({
+  "id": zod.string().min(1),
+  "mergedInto": zod.string().nullable(),
+  "updatedAt": zod.string().regex(prepareDbPortsExportResponseEditionItemsItemTwoUpdatedAtRegExp),
+  "blockers": zod.array(zod.string()),
+  "secondaryReviewRequired": zod.boolean()
+}))).max(prepareDbPortsExportResponseEditionItemsMax),
+  "worklog": zod.array(zod.object({
+  "id": zod.string().min(1),
+  "activity": zod.enum(['research', 'verification', 'writing', 'review', 'export', 'correction', 'missed_signal']),
+  "minutes": zod.number().min(prepareDbPortsExportResponseEditionWorklogItemMinutesMin).max(prepareDbPortsExportResponseEditionWorklogItemMinutesMax),
+  "notes": zod.string(),
+  "createdAt": zod.string().regex(prepareDbPortsExportResponseEditionWorklogItemCreatedAtRegExp)
+})).max(prepareDbPortsExportResponseEditionWorklogMax),
+  "coverage": zod.array(zod.object({
+  "sourceId": zod.string().min(1),
+  "status": zod.enum(['checked', 'no_material', 'unavailable']),
+  "checkedAt": zod.string().regex(prepareDbPortsExportResponseEditionCoverageItemCheckedAtRegExp),
+  "notes": zod.string()
+})),
+  "history": zod.array(zod.object({
+  "at": zod.string().regex(prepareDbPortsExportResponseEditionHistoryItemAtRegExp),
+  "action": zod.string(),
+  "detail": zod.string()
+})),
+  "createdAt": zod.string().regex(prepareDbPortsExportResponseEditionCreatedAtRegExp),
+  "updatedAt": zod.string().regex(prepareDbPortsExportResponseEditionUpdatedAtRegExp),
+  "approvedAt": zod.string().regex(prepareDbPortsExportResponseEditionApprovedAtRegExp).nullable(),
+  "quality": zod.object({
+  "blockers": zod.array(zod.string()),
+  "warnings": zod.array(zod.string()),
+  "selectedCount": zod.number().min(prepareDbPortsExportResponseEditionQualitySelectedCountMin),
+  "watchCount": zod.number().min(prepareDbPortsExportResponseEditionQualityWatchCountMin),
+  "heldCount": zod.number().min(prepareDbPortsExportResponseEditionQualityHeldCountMin),
+  "inboxCount": zod.number().min(prepareDbPortsExportResponseEditionQualityInboxCountMin),
+  "rejectedCount": zod.number().min(prepareDbPortsExportResponseEditionQualityRejectedCountMin),
+  "totalMinutes": zod.number().min(prepareDbPortsExportResponseEditionQualityTotalMinutesMin),
+  "corrections": zod.number().min(prepareDbPortsExportResponseEditionQualityCorrectionsMin),
+  "missedSignals": zod.number().min(prepareDbPortsExportResponseEditionQualityMissedSignalsMin),
+  "sourceFailures": zod.number().min(prepareDbPortsExportResponseEditionQualitySourceFailuresMin),
+  "readyForReview": zod.boolean()
+})
+}),
+  "mode": zod.enum(['working', 'reviewed']),
+  "generatedAt": zod.string().regex(prepareDbPortsExportResponseGeneratedAtRegExp)
+})
+
+

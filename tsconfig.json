@@ -19,6 +19,9 @@
       "path": "./lib/api-client-react"
     },
     {
+      "path": "./lib/db-ports"
+    },
+    {
       "path": "./lib/api-zod"
     },
     {

@@ -76,6 +76,7 @@ module.exports = {
     "^@workspace/ingest$": "<rootDir>/lib/ingest/src/index.ts",
     "^@workspace/strike-targets$": "<rootDir>/lib/strike-targets/src/index.ts",
     "^@workspace/relevance$": "<rootDir>/lib/relevance/src/index.ts",
+    "^@workspace/db-ports$": "<rootDir>/lib/db-ports/src/index.ts",
     "^@workspace/country-engine$": "<rootDir>/lib/country-engine/src/index.ts",
     "^@workspace/country-engine/(.*)$":
       "<rootDir>/lib/country-engine/src/$1.ts",

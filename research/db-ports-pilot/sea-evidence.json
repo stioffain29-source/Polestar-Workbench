@@ -1,0 +1,58 @@
+[
+  {
+    "headline": "Malaysia Marine Department warns mariners around PM3 CAA drilling activity",
+    "country": "Malaysia",
+    "eventDate": "2026-09-22",
+    "location": "Block PM3 CAA, South China Sea (06°58.638′N, 104°10.825′E)",
+    "assetName": "HAKURYU-14 drilling rig and support vessels JM ABADI and PTSC TITAN",
+    "theme": "operations",
+    "sourceName": "Malaysia Marine Department",
+    "sourceUrl": "https://www.marine.gov.my/wp-content/uploads/2026/09/PENINSULAR-NTM-176T-2026-VESSEL-MOVEMENT-AND-EXPLORATION-WELL-DRILLING-ACTIVITIES-SOUTH-CHINA-SEA.pdf",
+    "publishedDate": "2026-09-14",
+    "facts": [
+      "Notice to Mariners 176(T)/2026 states that vessel movements and exploration-well drilling at Block PM3 CAA run from 22 September through 16 October 2026.",
+      "The notice identifies one drilling rig and two anchor-handling tug supply vessels and gives a WGS-84 work-area coordinate.",
+      "Source tier: Tier 1 primary maritime regulator; the fetched PDF text directly verifies the issue date, activity period, vessels, coordinate and navigation instruction."
+    ],
+    "excerpt": "Mariners are advised to give wide berth when passing and navigate with caution when in the vicinity.",
+    "materialityReason": "A regulator-directed wide berth and caution around named offshore assets creates a defined maritime-access constraint for vessels transiting the work area.",
+    "impactAreas": [
+      "maritime_access",
+      "port_operations",
+      "business_continuity"
+    ],
+    "missingInfo": [
+      "The notice does not quantify the berth distance, traffic delays, affected voyages or any port-call impact.",
+      "No operator confirmation of actual activity commencement on 22 September was located."
+    ],
+    "recommendation": "candidate"
+  },
+  {
+    "headline": "Hong Kong Marine Department schedules six-hour outage of all electronic port-formality services",
+    "country": "Hong Kong",
+    "eventDate": "2026-09-22",
+    "location": "Hong Kong",
+    "assetName": "Marine Department Electronic Business System (eBS)",
+    "theme": "operations",
+    "sourceName": "Hong Kong Marine Department",
+    "sourceUrl": "https://ebs.mardep.gov.hk/",
+    "publishedDate": null,
+    "facts": [
+      "The Marine Department eBS page states that all eBS services will be unavailable from 18:00 to 23:59 HKT on 22 September 2026.",
+      "The same primary page describes eBS as handling port formalities and shipping-related documents required by the Marine, Health and Immigration departments.",
+      "Source tier: Tier 1 primary maritime regulator; the live page directly verifies the outage date, hours and affected service scope."
+    ],
+    "excerpt": "eBS maintenance will be carried out on 22 September 2026 (Tuesday); all services are listed as temporarily unavailable from 18:00 to 23:59 HKT.",
+    "materialityReason": "Temporary loss of the regulator's full electronic service channel can affect timely submission or processing of port formalities and shipping documents during the stated window.",
+    "impactAreas": [
+      "port_operations",
+      "compliance",
+      "business_continuity"
+    ],
+    "missingInfo": [
+      "The page does not display a publication timestamp, so publication within the 9-22 September window cannot be proven.",
+      "No fallback submission method, affected transaction count or evidence of realized processing delay is stated."
+    ],
+    "recommendation": "hold"
+  }
+]

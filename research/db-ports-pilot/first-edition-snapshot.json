@@ -1,0 +1,167 @@
+{
+  "id": 1,
+  "title": "DB Ports Pilot — 9–22 September 2026",
+  "startDate": "2026-09-09",
+  "endDate": "2026-09-22",
+  "overview": "This first DB Ports pilot draft covers 9–22 September 2026 and is for internal review only. No priority development has yet passed analyst verification and selection. The absence of approved items is a research outcome, not an assessment that regional operations were unaffected.\n\nTwo primary-source leads are retained on hold. A Malaysian navigation notice concerns offshore drilling beginning on 22 September; a material connection to port operations or a confirmed client route has not been established. A Hong Kong notice describes a planned electronic port-formalities outage on the same day, but its publication date and any realised processing effects remain unverified. Neither lead is presented as an approved incident or assigned a severity rating.\n\nThe checked ReCAAP weekly report covers 8–14 September only; it cannot establish conditions for the remainder of this edition. Other targeted source searches produced no qualifying current item, and an inaccessible Indonesian weather-warning download remains a coverage gap. Source checks are recorded separately from analyst approval.\n\nThe next review should resolve publication dates, operating materiality and asset relevance before selecting any development. The provisional port roster is not a confirmed client asset list. No human research hours, independent review or permission to distribute this draft is implied.",
+  "status": "draft",
+  "revision": 1,
+  "items": [
+    {
+      "id": "pilot-notice-1",
+      "theme": "operations",
+      "assets": [
+        "HAKURYU-14 drilling rig and support vessels JM ABADI and PTSC TITAN"
+      ],
+      "country": "Malaysia",
+      "outlook": "Check whether operations commenced and whether a confirmed client route intersects the work area before considering this notice for selection.",
+      "blockers": [],
+      "evidence": [
+        {
+          "id": "pilot-source-1",
+          "excerpt": "Mariners are advised to give wide berth when passing and navigate with caution when in the vicinity.",
+          "verified": false,
+          "sourceUrl": "https://www.marine.gov.my/wp-content/uploads/2026/09/PENINSULAR-NTM-176T-2026-VESSEL-MOVEMENT-AND-EXPLORATION-WELL-DRILLING-ACTIVITIES-SOUTH-CHINA-SEA.pdf",
+          "sourceDate": null,
+          "sourceName": "Malaysia Marine Department",
+          "sourceType": "official",
+          "retrievedAt": "2026-09-22T03:57:44.713Z",
+          "sourceRecord": null,
+          "originalTitle": "Malaysia Marine Department warns mariners around PM3 CAA drilling activity",
+          "publishedDate": "2026-09-14"
+        }
+      ],
+      "headline": "Malaysia Marine Department warns mariners around PM3 CAA drilling activity",
+      "location": "Block PM3 CAA, South China Sea (06°58.638′N, 104°10.825′E)",
+      "reviewed": false,
+      "reviewer": "",
+      "severity": null,
+      "eventDate": "2026-09-22",
+      "updatedAt": "2026-09-22T03:57:44.713Z",
+      "confidence": "unverified",
+      "mergedInto": null,
+      "disposition": "hold",
+      "impactAreas": [
+        "maritime_access"
+      ],
+      "missingInfo": "The notice does not quantify the berth distance, traffic delays, affected voyages or any port-call impact.\nNo operator confirmation of actual activity commencement on 22 September was located.\nRequires analyst verification, operating-materiality assessment and sign-off; research assistance is not approval.",
+      "analystNotes": "Prepared from direct primary-source research for an INTERNAL UNPUBLISHED pilot. This is a held lead, not an approved development. Initial coverage targets do not establish client ownership or exposure.",
+      "confirmedFacts": "",
+      "secondReviewer": "",
+      "secondReviewNote": "",
+      "unverifiedClaims": "Notice to Mariners 176(T)/2026 states that vessel movements and exploration-well drilling at Block PM3 CAA run from 22 September through 16 October 2026.\nThe notice identifies one drilling rig and two anchor-handling tug supply vessels and gives a WGS-84 work-area coordinate.",
+      "materialityReason": "A navigation caution affects the named offshore work area; its materiality to port or client operations remains unproven.",
+      "operationalImplications": "The notice advises vessels passing the specified drilling area to give a wide berth and navigate with caution. No port closure, terminal delay or effect on a confirmed client route has been established.",
+      "secondaryReviewRequired": false
+    },
+    {
+      "id": "pilot-notice-2",
+      "theme": "operations",
+      "assets": [
+        "Marine Department Electronic Business System (eBS)"
+      ],
+      "country": "Hong Kong",
+      "outlook": "Establish the notice publication date, fallback submission arrangements and service-restoration status before considering selection.",
+      "blockers": [],
+      "evidence": [
+        {
+          "id": "pilot-source-2",
+          "excerpt": "eBS maintenance will be carried out on 22 September 2026 (Tuesday); all services are listed as temporarily unavailable from 18:00 to 23:59 HKT.",
+          "verified": false,
+          "sourceUrl": "https://ebs.mardep.gov.hk/",
+          "sourceDate": null,
+          "sourceName": "Hong Kong Marine Department",
+          "sourceType": "official",
+          "retrievedAt": "2026-09-22T03:57:44.713Z",
+          "sourceRecord": null,
+          "originalTitle": "Hong Kong Marine Department schedules six-hour outage of all electronic port-formality services",
+          "publishedDate": null
+        }
+      ],
+      "headline": "Hong Kong Marine Department schedules six-hour outage of all electronic port-formality services",
+      "location": "Hong Kong",
+      "reviewed": false,
+      "reviewer": "",
+      "severity": null,
+      "eventDate": "2026-09-22",
+      "updatedAt": "2026-09-22T03:57:44.713Z",
+      "confidence": "unverified",
+      "mergedInto": null,
+      "disposition": "hold",
+      "impactAreas": [
+        "port_operations",
+        "compliance"
+      ],
+      "missingInfo": "The page does not display a publication timestamp, so publication within the 9-22 September window cannot be proven.\nNo fallback submission method, affected transaction count or evidence of realized processing delay is stated.\nRequires analyst verification, operating-materiality assessment and sign-off; research assistance is not approval.",
+      "analystNotes": "Prepared from direct primary-source research for an INTERNAL UNPUBLISHED pilot. This is a held lead, not an approved development. Initial coverage targets do not establish client ownership or exposure.",
+      "confirmedFacts": "",
+      "secondReviewer": "",
+      "secondReviewNote": "",
+      "unverifiedClaims": "The Marine Department eBS page states that all eBS services will be unavailable from 18:00 to 23:59 HKT on 22 September 2026.\nThe same primary page describes eBS as handling port formalities and shipping-related documents required by the Marine, Health and Immigration departments.",
+      "materialityReason": "The stated interruption concerns electronic port formalities; material operational consequences remain unverified.",
+      "operationalImplications": "The notice identifies a planned interruption to the electronic port-formality channel. Actual processing delay, operational effects and fallback arrangements have not been verified.",
+      "secondaryReviewRequired": false
+    }
+  ],
+  "worklog": [],
+  "coverage": [
+    {
+      "notes": "Research assist: directly checked NTM176(T)/2026, issued14September. Held offshore-drilling lead; actual port/client-route materiality unproven. Dynamic port-circular index returned no linked rows; that separate coverage gap remains.",
+      "status": "checked",
+      "sourceId": "my-marine",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: directly checked the eBS page and its22September18:00–23:59HKT maintenance notice. Publication date not visible; actual delay and fallback arrangements unverified. Held, not approved.",
+      "status": "checked",
+      "sourceId": "hk-ebs",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: eastern Central Java wave-warning download returned Invalid or expired token. Routine port forecasts did not demonstrate disruption. This is a coverage gap, not evidence of no hazard.",
+      "status": "unavailable",
+      "sourceId": "bmkg",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: checked Osaka Customs index. Surfaced11,15,16and18September entries were administrative/procurement/statistical. Publication date and port-flow effects of an October building-power-outage notice were not established. Limited check, not complete Japan coverage.",
+      "status": "no_material",
+      "sourceId": "osaka-customs",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: fetched https://www.poal.co.nz/news-media/operations-update-44;19August2026, outside this window. Response truncated. No qualifying current item retained; not complete New Zealand coverage.",
+      "status": "no_material",
+      "sourceId": "auckland",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: checked Sydney Harbour community notifications. Road-work entry starting6September lacked established publication date and material cargo-access effect. Not complete Australian port coverage.",
+      "status": "no_material",
+      "sourceId": "nsw-ports",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: checked https://frcs.org.fj/news. Visible in-window tax engagement/community entries were out of scope; response truncated. Not complete Fiji coverage.",
+      "status": "no_material",
+      "sourceId": "fiji-customs",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    },
+    {
+      "notes": "Research assist: checked https://www.recaap.org/ and its linked8–14September2026 weekly report. No piracy/armed-robbery incidents were reported for that week only. This does NOT cover15–22September; report period is not proof of publication date. Standing vigilance advice not treated as a new event.",
+      "status": "no_material",
+      "sourceId": "recaap",
+      "checkedAt": "2026-09-22T03:57:44.713Z"
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-09-22T03:57:44.713Z",
+      "action": "edition_created",
+      "detail": "Initial internal unpublished pilot draft. Research-assist source checks and held leads; no analyst approval, verified selected events or logged human effort."
+    }
+  ],
+  "createdAt": "2026-09-22T03:57:44.941455+00:00",
+  "updatedAt": "2026-09-22T03:57:44.941455+00:00",
+  "approvedAt": null
+}

@@ -31,6 +31,7 @@ import backfillRouter from "./backfill";
 import flashpointValidityAdminRouter from "./flashpointValidityAdmin";
 import cardsRouter from "./cards";
 import protestEventsRouter from "./protestEvents";
+import dbPortsRouter from "./dbPorts";
 import { requireOwner } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
@@ -77,5 +78,6 @@ router.use(officialMilitaryMaritimeSourcesRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
 router.use(protestEventsRouter);
+router.use(dbPortsRouter);
 
 export default router;

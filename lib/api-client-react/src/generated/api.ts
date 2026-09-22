@@ -52,6 +52,22 @@ import type {
   DataCentreFacility,
   DataCentreFacilityInput,
   DataCentreFacilityUpdate,
+  DbPortsBadRequestResponse,
+  DbPortsConflictResponse,
+  DbPortsCoverageInput,
+  DbPortsEdition,
+  DbPortsEditionInput,
+  DbPortsEditionSummary,
+  DbPortsEditionUpdate,
+  DbPortsExportInput,
+  DbPortsExportPayload,
+  DbPortsItemMutation,
+  DbPortsMergeInput,
+  DbPortsNotFoundResponse,
+  DbPortsRevisionInput,
+  DbPortsSettings,
+  DbPortsSettingsInput,
+  DbPortsWorklogInput,
   EditCountryProseInput,
   EditReportIncidentSummariesInput,
   EditReportProseInput,
@@ -8046,5 +8062,1012 @@ export const useLogoutMobileSession = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLogoutMobileSessionMutationOptions(options));
+    }
+
+export const getListDbPortsEditionsUrl = () => {
+
+
+
+
+  return `/api/db-ports/editions`
+}
+
+export const listDbPortsEditions = async ( options?: RequestInit): Promise<DbPortsEditionSummary[]> => {
+
+  return customFetch<DbPortsEditionSummary[]>(getListDbPortsEditionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDbPortsEditionsQueryKey = () => {
+    return [
+    `/api/db-ports/editions`
+    ] as const;
+    }
+
+
+export const getListDbPortsEditionsQueryOptions = <TData = Awaited<ReturnType<typeof listDbPortsEditions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDbPortsEditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDbPortsEditionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDbPortsEditions>>> = ({ signal }) => listDbPortsEditions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDbPortsEditions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDbPortsEditionsQueryResult = NonNullable<Awaited<ReturnType<typeof listDbPortsEditions>>>
+export type ListDbPortsEditionsQueryError = ErrorType<unknown>
+
+
+
+export function useListDbPortsEditions<TData = Awaited<ReturnType<typeof listDbPortsEditions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDbPortsEditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDbPortsEditionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDbPortsEditionUrl = () => {
+
+
+
+
+  return `/api/db-ports/editions`
+}
+
+export const createDbPortsEdition = async (dbPortsEditionInput: DbPortsEditionInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getCreateDbPortsEditionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsEditionInput,)
+  }
+);}
+
+
+
+
+export const getCreateDbPortsEditionMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDbPortsEdition>>, TError,{data: BodyType<DbPortsEditionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDbPortsEdition>>, TError,{data: BodyType<DbPortsEditionInput>}, TContext> => {
+
+const mutationKey = ['createDbPortsEdition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDbPortsEdition>>, {data: BodyType<DbPortsEditionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDbPortsEdition(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDbPortsEditionMutationResult = NonNullable<Awaited<ReturnType<typeof createDbPortsEdition>>>
+    export type CreateDbPortsEditionMutationBody = BodyType<DbPortsEditionInput>
+    export type CreateDbPortsEditionMutationError = ErrorType<DbPortsBadRequestResponse>
+
+    export const useCreateDbPortsEdition = <TError = ErrorType<DbPortsBadRequestResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDbPortsEdition>>, TError,{data: BodyType<DbPortsEditionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDbPortsEdition>>,
+        TError,
+        {data: BodyType<DbPortsEditionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDbPortsEditionMutationOptions(options));
+    }
+
+export const getGetDbPortsEditionUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}`
+}
+
+export const getDbPortsEdition = async (id: number, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getGetDbPortsEditionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDbPortsEditionQueryKey = (id: number,) => {
+    return [
+    `/api/db-ports/editions/${id}`
+    ] as const;
+    }
+
+
+export const getGetDbPortsEditionQueryOptions = <TData = Awaited<ReturnType<typeof getDbPortsEdition>>, TError = ErrorType<DbPortsNotFoundResponse>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDbPortsEdition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDbPortsEditionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDbPortsEdition>>> = ({ signal }) => getDbPortsEdition(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDbPortsEdition>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDbPortsEditionQueryResult = NonNullable<Awaited<ReturnType<typeof getDbPortsEdition>>>
+export type GetDbPortsEditionQueryError = ErrorType<DbPortsNotFoundResponse>
+
+
+
+export function useGetDbPortsEdition<TData = Awaited<ReturnType<typeof getDbPortsEdition>>, TError = ErrorType<DbPortsNotFoundResponse>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDbPortsEdition>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDbPortsEditionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDbPortsEditionUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}`
+}
+
+export const updateDbPortsEdition = async (id: number,
+    dbPortsEditionUpdate: DbPortsEditionUpdate, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getUpdateDbPortsEditionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsEditionUpdate,)
+  }
+);}
+
+
+
+
+export const getUpdateDbPortsEditionMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsEditionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsEditionUpdate>}, TContext> => {
+
+const mutationKey = ['updateDbPortsEdition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDbPortsEdition>>, {id: number;data: BodyType<DbPortsEditionUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateDbPortsEdition(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDbPortsEditionMutationResult = NonNullable<Awaited<ReturnType<typeof updateDbPortsEdition>>>
+    export type UpdateDbPortsEditionMutationBody = BodyType<DbPortsEditionUpdate>
+    export type UpdateDbPortsEditionMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const useUpdateDbPortsEdition = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsEditionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDbPortsEdition>>,
+        TError,
+        {id: number;data: BodyType<DbPortsEditionUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateDbPortsEditionMutationOptions(options));
+    }
+
+export const getDeleteDbPortsEditionUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}`
+}
+
+export const deleteDbPortsEdition = async (id: number,
+    dbPortsRevisionInput: DbPortsRevisionInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDbPortsEditionUrl(id),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsRevisionInput,)
+  }
+);}
+
+
+
+
+export const getDeleteDbPortsEditionMutationOptions = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext> => {
+
+const mutationKey = ['deleteDbPortsEdition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDbPortsEdition>>, {id: number;data: BodyType<DbPortsRevisionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  deleteDbPortsEdition(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDbPortsEditionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDbPortsEdition>>>
+    export type DeleteDbPortsEditionMutationBody = BodyType<DbPortsRevisionInput>
+    export type DeleteDbPortsEditionMutationError = ErrorType<DbPortsConflictResponse>
+
+    export const useDeleteDbPortsEdition = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsEdition>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDbPortsEdition>>,
+        TError,
+        {id: number;data: BodyType<DbPortsRevisionInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteDbPortsEditionMutationOptions(options));
+    }
+
+export const getImportDbPortsCandidatesUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/import`
+}
+
+export const importDbPortsCandidates = async (id: number,
+    dbPortsRevisionInput: DbPortsRevisionInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getImportDbPortsCandidatesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsRevisionInput,)
+  }
+);}
+
+
+
+
+export const getImportDbPortsCandidatesMutationOptions = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDbPortsCandidates>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importDbPortsCandidates>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext> => {
+
+const mutationKey = ['importDbPortsCandidates'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importDbPortsCandidates>>, {id: number;data: BodyType<DbPortsRevisionInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  importDbPortsCandidates(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportDbPortsCandidatesMutationResult = NonNullable<Awaited<ReturnType<typeof importDbPortsCandidates>>>
+    export type ImportDbPortsCandidatesMutationBody = BodyType<DbPortsRevisionInput>
+    export type ImportDbPortsCandidatesMutationError = ErrorType<DbPortsConflictResponse>
+
+    export const useImportDbPortsCandidates = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importDbPortsCandidates>>, TError,{id: number;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importDbPortsCandidates>>,
+        TError,
+        {id: number;data: BodyType<DbPortsRevisionInput>},
+        TContext
+      > => {
+      return useMutation(getImportDbPortsCandidatesMutationOptions(options));
+    }
+
+export const getAddDbPortsItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/items`
+}
+
+export const addDbPortsItem = async (id: number,
+    dbPortsItemMutation: DbPortsItemMutation, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getAddDbPortsItemUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsItemMutation,)
+  }
+);}
+
+
+
+
+export const getAddDbPortsItemMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addDbPortsItem>>, TError,{id: number;data: BodyType<DbPortsItemMutation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addDbPortsItem>>, TError,{id: number;data: BodyType<DbPortsItemMutation>}, TContext> => {
+
+const mutationKey = ['addDbPortsItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addDbPortsItem>>, {id: number;data: BodyType<DbPortsItemMutation>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addDbPortsItem(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddDbPortsItemMutationResult = NonNullable<Awaited<ReturnType<typeof addDbPortsItem>>>
+    export type AddDbPortsItemMutationBody = BodyType<DbPortsItemMutation>
+    export type AddDbPortsItemMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const useAddDbPortsItem = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addDbPortsItem>>, TError,{id: number;data: BodyType<DbPortsItemMutation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addDbPortsItem>>,
+        TError,
+        {id: number;data: BodyType<DbPortsItemMutation>},
+        TContext
+      > => {
+      return useMutation(getAddDbPortsItemMutationOptions(options));
+    }
+
+export const getUpdateDbPortsItemUrl = (id: number,
+    itemId: string,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/items/${itemId}`
+}
+
+export const updateDbPortsItem = async (id: number,
+    itemId: string,
+    dbPortsItemMutation: DbPortsItemMutation, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getUpdateDbPortsItemUrl(id,itemId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsItemMutation,)
+  }
+);}
+
+
+
+
+export const getUpdateDbPortsItemMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsItem>>, TError,{id: number;itemId: string;data: BodyType<DbPortsItemMutation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsItem>>, TError,{id: number;itemId: string;data: BodyType<DbPortsItemMutation>}, TContext> => {
+
+const mutationKey = ['updateDbPortsItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDbPortsItem>>, {id: number;itemId: string;data: BodyType<DbPortsItemMutation>}> = (props) => {
+          const {id,itemId,data} = props ?? {};
+
+          return  updateDbPortsItem(id,itemId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDbPortsItemMutationResult = NonNullable<Awaited<ReturnType<typeof updateDbPortsItem>>>
+    export type UpdateDbPortsItemMutationBody = BodyType<DbPortsItemMutation>
+    export type UpdateDbPortsItemMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const useUpdateDbPortsItem = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsItem>>, TError,{id: number;itemId: string;data: BodyType<DbPortsItemMutation>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDbPortsItem>>,
+        TError,
+        {id: number;itemId: string;data: BodyType<DbPortsItemMutation>},
+        TContext
+      > => {
+      return useMutation(getUpdateDbPortsItemMutationOptions(options));
+    }
+
+export const getMergeDbPortsItemsUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/merge`
+}
+
+export const mergeDbPortsItems = async (id: number,
+    dbPortsMergeInput: DbPortsMergeInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getMergeDbPortsItemsUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsMergeInput,)
+  }
+);}
+
+
+
+
+export const getMergeDbPortsItemsMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeDbPortsItems>>, TError,{id: number;data: BodyType<DbPortsMergeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeDbPortsItems>>, TError,{id: number;data: BodyType<DbPortsMergeInput>}, TContext> => {
+
+const mutationKey = ['mergeDbPortsItems'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeDbPortsItems>>, {id: number;data: BodyType<DbPortsMergeInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  mergeDbPortsItems(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeDbPortsItemsMutationResult = NonNullable<Awaited<ReturnType<typeof mergeDbPortsItems>>>
+    export type MergeDbPortsItemsMutationBody = BodyType<DbPortsMergeInput>
+    export type MergeDbPortsItemsMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const useMergeDbPortsItems = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeDbPortsItems>>, TError,{id: number;data: BodyType<DbPortsMergeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeDbPortsItems>>,
+        TError,
+        {id: number;data: BodyType<DbPortsMergeInput>},
+        TContext
+      > => {
+      return useMutation(getMergeDbPortsItemsMutationOptions(options));
+    }
+
+export const getAddDbPortsWorklogUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/worklog`
+}
+
+export const addDbPortsWorklog = async (id: number,
+    dbPortsWorklogInput: DbPortsWorklogInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getAddDbPortsWorklogUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsWorklogInput,)
+  }
+);}
+
+
+
+
+export const getAddDbPortsWorklogMutationOptions = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addDbPortsWorklog>>, TError,{id: number;data: BodyType<DbPortsWorklogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addDbPortsWorklog>>, TError,{id: number;data: BodyType<DbPortsWorklogInput>}, TContext> => {
+
+const mutationKey = ['addDbPortsWorklog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addDbPortsWorklog>>, {id: number;data: BodyType<DbPortsWorklogInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addDbPortsWorklog(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddDbPortsWorklogMutationResult = NonNullable<Awaited<ReturnType<typeof addDbPortsWorklog>>>
+    export type AddDbPortsWorklogMutationBody = BodyType<DbPortsWorklogInput>
+    export type AddDbPortsWorklogMutationError = ErrorType<DbPortsConflictResponse>
+
+    export const useAddDbPortsWorklog = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addDbPortsWorklog>>, TError,{id: number;data: BodyType<DbPortsWorklogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addDbPortsWorklog>>,
+        TError,
+        {id: number;data: BodyType<DbPortsWorklogInput>},
+        TContext
+      > => {
+      return useMutation(getAddDbPortsWorklogMutationOptions(options));
+    }
+
+export const getDeleteDbPortsWorklogUrl = (id: number,
+    entryId: string,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/worklog/${entryId}`
+}
+
+export const deleteDbPortsWorklog = async (id: number,
+    entryId: string,
+    dbPortsRevisionInput: DbPortsRevisionInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getDeleteDbPortsWorklogUrl(id,entryId),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsRevisionInput,)
+  }
+);}
+
+
+
+
+export const getDeleteDbPortsWorklogMutationOptions = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsWorklog>>, TError,{id: number;entryId: string;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsWorklog>>, TError,{id: number;entryId: string;data: BodyType<DbPortsRevisionInput>}, TContext> => {
+
+const mutationKey = ['deleteDbPortsWorklog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDbPortsWorklog>>, {id: number;entryId: string;data: BodyType<DbPortsRevisionInput>}> = (props) => {
+          const {id,entryId,data} = props ?? {};
+
+          return  deleteDbPortsWorklog(id,entryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDbPortsWorklogMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDbPortsWorklog>>>
+    export type DeleteDbPortsWorklogMutationBody = BodyType<DbPortsRevisionInput>
+    export type DeleteDbPortsWorklogMutationError = ErrorType<DbPortsConflictResponse>
+
+    export const useDeleteDbPortsWorklog = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDbPortsWorklog>>, TError,{id: number;entryId: string;data: BodyType<DbPortsRevisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDbPortsWorklog>>,
+        TError,
+        {id: number;entryId: string;data: BodyType<DbPortsRevisionInput>},
+        TContext
+      > => {
+      return useMutation(getDeleteDbPortsWorklogMutationOptions(options));
+    }
+
+export const getRecordDbPortsCoverageUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/coverage`
+}
+
+export const recordDbPortsCoverage = async (id: number,
+    dbPortsCoverageInput: DbPortsCoverageInput, options?: RequestInit): Promise<DbPortsEdition> => {
+
+  return customFetch<DbPortsEdition>(getRecordDbPortsCoverageUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsCoverageInput,)
+  }
+);}
+
+
+
+
+export const getRecordDbPortsCoverageMutationOptions = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordDbPortsCoverage>>, TError,{id: number;data: BodyType<DbPortsCoverageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordDbPortsCoverage>>, TError,{id: number;data: BodyType<DbPortsCoverageInput>}, TContext> => {
+
+const mutationKey = ['recordDbPortsCoverage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordDbPortsCoverage>>, {id: number;data: BodyType<DbPortsCoverageInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  recordDbPortsCoverage(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordDbPortsCoverageMutationResult = NonNullable<Awaited<ReturnType<typeof recordDbPortsCoverage>>>
+    export type RecordDbPortsCoverageMutationBody = BodyType<DbPortsCoverageInput>
+    export type RecordDbPortsCoverageMutationError = ErrorType<DbPortsConflictResponse>
+
+    export const useRecordDbPortsCoverage = <TError = ErrorType<DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordDbPortsCoverage>>, TError,{id: number;data: BodyType<DbPortsCoverageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordDbPortsCoverage>>,
+        TError,
+        {id: number;data: BodyType<DbPortsCoverageInput>},
+        TContext
+      > => {
+      return useMutation(getRecordDbPortsCoverageMutationOptions(options));
+    }
+
+export const getGetDbPortsSettingsUrl = () => {
+
+
+
+
+  return `/api/db-ports/settings`
+}
+
+export const getDbPortsSettings = async ( options?: RequestInit): Promise<DbPortsSettings> => {
+
+  return customFetch<DbPortsSettings>(getGetDbPortsSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDbPortsSettingsQueryKey = () => {
+    return [
+    `/api/db-ports/settings`
+    ] as const;
+    }
+
+
+export const getGetDbPortsSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getDbPortsSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDbPortsSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDbPortsSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDbPortsSettings>>> = ({ signal }) => getDbPortsSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDbPortsSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDbPortsSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getDbPortsSettings>>>
+export type GetDbPortsSettingsQueryError = ErrorType<unknown>
+
+
+
+export function useGetDbPortsSettings<TData = Awaited<ReturnType<typeof getDbPortsSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDbPortsSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDbPortsSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getUpdateDbPortsSettingsUrl = () => {
+
+
+
+
+  return `/api/db-ports/settings`
+}
+
+export const updateDbPortsSettings = async (dbPortsSettingsInput: DbPortsSettingsInput, options?: RequestInit): Promise<DbPortsSettings> => {
+
+  return customFetch<DbPortsSettings>(getUpdateDbPortsSettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsSettingsInput,)
+  }
+);}
+
+
+
+
+export const getUpdateDbPortsSettingsMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsSettings>>, TError,{data: BodyType<DbPortsSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsSettings>>, TError,{data: BodyType<DbPortsSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateDbPortsSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateDbPortsSettings>>, {data: BodyType<DbPortsSettingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateDbPortsSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateDbPortsSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateDbPortsSettings>>>
+    export type UpdateDbPortsSettingsMutationBody = BodyType<DbPortsSettingsInput>
+    export type UpdateDbPortsSettingsMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const useUpdateDbPortsSettings = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateDbPortsSettings>>, TError,{data: BodyType<DbPortsSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateDbPortsSettings>>,
+        TError,
+        {data: BodyType<DbPortsSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateDbPortsSettingsMutationOptions(options));
+    }
+
+export const getPrepareDbPortsExportUrl = (id: number,) => {
+
+
+
+
+  return `/api/db-ports/editions/${id}/export`
+}
+
+export const prepareDbPortsExport = async (id: number,
+    dbPortsExportInput: DbPortsExportInput, options?: RequestInit): Promise<DbPortsExportPayload> => {
+
+  return customFetch<DbPortsExportPayload>(getPrepareDbPortsExportUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dbPortsExportInput,)
+  }
+);}
+
+
+
+
+export const getPrepareDbPortsExportMutationOptions = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareDbPortsExport>>, TError,{id: number;data: BodyType<DbPortsExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof prepareDbPortsExport>>, TError,{id: number;data: BodyType<DbPortsExportInput>}, TContext> => {
+
+const mutationKey = ['prepareDbPortsExport'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof prepareDbPortsExport>>, {id: number;data: BodyType<DbPortsExportInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  prepareDbPortsExport(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PrepareDbPortsExportMutationResult = NonNullable<Awaited<ReturnType<typeof prepareDbPortsExport>>>
+    export type PrepareDbPortsExportMutationBody = BodyType<DbPortsExportInput>
+    export type PrepareDbPortsExportMutationError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>
+
+    export const usePrepareDbPortsExport = <TError = ErrorType<DbPortsBadRequestResponse | DbPortsConflictResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof prepareDbPortsExport>>, TError,{id: number;data: BodyType<DbPortsExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof prepareDbPortsExport>>,
+        TError,
+        {id: number;data: BodyType<DbPortsExportInput>},
+        TContext
+      > => {
+      return useMutation(getPrepareDbPortsExportMutationOptions(options));
     }
 

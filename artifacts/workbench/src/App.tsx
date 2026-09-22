@@ -34,6 +34,9 @@ import SpotReports from "./pages/SpotReports";
 import SpotReportEditor from "./pages/SpotReportEditor";
 import SpecialReports from "./pages/SpecialReports";
 import SpecialReportEditor from "./pages/SpecialReportEditor";
+import DbPortsEditions from "./pages/DbPortsEditions";
+import DbPortsSettings from "./pages/DbPortsSettings";
+import DbPortsReview from "./pages/DbPortsReview";
 import BrandSettings from "./pages/BrandSettings";
 import ReportRouteErrorBoundary from "./components/ReportRouteErrorBoundary";
 
@@ -235,6 +238,9 @@ function Router() {
         <Route path="/spot-reports/:id" component={SpotReportEditor} />
         <Route path="/special-reports" component={SpecialReports} />
         <Route path="/special-reports/:id" component={SpecialReportEditor} />
+        <Route path="/db-ports" component={DbPortsEditions} />
+        <Route path="/db-ports/settings" component={DbPortsSettings} />
+        <Route path="/db-ports/:id" component={DbPortsReview} />
         <Route path="/card-settings" component={BrandSettings} />
         <Route component={NotFound} />
       </Switch>

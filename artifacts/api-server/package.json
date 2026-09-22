@@ -14,6 +14,7 @@
     "@workspace/api-zod": "workspace:*",
     "@workspace/country-engine": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/db-ports": "workspace:*",
     "@workspace/ingest": "workspace:*",
     "@workspace/relevance": "workspace:*",
     "compression": "^1.8.1",
