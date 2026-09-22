@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
-import { Ship, Plus, Settings, AlertCircle, Calendar } from "lucide-react";
+import { Ship, Plus, Settings, AlertTriangle, Calendar } from "lucide-react";
 import {
   useListDbPortsEditions,
   useCreateDbPortsEdition,
@@ -65,10 +65,10 @@ export default function DbPortsEditions() {
           </div>
           <h1 className="text-3xl font-serif font-bold text-primary uppercase tracking-tight mt-1 flex items-center gap-3">
             <Ship className="w-8 h-8" />
-            DB Ports Pilot
+            Ports and Logistics Intelligence
           </h1>
           <p className="text-muted-foreground font-sans mt-1 text-sm">
-            Fortnightly bulletin covering port, maritime, and logistics developments
+            Fortnightly APAC and Oceania reporting on port, maritime and logistics disruption
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -78,7 +78,7 @@ export default function DbPortsEditions() {
             className="rounded-sm"
           >
             <Settings className="w-4 h-4 mr-2" />
-            Pilot Settings
+            Report Settings
           </Button>
           <Button
             onClick={() => setCreateOpen(true)}
@@ -103,19 +103,11 @@ export default function DbPortsEditions() {
             className="bg-card border border-border rounded-sm p-5 hover:border-accent/50 transition-colors group flex flex-col h-full"
           >
             <div className="flex items-start justify-between">
-              <span
-                className={`px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm ${
-                  ed.status === "approved"
-                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400"
-                    : ed.status === "in_review"
-                    ? "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                    : "bg-secondary text-secondary-foreground"
-                }`}
-              >
-                {ed.status.replace("_", " ")}
+              <span className="rounded-sm bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-secondary-foreground">
+                {ed.quality.selectedCount > 0 ? "drafted" : "not drafted"}
               </span>
-              {!ed.quality.readyForReview && ed.status === "draft" && (
-                <AlertCircle className="w-4 h-4 text-destructive opacity-50" />
+              {ed.quality.warnings.length > 0 && (
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
               )}
             </div>
 

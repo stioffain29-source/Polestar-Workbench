@@ -13,8 +13,10 @@ import {
   DbPortsSourceReliability,
   DbPortsWatchTargetKind,
   DbPortsTheme,
+  DbPortsParameters,
 } from "@workspace/api-client-react";
-import { DB_PORTS_COUNTRIES } from "@workspace/db-ports";
+import { DB_PORTS_COUNTRIES, DEFAULT_DB_PORTS_PARAMETERS } from "@workspace/db-ports";
+import DbPortsParameterPanel from "@/components/dbPorts/DbPortsParameterPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +52,7 @@ export default function DbPortsSettings() {
   const [sources, setSources] = useState<DbPortsSource[]>([]);
   const [watchlist, setWatchlist] = useState<DbPortsWatchTarget[]>([]);
   const [notes, setNotes] = useState("");
+  const [defaults, setDefaults] = useState<DbPortsParameters | null>(null);
   const revisionRef = useRef<number>(0);
   const initialized = useRef(false);
 
@@ -58,6 +61,7 @@ export default function DbPortsSettings() {
       setSources(settings.sources || []);
       setWatchlist(settings.watchlist || []);
       setNotes(settings.notes || "");
+      setDefaults(settings.defaults);
       revisionRef.current = settings.revision;
       initialized.current = true;
     }
@@ -71,6 +75,7 @@ export default function DbPortsSettings() {
           sources,
           watchlist,
           notes,
+          defaults: defaults ?? settings?.defaults ?? DEFAULT_DB_PORTS_PARAMETERS,
         },
       },
       {
@@ -107,7 +112,7 @@ export default function DbPortsSettings() {
         country: "Regional",
         url: "",
         sourceType: "discovery",
-        themes: ["operations"],
+        themes: ["port_terminal_operations"],
         language: "EN",
         accessMode: "manual",
         status: "pending",
@@ -148,10 +153,10 @@ export default function DbPortsSettings() {
           </Button>
           <div>
             <h1 className="text-2xl font-serif font-bold text-primary uppercase tracking-tight">
-              Pilot Settings
+              Report Settings
             </h1>
             <div className="text-xs text-muted-foreground font-sans">
-              Source Roster & Watchlist
+              Default configuration, source roster and watchlist
             </div>
           </div>
         </div>
@@ -160,6 +165,16 @@ export default function DbPortsSettings() {
           {updateMutation.isPending ? "Saving..." : "Save Settings"}
         </Button>
       </div>
+
+      <section className="space-y-4 rounded-sm border border-border bg-card p-5">
+        <div>
+          <h2 className="font-serif text-lg font-bold text-primary">Default report configuration</h2>
+          <p className="text-sm text-muted-foreground">
+            New reports start from this preset. Each report can still be tuned on its own Configuration tab.
+          </p>
+        </div>
+        {defaults && <DbPortsParameterPanel value={defaults} onChange={setDefaults} />}
+      </section>
 
       <Accordion type="multiple" defaultValue={["sources", "watchlist", "notes"]}>
         <AccordionItem value="sources" className="border-border">

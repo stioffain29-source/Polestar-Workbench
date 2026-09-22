@@ -23,13 +23,51 @@ export type DbPortsTheme = typeof DbPortsTheme[keyof typeof DbPortsTheme];
 
 
 export const DbPortsTheme = {
-  security: 'security',
-  cargo: 'cargo',
-  operations: 'operations',
-  geopolitical: 'geopolitical',
-  hazards: 'hazards',
-  regulatory: 'regulatory',
+  security_public_order: 'security_public_order',
+  personnel_safety: 'personnel_safety',
+  port_terminal_operations: 'port_terminal_operations',
+  maritime_access: 'maritime_access',
+  landside_logistics: 'landside_logistics',
+  cargo_asset_security: 'cargo_asset_security',
+  organised_crime_smuggling: 'organised_crime_smuggling',
+  industrial_action: 'industrial_action',
+  supply_chain_continuity: 'supply_chain_continuity',
+  geopolitical_trade: 'geopolitical_trade',
+  natural_hazards: 'natural_hazards',
+  regulatory_compliance: 'regulatory_compliance',
+  critical_infrastructure: 'critical_infrastructure',
 } as const;
+
+export type DbPortsSeverity = typeof DbPortsSeverity[keyof typeof DbPortsSeverity];
+
+
+export const DbPortsSeverity = {
+  Insignificant: 'Insignificant',
+  Low: 'Low',
+  Moderate: 'Moderate',
+  High: 'High',
+  Extreme: 'Extreme',
+} as const;
+
+export type DbPortsWarningCode = typeof DbPortsWarningCode[keyof typeof DbPortsWarningCode];
+
+
+export const DbPortsWarningCode = {
+  missing_source: 'missing_source',
+  missing_event_date: 'missing_event_date',
+  missing_location: 'missing_location',
+  weak_operational_connection: 'weak_operational_connection',
+  single_source: 'single_source',
+  possible_duplicate: 'possible_duplicate',
+  excluded_geography: 'excluded_geography',
+  aggregator_only: 'aggregator_only',
+  item_length: 'item_length',
+} as const;
+
+export interface DbPortsWarning {
+  code: DbPortsWarningCode;
+  message: string;
+}
 
 export type DbPortsImpactArea = typeof DbPortsImpactArea[keyof typeof DbPortsImpactArea];
 
@@ -123,11 +161,13 @@ export interface DbPortsItemContent {
   severity: DbPortsItemContentSeverity;
   confidence: DbPortsItemContentConfidence;
   /** @maxLength 8000 */
-  confirmedFacts: string;
+  summary: string;
   /** @maxLength 4000 */
   unverifiedClaims: string;
   /** @maxLength 4000 */
-  operationalImplications: string;
+  operationalImpact: string;
+  /** @maxLength 4000 */
+  polestarView: string;
   /** @maxLength 4000 */
   outlook: string;
   /** @maxLength 2000 */
@@ -137,10 +177,6 @@ export interface DbPortsItemContent {
   missingInfo: string;
   /** @maxLength 4000 */
   analystNotes: string;
-  reviewed: boolean;
-  reviewer: string;
-  secondReviewer: string;
-  secondReviewNote: string;
   /** @maxItems 12 */
   evidence: DbPortsEvidence[];
 }
@@ -151,35 +187,9 @@ export type DbPortsItem = DbPortsItemContent & ({
   /** @nullable */
   mergedInto: string | null;
   updatedAt: DbPortsIsoTimestamp;
-  blockers: string[];
-  secondaryReviewRequired: boolean;
+  warnings: DbPortsWarning[];
+  drafted: boolean;
 });
-
-export type DbPortsWorklogActivity = typeof DbPortsWorklogActivity[keyof typeof DbPortsWorklogActivity];
-
-
-export const DbPortsWorklogActivity = {
-  research: 'research',
-  verification: 'verification',
-  writing: 'writing',
-  review: 'review',
-  export: 'export',
-  correction: 'correction',
-  missed_signal: 'missed_signal',
-} as const;
-
-export interface DbPortsWorklog {
-  /** @minLength 1 */
-  id: string;
-  activity: DbPortsWorklogActivity;
-  /**
-     * @minimum 0
-     * @maximum 2400
-     */
-  minutes: number;
-  notes: string;
-  createdAt: DbPortsIsoTimestamp;
-}
 
 export type DbPortsCoverageStatus = typeof DbPortsCoverageStatus[keyof typeof DbPortsCoverageStatus];
 
@@ -205,7 +215,6 @@ export interface DbPortsHistory {
 }
 
 export interface DbPortsQuality {
-  blockers: string[];
   warnings: string[];
   /** @minimum 0 */
   selectedCount: number;
@@ -218,24 +227,45 @@ export interface DbPortsQuality {
   /** @minimum 0 */
   rejectedCount: number;
   /** @minimum 0 */
-  totalMinutes: number;
-  /** @minimum 0 */
-  corrections: number;
-  /** @minimum 0 */
-  missedSignals: number;
+  itemWarningCount: number;
   /** @minimum 0 */
   sourceFailures: number;
-  readyForReview: boolean;
 }
 
-export type DbPortsEditionStatus = typeof DbPortsEditionStatus[keyof typeof DbPortsEditionStatus];
-
-
-export const DbPortsEditionStatus = {
-  draft: 'draft',
-  in_review: 'in_review',
-  approved: 'approved',
-} as const;
+export interface DbPortsParameters {
+  /** @maxLength 200 */
+  reportTitle: string;
+  /** @maxLength 200 */
+  customerName: string;
+  publicationDate: DbPortsCalendarDate | null;
+  /**
+     * @minimum 1
+     * @maximum 40
+     */
+  targetItems: number;
+  /** @maxItems 80 */
+  includedCountries: string[];
+  includedThemes: DbPortsTheme[];
+  /** @maxItems 80 */
+  excludedRegions: string[];
+  /** @maxItems 80 */
+  excludedSubjects: string[];
+  minimumSeverity: DbPortsSeverity;
+  /** @maxItems 100 */
+  priorityAssets: string[];
+  /**
+     * @minimum 150
+     * @maximum 600
+     */
+  itemWordTarget: number;
+  /**
+     * @minimum 150
+     * @maximum 250
+     */
+  overviewWordTarget: number;
+  includeWatchlist: boolean;
+  includeSourceLinks: boolean;
+}
 
 export interface DbPortsEdition {
   /** @minimum 1 */
@@ -244,33 +274,17 @@ export interface DbPortsEdition {
   startDate: DbPortsCalendarDate;
   endDate: DbPortsCalendarDate;
   overview: string;
-  status: DbPortsEditionStatus;
   /** @minimum 1 */
   revision: number;
+  parameters: DbPortsParameters;
   /** @maxItems 200 */
   items: DbPortsItem[];
-  /** @maxItems 500 */
-  worklog: DbPortsWorklog[];
   coverage: DbPortsCoverage[];
   history: DbPortsHistory[];
   createdAt: DbPortsIsoTimestamp;
   updatedAt: DbPortsIsoTimestamp;
-  /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
-     */
-  approvedAt: string | null;
   quality: DbPortsQuality;
 }
-
-export type DbPortsEditionSummaryStatus = typeof DbPortsEditionSummaryStatus[keyof typeof DbPortsEditionSummaryStatus];
-
-
-export const DbPortsEditionSummaryStatus = {
-  draft: 'draft',
-  in_review: 'in_review',
-  approved: 'approved',
-} as const;
 
 export interface DbPortsEditionSummary {
   /** @minimum 1 */
@@ -279,16 +293,11 @@ export interface DbPortsEditionSummary {
   startDate: DbPortsCalendarDate;
   endDate: DbPortsCalendarDate;
   overview: string;
-  status: DbPortsEditionSummaryStatus;
   /** @minimum 1 */
   revision: number;
+  parameters: DbPortsParameters;
   createdAt: DbPortsIsoTimestamp;
   updatedAt: DbPortsIsoTimestamp;
-  /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
-     */
-  approvedAt: string | null;
   quality: DbPortsQuality;
 }
 
@@ -383,6 +392,7 @@ export interface DbPortsSettings {
   /** @maxItems 150 */
   watchlist: DbPortsWatchTarget[];
   notes: string;
+  defaults: DbPortsParameters;
   updatedAt: DbPortsIsoTimestamp | null;
 }
 
@@ -391,21 +401,13 @@ export interface DbPortsEditionInput {
   title?: string;
 }
 
-export type DbPortsEditionUpdateStatus = typeof DbPortsEditionUpdateStatus[keyof typeof DbPortsEditionUpdateStatus];
-
-
-export const DbPortsEditionUpdateStatus = {
-  draft: 'draft',
-  in_review: 'in_review',
-  approved: 'approved',
-} as const;
-
 export interface DbPortsEditionUpdate {
   /** @minimum 1 */
   revision: number;
   title?: string;
   overview?: string;
-  status?: DbPortsEditionUpdateStatus;
+  endDate?: DbPortsCalendarDate;
+  parameters?: DbPortsParameters;
 }
 
 export interface DbPortsRevisionInput {
@@ -419,6 +421,16 @@ export interface DbPortsItemMutation {
   item: DbPortsItemContent;
 }
 
+export interface DbPortsReorderInput {
+  /** @minimum 1 */
+  revision: number;
+  /**
+     * @minItems 1
+     * @maxItems 200
+     */
+  itemIds: string[];
+}
+
 export interface DbPortsMergeInput {
   /** @minimum 1 */
   revision: number;
@@ -426,31 +438,6 @@ export interface DbPortsMergeInput {
   sourceItemId: string;
   /** @minLength 1 */
   targetItemId: string;
-}
-
-export type DbPortsWorklogInputActivity = typeof DbPortsWorklogInputActivity[keyof typeof DbPortsWorklogInputActivity];
-
-
-export const DbPortsWorklogInputActivity = {
-  research: 'research',
-  verification: 'verification',
-  writing: 'writing',
-  review: 'review',
-  export: 'export',
-  correction: 'correction',
-  missed_signal: 'missed_signal',
-} as const;
-
-export interface DbPortsWorklogInput {
-  /** @minimum 1 */
-  revision: number;
-  activity: DbPortsWorklogInputActivity;
-  /**
-     * @minimum 0
-     * @maximum 2400
-     */
-  minutes: number;
-  notes: string;
 }
 
 export type DbPortsCoverageInputStatus = typeof DbPortsCoverageInputStatus[keyof typeof DbPortsCoverageInputStatus];
@@ -479,33 +466,16 @@ export interface DbPortsSettingsInput {
   /** @maxItems 150 */
   watchlist: DbPortsWatchTarget[];
   notes: string;
+  defaults: DbPortsParameters;
 }
-
-export type DbPortsExportInputMode = typeof DbPortsExportInputMode[keyof typeof DbPortsExportInputMode];
-
-
-export const DbPortsExportInputMode = {
-  working: 'working',
-  reviewed: 'reviewed',
-} as const;
 
 export interface DbPortsExportInput {
   /** @minimum 1 */
   revision: number;
-  mode: DbPortsExportInputMode;
 }
-
-export type DbPortsExportPayloadMode = typeof DbPortsExportPayloadMode[keyof typeof DbPortsExportPayloadMode];
-
-
-export const DbPortsExportPayloadMode = {
-  working: 'working',
-  reviewed: 'reviewed',
-} as const;
 
 export interface DbPortsExportPayload {
   edition: DbPortsEdition;
-  mode: DbPortsExportPayloadMode;
   generatedAt: DbPortsIsoTimestamp;
 }
 

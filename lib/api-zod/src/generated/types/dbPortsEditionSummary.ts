@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DbPortsCalendarDate } from './dbPortsCalendarDate';
-import type { DbPortsEditionSummaryStatus } from './dbPortsEditionSummaryStatus';
 import type { DbPortsIsoTimestamp } from './dbPortsIsoTimestamp';
+import type { DbPortsParameters } from './dbPortsParameters';
 import type { DbPortsQuality } from './dbPortsQuality';
 
 export interface DbPortsEditionSummary {
@@ -17,15 +17,10 @@ export interface DbPortsEditionSummary {
   startDate: DbPortsCalendarDate;
   endDate: DbPortsCalendarDate;
   overview: string;
-  status: DbPortsEditionSummaryStatus;
   /** @minimum 1 */
   revision: number;
+  parameters: DbPortsParameters;
   createdAt: DbPortsIsoTimestamp;
   updatedAt: DbPortsIsoTimestamp;
-  /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
-     */
-  approvedAt: string | null;
   quality: DbPortsQuality;
 }

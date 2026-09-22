@@ -36,13 +36,20 @@ function titleKey(title: string, country: string): string {
   return `${country}|${title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()}`;
 }
 
-function themeFor(text: string): DbPortsItemContent["theme"] {
-  if (/\b(?:customs|sanction|regulat|export\s+(?:ban|control)|trade\s+restriction)\w*/i.test(text)) return "regulatory";
-  if (/\b(?:theft|stolen|smuggl|seiz|hijack|cargo\s+crime)\w*/i.test(text)) return "cargo";
-  if (/\b(?:piracy|robbery|attack|ransomware|cyber|armed|bomb)\w*/i.test(text)) return "security";
-  if (/\b(?:typhoon|cyclone|storm|earthquake|flood|tsunami|landslide)\w*/i.test(text)) return "hazards";
-  if (/\b(?:military|naval|geopolit|blockade|territorial)\w*/i.test(text)) return "geopolitical";
-  return "operations";
+export function themeFor(text: string): DbPortsItemContent["theme"] {
+  if (/\b(?:strike|walkout|work\s+stoppage|industrial\s+action|union\s+action|picket)\w*/i.test(text)) return "industrial_action";
+  if (/\b(?:smuggl|trafficking|contraband|narcotics|syndicate|organised\s+crime)\w*/i.test(text)) return "organised_crime_smuggling";
+  if (/\b(?:theft|stolen|robber|hijack|cargo\s+crime|pilferage)\w*/i.test(text)) return "cargo_asset_security";
+  if (/\b(?:customs|sanction|regulat|export\s+(?:ban|control)|tariff|trade\s+restriction|compliance)\w*/i.test(text)) return "regulatory_compliance";
+  if (/\b(?:typhoon|cyclone|storm|earthquake|flood|tsunami|landslide|volcan|heatwave)\w*/i.test(text)) return "natural_hazards";
+  if (/\b(?:cyber|ransomware|power\s+(?:cut|outage)|grid|blackout|pipeline|telecom|undersea\s+cable)\w*/i.test(text)) return "critical_infrastructure";
+  if (/\b(?:military|naval|geopolit|blockade|territorial|incursion|maritime\s+dispute)\w*/i.test(text)) return "geopolitical_trade";
+  if (/\b(?:piracy|boarding|armed|attack|bomb|shooting|unrest|riot|protest)\w*/i.test(text)) return "security_public_order";
+  if (/\b(?:injur|fatalit|killed|died|death|crush|fell|overboard|worker\s+safety)\w*/i.test(text)) return "personnel_safety";
+  if (/\b(?:channel|anchorage|draft\s+restriction|dredg|lock|canal|strait\s+transit|navigation)\w*/i.test(text)) return "maritime_access";
+  if (/\b(?:truck|rail|road|highway|haulage|drayage|warehouse|inland\s+depot)\w*/i.test(text)) return "landside_logistics";
+  if (/\b(?:shortage|supply\s+chain|backlog|lead\s+time|inventory|capacity\s+crunch)\w*/i.test(text)) return "supply_chain_continuity";
+  return "port_terminal_operations";
 }
 
 /** Read-only discovery screening. It never upgrades an upstream headline,
@@ -111,14 +118,10 @@ export function importDbPortsDiscovery(
       if (!existing.evidence.some(e => canonicalSourceUrl(e.sourceUrl) === key)) {
         if (existing.evidence.length >= 12) { truncated = true; continue; }
         existing.evidence.push(evidence);
-        existing.reviewed = false;
-        existing.reviewer = "";
-        existing.secondReviewer = "";
-        existing.secondReviewNote = "";
         existing.confidence = "unverified";
         if (existing.disposition === "selected") existing.disposition = "hold";
         existing.updatedAt = nowIso;
-        Object.assign(existing, assessDbPortsItem(existing, window));
+        existing.warnings = assessDbPortsItem(existing, window);
       }
       recordIds.add(row.id);
       byUrl.set(`${country}|${key}`, duplicateIndex);
@@ -137,7 +140,7 @@ export function importDbPortsDiscovery(
     };
     const item: DbPortsItem = {
       ...content, id: `candidate-${sourceId}`, mergedInto: null, updatedAt: nowIso,
-      ...assessDbPortsItem(content, window),
+      drafted: false, warnings: assessDbPortsItem(content, window),
     };
     const index = items.length;
     items.push(item);

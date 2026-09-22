@@ -6,11 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DbPortsEdition } from './dbPortsEdition';
-import type { DbPortsExportPayloadMode } from './dbPortsExportPayloadMode';
 import type { DbPortsIsoTimestamp } from './dbPortsIsoTimestamp';
 
 export interface DbPortsExportPayload {
   edition: DbPortsEdition;
-  mode: DbPortsExportPayloadMode;
   generatedAt: DbPortsIsoTimestamp;
 }

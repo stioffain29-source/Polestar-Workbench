@@ -2,7 +2,7 @@ import type {
   DbPortsCoverage,
   DbPortsHistory,
   DbPortsItem,
-  DbPortsWorklog,
+  DbPortsParameters,
 } from "@workspace/db-ports";
 import {
   date,
@@ -34,10 +34,15 @@ export const dbPortsEditionsTable = pgTable(
       .$type<DbPortsItem[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    // Retained only so historical pilot entries are not destroyed. The report
+    // no longer reads or writes this column.
     worklog: jsonb("worklog")
-      .$type<DbPortsWorklog[]>()
+      .$type<unknown[]>()
       .notNull()
       .default(sql`'[]'::jsonb`),
+    parameters: jsonb("parameters")
+      .$type<DbPortsParameters | null>()
+      .default(sql`NULL`),
     coverage: jsonb("coverage")
       .$type<DbPortsCoverage[]>()
       .notNull()

@@ -7,6 +7,7 @@
  */
 import type { DbPortsIsoTimestamp } from './dbPortsIsoTimestamp';
 import type { DbPortsItemContent } from './dbPortsItemContent';
+import type { DbPortsWarning } from './dbPortsWarning';
 
 export type DbPortsItem = DbPortsItemContent & ({
   /** @minLength 1 */
@@ -14,6 +15,6 @@ export type DbPortsItem = DbPortsItemContent & ({
   /** @nullable */
   mergedInto: string | null;
   updatedAt: DbPortsIsoTimestamp;
-  blockers: string[];
-  secondaryReviewRequired: boolean;
+  warnings: DbPortsWarning[];
+  drafted: boolean;
 });

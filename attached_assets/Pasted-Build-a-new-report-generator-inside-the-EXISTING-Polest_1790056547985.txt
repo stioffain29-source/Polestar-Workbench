@@ -1,0 +1,326 @@
+Build a new report generator inside the EXISTING Polestar Insights Workbench.
+
+The purpose is to create a customer ready first draft of a fortnightly APAC and Oceania ports, terminals and logistics intelligence report using information already collected by the Workbench.
+
+This is not a client portal.
+
+This is not a workload tracker.
+
+This is not a project management system.
+
+Remove the Worklog, Corrections, Missed Signals, Blockers and Request Review functions already created for this report.
+
+Do not create a separate application.
+
+Add this as a new report type within the existing Workbench report builder.
+
+REPORT NAME
+
+Ports and Logistics Intelligence
+
+USER WORKFLOW
+
+The workflow must be simple:
+
+1. Open Ports and Logistics Intelligence in the Workbench.
+
+2. Select or confirm the report parameters.
+
+3. Press Generate Draft.
+
+4. The Workbench searches existing collected material, applies the defined criteria, removes irrelevant and duplicate reporting, and produces a structured draft report.
+
+5. I review and edit the generated draft inside the Workbench.
+
+6. I export the completed report to Word or PDF.
+
+The system should do as much of the collection, filtering, sorting, summarising and drafting as possible before presenting the report to me.
+
+REPORT PARAMETERS
+
+Create a single configuration panel containing:
+
+Report title
+Customer name
+Reporting period
+Publication date
+Target number of items
+Countries and regions
+Included intelligence themes
+Excluded regions and subjects
+Minimum severity
+Priority ports, terminals and corridors
+Maximum item word count
+Regional Overview word count
+Include Watchlist yes or no
+Include source hyperlinks yes or no
+
+Save the following as the default preset.
+
+DEFAULT GEOGRAPHY
+
+Include:
+
+Southeast Asia
+Greater China, including Hong Kong and Taiwan
+Japan
+South Korea
+Australia
+New Zealand
+Pacific Island states where materially relevant
+
+Exclude:
+
+India
+Pakistan
+Bangladesh
+Sri Lanka
+Nepal
+Bhutan
+Maldives
+Afghanistan
+Middle East conflict reporting
+Red Sea conflict reporting
+Houthi activity
+
+Global developments may be included only when the system can identify a direct implication for APAC or Oceania ports, terminals, maritime trade, landside logistics or supply chain continuity.
+
+DEFAULT INTELLIGENCE THEMES
+
+Security and public order
+Personnel safety
+Port and terminal operations
+Maritime access
+Landside logistics
+Cargo and asset security
+Organised crime and smuggling
+Industrial action
+Supply chain continuity
+Geopolitical and trade exposure
+Natural hazards affecting operations
+Regulatory and compliance change
+Critical infrastructure disruption
+
+Cyber incidents may be included only when there is a confirmed operational effect on a port, terminal, customs, transport or logistics system.
+
+MATERIALITY RULE
+
+An item must not be included merely because it mentions a port, ship, transport company or country.
+
+Every included item must identify:
+
+A relevant event or development
+The affected port, terminal, corridor, market or operational function
+A credible current or potential operational consequence
+
+The consequence must relate to at least one of:
+
+Personnel
+Port or terminal operations
+Cargo or assets
+Landside access
+Maritime access
+Supply chain continuity
+Regulatory compliance
+Business continuity
+
+Reject routine industry news, commercial announcements, general political reporting and hazards with no identifiable operational relevance.
+
+SOURCE HANDLING
+
+Use the existing Workbench feeds and stored reporting.
+
+Prefer primary and authoritative sources where available.
+
+Discovery sources may identify an event but must not be treated as authoritative confirmation.
+
+Retain:
+
+Original source
+Source hyperlink
+Publication date
+Event date
+Any corroborating sources
+Verification status
+
+If material information is missing, flag the item for my attention inside the editor. Do not invent the missing information.
+
+DEDUPLICATION
+
+Combine reports describing the same event.
+
+Retain all useful corroborating sources under the consolidated item.
+
+Do not create separate report items merely because several publishers covered the same incident.
+
+CURRENT SEVERITY
+
+Use only:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+Severity must describe the current event and its confirmed consequences.
+
+Do not label anything “highest severity”.
+
+Do not confuse event severity with the customer’s overall organisational risk.
+
+GENERATED REPORT STRUCTURE
+
+1. REGIONAL OVERVIEW
+
+Generate a concise analytical overview of 150 to 250 words.
+
+It should identify:
+
+The most important developments during the reporting period
+Any change in the regional operating environment
+Emerging hotspots
+Material disruption
+Issues requiring closer monitoring
+
+It must be an analytical summary, not a list of headlines.
+
+2. PRIORITY INTELLIGENCE ITEMS
+
+Generate approximately 10 to 15 items when sufficient material exists.
+
+Do not invent or pad the report to reach the target.
+
+Each item must contain:
+
+Headline
+Location
+Relevant port, terminal or corridor where known
+Event date
+Intelligence theme
+Current severity
+Summary
+Operational Impact
+Polestar View
+Outlook and indicators to monitor
+Source
+Source hyperlink
+Publication date
+
+The Summary should explain what happened using confirmed information.
+
+Operational Impact should explain the relevance to personnel, operations, cargo, access, continuity or compliance.
+
+Polestar View should provide proportionate analysis without repeating the Summary.
+
+Outlook should identify realistic developments or indicators to monitor.
+
+Each complete item should normally remain between 150 and 225 words.
+
+3. WATCHLIST
+
+Where enabled, include up to five developing issues that may become material but do not yet justify a full item.
+
+Each Watchlist entry should contain:
+
+Issue
+Location
+Reason for monitoring
+Trigger or indicator
+Current verification status
+
+EDITOR
+
+Present the generated report in the existing Workbench editing environment.
+
+I must be able to:
+
+Edit every field
+Delete an item
+Add an item from existing collected material
+Move an item between the main report and Watchlist
+Reorder items
+Change severity
+Replace or add sources
+Regenerate one item without regenerating the entire report
+Regenerate the Regional Overview after editing the items
+Save the report as a draft
+Preview the final report
+
+Show unresolved warnings within the editor, including:
+
+Missing source
+Missing event date
+Missing location
+Weak operational connection
+Single uncorroborated source
+Possible duplicate
+Excluded geography
+Summary based only on an aggregator
+
+Warnings should not appear in the customer export.
+
+OUTPUT
+
+Export the completed report through the existing Polestar report system.
+
+Provide:
+
+Editable Word
+PDF
+
+Use the established Polestar report styling and export rules already present in the Workbench.
+
+Do not create a new visual identity.
+
+Do not create a client facing dashboard.
+
+Do not add workload logging.
+
+Do not add reviewer assignment.
+
+Do not add Request Review.
+
+Do not add corrections or missed signals counters.
+
+Do not add project management functions.
+
+IMPLEMENTATION ORDER
+
+Before changing anything, inspect the existing Workbench report builder, stored intelligence data, editing functions and export system.
+
+Reuse the existing architecture and components.
+
+Then:
+
+1. Remove the unwanted pilot management and Worklog features.
+
+2. Add Ports and Logistics Intelligence as a report type.
+
+3. Add the parameter preset.
+
+4. Connect it to existing collected intelligence.
+
+5. Implement filtering, exclusions and deduplication.
+
+6. Generate the structured report draft.
+
+7. Add editing and individual item regeneration.
+
+8. Connect Word and PDF export.
+
+9. Test it using the most recent fourteen days of stored data.
+
+Do not redesign unrelated areas of the Workbench.
+
+Do not publish or deploy anything without my instruction.
+
+When complete, show me:
+
+The report configuration screen
+The generated draft
+The editing view
+The Word preview
+The PDF preview
+A list of exactly what was changed
+Any information fields that the current feeds could not populate reliably

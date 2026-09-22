@@ -26,7 +26,7 @@ tags:
   - name: Auth
     description: Browser and mobile authentication endpoints.
   - name: db-ports
-    description: Internal fortnightly DB Ports pilot workflow.
+    description: Fortnightly Ports and Logistics Intelligence report generation.
 
 paths:
   /healthz:
@@ -2276,6 +2276,23 @@ paths:
               schema: { $ref: "#/components/schemas/DbPortsEdition" }
         "400": { $ref: "#/components/responses/DbPortsBadRequest" }
         "409": { $ref: "#/components/responses/DbPortsConflict" }
+    delete:
+      operationId: deleteDbPortsItem
+      tags: [db-ports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DbPortsRevisionInput" }
+      responses:
+        "200":
+          description: Updated edition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbPortsEdition" }
+        "400": { $ref: "#/components/responses/DbPortsBadRequest" }
+        "404": { $ref: "#/components/responses/DbPortsNotFound" }
+        "409": { $ref: "#/components/responses/DbPortsConflict" }
 
   /db-ports/editions/{id}/merge:
     parameters:
@@ -2297,34 +2314,32 @@ paths:
         "400": { $ref: "#/components/responses/DbPortsBadRequest" }
         "409": { $ref: "#/components/responses/DbPortsConflict" }
 
-  /db-ports/editions/{id}/worklog:
+  /db-ports/editions/{id}/reorder:
     parameters:
       - $ref: "#/components/parameters/DbPortsEditionId"
     post:
-      operationId: addDbPortsWorklog
+      operationId: reorderDbPortsItems
       tags: [db-ports]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/DbPortsWorklogInput" }
+            schema: { $ref: "#/components/schemas/DbPortsReorderInput" }
       responses:
         "200":
           description: Updated edition
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DbPortsEdition" }
+        "400": { $ref: "#/components/responses/DbPortsBadRequest" }
+        "404": { $ref: "#/components/responses/DbPortsNotFound" }
         "409": { $ref: "#/components/responses/DbPortsConflict" }
 
-  /db-ports/editions/{id}/worklog/{entryId}:
+  /db-ports/editions/{id}/generate:
     parameters:
       - $ref: "#/components/parameters/DbPortsEditionId"
-      - name: entryId
-        in: path
-        required: true
-        schema: { type: string, minLength: 1 }
-    delete:
-      operationId: deleteDbPortsWorklog
+    post:
+      operationId: generateDbPortsDraft
       tags: [db-ports]
       requestBody:
         required: true
@@ -2333,10 +2348,55 @@ paths:
             schema: { $ref: "#/components/schemas/DbPortsRevisionInput" }
       responses:
         "200":
-          description: Updated edition
+          description: Edition carrying the generated draft
           content:
             application/json:
               schema: { $ref: "#/components/schemas/DbPortsEdition" }
+        "400": { $ref: "#/components/responses/DbPortsBadRequest" }
+        "409": { $ref: "#/components/responses/DbPortsConflict" }
+
+  /db-ports/editions/{id}/overview:
+    parameters:
+      - $ref: "#/components/parameters/DbPortsEditionId"
+    post:
+      operationId: regenerateDbPortsOverview
+      tags: [db-ports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DbPortsRevisionInput" }
+      responses:
+        "200":
+          description: Edition with a regenerated Regional Overview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbPortsEdition" }
+        "400": { $ref: "#/components/responses/DbPortsBadRequest" }
+        "409": { $ref: "#/components/responses/DbPortsConflict" }
+
+  /db-ports/editions/{id}/items/{itemId}/regenerate:
+    parameters:
+      - $ref: "#/components/parameters/DbPortsEditionId"
+      - name: itemId
+        in: path
+        required: true
+        schema: { type: string, minLength: 1 }
+    post:
+      operationId: regenerateDbPortsItem
+      tags: [db-ports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DbPortsRevisionInput" }
+      responses:
+        "200":
+          description: Edition with the single item redrafted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DbPortsEdition" }
+        "400": { $ref: "#/components/responses/DbPortsBadRequest" }
         "409": { $ref: "#/components/responses/DbPortsConflict" }
 
   /db-ports/editions/{id}/coverage:
@@ -2457,7 +2517,42 @@ components:
       pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$'
     DbPortsTheme:
       type: string
-      enum: [security, cargo, operations, geopolitical, hazards, regulatory]
+      enum:
+        - security_public_order
+        - personnel_safety
+        - port_terminal_operations
+        - maritime_access
+        - landside_logistics
+        - cargo_asset_security
+        - organised_crime_smuggling
+        - industrial_action
+        - supply_chain_continuity
+        - geopolitical_trade
+        - natural_hazards
+        - regulatory_compliance
+        - critical_infrastructure
+    DbPortsSeverity:
+      type: string
+      enum: [Insignificant, Low, Moderate, High, Extreme]
+    DbPortsWarningCode:
+      type: string
+      enum:
+        - missing_source
+        - missing_event_date
+        - missing_location
+        - weak_operational_connection
+        - single_source
+        - possible_duplicate
+        - excluded_geography
+        - aggregator_only
+        - item_length
+    DbPortsWarning:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { $ref: "#/components/schemas/DbPortsWarningCode" }
+        message: { type: string }
     DbPortsImpactArea:
       type: string
       enum: [personnel, port_operations, cargo_assets, landside_access, maritime_access, supply_chain, compliance, business_continuity]
@@ -2486,7 +2581,7 @@ components:
     DbPortsItemContent:
       type: object
       additionalProperties: false
-      required: [headline, country, location, assets, eventDate, theme, disposition, severity, confidence, confirmedFacts, unverifiedClaims, operationalImplications, outlook, materialityReason, impactAreas, missingInfo, analystNotes, reviewed, reviewer, secondReviewer, secondReviewNote, evidence]
+      required: [headline, country, location, assets, eventDate, theme, disposition, severity, confidence, summary, unverifiedClaims, operationalImpact, polestarView, outlook, materialityReason, impactAreas, missingInfo, analystNotes, evidence]
       properties:
         headline: { type: string, maxLength: 500 }
         country: { type: string }
@@ -2502,9 +2597,10 @@ components:
           type: [string, 'null']
           enum: [Insignificant, Low, Moderate, High, Extreme, null]
         confidence: { type: string, enum: [unverified, single_source, corroborated, official] }
-        confirmedFacts: { type: string, maxLength: 8000 }
+        summary: { type: string, maxLength: 8000 }
         unverifiedClaims: { type: string, maxLength: 4000 }
-        operationalImplications: { type: string, maxLength: 4000 }
+        operationalImpact: { type: string, maxLength: 4000 }
+        polestarView: { type: string, maxLength: 4000 }
         outlook: { type: string, maxLength: 4000 }
         materialityReason: { type: string, maxLength: 2000 }
         impactAreas:
@@ -2513,10 +2609,6 @@ components:
           items: { $ref: "#/components/schemas/DbPortsImpactArea" }
         missingInfo: { type: string, maxLength: 4000 }
         analystNotes: { type: string, maxLength: 4000 }
-        reviewed: { type: boolean }
-        reviewer: { type: string }
-        secondReviewer: { type: string }
-        secondReviewNote: { type: string }
         evidence:
           type: array
           maxItems: 12
@@ -2526,23 +2618,15 @@ components:
         - $ref: "#/components/schemas/DbPortsItemContent"
         - type: object
           additionalProperties: false
-          required: [id, mergedInto, updatedAt, blockers, secondaryReviewRequired]
+          required: [id, mergedInto, updatedAt, warnings, drafted]
           properties:
             id: { type: string, minLength: 1 }
             mergedInto: { type: [string, 'null'] }
             updatedAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
-            blockers: { type: array, items: { type: string } }
-            secondaryReviewRequired: { type: boolean }
-    DbPortsWorklog:
-      type: object
-      additionalProperties: false
-      required: [id, activity, minutes, notes, createdAt]
-      properties:
-        id: { type: string, minLength: 1 }
-        activity: { type: string, enum: [research, verification, writing, review, export, correction, missed_signal] }
-        minutes: { type: integer, minimum: 0, maximum: 2400 }
-        notes: { type: string }
-        createdAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
+            warnings:
+              type: array
+              items: { $ref: "#/components/schemas/DbPortsWarning" }
+            drafted: { type: boolean }
     DbPortsCoverage:
       type: object
       additionalProperties: false
@@ -2563,55 +2647,73 @@ components:
     DbPortsQuality:
       type: object
       additionalProperties: false
-      required: [blockers, warnings, selectedCount, watchCount, heldCount, inboxCount, rejectedCount, totalMinutes, corrections, missedSignals, sourceFailures, readyForReview]
+      required: [warnings, selectedCount, watchCount, heldCount, inboxCount, rejectedCount, itemWarningCount, sourceFailures]
       properties:
-        blockers: { type: array, items: { type: string } }
         warnings: { type: array, items: { type: string } }
         selectedCount: { type: integer, minimum: 0 }
         watchCount: { type: integer, minimum: 0 }
         heldCount: { type: integer, minimum: 0 }
         inboxCount: { type: integer, minimum: 0 }
         rejectedCount: { type: integer, minimum: 0 }
-        totalMinutes: { type: integer, minimum: 0 }
-        corrections: { type: integer, minimum: 0 }
-        missedSignals: { type: integer, minimum: 0 }
+        itemWarningCount: { type: integer, minimum: 0 }
         sourceFailures: { type: integer, minimum: 0 }
-        readyForReview: { type: boolean }
+    DbPortsParameters:
+      type: object
+      additionalProperties: false
+      required: [reportTitle, customerName, publicationDate, targetItems, includedCountries, includedThemes, excludedRegions, excludedSubjects, minimumSeverity, priorityAssets, itemWordTarget, overviewWordTarget, includeWatchlist, includeSourceLinks]
+      properties:
+        reportTitle: { type: string, maxLength: 200 }
+        customerName: { type: string, maxLength: 200 }
+        publicationDate:
+          oneOf:
+            - $ref: "#/components/schemas/DbPortsCalendarDate"
+            - type: 'null'
+        targetItems: { type: integer, minimum: 1, maximum: 40 }
+        includedCountries: { type: array, maxItems: 80, items: { type: string } }
+        includedThemes:
+          type: array
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/DbPortsTheme" }
+        excludedRegions: { type: array, maxItems: 80, items: { type: string, maxLength: 120 } }
+        excludedSubjects: { type: array, maxItems: 80, items: { type: string, maxLength: 120 } }
+        minimumSeverity: { $ref: "#/components/schemas/DbPortsSeverity" }
+        priorityAssets: { type: array, maxItems: 100, items: { type: string, maxLength: 120 } }
+        itemWordTarget: { type: integer, minimum: 150, maximum: 600 }
+        overviewWordTarget: { type: integer, minimum: 150, maximum: 250 }
+        includeWatchlist: { type: boolean }
+        includeSourceLinks: { type: boolean }
     DbPortsEdition:
       type: object
       additionalProperties: false
-      required: [id, title, startDate, endDate, overview, status, revision, items, worklog, coverage, history, createdAt, updatedAt, approvedAt, quality]
+      required: [id, title, startDate, endDate, overview, revision, parameters, items, coverage, history, createdAt, updatedAt, quality]
       properties:
         id: { type: integer, minimum: 1 }
         title: { type: string }
         startDate: { $ref: "#/components/schemas/DbPortsCalendarDate" }
         endDate: { $ref: "#/components/schemas/DbPortsCalendarDate" }
         overview: { type: string }
-        status: { type: string, enum: [draft, in_review, approved] }
         revision: { type: integer, minimum: 1 }
+        parameters: { $ref: "#/components/schemas/DbPortsParameters" }
         items: { type: array, maxItems: 200, items: { $ref: "#/components/schemas/DbPortsItem" } }
-        worklog: { type: array, maxItems: 500, items: { $ref: "#/components/schemas/DbPortsWorklog" } }
         coverage: { type: array, items: { $ref: "#/components/schemas/DbPortsCoverage" } }
         history: { type: array, items: { $ref: "#/components/schemas/DbPortsHistory" } }
         createdAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
         updatedAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
-        approvedAt: { type: [string, 'null'], pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$' }
         quality: { $ref: "#/components/schemas/DbPortsQuality" }
     DbPortsEditionSummary:
       type: object
       additionalProperties: false
-      required: [id, title, startDate, endDate, overview, status, revision, createdAt, updatedAt, approvedAt, quality]
+      required: [id, title, startDate, endDate, overview, revision, parameters, createdAt, updatedAt, quality]
       properties:
         id: { type: integer, minimum: 1 }
         title: { type: string }
         startDate: { $ref: "#/components/schemas/DbPortsCalendarDate" }
         endDate: { $ref: "#/components/schemas/DbPortsCalendarDate" }
         overview: { type: string }
-        status: { type: string, enum: [draft, in_review, approved] }
         revision: { type: integer, minimum: 1 }
+        parameters: { $ref: "#/components/schemas/DbPortsParameters" }
         createdAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
         updatedAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
-        approvedAt: { type: [string, 'null'], pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$' }
         quality: { $ref: "#/components/schemas/DbPortsQuality" }
     DbPortsSource:
       type: object
@@ -2659,12 +2761,13 @@ components:
     DbPortsSettings:
       type: object
       additionalProperties: false
-      required: [revision, sources, watchlist, notes, updatedAt]
+      required: [revision, sources, watchlist, notes, defaults, updatedAt]
       properties:
         revision: { type: integer, minimum: 0 }
         sources: { type: array, maxItems: 150, items: { $ref: "#/components/schemas/DbPortsSource" } }
         watchlist: { type: array, maxItems: 150, items: { $ref: "#/components/schemas/DbPortsWatchTarget" } }
         notes: { type: string }
+        defaults: { $ref: "#/components/schemas/DbPortsParameters" }
         updatedAt:
           oneOf:
             - $ref: "#/components/schemas/DbPortsIsoTimestamp"
@@ -2684,7 +2787,8 @@ components:
         revision: { type: integer, minimum: 1 }
         title: { type: string }
         overview: { type: string }
-        status: { type: string, enum: [draft, in_review, approved] }
+        endDate: { $ref: "#/components/schemas/DbPortsCalendarDate" }
+        parameters: { $ref: "#/components/schemas/DbPortsParameters" }
     DbPortsRevisionInput:
       type: object
       additionalProperties: false
@@ -2698,6 +2802,17 @@ components:
       properties:
         revision: { type: integer, minimum: 1 }
         item: { $ref: "#/components/schemas/DbPortsItemContent" }
+    DbPortsReorderInput:
+      type: object
+      additionalProperties: false
+      required: [revision, itemIds]
+      properties:
+        revision: { type: integer, minimum: 1 }
+        itemIds:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { type: string, minLength: 1 }
     DbPortsMergeInput:
       type: object
       additionalProperties: false
@@ -2706,15 +2821,6 @@ components:
         revision: { type: integer, minimum: 1 }
         sourceItemId: { type: string, minLength: 1 }
         targetItemId: { type: string, minLength: 1 }
-    DbPortsWorklogInput:
-      type: object
-      additionalProperties: false
-      required: [revision, activity, minutes, notes]
-      properties:
-        revision: { type: integer, minimum: 1 }
-        activity: { type: string, enum: [research, verification, writing, review, export, correction, missed_signal] }
-        minutes: { type: integer, minimum: 0, maximum: 2400 }
-        notes: { type: string }
     DbPortsCoverageInput:
       type: object
       additionalProperties: false
@@ -2727,26 +2833,25 @@ components:
     DbPortsSettingsInput:
       type: object
       additionalProperties: false
-      required: [revision, sources, watchlist, notes]
+      required: [revision, sources, watchlist, notes, defaults]
       properties:
         revision: { type: integer, minimum: 0 }
         sources: { type: array, maxItems: 150, items: { $ref: "#/components/schemas/DbPortsSource" } }
         watchlist: { type: array, maxItems: 150, items: { $ref: "#/components/schemas/DbPortsWatchTarget" } }
         notes: { type: string }
+        defaults: { $ref: "#/components/schemas/DbPortsParameters" }
     DbPortsExportInput:
       type: object
       additionalProperties: false
-      required: [revision, mode]
+      required: [revision]
       properties:
         revision: { type: integer, minimum: 1 }
-        mode: { type: string, enum: [working, reviewed] }
     DbPortsExportPayload:
       type: object
       additionalProperties: false
-      required: [edition, mode, generatedAt]
+      required: [edition, generatedAt]
       properties:
         edition: { $ref: "#/components/schemas/DbPortsEdition" }
-        mode: { type: string, enum: [working, reviewed] }
         generatedAt: { $ref: "#/components/schemas/DbPortsIsoTimestamp" }
 
     HealthStatus:

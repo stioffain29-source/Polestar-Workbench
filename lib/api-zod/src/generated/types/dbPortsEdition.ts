@@ -7,12 +7,11 @@
  */
 import type { DbPortsCalendarDate } from './dbPortsCalendarDate';
 import type { DbPortsCoverage } from './dbPortsCoverage';
-import type { DbPortsEditionStatus } from './dbPortsEditionStatus';
 import type { DbPortsHistory } from './dbPortsHistory';
 import type { DbPortsIsoTimestamp } from './dbPortsIsoTimestamp';
 import type { DbPortsItem } from './dbPortsItem';
+import type { DbPortsParameters } from './dbPortsParameters';
 import type { DbPortsQuality } from './dbPortsQuality';
-import type { DbPortsWorklog } from './dbPortsWorklog';
 
 export interface DbPortsEdition {
   /** @minimum 1 */
@@ -21,21 +20,14 @@ export interface DbPortsEdition {
   startDate: DbPortsCalendarDate;
   endDate: DbPortsCalendarDate;
   overview: string;
-  status: DbPortsEditionStatus;
   /** @minimum 1 */
   revision: number;
+  parameters: DbPortsParameters;
   /** @maxItems 200 */
   items: DbPortsItem[];
-  /** @maxItems 500 */
-  worklog: DbPortsWorklog[];
   coverage: DbPortsCoverage[];
   history: DbPortsHistory[];
   createdAt: DbPortsIsoTimestamp;
   updatedAt: DbPortsIsoTimestamp;
-  /**
-     * @nullable
-     * @pattern ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$
-     */
-  approvedAt: string | null;
   quality: DbPortsQuality;
 }

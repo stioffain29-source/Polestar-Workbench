@@ -9,12 +9,16 @@ import {
   assessDbPortsItem,
   buildDbPortsQuality,
   editionWindow,
+  flagDuplicates,
+  normaliseParameters,
+  normaliseStoredItems,
   type DbPortsEdition,
   type DbPortsEditionSummary,
   type DbPortsEvidence,
   type DbPortsHistory,
   type DbPortsItem,
   type DbPortsItemContent,
+  type DbPortsParameters,
 } from "@workspace/db-ports";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -32,34 +36,36 @@ function boundedHistory(history: DbPortsHistory[], entry: DbPortsHistory): DbPor
   return [...history, entry].slice(-MAX_HISTORY);
 }
 
-function deriveItem(item: DbPortsItem, row: Pick<DbPortsEditionRow, "startDate" | "endDate">): DbPortsItem {
-  return { ...item, ...assessDbPortsItem(item, row) };
-}
-
+/** Warnings are always recomputed from the current text and parameters, so an
+ * edit can clear one and stored rows never carry a stale judgment forward. */
 export function toEdition(row: DbPortsEditionRow): DbPortsEdition {
-  const items = row.items.map((item) => deriveItem(item, row));
+  const parameters = normaliseParameters(row.parameters);
+  const window = { startDate: row.startDate, endDate: row.endDate };
+  const items = flagDuplicates(
+    normaliseStoredItems(row.items).map((item) => ({
+      ...item,
+      warnings: assessDbPortsItem(item, window, parameters),
+    })),
+  );
   const base = {
     id: row.id,
     title: row.title,
     startDate: row.startDate,
     endDate: row.endDate,
     overview: row.overview,
-    status: row.status,
     revision: row.revision,
+    parameters,
     items,
-    worklog: row.worklog,
     coverage: row.coverage,
     history: row.history,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
-    approvedAt: row.approvedAt,
   };
   return { ...base, quality: buildDbPortsQuality(base) };
 }
 
 export function toEditionSummary(row: DbPortsEditionRow): DbPortsEditionSummary {
-  const { items: _items, worklog: _worklog, coverage: _coverage, history: _history, ...summary } =
-    toEdition(row);
+  const { items: _items, coverage: _coverage, history: _history, ...summary } = toEdition(row);
   return summary;
 }
 
@@ -74,15 +80,20 @@ export async function getEditionRow(id: number): Promise<DbPortsEditionRow> {
   return row;
 }
 
-export async function createEdition(endDate: string, title?: string): Promise<DbPortsEdition> {
+export async function createEdition(
+  endDate: string,
+  parameters: DbPortsParameters,
+  title?: string,
+): Promise<DbPortsEdition> {
   const window = editionWindow(endDate);
   const now = new Date().toISOString();
   const [created] = await db
     .insert(dbPortsEditionsTable)
     .values({
       ...window,
-      title: title?.trim() || `DB Ports — fortnight ending ${endDate}`,
-      history: [audit("edition_created", "Created internal unpublished pilot edition.", now)],
+      title: title?.trim() || `${parameters.reportTitle} — fortnight ending ${endDate}`,
+      parameters,
+      history: [audit("edition_created", "Created report edition from the saved parameter preset.", now)],
       createdAt: now,
       updatedAt: now,
     })
@@ -98,18 +109,21 @@ export async function createEdition(endDate: string, title?: string): Promise<Db
 }
 
 type EditionChanges = Partial<
-  Pick<DbPortsEditionRow, "title" | "overview" | "status" | "items" | "worklog" | "coverage" | "history" | "approvedAt">
+  Pick<
+    DbPortsEditionRow,
+    "title" | "overview" | "items" | "coverage" | "history" | "parameters" | "startDate" | "endDate"
+  >
 >;
 
 export async function mutateEdition(
   id: number,
   revision: number,
-  transform: (row: DbPortsEditionRow, now: string) => EditionChanges,
+  transform: (row: DbPortsEditionRow, now: string) => EditionChanges | Promise<EditionChanges>,
 ): Promise<DbPortsEdition> {
   const current = await getEditionRow(id);
   if (current.revision !== revision) throw new DbPortsConflictError("Edition revision has changed.");
   const now = new Date().toISOString();
-  const changes = transform(current, now);
+  const changes = await transform(current, now);
   const [updated] = await db
     .update(dbPortsEditionsTable)
     .set({ ...changes, revision: revision + 1, updatedAt: now })
@@ -134,89 +148,67 @@ export function contentEdit(
   detail: string,
   now: string,
 ): EditionChanges {
-  return {
-    ...changes,
-    status: "draft",
-    approvedAt: null,
-    history: boundedHistory(row.history, audit(action, detail, now)),
-  };
+  return { ...changes, history: boundedHistory(row.history, audit(action, detail, now)) };
 }
 
 export function makeItem(content: DbPortsItemContent, row: DbPortsEditionRow, now: string): DbPortsItem {
-  const assessment = assessDbPortsItem(content, row);
-  if ((content.disposition === "selected" || content.disposition === "watch") && assessment.blockers.length) {
-    throw new DbPortsValidationError(assessment.blockers.join(" "));
-  }
   return {
     ...content,
     id: crypto.randomUUID(),
     mergedInto: null,
     updatedAt: now,
-    ...assessment,
+    drafted: false,
+    warnings: assessDbPortsItem(content, row, normaliseParameters(row.parameters)),
   };
 }
 
 export function assertDispositionCaps(items: DbPortsItem[]): void {
   const active = items.filter((item) => !item.mergedInto);
   if (active.filter((item) => item.disposition === "selected").length > DB_PORTS_MAX_SELECTED) {
-    throw new DbPortsValidationError("The pilot permits at most six selected developments.");
+    throw new DbPortsValidationError(`A report carries at most ${DB_PORTS_MAX_SELECTED} priority items.`);
   }
   if (active.filter((item) => item.disposition === "watch").length > DB_PORTS_MAX_WATCH) {
-    throw new DbPortsValidationError("The pilot permits at most five watch items.");
+    throw new DbPortsValidationError(`The Watchlist carries at most ${DB_PORTS_MAX_WATCH} entries.`);
   }
 }
 
-const IMPORTED_IMMUTABLE: (keyof DbPortsEvidence)[] = [
-  "originalTitle",
-  "sourceRecord",
-  "retrievedAt",
-  "sourceDate",
-];
-const CORRECTABLE: (keyof DbPortsEvidence)[] = [
-  "sourceName",
-  "sourceType",
-  "publishedDate",
-  "excerpt",
-  "verified",
-];
+const IMPORTED_IMMUTABLE: (keyof DbPortsEvidence)[] = ["originalTitle", "sourceRecord", "sourceDate"];
 
+/** Sources may be replaced or added. What cannot happen is quietly rewriting an
+ * imported record's provenance while keeping its identity: remove it instead. */
 export function updateItemPreservingEvidence(
   previous: DbPortsItem,
   content: DbPortsItemContent,
   row: DbPortsEditionRow,
   now: string,
-): { item: DbPortsItem; correctionSummary: string | null } {
-  const byId = new Map(content.evidence.map((entry) => [entry.id, entry]));
-  const corrections: string[] = [];
-  for (const oldEvidence of previous.evidence) {
-    const next = byId.get(oldEvidence.id);
-    if (!next) throw new DbPortsValidationError("Evidence cannot be removed; reject the item or add a correcting source.");
-    if (oldEvidence.sourceRecord) {
-      if (next.sourceUrl !== oldEvidence.sourceUrl) {
-        throw new DbPortsValidationError("An imported evidence URL cannot be substituted; add a new evidence record.");
-      }
-      for (const key of IMPORTED_IMMUTABLE) {
-        if (next[key] !== oldEvidence[key]) {
-          throw new DbPortsValidationError(`Imported evidence ${key} cannot be changed.`);
-        }
+): DbPortsItem {
+  const byId = new Map(previous.evidence.map((entry) => [entry.id, entry]));
+  for (const next of content.evidence) {
+    const old = byId.get(next.id);
+    if (!old?.sourceRecord) continue;
+    if (next.sourceUrl !== old.sourceUrl) {
+      throw new DbPortsValidationError(
+        "An imported source URL cannot be substituted under the same record; remove it and add the replacement source.",
+      );
+    }
+    for (const key of IMPORTED_IMMUTABLE) {
+      if (next[key] !== old[key]) {
+        throw new DbPortsValidationError(`Imported source ${key} cannot be changed.`);
       }
     }
-    const changed = CORRECTABLE.filter((key) => next[key] !== oldEvidence[key]);
-    if (changed.length) corrections.push(`${oldEvidence.id}: ${changed.join(", ")}`);
-  }
-  const assessment = assessDbPortsItem(content, row);
-  if ((content.disposition === "selected" || content.disposition === "watch") && assessment.blockers.length) {
-    throw new DbPortsValidationError(assessment.blockers.join(" "));
   }
   return {
-    item: { ...content, id: previous.id, mergedInto: previous.mergedInto, updatedAt: now, ...assessment },
-    correctionSummary: corrections.length ? corrections.join("; ") : null,
+    ...content,
+    id: previous.id,
+    mergedInto: previous.mergedInto,
+    // Once an analyst has saved an item it belongs to them: a later Generate
+    // Draft replaces generator drafts only, so the edit cannot be overwritten.
+    drafted: false,
+    updatedAt: now,
+    warnings: assessDbPortsItem(content, row, normaliseParameters(row.parameters)),
   };
 }
 
-export function appendHistory(
-  row: DbPortsEditionRow,
-  entry: DbPortsHistory,
-): DbPortsHistory[] {
+export function appendHistory(row: DbPortsEditionRow, entry: DbPortsHistory): DbPortsHistory[] {
   return boundedHistory(row.history, entry);
 }

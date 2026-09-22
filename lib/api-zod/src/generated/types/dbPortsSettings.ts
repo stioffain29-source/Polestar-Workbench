@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { DbPortsIsoTimestamp } from './dbPortsIsoTimestamp';
+import type { DbPortsParameters } from './dbPortsParameters';
 import type { DbPortsSource } from './dbPortsSource';
 import type { DbPortsWatchTarget } from './dbPortsWatchTarget';
 
@@ -17,5 +18,6 @@ export interface DbPortsSettings {
   /** @maxItems 150 */
   watchlist: DbPortsWatchTarget[];
   notes: string;
+  defaults: DbPortsParameters;
   updatedAt: DbPortsIsoTimestamp | null;
 }

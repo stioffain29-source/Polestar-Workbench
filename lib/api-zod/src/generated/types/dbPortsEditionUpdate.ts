@@ -5,12 +5,14 @@
  * Polestar Advisory Workbench API
  * OpenAPI spec version: 0.1.0
  */
-import type { DbPortsEditionUpdateStatus } from './dbPortsEditionUpdateStatus';
+import type { DbPortsCalendarDate } from './dbPortsCalendarDate';
+import type { DbPortsParameters } from './dbPortsParameters';
 
 export interface DbPortsEditionUpdate {
   /** @minimum 1 */
   revision: number;
   title?: string;
   overview?: string;
-  status?: DbPortsEditionUpdateStatus;
+  endDate?: DbPortsCalendarDate;
+  parameters?: DbPortsParameters;
 }

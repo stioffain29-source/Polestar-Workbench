@@ -1535,3 +1535,87 @@ mtime_ms = 1790049812880
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/9870d09e-673f-4eda-9c58-d95890f720bf/e0dfc71b-ede6-4d81-9199-4cc43d55553e"
 storage_version_token = "1790050976170810"
 content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "CNG4OwJSOBEqwUMH2_3Qt"
+uri = "file://exports/db-ports/screens/01-configuration.png"
+type = "image"
+title = "Configuration screen"
+description = "The single configuration panel: title, customer, reporting period, item target, geography, themes, exclusions, minimum severity, priority assets, word targets, watchlist and source links — savable as the default preset."
+logical_id = "12ab28a8-1e7b-4274-9b57-9f243cd80aab"
+content_hash = "sha256:11765831e8f6a5b916f7712e39dd98fd4e488b8ebc097fefddabb5dd39123509"
+size = 165575
+mtime_ms = 1790059834356
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/12ab28a8-1e7b-4274-9b57-9f243cd80aab/aae6e882-f4b2-4e1f-ba99-65138d9e74de"
+storage_version_token = "1790059920620426"
+content_type = "image/png"
+
+[[outputs]]
+id = "9ZZ46Z0c7s069x1mkrdrI"
+uri = "file://exports/db-ports/screens/02-items.png"
+type = "image"
+title = "Generated draft — items"
+description = "Generate Draft output: three report items and eleven held near-misses, each with theme, severity, disposition and editor checks."
+logical_id = "f127c8de-3fba-4e48-ad57-be21b7cfc370"
+content_hash = "sha256:b984637fc0238391e1a6dcd58c04d5f0017cebc2a44934fd4aa67380f9eca154"
+size = 147898
+mtime_ms = 1790059844136
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/f127c8de-3fba-4e48-ad57-be21b7cfc370/075c5975-0482-4912-8d9f-2d2729cb3e2f"
+storage_version_token = "1790059921996529"
+content_type = "image/png"
+
+[[outputs]]
+id = "e4afpVKjQucDwwL8qv8lp"
+uri = "file://exports/db-ports/screens/03-item-editor.png"
+type = "image"
+title = "Editing view"
+description = "Full in-editor editing of one item: headline, location, asset, event date, theme, severity, Summary, Operational Impact, Polestar View, Outlook, sources and analyst notes."
+logical_id = "3f76aae2-a6d1-41a3-896e-19bc169cd628"
+content_hash = "sha256:711e04ce7f3b5d88738fc7a2efffd16af64cdfd2d616f34836d5315ab9bc6dd4"
+size = 232225
+mtime_ms = 1790059860572
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/3f76aae2-a6d1-41a3-896e-19bc169cd628/f8ee4c99-75ca-41b2-977f-dd797edac862"
+storage_version_token = "1790059923308539"
+content_type = "image/png"
+
+[[outputs]]
+id = "bgAXs10z6iz6mXvzMaAbw"
+uri = "file://exports/db-ports/screens/04-preview.png"
+type = "image"
+title = "Report preview"
+description = "The on-screen preview of the customer document — Regional Overview, numbered priority items, Watchlist and disclaimer. Editor warnings stay outside this document."
+logical_id = "1b903ec4-9920-4b24-8e06-8da1ed220c66"
+content_hash = "sha256:740be5e1ebc960e988a90c8cc29e208c0b982e1c62463564c476b4285f628d2c"
+size = 119035
+mtime_ms = 1790059879056
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/1b903ec4-9920-4b24-8e06-8da1ed220c66/f2637f7b-2b7f-4496-bea5-6751e945a571"
+storage_version_token = "1790059924650083"
+content_type = "image/png"
+
+[[outputs]]
+id = "4tcnrpIgl_wdK2DxhAVmP"
+uri = "file://exports/db-ports/Ports-and-Logistics-Intelligence-2026-09-22.docx"
+type = "word_document"
+title = "Word export (editable)"
+description = "Editable Word version of the 9–22 September 2026 report in Polestar styling."
+logical_id = "403528d9-aaaa-42b6-8f2c-e8cdbb517a35"
+content_hash = "sha256:a5535eb0b34e25faafbbb4837a39630a758391036864fb4c10e3017c628bca6f"
+size = 13665
+mtime_ms = 1790059909572
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/403528d9-aaaa-42b6-8f2c-e8cdbb517a35/f3e04838-fc47-4ea7-82c2-2c47529518c6"
+storage_version_token = "1790059926171688"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+[[outputs]]
+id = "9I79nVM74jfxn9vBsbrYW"
+uri = "file://exports/db-ports/Ports-and-Logistics-Intelligence-2026-09-22.pdf"
+type = "pdf"
+title = "PDF export"
+description = "PDF version of the same report, generated from the same content model as the Word file and the preview."
+logical_id = "515a37fc-1e03-488e-85c4-6b0c2a4a26fa"
+content_hash = "sha256:58586cd6d947cbe83b5113d8c6fe5cc24c25bc23bd0d7394e3acaaf6de616b97"
+size = 149797
+mtime_ms = 1790059909688
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/515a37fc-1e03-488e-85c4-6b0c2a4a26fa/c3b65af3-b0ee-42f2-a597-d249eaca5f8e"
+storage_version_token = "1790059927644150"
+content_type = "application/pdf"

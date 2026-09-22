@@ -7,7 +7,6 @@
  */
 
 export interface DbPortsQuality {
-  blockers: string[];
   warnings: string[];
   /** @minimum 0 */
   selectedCount: number;
@@ -20,12 +19,7 @@ export interface DbPortsQuality {
   /** @minimum 0 */
   rejectedCount: number;
   /** @minimum 0 */
-  totalMinutes: number;
-  /** @minimum 0 */
-  corrections: number;
-  /** @minimum 0 */
-  missedSignals: number;
+  itemWarningCount: number;
   /** @minimum 0 */
   sourceFailures: number;
-  readyForReview: boolean;
 }

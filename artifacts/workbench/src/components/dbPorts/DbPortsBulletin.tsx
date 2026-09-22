@@ -5,15 +5,15 @@ export type DbPortsBulletinProps = {
   payload: DbPortsExportPayload;
 };
 
-/** Read-only bulletin proof. Content and ordering come from the export model. */
+/** Read-only preview of the customer report. Content and ordering come from the
+ * same export model as Word and PDF, and editor warnings are never part of it. */
 export function DbPortsBulletin({ payload }: DbPortsBulletinProps) {
   const report = buildDbPortsDocument(payload);
 
   return (
-    <article className="mx-auto max-w-4xl bg-white px-6 py-8 text-[#363636] sm:px-10">
+    <article className="mx-auto max-w-4xl bg-white px-6 py-8 text-[#363636] sm:px-10" data-testid="db-ports-preview">
       <header className="border-b-2 border-[#465bff] pb-6">
-        <p className="text-xs font-bold tracking-wide text-red-800">{report.notice}</p>
-        <h1 className="mt-3 text-3xl font-bold text-[#0b0a3d]">{report.title}</h1>
+        <h1 className="text-3xl font-bold text-[#0b0a3d]">{report.title}</h1>
         <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-[#0b0a3d]">
           {report.kicker}
         </p>

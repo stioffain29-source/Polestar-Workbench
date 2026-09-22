@@ -153,4 +153,5 @@
 - [Report footer standard](report-footer-standard.md) — every report keeps page numbering in the footer; never move, suppress or duplicate it in body-page headers.
 - [Map incident identity](map-incident-identity.md) — map markers represent distinct events, not source articles; preserve all corroborating links on the single event marker.
 - [Regional weekly intelligence scope](regional-weekly-intelligence-scope.md) — APAC/ME business briefs use checked facts, not headline templates; one saved report for preview/PDF.
-- [DB Ports pilot boundary](db-ports-pilot-scope.md) — internal feasibility trial, not a client launch; provisional targets, sparse drafts and unlogged effort must remain explicit.
+- [Ports and Logistics report scope](ports-logistics-report-scope.md) — exports are customer-facing: no internal notices or effort logging, provisional asset targets, and a short report beats padding.
+- [Regional weekly map selection](regional-map-selection.md) — the map plots a capped deterministic selection of developments, not a mirror of the Key Developments list.

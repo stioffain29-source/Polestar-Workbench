@@ -18,12 +18,15 @@ import type {
   DbPortsEvidence,
   DbPortsExportPayload,
   DbPortsItem,
+  DbPortsParameters,
 } from "@workspace/api-client-react";
 import {
-  buildDbPortsQuality,
   DB_PORTS_DISCLAIMER,
   DB_PORTS_MAX_SELECTED,
   DB_PORTS_MAX_WATCH,
+  dbPortsThemeLabel,
+  findDbPortsBannedWording,
+  normaliseParameters,
 } from "@workspace/db-ports";
 import {
   DUSK,
@@ -55,188 +58,122 @@ export type DbPortsDocumentSection = {
 export type DbPortsDocumentModel = {
   title: string;
   kicker: string;
-  notice: string;
   metadata: DbPortsDocumentLine[];
   sections: DbPortsDocumentSection[];
   disclaimer: string;
 };
 
-const INTERNAL_NOTICE = "INTERNAL — UNPUBLISHED DB PORTS PILOT";
 const NOT_RECORDED = "Not recorded.";
 
 function present(value: string | null | undefined): string {
   return value?.trim() || NOT_RECORDED;
 }
 
-function dateTime(value: string): string {
+function dateOnly(value: string): string {
   const parsed = new Date(value);
-  return Number.isFinite(parsed.getTime())
-    ? parsed.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")
-    : value;
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : value;
 }
 
-function shortExtract(value: string): string {
-  const clean = value.trim().replace(/\s+/g, " ");
-  return clean.length <= 400 ? clean : `${clean.slice(0, 397).trimEnd()}…`;
-}
-
-function gatePayload(payload: DbPortsExportPayload): void {
-  if (!payload?.edition) throw new Error("DB Ports export requires a saved edition snapshot.");
-  if (payload.mode !== "working" && payload.mode !== "reviewed") {
-    throw new Error("DB Ports export mode must be working or reviewed.");
-  }
-  if (payload.mode === "reviewed") {
-    if (payload.edition.status !== "approved") {
-      throw new Error("Reviewed DB Ports export requires an approved edition.");
+function sourceLines(item: DbPortsItem, parameters: DbPortsParameters): DbPortsDocumentLine[] {
+  if (!item.evidence.length) return [{ label: "Source", text: NOT_RECORDED }];
+  const lines: DbPortsDocumentLine[] = [];
+  item.evidence.forEach((entry: DbPortsEvidence, index: number) => {
+    const label = index === 0 ? "Source" : "Corroborating source";
+    // Only a real publication date may be presented as one. The collected
+    // record also carries an event date, and printing that as "published"
+    // would put a date on the page that the publisher never gave.
+    const published = entry.publishedDate;
+    lines.push({
+      label,
+      text: `${present(entry.sourceName)}${published ? ` — published ${published}` : " — publication date not recorded"}`,
+    });
+    if (parameters.includeSourceLinks && entry.sourceUrl) {
+      lines.push({ label: "Link", text: entry.sourceUrl, url: entry.sourceUrl });
     }
-    const freshQuality = buildDbPortsQuality(payload.edition);
-    if (!freshQuality.readyForReview) {
-      throw new Error(
-        `Reviewed DB Ports export failed the current quality gate: ${freshQuality.blockers.join(" | ")}`,
-      );
-    }
-  }
-}
-
-function evidenceLines(evidence: DbPortsEvidence): DbPortsDocumentLine[] {
-  const checked = evidence.verified ? "checked" : "not checked";
-  const lines: DbPortsDocumentLine[] = [
-    {
-      label: "Source",
-      text: `${present(evidence.sourceName)} — publication date: ${evidence.publishedDate ?? "not recorded"}; source date: ${evidence.sourceDate ?? "not recorded"}; ${checked}`,
-    },
-    { label: "URL", text: evidence.sourceUrl, url: evidence.sourceUrl },
-  ];
-  if (evidence.originalTitle.trim()) {
-    lines.push({ label: "Source title", text: evidence.originalTitle.trim() });
-  }
-  lines.push({
-    label: "Supporting extract",
-    text: shortExtract(evidence.excerpt) || "No supporting extract saved.",
   });
   return lines;
 }
 
-function itemEntry(item: DbPortsItem, mode: DbPortsExportPayload["mode"]): DbPortsDocumentEntry {
-  const evidence = item.evidence.flatMap(evidenceLines);
-  const reviewLabel =
-    mode === "reviewed" && item.reviewed
-      ? `Analyst-confirmed; reviewed by ${present(item.reviewer)}`
-      : item.reviewed
-        ? `Reviewed in working snapshot by ${present(item.reviewer)}; edition remains unapproved`
-        : "Unverified working item; analyst review not recorded";
+/** Customer-facing item block. Editor-only warnings are never read here, so no
+ * warning can reach an export by accident. */
+function itemEntry(item: DbPortsItem, index: number, parameters: DbPortsParameters): DbPortsDocumentEntry {
   return {
-    heading: present(item.headline),
+    heading: `${index + 1}. ${present(item.headline)}`,
     lines: [
-      { label: "Geography / asset", text: `${present(item.country)} — ${present(item.location)}; assets: ${item.assets.length ? item.assets.join(", ") : "none recorded"}` },
-      { label: "Event date", text: item.eventDate ?? "not recorded" },
-      { label: "Severity", text: item.severity ?? "not assessed" },
-      { label: "Confidence", text: item.confidence.replaceAll("_", " ") },
-      { label: "Review state", text: reviewLabel },
-      {
-        label: item.reviewed ? "Confirmed facts" : "Source-reported statements awaiting analyst verification",
-        text: present(item.confirmedFacts),
-      },
-      { label: "Unverified claims", text: item.unverifiedClaims.trim() || "None recorded." },
-      { label: "Operating implications", text: present(item.operationalImplications) },
-      { label: "Outlook", text: present(item.outlook) },
-      { label: "Missing information", text: item.missingInfo.trim() || "None recorded." },
-      ...evidence,
+      { label: "Location", text: `${present(item.location)}${item.country ? `, ${item.country}` : ""}` },
+      { label: "Port, terminal or corridor", text: item.assets.length ? item.assets.join("; ") : "Not specified in reporting." },
+      { label: "Event date", text: item.eventDate ?? "Not stated in reporting." },
+      { label: "Theme", text: dbPortsThemeLabel(item.theme) },
+      { label: "Current severity", text: item.severity ?? "Not assessed" },
+      { label: "Summary", text: present(item.summary) },
+      { label: "Operational Impact", text: present(item.operationalImpact) },
+      { label: "Polestar View", text: present(item.polestarView) },
+      { label: "Outlook and indicators", text: present(item.outlook) },
+      ...sourceLines(item, parameters),
+    ],
+  };
+}
+
+function watchEntry(item: DbPortsItem, index: number): DbPortsDocumentEntry {
+  return {
+    heading: `${index + 1}. ${present(item.headline)}`,
+    lines: [
+      { label: "Location", text: `${present(item.location)}${item.country ? `, ${item.country}` : ""}` },
+      { label: "Reason for monitoring", text: present(item.materialityReason) },
+      { label: "Trigger or indicator", text: present(item.outlook) },
+      { label: "Verification status", text: item.confidence.replaceAll("_", " ") },
     ],
   };
 }
 
 /**
- * Single content authority used by Word, PDF and the read-only React preview.
- * It intentionally derives quality afresh and never trusts the saved quality object.
+ * Single content authority for Word, PDF and the on-screen preview, so the
+ * three can never drift apart.
  */
 export function buildDbPortsDocument(payload: DbPortsExportPayload): DbPortsDocumentModel {
-  gatePayload(payload);
+  if (!payload?.edition) throw new Error("The ports report export requires a saved report.");
   const { edition } = payload;
+  const parameters = normaliseParameters(edition.parameters);
   const selected = edition.items
     .filter((item) => item.disposition === "selected" && !item.mergedInto)
     .slice(0, DB_PORTS_MAX_SELECTED);
-  const watch = edition.items
-    .filter((item) => item.disposition === "watch" && !item.mergedInto)
-    .slice(0, DB_PORTS_MAX_WATCH);
-  const pending = edition.items.filter(
-    (item) => (item.disposition === "inbox" || item.disposition === "hold") && !item.mergedInto,
-  );
-  const quality = buildDbPortsQuality(edition);
-  const minutes = edition.worklog.reduce((sum, row) => sum + row.minutes, 0);
+  const watch = parameters.includeWatchlist
+    ? edition.items.filter((item) => item.disposition === "watch" && !item.mergedInto).slice(0, DB_PORTS_MAX_WATCH)
+    : [];
 
   const sections: DbPortsDocumentSection[] = [
     {
-      heading: "Editorial overview",
-      introduction: edition.overview.trim() || "Editorial overview not drafted in this saved snapshot.",
+      heading: "Regional Overview",
+      introduction: edition.overview.trim() || "The Regional Overview has not been drafted.",
       entries: [],
     },
     {
-      heading: "Priority developments",
+      heading: "Priority Intelligence Items",
       introduction: selected.length
         ? undefined
-        : "No developments selected. The edition has not been padded to meet a quota.",
-      entries: selected.map((item) => itemEntry(item, payload.mode)),
-    },
-    {
-      heading: "Watch list",
-      introduction: watch.length
-        ? undefined
-        : "No watch items saved. The edition has not been padded to meet a quota.",
-      entries: watch.map((item) => itemEntry(item, payload.mode)),
+        : "No development in this period met the inclusion criteria for a priority item.",
+      entries: selected.map((item, index) => itemEntry(item, index, parameters)),
     },
   ];
 
-  if (pending.length) {
+  if (parameters.includeWatchlist) {
     sections.push({
-      heading: "Pending verification appendix",
-      introduction:
-        "Inbox and hold items only. These are leads, not established events, and are excluded from the reviewed findings.",
-      entries: pending.map((item) => itemEntry(item, "working")),
+      heading: "Watchlist",
+      introduction: watch.length
+        ? "Developing issues that may become material but do not yet justify a full item."
+        : "No developing issues met the Watchlist threshold for this period.",
+      entries: watch.map(watchEntry),
     });
   }
 
-  sections.push(
-    {
-      heading: "Source checks and coverage gaps",
-      introduction: edition.coverage.length
-        ? "Only checks saved in this snapshot are listed. An absent roster source is not assumed to have been covered."
-        : "No source checks were saved. Unchecked roster sources are not assumed to have been covered.",
-      entries: edition.coverage.map((check) => ({
-        heading: check.sourceId,
-        lines: [
-          { label: "Status", text: check.status.replaceAll("_", " ") },
-          { label: "Checked at", text: dateTime(check.checkedAt) },
-          { label: "Notes / gap", text: check.notes.trim() || "No note recorded." },
-        ],
-      })),
-    },
-    {
-      heading: "Effort and methodology",
-      introduction:
-        "Counts reflect logged real minutes only. Zero means effort was not logged, not that no work occurred. Coverage is limited to saved checks and evidence and is not comprehensive.",
-      entries: [
-        {
-          heading: "Pilot effort",
-          lines: [
-            { label: "Logged minutes", text: String(minutes) },
-            { label: "Corrections", text: String(quality.corrections) },
-            { label: "Missed signals", text: String(quality.missedSignals) },
-          ],
-        },
-      ],
-    },
-  );
-
   return {
-    title: edition.title.trim() || "DB Ports Bulletin",
-    kicker: payload.mode === "reviewed" ? "REVIEWED / CONFIRMED SNAPSHOT" : "WORKING / UNVERIFIED SNAPSHOT",
-    notice: INTERNAL_NOTICE,
+    title: edition.title.trim() || parameters.reportTitle,
+    kicker: parameters.reportTitle,
     metadata: [
-      { label: "Edition period", text: `${edition.startDate} to ${edition.endDate}` },
-      { label: "Generated", text: dateTime(payload.generatedAt) },
-      { label: "Edition revision", text: String(edition.revision) },
-      { label: "Edition status", text: edition.status.replaceAll("_", " ") },
+      { label: "Customer", text: present(parameters.customerName) },
+      { label: "Reporting period", text: `${edition.startDate} to ${edition.endDate}` },
+      { label: "Publication date", text: parameters.publicationDate ?? dateOnly(payload.generatedAt) },
+      { label: "Items included", text: `${selected.length} priority ${selected.length === 1 ? "item" : "items"}${parameters.includeWatchlist ? `; ${watch.length} watchlist ${watch.length === 1 ? "entry" : "entries"}` : ""}` },
     ],
     sections,
     disclaimer: DB_PORTS_DISCLAIMER,
@@ -263,10 +200,32 @@ function wordLine(line: DbPortsDocumentLine): Paragraph {
   return new Paragraph({ spacing: { after: 80 }, children });
 }
 
+/** Last gate before a customer file is written. The preview still renders the
+ * offending text so the analyst can find and rewrite it; only the export stops. */
+export function assertDbPortsExportWording(model: DbPortsDocumentModel): void {
+  // Every string the exporters render, not only the body: a report title or a
+  // customer name can carry the forbidden wording just as easily as an item.
+  const text = [
+    model.title,
+    model.kicker,
+    ...model.metadata.flatMap((entry) => [entry.label, entry.text]),
+    ...model.sections.flatMap((section) => [
+      section.heading,
+      section.introduction ?? "",
+      ...section.entries.flatMap((entry) => [entry.heading, ...entry.lines.map((line) => line.text)]),
+    ]),
+    model.disclaimer,
+  ].join(" ");
+  const banned = findDbPortsBannedWording(text);
+  if (banned) {
+    throw new Error(`The report text uses wording the report standard forbids ("${banned}"). Rewrite it before exporting.`);
+  }
+}
+
 export function buildDbPortsDocxDocument(payload: DbPortsExportPayload): Document {
   const model = buildDbPortsDocument(payload);
+  assertDbPortsExportWording(model);
   const children: Array<Paragraph | Table> = [
-    new Paragraph({ children: [new TextRun({ text: model.notice, bold: true, color: "A33232", font: "Roboto", size: 20 })] }),
     new Paragraph({
       heading: HeadingLevel.TITLE,
       spacing: { before: 100, after: 100 },
@@ -314,7 +273,7 @@ export function buildDbPortsDocxDocument(payload: DbPortsExportPayload): Documen
           children: [new Paragraph({
             alignment: AlignmentType.RIGHT,
             children: [
-              new TextRun({ text: "INTERNAL — UNPUBLISHED DB PORTS PILOT  |  Page ", font: "Roboto", size: 16 }),
+              new TextRun({ text: `${model.kicker}  |  Page `, font: "Roboto", size: 16 }),
               new TextRun({ children: [PageNumber.CURRENT], font: "Roboto", size: 16 }),
               new TextRun({ text: " of ", font: "Roboto", size: 16 }),
               new TextRun({ children: [PageNumber.TOTAL_PAGES], font: "Roboto", size: 16 }),
@@ -337,13 +296,18 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+function exportName(payload: DbPortsExportPayload): string {
+  return `ports-and-logistics-intelligence-${payload.edition.endDate}`;
+}
+
 export async function downloadDbPortsDocx(payload: DbPortsExportPayload): Promise<void> {
   const blob = await Packer.toBlob(buildDbPortsDocxDocument(payload));
-  triggerDownload(blob, `db-ports-${payload.edition.endDate}-${payload.mode}.docx`);
+  triggerDownload(blob, `${exportName(payload)}.docx`);
 }
 
 export async function buildDbPortsPdf(payload: DbPortsExportPayload): Promise<jsPDF> {
   const model = buildDbPortsDocument(payload);
+  assertDbPortsExportWording(model);
   const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
   await ensureRobotoLoaded(pdf);
   const width = pdf.internal.pageSize.getWidth();
@@ -398,11 +362,6 @@ export async function buildDbPortsPdf(payload: DbPortsExportPayload): Promise<js
   };
 
   setRoboto(pdf, "bold");
-  pdf.setFontSize(9);
-  pdf.setTextColor(163, 50, 50);
-  pdf.text(model.notice, margin, y);
-  y += 25;
-  setRoboto(pdf, "bold");
   pdf.setFontSize(23);
   pdf.setTextColor(NAVY);
   for (const line of pdf.splitTextToSize(sanitize(model.title), contentWidth)) {
@@ -448,7 +407,7 @@ export async function buildDbPortsPdf(payload: DbPortsExportPayload): Promise<js
     setRoboto(pdf, "regular");
     pdf.setFontSize(8);
     pdf.setTextColor(DUSK);
-    pdf.text("INTERNAL — UNPUBLISHED DB PORTS PILOT", margin, height - 12);
+    pdf.text(model.kicker, margin, height - 12);
     pdf.text(`Page ${page} of ${pages}`, width - margin, height - 12, { align: "right" });
   }
   return pdf;
@@ -456,5 +415,5 @@ export async function buildDbPortsPdf(payload: DbPortsExportPayload): Promise<js
 
 export async function downloadDbPortsPdf(payload: DbPortsExportPayload): Promise<void> {
   const pdf = await buildDbPortsPdf(payload);
-  pdf.save(`db-ports-${payload.edition.endDate}-${payload.mode}.pdf`);
+  pdf.save(`${exportName(payload)}.pdf`);
 }

@@ -1,4 +1,4 @@
-import type { DbPortsSource, DbPortsWatchTarget } from "@workspace/db-ports";
+import type { DbPortsParameters, DbPortsSource, DbPortsWatchTarget } from "@workspace/db-ports";
 import {
   integer,
   jsonb,
@@ -20,6 +20,9 @@ export const dbPortsSettingsTable = pgTable("db_ports_settings", {
     .notNull()
     .default(sql`'[]'::jsonb`),
   notes: text("notes").notNull().default(""),
+  defaults: jsonb("defaults")
+    .$type<DbPortsParameters | null>()
+    .default(sql`NULL`),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
     .notNull()
     .defaultNow(),

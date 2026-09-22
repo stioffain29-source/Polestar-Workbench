@@ -6,7 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface DbPortsExportInput {
+export interface DbPortsReorderInput {
   /** @minimum 1 */
   revision: number;
+  /**
+     * @minItems 1
+     * @maxItems 200
+     */
+  itemIds: string[];
 }

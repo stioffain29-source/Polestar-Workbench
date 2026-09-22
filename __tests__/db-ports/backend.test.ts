@@ -18,9 +18,11 @@ import {
   isPositiveInteger,
   validateCalendarDate,
   validateItemContent,
+  validateParameters,
   validateSettings,
 } from "../../artifacts/api-server/src/lib/dbPortsValidation";
 import {
+  DEFAULT_DB_PORTS_PARAMETERS,
   DEFAULT_DB_PORTS_SETTINGS,
   assessDbPortsItem,
   emptyDbPortsItem,
@@ -43,7 +45,7 @@ function content(overrides: Partial<DbPortsItemContent> = {}): DbPortsItemConten
     confidence: "unverified",
     materialityReason: "Affects landside access.",
     impactAreas: ["landside_access"],
-    operationalImplications: "Use the alternate gate.",
+    operationalImpact: "Use the alternate gate.",
     outlook: "Watch for reopening.",
     evidence: [{
       id: "evidence-incident-1",
@@ -64,26 +66,24 @@ function content(overrides: Partial<DbPortsItemContent> = {}): DbPortsItemConten
 
 function item(id: string, disposition: DbPortsItem["disposition"] = "inbox"): DbPortsItem {
   const body = content({ disposition });
-  return { ...body, id, mergedInto: null, updatedAt: now, ...assessDbPortsItem(body, window) };
+  return { ...body, id, mergedInto: null, updatedAt: now, drafted: false, warnings: assessDbPortsItem(body, window) };
 }
 
 const row = {
   id: 1,
   ...window,
-  title: "Edition",
+  title: "Report",
   overview: "",
-  status: "draft" as const,
   revision: 1,
+  parameters: DEFAULT_DB_PORTS_PARAMETERS,
   items: [] as DbPortsItem[],
-  worklog: [],
   coverage: [],
   history: [],
   createdAt: now,
   updatedAt: now,
-  approvedAt: null,
 };
 
-describe("DB Ports backend validation and provenance", () => {
+describe("Ports report backend validation and provenance", () => {
   test("refines generated numeric/date shapes instead of accepting malformed values", () => {
     expect(isPositiveInteger(1)).toBe(true);
     expect(isPositiveInteger(1.5)).toBe(false);
@@ -95,9 +95,22 @@ describe("DB Ports backend validation and provenance", () => {
     }] }))).toContain("HTTP");
   });
 
+  test("configuration values are rejected with a reason rather than silently clamped", () => {
+    expect(validateParameters(DEFAULT_DB_PORTS_PARAMETERS)).toBeNull();
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, reportTitle: "  " })).toContain("title");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, publicationDate: "2026-02-30" })).toContain("real calendar");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, targetItems: 0 })).toContain("between 1 and");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, includedCountries: [] })).toContain("at least one country");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, includedCountries: ["Atlantis"] })).toContain("Unrecognised country");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, includedThemes: [] })).toContain("at least one intelligence theme");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, itemWordTarget: 120 })).toContain("150-word floor");
+    expect(validateParameters({ ...DEFAULT_DB_PORTS_PARAMETERS, overviewWordTarget: 300 })).toContain("between 150 and 250");
+  });
+
   test("enforces hard item and settings caps", () => {
-    expect(() => assertDispositionCaps(Array.from({ length: 7 }, (_, i) => item(String(i), "selected")))).toThrow("six");
-    expect(() => assertDispositionCaps(Array.from({ length: 6 }, (_, i) => item(String(i), "watch")))).toThrow("five");
+    expect(() => assertDispositionCaps(Array.from({ length: 41 }, (_, i) => item(String(i), "selected")))).toThrow("40");
+    expect(() => assertDispositionCaps(Array.from({ length: 6 }, (_, i) => item(String(i), "watch")))).toThrow("5");
+    expect(() => assertDispositionCaps(Array.from({ length: 5 }, (_, i) => item(String(i), "watch")))).not.toThrow();
     expect(validateSettings({
       sources: Array.from({ length: 151 }, (_, i) => ({ ...DEFAULT_DB_PORTS_SETTINGS.sources[0]!, id: String(i) })),
       watchlist: [],
@@ -107,7 +120,7 @@ describe("DB Ports backend validation and provenance", () => {
   test("optional source-roster check metadata is retained and validated when present", () => {
     const source = {
       ...DEFAULT_DB_PORTS_SETTINGS.sources[0]!,
-      expectedCadence: "Check each weekday during an active edition.",
+      expectedCadence: "Check each weekday while a report is open.",
       reliability: "intermittent" as const,
       manualReviewRequired: true,
       lastSuccessfulCheckAt: now,
@@ -115,11 +128,6 @@ describe("DB Ports backend validation and provenance", () => {
       lastRelevantItemUrl: "https://authority.example/notices/21",
     };
     expect(validateSettings({ sources: [source], watchlist: [] })).toBeNull();
-    expect(source).toMatchObject({
-      reliability: "intermittent",
-      manualReviewRequired: true,
-      lastRelevantItemDate: "2026-09-21",
-    });
     expect(validateSettings({
       sources: [{ ...source, lastRelevantItemDate: "2026-02-30" }],
       watchlist: [],
@@ -134,7 +142,7 @@ describe("DB Ports backend validation and provenance", () => {
     })).toContain("invalid last successful check timestamp");
   });
 
-  test("retains imported provenance while auditing permitted metadata corrections", () => {
+  test("an imported source keeps its provenance; a replacement is added, never swapped in place", () => {
     const previous = item("i1");
     const corrected = content({
       evidence: [{
@@ -146,29 +154,44 @@ describe("DB Ports backend validation and provenance", () => {
         verified: true,
       }],
     });
-    const result = updateItemPreservingEvidence(previous, corrected, row, now);
-    expect(result.item.evidence[0]).toMatchObject({
+    const updated = updateItemPreservingEvidence(previous, corrected, row, now);
+    expect(updated.evidence[0]).toMatchObject({
       originalTitle: "Original upstream title",
       sourceRecord: "incident:1",
       sourceDate: "2026-09-21",
-      retrievedAt: now,
+      sourceName: "Correct publisher",
     });
-    expect(result.correctionSummary).toContain("sourceName");
+    expect(updated.id).toBe("i1");
+    expect(updated.updatedAt).toBe(now);
+    expect(Array.isArray(updated.warnings)).toBe(true);
     expect(() => updateItemPreservingEvidence(previous, {
       ...corrected,
       evidence: [{ ...corrected.evidence[0]!, sourceUrl: "https://replacement.example/" }],
     }, row, now)).toThrow("cannot be substituted");
-    expect(() => updateItemPreservingEvidence(previous, { ...corrected, evidence: [] }, row, now)).toThrow("cannot be removed");
+    expect(() => updateItemPreservingEvidence(previous, {
+      ...corrected,
+      evidence: [{ ...corrected.evidence[0]!, originalTitle: "Rewritten upstream title" }],
+    }, row, now)).toThrow("cannot be changed");
+    const added = updateItemPreservingEvidence(previous, {
+      ...corrected,
+      evidence: [corrected.evidence[0]!, {
+        ...corrected.evidence[0]!,
+        id: "analyst-added",
+        sourceUrl: "https://second.example/corroboration",
+        sourceRecord: null,
+      }],
+    }, row, now);
+    expect(added.evidence).toHaveLength(2);
   });
 });
 
-describe("DB Ports route invariants", () => {
+describe("Ports report route surface", () => {
   const root = path.resolve(__dirname, "../..");
   const routeSource = fs.readFileSync(path.join(root, "artifacts/api-server/src/routes/dbPorts.ts"), "utf8");
   const serviceSource = fs.readFileSync(path.join(root, "artifacts/api-server/src/lib/dbPortsEditions.ts"), "utf8");
   const indexSource = fs.readFileSync(path.join(root, "artifacts/api-server/src/routes/index.ts"), "utf8");
 
-  test("all edition writes use id-and-revision CAS and settings first-save is conflict safe", () => {
+  test("all report writes use id-and-revision CAS and settings first-save is conflict safe", () => {
     expect(serviceSource).toContain("eq(dbPortsEditionsTable.id, id), eq(dbPortsEditionsTable.revision, revision)");
     expect(routeSource).toContain("eq(dbPortsSettingsTable.id, 1), eq(dbPortsSettingsTable.revision, body.revision)");
     expect(routeSource).toContain("onConflictDoNothing");
@@ -179,9 +202,25 @@ describe("DB Ports route invariants", () => {
     expect(routeSource).not.toContain("requireAdminToken");
   });
 
-  test("approval and reviewed export both independently enforce current quality", () => {
-    expect(routeSource).toContain('row.status !== "in_review"');
-    expect(routeSource).toContain("candidate.quality.readyForReview");
-    expect(routeSource).toContain('edition.status !== "approved" || !quality.readyForReview');
+  test("drafting, editing and export routes exist for every editor action", () => {
+    for (const route of [
+      '"/db-ports/editions/:id/generate"',
+      '"/db-ports/editions/:id/overview"',
+      '"/db-ports/editions/:id/items/:itemId/regenerate"',
+      '"/db-ports/editions/:id/reorder"',
+      '"/db-ports/editions/:id/items"',
+      '"/db-ports/editions/:id/items/:itemId"',
+      '"/db-ports/editions/:id/merge"',
+      '"/db-ports/editions/:id/export"',
+    ]) {
+      expect(routeSource).toContain(route);
+    }
+    expect(routeSource).toContain('router.delete("/db-ports/editions/:id/items/:itemId"');
+  });
+
+  test("worklog, review and approval surfaces are gone from the API", () => {
+    for (const removed of ["worklog", "blocker", "readyForReview", "requestReview", "in_review", "approve", "missedSignal", "correction"]) {
+      expect(routeSource.toLowerCase()).not.toContain(removed.toLowerCase());
+    }
   });
 });

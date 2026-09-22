@@ -26,11 +26,13 @@ export interface DbPortsItemContent {
   severity: DbPortsItemContentSeverity;
   confidence: DbPortsItemContentConfidence;
   /** @maxLength 8000 */
-  confirmedFacts: string;
+  summary: string;
   /** @maxLength 4000 */
   unverifiedClaims: string;
   /** @maxLength 4000 */
-  operationalImplications: string;
+  operationalImpact: string;
+  /** @maxLength 4000 */
+  polestarView: string;
   /** @maxLength 4000 */
   outlook: string;
   /** @maxLength 2000 */
@@ -40,10 +42,6 @@ export interface DbPortsItemContent {
   missingInfo: string;
   /** @maxLength 4000 */
   analystNotes: string;
-  reviewed: boolean;
-  reviewer: string;
-  secondReviewer: string;
-  secondReviewNote: string;
   /** @maxItems 12 */
   evidence: DbPortsEvidence[];
 }

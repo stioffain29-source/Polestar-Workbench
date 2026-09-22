@@ -1,152 +1,280 @@
 import {
-  assessDbPortsItem, buildDbPortsQuality, canonicalDbPortsCountry, DEFAULT_DB_PORTS_SETTINGS,
-  emptyDbPortsItem, editionWindow, importDbPortsDiscovery, isCalendarDate,
-  type DbPortsDiscoveryRow, type DbPortsEdition, type DbPortsItem, type DbPortsItemContent,
+  DEFAULT_DB_PORTS_PARAMETERS,
+  DEFAULT_DB_PORTS_SETTINGS,
+  assessDbPortsItem,
+  buildDbPortsQuality,
+  canonicalDbPortsCountry,
+  editionWindow,
+  emptyDbPortsItem,
+  flagDuplicates,
+  importDbPortsDiscovery,
+  isCalendarDate,
+  normaliseParameters,
+  normaliseStoredItem,
+  type DbPortsDiscoveryRow,
+  type DbPortsEvidence,
+  type DbPortsItem,
+  type DbPortsItemContent,
+  type DbPortsParameters,
 } from "../../lib/db-ports/src/index";
 
 const window = editionWindow("2026-09-22");
 const now = "2026-09-22T06:00:00.000Z";
 
+/** Body text of a stated length, so word-count rules are exercised exactly. */
+function filler(count: number): string {
+  return Array.from({ length: count }, (_, index) => `word${index % 9}`).join(" ");
+}
+
+function evidence(overrides: Partial<DbPortsEvidence> = {}): DbPortsEvidence {
+  return {
+    id: "e1",
+    sourceName: "Maritime and Port Authority",
+    sourceUrl: "https://authority.example/notices/1",
+    sourceType: "official",
+    publishedDate: "2026-09-21",
+    sourceDate: "2026-09-21",
+    retrievedAt: now,
+    excerpt: "The gate is closed for repairs.",
+    originalTitle: "Gate closure notice",
+    sourceRecord: null,
+    verified: true,
+    ...overrides,
+  };
+}
+
 function content(overrides: Partial<DbPortsItemContent> = {}): DbPortsItemContent {
   return {
-    ...emptyDbPortsItem(), headline: "A named terminal closes its gate for a confirmed short repair",
-    country: "Singapore", location: "Named terminal", eventDate: "2026-09-21",
-    disposition: "selected", severity: "Low", confidence: "official",
-    confirmedFacts: "The authority confirms that the terminal access gate was closed for repairs.",
-    operationalImplications: "Use the authority's stated alternate gate during the repair.",
-    materialityReason: "The notice identifies an actual gate closure and alternate access.",
-    outlook: "Watch for the authority's gate reopening notice.",
-    impactAreas: ["landside_access"], reviewed: true, reviewer: "Primary reviewer",
-    evidence: [{
-      id: "e1", sourceName: "Test port authority", sourceUrl: "https://authority.example/notice-1",
-      sourceType: "official", publishedDate: "2026-09-21", sourceDate: "2026-09-21",
-      retrievedAt: now, excerpt: "The gate is closed for repairs. Use the alternate gate.",
-      originalTitle: "Gate closure", sourceRecord: null, verified: true,
-    }],
+    ...emptyDbPortsItem(),
+    headline: "Container terminal gate closed after a quay crane failure",
+    country: "Singapore",
+    location: "Port of Singapore",
+    assets: ["Terminal 3"],
+    eventDate: "2026-09-21",
+    theme: "port_terminal_operations",
+    disposition: "selected",
+    severity: "Moderate",
+    confidence: "corroborated",
+    summary: filler(110),
+    operationalImpact: filler(25),
+    polestarView: filler(25),
+    outlook: filler(15),
+    materialityReason: "The closure removes one of three landside access gates.",
+    impactAreas: ["landside_access"],
+    evidence: [
+      evidence(),
+      evidence({ id: "e2", sourceName: "Independent newspaper", sourceUrl: "https://newspaper.example/story", sourceType: "news" }),
+    ],
     ...overrides,
   };
 }
 
 function item(id = "i1", overrides: Partial<DbPortsItemContent> = {}): DbPortsItem {
   const body = content(overrides);
-  return { ...body, id, mergedInto: null, updatedAt: now, ...assessDbPortsItem(body, window) };
+  return { ...body, id, mergedInto: null, updatedAt: now, drafted: false, warnings: assessDbPortsItem(body, window) };
 }
 
-function edition(overrides: Partial<DbPortsEdition> = {}): DbPortsEdition {
-  const body = {
-    id: 1, title: "TEST — unpublished pilot", ...window, overview: "Evidence ".repeat(160).trim(),
-    status: "draft" as const, revision: 1, items: [item()],
-    worklog: [{ id: "w1", activity: "verification" as const, minutes: 45, notes: "Checked notice.", createdAt: now }],
-    coverage: [{ sourceId: "recaap", status: "checked" as const, checkedAt: now, notes: "Manual source check." }],
-    history: [], createdAt: now, updatedAt: now, approvedAt: null, ...overrides,
-  };
-  return { ...body, quality: buildDbPortsQuality(body) };
+function codes(body: DbPortsItemContent, parameters?: DbPortsParameters): string[] {
+  return assessDbPortsItem(body, window, parameters).map((entry) => entry.code);
 }
 
 function row(overrides: Partial<DbPortsDiscoveryRow> = {}): DbPortsDiscoveryRow {
   return {
-    id: "incident:1", title: "Container terminal access suspended at named Singapore port after a power outage",
-    summary: "Source-reported disruption; actual duration still requires checking.", country: "Singapore",
-    location: "Port of Singapore", sourceName: "Discovery publisher",
-    sourceUrl: "https://publisher.example/story", sourceDate: "2026-09-21", eventDate: null,
+    id: "incident:1",
+    title: "Container terminal access suspended at named Singapore port after a power outage",
+    summary: "Source-reported disruption; actual duration still requires checking.",
+    country: "Singapore",
+    location: "Port of Singapore",
+    sourceName: "Discovery publisher",
+    sourceUrl: "https://publisher.example/story",
+    sourceDate: "2026-09-21",
+    eventDate: null,
     ...overrides,
   };
 }
 
-describe("DB Ports pilot editorial gates", () => {
-  test("the inclusive calendar window is exactly14 days and timezone-independent", () => {
+describe("Ports and Logistics reporting period and geography", () => {
+  test("the inclusive calendar window is exactly 14 days and timezone-independent", () => {
     expect(window).toEqual({ startDate: "2026-09-09", endDate: "2026-09-22" });
     expect(editionWindow("2028-03-01").startDate).toBe("2028-02-17");
     expect(isCalendarDate("2026-02-30")).toBe(false);
     expect(() => editionWindow("2026-02-30")).toThrow();
   });
 
-  test("scope is explicit, with Hong Kong independently attributed", () => {
+  test("scope is APAC and Oceania, with Hong Kong independently attributed", () => {
     expect(canonicalDbPortsCountry("Hong Kong SAR")).toBe("Hong Kong");
     expect(canonicalDbPortsCountry("PNG")).toBe("Papua New Guinea");
-    for (const country of ["India", "Bangladesh", "Pakistan", "Sri Lanka", "Nepal", "Iran", "Yemen", "Unknown"]) {
-      expect(assessDbPortsItem(content({ country }), window).blockers.join(" ")).toContain("outside");
+    for (const country of ["India", "Bangladesh", "Pakistan", "Sri Lanka", "Iran", "Yemen", "Unknown"]) {
+      expect(codes(content({ country }))).toContain("excluded_geography");
     }
-    expect(assessDbPortsItem(content({ headline: "Red Sea attacks force port rerouting" }), window).blockers.join(" ")).toContain("excluded");
-  });
-
-  test("a discovery date, URL and headline are not verification", () => {
-    const body = content();
-    body.evidence[0]!.verified = false;
-    body.evidence[0]!.publishedDate = null;
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("publication date");
-    body.evidence[0]!.verified = true;
-    body.evidence[0]!.publishedDate = "2026-09-01";
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("14-day window");
-  });
-
-  test("severity and confidence remain independent of source authority", () => {
-    expect(assessDbPortsItem(content(), window).blockers).toEqual([]);
-    const result = assessDbPortsItem(content({ severity: null }), window);
-    expect(result.blockers.join(" ")).toContain("current severity");
-    expect(result.secondaryReviewRequired).toBe(false);
-  });
-
-  test("High/Extreme and sensitive claims need an independent recorded second review", () => {
-    const body = content({ severity: "High" });
-    expect(assessDbPortsItem(body, window).secondaryReviewRequired).toBe(true);
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("second review");
-    body.secondReviewer = body.reviewer;
-    body.secondReviewNote = "I looked twice.";
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("second review");
-    body.secondReviewer = "Independent reviewer";
-    expect(assessDbPortsItem(body, window).blockers).toEqual([]);
-    expect(assessDbPortsItem(content({ headline: "Port worker killed in accident" }), window).secondaryReviewRequired).toBe(true);
-    expect(assessDbPortsItem(content({ country: "Taiwan", theme: "geopolitical" }), window).secondaryReviewRequired).toBe(true);
-  });
-
-  test("syndication is not two independent confirmations", () => {
-    const body = content({ confidence: "corroborated" });
-    body.evidence[0]!.sourceType = "news";
-    body.evidence.push({ ...body.evidence[0]!, id: "e2", sourceUrl: "https://authority.example/followup" });
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("independent");
-    body.evidence[1]!.sourceUrl = "https://independent.example/news";
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("independent");
-    body.evidence[1]!.sourceName = "Independent newspaper";
-    expect(assessDbPortsItem(body, window).blockers).toEqual([]);
-  });
-
-  test("future events stay on watch, with uncertainty visibly recorded", () => {
-    const body = content({ eventDate: "2026-09-25" });
-    expect(assessDbPortsItem(body, window).blockers.join(" ")).toContain("future event");
-    body.disposition = "watch";
-    body.missingInfo = "Whether planned activity affects terminal access is not established.";
-    body.confidence = "unverified";
-    expect(assessDbPortsItem(body, window).blockers).toEqual([]);
-  });
-
-  test("one verified item is preferable to quota padding; six/five are hard caps", () => {
-    expect(edition().quality.readyForReview).toBe(true);
-    expect(edition().quality.warnings.join(" ")).toContain("shorter verified edition");
-    const selected = Array.from({ length: 7 }, (_, i) => item(`s${i}`));
-    const watch = Array.from({ length: 6 }, (_, i) => item(`w${i}`, { disposition: "watch", missingInfo: "Pending confirmation." }));
-    const quality = edition({ items: [...selected, ...watch] }).quality;
-    expect(quality.blockers.join(" ")).toContain("six priority");
-    expect(quality.blockers.join(" ")).toContain("five watch");
-    expect(quality.readyForReview).toBe(false);
-  });
-
-  test("a zero-result edition stays unapproved and measured effort is never fabricated", () => {
-    const quality = edition({ items: [], overview: "", worklog: [], coverage: [] }).quality;
-    expect(quality.readyForReview).toBe(false);
-    expect(quality.totalMinutes).toBe(0);
-    expect(quality.warnings.join(" ")).toContain("zero recorded hours does not mean zero work");
-    expect(quality.blockers.join(" ")).toContain("No verified priority");
-    const long = edition({ worklog: [{ id: "w2", activity: "review", minutes: 2400, notes: "Actual logged work.", createdAt: now }] });
-    expect(long.quality.warnings.join(" ")).toContain("40-hour");
   });
 });
 
-describe("DB Ports read-only discovery and provisional roster", () => {
+describe("Editor-only item warnings", () => {
+  test("a complete, corroborated, in-window item raises nothing", () => {
+    expect(assessDbPortsItem(content(), window, DEFAULT_DB_PORTS_PARAMETERS)).toEqual([]);
+  });
+
+  test("each defect is reported under its own code", () => {
+    expect(codes(content({ evidence: [] }))).toContain("missing_source");
+    expect(codes(content({
+      evidence: [evidence({ publishedDate: null, sourceDate: null })],
+    }))).toContain("missing_source");
+    expect(codes(content({ eventDate: null }))).toContain("missing_event_date");
+    expect(codes(content({ eventDate: "2026-09-30" }))).toContain("missing_event_date");
+    expect(codes(content({ location: "", assets: [] }))).toContain("missing_location");
+    expect(codes(content({ impactAreas: [], operationalImpact: "" }))).toContain("weak_operational_connection");
+    expect(codes(content({ evidence: [evidence()] }))).toContain("single_source");
+    expect(codes(content({
+      evidence: [evidence({ sourceType: "discovery" }), evidence({ id: "e2", sourceUrl: "https://news.google.com/read/abc", sourceType: "news" })],
+    }))).toContain("aggregator_only");
+    expect(codes(content({ summary: filler(20) }))).toContain("item_length");
+    expect(codes(content({ summary: filler(400) }))).toContain("item_length");
+  });
+
+  test("configured exclusions are matched against the item's own text", () => {
+    const flagged = assessDbPortsItem(
+      content({ headline: "Red Sea rerouting lengthens Singapore transhipment calls" }),
+      window,
+      DEFAULT_DB_PORTS_PARAMETERS,
+    );
+    expect(flagged.map((entry) => entry.message).join(" ")).toContain('excluded term "Red Sea"');
+    const narrowed = { ...DEFAULT_DB_PORTS_PARAMETERS, includedCountries: ["Malaysia"] };
+    expect(codes(content(), narrowed)).toContain("excluded_geography");
+  });
+
+  test("the maximum item word count comes from the configuration panel", () => {
+    const longer = { ...DEFAULT_DB_PORTS_PARAMETERS, itemWordTarget: 400 };
+    expect(codes(content({ summary: filler(300) }))).toContain("item_length");
+    expect(codes(content({ summary: filler(300) }), longer)).not.toContain("item_length");
+  });
+
+  test("watchlist entries are short by design and exempt from item-length and impact rules", () => {
+    const watch = content({ disposition: "watch", summary: "", operationalImpact: "", impactAreas: [], polestarView: "", outlook: "Trigger: a further gate closure." });
+    expect(codes(watch)).not.toContain("item_length");
+    expect(codes(watch)).not.toContain("weak_operational_connection");
+  });
+});
+
+describe("Same-event handling and edition quality", () => {
+  test("two reports of one event are flagged, and separate countries are not", () => {
+    const flagged = flagDuplicates([
+      item("a", { headline: "Container terminal gate closed after a quay crane failure" }),
+      item("b", { headline: "Quay crane failure closes container terminal gate" }),
+      item("c", { headline: "Quay crane failure closes container terminal gate", country: "Malaysia", location: "Port Klang" }),
+    ]);
+    expect(flagged[0]!.warnings.some((entry) => entry.code === "possible_duplicate")).toBe(true);
+    expect(flagged[1]!.warnings.some((entry) => entry.code === "possible_duplicate")).toBe(true);
+    expect(flagged[2]!.warnings.some((entry) => entry.code === "possible_duplicate")).toBe(false);
+  });
+
+  test("quality counts every disposition and prefers a shorter report to padding", () => {
+    const quality = buildDbPortsQuality({
+      overview: filler(200),
+      parameters: DEFAULT_DB_PORTS_PARAMETERS,
+      coverage: [{ sourceId: "recaap", status: "unavailable", checkedAt: now, notes: "Site unreachable." }],
+      items: [
+        item("s1"),
+        item("w1", { disposition: "watch" }),
+        item("h1", { disposition: "hold" }),
+        item("i1", { disposition: "inbox" }),
+        item("r1", { disposition: "rejected" }),
+      ],
+    });
+    expect(quality).toMatchObject({ selectedCount: 1, watchCount: 1, heldCount: 1, inboxCount: 1, rejectedCount: 1, sourceFailures: 1 });
+    expect(quality.warnings.join(" ")).toContain("A shorter report is preferable to padding");
+    expect(quality.warnings.join(" ")).toContain("coverage gap");
+  });
+
+  test("the Regional Overview band and the five-entry Watchlist cap are reported", () => {
+    const short = buildDbPortsQuality({
+      overview: filler(90),
+      parameters: DEFAULT_DB_PORTS_PARAMETERS,
+      coverage: [],
+      items: Array.from({ length: 6 }, (_, index) => item(`w${index}`, { disposition: "watch" })),
+    });
+    expect(short.warnings.join(" ")).toContain(
+      `the configured length is 150–${DEFAULT_DB_PORTS_PARAMETERS.overviewWordTarget}`,
+    );
+    expect(short.warnings.join(" ")).toContain("the report allows five");
+    expect(short.warnings.join(" ")).toContain("No priority item has been selected yet");
+  });
+
+  test("the overview ceiling follows the configured length and stays inside the report standard", () => {
+    const long = buildDbPortsQuality({
+      overview: filler(240),
+      parameters: { ...DEFAULT_DB_PORTS_PARAMETERS, overviewWordTarget: 250 },
+      coverage: [],
+      items: [item("s1", { disposition: "selected" })],
+    });
+    expect(long.warnings.join(" ")).not.toContain("Regional Overview runs to");
+    const capped = buildDbPortsQuality({
+      overview: filler(240),
+      parameters: { ...DEFAULT_DB_PORTS_PARAMETERS, overviewWordTarget: 900 },
+      coverage: [],
+      items: [item("s1", { disposition: "selected" })],
+    });
+    expect(capped.warnings.join(" ")).not.toContain("Regional Overview runs to");
+    const over = buildDbPortsQuality({
+      overview: filler(260),
+      parameters: { ...DEFAULT_DB_PORTS_PARAMETERS, overviewWordTarget: 900 },
+      coverage: [],
+      items: [item("s1", { disposition: "selected" })],
+    });
+    expect(over.warnings.join(" ")).toContain("the configured length is 150–250");
+  });
+});
+
+describe("Stored report migration", () => {
+  test("word targets saved under older limits normalise into the band the server accepts", () => {
+    const normalised = normaliseParameters({ itemWordTarget: 60, overviewWordTarget: 80 });
+    expect(normalised.itemWordTarget).toBe(150);
+    expect(normalised.overviewWordTarget).toBe(150);
+    const generous = normaliseParameters({ itemWordTarget: 900, overviewWordTarget: 900 });
+    expect(generous.itemWordTarget).toBe(600);
+    expect(generous.overviewWordTarget).toBe(250);
+  });
+
+
+  test("text written under the pilot field names is carried across, review fields are dropped", () => {
+    const migrated = normaliseStoredItem({
+      id: "legacy-1",
+      headline: "Legacy item",
+      country: "Singapore",
+      theme: "operations",
+      disposition: "selected",
+      confirmedFacts: "What the analyst wrote as confirmed facts.",
+      operationalImplications: "What the analyst wrote as operational implications.",
+      reviewed: true,
+      reviewer: "Analyst",
+      secondaryReviewRequired: true,
+      blockers: ["Needs a second review."],
+      evidence: [{ id: "e1", sourceName: "Publisher", sourceUrl: "https://publisher.example/a", retrievedAt: now }],
+    });
+    expect(migrated.summary).toBe("What the analyst wrote as confirmed facts.");
+    expect(migrated.operationalImpact).toBe("What the analyst wrote as operational implications.");
+    expect(migrated.theme).toBe("port_terminal_operations");
+    expect(migrated.warnings).toEqual([]);
+    expect(migrated.drafted).toBe(false);
+    expect(Object.keys(migrated)).not.toContain("blockers");
+    expect(Object.keys(migrated)).not.toContain("reviewed");
+  });
+
+  test("an older report inherits any parameter it predates from the saved preset", () => {
+    const parameters = normaliseParameters({ customerName: "DB Ports", targetItems: 900 });
+    expect(parameters.customerName).toBe("DB Ports");
+    expect(parameters.targetItems).toBe(40);
+    expect(parameters.includedThemes).toEqual(DEFAULT_DB_PORTS_PARAMETERS.includedThemes);
+    expect(normaliseParameters(null, { ...DEFAULT_DB_PORTS_PARAMETERS, customerName: "Preset customer" }).customerName)
+      .toBe("Preset customer");
+  });
+});
+
+describe("Collected-material import", () => {
   test("initial targets are never asserted to be client assets or checked feeds", () => {
-    expect(DEFAULT_DB_PORTS_SETTINGS.watchlist.every(target => !target.confirmedClientAsset)).toBe(true);
-    expect(DEFAULT_DB_PORTS_SETTINGS.sources.every(source => source.status === "pending" && source.accessMode === "manual")).toBe(true);
-    expect(DEFAULT_DB_PORTS_SETTINGS.sources.some(source => source.id === "recaap")).toBe(true);
+    expect(DEFAULT_DB_PORTS_SETTINGS.watchlist.every((target) => !target.confirmedClientAsset)).toBe(true);
+    expect(DEFAULT_DB_PORTS_SETTINGS.sources.every((source) => source.status === "pending" && source.accessMode === "manual")).toBe(true);
+    expect(DEFAULT_DB_PORTS_SETTINGS.sources.some((source) => source.id === "recaap")).toBe(true);
   });
 
   test("imports preserve provenance but never infer verified facts, publication date or severity", () => {
@@ -154,11 +282,11 @@ describe("DB Ports read-only discovery and provisional roster", () => {
     expect(result.added).toBe(1);
     const imported = result.items[0]!;
     expect(imported.disposition).toBe("inbox");
+    expect(imported.drafted).toBe(false);
     expect(imported.severity).toBeNull();
-    expect(imported.confirmedFacts).toBe("");
+    expect(imported.summary).toBe("");
     expect(imported.unverifiedClaims).toContain("Source-reported");
     expect(imported.evidence[0]).toMatchObject({ sourceRecord: "incident:1", publishedDate: null, sourceDate: "2026-09-21", verified: false });
-    expect(imported.blockers.length).toBeGreaterThan(0);
     expect(importDbPortsDiscovery([row()], result.items, window, DEFAULT_DB_PORTS_SETTINGS.watchlist, now).added).toBe(0);
   });
 
@@ -174,9 +302,10 @@ describe("DB Ports read-only discovery and provisional roster", () => {
     expect(importDbPortsDiscovery(rows, [], window, [], now).items).toEqual([]);
   });
 
-  test("same-source URLs and exact event titles fold conservatively while retaining corroboration", () => {
+  test("same-event reports are combined and every corroborating source is retained", () => {
     const rows = [
-      row(), row({ id: "gdelt:2", sourceUrl: "https://publisher.example/story?utm_source=test" }),
+      row(),
+      row({ id: "gdelt:2", sourceUrl: "https://publisher.example/story?utm_source=test" }),
       row({ id: "gdelt:3", sourceUrl: "https://second.example/corroboration", sourceName: "Second publisher" }),
       row({ id: "different", title: "Container terminal access suspended at different Malaysia port after an unrelated outage", country: "Malaysia", sourceUrl: "https://third.example/distinct" }),
     ];
@@ -186,15 +315,13 @@ describe("DB Ports read-only discovery and provisional roster", () => {
     expect(result.duplicates).toBe(2);
   });
 
-  test("new evidence invalidates a previous selection, rather than silently extending its approval", () => {
-    const selected = item("i1", { secondReviewer: "Independent reviewer", secondReviewNote: "Prior assessment." });
-    const extra = row({ title: selected.headline, sourceUrl: "https://new.example/update" });
+  test("new evidence on a selected item returns it to the analyst rather than extending the old text", () => {
+    const selected = item("i1", { headline: row().title });
+    const extra = row({ id: "incident:9", title: selected.headline, sourceUrl: "https://new.example/update" });
     const result = importDbPortsDiscovery([extra], [selected], window, [], now);
-    expect(result.items[0]).toMatchObject({ disposition: "hold", reviewed: false, confidence: "unverified" });
-    expect(result.items[0]!.evidence).toHaveLength(2);
-    expect(result.items[0]!.confirmedFacts).toBe(selected.confirmedFacts);
-    expect(result.items[0]!.secondReviewer).toBe("");
-    expect(result.items[0]!.secondReviewNote).toBe("");
+    expect(result.items[0]).toMatchObject({ disposition: "hold", confidence: "unverified" });
+    expect(result.items[0]!.evidence).toHaveLength(3);
+    expect(result.items[0]!.summary).toBe(selected.summary);
   });
 
   test("explicit cluster links survive repeated imports without mixing countries", () => {

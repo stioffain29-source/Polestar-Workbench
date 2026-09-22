@@ -1,9 +1,45 @@
 import type {
   DbPortsEvidence,
   DbPortsItemContent,
+  DbPortsParameters,
   DbPortsSettings,
 } from "@workspace/db-ports";
-import { isCalendarDate, isPublicSourceUrl } from "@workspace/db-ports";
+import {
+  DB_PORTS_MAX_SELECTED,
+  DB_PORTS_OVERVIEW_MAX_WORDS,
+  DB_PORTS_OVERVIEW_MIN_WORDS,
+  DB_PORTS_ITEM_MIN_WORDS,
+  canonicalDbPortsCountry,
+  isCalendarDate,
+  isPublicSourceUrl,
+} from "@workspace/db-ports";
+
+/** Parameters the analyst can set. Rejected values are reported rather than
+ * silently clamped, so the panel always shows what the report will use. */
+export function validateParameters(parameters: DbPortsParameters): string | null {
+  if (!parameters.reportTitle.trim()) return "The report title cannot be empty.";
+  if (parameters.publicationDate && !isCalendarDate(parameters.publicationDate)) {
+    return "Publication date must be a real calendar date.";
+  }
+  if (parameters.targetItems < 1 || parameters.targetItems > DB_PORTS_MAX_SELECTED) {
+    return `Target number of items must be between 1 and ${DB_PORTS_MAX_SELECTED}.`;
+  }
+  if (!parameters.includedCountries.length) return "Select at least one country or region.";
+  const unknown = parameters.includedCountries.filter((country) => !canonicalDbPortsCountry(country));
+  if (unknown.length) return `Unrecognised country in the geography list: ${unknown[0]}.`;
+  if (!parameters.includedThemes.length) return "Select at least one intelligence theme.";
+  if (parameters.itemWordTarget < DB_PORTS_ITEM_MIN_WORDS) {
+    return `Maximum item word count cannot be below the ${DB_PORTS_ITEM_MIN_WORDS}-word floor for a complete item.`;
+  }
+  if (parameters.itemWordTarget > 600) return "Maximum item word count cannot exceed 600.";
+  if (
+    parameters.overviewWordTarget < DB_PORTS_OVERVIEW_MIN_WORDS ||
+    parameters.overviewWordTarget > DB_PORTS_OVERVIEW_MAX_WORDS
+  ) {
+    return `Regional Overview word count must be between ${DB_PORTS_OVERVIEW_MIN_WORDS} and ${DB_PORTS_OVERVIEW_MAX_WORDS}.`;
+  }
+  return null;
+}
 
 export function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;

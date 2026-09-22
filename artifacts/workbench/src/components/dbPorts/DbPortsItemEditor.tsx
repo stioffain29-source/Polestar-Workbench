@@ -1,460 +1,453 @@
-import { useState, useEffect, useRef } from "react";
-import { 
+import { useEffect, useRef, useState } from "react";
+import {
   DbPortsEdition,
-  DbPortsItem,
-  useUpdateDbPortsItem,
-  getGetDbPortsEditionQueryKey,
-  DbPortsTheme,
-  DbPortsItemContentDisposition,
-  DbPortsItemContentSeverity,
-  DbPortsItemContentConfidence,
-  DbPortsImpactArea,
   DbPortsEvidence,
-  DbPortsEvidenceSourceType
+  DbPortsItem,
+  DbPortsItemContent,
+  getGetDbPortsEditionQueryKey,
+  useDeleteDbPortsItem,
+  useMergeDbPortsItems,
+  useRegenerateDbPortsItem,
+  useUpdateDbPortsItem,
 } from "@workspace/api-client-react";
-import { DB_PORTS_COUNTRIES } from "@workspace/db-ports";
-import { Save, Plus, Trash2, Link as LinkIcon, CheckCircle, GitMerge } from "lucide-react";
+import {
+  DB_PORTS_COUNTRIES,
+  DB_PORTS_IMPACT_AREAS,
+  DB_PORTS_SEVERITIES,
+  DB_PORTS_THEMES,
+  dbPortsThemeLabel,
+} from "@workspace/db-ports";
+import { AlertTriangle, GitMerge, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { useMergeDbPortsItems } from "@workspace/api-client-react";
 
 interface Props {
   edition: DbPortsEdition;
   itemId: string;
   onDirtyChange?: (dirty: boolean) => void;
+  onDeleted?: () => void;
 }
 
-function getNormalizedItem(item: any) {
-  if (!item) return "";
-  const clone = JSON.parse(JSON.stringify(item));
-  delete clone.id;
-  delete clone.updatedAt;
-  delete clone.blockers;
-  delete clone.secondaryReviewRequired;
-  delete clone.mergedInto;
-  
-  const sortKeys = (obj: any): any => {
-    if (Array.isArray(obj)) return obj.map(sortKeys);
-    if (obj !== null && typeof obj === "object") {
-      return Object.keys(obj).sort().reduce((acc: any, key: string) => {
-        acc[key] = sortKeys(obj[key]);
-        return acc;
-      }, {});
-    }
-    return obj;
-  };
-  
-  return JSON.stringify(sortKeys(clone));
+const DISPOSITIONS = ["selected", "watch", "hold", "inbox", "rejected"] as const;
+const CONFIDENCES = ["unverified", "single_source", "corroborated", "official"] as const;
+const SOURCE_TYPES = ["official", "specialist", "news", "discovery"] as const;
+const UNASSESSED = "__unassessed__";
+
+function toContent(item: DbPortsItem): DbPortsItemContent {
+  const { id: _id, mergedInto: _mergedInto, updatedAt: _updatedAt, warnings: _warnings, drafted: _drafted, ...content } = item;
+  return content;
 }
 
-export default function DbPortsItemEditor({ edition, itemId, onDirtyChange }: Props) {
+function wordCount(...values: string[]): number {
+  return values.join(" ").split(/\s+/).filter(Boolean).length;
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{children}</span>;
+}
+
+export default function DbPortsItemEditor({ edition, itemId, onDirtyChange, onDeleted }: Props) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const updateMutation = useUpdateDbPortsItem();
+  const deleteMutation = useDeleteDbPortsItem();
+  const regenerateMutation = useRegenerateDbPortsItem();
   const mergeMutation = useMergeDbPortsItems();
-  
-  const item = edition.items.find(i => i.id === itemId);
-  
-  const [formData, setFormData] = useState<DbPortsItem | null>(null);
-  const initializedForId = useRef<string | null>(null);
+
+  const item = edition.items.find((entry) => entry.id === itemId);
+  const [form, setForm] = useState<DbPortsItemContent | null>(null);
+  const loadedFor = useRef<string>("");
   const baseline = useRef<string>("");
-  
+
   useEffect(() => {
-    if (item && initializedForId.current !== itemId) {
-      setFormData(JSON.parse(JSON.stringify(item)));
-      baseline.current = getNormalizedItem(item);
-      initializedForId.current = itemId;
-    }
-  }, [item, itemId]);
-  
+    if (!item) return;
+    const signature = `${item.id}:${item.updatedAt}`;
+    if (loadedFor.current === signature) return;
+    const clean = getNormalised(form);
+    if (loadedFor.current.startsWith(`${item.id}:`) && clean !== baseline.current) return; // keep unsaved edits
+    const content = toContent(item);
+    setForm(content);
+    baseline.current = getNormalised(content);
+    loadedFor.current = signature;
+  }, [item, form]);
+
   useEffect(() => {
-    if (formData) {
-      const isDirty = getNormalizedItem(formData) !== baseline.current;
-      onDirtyChange?.(isDirty);
-    }
-  }, [formData, onDirtyChange]);
-  
-  // Also update if the server revision changes and we aren't dirty? We just rely on manual save for this pilot editor to avoid complex autosave merge loops.
-  
-  if (!item || !formData) return <div>Item not found.</div>;
-  
+    if (form) onDirtyChange?.(getNormalised(form) !== baseline.current);
+  }, [form, onDirtyChange]);
+
+  if (!item || !form) return <div className="text-sm text-muted-foreground">Item not found.</div>;
+
+  const busy =
+    updateMutation.isPending || deleteMutation.isPending || regenerateMutation.isPending || mergeMutation.isPending;
+
+  const apply = (updated: DbPortsEdition) => qc.setQueryData(getGetDbPortsEditionQueryKey(edition.id), updated);
+  const failed = (title: string) => (error: any) =>
+    toast({
+      variant: "destructive",
+      title,
+      description:
+        error?.status === 409
+          ? "This report changed elsewhere. Your text is still on screen — copy it, then reload."
+          : error?.data?.error || "Unknown error",
+    });
+
+  const set = <K extends keyof DbPortsItemContent>(key: K, value: DbPortsItemContent[K]) =>
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+
   const handleSave = () => {
-    if (!formData) return;
-    const capturedFormData = { ...formData };
-    
+    const captured = form;
     updateMutation.mutate(
-      {
-        id: edition.id,
-        itemId: formData.id,
-        data: {
-          revision: edition.revision,
-          item: capturedFormData
-        }
-      },
+      { id: edition.id, itemId: item.id, data: { revision: edition.revision, item: captured } },
       {
         onSuccess: (updated) => {
-          qc.setQueryData(getGetDbPortsEditionQueryKey(edition.id), updated);
-          
-          const updatedItem = updated.items.find(i => i.id === formData.id);
-          if (updatedItem) {
-            setFormData(prev => prev ? {
-              ...prev,
-              updatedAt: updatedItem.updatedAt,
-              blockers: updatedItem.blockers,
-              secondaryReviewRequired: updatedItem.secondaryReviewRequired,
-              mergedInto: updatedItem.mergedInto
-            } : prev);
-          }
-          
-          baseline.current = getNormalizedItem(capturedFormData);
-          onDirtyChange?.(getNormalizedItem(formData) !== baseline.current);
+          apply(updated);
+          baseline.current = getNormalised(captured);
+          loadedFor.current = "";
+          onDirtyChange?.(false);
           toast({ title: "Item saved" });
         },
-        onError: (err: any) => {
-          if (err?.status === 409) {
-            toast({ 
-              variant: "destructive", 
-              title: "Conflict Detected", 
-              description: "This item was modified elsewhere. Your local edits have been preserved. Please copy your changes and reload the page." 
-            });
-          } else {
-            toast({ variant: "destructive", title: "Save failed", description: err?.data?.error || "Unknown error" });
-          }
-        }
-      }
+        onError: failed("Save failed"),
+      },
     );
   };
-  
-  const updateField = (field: keyof DbPortsItem, value: any) => {
-    setFormData(prev => prev ? { ...prev, [field]: value } : prev);
+
+  const handleRegenerate = () => {
+    if (getNormalised(form) !== baseline.current && !confirm("Regenerating replaces the drafted text. Discard your unsaved edits?")) return;
+    regenerateMutation.mutate(
+      { id: edition.id, itemId: item.id, data: { revision: edition.revision } },
+      {
+        onSuccess: (updated) => {
+          apply(updated);
+          baseline.current = "";
+          loadedFor.current = "";
+          onDirtyChange?.(false);
+          toast({ title: "Item redrafted from its own sources" });
+        },
+        onError: failed("Redraft failed"),
+      },
+    );
+  };
+
+  const handleDelete = () => {
+    if (!confirm("Delete this item from the report?")) return;
+    deleteMutation.mutate(
+      { id: edition.id, itemId: item.id, data: { revision: edition.revision } },
+      {
+        onSuccess: (updated) => {
+          apply(updated);
+          onDirtyChange?.(false);
+          onDeleted?.();
+          toast({ title: "Item deleted" });
+        },
+        onError: failed("Delete failed"),
+      },
+    );
   };
 
   const handleMerge = () => {
-    const sourceId = prompt("Enter the ID of the candidate to merge into this one:");
+    const sourceId = prompt("Paste the id of the duplicate report to fold into this item. Its sources are kept as corroboration.");
     if (!sourceId) return;
-    
     mergeMutation.mutate(
-      {
-        id: edition.id,
-        data: {
-          revision: edition.revision,
-          targetItemId: formData.id,
-          sourceItemId: sourceId
-        }
-      },
+      { id: edition.id, data: { revision: edition.revision, targetItemId: item.id, sourceItemId: sourceId.trim() } },
       {
         onSuccess: (updated) => {
-          qc.setQueryData(getGetDbPortsEditionQueryKey(edition.id), updated);
-          toast({ title: "Items merged successfully" });
+          apply(updated);
+          loadedFor.current = "";
+          toast({ title: "Duplicate folded in" });
         },
-        onError: (err: any) => {
-          toast({ variant: "destructive", title: "Merge failed", description: err?.data?.error });
-        }
-      }
+        onError: failed("Merge failed"),
+      },
     );
   };
 
-  const toggleImpactArea = (area: DbPortsImpactArea) => {
-    setFormData(prev => {
-      if (!prev) return prev;
-      const set = new Set(prev.impactAreas);
-      if (set.has(area)) set.delete(area);
-      else set.add(area);
-      return { ...prev, impactAreas: Array.from(set) };
-    });
-  };
+  const updateEvidence = (index: number, patch: Partial<DbPortsEvidence>) =>
+    setForm((prev) =>
+      prev
+        ? { ...prev, evidence: prev.evidence.map((entry, position) => (position === index ? { ...entry, ...patch } : entry)) }
+        : prev,
+    );
+
+  const words = wordCount(form.summary, form.operationalImpact, form.polestarView, form.outlook);
+  const limit = edition.parameters.itemWordTarget;
 
   return (
     <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between sticky top-0 bg-background z-20 pb-4 pt-2 border-b border-border">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background pb-4 pt-2">
         <div>
-          <h2 className="text-xl font-serif font-bold text-primary">Edit Item</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground font-mono">ID: {item.id}</span>
-            {item.mergedInto && <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">MERGED</span>}
+          <h2 className="font-serif text-xl font-bold text-primary">Edit item</h2>
+          <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+            <span>{item.id}</span>
+            <span>{item.drafted ? "drafted by generator" : "analyst item"}</span>
+            {item.mergedInto ? <span className="font-bold uppercase text-amber-600">folded into another item</span> : null}
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" onClick={handleMerge} title="Merge another item into this one" disabled={mergeMutation.isPending}>
-            <GitMerge className="w-4 h-4 text-muted-foreground" />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" title="Fold a duplicate into this item" onClick={handleMerge} disabled={busy}>
+            <GitMerge className="h-4 w-4" />
           </Button>
-          <Select value={formData.disposition} onValueChange={(v: any) => updateField("disposition", v)}>
-            <SelectTrigger className="w-[140px] font-bold text-xs uppercase tracking-wider"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Object.values(DbPortsItemContentDisposition).map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleSave} disabled={updateMutation.isPending}>
-            <Save className="w-4 h-4 mr-2" /> Save Item
+          <Button variant="outline" size="sm" onClick={handleRegenerate} disabled={busy} data-testid="button-regenerate-item">
+            <RefreshCw className="mr-2 h-4 w-4" /> Regenerate item
+          </Button>
+          <Button variant="ghost" size="icon" className="text-destructive" onClick={handleDelete} disabled={busy} data-testid="button-delete-item">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <Button onClick={handleSave} disabled={busy} data-testid="button-save-item">
+            <Save className="mr-2 h-4 w-4" /> Save item
           </Button>
         </div>
       </div>
-      
-      {item.blockers && item.blockers.length > 0 && (
-        <div className="bg-destructive/10 border border-destructive p-3 rounded-sm text-sm text-destructive">
-          <strong>Blockers preventing approval:</strong>
-          <ul className="list-disc pl-5 mt-1">
-            {item.blockers.map((b, i) => <li key={i}>{b}</li>)}
+
+      {item.warnings.length > 0 && (
+        <div className="rounded-sm border border-amber-500/60 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          <div className="flex items-center gap-2 font-bold">
+            <AlertTriangle className="h-4 w-4" /> Editor checks — never exported
+          </div>
+          <ul className="mt-1 list-disc pl-5">
+            {item.warnings.map((warning) => (
+              <li key={warning.code}>{warning.message}</li>
+            ))}
           </ul>
         </div>
       )}
 
-      {/* Core Metadata */}
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Headline</label>
-          <Input className="font-serif text-lg" value={formData.headline} onChange={e => updateField("headline", e.target.value)} />
+          <Label>Headline</Label>
+          <Input className="font-serif text-lg" value={form.headline} onChange={(event) => set("headline", event.target.value)} data-testid="input-headline" />
         </div>
         <div className="col-span-12 sm:col-span-3">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Country</label>
-          <Select value={formData.country} onValueChange={v => updateField("country", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Label>Country</Label>
+          <Select value={form.country} onValueChange={(value) => set("country", value)}>
+            <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
             <SelectContent>
-              {DB_PORTS_COUNTRIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {DB_PORTS_COUNTRIES.map((country) => <SelectItem key={country} value={country}>{country}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="col-span-12 sm:col-span-3">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Location</label>
-          <Input value={formData.location} onChange={e => updateField("location", e.target.value)} />
+          <Label>Location</Label>
+          <Input value={form.location} onChange={(event) => set("location", event.target.value)} />
         </div>
         <div className="col-span-12 sm:col-span-3">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Event Date</label>
-          <Input type="date" value={formData.eventDate || ""} onChange={e => updateField("eventDate", e.target.value || null)} />
+          <Label>Event date</Label>
+          <Input type="date" value={form.eventDate ?? ""} onChange={(event) => set("eventDate", event.target.value || null)} />
         </div>
         <div className="col-span-12 sm:col-span-3">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Theme</label>
-          <Select value={formData.theme} onValueChange={v => updateField("theme", v)}>
+          <Label>Theme</Label>
+          <Select value={form.theme} onValueChange={(value) => set("theme", value as DbPortsItemContent["theme"])}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {Object.values(DbPortsTheme).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {DB_PORTS_THEMES.map((theme) => <SelectItem key={theme} value={theme}>{dbPortsThemeLabel(theme)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-12 sm:col-span-4">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Severity</label>
-          <Select value={formData.severity || "Unassessed"} onValueChange={(v: any) => updateField("severity", v === "Unassessed" ? null : v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+        <div className="col-span-12 sm:col-span-3">
+          <Label>Severity</Label>
+          <Select
+            value={form.severity ?? UNASSESSED}
+            onValueChange={(value) => set("severity", value === UNASSESSED ? null : (value as DbPortsItemContent["severity"]))}
+          >
+            <SelectTrigger data-testid="select-item-severity"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="Unassessed">Unassessed</SelectItem>
-              {Object.values(DbPortsItemContentSeverity).map(s => s && <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              <SelectItem value={UNASSESSED}>Not assessed</SelectItem>
+              {DB_PORTS_SEVERITIES.map((severity) => <SelectItem key={severity} value={severity}>{severity}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-12 sm:col-span-4">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Confidence</label>
-          <Select value={formData.confidence} onValueChange={v => updateField("confidence", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+        <div className="col-span-12 sm:col-span-3">
+          <Label>Placement</Label>
+          <Select value={form.disposition} onValueChange={(value) => set("disposition", value as DbPortsItemContent["disposition"])}>
+            <SelectTrigger data-testid="select-item-disposition"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {Object.values(DbPortsItemContentConfidence).map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {DISPOSITIONS.map((disposition) => <SelectItem key={disposition} value={disposition}>{disposition}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <div className="col-span-12 sm:col-span-4">
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Assets (comma separated)</label>
-          <Input value={formData.assets.join(", ")} onChange={e => updateField("assets", e.target.value.split(",").map(a => a.trim()).filter(Boolean))} />
+        <div className="col-span-12 sm:col-span-3">
+          <Label>Verification status</Label>
+          <Select value={form.confidence} onValueChange={(value) => set("confidence", value as DbPortsItemContent["confidence"])}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CONFIDENCES.map((confidence) => (
+                <SelectItem key={confidence} value={confidence}>{confidence.replace("_", " ")}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="col-span-12 sm:col-span-3">
+          <Label>Port, terminal or corridor</Label>
+          <Input
+            value={form.assets.join(", ")}
+            onChange={(event) => set("assets", event.target.value.split(",").map((asset) => asset.trim()).filter(Boolean))}
+          />
         </div>
       </div>
 
-      {/* Editor textareas */}
-      <div className="space-y-4 pt-4 border-t border-border">
-        <h3 className="font-serif font-bold text-lg">Analysis & Content</h3>
-        
+      <div className="space-y-4 border-t border-border pt-4">
+        <div className="flex items-baseline justify-between">
+          <h3 className="font-serif text-lg font-bold">Item text</h3>
+          <span className={`font-mono text-xs ${words > limit ? "text-amber-600" : "text-muted-foreground"}`}>
+            {words} words / {limit} max
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Confirmed Facts</label>
-            <Textarea className="min-h-[120px]" value={formData.confirmedFacts} onChange={e => updateField("confirmedFacts", e.target.value)} />
+            <Label>Summary</Label>
+            <Textarea className="min-h-[140px]" value={form.summary} onChange={(event) => set("summary", event.target.value)} data-testid="input-summary" />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Unverified Claims / Allegations</label>
-            <Textarea className="min-h-[120px]" value={formData.unverifiedClaims} onChange={e => updateField("unverifiedClaims", e.target.value)} />
+            <Label>Operational Impact</Label>
+            <Textarea className="min-h-[140px]" value={form.operationalImpact} onChange={(event) => set("operationalImpact", event.target.value)} />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Operational Implications</label>
-            <Textarea className="min-h-[120px]" value={formData.operationalImplications} onChange={e => updateField("operationalImplications", e.target.value)} />
+            <Label>Polestar View</Label>
+            <Textarea className="min-h-[140px]" value={form.polestarView} onChange={(event) => set("polestarView", event.target.value)} />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Outlook</label>
-            <Textarea className="min-h-[120px]" value={formData.outlook} onChange={e => updateField("outlook", e.target.value)} />
+            <Label>Outlook and indicators</Label>
+            <Textarea className="min-h-[140px]" value={form.outlook} onChange={(event) => set("outlook", event.target.value)} />
           </div>
         </div>
-        
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Materiality Reason (Internal)</label>
-            <Input value={formData.materialityReason} onChange={e => updateField("materialityReason", e.target.value)} />
+            <Label>Reason it is material (watchlist reason; not exported for items)</Label>
+            <Input value={form.materialityReason} onChange={(event) => set("materialityReason", event.target.value)} />
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Missing Information</label>
-            <Input value={formData.missingInfo} onChange={e => updateField("missingInfo", e.target.value)} />
+            <Label>Unverified claims (editor note)</Label>
+            <Input value={form.unverifiedClaims} onChange={(event) => set("unverifiedClaims", event.target.value)} />
+          </div>
+          <div>
+            <Label>Missing information (editor note)</Label>
+            <Input value={form.missingInfo} onChange={(event) => set("missingInfo", event.target.value)} />
+          </div>
+          <div>
+            <Label>Analyst notes (editor note)</Label>
+            <Input value={form.analystNotes} onChange={(event) => set("analystNotes", event.target.value)} />
           </div>
         </div>
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Analyst Notes</label>
-          <Textarea className="min-h-[80px]" value={formData.analystNotes} onChange={e => updateField("analystNotes", e.target.value)} />
-        </div>
-        <div>
-          <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 block">Impact Areas</label>
+          <Label>Impact areas</Label>
           <div className="flex flex-wrap gap-4">
-            {Object.values(DbPortsImpactArea).map(area => (
-              <div key={area} className="flex items-center space-x-2">
-                <Checkbox id={`impact-${area}`} checked={formData.impactAreas.includes(area)} onCheckedChange={() => toggleImpactArea(area)} />
-                <label htmlFor={`impact-${area}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 capitalize">
-                  {area.replace(/_/g, " ")}
-                </label>
-              </div>
+            {DB_PORTS_IMPACT_AREAS.map((area) => (
+              <label key={area} className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={form.impactAreas.includes(area)}
+                  onCheckedChange={(checked) =>
+                    set(
+                      "impactAreas",
+                      checked === true ? [...form.impactAreas, area] : form.impactAreas.filter((entry) => entry !== area),
+                    )
+                  }
+                />
+                <span className="capitalize">{area.replaceAll("_", " ")}</span>
+              </label>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Evidence */}
-      <div className="space-y-4 pt-4 border-t border-border">
+      <div className="space-y-4 border-t border-border pt-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-serif font-bold text-lg">Evidence & Sources</h3>
-          <Button size="sm" variant="outline" onClick={() => {
-            const newEv: DbPortsEvidence = {
-              id: Math.random().toString(36).substring(2, 9),
-              sourceName: "",
-              sourceUrl: "",
-              sourceType: "discovery",
-              publishedDate: null,
-              sourceDate: null,
-              retrievedAt: new Date().toISOString(),
-              excerpt: "",
-              originalTitle: "",
-              sourceRecord: null,
-              verified: false
-            };
-            updateField("evidence", [...formData.evidence, newEv]);
-          }}>
-            <Plus className="w-4 h-4 mr-2" /> Add Evidence
+          <h3 className="font-serif text-lg font-bold">Sources</h3>
+          <Button
+            size="sm"
+            variant="outline"
+            data-testid="button-add-source"
+            onClick={() =>
+              set("evidence", [
+                ...form.evidence,
+                {
+                  id: Math.random().toString(36).slice(2, 10),
+                  sourceName: "",
+                  sourceUrl: "",
+                  sourceType: "news",
+                  publishedDate: null,
+                  sourceDate: null,
+                  retrievedAt: new Date().toISOString(),
+                  excerpt: "",
+                  originalTitle: "",
+                  sourceRecord: null,
+                  verified: false,
+                },
+              ])
+            }
+          >
+            <Plus className="mr-2 h-4 w-4" /> Add source
           </Button>
         </div>
-        <div className="space-y-4">
-          {formData.evidence.map((ev, i) => (
-            <div key={ev.id} className="bg-muted/30 border border-border p-3 rounded-sm space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 grid grid-cols-12 gap-3">
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Source Name</label>
-                    <Input value={ev.sourceName} disabled={!!ev.sourceRecord} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].sourceName = e.target.value;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
-                  <div className="col-span-12 sm:col-span-5">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Source URL</label>
-                    <Input value={ev.sourceUrl} disabled={!!ev.sourceRecord} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].sourceUrl = e.target.value;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
-                  <div className="col-span-12 sm:col-span-2">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Type</label>
-                    <Select value={ev.sourceType} onValueChange={(v: any) => {
-                      const evs = [...formData.evidence];
-                      evs[i].sourceType = v;
-                      updateField("evidence", evs);
-                    }}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.values(DbPortsEvidenceSourceType).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-12 sm:col-span-2 flex items-end">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Checkbox id={`verified-${ev.id}`} checked={ev.verified} onCheckedChange={(c) => {
-                        const evs = [...formData.evidence];
-                        evs[i].verified = !!c;
-                        updateField("evidence", evs);
-                      }} />
-                      <label htmlFor={`verified-${ev.id}`} className="text-xs font-bold text-emerald-600">VERIFIED</label>
-                    </div>
-                  </div>
-                  <div className="col-span-12 sm:col-span-6">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Original Title</label>
-                    <Input value={ev.originalTitle} disabled={!!ev.sourceRecord} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].originalTitle = e.target.value;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Published Date</label>
-                    <Input type="date" value={ev.publishedDate || ""} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].publishedDate = e.target.value || null;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
-                  <div className="col-span-12 sm:col-span-3">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Source Date</label>
-                    <Input type="date" value={ev.sourceDate || ""} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].sourceDate = e.target.value || null;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
-                  <div className="col-span-12">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Excerpt</label>
-                    <Textarea className="min-h-[60px]" value={ev.excerpt} onChange={e => {
-                      const evs = [...formData.evidence];
-                      evs[i].excerpt = e.target.value;
-                      updateField("evidence", evs);
-                    }} />
-                  </div>
+        {form.evidence.map((entry, index) => (
+          <div key={entry.id} className="space-y-3 rounded-sm border border-border bg-muted/30 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="grid flex-1 grid-cols-12 gap-3">
+                <div className="col-span-12 sm:col-span-4">
+                  <Label>Source name</Label>
+                  <Input value={entry.sourceName} disabled={!!entry.sourceRecord} onChange={(event) => updateEvidence(index, { sourceName: event.target.value })} />
                 </div>
-                {!ev.sourceRecord && (
-                  <Button variant="ghost" size="icon" className="text-destructive ml-2" onClick={() => {
-                    if(confirm("Remove manual evidence?")) {
-                      updateField("evidence", formData.evidence.filter((_, idx) => idx !== i));
-                    }
-                  }}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+                <div className="col-span-12 sm:col-span-5">
+                  <Label>Hyperlink</Label>
+                  <Input value={entry.sourceUrl} disabled={!!entry.sourceRecord} onChange={(event) => updateEvidence(index, { sourceUrl: event.target.value })} />
+                </div>
+                <div className="col-span-12 sm:col-span-3">
+                  <Label>Type</Label>
+                  <Select value={entry.sourceType} onValueChange={(value) => updateEvidence(index, { sourceType: value as DbPortsEvidence["sourceType"] })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SOURCE_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-12 sm:col-span-6">
+                  <Label>Source title</Label>
+                  <Input value={entry.originalTitle} disabled={!!entry.sourceRecord} onChange={(event) => updateEvidence(index, { originalTitle: event.target.value })} />
+                </div>
+                <div className="col-span-6 sm:col-span-3">
+                  <Label>Publication date</Label>
+                  <Input type="date" value={entry.publishedDate ?? ""} onChange={(event) => updateEvidence(index, { publishedDate: event.target.value || null })} />
+                </div>
+                <div className="col-span-6 sm:col-span-3 flex items-end pb-2">
+                  <label className="flex items-center gap-2 text-xs font-bold">
+                    <Checkbox checked={entry.verified} onCheckedChange={(checked) => updateEvidence(index, { verified: checked === true })} />
+                    <span>Checked</span>
+                  </label>
+                </div>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive"
+                title="Remove this source"
+                onClick={() => set("evidence", form.evidence.filter((_, position) => position !== index))}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-          ))}
-          {formData.evidence.length === 0 && <div className="text-sm text-muted-foreground">No evidence attached.</div>}
-        </div>
+          </div>
+        ))}
+        {form.evidence.length === 0 && <div className="text-sm text-muted-foreground">No sources attached.</div>}
       </div>
-
-      {/* QA & Review */}
-      <div className="space-y-4 pt-4 border-t border-border bg-muted/20 p-4 rounded-sm">
-        <h3 className="font-serif font-bold text-lg">Quality Assurance</h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <Checkbox id="reviewed" checked={formData.reviewed} onCheckedChange={(c) => updateField("reviewed", !!c)} />
-              <label htmlFor="reviewed" className="text-sm font-medium">Ready for Review (First Pass)</label>
-            </div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Primary Reviewer</label>
-            <Input value={formData.reviewer} onChange={e => updateField("reviewer", e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block flex justify-between">
-              <span>Secondary Reviewer</span>
-              {formData.secondaryReviewRequired && <span className="text-amber-600">REQUIRED</span>}
-            </label>
-            <Input value={formData.secondReviewer} onChange={e => updateField("secondReviewer", e.target.value)} />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1 block">Secondary Review Note</label>
-            <Input value={formData.secondReviewNote} onChange={e => updateField("secondReviewNote", e.target.value)} />
-          </div>
-        </div>
-      </div>
-      
     </div>
   );
+}
+
+function getNormalised(value: unknown): string {
+  if (!value) return "";
+  const sortKeys = (input: any): any => {
+    if (Array.isArray(input)) return input.map(sortKeys);
+    if (input !== null && typeof input === "object") {
+      return Object.keys(input)
+        .sort()
+        .reduce((acc: any, key: string) => {
+          acc[key] = sortKeys(input[key]);
+          return acc;
+        }, {});
+    }
+    return input;
+  };
+  return JSON.stringify(sortKeys(value));
 }
