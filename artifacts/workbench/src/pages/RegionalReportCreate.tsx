@@ -7,6 +7,7 @@ import {
   type RegionalReportJobInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { getLoginUrl } from "@workspace/replit-auth-web";
 import { ArrowLeft, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { currentReportDate } from "@/lib/reportLifecycle";
@@ -112,7 +113,7 @@ export default function RegionalReportCreate() {
         {error ? (
           <>
             <h1 className="font-serif text-2xl font-bold text-primary">
-              {error.kind === "connection" ? "Connection interrupted" : error.kind === "session" ? "Refresh your session" : "Report creation failed"}
+              {error.kind === "connection" ? "Connection interrupted" : error.kind === "session" ? "Sign in to continue" : error.kind === "access" ? "Owner access required" : "Report creation failed"}
             </h1>
             <p role="alert" className="mt-3 text-sm text-muted-foreground">{error.message}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -122,13 +123,20 @@ export default function RegionalReportCreate() {
                   Back to reports
                 </Link>
               </Button>
-              {topic && error.kind !== "session" && (
+              {topic && error.kind !== "session" && error.kind !== "access" && (
                 <Button onClick={() => setAttempt((value) => value + 1)}>
                   <RotateCw className="mr-2 h-4 w-4" />
                   {error.kind === "connection" ? "Reconnect" : "Try again"}
                 </Button>
               )}
-              {(error.kind === "connection" || error.kind === "session") && (
+              {(error.kind === "session" || error.kind === "access") && (
+                <Button asChild>
+                  <a href={getLoginUrl()}>
+                    {error.kind === "access" ? "Sign in with owner account" : "Sign in and resume"}
+                  </a>
+                </Button>
+              )}
+              {error.kind === "connection" && (
                 <Button variant="outline" onClick={() => window.location.reload()}>
                   Reload page
                 </Button>

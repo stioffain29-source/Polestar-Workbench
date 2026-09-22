@@ -1,6 +1,6 @@
 ---
 name: jest route-test harness gotchas
-description: Three non-obvious traps when unit-testing an Express route in isolation in this repo — a missing req.log, shared helper files run as empty suites, and a global beforeEach that wipes a token set only in beforeAll.
+description: Non-obvious Jest harness traps involving bare Express routes, helper discovery, integration secrets and duplicate workspace skill templates.
 ---
 
 # Testing an Express route on a bare app
@@ -46,3 +46,18 @@ resolve, so the helper keeps working for the suites that import it.
 
 **Why:** these are easy to misread as a route bug or a broken import. Both are
 harness gaps; the production code is fine.
+
+## Workspace package names duplicated by skill templates
+
+Exclude reference skill templates from Jest's module discovery, not only from
+test discovery. An explicit module mapping alone may not prevent a Haste
+duplicate-package failure.
+
+**Why:** installed skills contain template package manifests with the same
+names as real workspace libraries. Haste can reject the ambiguous package
+before the configured mapping resolves it.
+
+**How to apply:** when a workspace import fails with duplicate package names,
+inspect the listed manifests and exclude the reference-template directory from
+module discovery. Do not delete the real library or alter app imports to make
+the harness pass.

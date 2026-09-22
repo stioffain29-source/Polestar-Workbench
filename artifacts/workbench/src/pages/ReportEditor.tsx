@@ -49,11 +49,13 @@ import { downloadCargoRegisterCsv } from "@/lib/cargoRegisterExport";
 import { ArrowLeft, Download, FileSpreadsheet, Loader2, RefreshCw, Save } from "lucide-react";
 import {
   clearRegionalRebuildInput,
+  RegionalCreationError,
   regionalRebuildInput,
   regionalRefreshDisabled,
   waitForRegionalReport,
 } from "@/lib/regionalReportCreation";
 import type { RegionalReportJob } from "@workspace/api-client-react";
+import { getLoginUrl } from "@workspace/replit-auth-web";
 import {
   exportElementToPdf,
   formatExportTimestampForFilename,
@@ -562,6 +564,7 @@ export default function ReportEditor() {
   const [editorDirty, setEditorDirty] = useState(false);
   const [rebuildJob, setRebuildJob] = useState<RegionalReportJob | null>(null);
   const [rebuildError, setRebuildError] = useState<string | null>(null);
+  const [rebuildErrorKind, setRebuildErrorKind] = useState<RegionalCreationError["kind"] | null>(null);
   const rebuildAbort = useRef<AbortController | null>(null);
   const todayUtc = new Date().toISOString().slice(0, 10);
   const effectiveFlashpointIssueDate =
@@ -2702,6 +2705,7 @@ export default function ReportEditor() {
     const controller = new AbortController();
     rebuildAbort.current = controller;
     setRebuildError(null);
+    setRebuildErrorKind(null);
     try {
       const input = regionalRebuildInput(
         report.topic,
@@ -2726,6 +2730,10 @@ export default function ReportEditor() {
       setRebuildJob(null);
     } catch (cause) {
       if (!controller.signal.aborted) {
+        // A lost polling connection does not mean the server job stopped.
+        // Clear the local busy state so reconnection can resume the SAME job.
+        setRebuildJob(null);
+        setRebuildErrorKind(cause instanceof RegionalCreationError ? cause.kind : "report");
         setRebuildError(
           cause instanceof Error ? cause.message : "Report refresh failed.",
         );
@@ -2970,10 +2978,17 @@ export default function ReportEditor() {
               </p>
               {rebuildError && (
                 <p className="mt-2 text-xs font-medium text-destructive" role="alert">
-                  Refresh failed — {rebuildError} Your report was not replaced; retry below.
+                  Refresh interrupted — {rebuildError} Reconnecting checks the same refresh request.
                 </p>
               )}
             </div>
+            {rebuildErrorKind === "session" || rebuildErrorKind === "access" ? (
+              <Button asChild disabled={hasUnsavedRegionalEdits}>
+                <a href={hasUnsavedRegionalEdits ? undefined : getLoginUrl()}>
+                  {rebuildErrorKind === "access" ? "Sign in with owner account" : "Sign in and resume"}
+                </a>
+              </Button>
+            ) : (
             <Button
               type="button"
               onClick={() => void refreshRegionalAnalysis()}
@@ -2997,6 +3012,7 @@ export default function ReportEditor() {
                   ? "Retry refresh"
                   : "Refresh report analysis"}
             </Button>
+            )}
           </div>
         </section>
       )}

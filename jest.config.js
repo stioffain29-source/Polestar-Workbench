@@ -22,6 +22,9 @@ module.exports = {
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  // Skill templates are reference material, not workspace packages. Haste
+  // indexes their duplicate package names even when moduleNameMapper is set.
+  modulePathIgnorePatterns: ["<rootDir>/.local/skills/"],
   moduleNameMapper: {
     // Asset imports (`@assets/*.png|jpg`, font `.ttf?url`) pulled in transitively
     // by the report preview chrome must not be parsed as JS modules — redirect
@@ -79,6 +82,10 @@ module.exports = {
     "^@workspace/api-zod$": "<rootDir>/lib/api-zod/src/index.ts",
     "^@workspace/api-client-react$":
       "<rootDir>/lib/api-client-react/src/index.ts",
+    // The auth skill ships a template package with the same workspace name.
+    // Resolve the real library explicitly instead of Jest's duplicate map.
+    "^@workspace/replit-auth-web$":
+      "<rootDir>/lib/replit-auth-web/src/index.ts",
     // `@tanstack/react-query` is only installed in the workbench package, not at
     // the repo root, so component tests that need the REAL client (not a
     // `jest.mock`) must be pointed at the workbench copy. Tests that

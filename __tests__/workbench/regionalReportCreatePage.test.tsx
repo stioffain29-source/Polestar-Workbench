@@ -45,6 +45,7 @@ function showPage() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.history.replaceState(null, "", `/regional-reports/create/apac_weekly?requestId=${input.requestId}&issueDate=${input.issueDate}`);
   jest.mocked(regionalCreationInput).mockReturnValue(input);
 });
 afterEach(cleanup);
@@ -76,11 +77,25 @@ test("connection error exposes reconnect and reload; reconnect preserves the sam
   expect(regionalCreationInput).toHaveBeenCalledTimes(1);
 });
 
-test("session expiry shows recovery rather than an unusable generic fetch error", async () => {
-  waitForReport.mockRejectedValueOnce(new RegionalCreationError("Reload this page to sign in and resume.", "session"));
+test("confirmed session expiry offers real sign-in and preserves the exact creation request", async () => {
+  waitForReport.mockRejectedValueOnce(new RegionalCreationError("Sign in to resume this report.", "session"));
   showPage();
-  expect(await screen.findByRole("heading", { name: "Refresh your session" })).not.toBeNull();
-  expect(screen.getByRole("button", { name: "Reload page" })).not.toBeNull();
+  expect(await screen.findByRole("heading", { name: "Sign in to continue" })).not.toBeNull();
+  const signIn = screen.getByRole("link", { name: "Sign in and resume" });
+  const url = new URL(signIn.getAttribute("href")!, window.location.origin);
+  expect(url.pathname).toBe("/api/login");
+  expect(url.searchParams.get("returnTo")).toBe(`${window.location.pathname}${window.location.search}`);
+  expect(screen.queryByRole("button", { name: "Reload page" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   expect(navigate).not.toHaveBeenCalled();
+});
+
+test("owner denial is distinct from expiration and offers the owner-account login", async () => {
+  waitForReport.mockRejectedValueOnce(new RegionalCreationError("Sign in with the owner account.", "access"));
+  showPage();
+  expect(await screen.findByRole("heading", { name: "Owner access required" })).not.toBeNull();
+  expect(screen.getByRole("link", { name: "Sign in with owner account" }).getAttribute("href")).toContain("/api/login?returnTo=");
+  expect(screen.queryByRole("button", { name: "Reload page" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  expect(waitForReport).toHaveBeenCalledTimes(1);
 });

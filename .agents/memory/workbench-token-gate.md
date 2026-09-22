@@ -59,6 +59,21 @@ irrelevant because the token teardown fired first.
 feature needs a live access token for a Replit API call, handle a stale token AT
 THE CALL SITE; do not log the owner out. Reaches prod only after a republish.
 
+**Gateway failures are not session expiry.** Private-hosting redirects, opaque
+status 0 and HTML responses do not establish that the owner was logged out.
+
+**Why:** Regional creation labelled all of those responses “Refresh your
+session”, while production recorded successful owner-authenticated polling and
+no corresponding application 401/403. Reload-only recovery also failed to start
+sign-in and could lose the creation destination.
+
+**How to apply:** follow normal browser redirects, retry transport failures
+against the same durable job, and confirm session/access state through the
+app's explicit JSON access probe. Distinguish absent session from non-owner
+denial. Sign-in must preserve the full local route and query, including job
+identity and rebuild concurrency inputs. A lost status response does not prove
+that the worker stopped or that the saved report was unchanged.
+
 **Two-layer gate + browser-report exceptions (a DECISION, not a workaround):**
 most privileged mutations (sources, incidents, strikes, countries,
 cards, baselines, prose, social) sit behind `requireOwner` THEN

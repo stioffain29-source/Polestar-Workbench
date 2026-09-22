@@ -5,7 +5,7 @@ import {
   type RegionalReportJobInput,
 } from "@workspace/api-client-react";
 
-export type RegionalCreationErrorKind = "connection" | "session" | "report";
+export type RegionalCreationErrorKind = "connection" | "session" | "access" | "report";
 
 export class RegionalCreationError extends Error {
   constructor(message: string, public readonly kind: RegionalCreationErrorKind) {
@@ -123,6 +123,32 @@ function serverMessage(error: unknown): string | undefined {
   return undefined;
 }
 
+/** The private hosting gateway can redirect or reject a request before it
+ * reaches the app. Only the app's explicit access response establishes whether
+ * the owner session is missing; status 0/HTML are not proof of a logout. */
+async function checkRegionalAccess(signal: AbortSignal): Promise<"allowed" | "session" | "access" | "unknown"> {
+  try {
+    const response = await fetch("/api/access", {
+      credentials: "include",
+      redirect: "follow",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+      signal,
+    });
+    if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return "unknown";
+    const data: unknown = await response.json();
+    if (!data || typeof data !== "object" || !("authenticated" in data) || !("allowed" in data)) return "unknown";
+    if (data.authenticated === true && data.allowed === true) return "allowed";
+    if (data.authenticated === true && data.allowed === false) return "access";
+    if (data.authenticated === false && data.allowed === false) return "session";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+class RegionalTransportError extends Error {}
+
 function abortError(): DOMException {
   return new DOMException("Creation page closed", "AbortError");
 }
@@ -170,9 +196,13 @@ export async function waitForRegionalReport(
       try {
         const job = await operation(controller.signal);
         if (signal.aborted) throw abortError();
+        // Following a gateway redirect can return its HTML login page instead
+        // of JSON. Reconnect without losing the job identity or inventing a
+        // session-expiry diagnosis.
+        if (typeof job === "string") throw new RegionalTransportError("Non-JSON report response");
         if (!job || job.id !== input.requestId || job.topic !== input.topic ||
           job.issueDate !== input.issueDate || !STATUSES.has(job.status) || !STAGES.has(job.stage)) {
-          throw new RegionalCreationError("The server returned an unexpected response. Reload this page to restore access and resume this report.", "session");
+          throw new RegionalCreationError("The server returned an invalid report status. Retry the same request; no new report will be created.", "report");
         }
         options.onReconnecting(false);
         return job;
@@ -180,14 +210,24 @@ export async function waitForRegionalReport(
         if (signal.aborted) throw abortError();
         if (error instanceof RegionalCreationError) throw error;
         const status = httpStatus(error);
-        if (status === 401 || status === 403 || status === 0) {
-          throw new RegionalCreationError("Your session needs to be refreshed. Reload this page to sign in and resume the same report.", "session");
+        if (status === 401 || status === 403) {
+          const access = await checkRegionalAccess(controller.signal);
+          if (signal.aborted) throw abortError();
+          if (access === "session") {
+            throw new RegionalCreationError("Sign in to resume this report. Your creation request is preserved; signing in will not create another report.", "session");
+          }
+          if (access === "access") {
+            throw new RegionalCreationError("This account does not have access to the workbench. Sign in with the owner account to resume the same report.", "access");
+          }
         }
-        const transient = status === undefined || status === 408 || status === 429 || (status >= 500);
+        const transient = status === undefined || status === 0 || status === 401 || status === 403 ||
+          status === 408 || status === 429 || status >= 500 ||
+          error instanceof RegionalTransportError ||
+          (error instanceof Error && error.name === "ResponseParseError");
         if (!transient) throw error;
         if (attempt >= 3) {
           throw new RegionalCreationError(
-            "The connection was interrupted. Reconnect to check the same creation request, or reload this page if your session has expired. Neither action creates another report.",
+            "The connection to the report service was interrupted. Reconnect to check the same request. If access to the site was interrupted, reopen this page. Neither action creates another report.",
             "connection",
           );
         }
@@ -200,8 +240,10 @@ export async function waitForRegionalReport(
     }
   };
   const fetchOptions = (requestSignal: AbortSignal): RequestInit => ({
-    credentials: "same-origin",
-    redirect: "manual",
+    credentials: "include",
+    // manual turns even a recoverable gateway redirect into opaque status 0.
+    redirect: "follow",
+    headers: { Accept: "application/json" },
     cache: "no-store",
     signal: requestSignal,
   });

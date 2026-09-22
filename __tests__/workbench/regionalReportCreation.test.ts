@@ -34,6 +34,8 @@ const queued: RegionalReportJob = {
 const completed: RegionalReportJob = { ...queued, status: "completed", stage: "completed", reportId: 164 };
 const failed: RegionalReportJob = { ...queued, status: "failed", stage: "failed", error: "Regional coverage is incomplete." };
 const missing = { status: 404, data: { error: "Job not found" } };
+const originalFetch = globalThis.fetch;
+const accessFetch = jest.fn();
 
 function options() {
   return {
@@ -48,7 +50,20 @@ function options() {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  Object.defineProperty(globalThis, "fetch", {
+    configurable: true,
+    writable: true,
+    value: accessFetch,
+  });
   window.history.replaceState(null, "", "/regional-reports/create/apac_weekly");
+});
+
+afterAll(() => {
+  Object.defineProperty(globalThis, "fetch", {
+    configurable: true,
+    writable: true,
+    value: originalFetch,
+  });
 });
 
 describe("regional report creation transport", () => {
@@ -63,8 +78,9 @@ describe("regional report creation transport", () => {
     await expect(waitForRegionalReport(input, callbacks)).resolves.toBe(164);
     expect(startJob).toHaveBeenCalledTimes(1);
     expect(startJob).toHaveBeenCalledWith(input, expect.objectContaining({
-      credentials: "same-origin",
-      redirect: "manual",
+      credentials: "include",
+      redirect: "follow",
+      headers: { Accept: "application/json" },
       cache: "no-store",
     }));
     expect(callbacks.onProgress.mock.calls.map(([job]) => job.stage))
@@ -116,7 +132,7 @@ describe("regional report creation transport", () => {
     getJob.mockRejectedValue(new TypeError("Failed to fetch"));
     await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
       kind: "connection",
-      message: expect.stringContaining("same creation request"),
+      message: expect.stringContaining("same request"),
     });
     expect(getJob).toHaveBeenCalledTimes(4);
     expect(startJob).not.toHaveBeenCalled();
@@ -132,12 +148,42 @@ describe("regional report creation transport", () => {
     expect(getJob).toHaveBeenCalledTimes(4);
   });
 
-  test.each([0, 401, 403])("status %s offers session recovery without loosening authentication", async (status) => {
-    getJob.mockRejectedValue({ status });
+  test("status 0 reconnects without claiming the session expired", async () => {
+    getJob.mockRejectedValue({ status: 0 });
+    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
+      kind: "connection",
+    });
+    expect(getJob).toHaveBeenCalledTimes(4);
+    expect(accessFetch).not.toHaveBeenCalled();
+    expect(startJob).not.toHaveBeenCalled();
+  });
+
+  test("a genuine 401 is a session error only after the access probe", async () => {
+    getJob.mockRejectedValue({ status: 401 });
+    accessFetch.mockResolvedValue({
+      ok: true,
+      headers: { get: () => "application/json; charset=utf-8" },
+      json: async () => ({ authenticated: false, allowed: false }),
+    });
     await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
       kind: "session",
-      message: expect.stringContaining("resume the same report"),
+      message: expect.stringContaining("resume this report"),
     });
+    expect(accessFetch).toHaveBeenCalledWith("/api/access", expect.objectContaining({
+      credentials: "include",
+      redirect: "follow",
+      headers: { Accept: "application/json" },
+    }));
+    expect(getJob).toHaveBeenCalledTimes(1);
+    expect(startJob).not.toHaveBeenCalled();
+  });
+
+  test("an HTML status body reconnects without starting a duplicate job", async () => {
+    getJob.mockResolvedValue("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob);
+    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
+      kind: "connection",
+    });
+    expect(getJob).toHaveBeenCalledTimes(4);
     expect(startJob).not.toHaveBeenCalled();
   });
 

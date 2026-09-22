@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { AuthUser } from "@workspace/api-client-react";
+import { getLoginUrl } from "./login";
 
 export type { AuthUser };
 
@@ -42,8 +43,7 @@ export function useAuth(): AuthState {
   }, []);
 
   const login = useCallback(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/+$/, "") || "/";
-    window.location.href = `/api/login?returnTo=${encodeURIComponent(base)}`;
+    window.location.href = getLoginUrl();
   }, []);
 
   const logout = useCallback(() => {

@@ -3,11 +3,11 @@ name: Owner-gated UI verification
 description: How to visually/behaviourally verify owner-private workbench pages when app_preview and the testing skill cannot authenticate.
 ---
 
-The workbench is owner-private via Replit Auth (OIDC). The `app_preview` screenshot proxy carries NO owner session, so any `/countries/*`, report, or monitor page screenshots as the login wall. The testing skill's Playwright runner can override **Clerk** auth only — NOT Replit Auth — so it cannot drive these pages either.
+The workbench is owner-private via Replit Auth (OIDC). The `app_preview` screenshot proxy carries NO owner session, so any `/countries/*`, report, or monitor page screenshots as the login wall. Current testing guidance supports Replit OIDC claim overrides; consult `.local/skills/testing/replit-auth.md` rather than assuming only Clerk is supported. An arbitrary test account still does not pass the workbench's owner gate.
 
-**Why:** every data router is behind `requireOwner`; the SPA also gates client-side. There is no in-environment way to mint an owner session for the proxy/test browser.
+**Why:** every data router is behind `requireOwner`; the SPA also gates client-side. Authenticating a test identity is distinct from authorising it as owner. Never weaken the production gate or reuse owner credentials to make a screenshot pass.
 
-**How to apply:** verify owner-gated UI/PDF work WITHOUT a live authenticated screenshot:
+**How to apply:** use controlled development-only claims when full OIDC testing is necessary. Otherwise verify owner-gated UI/PDF work without claiming a live authenticated screenshot:
 - Render React bodies headlessly with `renderToStaticMarkup` in a jest/tsx test (section order, tables, prose) — this is the screen==PDF contract because the in-app PDF rasterises the same DOM.
 - Use the headless PDF audit scripts (e.g. `auditJakartaPdf.ts`, `validateFonts.sh`) for 3-way section parity + the only-Roboto font gate; they read Postgres directly (mirror the API shape) instead of hitting the owner-gated `/api`.
 - Pin pure model/builder logic with unit tests.
