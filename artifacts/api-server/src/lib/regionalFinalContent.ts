@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, reportsTable } from "@workspace/db";
 import {
   regionalCanonicalReportFromHardNumbers,
-  validateRegionalCanonicalStructure,
+  validateRegionalCanonicalIntegrity,
   type RegionalCanonicalReport,
 } from "../../../workbench/src/lib/regionalWeekly";
 import { logger } from "./logger";
@@ -105,7 +105,7 @@ function validatePayload(payload: RegionalFinalContentEntry[]): void {
     const canonical = entry.hardNumbers.regionalCanonicalReport as unknown as RegionalCanonicalReport;
     let errors: string[];
     try {
-      errors = validateRegionalCanonicalStructure(canonical);
+      errors = validateRegionalCanonicalIntegrity(canonical);
     } catch {
       errors = ["Canonical report structure is malformed."];
     }

@@ -373,8 +373,11 @@ function dirByKeyFromFacts(
 const LEADER_CLAIM_RE =
   /\b(clearest|primary|main|leading|dominant|principal|biggest|foremost)\b[^.!?]{0,60}\bpressure point\b(?!s)|\bpressure\b[^.!?]{0,40}\bconcentrated in\b/i;
 
+// A record total is what is banned. A period label ("7 Days", "7 Day Watch",
+// "over 14 days") is ordinary reporting language, not a count of incidents, so
+// day/date nouns only count when a record-set qualifier marks them as a tally.
 const COUNT_CLAIM_RE =
-  /\b(\d{1,4})\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(incidents?|records?|events?|reports?|dates?|days?)\b/gi;
+  /\b(\d{1,4})\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(incidents?|records?|events?|reports?)\b|\b(\d{1,4})\s+(?:qualifying|fuel[- ]related|distinct|confirmed)\s+(dates?|days?)\b/gi;
 
 const VOLUME_PROSE_RE =
   /\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;

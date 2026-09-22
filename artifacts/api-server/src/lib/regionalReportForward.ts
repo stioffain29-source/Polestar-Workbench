@@ -231,67 +231,78 @@ export function validateRegionalForwardExtraction(
 
   for (const rejected of extraction.rejected) {
     const source = sourceById.get(rejected.sourceId)!;
-    if (!rejected.reason.trim()) throw new Error(`Rejected source ${source.id} has no reason.`);
     evidence.push({
       sourceId: source.id, title: source.title, source: source.source, url: source.url,
-      publishedAt: source.publishedAt, status: "rejected", reason: rejected.reason.trim(),
+      publishedAt: source.publishedAt, status: "rejected",
+      reason: rejected.reason.trim() || "Excluded without a stated reason.",
     });
   }
   for (const candidate of extraction.candidates) {
     const source = sourceById.get(candidate.sourceId);
     if (!source) throw new Error(`Forward extraction cited unknown source ${candidate.sourceId}.`);
     if (candidate.decision !== "include") {
-      if (!candidate.reason.trim()) throw new Error(`Rejected source ${source.id} has no reason.`);
       evidence.push({
         sourceId: source.id, title: source.title, source: source.source, url: source.url,
-        publishedAt: source.publishedAt, status: "rejected", reason: candidate.reason.trim(),
+        publishedAt: source.publishedAt, status: "rejected",
+        reason: candidate.reason.trim() || "Excluded without a stated reason.",
       });
       continue;
     }
-    if (!exactSourceSpan(candidate.dateQuote, source) || !exactSourceSpan(candidate.eventQuote, source)) {
-      throw new Error(`Forward event ${source.id} lacks exact source quotations.`);
-    }
-    const resolvedDate = resolveRegionalForwardDate(candidate.dateQuote, source.publishedAt);
-    const eventMs = utcDay(candidate.eventDate);
-    if (!resolvedDate || resolvedDate !== candidate.eventDate || eventMs == null
-      || eventMs <= issueMs || eventMs > issueMs + 7 * DAY_MS) {
-      throw new Error(`Forward event ${source.id} has an unsupported or out-of-window event date.`);
-    }
-    if (candidate.eventDate === source.publishedAt.slice(0, 10)
-      && !normalizedRegionalQuote(candidate.dateQuote).includes(candidate.eventDate.replace(/-/g, " "))) {
-      throw new Error(`Forward event ${source.id} confuses publication and event dates.`);
-    }
-    if (!allowedCountries.has(candidate.country)
-      || (source.country !== candidate.country
-        && !normalizedRegionalQuote(`${source.title} ${source.summary}`).includes(normalizedRegionalQuote(candidate.country)))) {
-      throw new Error(`Forward event ${source.id} has an unsupported or out-of-region country.`);
-    }
-    const sourceText = normalizedRegionalQuote(`${source.title} ${source.summary}`);
-    if (!candidate.location.trim() || !sourceText.includes(normalizedRegionalQuote(candidate.location))) {
-      throw new Error(`Forward event ${source.id} has an unsupported location.`);
-    }
-    if (!candidate.eventIdentity.trim() || unsafeRenderedCopy(candidate.trigger, source)
-      || unsafeRenderedCopy(candidate.whyItMatters, source)
-      || unsafeRenderedCopy(candidate.whatToWatch, source)
-      || regionalWordCount(candidate.trigger) > 12
-      || regionalWordCount(candidate.whyItMatters) > 35
-      || regionalWordCount(candidate.whatToWatch) > 25) {
-      throw new Error(`Forward event ${source.id} contains raw source copy or invalid rendered prose.`);
-    }
-    if (!eventQuoteSupportsLabel(candidate.trigger, candidate.eventQuote)) {
-      throw new Error(`Forward event ${source.id} has a label unsupported by its event quotation.`);
-    }
-    if (!/\b(?:if|could|may|might|would|risk|expose|depending|potential)\b/i.test(candidate.whyItMatters)) {
-      throw new Error(`Forward event ${source.id} does not state its operational implication conditionally.`);
-    }
-    if (!/\b(?:alert|announcement|boundary|cancel|closure|decision|deadline|deployment|forecast|implementation|lifting|notice|order|restriction|route|schedule|traffic|turnout|warning)\w*\b/i.test(candidate.whatToWatch)) {
-      throw new Error(`Forward event ${source.id} lacks a specific observable watch signal.`);
-    }
-    if (!supportedRenderedNumbers(candidate)) {
-      throw new Error(`Forward event ${source.id} contains a number unsupported by its quotations.`);
-    }
+    // A forward item that cannot be verified against its source is dropped and
+    // recorded with the reason. Nothing is invented to keep the watch full, and
+    // a sparse watch never cancels the report.
     const identity = `${candidate.eventDate}|${candidate.country}|${normalizedRegionalQuote(candidate.eventIdentity)}`;
-    if (identities.has(identity)) throw new Error(`Forward extraction duplicated event identity ${candidate.eventIdentity}.`);
+    const unverified = ((): string | null => {
+      if (!exactSourceSpan(candidate.dateQuote, source) || !exactSourceSpan(candidate.eventQuote, source)) {
+        return "Lacks exact source quotations.";
+      }
+      const resolvedDate = resolveRegionalForwardDate(candidate.dateQuote, source.publishedAt);
+      const eventMs = utcDay(candidate.eventDate);
+      if (!resolvedDate || resolvedDate !== candidate.eventDate || eventMs == null
+        || eventMs <= issueMs || eventMs > issueMs + 7 * DAY_MS) {
+        return "Unsupported or out-of-window event date.";
+      }
+      if (candidate.eventDate === source.publishedAt.slice(0, 10)
+        && !normalizedRegionalQuote(candidate.dateQuote).includes(candidate.eventDate.replace(/-/g, " "))) {
+        return "Confuses publication and event dates.";
+      }
+      if (!allowedCountries.has(candidate.country)
+        || (source.country !== candidate.country
+          && !normalizedRegionalQuote(`${source.title} ${source.summary}`).includes(normalizedRegionalQuote(candidate.country)))) {
+        return "Unsupported or out-of-region country.";
+      }
+      const sourceText = normalizedRegionalQuote(`${source.title} ${source.summary}`);
+      if (!candidate.location.trim() || !sourceText.includes(normalizedRegionalQuote(candidate.location))) {
+        return "Unsupported location.";
+      }
+      if (!candidate.eventIdentity.trim() || unsafeRenderedCopy(candidate.trigger, source)
+        || unsafeRenderedCopy(candidate.whyItMatters, source)
+        || unsafeRenderedCopy(candidate.whatToWatch, source)
+        || regionalWordCount(candidate.trigger) > 12
+        || regionalWordCount(candidate.whyItMatters) > 35
+        || regionalWordCount(candidate.whatToWatch) > 25) {
+        return "Contains raw source copy or invalid rendered prose.";
+      }
+      if (!eventQuoteSupportsLabel(candidate.trigger, candidate.eventQuote)) {
+        return "Label unsupported by its event quotation.";
+      }
+      if (!/\b(?:if|could|may|might|would|risk|expose|depending|potential)\b/i.test(candidate.whyItMatters)) {
+        return "Operational implication is not stated conditionally.";
+      }
+      if (!/\b(?:alert|announcement|boundary|cancel|closure|decision|deadline|deployment|forecast|implementation|lifting|notice|order|restriction|route|schedule|traffic|turnout|warning)\w*\b/i.test(candidate.whatToWatch)) {
+        return "Lacks a specific observable watch signal.";
+      }
+      if (!supportedRenderedNumbers(candidate)) return "Contains a number unsupported by its quotations.";
+      if (identities.has(identity)) return `Duplicate event identity ${candidate.eventIdentity}.`;
+      return null;
+    })();
+    if (unverified) {
+      evidence.push({
+        sourceId: source.id, title: source.title, source: source.source, url: source.url,
+        publishedAt: source.publishedAt, status: "rejected", reason: unverified,
+      });
+      continue;
+    }
     identities.add(identity);
     events.push({
       date: candidate.eventDate,

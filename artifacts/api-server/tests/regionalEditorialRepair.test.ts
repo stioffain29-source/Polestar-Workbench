@@ -202,7 +202,7 @@ describe("regional editorial repair", () => {
       .toBe("The operational decision remains local to the named facility.");
   });
 
-  it("stops after the bounded repair attempts instead of saving an unverified report", async () => {
+  it("publishes the best draft with its editorial warnings after the bounded repair attempts", async () => {
     const rejected = analysis(countryByCountryOutlook());
     mockedRegionalJson
       .mockResolvedValueOnce(rejected)
@@ -213,9 +213,11 @@ describe("regional editorial repair", () => {
         businessImplications: rejected.businessImplications,
       });
 
-    await expect(finishRegionalEditorialReport(
+    const result = await finishRegionalEditorialReport(
       [], { events, rejected: [] }, "apac_weekly", "2026-09-18", futureEvents, coverageManifest,
-    )).rejects.toThrow(/Polestar Outlook/);
+    );
+    expect(result.canonical.polestarOutlook).toBe(rejected.polestarOutlook.text);
+    expect(result.editorialWarnings.join(" ")).toMatch(/Polestar Outlook/);
     expect(mockedRegionalJson).toHaveBeenCalledTimes(3);
   });
 });

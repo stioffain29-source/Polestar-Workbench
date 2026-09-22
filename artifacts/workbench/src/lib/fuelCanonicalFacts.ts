@@ -782,8 +782,10 @@ export function validateFuelReportConsistency(facts: FuelCanonicalFacts, section
     body.toLowerCase().includes(primary.toLowerCase()) ||
     (facts.primaryPressurePoint.kind === "distributed" && /\bdistributed\b/i.test(body));
   const directions = facts.marketIndicators;
+  // "7 Days", "7 Day Watch" and "over 14 days" are period labels, not record
+  // totals, so a day noun only counts when a record-set qualifier precedes it.
   const VOLUME_PROSE_RE =
-    /\b\d+\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(?:incidents?|records?|events?|reports?|days?)\b|\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;
+    /\b\d+\s+(?:qualifying\s+|fuel[- ]related\s+|distinct\s+|confirmed\s+)?(?:incidents?|records?|events?|reports?)\b|\b\d+\s+(?:qualifying|fuel[- ]related|distinct|confirmed)\s+days?\b|\b(?:incidents?|records?)\s+(?:were\s+)?(?:logged|recorded|carried)\b|\b(?:reporting|qualifying)\s+(?:record|incident)\b|\b(?:led by|leads with)\s+[“"]/i;
   for (const [section, body] of Object.entries(sections)) {
     // Internal deterministic traceability arrays are intentionally not prose
     // and must never enter the renderer-level wording checks.

@@ -88,9 +88,11 @@ export async function refreshRegionalEditorialOutlook(
     editorialVersion: REGIONAL_EDITORIAL_VERSION,
     mapPoints: prior.mapPoints.slice(0, REGIONAL_MAX_MAP_POINTS),
   }).filter((problem) => !/polestar outlook/i.test(problem));
-  if (retained.length) {
-    throw new Error(`This saved edition predates the current content standard, and refreshing the Outlook alone cannot correct it: ${retained.join(" ")} Regenerate the report to apply the current standard. No report was changed.`);
-  }
+  // Content findings on prose this path deliberately preserves are reported,
+  // not fatal: refreshing the Outlook still produces a usable report.
+  const retainedWarnings = retained.length
+    ? [`This saved edition predates the current content standard and refreshing the Outlook alone cannot correct it: ${retained.join(" ")}`]
+    : [];
   const facts = regionalAnalyticalInput(selected, prior.topic, prior.issueDate);
   let outlook = await regionalJson(Outlook, OUTLOOK_INSTRUCTION, {
     ...facts, openingToAvoidRepeating: prior.regionalOutlook,
@@ -119,6 +121,7 @@ export async function refreshRegionalEditorialOutlook(
   if (!canonical) throw new Error("The refreshed Outlook could not be verified.");
   return {
     canonical,
+    editorialWarnings: retainedWarnings,
     evidenceSnapshot: {
       ...evidence,
       version: REGIONAL_EDITORIAL_VERSION,

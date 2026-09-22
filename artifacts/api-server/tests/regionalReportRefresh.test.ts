@@ -244,10 +244,16 @@ describe("APAC regional Outlook refresh", () => {
     ["prose that describes its own inputs", {
       riskPicture: "The supplied facts do not establish disruption beyond the named site.",
     }],
-  ])("refuses to refresh a saved edition with %s, before paying for the rewrite", async (_label, overrides) => {
-    const { saved } = savedEdition(overrides);
-    await expect(refreshRegionalEditorialOutlook(saved))
-      .rejects.toThrow(/predates the current content standard/);
-    expect(mockedRegionalJson).not.toHaveBeenCalled();
+  ])("refreshes a saved edition with %s and reports it instead of cancelling", async (_label, overrides) => {
+    const { saved, selectedEventKeys } = savedEdition(overrides);
+    mockedRegionalJson.mockResolvedValue({
+      text: closingOutlook(),
+      evidenceKeys: selectedEventKeys,
+    });
+
+    const result = await refreshRegionalEditorialOutlook(saved);
+
+    expect(result.editorialWarnings.join(" ")).toMatch(/predates the current content standard/);
+    expect(mockedRegionalJson).toHaveBeenCalled();
   });
 });

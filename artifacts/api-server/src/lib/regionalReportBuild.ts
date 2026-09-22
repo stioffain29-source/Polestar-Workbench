@@ -13,7 +13,8 @@ import {
   auditRegionalWeeklyCandidateFunnel,
   assertRegionalWeeklyReady,
   regionalCountryQuery,
-  validateRegionalCanonicalStructure,
+  regionalCanonicalEditorialFindings,
+  validateRegionalCanonicalIntegrity,
   type RegionalCoverageManifest,
   type RegionalWeeklyTopic,
 } from "../../../workbench/src/lib/regionalWeekly";
@@ -45,19 +46,29 @@ function normalizeHardNumbers(value: unknown): FuelHardNumbers {
 async function reportValues(
   topic: RegionalReportTopic,
   issueDate: string,
-  result: Awaited<ReturnType<typeof finishRegionalEditorialReport>>,
+  result: {
+    canonical: Awaited<ReturnType<typeof finishRegionalEditorialReport>>["canonical"];
+    evidenceSnapshot: Record<string, unknown>;
+    editorialWarnings?: string[];
+  },
   setStage: (stage: RegionalReportBuildStage) => Promise<void>,
   additionalEvidence: Record<string, unknown> = {},
 ): Promise<InsertReport> {
-  const errors = validateRegionalCanonicalStructure(result.canonical);
+  // A build stops only when the report is technically unusable. Editorial
+  // findings are saved alongside it so the analyst sees them in the editor.
+  const errors = validateRegionalCanonicalIntegrity(result.canonical);
   if (errors.length > 0) throw new Error(errors.join(" "));
+  const editorialWarnings = [...new Set([
+    ...(result.editorialWarnings ?? []),
+    ...regionalCanonicalEditorialFindings(result.canonical),
+  ])];
   await setStage("saving");
   return {
     title: topic === "apac_weekly" ? "Polestar APAC Weekly" : "Polestar Middle East Weekly",
     topic, issueDate, status: "draft",
     hardNumbers: normalizeHardNumbers({
       regionalCanonicalReport: result.canonical,
-      regionalEvidenceSnapshot: { ...result.evidenceSnapshot, ...additionalEvidence },
+      regionalEvidenceSnapshot: { ...result.evidenceSnapshot, ...additionalEvidence, editorialWarnings },
     }),
     updatedAt: new Date(),
   };

@@ -836,6 +836,9 @@ export default function ReportEditor() {
   // Override flag for the "fail closed" export gate. Reset on every
   // successful export and whenever the user edits the market data.
   const [exportError, setExportError] = useState<string | null>(null);
+  // Editorial findings are shown, not enforced: only a technical failure may
+  // cancel an export. Content problems are reported beside the finished PDF.
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
 
   // Cargo Watch: opt-in to appending the full incident register as a PDF annex.
   // Off by default — the standard cargo report ends at Selected Incidents →
@@ -1732,6 +1735,7 @@ export default function ReportEditor() {
     }
     setExporting(true);
     setExportError(null);
+    setExportWarning(null);
     try {
       const filename = `polestar-report-${slugifyForFilename(form.title || "untitled")}-${formatExportTimestampForFilename()}.pdf`;
       let fuelExportHardNumbers: Record<string, unknown> | null = null;
@@ -1742,12 +1746,20 @@ export default function ReportEditor() {
         if (!id) throw new Error("Fuel Watch export requires an exact report id.");
         const assembled = await assembleFuelWatchReport(id);
         assertFuelHydrationValid(assembled.validation);
-        const publicationFailures = [
-          ...(!assembled.publication.marketReadiness.ready
-            ? assembled.publication.marketReadiness.missingRequired.map(
-                (item) => `Missing required market data: ${item}.`,
-              )
-            : []),
+        // Missing market data is missing report data, so it still stops the
+        // export. Wording, repetition and percentage-tracing findings are
+        // editorial: they are reported and the export continues.
+        const missingData = !assembled.publication.marketReadiness.ready
+          ? assembled.publication.marketReadiness.missingRequired.map(
+              (item) => `Missing required market data: ${item}.`,
+            )
+          : [];
+        if (missingData.length > 0) {
+          throw new Error(
+            `Fuel Watch export blocked by missing report data: ${missingData.join(" ")}`,
+          );
+        }
+        const editorialFindings = [
           ...assembled.publication.auditIssues.canonical.map(
             (issue) =>
               `Canonical ${issue.section} conflict: ${issue.conflictingStatement} (expected ${issue.canonicalValue}).`,
@@ -1755,10 +1767,8 @@ export default function ReportEditor() {
           ...assembled.publication.auditIssues.consistency.map((issue) => issue.message),
           ...assembled.publication.auditIssues.evidence.map((issue) => issue.message),
         ];
-        if (publicationFailures.length > 0) {
-          throw new Error(
-            `Fuel Watch export blocked by publication validation: ${publicationFailures.join(" ")}`,
-          );
+        if (editorialFindings.length > 0) {
+          setExportWarning(editorialFindings.join(" "));
         }
         fuelExportHardNumbers = assembled.hydratedReport.hardNumbers as Record<string, unknown>;
         fuelExportIssueDate = assembled.validation.reportingPeriodEnd;
@@ -3037,6 +3047,11 @@ export default function ReportEditor() {
       {exportError ? (
         <p className="text-[12px] font-medium text-destructive" role="alert">
           PDF export failed — {exportError}
+        </p>
+      ) : null}
+      {exportWarning ? (
+        <p className="text-[12px] font-medium text-amber-700" role="status">
+          Editorial warning (the PDF was still produced) — {exportWarning}
         </p>
       ) : null}
 

@@ -78,46 +78,44 @@ describe("regional forward-event validation", () => {
     expect(resolveRegionalForwardDate("on Monday", "2026-09-18T08:00:00Z")).toBeNull();
   });
 
-  it("rejects dates outside the issue-date window", () => {
-    expect(() => validateRegionalForwardExtraction(
-      included({ eventDate: "2026-09-22" }), [source], "middle_east_weekly", "2026-09-22",
-    )).toThrow("unsupported or out-of-window event date");
+  // An unverifiable candidate is dropped and recorded with its reason. The
+  // watch is honestly sparser; nothing is invented and no report is cancelled.
+  const dropped = (
+    overrides: Partial<RegionalForwardExtraction["candidates"][number]>,
+    issueDate = "2026-09-18",
+  ): string => {
+    const result = validateRegionalForwardExtraction(
+      included(overrides), [source], "middle_east_weekly", issueDate,
+    );
+    expect(result.events).toEqual([]);
+    expect(result.evidence).toHaveLength(1);
+    expect(result.evidence[0]).toMatchObject({ sourceId: "me-1", status: "rejected" });
+    return result.evidence[0].reason ?? "";
+  };
+
+  it("drops dates outside the issue-date window", () => {
+    expect(dropped({ eventDate: "2026-09-22" }, "2026-09-22")).toMatch(/out-of-window event date/i);
   });
 
-  it("rejects a date not established by the exact quotation", () => {
-    expect(() => validateRegionalForwardExtraction(
-      included({ dateQuote: "will begin" }), [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("unsupported or out-of-window event date");
+  it("drops a date not established by the exact quotation", () => {
+    expect(dropped({ dateQuote: "will begin" })).toMatch(/out-of-window event date/i);
   });
 
-  it("rejects invented locations and off-region countries", () => {
-    expect(() => validateRegionalForwardExtraction(
-      included({ location: "Dubai" }), [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("unsupported location");
-    expect(() => validateRegionalForwardExtraction(
-      included({ country: "France" }), [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("unsupported or out-of-region country");
+  it("drops invented locations and off-region countries", () => {
+    expect(dropped({ location: "Dubai" })).toMatch(/unsupported location/i);
+    expect(dropped({ country: "France" })).toMatch(/out-of-region country/i);
   });
 
-  it("rejects copied publisher/headline text and unsupported numerical consequences", () => {
-    expect(() => validateRegionalForwardExtraction(
-      included({ trigger: source.title }), [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("raw source copy or invalid rendered prose");
-    expect(() => validateRegionalForwardExtraction(
-      included({ whyItMatters: "Vessels could face 12-hour delays." }),
-      [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("number unsupported");
+  it("drops copied publisher/headline text and unsupported numerical consequences", () => {
+    expect(dropped({ trigger: source.title })).toMatch(/raw source copy or invalid rendered prose/i);
+    expect(dropped({ whyItMatters: "Vessels could face 12-hour delays." }))
+      .toMatch(/number unsupported/i);
   });
 
-  it("rejects an unsupported label and a generic watch instruction", () => {
-    expect(() => validateRegionalForwardExtraction(
-      included({ trigger: "Airport terminal closes" }),
-      [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("label unsupported");
-    expect(() => validateRegionalForwardExtraction(
-      included({ whatToWatch: "Continue monitoring the situation." }),
-      [source], "middle_east_weekly", "2026-09-18",
-    )).toThrow("specific observable watch signal");
+  it("drops an unsupported label and a generic watch instruction", () => {
+    expect(dropped({ trigger: "Airport terminal closes" })).toMatch(/label unsupported/i);
+    expect(dropped({ whatToWatch: "Continue monitoring the situation." }))
+      .toMatch(/observable watch signal/i);
   });
 
   it("allows a genuine zero while preserving rejected source links", () => {

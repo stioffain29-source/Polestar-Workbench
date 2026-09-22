@@ -4,7 +4,8 @@ import {
   buildApacGlanceMetrics,
   buildApacWeeklyWatchlist,
   buildCanonicalRegionalMapPoints,
-  validateRegionalCanonicalStructure,
+  regionalCanonicalEditorialFindings,
+  validateRegionalCanonicalIntegrity,
   type RegionalCanonicalReport,
   type RegionalCoverageManifest,
   type RegionalDomainBrief,
@@ -356,8 +357,10 @@ export function assembleRegionalEditorialReport(
     },
     coverageManifest,
   };
-  const errors = validateRegionalCanonicalStructure(report);
-  if (errors.length) throw new Error(`Regional editorial checks failed: ${errors.join(" ")}`);
+  // Only a technically unusable report is rejected here. Editorial findings are
+  // returned to the caller as warnings.
+  const errors = validateRegionalCanonicalIntegrity(report);
+  if (errors.length) throw new Error(`Regional report structure is invalid: ${errors.join(" ")}`);
   return report;
 }
 
@@ -387,26 +390,41 @@ export async function finishRegionalEditorialReport(
   if (selected.length < 5) {
     throw new Error(`Only ${selected.length} distinct events have adequate factual support. No thin or padded report was saved.`);
   }
-  // Forward items come from collection, not from writing: a thin or holiday-led
-  // watch cannot be repaired by the writer, so it fails before any analysis is paid for.
-  const watchProblems = validateRegionalForwardWatch(
+  // Forward items come from collection, not from writing. A thin or holiday-led
+  // week is published with the calendar it actually has and says so; it is
+  // recorded as an editorial warning rather than cancelling the report.
+  const editorialWarnings = validateRegionalForwardWatch(
     topic, buildApacWeeklyWatchlist([], futureEvents, issueDate));
-  if (watchProblems.length > 0) {
-    throw new Error(`${watchProblems.join(" ")} No report was generated.`);
-  }
   let analysis = await regionalJson(
     RegionalAnalysisSchema, ANALYSIS_INSTRUCTION,
     regionalAnalyticalInput(selected, topic, issueDate),
   );
   // Bounded editorial correction, never truncation or a raw-headline fallback.
   // Each retry keeps the same fixed facts, selection and evidence references.
+  // A bounded rewrite is still attempted for editorial findings, but the last
+  // draft is kept and published with its warnings instead of being cancelled.
   let canonical: RegionalCanonicalReport | undefined;
+  let findings: string[] = [];
   let failure: unknown;
   for (let attempt = 0; attempt <= REGIONAL_EDITORIAL_REPAIR_ATTEMPTS; attempt++) {
     try {
-      canonical = assembleRegionalEditorialReport(selected, analysis, topic, issueDate, futureEvents, coverageManifest);
-      break;
+      const draft = assembleRegionalEditorialReport(selected, analysis, topic, issueDate, futureEvents, coverageManifest);
+      const draftFindings = regionalCanonicalEditorialFindings(draft);
+      if (draftFindings.length === 0) {
+        canonical = draft;
+        findings = [];
+        break;
+      }
+      if (!canonical || draftFindings.length < findings.length) {
+        canonical = draft;
+        findings = draftFindings;
+      }
+      if (attempt === REGIONAL_EDITORIAL_REPAIR_ATTEMPTS) break;
+      analysis = await repairRegionalAnalysis(
+        analysis, selected, topic, issueDate, new Error(draftFindings.join(" ")));
     } catch (error) {
+      // Structural or data failures remain fatal, and are still worth one
+      // bounded regeneration before the build stops.
       failure = error;
       if (attempt === REGIONAL_EDITORIAL_REPAIR_ATTEMPTS) break;
       analysis = await repairRegionalAnalysis(analysis, selected, topic, issueDate, error);
@@ -414,12 +432,13 @@ export async function finishRegionalEditorialReport(
   }
   if (!canonical) {
     throw new Error(
-      failure instanceof Error ? failure.message : "The corrected analysis failed verification.",
+      failure instanceof Error ? failure.message : "The analysis could not be assembled into a valid report.",
       { cause: { analysis } },
     );
   }
   return {
     canonical,
+    editorialWarnings: [...new Set([...editorialWarnings, ...findings])],
     // Raw source text is audit evidence OUTSIDE the report object. All rendered
     // sections, metrics and maps use the canonical object above, including reload/PDF.
     evidenceSnapshot: {

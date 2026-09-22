@@ -198,7 +198,11 @@ export const REQUIRED_REGIONAL_REPORT_DOMAINS = [
   "Operational Disruption",
 ] as const satisfies readonly RegionalIntelligenceCategory[];
 
-export function validateRegionalCanonicalStructure(
+/**
+ * Technical integrity only: the structure a report must have to render, save
+ * and export at all. These are the sole conditions that may cancel a build.
+ */
+export function validateRegionalCanonicalIntegrity(
   report: RegionalCanonicalReport,
 ): string[] {
   const errors: string[] = [];
@@ -224,7 +228,28 @@ export function validateRegionalCanonicalStructure(
   if (report.developments.length === 0) errors.push("Regional report requires key developments.");
   if (!report.businessImplicationsNarrative.trim()) errors.push("Regional report requires business implications.");
   if (!report.polestarOutlook.trim()) errors.push("Regional report requires a Polestar Outlook.");
-  return [...errors, ...validateRegionalEditorialReport(report)];
+  return [...new Set(errors)];
+}
+
+/**
+ * Editorial findings: wording, repetition, concentration, quotation and watch
+ * composition. They are shown to the analyst and never cancel generation,
+ * saving or export.
+ */
+export function regionalCanonicalEditorialFindings(
+  report: RegionalCanonicalReport,
+): string[] {
+  return validateRegionalEditorialReport(report);
+}
+
+/** Every check, for audits and tests that want the complete picture. */
+export function validateRegionalCanonicalStructure(
+  report: RegionalCanonicalReport,
+): string[] {
+  return [...new Set([
+    ...validateRegionalCanonicalIntegrity(report),
+    ...regionalCanonicalEditorialFindings(report),
+  ])];
 }
 
 export function regionalCanonicalReportFromHardNumbers(
@@ -238,7 +263,9 @@ export function regionalCanonicalReportFromHardNumbers(
   if (issueDate && value.issueDate !== issueDate) return null;
   if (!value.coverageManifest || !isCompleteRegionalCoverage(value.coverageManifest)) return null;
   if (value.developments.some((row) => !row.eventDate || row.dateVerified !== true)) return null;
-  if (validateRegionalCanonicalStructure(value).length > 0) return null;
+  // A saved edition is withheld only when it is technically unusable. An
+  // editorial finding is reported beside the report, not by hiding it.
+  if (validateRegionalCanonicalIntegrity(value).length > 0) return null;
   return value;
 }
 
