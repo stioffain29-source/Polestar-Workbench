@@ -1,6 +1,7 @@
 import { addDays, differenceInCalendarDays, format, isAfter, isValid, parse, parseISO } from "date-fns";
 import { consolidateCountryStories } from "./countrySameStory";
 import { incidentMapFallback } from "./incidentMapFallback";
+import { REGIONAL_MAX_MAP_POINTS, selectRegionalMapDevelopments } from "./regionalContentPolicy";
 import { isRegionalFactualEdition, validateRegionalEditorialReport } from "./regionalEditorial";
 import { cleanRegionalSourceText } from "./regionalSourceText";
 
@@ -2157,6 +2158,17 @@ export function buildRegionalMapPoints<T extends RegionalIncident>(
 }
 
 export function buildCanonicalRegionalMapPoints<T extends RegionalIncident>(
+  incidents: T[],
+  developments: RegionalVerifiedDevelopment[],
+): RegionalMapPoint[] {
+  // Only developments that can actually be plotted compete for the five slots.
+  const plottable = developments.filter((development) =>
+    buildRegionalMapPointsFor(incidents, [development]).length > 0);
+  return buildRegionalMapPointsFor(
+    incidents, selectRegionalMapDevelopments(plottable, REGIONAL_MAX_MAP_POINTS));
+}
+
+function buildRegionalMapPointsFor<T extends RegionalIncident>(
   incidents: T[],
   developments: RegionalVerifiedDevelopment[],
 ): RegionalMapPoint[] {

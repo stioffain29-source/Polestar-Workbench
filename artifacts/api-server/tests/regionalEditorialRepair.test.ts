@@ -105,10 +105,17 @@ function synthesisedOutlook(words = 138): string {
   return `${opening} ${body.repeat(14)}`.trim().split(/\s+/).slice(0, words).join(" ");
 }
 
+/** The opening assessment has its own 100-130 word range. */
+function openingAssessment(words = 115): string {
+  const opening = "The most consequential change this week is a verified operational disruption at one named facility.";
+  const body = "Exposure sits with continuity planning and scheduling decisions while connected operations elsewhere continue under existing arrangements without restriction.";
+  return `${opening} ${body.repeat(12)}`.trim().split(/\s+/).slice(0, words).join(" ");
+}
+
 function analysis(outlook: string): RegionalAnalysis {
   return {
     regionalOutlook: {
-      text: "The opening assessment ranks the verified operating effects across the selected markets.",
+      text: openingAssessment(),
       evidenceKeys: eventKeys,
     },
     riskPicture: {

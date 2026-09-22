@@ -26,6 +26,14 @@ corrective retry did not clear it, so creation failed outright. Spreading a whol
 regenerated narrative back over the draft would also let verified prose be reworded
 or dropped silently, because the validators only check maxima and non-emptiness.
 
+A partial-rewrite path is the trap when the content rules are version-gated.
+Rebuilding a saved edition re-stamps it with the current editorial version, so the
+current rules are then applied to prose that path deliberately preserves — and the
+retry can only rewrite its own section, so the failure is unfixable. Such a path
+must pre-flight the retained prose under the current rules **before** the first
+paid call and say plainly that the edition predates the standard and needs full
+regeneration. Never re-stamp it silently, and never half-correct it.
+
 **How to apply:** when adding or tightening any regional editorial rule, add its
 measurement to the diagnostics, state it countably in the instruction, and make sure
 the failure message names the section it belongs to — the repair router matches

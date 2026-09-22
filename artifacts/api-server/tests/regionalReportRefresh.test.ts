@@ -4,6 +4,7 @@ jest.mock("../src/lib/regionalAi", () => ({ regionalJson: jest.fn() }));
 
 import { regionalJson } from "../src/lib/regionalAi";
 import { refreshRegionalEditorialOutlook } from "../src/lib/regionalReportRefresh";
+import { REGIONAL_MAX_MAP_POINTS } from "../../workbench/src/lib/regionalContentPolicy";
 import type { GroundedRegionalEvent } from "../src/lib/regionalReportFacts";
 import type {
   RegionalCanonicalReport,
@@ -96,25 +97,31 @@ function development(event: GroundedRegionalEvent): RegionalDevelopment {
   };
 }
 
+/** The opening assessment has its own 100-130 word range. */
+function openingAssessment(words = 115): string {
+  const opening = "The most consequential change this week is a verified operational disruption at one named facility.";
+  const body = "Exposure sits with continuity planning and scheduling decisions while connected operations elsewhere continue under existing arrangements without restriction.";
+  return `${opening} ${body.repeat(12)}`.trim().split(/\s+/).slice(0, words).join(" ");
+}
+
 function closingOutlook(words = 135): string {
   const start = "Japan Australia Singapore India Malaysia and the Philippines require distinct decisions as recovery and implementation signals develop.";
   const body = "Operators should rank confirmed service effects while distinguishing stabilisation from plausible deterioration across security mobility regulatory and digital functions.";
   return `${start} ${body.repeat(14)}`.trim().split(/\s+/).slice(0, words).join(" ");
 }
 
-describe("APAC regional Outlook refresh", () => {
-  it("rewrites only the closing Outlook while preserving the six selected facts, card order, maps and other prose", async () => {
-    const extractedEvents = Array.from({ length: 6 }, (_, index) => grounded(index));
-    const developments = extractedEvents.map(development);
-    const checks = Array.from({ length: 7 }, (_, index) => checked(`domain-${index}`));
-    const prior: RegionalCanonicalReport = {
+function savedEdition(priorOverrides: Partial<RegionalCanonicalReport> = {}) {
+  const extractedEvents = Array.from({ length: 6 }, (_, index) => grounded(index));
+  const developments = extractedEvents.map(development);
+  const checks = Array.from({ length: 7 }, (_, index) => checked(`domain-${index}`));
+  const prior: RegionalCanonicalReport = {
       schemaVersion: "regional-weekly-canonical-v1",
       editorialVersion: "regional-facts-v3",
       evidenceFingerprint: "prior-fingerprint",
       topic: "apac_weekly",
       issueDate: "2026-09-18",
       developments,
-      regionalOutlook: "The opening assessment ranks the verified operating effects.",
+      regionalOutlook: openingAssessment(),
       riskPicture: "The risk picture distinguishes direct effects from contingent exposure.",
       polestarOutlook: closingOutlook(130),
       polestarOutlookEvidenceKeys: developments.map((event) => event.eventKey!),
@@ -149,42 +156,48 @@ describe("APAC regional Outlook refresh", () => {
         requiredGeographies: countries,
         searchedGeographies: countries,
       },
-    };
-    const selectedEventKeys = developments.map((event) => event.eventKey!);
+    ...priorOverrides,
+  };
+  const selectedEventKeys = developments.map((event) => event.eventKey!);
+  const saved = {
+    canonical: prior,
+    evidence: {
+      version: "regional-facts-v3" as const,
+      fingerprint: "prior-fingerprint",
+      sourcePackets: [],
+      extractedEvents,
+      rejectedCandidates: [],
+      selectedEventKeys,
+      forwardEvents: [{
+        date: "2026-09-22",
+        location: "Singapore",
+        trigger: "A scheduled implementation window begins",
+        whyItMatters: "Operating requirements may change.",
+        currentSeverity: "Moderate" as const,
+        whatToWatch: "Watch for the final authority notice.",
+      }],
+      analysisEvidence: {
+        regionalOutlook: ["event-0"],
+        riskPicture: ["event-1"],
+        businessImplications: [{
+          heading: "Operations & Assets",
+          evidenceKeys: ["event-2"],
+        }],
+        polestarOutlook: selectedEventKeys,
+      },
+    },
+  };
+  return { prior, developments, selectedEventKeys, saved };
+}
+
+describe("APAC regional Outlook refresh", () => {
+  it("rewrites only the closing Outlook while preserving the six selected facts, card order, maps and other prose", async () => {
+    const { prior, developments, selectedEventKeys, saved } = savedEdition();
     const refreshedText = closingOutlook();
     mockedRegionalJson.mockResolvedValue({
       text: refreshedText,
       evidenceKeys: selectedEventKeys,
     });
-
-    const saved = {
-      canonical: prior,
-      evidence: {
-        version: "regional-facts-v3" as const,
-        fingerprint: "prior-fingerprint",
-        sourcePackets: [],
-        extractedEvents,
-        rejectedCandidates: [],
-        selectedEventKeys,
-        forwardEvents: [{
-          date: "2026-09-22",
-          location: "Singapore",
-          trigger: "A scheduled implementation window begins",
-          whyItMatters: "Operating requirements may change.",
-          currentSeverity: "Moderate" as const,
-          whatToWatch: "Watch for the final authority notice.",
-        }],
-        analysisEvidence: {
-          regionalOutlook: ["event-0"],
-          riskPicture: ["event-1"],
-          businessImplications: [{
-            heading: "Operations & Assets",
-            evidenceKeys: ["event-2"],
-          }],
-          polestarOutlook: selectedEventKeys,
-        },
-      },
-    };
 
     const result = await refreshRegionalEditorialOutlook(saved);
 
@@ -205,8 +218,12 @@ describe("APAC regional Outlook refresh", () => {
       polestarView: event.polestarView,
       outlook7Days: event.outlook7Days,
     })));
-    expect(result.canonical.mapPoints.map((point) => point.title))
-      .toEqual(prior.mapPoints.map((point) => point.title));
+    // The map carries a five-development selection of the same set, in report order.
+    const mapTitles = result.canonical.mapPoints.map((point) => point.title);
+    expect(mapTitles).toHaveLength(REGIONAL_MAX_MAP_POINTS);
+    expect(prior.mapPoints.map((point) => point.title)).toEqual(expect.arrayContaining(mapTitles));
+    expect(mapTitles).toEqual(developments.filter((event) => mapTitles.includes(event.title))
+      .map((event) => event.title));
     expect(result.canonical).toMatchObject({
       regionalOutlook: prior.regionalOutlook,
       riskPicture: prior.riskPicture,
@@ -215,5 +232,22 @@ describe("APAC regional Outlook refresh", () => {
     });
     expect(result.evidenceSnapshot.selectedEventKeys).toEqual(selectedEventKeys);
     expect(result.evidenceSnapshot.analysisEvidence.polestarOutlook).toEqual(selectedEventKeys);
+  });
+
+  // Rebuilding stamps the current editorial version, so the retained prose is
+  // judged by the current rules. An edition written under an earlier standard
+  // must be regenerated rather than re-stamped or half-corrected.
+  it.each([
+    ["an opening assessment below the current length", {
+      regionalOutlook: "The opening assessment ranks the verified operating effects.",
+    }],
+    ["prose that describes its own inputs", {
+      riskPicture: "The supplied facts do not establish disruption beyond the named site.",
+    }],
+  ])("refuses to refresh a saved edition with %s, before paying for the rewrite", async (_label, overrides) => {
+    const { saved } = savedEdition(overrides);
+    await expect(refreshRegionalEditorialOutlook(saved))
+      .rejects.toThrow(/predates the current content standard/);
+    expect(mockedRegionalJson).not.toHaveBeenCalled();
   });
 });

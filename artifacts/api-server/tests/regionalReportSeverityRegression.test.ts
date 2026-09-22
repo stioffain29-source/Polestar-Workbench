@@ -262,6 +262,13 @@ function coverage(topic: RegionalWeeklyTopic): RegionalCoverageManifest {
   };
 }
 
+/** The opening assessment has its own 100-130 word range. */
+function openingAssessment(words = 115): string {
+  const opening = "The most consequential change this week is a verified operational disruption at one named facility.";
+  const body = "Exposure sits with continuity planning and scheduling decisions while connected operations elsewhere continue under existing arrangements without restriction.";
+  return `${opening} ${body.repeat(12)}`.trim().split(/\s+/).slice(0, words).join(" ");
+}
+
 function outlook(countries: string[]): string {
   const opening = `${countries.join(", ")} present connected operating questions that should be compared through verified consequences rather than assumed escalation.`;
   const body = "Operators should rank confirmed effects, distinguish direct disruption from contingent exposure, and use official recovery signals to adjust security, mobility, compliance, logistics, staffing, and digital continuity decisions.";
@@ -272,7 +279,7 @@ function analysisFor(events: ReturnType<typeof extractedEvents>): RegionalAnalys
   const keys = events.map((event) => event.eventKey);
   return {
     regionalOutlook: {
-      text: "Verified consequences create different operating decisions across the region.",
+      text: openingAssessment(),
       evidenceKeys: keys,
     },
     riskPicture: {
@@ -309,6 +316,8 @@ describe.each([
   it("survives repeated reassessment and the real final content-policy gate", () => {
     const events = extractedEvents([...fixtures], topic);
     const reassessed = reassessRegionalEvents(reassessRegionalEvents(events));
+    // The Middle East edition now requires three to five forward items from its
+    // separate eleven-domain search; APAC keeps its scheduled-event store.
     const futureEvents: RegionalFutureEventInput[] = topic === "apac_weekly" ? [{
       date: "2026-09-20",
       location: "Singapore",
@@ -316,7 +325,32 @@ describe.each([
       whyItMatters: "Import reporting requirements may change.",
       currentSeverity: "Moderate",
       whatToWatch: "Watch for the final customs authority notice.",
-    }] : [];
+    }] : [
+      {
+        date: "2026-09-20",
+        location: "Dubai",
+        trigger: "A port maintenance closure takes effect",
+        whyItMatters: "Berth availability may change for scheduled calls.",
+        currentSeverity: "Moderate" as const,
+        whatToWatch: "Watch for the revised berthing schedule.",
+      },
+      {
+        date: "2026-09-21",
+        location: "Riyadh",
+        trigger: "A regulatory filing deadline falls due",
+        whyItMatters: "Market access requirements may change.",
+        currentSeverity: "Moderate" as const,
+        whatToWatch: "Watch for the authority implementation notice.",
+      },
+      {
+        date: "2026-09-22",
+        location: "Manama",
+        trigger: "A scheduled maritime exercise begins",
+        whyItMatters: "Transit routing may be restricted temporarily.",
+        currentSeverity: "Moderate" as const,
+        whatToWatch: "Watch for the navigational warning.",
+      },
+    ];
     const report = assembleRegionalEditorialReport(
       reassessed,
       analysisFor(reassessed),

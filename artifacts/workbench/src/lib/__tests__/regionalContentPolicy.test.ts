@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   MIDDLE_EAST_COLLECTION_DOMAINS,
+  REGIONAL_MAX_MAP_POINTS,
+  selectRegionalMapDevelopments,
   validateRegionalContentPolicy,
 } from "../regionalContentPolicy";
 import {
@@ -57,6 +59,23 @@ function development(index: number, overrides: Partial<RegionalDevelopment> = {}
   };
 }
 
+/** The opening assessment now has its own 100-130 word range. */
+function summary(words = 115): string {
+  const opening = "The most consequential change this week is a confirmed operational disruption at a single named facility.";
+  const filler = "Exposure sits with continuity planning and scheduling decisions while connected operations elsewhere continue under existing arrangements without restriction.";
+  return `${opening} ${filler.repeat(12)}`.trim().split(/\s+/).slice(0, words).join(" ");
+}
+
+function watchItem(day: number, trigger: string) {
+  return {
+    date: `2026-09-2${day}`,
+    location: "Singapore",
+    trigger,
+    whyItMatters: "Operating requirements may change.",
+    whatToWatch: "Watch for the final authority notice.",
+  };
+}
+
 function outlook(events: RegionalDevelopment[], words = 130): string {
   const opening = `Japan Australia Singapore face distinct operational decisions while India Malaysia and the Philippines provide the wider regional context.`;
   const filler = "Verified conditions require proportionate decisions as operators compare recovery signals and implementation changes across connected supply mobility security and digital functions.";
@@ -77,7 +96,7 @@ function report(topic: RegionalCanonicalReport["topic"] = "apac_weekly"): Region
     topic,
     issueDate: "2026-09-18",
     developments,
-    regionalOutlook: "The selected changes create distinct operating decisions across the region.",
+    regionalOutlook: summary(),
     riskPicture: "The confirmed effects remain bounded but require active operational decisions.",
     polestarOutlook: outlook(developments),
     polestarOutlookEvidenceKeys: developments.map((event) => event.eventKey!),
@@ -87,15 +106,13 @@ function report(topic: RegionalCanonicalReport["topic"] = "apac_weekly"): Region
       body: "Confirm local operating conditions before dispatch.",
     }],
     businessImplicationsNarrative: "Confirm local operating conditions before dispatch.",
-    watchItems: [{
-      date: "2026-09-22",
-      location: "Singapore",
-      trigger: "A scheduled implementation window begins",
-      whyItMatters: "Operating requirements may change.",
-      whatToWatch: "Watch for the final authority notice.",
-    }],
+    watchItems: [
+      watchItem(2, "A scheduled implementation window begins"),
+      watchItem(3, "A port maintenance closure takes effect"),
+      watchItem(4, "A regulatory filing deadline falls due"),
+    ],
     glanceMetrics: [],
-    mapPoints: developments.map((event, index) => ({
+    mapPoints: developments.slice(0, REGIONAL_MAX_MAP_POINTS).map((event, index) => ({
       lat: index,
       lng: index,
       severity: event.severity,
@@ -129,8 +146,17 @@ describe("regional final-content policy", () => {
       value.polestarOutlookEvidenceKeys!.pop();
       value.mapPoints.pop();
     }, "APAC must retain six distinct developments and map items."],
-    ["five map items", (value: RegionalCanonicalReport) => value.mapPoints.pop(),
-      "Every selected development must retain its distinct map item."],
+    ["a sixth map item", (value: RegionalCanonicalReport) => {
+      value.mapPoints.push({
+        ...value.mapPoints[0], title: value.developments[5].title,
+      });
+    }, `The map must plot one to ${REGIONAL_MAX_MAP_POINTS} distinct developments chosen for the operating picture.`],
+    ["a repeated map item", (value: RegionalCanonicalReport) => {
+      value.mapPoints[1] = { ...value.mapPoints[0] };
+    }, `The map must plot one to ${REGIONAL_MAX_MAP_POINTS} distinct developments chosen for the operating picture.`],
+    ["no map item", (value: RegionalCanonicalReport) => {
+      value.mapPoints = [];
+    }, `The map must plot one to ${REGIONAL_MAX_MAP_POINTS} distinct developments chosen for the operating picture.`],
     ["no Cyber event", (value: RegionalCanonicalReport) => {
       value.developments[0].category = "Security";
     }, "APAC requires a material Cyber development; do not substitute filler."],
@@ -220,9 +246,7 @@ describe("regional final-content policy", () => {
   });
 
   it("requires five to eight Middle East events and all nine collection checks to be genuinely completed", () => {
-    const valid = report("middle_east_weekly");
-    valid.watchItems = [];
-    expect(validateRegionalContentPolicy(valid)).toEqual([]);
+    expect(validateRegionalContentPolicy(report("middle_east_weekly"))).toEqual([]);
 
     for (const count of [4, 9]) {
       const value = report("middle_east_weekly");
@@ -249,11 +273,30 @@ describe("regional final-content policy", () => {
     }
   });
 
-  it("permits a zero Middle East watch only after all eleven forward domains and the separate search completed", () => {
-    const valid = report("middle_east_weekly");
-    valid.watchItems = [];
-    expect(validateRegionalContentPolicy(valid)).toEqual([]);
+  it("requires three to five real Middle East forward items, not a holiday calendar", () => {
+    expect(validateRegionalContentPolicy(report("middle_east_weekly"))).toEqual([]);
 
+    for (const count of [0, 2, 6]) {
+      const value = report("middle_east_weekly");
+      value.watchItems = Array.from({ length: count }, (_, index) =>
+        watchItem(index % 8, `A scheduled operating decision ${index}`));
+      expect(validateRegionalContentPolicy(value)).toContain(
+        "7 Day Watch requires 3 to 5 forward items from the separate forward search.",
+      );
+    }
+
+    const holidays = report("middle_east_weekly");
+    holidays.watchItems = [
+      watchItem(2, "National Day public holiday"),
+      watchItem(3, "Eid al-Adha holiday closures"),
+      watchItem(4, "A port maintenance closure takes effect"),
+    ];
+    expect(validateRegionalContentPolicy(holidays)).toContain(
+      "7 Day Watch must not consist mainly of public holidays and observances.",
+    );
+  });
+
+  it("requires the eleven-domain forward search behind the Middle East watch", () => {
     const defects: Array<(value: RegionalCanonicalReport) => void> = [
       (value) => { value.coverageManifest.requiredForwardDomains!.pop(); },
       (value) => { value.coverageManifest.forwardDomains![0].status = "not_run"; },
@@ -263,7 +306,6 @@ describe("regional final-content policy", () => {
     ];
     for (const mutate of defects) {
       const value = report("middle_east_weekly");
-      value.watchItems = [];
       mutate(value);
       expect(validateRegionalContentPolicy(value)).toContain(
         "Middle East requires a completed, separate eleven-domain 7 Day Watch search.",
@@ -282,6 +324,92 @@ describe("regional final-content policy", () => {
     );
     value.coverageManifest.collectionPasses = 2;
     expect(validateRegionalContentPolicy(value)).toEqual([]);
+  });
+
+  it("holds the opening assessment to 100 to 130 words", () => {
+    for (const words of [99, 131]) {
+      const value = report();
+      value.regionalOutlook = summary(words);
+      expect(validateRegionalContentPolicy(value)).toContain(
+        "regionalOutlook must contain 100 to 130 words: it states the week's most consequential change and where exposure sits, not a roundup.",
+      );
+    }
+    for (const words of [100, 130]) {
+      const value = report();
+      value.regionalOutlook = summary(words);
+      expect(validateRegionalContentPolicy(value)).toEqual([]);
+    }
+  });
+
+  it("rejects prose that describes its own inputs instead of addressing the client", () => {
+    const narrative = report();
+    narrative.riskPicture = "The supplied facts do not establish wider disruption beyond the named site.";
+    expect(validateRegionalContentPolicy(narrative).some((error) =>
+      error.startsWith("riskPicture refers to the reporting behind the assessment"))).toBe(true);
+
+    const perDevelopment = report();
+    perDevelopment.developments[0].polestarView = "The packet does not confirm a wider outage.";
+    expect(validateRegionalContentPolicy(perDevelopment)).toContain(
+      "Distinct development 0: source-material voice in polestarView.",
+    );
+  });
+
+  it("rejects a country-by-country risk picture and business implications", () => {
+    const value = report();
+    value.riskPicture = "Japan faces a digital recovery decision. Australia faces weather constraints. Singapore awaits regulatory detail. India requires local monitoring.";
+    expect(validateRegionalContentPolicy(value)).toContain(
+      "riskPicture must connect the developments into a risk picture rather than work through one country at a time.",
+    );
+
+    const implications = report();
+    implications.businessImplicationsNarrative = "Japan needs continuity cover. Australia needs travel rebooking. Singapore needs filing support. India needs escort arrangements.";
+    expect(validateRegionalContentPolicy(implications)).toContain(
+      "businessImplicationsNarrative must stay organised by business function rather than by country.",
+    );
+  });
+
+  it("rejects a Middle East Outlook dominated by energy prose when other risks were selected", () => {
+    const value = report("middle_east_weekly");
+    value.polestarOutlook = [
+      "Refinery outages in Japan and Singapore remain the dominant fuel supply question for the coming week, and operators should expect continued pressure on regional diesel availability while repairs continue at both affected sites.",
+      "Pipeline repair work in Australia and India will determine whether crude flows normalise, with electricity demand in both markets still exposed to any further interruption at generation or storage assets.",
+      "Gas processing constraints across Malaysia and the Philippines could extend the same exposure into petrochemical feedstock, keeping procurement decisions unusually sensitive to short notice changes.",
+      "Regulatory implementation in Singapore and Japan remains the principal separate question, and workforce approvals should be confirmed before committing to new deployments in either market.",
+      "Security conditions in India and Australia are stable enough to support existing schedules.",
+    ].join(" ");
+    expect(validateRegionalContentPolicy(value)).toContain(
+      "Polestar Outlook concentrates on energy infrastructure while other material risks were selected.",
+    );
+  });
+
+  it("plots at most five developments, chosen for breadth rather than severity alone", () => {
+    const candidates = [
+      { country: "Saudi Arabia", category: "Energy", severity: "Extreme", title: "Refinery fire halts crude processing", whatChanged: "A refinery fire halted crude processing at the plant." },
+      { country: "Saudi Arabia", category: "Energy", severity: "High", title: "Second refinery unit shut", whatChanged: "A second refinery unit shut down for inspection." },
+      { country: "Israel", category: "Security", severity: "High", title: "Airspace closure suspends flights", whatChanged: "An airspace closure suspended flights at the airport." },
+      { country: "Egypt", category: "Regulatory", severity: "Low", title: "Customs rule takes effect", whatChanged: "A customs regulation takes effect at the border crossing." },
+      { country: "Iraq", category: "Cyber", severity: "Moderate", title: "Ransomware disrupts port systems", whatChanged: "A ransomware breach disrupted port cargo systems." },
+      { country: "Jordan", category: "Political", severity: "Low", title: "Parliamentary vote scheduled", whatChanged: "A parliamentary vote was scheduled for next week." },
+      { country: "Yemen", category: "Security", severity: "Moderate", title: "Vessel attacked near Bab el-Mandeb", whatChanged: "A vessel was attacked near the strait." },
+    ];
+    const chosen = selectRegionalMapDevelopments(candidates);
+    expect(chosen).toHaveLength(REGIONAL_MAX_MAP_POINTS);
+    // The second Saudi energy entry describes the same operating issue.
+    expect(chosen.map((entry) => entry.title)).not.toContain("Second refinery unit shut");
+    expect(chosen.map((entry) => entry.country)).toEqual(
+      expect.arrayContaining(["Saudi Arabia", "Israel", "Iraq"]));
+    const order = chosen.map((entry) => candidates.indexOf(entry));
+    expect(order).toEqual([...order].sort((first, second) => first - second));
+  });
+
+  it("keeps two different operating issues in the same market and domain", () => {
+    const candidates = [
+      { country: "Egypt", category: "Regulatory", severity: "Low", title: "Customs rule takes effect", whatChanged: "A customs regulation takes effect at the border crossing." },
+      { country: "Egypt", category: "Regulatory", severity: "Low", title: "Work visa approvals suspended", whatChanged: "Work visa approvals were suspended for new applicants." },
+      { country: "Israel", category: "Security", severity: "High", title: "Airspace closure suspends flights", whatChanged: "An airspace closure suspended flights at the airport." },
+    ];
+    expect(selectRegionalMapDevelopments(candidates).map((entry) => entry.title))
+      .toEqual(candidates.map((entry) => entry.title));
   });
 
   it("keeps legacy v2 reports readable without six domain briefs or the new 120-word minimum", () => {

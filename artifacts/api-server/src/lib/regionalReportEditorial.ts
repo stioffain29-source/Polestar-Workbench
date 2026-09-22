@@ -21,11 +21,17 @@ import {
   type RegionalEventFact,
 } from "../../../workbench/src/lib/regionalEditorial";
 import {
+  REGIONAL_MAX_MAP_POINTS,
+  REGIONAL_MAX_RISK_SINGLE_COUNTRY_SENTENCES,
   REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES,
   REGIONAL_OUTLOOK_MAX_WORDS,
   REGIONAL_OUTLOOK_MIN_WORDS,
+  REGIONAL_SUMMARY_MAX_WORDS,
+  REGIONAL_SUMMARY_MIN_WORDS,
   regionalOutlookNamedCountries,
+  regionalPipelineVoicePhrases,
   regionalSingleCountrySentences,
+  validateRegionalForwardWatch,
 } from "../../../workbench/src/lib/regionalContentPolicy";
 import {
   extractRegionalReportFacts,
@@ -72,17 +78,18 @@ export const POLESTAR_SENTENCE_RULE =
   `At most ${REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES} sentences may name exactly one of the selected countries. Every other sentence must name two or more of them together, or none at all, so related exposures are compared inside the sentence instead of each country receiving its own update.`;
 
 const ANALYSIS_INSTRUCTION = `Write a concise Regional Weekly business-risk assessment using ONLY the supplied structured event facts. You are not given articles or headlines: do not introduce external information.
-The event set, factual sentences, jurisdiction, dates, event identity, severity and map selection are FIXED. Do not change them or infer unreported consequences. A reported date is not an occurrence date. Source counts are not evidence of impact.
+The event set, factual sentences, jurisdiction, dates, event identity, severity and map selection are FIXED; the map plots at most ${REGIONAL_MAX_MAP_POINTS} of the selected developments, so do not describe the map as showing all of them. Do not change them or infer unreported consequences. A reported date is not an occurrence date. Source counts are not evidence of impact.
 Each section has a DIFFERENT purpose:
-regionalOutlook: 90-125 words (hard maximum 140), at most two paragraphs. Rank the week's most consequential exposure and contrast it with another distinct operating issue. Name at most three markets or places; this is not a roundup of every country/development. Do NOT repeat casualties or write travel advice.
-riskPicture: 100-160 words (hard maximum 180), at most three short paragraphs. Explain the transmission of the actual disruptions into business activity, distinguishing direct impact from a plausible contingent exposure. Compare the named risks; do not produce a country-by-country list or general essays about types of risk.
-businessImplications: 2-3 short paragraphs, TOTAL 110-135 words across ALL paragraphs combined (hard maximum 180). Organise by relevant business function, not countries. Each paragraph must identify the exposed function, a concrete decision and its trigger grounded in the facts. Do not repeat per-event impact paragraphs, invent service restoration times, evacuation needs or pricing changes. No paragraph for a function without evidence.
-polestarOutlook: ${REGIONAL_OUTLOOK_MIN_WORDS}-${REGIONAL_OUTLOOK_MAX_WORDS} words inclusive, aim 135-150 and count the words before returning; ${REGIONAL_OUTLOOK_MAX_WORDS} words is a hard ceiling. One or two connected paragraphs. A genuine REGIONAL forward assessment considering ALL selected developments; name at least three of their countries or locations. ${POLESTAR_SENTENCE_RULE} Rank what matters most next, connect the risks across business functions, distinguish plausible deterioration from stabilisation and identify specific changes that would materially alter the assessment. Do not default to Japan alone or Saudi energy infrastructure alone. Do NOT write separate mini country updates, repeat Key Developments or repeat the opening. Link every selected eventKey in the section metadata, while synthesising their implications rather than listing them.
+regionalOutlook: ${REGIONAL_SUMMARY_MIN_WORDS}-${REGIONAL_SUMMARY_MAX_WORDS} words inclusive (${REGIONAL_SUMMARY_MAX_WORDS} is a hard ceiling; count the words before returning), at most two paragraphs. State the single most consequential change of the week, then where business exposure actually sits and what is NOT affected. Contrast it with one other distinct operating issue. Name at most three markets or places; this is not a roundup of every country/development. Do NOT repeat casualties or write travel advice.
+riskPicture: 100-160 words (hard maximum 180), at most three short paragraphs. Explain how the actual disruptions transmit into business activity, distinguishing direct impact from a plausible contingent exposure. Connect the developments where the evidence supports it: aviation or airspace disruption with energy and military activity, chokepoint pressure with energy logistics and shipping cost, cyber intrusion with operational continuity, regulatory change with workforce or market access. At most ${REGIONAL_MAX_RISK_SINGLE_COUNTRY_SENTENCES} sentences may name exactly one selected country: do not produce a country-by-country list or a general essay about types of risk.
+businessImplications: 2-3 short paragraphs, TOTAL 110-135 words across ALL paragraphs combined (hard maximum 180). Organise by relevant business function, not countries; at most ${REGIONAL_MAX_RISK_SINGLE_COUNTRY_SENTENCES} sentences across all paragraphs may name exactly one selected country. Each paragraph must identify the exposed function, a concrete decision and its trigger grounded in the facts. Do not repeat per-event impact paragraphs, invent service restoration times, evacuation needs or pricing changes. No paragraph for a function without evidence.
+polestarOutlook: ${REGIONAL_OUTLOOK_MIN_WORDS}-${REGIONAL_OUTLOOK_MAX_WORDS} words inclusive, aim 135-150 and count the words before returning; ${REGIONAL_OUTLOOK_MAX_WORDS} words is a hard ceiling. One or two connected paragraphs. A genuine REGIONAL forward assessment considering ALL selected developments; name at least three of their countries or locations. ${POLESTAR_SENTENCE_RULE} Cover four things: the most important forward driver for the region, the secondary risks that could become operationally significant, what would materially worsen the assessment, and what would indicate stabilisation. Connect the risks across business functions. Do not default to Japan alone or Saudi energy infrastructure alone, and do not let energy infrastructure dominate the section when non-energy developments were selected. Do NOT write separate mini country updates, repeat Key Developments or repeat the opening. Link every selected eventKey in the section metadata, while synthesising their implications rather than listing them.
 For EACH development supply: operationalImpact<=35 words (which function is exposed, and how, not a repeat of the fact); polestarView<=30 words (a distinct, defensible judgement separating what is known from conditional consequences); outlook7Days<=25 words (one specific observable next signal). Do not add titles or whatChanged: those already come from verified facts.
 Keep current loss of service separate from possible consequences. For cyber, distinguish data exposure from service downtime; a hotel breach does not prove bookings halted, and a government platform outage does not prove all transport stopped. For LPG, do not invent prices, rationing, import causes or nationwide closure. A police-site bombing does not prove commercial road closure. Do not forecast escalation simply because an attack occurred.
 Historical source status must remain historical: "fighting was ongoing when the toll was reported" does NOT establish that fighting continues on the issue date. Do not turn an attack into confirmed business-access disruption, or say business activity "continues" to be impeded when that impact was never established. State those exposures conditionally. Do not use "Known:" or "Conditional:" scaffolding; write the distinction as ordinary sentences.
 Cite each analytical section's supporting eventKeys in its metadata, never inline. Every factual name, number, cause or asserted impact must derive from the relevant supplied confirmedFacts; recommendations must be conditional where their trigger is not observed.
 Do not use source/outlet names, domains, URLs, raw headlines, sentence fragments, rhetorical filler, or count-based prose. No quotes or citation markers in rendered text.
+Write as an analyst addressing the client, never as a writer describing your own inputs. NEVER write "the supplied facts", "on the supplied facts", "the packet", "the source material", "confirmed facts", "the evidence set" or any similar reference to what you were given. Where something is unproven, say so in the client's terms: "There is currently no evidence of wider disruption."; "The extent of damage remains unclear."; "No operational outage has been confirmed."; "The duration of the disruption remains uncertain."; "Current reporting indicates limited effect beyond the affected site."
 BANNED phrases: "The development is relevant to"; "Their regional importance comes from what could follow"; "the specific indicators are"; "the significance is confined to the named market"; "reporting placed the casualties at"; "selected evidence"; "the principal changes this week were".
 Write in direct, precise, sentence-cased analytical English. No template padding, no claim of uniform regional deterioration, no statement that a domain is empty, and no verbatim sentence repeated across sections. Return complete sentences without truncation.`;
 
@@ -105,6 +112,7 @@ export function regionalOutlookDiagnostics(
     countriesCurrentlyNamed: regionalOutlookNamedCountries(outlook.text, events),
     requiredEvidenceKeys: events.map((event) => event.eventKey),
     suppliedEvidenceKeys: outlook.evidenceKeys,
+    phrasesDescribingYourOwnInputs: regionalPipelineVoicePhrases(outlook.text),
   };
 }
 
@@ -115,10 +123,19 @@ function regionalNarrativeDiagnostics(analysis: RegionalAnalysis, events: Ground
     businessImplicationsNarrative: analysis.businessImplications.map((block) => block.body).join("\n\n"),
     polestarOutlook: analysis.polestarOutlook.text,
   } as const;
+  const countries = events.map((event) => event.country);
   return {
     measuredSectionWords: Object.fromEntries(Object.entries(sections).map(([key, text]) => [key, {
       words: regionalWordCount(text),
       hardMaximum: REGIONAL_WORD_LIMITS[key as keyof typeof sections],
+      ...(key === "regionalOutlook"
+        ? { requiredWords: `${REGIONAL_SUMMARY_MIN_WORDS}-${REGIONAL_SUMMARY_MAX_WORDS} inclusive` }
+        : {}),
+      phrasesDescribingYourOwnInputs: regionalPipelineVoicePhrases(text),
+      ...(key === "riskPicture" || key === "businessImplicationsNarrative" ? {
+        sentencesNamingExactlyOneSelectedCountry: regionalSingleCountrySentences(text, countries),
+        maximumAllowed: REGIONAL_MAX_RISK_SINGLE_COUNTRY_SENTENCES,
+      } : {}),
     }])),
     polestarOutlook: regionalOutlookDiagnostics(analysis.polestarOutlook, events),
   };
@@ -127,7 +144,7 @@ function regionalNarrativeDiagnostics(analysis: RegionalAnalysis, events: Ground
 // Only the analytical prose can be repaired by rewriting it. A fixed-fact,
 // evidence, severity, map or selection failure must regenerate the whole object.
 const DEVELOPMENT_LEVEL_FAILURE =
-  /analytical development set|Missing analysis for|Unsupported analytical number|invalid (?:title|whatChanged|operationalImpact|polestarView|outlook7Days) length|source text or generic prose in|Missing factual evidence for|map point|map item|Developments must represent|selection must contain|Severity has not been reassessed|same source evidence|7 Day Watch|collection is incomplete|coverage|APAC (?:must retain|requires)|Middle East requires|dominates/i;
+  /analytical development set|Missing analysis for|Unsupported analytical number|invalid (?:title|whatChanged|operationalImpact|polestarView|outlook7Days) length|source text or generic prose in|source-material voice in|Missing factual evidence for|map point|map item|The map must plot|Developments must represent|selection must contain|Severity has not been reassessed|same source evidence|7 Day Watch|collection is incomplete|coverage|APAC (?:must retain|requires)|Middle East requires|dominates/i;
 
 // The validators name the failing section, so only that section is replaced.
 // A rewrite must never quietly alter prose that already passed.
@@ -369,6 +386,13 @@ export async function finishRegionalEditorialReport(
   const selected = selectGroundedRegionalEvents(reassessRegionalEvents(extracted.events), topic);
   if (selected.length < 5) {
     throw new Error(`Only ${selected.length} distinct events have adequate factual support. No thin or padded report was saved.`);
+  }
+  // Forward items come from collection, not from writing: a thin or holiday-led
+  // watch cannot be repaired by the writer, so it fails before any analysis is paid for.
+  const watchProblems = validateRegionalForwardWatch(
+    topic, buildApacWeeklyWatchlist([], futureEvents, issueDate));
+  if (watchProblems.length > 0) {
+    throw new Error(`${watchProblems.join(" ")} No report was generated.`);
   }
   let analysis = await regionalJson(
     RegionalAnalysisSchema, ANALYSIS_INSTRUCTION,

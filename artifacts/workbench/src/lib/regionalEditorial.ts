@@ -5,10 +5,11 @@ import type {
 } from "./regionalWeekly";
 import { REGIONAL_OUTLOOK_MAX_WORDS, validateRegionalContentPolicy } from "./regionalContentPolicy";
 
-export const REGIONAL_EDITORIAL_VERSION = "regional-facts-v3" as const;
+export const REGIONAL_EDITORIAL_VERSION = "regional-facts-v4" as const;
 
 export function isRegionalFactualEdition(version: string | undefined): boolean {
-  return version === "regional-facts-v2" || version === REGIONAL_EDITORIAL_VERSION;
+  return version === "regional-facts-v2" || version === "regional-facts-v3" ||
+    version === REGIONAL_EDITORIAL_VERSION;
 }
 
 /** Report facts are separate from source articles and from analytical judgement. */
@@ -141,7 +142,8 @@ export function validateRegionalEditorialReport(report: RegionalCanonicalReport)
   }
   const keys = report.developments.map((row) => row.eventKey);
   if (keys.some((key) => !key) || new Set(keys).size !== keys.length) errors.push("Developments must represent distinct identified events.");
-  const maximum = report.editorialVersion === REGIONAL_EDITORIAL_VERSION && report.topic === "middle_east_weekly" ? 8 : 6;
+  // Five to eight for the Middle East since the factual editions; APAC stays at six.
+  const maximum = report.editorialVersion !== "regional-facts-v2" && report.topic === "middle_east_weekly" ? 8 : 6;
   if (report.developments.length < 5 || report.developments.length > maximum) errors.push(`The regional selection must contain five to ${maximum} material events.`);
   const sourceIds = new Set<string>();
   for (const row of report.developments) {

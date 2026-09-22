@@ -1,0 +1,373 @@
+MIDDLE EAST WEEKLY — CONTENT CORRECTION ONLY
+
+KEEP THE CURRENT FORMAT.
+
+DO NOT change:
+
+cover
+pagination
+page structure
+Carto Positron map style
+fonts
+headers
+footers
+development card design
+Week at a Glance layout
+
+The layout is now working.
+
+The remaining problems are:
+
+1. collection breadth
+2. 7 Day Watch quality
+3. analyst language
+4. map overcrowding
+
+==================================================
+1. MAP — MAXIMUM FIVE ITEMS
+==================================================
+
+The current Middle East map has 7 items.
+
+That is too many.
+
+HARD LIMIT:
+
+MAXIMUM 5 MAP ITEMS.
+
+The report itself may contain more than five Key Developments.
+
+The map must show ONLY the five developments that best explain the regional operating picture.
+
+Select by:
+
+business consequence
+security significance
+transport impact
+energy impact
+regional relevance
+forward importance
+
+Do NOT select simply because an item has a higher severity.
+
+Do NOT duplicate multiple incidents where one broader development explains the same operating issue.
+
+Keep the existing Carto Positron presentation.
+
+Do not redesign the map.
+
+==================================================
+2. COLLECTION IS STILL TOO ENERGY HEAVY
+==================================================
+
+The current report is much improved but remains concentrated around:
+
+Saudi Arabia
+Bahrain
+Kuwait
+Syria
+Israel
+
+with heavy emphasis on attacks against energy infrastructure.
+
+Before selecting the final developments, deliberately check:
+
+MARITIME
+
+Strait of Hormuz
+Bab el Mandeb
+Red Sea
+Gulf shipping
+commercial vessel movements
+ports
+shipping restrictions
+rerouting
+insurance
+container traffic
+oil and LNG movements
+
+CYBER AND DIGITAL INFRASTRUCTURE
+
+significant cyber attacks
+ransomware
+telecommunications
+cloud infrastructure
+government systems
+ports
+airports
+energy systems
+Iran linked cyber activity
+major service outages
+
+POLITICAL AND REGULATORY
+
+sanctions
+trade restrictions
+customs
+immigration
+visa changes
+labour regulation
+foreign investment
+market access
+government policy
+political instability
+
+WEATHER AND NATURAL HAZARDS
+
+heavy rain
+flash flooding
+sandstorms
+earthquakes
+extreme heat
+severe storms
+weather affecting roads, airports or sites
+
+REGIONAL SECURITY
+
+Iran
+Iraq
+Lebanon
+Jordan
+Yemen
+Israel
+Saudi Arabia
+Syria
+Gulf states
+
+These categories must be CHECKED.
+
+Do not force them into the report if nothing material occurred.
+
+But do not generate the report until the collection check has run.
+
+==================================================
+3. KEY DEVELOPMENTS
+==================================================
+
+Target:
+
+5 to 8 material developments.
+
+Do NOT force seven.
+
+Do NOT force exactly five.
+
+The report may contain more developments than the map.
+
+Each development must earn its place through actual operational relevance.
+
+Remove weak developments if a more important maritime, cyber, political, regulatory or weather development is available.
+
+==================================================
+4. ANALYST LANGUAGE
+==================================================
+
+Stop using phrases such as:
+
+“the supplied facts establish”
+
+“the supplied facts do not establish”
+
+“on the supplied facts”
+
+“the packet does not confirm”
+
+This sounds like the AI describing its source material.
+
+Polestar speaks directly to the client.
+
+Use:
+
+“There is currently no evidence of wider disruption.”
+
+“The extent of damage remains unclear.”
+
+“No operational outage has been confirmed.”
+
+“The duration of the disruption remains uncertain.”
+
+“Current reporting indicates…”
+
+Write as an analyst.
+
+Do not refer to the data pipeline, source packet or supplied facts.
+
+==================================================
+5. 7 DAY WATCH — REBUILD
+==================================================
+
+The current 7 Day Watch contains:
+
+Saudi National Day
+Yemen Revolution Day
+Sukkot
+
+These may be operationally relevant, but a Middle East intelligence watch cannot consist mainly of public holidays.
+
+Run a separate forward search across the NEXT SEVEN DAYS.
+
+Look specifically for:
+
+missile and drone activity
+shipping restrictions
+Hormuz developments
+Red Sea / Bab el Mandeb activity
+military exercises
+security alerts
+planned protests
+political deadlines
+sanctions decisions
+regulatory implementation
+border changes
+airport or airspace restrictions
+energy infrastructure developments
+weather warnings
+major public events
+
+Target:
+
+3 to 5 useful watch items.
+
+Public holidays may remain if genuinely operationally important.
+
+They must not crowd out more material forward risks.
+
+Each Watch item must contain:
+
+DATE
+LOCATION
+EVENT
+
+WHY IT MATTERS
+
+WATCH
+
+==================================================
+6. REGIONAL OUTLOOK
+==================================================
+
+The current length is good.
+
+KEEP IT SHORT.
+
+Approximately 100 to 130 words.
+
+Do not expand it.
+
+However, the Outlook should reflect the broader collection if meaningful maritime, cyber, regulatory or weather developments are identified.
+
+It should answer:
+
+What changed?
+What matters most to business?
+Where is the immediate exposure?
+
+Do not list every development.
+
+==================================================
+7. REGIONAL RISK PICTURE
+==================================================
+
+Keep this analytical and concise.
+
+Do not simply work through every country.
+
+Connect developments where useful.
+
+For example:
+
+Saudi aviation disruption + energy infrastructure attacks
+
+Hormuz / Red Sea pressure + energy logistics
+
+Cyber disruption + business continuity
+
+Political or regulatory change + workforce / market access
+
+Only make these connections where supported by evidence.
+
+==================================================
+8. BUSINESS IMPLICATIONS
+==================================================
+
+The current direction is good.
+
+Keep the focus on:
+
+travel
+operations
+logistics
+assets
+procurement
+continuity
+workforce
+compliance
+
+Do NOT turn it back into country summaries.
+
+==================================================
+9. POLESTAR OUTLOOK
+==================================================
+
+Target:
+
+120 to 160 words.
+
+The current Outlook is still too concentrated on energy infrastructure.
+
+It should identify:
+
+the most important forward regional driver
+
+secondary risks that could become operationally significant
+
+what would materially worsen the assessment
+
+what would indicate stabilisation
+
+Do NOT simply repeat the Key Developments.
+
+Do NOT list countries one by one.
+
+==================================================
+10. QUALITY CHECK BEFORE EXPORT
+==================================================
+
+Confirm:
+
+MAP ITEMS <= 5
+
+No duplicate developments.
+
+Maritime collection completed.
+
+Cyber collection completed.
+
+Political / regulatory collection completed.
+
+Weather collection completed.
+
+Regional security collection completed.
+
+7 Day Watch forward search completed.
+
+No references to:
+“supplied facts”
+“packet”
+“source material”
+
+Severity reflects actual consequence.
+
+Regional Outlook remains concise.
+
+Polestar Outlook provides genuine forward judgement.
+
+If any check fails:
+
+DO NOT GENERATE.
+
+Regenerate MIDDLE EAST WEEKLY only.
+
+Do not alter APAC.
+
+STOP.
