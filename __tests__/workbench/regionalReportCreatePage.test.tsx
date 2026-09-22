@@ -73,6 +73,20 @@ test("connection error exposes reconnect and reload; reconnect preserves the sam
   fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
   await waitFor(() => expect(navigate).toHaveBeenCalledWith("/reports/165"));
   expect(waitForReport.mock.calls.map(([body]) => body.requestId)).toEqual([input.requestId, input.requestId]);
+  expect(waitForReport.mock.calls[1][1].retryFailed).toBe(false);
+  expect(regionalCreationInput).toHaveBeenCalledTimes(1);
+});
+
+test("Try again explicitly retries a failed report once with the same identity", async () => {
+  waitForReport
+    .mockRejectedValueOnce(new RegionalCreationError("Regional coverage is incomplete.", "report"))
+    .mockResolvedValueOnce(165);
+  showPage();
+  expect(await screen.findByRole("heading", { name: "Report creation failed" })).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(navigate).toHaveBeenCalledWith("/reports/165"));
+  expect(waitForReport.mock.calls.map(([body]) => body.requestId))
+    .toEqual([input.requestId, input.requestId]);
   expect(waitForReport.mock.calls[1][1].retryFailed).toBe(true);
   expect(regionalCreationInput).toHaveBeenCalledTimes(1);
 });

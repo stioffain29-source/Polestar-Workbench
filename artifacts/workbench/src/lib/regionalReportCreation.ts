@@ -153,19 +153,36 @@ function abortError(): DOMException {
   return new DOMException("Creation page closed", "AbortError");
 }
 
-function pause(ms: number, signal: AbortSignal): Promise<void> {
+function pause(ms: number, signal: AbortSignal, wakeOnReconnect = false): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) { reject(abortError()); return; }
-    const onAbort = () => {
+    const cleanup = () => {
       clearTimeout(timer);
       signal.removeEventListener("abort", onAbort);
+      if (wakeOnReconnect && typeof window !== "undefined") {
+        window.removeEventListener("online", finish);
+        window.removeEventListener("focus", finish);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
+    };
+    const finish = () => {
+      cleanup();
+      resolve();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") finish();
+    };
+    const onAbort = () => {
+      cleanup();
       reject(abortError());
     };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
+    const timer = setTimeout(finish, ms);
     signal.addEventListener("abort", onAbort, { once: true });
+    if (wakeOnReconnect && typeof window !== "undefined") {
+      window.addEventListener("online", finish);
+      window.addEventListener("focus", finish);
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
   });
 }
 
@@ -186,6 +203,16 @@ export async function waitForRegionalReport(
   options: CreationOptions,
 ): Promise<number> {
   const { signal } = options;
+  const validateJob = (job: RegionalReportJob): RegionalReportJob => {
+    // A private gateway may follow a redirect to an HTML login page.
+    // It is not an application response and cannot establish a logout.
+    if (typeof job === "string") throw new RegionalTransportError("Non-JSON report response");
+    if (!job || job.id !== input.requestId || job.topic !== input.topic ||
+      job.issueDate !== input.issueDate || !STATUSES.has(job.status) || !STAGES.has(job.stage)) {
+      throw new RegionalCreationError("The server returned an invalid report status. Retry the same request; no new report will be created.", "report");
+    }
+    return job;
+  };
   const request = async (operation: (requestSignal: AbortSignal) => Promise<RegionalReportJob>) => {
     for (let attempt = 0; ; attempt++) {
       if (signal.aborted) throw abortError();
@@ -194,16 +221,8 @@ export async function waitForRegionalReport(
       signal.addEventListener("abort", abort, { once: true });
       const timer = setTimeout(abort, options.requestTimeoutMs ?? 20_000);
       try {
-        const job = await operation(controller.signal);
+        const job = validateJob(await operation(controller.signal));
         if (signal.aborted) throw abortError();
-        // Following a gateway redirect can return its HTML login page instead
-        // of JSON. Reconnect without losing the job identity or inventing a
-        // session-expiry diagnosis.
-        if (typeof job === "string") throw new RegionalTransportError("Non-JSON report response");
-        if (!job || job.id !== input.requestId || job.topic !== input.topic ||
-          job.issueDate !== input.issueDate || !STATUSES.has(job.status) || !STAGES.has(job.stage)) {
-          throw new RegionalCreationError("The server returned an invalid report status. Retry the same request; no new report will be created.", "report");
-        }
         options.onReconnecting(false);
         return job;
       } catch (error) {
@@ -225,18 +244,15 @@ export async function waitForRegionalReport(
           error instanceof RegionalTransportError ||
           (error instanceof Error && error.name === "ResponseParseError");
         if (!transient) throw error;
-        if (attempt >= 3) {
-          throw new RegionalCreationError(
-            "The connection to the report service was interrupted. Reconnect to check the same request. If access to the site was interrupted, reopen this page. Neither action creates another report.",
-            "connection",
-          );
-        }
+        // A transport outage is not a failed build. Keep following the durable
+        // job while this page is open instead of stranding a saved report after
+        // four failed polls. The UI keeps reload/back controls available.
         options.onReconnecting(true);
       } finally {
         clearTimeout(timer);
         signal.removeEventListener("abort", abort);
       }
-      await pause((options.retryMs ?? 1_500) * (attempt + 1), signal);
+      await pause(Math.min((options.retryMs ?? 1_500) * (attempt + 1), 15_000), signal, true);
     }
   };
   const fetchOptions = (requestSignal: AbortSignal): RequestInit => ({
@@ -248,17 +264,25 @@ export async function waitForRegionalReport(
     signal: requestSignal,
   });
   try {
-    let job: RegionalReportJob;
-    try {
-      job = await request((requestSignal) => getRegionalReportJob(input.requestId, fetchOptions(requestSignal)));
-    } catch (error) {
-      if (httpStatus(error) !== 404) throw error;
-      job = await request((requestSignal) => startRegionalReport(input, fetchOptions(requestSignal)));
-    }
-    if (job.status === "failed" && options.retryFailed) {
-      job = await request((requestSignal) => startRegionalReport(input, fetchOptions(requestSignal)));
-    }
-    const started = Date.now();
+    let retryFailed = options.retryFailed === true;
+    let job = await request(async (requestSignal) => {
+      let existing: RegionalReportJob;
+      try {
+        existing = validateJob(await getRegionalReportJob(input.requestId, fetchOptions(requestSignal)));
+      } catch (error) {
+        if (httpStatus(error) !== 404) throw error;
+        retryFailed = false;
+        return startRegionalReport(input, fetchOptions(requestSignal));
+      }
+      const retry = existing.status === "failed" && retryFailed;
+      // Consume explicit retry intent once. After a lost POST response, GET
+      // reconciles the same job before any further submission; a failed result
+      // must not silently trigger another build.
+      retryFailed = false;
+      return retry
+        ? startRegionalReport(input, fetchOptions(requestSignal))
+        : existing;
+    });
     while (true) {
       if (signal.aborted) throw abortError();
       options.onProgress(job);
@@ -270,9 +294,6 @@ export async function waitForRegionalReport(
       }
       if (job.status === "failed") {
         throw new RegionalCreationError(job.error || "Report creation failed. No incomplete report was saved.", "report");
-      }
-      if (Date.now() - started > 10 * 60_000) {
-        throw new RegionalCreationError("Creation is still queued or running. Reconnect to check its progress; the same request will be used.", "connection");
       }
       await pause(options.pollMs ?? 1_500, signal);
       job = await request((requestSignal) => getRegionalReportJob(input.requestId, fetchOptions(requestSignal)));

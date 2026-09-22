@@ -1,0 +1,238 @@
+I want to scope the technical feasibility of an intelligence production system for a proposed APAC and Oceania ports, terminals and logistics intelligence service.
+
+This is a feasibility and workload assessment. Do not build the full product yet. Do not redesign the existing application or deploy anything.
+
+SERVICE REQUIREMENT
+
+The proposed service will produce one intelligence bulletin every two weeks.
+
+Geographic coverage:
+
+Southeast Asia
+Greater China, including Hong Kong and Taiwan
+Japan
+South Korea
+Australia
+New Zealand
+Pacific Island states where materially relevant
+
+Excluded:
+
+The Indian Subcontinent
+Middle East conflict reporting
+Red Sea and Houthi reporting
+
+The service will monitor developments affecting:
+
+Personnel safety and security
+Port and terminal operations
+Maritime and landside logistics
+Supply chain continuity
+Asset and cargo security
+Business continuity
+Geopolitical exposure
+Regulatory change
+Crisis preparedness
+
+PRIMARY INTELLIGENCE THEMES
+
+1. Security and public order
+
+Terrorism
+Politically motivated violence
+Civil unrest
+Protests near ports or logistics infrastructure
+Sabotage
+Organised crime
+Critical infrastructure incidents
+
+2. Cargo and asset security
+
+Cargo theft
+Organised theft networks
+Smuggling
+Illicit trade
+Insider activity
+Warehouse and depot incidents
+Piracy and armed robbery where port use or cargo flows could be affected
+
+3. Operational disruption
+
+Port closures
+Terminal disruption
+Industrial action
+Road and rail disruption
+Infrastructure outages
+Energy disruption
+Fuel or bunkering constraints
+Customs and border disruption
+
+4. Geopolitical and trade exposure
+
+Interstate tension
+Territorial disputes
+Sanctions
+Trade restrictions
+Government transitions
+Border closures
+Political instability
+Risks affecting maritime corridors
+
+5. Natural hazards and environmental disruption
+
+Typhoons and cyclones
+Flooding
+Earthquakes and tsunamis
+Volcanic activity
+Wildfires
+Extreme heat
+Pollution incidents
+
+Only include these where there is a credible operational implication.
+
+6. Regulatory change
+
+Port and maritime security requirements
+Environmental measures with operational implications
+Government intervention in strategic infrastructure
+Changes affecting market access or operations
+
+PROPOSED OUTPUT
+
+Each fortnightly edition should contain:
+
+A Regional Overview of 150 to 250 words
+A target of 8 to 10 priority intelligence items
+A maximum of 12 items
+Up to five developing issues on a watchlist
+
+Each intelligence item should contain:
+
+Headline
+Event date
+Country
+Specific location
+Relevant port, terminal or corridor where known
+Intelligence theme
+Current severity
+Summary of confirmed information
+Operational implications
+Outlook and indicators to monitor
+Primary or authoritative source
+Source hyperlink
+Publication date
+Confidence or verification status
+
+Current severity must use:
+
+Insignificant
+Low
+Moderate
+High
+Extreme
+
+Severity describes the current event. It must not be presented as the client’s overall business risk.
+
+FEASIBILITY QUESTIONS
+
+Assess whether the existing Replit application can support this service.
+
+Determine:
+
+1. Which existing feeds, APIs, scrapers and stored sources can already provide relevant material.
+
+2. Which countries and intelligence themes currently have adequate source coverage.
+
+3. Where there are significant source gaps, particularly in local reporting, Pacific Island states, port notices, industrial action, cargo theft and regulatory change.
+
+4. Which suitable sources provide APIs, RSS feeds or other lawful automated access.
+
+5. Which important sources would still require manual review.
+
+6. Whether duplicate reporting of the same incident can be identified and grouped reliably.
+
+7. Whether the system can distinguish routine industry news from events with plausible security, operational or continuity implications.
+
+8. Whether automated geographic and thematic exclusions can reliably remove Subcontinent, Middle East and Red Sea reporting.
+
+9. Whether the system can identify the port, terminal, city, transport corridor and affected country from collected reporting.
+
+10. Whether the system can distinguish confirmed facts, unverified claims and analytical judgement.
+
+11. Whether it can generate structured draft intelligence items while retaining the original source and publication date.
+
+12. How much human review would still be required for verification, selection, assessment and final editing.
+
+13. Whether the system can export the selected material into an editable Microsoft Word format.
+
+14. What would be required to add a client specific watchlist of ports, terminals, markets and corridors.
+
+15. What technical, legal, source reliability or continuity risks could prevent dependable fortnightly production.
+
+MATERIALITY TEST
+
+Recommend a simple filtering method that admits an item only when it has a credible or confirmed implication for at least one of the following:
+
+Personnel
+Port or terminal operations
+Cargo or assets
+Landside access
+Maritime access
+Supply chain continuity
+Regulatory compliance
+Business continuity
+
+Routine news, minor incidents and general political reporting should not qualify without a clear connection to one of these areas.
+
+TEST EXERCISE
+
+Run a limited test using the existing system and available sources.
+
+Use reporting from the most recent fourteen day period.
+
+Do not attempt full regional coverage at this stage.
+
+Test a representative sample covering:
+
+Singapore or Malaysia
+Indonesia
+The Philippines
+Greater China
+Japan or South Korea
+Australia
+New Zealand
+One Pacific Island state
+
+Collect candidate reporting, apply the exclusions and materiality test, remove duplicates, and identify what would qualify for a trial bulletin.
+
+For each accepted item, show:
+
+The original source
+Why it qualifies
+The intelligence theme
+Current severity
+What was generated automatically
+What required human judgement
+Any missing information
+
+Do not publish or distribute the test bulletin.
+
+REQUIRED RESPONSE
+
+Provide a technical feasibility report containing:
+
+Executive conclusion
+What the existing system can already do
+What needs to be added
+Source coverage by country and theme
+Automation opportunities
+Tasks that must remain human led
+Estimated setup work
+Estimated recurring human production time
+Primary risks and limitations
+Recommended minimum viable workflow
+Go, conditional go or no go recommendation
+
+Be direct. Do not assume the service is viable simply because individual technical functions can be built. The main test is whether one person can operate the service reliably while maintaining analytical quality.
+
+Do not begin the full build until I have reviewed and approved the feasibility report.

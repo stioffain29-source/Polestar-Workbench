@@ -1479,3 +1479,31 @@ mtime_ms = 1790036980390
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/01bf8584-f349-4e24-b1ce-389654c65212/311190b2-e0f0-4396-8285-cd0bb5ef3c07"
 storage_version_token = "1790037194210526"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "UtEMQ6w7kQtsqAvGfna27"
+uri = "file://research/notes.md"
+type = "text"
+title = "DB Ports Research Notes"
+description = "Research plan and running feasibility findings."
+logical_id = "4a79aea4-67a0-45a2-bea8-de8ced103ec5"
+content_hash = "sha256:a2b7381a66e171836a34f6b050ce2088c9f72fac38ff8136dea765df482c954b"
+size = 1806
+mtime_ms = 1790044506144
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/4a79aea4-67a0-45a2-bea8-de8ced103ec5/2e5cccf1-9d07-4374-bdec-d41d5c7a5fa6"
+storage_version_token = "1790044526489553"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "_samt7F7nzcid_fvLbBlK"
+uri = "file://research/db-ports-technical-feasibility.md"
+type = "text"
+title = "DB Ports Technical Feasibility Assessment"
+description = "System assessment, source coverage, unpublished 14-day trial, workload estimates and recommendation."
+logical_id = "e7b1d55c-5563-47bd-a860-8d8a6af69880"
+content_hash = "sha256:586179635647f0580b1af113a45b29c1ba132ef5eee5bdefd9d7a51153d1d5b4"
+size = 23482
+mtime_ms = 1790047671140
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e7b1d55c-5563-47bd-a860-8d8a6af69880/eb99482d-a15c-4b7a-8c92-057a6308247e"
+storage_version_token = "1790047708544940"
+content_type = "text/markdown"

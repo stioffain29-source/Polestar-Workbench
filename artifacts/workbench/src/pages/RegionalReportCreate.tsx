@@ -56,8 +56,9 @@ export default function RegionalReportCreate() {
   const qc = useQueryClient();
   const runGeneration = useRef(0);
   const inputRef = useRef<RegionalReportJobInput | null>(null);
+  const retryFailedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
-  const [stage, setStage] = useState<Stage>("queued");
+  const [stage, setStage] = useState<Stage | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [error, setError] = useState<RegionalCreationError | null>(null);
 
@@ -76,10 +77,13 @@ export default function RegionalReportCreate() {
         setReconnecting(false);
         if (!inputRef.current || inputRef.current.topic !== topic) {
           inputRef.current = regionalCreationInput(topic, currentReportDate());
+          setStage(null);
         }
+        const retryFailed = retryFailedRef.current;
+        retryFailedRef.current = false;
         const reportId = await waitForRegionalReport(inputRef.current, {
           signal: controller.signal,
-          retryFailed: attempt > 0,
+          retryFailed,
           onProgress: (job) => { if (active()) setStage(job.stage); },
           onReconnecting: (value) => { if (active()) setReconnecting(value); },
         });
@@ -106,7 +110,11 @@ export default function RegionalReportCreate() {
     };
   }, [attempt, qc, setLocation, topic]);
 
-  const copy = STAGE_COPY[stage];
+  const resume = (retryFailed = false) => {
+    retryFailedRef.current = retryFailed;
+    setAttempt((value) => value + 1);
+  };
+  const copy = STAGE_COPY[stage ?? "queued"];
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center">
       <section className="w-full rounded-sm border border-border bg-card p-10 text-center">
@@ -124,7 +132,7 @@ export default function RegionalReportCreate() {
                 </Link>
               </Button>
               {topic && error.kind !== "session" && error.kind !== "access" && (
-                <Button onClick={() => setAttempt((value) => value + 1)}>
+                <Button onClick={() => resume(error.kind === "report")}>
                   <RotateCw className="mr-2 h-4 w-4" />
                   {error.kind === "connection" ? "Reconnect" : "Try again"}
                 </Button>
@@ -151,12 +159,36 @@ export default function RegionalReportCreate() {
                 {reconnecting ? "Reconnecting to your report" : copy.title}
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                {reconnecting ? "Checking the same creation request. No duplicate report will be created." : copy.detail}
+                {reconnecting ? "Status updates are temporarily unavailable. Checking the same request automatically; no duplicate report will be created." : copy.detail}
               </p>
+              {reconnecting && stage && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Last confirmed step: {copy.title.toLowerCase()}.
+                </p>
+              )}
             </div>
             <p className="mt-5 text-xs uppercase tracking-widest text-muted-foreground">
               The editor will open automatically. Refreshing this page is safe.
             </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button variant="outline" asChild>
+                <Link href="/regional-reports">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to reports
+                </Link>
+              </Button>
+              {reconnecting && (
+                <>
+                  <Button onClick={() => resume()}>
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    Check now
+                  </Button>
+                  <Button variant="outline" onClick={() => window.location.reload()}>
+                    Reload page
+                  </Button>
+                </>
+              )}
+            </div>
           </>
         )}
       </section>

@@ -177,30 +177,33 @@ describe("regional report session recovery", () => {
     ["failed", () => Promise.reject(new TypeError("probe disconnected"))],
     ["non-JSON", () => Promise.resolve(accessResponse("<!doctype html>"))],
   ])(
-    "bounds reconnect attempts when the access probe is %s and never reports session",
+    "keeps checking after more than four %s access probes and never reports session",
     async (_label, probe) => {
-      mockedGetRegionalReportJob.mockRejectedValue(statusError(401));
+      const controller = new AbortController();
+      mockedGetRegionalReportJob.mockImplementation(async () => {
+        if (mockedGetRegionalReportJob.mock.calls.length > 5) {
+          controller.abort();
+        }
+        throw statusError(401);
+      });
       mockedFetch.mockImplementation(probe);
 
-      const error = await waitForRegionalReport(input, options()).catch(
+      const error = await waitForRegionalReport(input, options(controller)).catch(
         (caught: unknown) => caught,
       );
 
-      expect(error).toMatchObject({
-        name: "RegionalCreationError",
-        kind: "connection",
-      });
+      expect(error).toMatchObject({ name: "AbortError" });
       expect(error).not.toMatchObject({ kind: "session" });
-      expect(mockedGetRegionalReportJob.mock.calls.length).toBeGreaterThan(1);
-      expect(mockedGetRegionalReportJob.mock.calls.length).toBeLessThanOrEqual(5);
+      expect(mockedGetRegionalReportJob.mock.calls.length).toBeGreaterThan(4);
+      // The final GET aborts the outer operation before it can launch a probe.
       expect(mockedFetch).toHaveBeenCalledTimes(
-        mockedGetRegionalReportJob.mock.calls.length,
+        mockedGetRegionalReportJob.mock.calls.length - 1,
       );
       expect(mockedStartRegionalReport).not.toHaveBeenCalled();
     },
   );
 
-  it("bounds reconnects for an HTML status response without duplicating the job", async () => {
+  it("recovers after more than four HTML status responses without duplicating the job", async () => {
     const htmlResponseError = Object.assign(
       new Error("Failed to parse response as JSON"),
       {
@@ -209,14 +212,16 @@ describe("regional report session recovery", () => {
         rawBody: "<!doctype html><title>Sign in</title>",
       },
     );
-    mockedGetRegionalReportJob.mockRejectedValue(htmlResponseError);
+    mockedGetRegionalReportJob
+      .mockRejectedValueOnce(htmlResponseError)
+      .mockRejectedValueOnce(htmlResponseError)
+      .mockRejectedValueOnce(htmlResponseError)
+      .mockRejectedValueOnce(htmlResponseError)
+      .mockRejectedValueOnce(htmlResponseError)
+      .mockResolvedValueOnce(job());
 
-    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
-      name: "RegionalCreationError",
-      kind: "connection",
-    });
-    expect(mockedGetRegionalReportJob.mock.calls.length).toBeGreaterThan(1);
-    expect(mockedGetRegionalReportJob.mock.calls.length).toBeLessThanOrEqual(5);
+    await expect(waitForRegionalReport(input, options())).resolves.toBe(42);
+    expect(mockedGetRegionalReportJob).toHaveBeenCalledTimes(6);
     expect(mockedStartRegionalReport).not.toHaveBeenCalled();
   });
 
@@ -232,21 +237,98 @@ describe("regional report session recovery", () => {
     expect(mockedStartRegionalReport).not.toHaveBeenCalled();
   });
 
-  it("retries a lost POST response with the exact same request identity", async () => {
-    mockedGetRegionalReportJob.mockRejectedValueOnce(statusError(404));
-    mockedStartRegionalReport
-      .mockRejectedValueOnce(new TypeError("response lost"))
+  it("reconciles GET after a lost POST response instead of submitting again", async () => {
+    mockedGetRegionalReportJob
+      .mockRejectedValueOnce(statusError(404))
       .mockResolvedValueOnce(job());
+    mockedStartRegionalReport.mockRejectedValueOnce(new TypeError("response lost"));
 
     await expect(waitForRegionalReport(input, options())).resolves.toBe(42);
 
-    expect(mockedGetRegionalReportJob).toHaveBeenCalledTimes(1);
-    expect(mockedStartRegionalReport).toHaveBeenCalledTimes(2);
+    expect(mockedGetRegionalReportJob).toHaveBeenCalledTimes(2);
+    expect(mockedStartRegionalReport).toHaveBeenCalledTimes(1);
     for (const [postInput, requestOptions] of mockedStartRegionalReport.mock.calls) {
       expect(postInput).toBe(input);
       expect(postInput.requestId).toBe(input.requestId);
       expectRequestTransport(requestOptions);
     }
+  });
+
+  it("does not POST again when a lost explicit retry response reconciles to failed", async () => {
+    mockedGetRegionalReportJob
+      .mockResolvedValueOnce(job({
+        status: "failed",
+        stage: "failed",
+        reportId: null,
+        error: "First attempt failed",
+      }))
+      .mockResolvedValueOnce(job({
+        status: "failed",
+        stage: "failed",
+        reportId: null,
+        error: "Retry also failed",
+      }));
+    mockedStartRegionalReport.mockRejectedValueOnce(new TypeError("response lost"));
+
+    await expect(waitForRegionalReport(input, {
+      ...options(),
+      retryFailed: true,
+    })).rejects.toMatchObject({
+      kind: "report",
+      message: "Retry also failed",
+    });
+    expect(mockedGetRegionalReportJob).toHaveBeenCalledTimes(2);
+    expect(mockedStartRegionalReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("consumes explicit retry once and does not restart after running becomes failed", async () => {
+    mockedGetRegionalReportJob
+      .mockResolvedValueOnce(job({
+        status: "failed",
+        stage: "failed",
+        reportId: null,
+        error: "First attempt failed",
+      }))
+      .mockResolvedValueOnce(job({
+        status: "failed",
+        stage: "failed",
+        reportId: null,
+        error: "Retry failed validation",
+      }));
+    mockedStartRegionalReport.mockResolvedValueOnce(job({
+      status: "running",
+      stage: "building",
+      reportId: null,
+    }));
+
+    await expect(waitForRegionalReport(input, {
+      ...options(),
+      retryFailed: true,
+    })).rejects.toMatchObject({
+      kind: "report",
+      message: "Retry failed validation",
+    });
+    expect(mockedStartRegionalReport).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps polling a healthy running job beyond ten minutes", async () => {
+    const now = jest.spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(10 * 60_000 + 1);
+    mockedGetRegionalReportJob
+      .mockResolvedValueOnce(job({
+        status: "running",
+        stage: "building",
+        reportId: null,
+      }))
+      .mockResolvedValueOnce(job());
+
+    try {
+      await expect(waitForRegionalReport(input, options())).resolves.toBe(42);
+    } finally {
+      now.mockRestore();
+    }
+    expect(mockedStartRegionalReport).not.toHaveBeenCalled();
   });
 
   it("surfaces the failed job's real error as a report error", async () => {

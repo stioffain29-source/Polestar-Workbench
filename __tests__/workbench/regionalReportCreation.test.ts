@@ -87,12 +87,13 @@ describe("regional report creation transport", () => {
       .toEqual(["queued", "collecting", "building", "saving", "completed"]);
   });
 
-  test("a lost POST response retries the same identity rather than another draft", async () => {
-    getJob.mockRejectedValueOnce(missing);
-    startJob.mockRejectedValueOnce(new TypeError("Failed to fetch")).mockResolvedValueOnce(completed);
+  test("a lost POST response is reconciled by GET rather than another POST", async () => {
+    getJob.mockRejectedValueOnce(missing).mockResolvedValueOnce(completed);
+    startJob.mockRejectedValueOnce(new TypeError("Failed to fetch"));
     const callbacks = options();
     await expect(waitForRegionalReport(input, callbacks)).resolves.toBe(164);
-    expect(startJob.mock.calls.map(([body]) => body.requestId)).toEqual([input.requestId, input.requestId]);
+    expect(startJob.mock.calls.map(([body]) => body.requestId)).toEqual([input.requestId]);
+    expect(getJob).toHaveBeenCalledTimes(2);
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(true);
   });
 
@@ -112,6 +113,78 @@ describe("regional report creation transport", () => {
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(true);
   });
 
+  test.each(["online", "focus"] as const)(
+    "browser %s wakes a reconnect wait immediately",
+    async (eventName) => {
+      jest.useFakeTimers();
+      getJob
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValueOnce(completed);
+      try {
+        const waiting = waitForRegionalReport(input, {
+          ...options(),
+          retryMs: 15_000,
+        });
+        await jest.advanceTimersByTimeAsync(0);
+        expect(getJob).toHaveBeenCalledTimes(1);
+
+        window.dispatchEvent(new Event(eventName));
+        await expect(waiting).resolves.toBe(164);
+        expect(getJob).toHaveBeenCalledTimes(2);
+        expect(startJob).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  test("becoming visible wakes a reconnect wait immediately", async () => {
+    jest.useFakeTimers();
+    const originalVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    getJob
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(completed);
+    try {
+      const waiting = waitForRegionalReport(input, {
+        ...options(),
+        retryMs: 15_000,
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await expect(waiting).resolves.toBe(164);
+      expect(getJob).toHaveBeenCalledTimes(2);
+    } finally {
+      if (originalVisibility) {
+        Object.defineProperty(document, "visibilityState", originalVisibility);
+      }
+      jest.useRealTimers();
+    }
+  });
+
+  test("abort removes reconnect wake listeners and prevents another request", async () => {
+    const controller = new AbortController();
+    getJob.mockRejectedValue(new TypeError("Failed to fetch"));
+    const waiting = waitForRegionalReport(input, {
+      ...options(),
+      signal: controller.signal,
+      retryMs: 60_000,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.abort();
+    await expect(waiting).rejects.toMatchObject({ name: "AbortError" });
+    const callsAtAbort = getJob.mock.calls.length;
+    window.dispatchEvent(new Event("online"));
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await Promise.resolve();
+    expect(getJob).toHaveBeenCalledTimes(callsAtAbort);
+  });
+
   test("does not silently retry actual report validation failures", async () => {
     getJob.mockResolvedValueOnce(failed);
     await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
@@ -128,32 +201,48 @@ describe("regional report creation transport", () => {
     expect(startJob).toHaveBeenCalledWith(input, expect.any(Object));
   });
 
-  test("a persistent network failure gives a reconnect action, not a false report failure", async () => {
-    getJob.mockRejectedValue(new TypeError("Failed to fetch"));
-    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
-      kind: "connection",
-      message: expect.stringContaining("same request"),
+  test("a persistent network failure keeps checking past four errors until cancellation", async () => {
+    const controller = new AbortController();
+    getJob.mockImplementation(async () => {
+      if (getJob.mock.calls.length > 5) controller.abort();
+      throw new TypeError("Failed to fetch");
     });
-    expect(getJob).toHaveBeenCalledTimes(4);
+    await expect(waitForRegionalReport(input, {
+      ...options(),
+      signal: controller.signal,
+    })).rejects.toMatchObject({ name: "AbortError" });
+    expect(getJob.mock.calls.length).toBeGreaterThan(4);
     expect(startJob).not.toHaveBeenCalled();
   });
 
-  test("bounds a hanging status call and does not leave polling stuck", async () => {
+  test("cancellation aborts a hanging status call", async () => {
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | null | undefined;
     getJob.mockImplementation((_id, init) => new Promise((_resolve, reject) => {
+      requestSignal = init?.signal;
       init?.signal?.addEventListener("abort", () => reject(new DOMException("Timed out", "AbortError")), { once: true });
     }));
-    await expect(waitForRegionalReport(input, { ...options(), requestTimeoutMs: 2 })).rejects.toMatchObject({
-      kind: "connection",
+    const waiting = waitForRegionalReport(input, {
+      ...options(),
+      signal: controller.signal,
+      requestTimeoutMs: 60_000,
     });
-    expect(getJob).toHaveBeenCalledTimes(4);
+    controller.abort();
+    await expect(waiting).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestSignal?.aborted).toBe(true);
+    expect(getJob).toHaveBeenCalledTimes(1);
   });
 
-  test("status 0 reconnects without claiming the session expired", async () => {
-    getJob.mockRejectedValue({ status: 0 });
-    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
-      kind: "connection",
-    });
-    expect(getJob).toHaveBeenCalledTimes(4);
+  test("status 0 recovers after more than four errors without claiming session expiry", async () => {
+    getJob
+      .mockRejectedValueOnce({ status: 0 })
+      .mockRejectedValueOnce({ status: 0 })
+      .mockRejectedValueOnce({ status: 0 })
+      .mockRejectedValueOnce({ status: 0 })
+      .mockRejectedValueOnce({ status: 0 })
+      .mockResolvedValueOnce(completed);
+    await expect(waitForRegionalReport(input, options())).resolves.toBe(164);
+    expect(getJob).toHaveBeenCalledTimes(6);
     expect(accessFetch).not.toHaveBeenCalled();
     expect(startJob).not.toHaveBeenCalled();
   });
@@ -178,12 +267,16 @@ describe("regional report creation transport", () => {
     expect(startJob).not.toHaveBeenCalled();
   });
 
-  test("an HTML status body reconnects without starting a duplicate job", async () => {
-    getJob.mockResolvedValue("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob);
-    await expect(waitForRegionalReport(input, options())).rejects.toMatchObject({
-      kind: "connection",
-    });
-    expect(getJob).toHaveBeenCalledTimes(4);
+  test("an HTML status body eventually recovers without starting a duplicate job", async () => {
+    getJob
+      .mockResolvedValueOnce("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob)
+      .mockResolvedValueOnce("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob)
+      .mockResolvedValueOnce("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob)
+      .mockResolvedValueOnce("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob)
+      .mockResolvedValueOnce("<!doctype html><title>Sign in</title>" as unknown as RegionalReportJob)
+      .mockResolvedValueOnce(completed);
+    await expect(waitForRegionalReport(input, options())).resolves.toBe(164);
+    expect(getJob).toHaveBeenCalledTimes(6);
     expect(startJob).not.toHaveBeenCalled();
   });
 

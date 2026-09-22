@@ -15,9 +15,9 @@ export interface RegionalSeverityAssessment {
 }
 
 const UNCERTAIN_OR_NEGATED_IMPACT_RE =
-  /\b(?:may|might|could|would|potential(?:ly)?|forecast|expected|likely|risk of|threat of|unconfirmed|not confirmed|has not been confirmed|unclear|unknown|no (?:material )?(?:disruption|interruption|damage|shortage|casualt(?:y|ies)|injur(?:y|ies)|deaths?|fatalit(?:y|ies)))\b/i;
+  /\b(?:may|might|could|would|potential(?:ly)?|forecast|expected|likely|risk of|threat of|unconfirmed|not (?:yet )?confirmed|has not been confirmed|unclear|unknown|(?:no|without|zero) (?:material |reported |confirmed |reports? of )?(?:disruption|interruption|damage|shortage|casualt(?:y|ies)|injur(?:y|ies)|deaths?|fatalit(?:y|ies))|(?:nobody|no one) (?:was |were )?(?:killed|injured|wounded)|(?:not|never) (?:been )?(?:killed|injured|wounded))\b/i;
 const ATTACK_RE =
-  /\b(?:attack(?:ed|s)?|strike|struck|missile|drone|bomb(?:ed|ing)?|blast|sabotage|armed assault)\b/i;
+  /\b(?:attack(?:ed|s)?|strike|struck|missile|drone|bomb(?:ed|ing)?|blast|sabotage|armed assault|opened fire|gunfire|shooting|ambush(?:ed)?|clash(?:ed|es)?)\b/i;
 const CRITICAL_INFRASTRUCTURE_RE =
   /\b(?:airport|airfield|airspace|port|terminal|fuel depot|refiner(?:y|ies)|pipeline|pumping stations?|power (?:station|plant|grid)|electricity grid|water (?:plant|network)|telecommunications?|critical infrastructure)\b/i;
 const DAMAGE_OR_INTERRUPTION_RE =
@@ -35,9 +35,36 @@ const MATERIAL_INTERRUPTION_RE =
 const EMERGENCY_RESTRICTION_RE =
   /\b(?:emergency (?:restriction|rationing|controls?|measures?)|mandatory rationing|state of emergency|government (?:restricted|suspended|banned|rationed))\b/i;
 const MASS_CASUALTY_RE =
-  /\b(?:mass casualt(?:y|ies)|dozens (?:killed|dead|injured|wounded)|[2-9]\d+\s+(?:people\s+)?(?:killed|dead|injured|wounded)|(?:kills?|injures?|wounds?)\s+(?:at least\s+)?[2-9]\d+)\b/i;
+  /\b(?:mass casualt(?:y|ies)|(?:dozens|scores|hundreds|thousands)(?: of people)? (?:were )?(?:killed|dead|injured|wounded))\b/i;
 const CONFIRMED_CASUALTY_RE =
-  /\b(?:(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine)\s+(?:people\s+|personnel\s+|workers?\s+|passengers?\s+)?(?:killed|dead|injured|wounded)|(?:kill(?:s|ed)?|injur(?:es?|ed)|wound(?:s|ed)?)\s+(?:at least\s+)?(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine)\s+(?:people|person|civilians?|workers?|passengers?|police(?: officers?)?|soldiers?|personnel)|fatalit(?:y|ies)|deaths?|died)\b/i;
+  /\b(?:(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine)\s+(?:people\s+|personnel\s+|workers?\s+|passengers?\s+)?(?:killed|dead|injured|wounded)|(?:kill(?:s|ed)?|injur(?:es?|ed)|wound(?:s|ed)?)\s+(?:at least\s+)?(?:[1-9]\d*|one|two|three|four|five|six|seven|eight|nine)\s+(?:people|person|civilians?|workers?|passengers?|police(?: officers?)?|soldiers?|personnel)|(?:was|were|has been|have been|had been)\s+(?:reportedly\s+)?(?:killed|injured|wounded)|shot dead|fatalit(?:y|ies)|deaths?|died)\b/i;
+
+const CASUALTY_NUMBER = String.raw`(?:\d+(?:,\d{3})*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen)`;
+const CASUALTY_ROLE = String.raw`(?:(?:police|security|military|army|civilian)\s+)?(?:people|person|civilians?|officers?|personnel|police|soldiers?|troops|militants?|insurgents?|fighters?|workers?|passengers?|children|men|women|residents?|suspects?)`;
+const COUNTED_CASUALTIES = [
+  // "31 police personnel were killed", not an age, reward, date or duration.
+  String.raw`\b(${CASUALTY_NUMBER})\s+(?:${CASUALTY_ROLE}\s+)?(?:(?:was|were|are|is|have been|has been|had been|reportedly|reported|confirmed|left|found)\s+){0,3}(?:killed|dead|injured|wounded)\b`,
+  // Active-voice and standalone tolls: "killed 31 people" / "injured 24."
+  String.raw`\b(?:kill(?:s|ed|ing)?|injur(?:es?|ed|ing)|wound(?:s|ed|ing)?)\s+(?:at least\s+)?(${CASUALTY_NUMBER})(?=\s+${CASUALTY_ROLE}\b|[.,;:]|\s+(?:and|but|in|at|during|after|when)\b|$)`,
+  String.raw`\b(?:death toll|fatality toll|casualty toll|deaths|fatalities|injuries|casualties)\s+(?:(?:rose|risen|rises|reached|reach|stands|stood|climbed|increased|was|were|is|are|has|had|been|now|reported|confirmed|at|least|to|of)\s+){0,8}(${CASUALTY_NUMBER})\b`,
+];
+const CASUALTY_NUMBER_WORDS = [
+  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+  "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+];
+
+/** Count only quantities attached to a casualty outcome, never every number in
+ * an attack sentence. Keep the complete supporting fact as the audit evidence. */
+function casualtyCounts(fact: string): number[] {
+  return COUNTED_CASUALTIES.flatMap((pattern) =>
+    [...fact.matchAll(new RegExp(pattern, "gi"))].map((match) => {
+      const value = match[1].toLowerCase();
+      return /^\d/.test(value)
+        ? Number(value.replace(/,/g, ""))
+        : CASUALTY_NUMBER_WORDS.indexOf(value);
+    }),
+  ).filter((count) => count > 0);
+}
 
 function eligibleFacts(facts: string[]): string[] {
   return facts.map((fact) => fact.trim()).filter((fact) =>
@@ -55,7 +82,8 @@ export function reassessRegionalSeverity(
   const facts = eligibleFacts(input.confirmedFacts);
   const matching = (pattern: RegExp) => facts.filter((fact) => pattern.test(fact));
 
-  const massCasualties = matching(MASS_CASUALTY_RE);
+   const massCasualties = facts.filter((fact) =>
+     MASS_CASUALTY_RE.test(fact) || casualtyCounts(fact).some((count) => count >= 20));
   if (massCasualties.length) {
     return {
       severity: "Extreme",
@@ -64,13 +92,12 @@ export function reassessRegionalSeverity(
     };
   }
 
-  const casualties = matching(CONFIRMED_CASUALTY_RE);
+  const casualties = facts.filter((fact) =>
+    CONFIRMED_CASUALTY_RE.test(fact) || casualtyCounts(fact).length > 0);
   if (casualties.length) {
     return {
-      severity: input.severity === "Extreme" ? "Extreme" : "High",
-      rationale: input.severity === "Extreme"
-        ? "The existing Extreme rating is retained on confirmed casualty evidence."
-        : "Confirmed deaths or injuries support a High rating.",
+      severity: "High",
+      rationale: "Confirmed deaths or injuries support a High rating.",
       evidence: casualties,
     };
   }
@@ -136,8 +163,19 @@ export function reassessRegionalSeverity(
     };
   }
 
+  if (attackFacts.length) {
+    return {
+      severity: "Moderate",
+      rationale: "An attack is confirmed, but no qualifying casualty, damage or operational consequence is established.",
+      evidence: attackFacts,
+    };
+  }
+
   return {
-    severity: input.severity,
+    // The publication gate requires consequence evidence for High/Extreme.
+    // Retaining either inherited tier with [] made every AI copy-edit retry
+    // fail on the same immutable facts. Unsupported tiers must be capped here.
+    severity: input.severity === "High" || input.severity === "Extreme" ? "Moderate" : input.severity,
     rationale: facts.length
       ? "No consequence rule changes the evidence-supported baseline rating."
       : "No confirmed consequence evidence is available to escalate the baseline rating.",
