@@ -15,9 +15,18 @@ import {
 } from "../../../workbench/src/lib/regionalWeekly";
 import {
   REGIONAL_EDITORIAL_VERSION,
+  REGIONAL_WORD_LIMITS,
   regionalNumericClaims,
+  regionalWordCount,
   type RegionalEventFact,
 } from "../../../workbench/src/lib/regionalEditorial";
+import {
+  REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES,
+  REGIONAL_OUTLOOK_MAX_WORDS,
+  REGIONAL_OUTLOOK_MIN_WORDS,
+  regionalOutlookNamedCountries,
+  regionalSingleCountrySentences,
+} from "../../../workbench/src/lib/regionalContentPolicy";
 import {
   extractRegionalReportFacts,
   prepareRegionalFactPackets,
@@ -32,15 +41,23 @@ const Section = z.object({
   text: z.string(),
   evidenceKeys: z.array(z.string()),
 }).strict();
+const BusinessImplication = z.object({
+  heading: z.enum(["People & Travel", "Operations & Assets", "Supply Chain & Logistics", "Regulatory & Market Access", "Business Continuity"]),
+  body: z.string(),
+  evidenceKeys: z.array(z.string()),
+}).strict();
+/** A narrative-only repair keeps the fixed developments and their checked numbers out of the rewrite. */
+const RegionalNarrativeSchema = z.object({
+  regionalOutlook: Section,
+  riskPicture: Section,
+  polestarOutlook: Section,
+  businessImplications: z.array(BusinessImplication),
+}).strict();
 export const RegionalAnalysisSchema = z.object({
   regionalOutlook: Section,
   riskPicture: Section,
   polestarOutlook: Section,
-  businessImplications: z.array(z.object({
-    heading: z.enum(["People & Travel", "Operations & Assets", "Supply Chain & Logistics", "Regulatory & Market Access", "Business Continuity"]),
-    body: z.string(),
-    evidenceKeys: z.array(z.string()),
-  }).strict()),
+  businessImplications: z.array(BusinessImplication),
   developments: z.array(z.object({
     eventKey: z.string(),
     operationalImpact: z.string(),
@@ -50,13 +67,17 @@ export const RegionalAnalysisSchema = z.object({
 }).strict();
 export type RegionalAnalysis = z.infer<typeof RegionalAnalysisSchema>;
 
+/** Stated as a countable limit because "synthesise, do not list" was not being met. */
+export const POLESTAR_SENTENCE_RULE =
+  `At most ${REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES} sentences may name exactly one of the selected countries. Every other sentence must name two or more of them together, or none at all, so related exposures are compared inside the sentence instead of each country receiving its own update.`;
+
 const ANALYSIS_INSTRUCTION = `Write a concise Regional Weekly business-risk assessment using ONLY the supplied structured event facts. You are not given articles or headlines: do not introduce external information.
 The event set, factual sentences, jurisdiction, dates, event identity, severity and map selection are FIXED. Do not change them or infer unreported consequences. A reported date is not an occurrence date. Source counts are not evidence of impact.
 Each section has a DIFFERENT purpose:
 regionalOutlook: 90-125 words (hard maximum 140), at most two paragraphs. Rank the week's most consequential exposure and contrast it with another distinct operating issue. Name at most three markets or places; this is not a roundup of every country/development. Do NOT repeat casualties or write travel advice.
 riskPicture: 100-160 words (hard maximum 180), at most three short paragraphs. Explain the transmission of the actual disruptions into business activity, distinguishing direct impact from a plausible contingent exposure. Compare the named risks; do not produce a country-by-country list or general essays about types of risk.
 businessImplications: 2-3 short paragraphs, TOTAL 110-135 words across ALL paragraphs combined (hard maximum 180). Organise by relevant business function, not countries. Each paragraph must identify the exposed function, a concrete decision and its trigger grounded in the facts. Do not repeat per-event impact paragraphs, invent service restoration times, evacuation needs or pricing changes. No paragraph for a function without evidence.
-polestarOutlook: 120-160 words inclusive (aim 135-150), one or two connected paragraphs. A genuine REGIONAL forward assessment considering ALL selected developments; name at least three of their countries or locations. Organise around shared operating questions and compare related exposures across countries within sentences, rather than giving each country its own sentence in succession. Rank what matters most next, connect the risks across business functions, distinguish plausible deterioration from stabilisation and identify specific changes that would materially alter the assessment. Do not default to Japan alone or Saudi energy infrastructure alone. Do NOT write separate mini country updates, repeat Key Developments or repeat the opening. Link every selected eventKey in the section metadata, while synthesising their implications rather than listing them.
+polestarOutlook: ${REGIONAL_OUTLOOK_MIN_WORDS}-${REGIONAL_OUTLOOK_MAX_WORDS} words inclusive, aim 135-150 and count the words before returning; ${REGIONAL_OUTLOOK_MAX_WORDS} words is a hard ceiling. One or two connected paragraphs. A genuine REGIONAL forward assessment considering ALL selected developments; name at least three of their countries or locations. ${POLESTAR_SENTENCE_RULE} Rank what matters most next, connect the risks across business functions, distinguish plausible deterioration from stabilisation and identify specific changes that would materially alter the assessment. Do not default to Japan alone or Saudi energy infrastructure alone. Do NOT write separate mini country updates, repeat Key Developments or repeat the opening. Link every selected eventKey in the section metadata, while synthesising their implications rather than listing them.
 For EACH development supply: operationalImpact<=35 words (which function is exposed, and how, not a repeat of the fact); polestarView<=30 words (a distinct, defensible judgement separating what is known from conditional consequences); outlook7Days<=25 words (one specific observable next signal). Do not add titles or whatChanged: those already come from verified facts.
 Keep current loss of service separate from possible consequences. For cyber, distinguish data exposure from service downtime; a hotel breach does not prove bookings halted, and a government platform outage does not prove all transport stopped. For LPG, do not invent prices, rationing, import causes or nationwide closure. A police-site bombing does not prove commercial road closure. Do not forecast escalation simply because an attack occurred.
 Historical source status must remain historical: "fighting was ongoing when the toll was reported" does NOT establish that fighting continues on the issue date. Do not turn an attack into confirmed business-access disruption, or say business activity "continues" to be impeded when that impact was never established. State those exposures conditionally. Do not use "Known:" or "Conditional:" scaffolding; write the distinction as ordinary sentences.
@@ -64,6 +85,117 @@ Cite each analytical section's supporting eventKeys in its metadata, never inlin
 Do not use source/outlet names, domains, URLs, raw headlines, sentence fragments, rhetorical filler, or count-based prose. No quotes or citation markers in rendered text.
 BANNED phrases: "The development is relevant to"; "Their regional importance comes from what could follow"; "the specific indicators are"; "the significance is confined to the named market"; "reporting placed the casualties at"; "selected evidence"; "the principal changes this week were".
 Write in direct, precise, sentence-cased analytical English. No template padding, no claim of uniform regional deterioration, no statement that a domain is empty, and no verbatim sentence repeated across sections. Return complete sentences without truncation.`;
+
+/**
+ * A rejected draft is re-asked against measurements, not against the same prose
+ * instruction that already failed. Nothing here rewrites or truncates the text.
+ */
+export function regionalOutlookDiagnostics(
+  outlook: { text: string; evidenceKeys: string[] },
+  events: Array<Pick<GroundedRegionalEvent, "eventKey" | "country" | "location">>,
+) {
+  const offending = regionalSingleCountrySentences(outlook.text, events.map((event) => event.country));
+  return {
+    measuredWords: regionalWordCount(outlook.text),
+    requiredWords: `${REGIONAL_OUTLOOK_MIN_WORDS}-${REGIONAL_OUTLOOK_MAX_WORDS} inclusive, target 135-150`,
+    sentencesNamingExactlyOneSelectedCountry: offending,
+    countOfThoseSentences: offending.length,
+    maximumAllowed: REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES,
+    selectedCountries: [...new Set(events.map((event) => event.country))],
+    countriesCurrentlyNamed: regionalOutlookNamedCountries(outlook.text, events),
+    requiredEvidenceKeys: events.map((event) => event.eventKey),
+    suppliedEvidenceKeys: outlook.evidenceKeys,
+  };
+}
+
+function regionalNarrativeDiagnostics(analysis: RegionalAnalysis, events: GroundedRegionalEvent[]) {
+  const sections = {
+    regionalOutlook: analysis.regionalOutlook.text,
+    riskPicture: analysis.riskPicture.text,
+    businessImplicationsNarrative: analysis.businessImplications.map((block) => block.body).join("\n\n"),
+    polestarOutlook: analysis.polestarOutlook.text,
+  } as const;
+  return {
+    measuredSectionWords: Object.fromEntries(Object.entries(sections).map(([key, text]) => [key, {
+      words: regionalWordCount(text),
+      hardMaximum: REGIONAL_WORD_LIMITS[key as keyof typeof sections],
+    }])),
+    polestarOutlook: regionalOutlookDiagnostics(analysis.polestarOutlook, events),
+  };
+}
+
+// Only the analytical prose can be repaired by rewriting it. A fixed-fact,
+// evidence, severity, map or selection failure must regenerate the whole object.
+const DEVELOPMENT_LEVEL_FAILURE =
+  /analytical development set|Missing analysis for|Unsupported analytical number|invalid (?:title|whatChanged|operationalImpact|polestarView|outlook7Days) length|source text or generic prose in|Missing factual evidence for|map point|map item|Developments must represent|selection must contain|Severity has not been reassessed|same source evidence|7 Day Watch|collection is incomplete|coverage|APAC (?:must retain|requires)|Middle East requires|dominates/i;
+
+// The validators name the failing section, so only that section is replaced.
+// A rewrite must never quietly alter prose that already passed.
+const NARRATIVE_SECTION_FAILURE = {
+  regionalOutlook: /\bregionalOutlook\b/i,
+  riskPicture: /\briskPicture\b/i,
+  businessImplications: /\bbusinessImplicationsNarrative\b/i,
+  polestarOutlook: /\bpolestarOutlook\b|Polestar Outlook/i,
+} as const;
+type NarrativeSection = keyof typeof NARRATIVE_SECTION_FAILURE;
+
+function failedNarrativeSections(validationProblem: string): NarrativeSection[] {
+  return (Object.keys(NARRATIVE_SECTION_FAILURE) as NarrativeSection[])
+    .filter((section) => NARRATIVE_SECTION_FAILURE[section].test(validationProblem));
+}
+
+const REPAIR_INSTRUCTION =
+  `Correct the supplied validation problem. The measurements in diagnostics were taken from your previous draft: treat them as facts about it, count your words before returning, and leave a margin inside every limit. The previous draft is not evidence; use only the fixed event facts.`;
+
+export const REGIONAL_EDITORIAL_REPAIR_ATTEMPTS = 2;
+
+async function repairRegionalAnalysis(
+  analysis: RegionalAnalysis,
+  events: GroundedRegionalEvent[],
+  topic: RegionalWeeklyTopic,
+  issueDate: string,
+  failure: unknown,
+): Promise<RegionalAnalysis> {
+  const validationProblem = failure instanceof Error
+    ? failure.message
+    : "The analytical draft failed verification.";
+  const input = {
+    ...regionalAnalyticalInput(events, topic, issueDate),
+    validationProblem,
+    diagnostics: regionalNarrativeDiagnostics(analysis, events),
+  };
+  const sections = DEVELOPMENT_LEVEL_FAILURE.test(validationProblem)
+    ? [] : failedNarrativeSections(validationProblem);
+  if (sections.length === 0) {
+    return regionalJson(
+      RegionalAnalysisSchema,
+      `${ANALYSIS_INSTRUCTION}\n${REPAIR_INSTRUCTION} Return the complete revised analytical object with all selected eventKeys, not a partial patch.`,
+      { ...input, previousDraft: analysis },
+    );
+  }
+  const narrative = await regionalJson(
+    RegionalNarrativeSchema,
+    `${ANALYSIS_INSTRUCTION}\n${REPAIR_INSTRUCTION} Rewrite ONLY the analytical narrative sections listed in sectionsToRewrite; only those sections are kept, every other section of the report is retained from the previous draft and must not be reworded. Do not return the per-development analysis.`,
+    {
+      ...input,
+      sectionsToRewrite: sections,
+      previousNarrative: {
+        regionalOutlook: analysis.regionalOutlook,
+        riskPicture: analysis.riskPicture,
+        polestarOutlook: analysis.polestarOutlook,
+        businessImplications: analysis.businessImplications,
+      },
+    },
+  );
+  const repaired: RegionalAnalysis = { ...analysis };
+  for (const section of sections) {
+    if (section === "businessImplications") repaired.businessImplications = narrative.businessImplications;
+    else if (section === "regionalOutlook") repaired.regionalOutlook = narrative.regionalOutlook;
+    else if (section === "riskPicture") repaired.riskPicture = narrative.riskPicture;
+    else repaired.polestarOutlook = narrative.polestarOutlook;
+  }
+  return repaired;
+}
 
 export function reassessRegionalEvents(events: GroundedRegionalEvent[]): GroundedRegionalEvent[] {
   return events.map((event) => {
@@ -242,29 +374,25 @@ export async function finishRegionalEditorialReport(
     RegionalAnalysisSchema, ANALYSIS_INSTRUCTION,
     regionalAnalyticalInput(selected, topic, issueDate),
   );
-  let canonical: RegionalCanonicalReport;
-  try {
-    canonical = assembleRegionalEditorialReport(selected, analysis, topic, issueDate, futureEvents, coverageManifest);
-  } catch (error) {
-    // A bounded editorial correction, never truncation or a raw-headline
-    // fallback. Keep the same fixed facts, selection and evidence references.
-    analysis = await regionalJson(
-      RegionalAnalysisSchema,
-      `${ANALYSIS_INSTRUCTION}\nCopy-edit the previous draft to correct the supplied validation problem. The draft is not evidence; use only fixed event facts. Leave a margin below every word limit. Return the complete revised analytical object with all selected eventKeys, not a partial patch.`,
-      {
-        ...regionalAnalyticalInput(selected, topic, issueDate),
-        previousDraft: analysis,
-        validationProblem: error instanceof Error ? error.message : "The analytical draft failed verification.",
-      },
-    );
+  // Bounded editorial correction, never truncation or a raw-headline fallback.
+  // Each retry keeps the same fixed facts, selection and evidence references.
+  let canonical: RegionalCanonicalReport | undefined;
+  let failure: unknown;
+  for (let attempt = 0; attempt <= REGIONAL_EDITORIAL_REPAIR_ATTEMPTS; attempt++) {
     try {
       canonical = assembleRegionalEditorialReport(selected, analysis, topic, issueDate, futureEvents, coverageManifest);
+      break;
     } catch (error) {
-      throw new Error(
-        error instanceof Error ? error.message : "The corrected analysis failed verification.",
-        { cause: { analysis } },
-      );
+      failure = error;
+      if (attempt === REGIONAL_EDITORIAL_REPAIR_ATTEMPTS) break;
+      analysis = await repairRegionalAnalysis(analysis, selected, topic, issueDate, error);
     }
+  }
+  if (!canonical) {
+    throw new Error(
+      failure instanceof Error ? failure.message : "The corrected analysis failed verification.",
+      { cause: { analysis } },
+    );
   }
   return {
     canonical,

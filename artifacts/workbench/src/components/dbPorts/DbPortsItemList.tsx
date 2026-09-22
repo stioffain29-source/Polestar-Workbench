@@ -3,7 +3,7 @@ import {
   DbPortsItemContentDisposition 
 } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { DownloadCloud, FileText, Filter, AlertTriangle } from "lucide-react";
+import { DownloadCloud, FileText, Filter, AlertTriangle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -11,11 +11,12 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onImport: () => void;
+  onAddManual: () => void;
   importing: boolean;
   importDisabled: boolean;
 }
 
-export default function DbPortsItemList({ edition, selectedId, onSelect, onImport, importing, importDisabled }: Props) {
+export default function DbPortsItemList({ edition, selectedId, onSelect, onImport, onAddManual, importing, importDisabled }: Props) {
   const groups: Record<DbPortsItemContentDisposition, any[]> = {
     inbox: [],
     selected: [],
@@ -33,10 +34,15 @@ export default function DbPortsItemList({ edition, selectedId, onSelect, onImpor
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border bg-card sticky top-0 z-10 flex flex-col gap-3">
-        <Button onClick={onImport} disabled={importDisabled || importing} className="w-full text-xs h-8" variant="secondary">
-          <DownloadCloud className="w-3.5 h-3.5 mr-2" />
-          {importing ? "Importing..." : "Import 14-Day Feeds"}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={onImport} disabled={importDisabled || importing} className="flex-1 text-xs h-8" variant="secondary">
+            <DownloadCloud className="w-3.5 h-3.5 mr-1" />
+            {importing ? "Importing..." : "Import Feeds"}
+          </Button>
+          <Button onClick={onAddManual} disabled={importDisabled} className="text-xs h-8 px-2" variant="outline" title="Add manual candidate">
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto">

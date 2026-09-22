@@ -2,7 +2,9 @@ import { z } from "zod";
 import { regionalJson } from "./regionalAi";
 import {
   assembleRegionalEditorialReport,
+  POLESTAR_SENTENCE_RULE,
   regionalAnalyticalInput,
+  regionalOutlookDiagnostics,
   reassessRegionalEvents,
   type RegionalAnalysis,
   type finishRegionalEditorialReport,
@@ -20,7 +22,7 @@ const Outlook = z.object({ text: z.string(), evidenceKeys: z.array(z.string()) }
 const OUTLOOK_INSTRUCTION = `Rewrite ONLY the closing Polestar Outlook for the supplied regional business-risk report. Use ONLY its checked event facts and fixed, consequence-based severity ratings.
 Write 120-160 words inclusive, aiming for 135-150, in one or two connected paragraphs. Consider all selected developments and include all their eventKeys in evidenceKeys. Name at least three of the supplied countries or locations. Do not introduce an unselected country or development.
 This is a regional FORWARD judgement, not six mini country updates or a repeat of Key Developments. Rank what matters most next, connect security, supply, mobility, regulatory implementation and digital recovery where evidenced, distinguish plausible deterioration from stabilisation, and identify the concrete indicators that would materially change the assessment.
-Organise the paragraphs around shared operating questions and compare related exposures across countries within sentences. Do not give each country its own sentence in succession or disguise a country list as one paragraph. Do not imply existing business-access disruption through words such as "further" when no such interruption is established. An internal state boundary is not an international border.
+Organise the paragraphs around shared operating questions. ${POLESTAR_SENTENCE_RULE} Do not disguise a country list as one paragraph. Do not imply existing business-access disruption through words such as "further" when no such interruption is established. An internal state boundary is not an international border.
 An APAC outlook must not concentrate on Japan alone; a Middle East outlook must not concentrate on Saudi energy infrastructure alone. Address only the actual supplied risks, without adding empty domains or speculative filler.
 Keep historical reported conditions historical. Do not turn a potential business consequence into confirmed interruption, infer business curtailment from supply stress, infer all transport has stopped from one administrative platform outage, or presume damage just because an attack occurred.
 Do not repeat the opening assessment, casualties, counts of incidents or generic monitoring advice. Do not quote articles or mention sources, publishers, provenance, evidence, templates, or "Known:"/"Conditional:" labels in the text. Complete sentences, no truncation. Return only text and evidenceKeys.`;
@@ -84,10 +86,15 @@ export async function refreshRegionalEditorialOutlook(
       break;
     } catch (error) {
       if (attempt === 1) throw error;
-      outlook = await regionalJson(Outlook, `${OUTLOOK_INSTRUCTION}\nCorrect the supplied validation failure. Revise ONLY the closing Outlook.`, {
-        ...facts, previousDraft: outlook,
-        validationProblem: error instanceof Error ? error.message : "The outlook failed verification.",
-      });
+      outlook = await regionalJson(
+        Outlook,
+        `${OUTLOOK_INSTRUCTION}\nCorrect the supplied validation failure. Revise ONLY the closing Outlook. The diagnostics were measured from your previous draft: count the words before returning and leave a margin inside the limit.`,
+        {
+          ...facts, previousDraft: outlook,
+          validationProblem: error instanceof Error ? error.message : "The outlook failed verification.",
+          diagnostics: regionalOutlookDiagnostics(outlook, selected),
+        },
+      );
     }
   }
   if (!canonical) throw new Error("The refreshed Outlook could not be verified.");

@@ -11,6 +11,26 @@ export const MIDDLE_EAST_COLLECTION_DOMAINS = [
 
 export const REGIONAL_OUTLOOK_MIN_WORDS = 120;
 export const REGIONAL_OUTLOOK_MAX_WORDS = 160;
+export const REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES = 2;
+
+/** One authority for the rule, so the writer can be told exactly what fails. */
+export function regionalSingleCountrySentences(outlook: string, countries: string[]): string[] {
+  const selected = [...new Set(countries.map((country) => country.toLowerCase()))];
+  return outlook.split(/(?<=[.!?])\s+/u)
+    .filter((sentence) =>
+      selected.filter((country) => sentence.toLowerCase().includes(country)).length === 1);
+}
+
+export function regionalOutlookNamedCountries(
+  outlook: string,
+  events: Array<{ country: string; location?: string | null }>,
+): string[] {
+  const text = outlook.toLowerCase();
+  return [...new Set(events
+    .filter((event) => text.includes(event.country.toLowerCase()) ||
+      (!!event.location && event.location.length >= 4 && text.includes(event.location.toLowerCase())))
+    .map((event) => event.country))];
+}
 
 export function regionalCheckCompleted(check: RegionalCoverageCheck | undefined): boolean {
   return !!check && check.status === "checked" && check.sourceNames.length > 0 && check.errors.length === 0;
@@ -53,18 +73,13 @@ export function validateRegionalContentPolicy(report: RegionalCanonicalReport): 
     evidenceKeys.some((key) => !events.some((event) => event.eventKey === key))) {
     errors.push("Polestar Outlook must consider the complete selected development set.");
   }
-  const namedCountries = new Set(events
-    .filter((event) => report.polestarOutlook.toLowerCase().includes(event.country.toLowerCase()) ||
-      (!!event.location && event.location.length >= 4 &&
-        report.polestarOutlook.toLowerCase().includes(event.location.toLowerCase())))
-    .map((event) => event.country));
+  const namedCountries = new Set(regionalOutlookNamedCountries(report.polestarOutlook, events));
   if (namedCountries.size < Math.min(3, new Set(events.map((event) => event.country)).size)) {
     errors.push("Polestar Outlook must assess the wider region, not one country or incident.");
   }
-  const selectedCountries = [...new Set(events.map((event) => event.country.toLowerCase()))];
-  const singleCountrySentences = report.polestarOutlook.split(/(?<=[.!?])\s+/u)
-    .filter((sentence) => selectedCountries.filter((country) => sentence.toLowerCase().includes(country)).length === 1);
-  if (singleCountrySentences.length >= 3) {
+  const singleCountrySentences = regionalSingleCountrySentences(
+    report.polestarOutlook, events.map((event) => event.country));
+  if (singleCountrySentences.length > REGIONAL_MAX_SINGLE_COUNTRY_SENTENCES) {
     errors.push("Polestar Outlook must synthesise regional risks rather than list separate country updates.");
   }
   const issue = new Date(`${report.issueDate}T00:00:00Z`).getTime();

@@ -143,6 +143,7 @@
 - [Global sports-fixture gate](sports-fixture-global-gate.md) — owner: NO sport in any report; one gate + unrest override immune to sports idioms (injury time/shot/crush/dead rubber); keep cues must be SUMMARY-safe ("stoppage time" trap).
 - [Energy report pagination](energy-report-register-retired.md) — no Related Incidents; compact prices and flowing detail pages supersede fixed breaks; plain 9pt disclaimer follows closing prose.
 - [Disclaimer typography](report-disclaimer-typography.md) — all Workbench report disclaimer bodies use 9-point Roboto in previews and exports; do not resize other prose.
+- [Regional editorial gate repair](regional-editorial-repair.md) — a rejected regional draft is re-asked with measurements of its own failure; a repair replaces ONLY the section the validator named; countable rules beat prose instructions.
 - [Canonical report risk](canonical-report-risk.md) — scheduled-report risk comes only from the final curated evidence set; prose and stale saved ratings never outrank canonical data.
 - [Cross-topic APAC country coverage](cross-topic-apac-country-coverage.md) — AU/CN/VN/KH/HK coverage is a registry+feed contract across topics; Hong Kong stays independently attributed.
 - [Incident read cache invalidation](incident-read-cache-invalidation.md) — incident APIs must never 304 across relevance backfills; stale payloads can preserve rows already rejected in the database.

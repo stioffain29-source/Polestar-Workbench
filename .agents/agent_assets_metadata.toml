@@ -1507,3 +1507,31 @@ mtime_ms = 1790047671140
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/e7b1d55c-5563-47bd-a860-8d8a6af69880/eb99482d-a15c-4b7a-8c92-057a6308247e"
 storage_version_token = "1790047708544940"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "tf0I7AgAjYrsCZGtkOym1"
+uri = "file://exports/db-ports/DB-Ports-Pilot-2026-09-22-working.pdf"
+type = "pdf"
+title = "DB Ports Pilot — working review edition (PDF)"
+description = "Internal feasibility snapshot for 9–22 Sep 2026: overview, two held leads, eight source checks, nothing selected or approved. Provisional coverage targets, no client distribution."
+logical_id = "3166f6a8-783d-4318-8844-ad6fd06ac725"
+content_hash = "sha256:2e471eb074552fb72a5366a0209cb8d998f3c90d5efe777032b21b23aaccaccb"
+size = 158458
+mtime_ms = 1790049813116
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/3166f6a8-783d-4318-8844-ad6fd06ac725/05309919-47fb-48a9-99fc-02d5bc6cf129"
+storage_version_token = "1790050974768837"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "pjf8LZtipYisGtjOwlV-B"
+uri = "file://exports/db-ports/DB-Ports-Pilot-2026-09-22-working.docx"
+type = "word_document"
+title = "DB Ports Pilot — working review edition (DOCX)"
+description = "Editable version of the same working snapshot, for internal review comments only."
+logical_id = "9870d09e-673f-4eda-9c58-d95890f720bf"
+content_hash = "sha256:1a5126feebc8277caa2476d62b8fcd8c55b18ba5468250c1dd401dfdcf00e497"
+size = 14223
+mtime_ms = 1790049812880
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/9870d09e-673f-4eda-9c58-d95890f720bf/e0dfc71b-ede6-4d81-9199-4cc43d55553e"
+storage_version_token = "1790050976170810"
+content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
