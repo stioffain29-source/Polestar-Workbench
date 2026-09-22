@@ -2,7 +2,7 @@ import html2canvas from "html2canvas";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import type { ReactElement } from "react";
-import { ensureSpace, drawSectionHeading, setRoboto, setText, type Ctx } from "./pdfChrome";
+import { ensureSpace, drawSectionHeading, hasRealDom, setRoboto, setText, type Ctx } from "./pdfChrome";
 import { waitForRegionalMapTiles } from "./regionalReportMapAssets";
 
 /** Optional section heading kept together with the chart image (see below). */
@@ -212,7 +212,7 @@ export async function embedReactChartInPdf(
   // here before renderElementToHtml touches `document`; embedChartMarkupInPdf
   // carries the same guard for the markup entry point. The heading is still
   // drawn so headless exports keep their section structure.
-  if (typeof document === "undefined") {
+  if (!hasRealDom()) {
     if (options.heading) drawSectionHeading(ctx, options.heading);
     console.warn(
       "[embedReportChartInPdf] Chart embedding requires a browser DOM. " +
@@ -310,7 +310,7 @@ export async function embedChartMarkupInPdf(
   html: string,
   options: EmbedChartOptions = {},
 ): Promise<boolean> {
-  if (typeof document === "undefined") {
+  if (!hasRealDom()) {
     if (options.heading) drawSectionHeading(ctx, options.heading);
     console.warn(
       "[embedReportChartInPdf] Chart embedding requires a browser DOM. " +

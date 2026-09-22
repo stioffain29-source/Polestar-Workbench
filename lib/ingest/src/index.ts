@@ -580,3 +580,4 @@ export type {
   AssignAnalystFlagsInput,
   AnalystFlags,
 } from "./m15";
+export * from "./dailyQuality";

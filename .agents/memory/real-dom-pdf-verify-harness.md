@@ -7,7 +7,22 @@ Some report-PDF sections rasterise a live React component via `html2canvas`
 (`embedReactChartInPdf` / `ln` in `embedReportChartInPdf.ts`) — e.g. the Energy
 Watch "Market Prices" card grid (`MarketPricesReportGrid`). These CANNOT be
 verified by the tsx headless exporter (`exportReportPdfHeadless.ts`): the embed
-NO-OPs when `typeof document === "undefined"`, so the cards silently vanish.
+skips itself without a real DOM, so the cards silently vanish.
+
+**A `typeof document === "undefined"` guard is NOT enough.** The tsx headless
+exporter installs a minimal `document`/`window` stub so shared browser modules
+can be imported at all, and its `createElement` returns a plain object with no
+`nodeType`. Every such guard therefore reads as "browser present" and the code
+proceeds until React or html2canvas rejects the container ("Target container is
+not a DOM element"), failing the whole export instead of falling back. Probe the
+created element (`hasRealDom()` in `pdfChrome.ts`), and route any new
+DOM-touching export path through it.
+
+**Fuel's export bypasses `pdf.save()` entirely.** Its in-app download builds a
+Blob and clicks an anchor, so a harness that patches `save()` captures nothing
+and no file is written — the topic font audit failed on exactly this, after the
+chart guard was fixed. Any such browser-only delivery path needs the same
+real-DOM gate with a `save()` fallback behind it.
 
 **To verify:** run in a real browser DOM. `scripts/verifyEnergyMarketPricesPdf.ts`
 (+ `.browser.tsx`) does this: fetch data from Postgres directly (owner-gated /api

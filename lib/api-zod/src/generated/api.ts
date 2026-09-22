@@ -9809,3 +9809,96 @@ export const PrepareDbPortsExportResponse = zod.object({
 })
 
 
+/**
+ * @summary Daily tracker quality refresh status, per-tracker outcomes and findings.
+ */
+export const GetDailyQualityStatusResponse = zod.object({
+  "lastAttemptAt": zod.string().nullish(),
+  "lastAttemptStatus": zod.string().nullish(),
+  "lastAttemptTrigger": zod.string().nullish(),
+  "lastAttemptError": zod.string().nullish(),
+  "lastSuccessAt": zod.string().nullish(),
+  "nextDueAt": zod.string().nullish(),
+  "running": zod.boolean(),
+  "checkedCount": zod.number(),
+  "excludedCount": zod.number(),
+  "reviewCount": zod.number(),
+  "targets": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['incidents', 'strikes', 'market', 'maritime', 'report']),
+  "outcome": zod.enum(['checked', 'no_new_records', 'source_failed', 'provider_disabled', 'no_collector', 'skipped', 'incomplete', 'error']).describe('Explicit per-tracker result. A successful check that found nothing new is `no_new_records`, which is distinct from a dead source, a switched-off provider, a tracker with no collector, an unreached target and an unfinished scan.\n'),
+  "detail": zod.string().nullish(),
+  "checkedCount": zod.number(),
+  "excludedCount": zod.number(),
+  "reviewCount": zod.number(),
+  "finishedAt": zod.string().nullish()
+})),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "targetKey": zod.string(),
+  "incidentId": zod.number().nullish(),
+  "kind": zod.enum(['excluded', 'review']),
+  "check": zod.string(),
+  "reason": zod.string(),
+  "title": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "ruleVersion": zod.string().nullish(),
+  "beforeStatus": zod.string().nullish(),
+  "afterStatus": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Owner-triggered daily quality check.
+ */
+export const RunDailyQualityNowResponse = zod.object({
+  "ran": zod.boolean(),
+  "reason": zod.string().nullish(),
+  "runId": zod.string().nullish(),
+  "status": zod.object({
+  "lastAttemptAt": zod.string().nullish(),
+  "lastAttemptStatus": zod.string().nullish(),
+  "lastAttemptTrigger": zod.string().nullish(),
+  "lastAttemptError": zod.string().nullish(),
+  "lastSuccessAt": zod.string().nullish(),
+  "nextDueAt": zod.string().nullish(),
+  "running": zod.boolean(),
+  "checkedCount": zod.number(),
+  "excludedCount": zod.number(),
+  "reviewCount": zod.number(),
+  "targets": zod.array(zod.object({
+  "key": zod.string(),
+  "label": zod.string(),
+  "kind": zod.enum(['incidents', 'strikes', 'market', 'maritime', 'report']),
+  "outcome": zod.enum(['checked', 'no_new_records', 'source_failed', 'provider_disabled', 'no_collector', 'skipped', 'incomplete', 'error']).describe('Explicit per-tracker result. A successful check that found nothing new is `no_new_records`, which is distinct from a dead source, a switched-off provider, a tracker with no collector, an unreached target and an unfinished scan.\n'),
+  "detail": zod.string().nullish(),
+  "checkedCount": zod.number(),
+  "excludedCount": zod.number(),
+  "reviewCount": zod.number(),
+  "finishedAt": zod.string().nullish()
+})),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "targetKey": zod.string(),
+  "incidentId": zod.number().nullish(),
+  "kind": zod.enum(['excluded', 'review']),
+  "check": zod.string(),
+  "reason": zod.string(),
+  "title": zod.string().nullish(),
+  "sourceUrl": zod.string().nullish(),
+  "ruleVersion": zod.string().nullish(),
+  "beforeStatus": zod.string().nullish(),
+  "afterStatus": zod.string().nullish(),
+  "createdAt": zod.string().nullish()
+}))
+}).optional(),
+  "checked": zod.number(),
+  "excluded": zod.number(),
+  "review": zod.number(),
+  "targets": zod.number()
+})
+
+

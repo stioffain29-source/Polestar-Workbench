@@ -9,6 +9,7 @@ jest.mock("../../artifacts/api-server/src/lib/logger", () => ({
 import {
   launchRegionalReportJob,
   regionalReportWorkerAppName,
+  startRegionalReportJobRecovery,
 } from "../../artifacts/api-server/src/lib/regionalReportJobService";
 import { installRegionalReportWorkerLifetime } from "../../artifacts/api-server/src/lib/regionalReportWorkerLifetime";
 
@@ -43,6 +44,20 @@ describe("regional report worker process boundary", () => {
     expect(label).toMatch(/^polestar-app:v2:regional-report:/);
     expect(label).not.toMatch(/^polestar-ingest:/);
     expect(Buffer.byteLength(label)).toBeLessThanOrEqual(63);
+  });
+
+  // Recovery previously ran only after data migrations succeeded, and the
+  // periodic timer was installed at the end of a successful pass. One failing
+  // pass therefore left the product with no reclaim at all, so jobs abandoned
+  // by a deploy stayed "running" through every later restart.
+  it("keeps the periodic reclaim installed when the first recovery pass fails", async () => {
+    jest.spyOn(db, "update").mockImplementation(() => {
+      throw new Error("relation \"regional_report_jobs\" does not exist");
+    });
+    const setIntervalSpy = jest.spyOn(globalThis, "setInterval");
+    startRegionalReportJobRecovery();
+    await Promise.resolve();
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 60_000);
   });
 
   it("terminates the actual isolated worker with SIGTERM then SIGKILL on timeout", async () => {

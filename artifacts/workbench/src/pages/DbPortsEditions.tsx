@@ -23,7 +23,13 @@ import { useToast } from "@/hooks/use-toast";
 export default function DbPortsEditions() {
   const [, setLocation] = useLocation();
   const qc = useQueryClient();
-  const { data: editions = [], isLoading } = useListDbPortsEditions();
+  const {
+    data: editions = [],
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useListDbPortsEditions();
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newEndDate, setNewEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -92,7 +98,22 @@ export default function DbPortsEditions() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading && <div className="text-muted-foreground">Loading editions...</div>}
-        {!isLoading && editions.length === 0 && (
+        {/* A failed list must not render as "no editions": that reads like an
+            empty product rather than an unreachable one. */}
+        {isError && (
+          <div className="col-span-full text-sm text-destructive flex items-center gap-3">
+            <span>Could not load editions.</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refetch()}
+              disabled={isRefetching}
+            >
+              {isRefetching ? "Retrying..." : "Retry"}
+            </Button>
+          </div>
+        )}
+        {!isLoading && !isError && editions.length === 0 && (
           <div className="text-sm text-muted-foreground col-span-full">
             No editions created yet.
           </div>

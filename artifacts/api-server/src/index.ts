@@ -8,7 +8,7 @@ import {
   convergeMaritimeSemantic,
   startMaritimeSemanticConvergence,
 } from "./lib/maritimeSemanticConvergence";
-import { recoverRegionalReportJobs } from "./lib/regionalReportJobService";
+import { startRegionalReportJobRecovery } from "./lib/regionalReportJobService";
 
 loadDevEnv();
 
@@ -33,6 +33,10 @@ app.listen(port, "0.0.0.0", (err) => {
   }
 
   logger.info({ port }, "Server listening");
+  // Reclaim abandoned regional report jobs independently of data migrations.
+  // A migration failure used to skip this entirely, so a worker orphaned by a
+  // deploy stayed "running" through every later restart while its page spun.
+  startRegionalReportJobRecovery();
   // Run data migrations (which seed the scraper source feeds) BEFORE starting
   // the ingest scheduler, so the boot/forced ingest can never fire against a
   // sources table that is still missing a newly seeded feed. The server is
@@ -46,11 +50,6 @@ app.listen(port, "0.0.0.0", (err) => {
         "data migrations failed; ingest scheduler not started",
       );
       return;
-    }
-    try {
-      await recoverRegionalReportJobs();
-    } catch (jobRecoveryErr) {
-      logger.error({ err: jobRecoveryErr }, "regional report job recovery failed");
     }
     // Converge the newest semantic rows before launching the much larger
     // multi-topic ingest. This prevents a semantic-version publish from leaving

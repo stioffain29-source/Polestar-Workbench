@@ -32,6 +32,7 @@ import flashpointValidityAdminRouter from "./flashpointValidityAdmin";
 import cardsRouter from "./cards";
 import protestEventsRouter from "./protestEvents";
 import dbPortsRouter from "./dbPorts";
+import dailyQualityRouter from "./dailyQuality";
 import { requireOwner } from "../lib/ownerAccess";
 
 const router: IRouter = Router();
@@ -79,5 +80,6 @@ router.use(integrationsRouter);
 router.use(cardsRouter);
 router.use(protestEventsRouter);
 router.use(dbPortsRouter);
+router.use(dailyQualityRouter);
 
 export default router;

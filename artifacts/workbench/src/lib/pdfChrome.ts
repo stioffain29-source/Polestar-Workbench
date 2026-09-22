@@ -1149,6 +1149,26 @@ export async function prepareCoverImage(
   }
 }
 
+/**
+ * True only in an environment with a working DOM implementation.
+ *
+ * `typeof document !== "undefined"` is not sufficient: the headless exporters
+ * install a minimal document stub so shared browser modules can be imported,
+ * and its `createElement` returns a plain object rather than a DOM node. React
+ * and html2canvas reject that container ("Target container is not a DOM
+ * element"), so chart and map embedders must probe the element itself and fall
+ * back to native drawing instead of throwing.
+ */
+export function hasRealDom(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const probe = document.createElement?.("div") as { nodeType?: unknown } | undefined;
+    return !!probe && typeof probe.nodeType === "number";
+  } catch {
+    return false;
+  }
+}
+
 export function todayLabel(): string {
   return format(new Date(), "dd MMM yyyy");
 }

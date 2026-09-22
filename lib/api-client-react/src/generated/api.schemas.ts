@@ -3831,6 +3831,98 @@ export interface ErrorEnvelope {
   error: string;
 }
 
+export type DailyQualityTargetKind = typeof DailyQualityTargetKind[keyof typeof DailyQualityTargetKind];
+
+
+export const DailyQualityTargetKind = {
+  incidents: 'incidents',
+  strikes: 'strikes',
+  market: 'market',
+  maritime: 'maritime',
+  report: 'report',
+} as const;
+
+/**
+ * Explicit per-tracker result. A successful check that found nothing new is `no_new_records`, which is distinct from a dead source, a switched-off provider, a tracker with no collector, an unreached target and an unfinished scan.
+
+ */
+export type DailyQualityTargetOutcome = typeof DailyQualityTargetOutcome[keyof typeof DailyQualityTargetOutcome];
+
+
+export const DailyQualityTargetOutcome = {
+  checked: 'checked',
+  no_new_records: 'no_new_records',
+  source_failed: 'source_failed',
+  provider_disabled: 'provider_disabled',
+  no_collector: 'no_collector',
+  skipped: 'skipped',
+  incomplete: 'incomplete',
+  error: 'error',
+} as const;
+
+export interface DailyQualityTarget {
+  key: string;
+  label: string;
+  kind: DailyQualityTargetKind;
+  /** Explicit per-tracker result. A successful check that found nothing new is `no_new_records`, which is distinct from a dead source, a switched-off provider, a tracker with no collector, an unreached target and an unfinished scan.
+   */
+  outcome: DailyQualityTargetOutcome;
+  detail?: string | null;
+  checkedCount: number;
+  excludedCount: number;
+  reviewCount: number;
+  finishedAt?: string | null;
+}
+
+export type DailyQualityFindingKind = typeof DailyQualityFindingKind[keyof typeof DailyQualityFindingKind];
+
+
+export const DailyQualityFindingKind = {
+  excluded: 'excluded',
+  review: 'review',
+} as const;
+
+export interface DailyQualityFinding {
+  id: number;
+  targetKey: string;
+  incidentId?: number | null;
+  kind: DailyQualityFindingKind;
+  check: string;
+  reason: string;
+  title?: string | null;
+  sourceUrl?: string | null;
+  ruleVersion?: string | null;
+  beforeStatus?: string | null;
+  afterStatus?: string | null;
+  createdAt?: string | null;
+}
+
+export interface DailyQualityStatus {
+  lastAttemptAt?: string | null;
+  lastAttemptStatus?: string | null;
+  lastAttemptTrigger?: string | null;
+  lastAttemptError?: string | null;
+  lastSuccessAt?: string | null;
+  nextDueAt?: string | null;
+  running: boolean;
+  checkedCount: number;
+  excludedCount: number;
+  reviewCount: number;
+  targets: DailyQualityTarget[];
+  findings: DailyQualityFinding[];
+}
+
+export interface DailyQualityRunResponse {
+  ran: boolean;
+  reason?: string | null;
+  runId?: string | null;
+  status?: DailyQualityStatus;
+  checked: number;
+  excluded: number;
+  review: number;
+  targets: number;
+}
+
 /**
  * Invalid request
  */

@@ -6,7 +6,6 @@ import { buildFuelCoverageSummary } from "@/lib/fuelCoverage";
 import { MarketPricesReportGrid, MARKET_PRICES_REPORT_EMPTY_TEXT } from "@/components/MarketPrices";
 import { buildCountryIntensity } from "@/components/CountryChoroplethMap";
 import EnergySituationVisual, { ENERGY_REPORT_MAP_HEIGHT } from "@/components/EnergySituationVisual";
-import { RegionalReportMap } from "@/components/RegionalReportMap";
 import type { MarketPrice } from "@workspace/api-client-react";
 import {
   buildCargoPatternModel,
@@ -53,12 +52,13 @@ import {
   SEV_COLOR,
   SEV_LABEL,
   sevKey,
+  hasRealDom,
   type Ctx,
   type KpiCardData,
 } from "./pdfChrome";
 import { layoutCallouts } from "./calloutLayout";
-import { clipCalloutTitle, clipCalloutSummary, severityRank } from "./incidentCallout";
 import { embedReactChartInPdf } from "./embedReportChartInPdf";
+import { drawRegionalReportMap } from "./regionalReportMapPdf";
 import { drawEnergyProse } from "./energyPdfFlow";
 import {
   resolveReportWindow,
@@ -89,8 +89,8 @@ import {
   type TopicAiProse,
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
-import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput, type RegionalCanonicalReport } from "./regionalWeekly";
-import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalBusinessImplicationsNarrative, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalMapPoints, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, regionalCanonicalReportFromHardNumbers, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
+import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
+import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalBusinessImplicationsNarrative, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, regionalCanonicalReportFromHardNumbers, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
 import {
@@ -661,31 +661,6 @@ function drawRelatedIncidents(
   // and to make the per-cadence behaviour obvious to readers of this code.
   void reportCadence(topic);
 }
-
-async function drawRegionalHotspotMap(
-  ctx: Ctx,
-  points: RegionalCanonicalReport["mapPoints"],
-  topic: RegionalWeeklyTopic = "middle_east_weekly",
-) {
-  // The same static tile/marker/key component as ReportPreview. Do not rebuild
-  // or sort saved points here: numbering and overlapping markers must agree.
-  const rendered = await embedReactChartInPdf(
-    ctx,
-    createElement(
-      "div",
-      { style: { width: "100%", margin: "0 auto" } },
-      createElement(RegionalReportMap, { points, topic, compact: true }),
-    ),
-    // Permit the shared embedder's bounded (minimum 75%) fit-to-remaining
-    // behaviour. This keeps the complete map, numbered markers and key together
-    // beneath the outlook/glance material instead of creating a map-only page.
-    { useCssPixelUnits: true },
-  );
-  if (!rendered) {
-    throw new Error("The regional map could not be exported. Use Download PDF in the report editor with the basemap loaded.");
-  }
-}
-
 function cargoPlaceLine(row: CargoAppendixRow): string {
   const country = sanitize(row.country);
   const loc = sanitize(row.location);
@@ -1018,9 +993,6 @@ export async function exportTopicReportPdf(
   filename: string,
   options: ExportTopicReportPdfOptions = {},
 ): Promise<void> {
-  const regionalTopic: RegionalWeeklyTopic = data.topic === "apac_weekly"
-    ? "apac_weekly"
-    : "middle_east_weekly";
   const regionalCanonical = isRegionalWeeklyTopic(data.topic)
     ? regionalCanonicalReportFromHardNumbers(data.hardNumbers, data.topic, data.issueDate)
     : null;
@@ -1265,6 +1237,9 @@ export async function exportTopicReportPdf(
       }
     }
   }
+  if (isRegionalWeekly && regionalCanonical) {
+    await drawRegionalReportMap(ctx, regionalCanonical.mapPoints, data.topic);
+  }
 
   if (isRegionalWeekly && regionalCanonical) {
     ensureSpace(ctx, 118);
@@ -1279,7 +1254,6 @@ export async function exportTopicReportPdf(
       4,
     );
     ctx.y += 8;
-    await drawRegionalHotspotMap(ctx, regionalCanonical.mapPoints, regionalTopic);
   }
 
     const rawWindow = filterIncidentsToWindow(
@@ -2013,7 +1987,11 @@ export async function exportTopicReportPdf(
     drawDisclaimer(ctx);
   }
   drawFooters(ctx.pdf);
-  if (data.topic === "fuel") {
+  // The in-app fuel download streams the bytes through an anchor click, which
+  // needs a real browser. Headless exporters install a document stub, so fall
+  // through to jsPDF's save() there — the harness patches save() to write the
+  // file, and fuel would otherwise never produce one.
+  if (data.topic === "fuel" && hasRealDom()) {
     const bytes = ctx.pdf.output("arraybuffer") as ArrayBuffer;
     console.info("[FUEL_PDF_TRACE] PDF BYTES CREATED", {
       byteCount: bytes.byteLength,

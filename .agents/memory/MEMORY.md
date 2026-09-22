@@ -155,3 +155,5 @@
 - [Regional weekly intelligence scope](regional-weekly-intelligence-scope.md) — APAC/ME business briefs use checked facts, not headline templates; one saved report for preview/PDF.
 - [Ports and Logistics report scope](ports-logistics-report-scope.md) — exports are customer-facing: no internal notices or effort logging, provisional asset targets, and a short report beats padding.
 - [Regional weekly map selection](regional-map-selection.md) — the map plots a capped deterministic selection of developments, not a mirror of the Key Developments list.
+- [Daily recheck input parity](daily-recheck-input-parity.md) — re-judging stored rows must feed the gate the RAW title (display_title mass-drops local-language records) and noise gates must never score translated text; region-feed topics legitimately carry Unknown country.
+- [Background job reclaim independence](background-job-reclaim-independence.md) — a durable job's recovery pass must arm its timer BEFORE its first pass and never sit behind migrations; status endpoint reclaims stale runs on read or the waiting page spins forever.

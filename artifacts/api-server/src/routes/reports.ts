@@ -29,6 +29,7 @@ import {
 import {
   createOrResumeRegionalReportJob,
   getRegionalReportJob,
+  reclaimStaleRegionalReportJob,
   RegionalReportJobInputError,
   toRegionalReportJob,
 } from "../lib/regionalReportJobService";
@@ -252,10 +253,16 @@ router.get("/reports/regional-create/:jobId", async (req, res): Promise<void> =>
     return;
   }
   const { jobId } = parsed.data;
-  const job = await getRegionalReportJob(jobId);
+  let job = await getRegionalReportJob(jobId);
   if (!job) {
     res.status(404).json({ error: "Not found" });
     return;
+  }
+  // A page waiting here must never poll a stage whose worker is already gone:
+  // reclaim the abandoned run so the next poll shows real progress or a real
+  // failure instead of an indefinite spinner.
+  if (job.status === "running") {
+    job = (await reclaimStaleRegionalReportJob(jobId)) ?? job;
   }
   const response: RegionalReportJob = GetRegionalReportJobResponse.parse(
     toRegionalReportJob(job),

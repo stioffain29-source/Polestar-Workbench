@@ -5336,6 +5336,81 @@ export async function runDataMigrations(): Promise<void> {
       }
     }
 
+    // -------------------------------------------------------------------
+    // Daily tracker quality refresh — durable run evidence.
+    //
+    // Additive and idempotent. Created BEFORE the fence refresh below so the
+    // ingest_run_fence_guard trigger covers these tables from their first
+    // boot: the daily run writes through the same write-fence contract as
+    // every other writable table, never around it.
+    // -------------------------------------------------------------------
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS daily_quality_runs (
+        id text PRIMARY KEY,
+        trigger text NOT NULL,
+        status text NOT NULL,
+        started_at timestamptz NOT NULL DEFAULT now(),
+        finished_at timestamptz,
+        due_at timestamptz NOT NULL DEFAULT now(),
+        error text,
+        checked_count integer NOT NULL DEFAULT 0,
+        excluded_count integer NOT NULL DEFAULT 0,
+        review_count integer NOT NULL DEFAULT 0,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS daily_quality_runs_started_idx ON daily_quality_runs (started_at)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS daily_quality_runs_status_idx ON daily_quality_runs (status)
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS daily_quality_targets (
+        id serial PRIMARY KEY,
+        run_id text NOT NULL,
+        target_key text NOT NULL,
+        label text NOT NULL,
+        kind text NOT NULL,
+        outcome text NOT NULL,
+        detail text,
+        checked_count integer NOT NULL DEFAULT 0,
+        excluded_count integer NOT NULL DEFAULT 0,
+        review_count integer NOT NULL DEFAULT 0,
+        cursor integer,
+        started_at timestamptz,
+        finished_at timestamptz
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS daily_quality_targets_run_target_idx
+        ON daily_quality_targets (run_id, target_key)
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS daily_quality_findings (
+        id serial PRIMARY KEY,
+        run_id text NOT NULL,
+        target_key text NOT NULL,
+        incident_id integer,
+        kind text NOT NULL,
+        check_name text NOT NULL,
+        reason text NOT NULL,
+        title text,
+        source_url text,
+        rule_version text,
+        before_status text,
+        after_status text,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS daily_quality_findings_run_idx ON daily_quality_findings (run_id)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS daily_quality_findings_incident_idx
+        ON daily_quality_findings (incident_id)
+    `);
+
     await ensureIngestRunWriteFence();
     logger.info("runDataMigrations: finished");
   } catch (err) {

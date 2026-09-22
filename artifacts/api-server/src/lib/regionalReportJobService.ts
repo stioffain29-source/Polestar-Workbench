@@ -247,9 +247,35 @@ export class RegionalReportJobInputError extends Error {
   }
 }
 
-export async function recoverRegionalReportJobs(): Promise<void> {
+/**
+ * The worker's own hard deadline. Once it passes, the parent has already
+ * SIGTERMed and SIGKILLed the child, so a row still marked running has lost
+ * the only process allowed to advance it.
+ */
+function staleRunningJobWhere() {
   const staleBefore = new Date(Date.now() - timeoutMs - graceMs);
-  await db.update(regionalReportJobsTable).set({
+  return and(
+    eq(regionalReportJobsTable.status, "running"),
+    or(
+      lt(regionalReportJobsTable.startedAt, staleBefore),
+      isNull(regionalReportJobsTable.startedAt),
+    ),
+  );
+}
+
+/**
+ * Reclaim a single abandoned job at read time. A worker orphaned by a deploy
+ * or a crash leaves its row running for good, and the waiting page then polls
+ * a stage that can never advance. Recovering on read lets that page heal
+ * itself instead of depending on a background pass that boot may never have
+ * reached.
+ */
+export async function reclaimStaleRegionalReportJob(
+  id: string,
+): Promise<RegionalReportJobRow | undefined> {
+  // This process still owns a live child for the job, so it is not abandoned.
+  if (active.has(id)) return undefined;
+  const [requeued] = await db.update(regionalReportJobsTable).set({
     status: "queued",
     stage: "queued",
     runToken: null,
@@ -257,12 +283,26 @@ export async function recoverRegionalReportJobs(): Promise<void> {
     error: null,
     updatedAt: new Date(),
   }).where(and(
-    eq(regionalReportJobsTable.status, "running"),
-    or(
-      lt(regionalReportJobsTable.startedAt, staleBefore),
-      isNull(regionalReportJobsTable.startedAt),
-    ),
-  ));
+    eq(regionalReportJobsTable.id, id),
+    staleRunningJobWhere(),
+  )).returning();
+  if (!requeued) return undefined;
+  logger.warn({ jobId: id }, "reclaimed abandoned regional report job");
+  void launchRegionalReportJob(id).catch((err) => {
+    logger.error({ err, jobId: id }, "reclaimed regional report worker launch failed");
+  });
+  return requeued;
+}
+
+export async function recoverRegionalReportJobs(): Promise<void> {
+  await db.update(regionalReportJobsTable).set({
+    status: "queued",
+    stage: "queued",
+    runToken: null,
+    startedAt: null,
+    error: null,
+    updatedAt: new Date(),
+  }).where(staleRunningJobWhere());
   const queued = await db.select().from(regionalReportJobsTable)
     .where(eq(regionalReportJobsTable.status, "queued"));
   for (const job of queued) {
@@ -271,6 +311,15 @@ export async function recoverRegionalReportJobs(): Promise<void> {
     });
   }
   logger.info({ count: queued.length }, "regional report jobs recovered");
+}
+
+/**
+ * Install the periodic reclaim before the first pass runs, and never let that
+ * pass failing cancel it. A boot-time failure previously left the product with
+ * no recovery at all, which is how abandoned jobs survived restart after
+ * restart while their pages spun.
+ */
+export function startRegionalReportJobRecovery(): void {
   if (!recoveryTimer) {
     // A worker can outlive a rolling API restart. Leave its lease intact, then
     // periodically reclaim it only after the hard worker deadline has passed.
@@ -281,4 +330,7 @@ export async function recoverRegionalReportJobs(): Promise<void> {
     }, 60_000);
     recoveryTimer.unref?.();
   }
+  void recoverRegionalReportJobs().catch((err) => {
+    logger.error({ err }, "initial regional report job recovery failed");
+  });
 }

@@ -48,6 +48,10 @@ export interface IncidentMapProps {
   hideControls?: boolean;
   /** Padding for the auto-fitted map bounds [x, y]. Defaults to [32, 32]. */
   boundsPadding?: [number, number];
+  /** Regional reports need regional context even when only one point is available. */
+  maxZoom?: number;
+  /** A report may already identify severity in its numbered caption grid. */
+  showSeverityLegend?: boolean;
 }
 
 /**
@@ -68,6 +72,8 @@ export default function IncidentMap({
   square = false,
   hideControls = false,
   boundsPadding = [32, 32],
+  maxZoom = 14,
+  showSeverityLegend = true,
 }: IncidentMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -82,7 +88,7 @@ export default function IncidentMap({
   // the effect below re-ran on every keystroke and re-fired fitBounds/setView,
   // resetting the analyst's manual pan/zoom.
   const pointsSig = JSON.stringify(
-    points.map((p) => [p.lat, p.lng, p.severity ?? "", p.title ?? "", p.label ?? "", !!p.primary]),
+    points.map((p) => [p.lat, p.lng, p.severity ?? "", p.title ?? "", p.label ?? "", !!p.primary, p.markerNumber ?? ""]),
   );
   const plottable = useMemo(
     () =>
@@ -105,8 +111,8 @@ export default function IncidentMap({
   // toggling labels or the radius redraws the overlay but must not snap the map
   // back, so the analyst's framing survives.
   const fitKey = useMemo(
-    () => JSON.stringify(plottable.map((p) => [p.lat, p.lng])),
-    [plottable],
+    () => JSON.stringify([maxZoom, plottable.map((p) => [p.lat, p.lng])]),
+    [plottable, maxZoom],
   );
   const lastFitKeyRef = useRef<string | null>(null);
 
@@ -404,9 +410,9 @@ export default function IncidentMap({
         // in further still and — because the auto-fit only re-runs when the
         // plotted point set changes — that manual framing is preserved through
         // edits and the PDF export.
-        map.setView(latLngs[0] as L.LatLngTuple, 14);
+        map.setView(latLngs[0] as L.LatLngTuple, maxZoom);
       } else {
-        map.fitBounds(L.latLngBounds(latLngs), { padding: boundsPadding, maxZoom: 14 });
+        map.fitBounds(L.latLngBounds(latLngs), { padding: boundsPadding, maxZoom });
       }
       lastFitKeyRef.current = fitKey;
     }
@@ -418,7 +424,7 @@ export default function IncidentMap({
     return () => {
       map.off("move zoom zoomend resize viewreset", positionAll);
     };
-  }, [plottable, affectedRadiusKm, showLabels, locationLabel, fitKey]);
+  }, [plottable, affectedRadiusKm, showLabels, locationLabel, fitKey, maxZoom]);
 
   useEffect(() => {
     return () => {
@@ -514,7 +520,7 @@ export default function IncidentMap({
       </div>
       {hasPlotted ? (
         <div className="flex flex-wrap items-center gap-3 mt-3">
-          {(["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (
+          {showSeverityLegend && (["extreme", "high", "moderate", "low", "insignificant"] as const).map((k) => (
             <div key={k} className="flex items-center gap-1.5">
               <span
                 style={{

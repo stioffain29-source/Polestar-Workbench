@@ -45,6 +45,8 @@ import type {
   CountryReport,
   CountryReportInput,
   CountryReportUpdate,
+  DailyQualityRunResponse,
+  DailyQualityStatus,
   DashboardOverview,
   DataCentreCountryRisk,
   DataCentreCountryRiskInput,
@@ -9269,5 +9271,152 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getPrepareDbPortsExportMutationOptions(options));
+    }
+
+export const getGetDailyQualityStatusUrl = () => {
+
+
+
+
+  return `/api/daily-quality`
+}
+
+/**
+ * @summary Daily tracker quality refresh status, per-tracker outcomes and findings.
+ */
+export const getDailyQualityStatus = async ( options?: RequestInit): Promise<DailyQualityStatus> => {
+
+  return customFetch<DailyQualityStatus>(getGetDailyQualityStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDailyQualityStatusQueryKey = () => {
+    return [
+    `/api/daily-quality`
+    ] as const;
+    }
+
+
+export const getGetDailyQualityStatusQueryOptions = <TData = Awaited<ReturnType<typeof getDailyQualityStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyQualityStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDailyQualityStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDailyQualityStatus>>> = ({ signal }) => getDailyQualityStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDailyQualityStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDailyQualityStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getDailyQualityStatus>>>
+export type GetDailyQualityStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Daily tracker quality refresh status, per-tracker outcomes and findings.
+ */
+
+export function useGetDailyQualityStatus<TData = Awaited<ReturnType<typeof getDailyQualityStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDailyQualityStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDailyQualityStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getRunDailyQualityNowUrl = () => {
+
+
+
+
+  return `/api/daily-quality/run`
+}
+
+/**
+ * @summary Owner-triggered daily quality check.
+ */
+export const runDailyQualityNow = async ( options?: RequestInit): Promise<DailyQualityRunResponse> => {
+
+  return customFetch<DailyQualityRunResponse>(getRunDailyQualityNowUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRunDailyQualityNowMutationOptions = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runDailyQualityNow>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runDailyQualityNow>>, TError,void, TContext> => {
+
+const mutationKey = ['runDailyQualityNow'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runDailyQualityNow>>, void> = () => {
+
+
+          return  runDailyQualityNow(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunDailyQualityNowMutationResult = NonNullable<Awaited<ReturnType<typeof runDailyQualityNow>>>
+
+    export type RunDailyQualityNowMutationError = ErrorType<ErrorEnvelope>
+
+    /**
+ * @summary Owner-triggered daily quality check.
+ */
+export const useRunDailyQualityNow = <TError = ErrorType<ErrorEnvelope>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runDailyQualityNow>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runDailyQualityNow>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRunDailyQualityNowMutationOptions(options));
     }
 

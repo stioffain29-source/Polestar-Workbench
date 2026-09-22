@@ -108,6 +108,8 @@ import {
   type CargoGroupedSection,
 } from "@/lib/cargoGroupedDataset";
 import IncidentMap from "@/components/IncidentMap";
+import { RegionalHotspotMap } from "@/components/RegionalHotspotMap";
+export { RegionalHotspotMap } from "@/components/RegionalHotspotMap";
 import polestarLogo from "@assets/Reverse_colour_logo_hor.png";
 import { SPOT_SEV_COLOR } from "@/lib/spotReport";
 import { layoutCallouts } from "@/lib/calloutLayout";
@@ -411,18 +413,6 @@ const APAC_MARKET_COORDS: Record<(typeof APAC_OUTLOOK_MARKETS)[number], [number,
   "Papua New Guinea": [-6.3, 143.9],
   Malaysia: [4.2, 102.0],
 };
-
-import { RegionalReportMap } from "@/components/RegionalReportMap";
-
-export function RegionalHotspotMap({
-  points,
-  topic,
-}: {
-  points: ReturnType<typeof import("@/lib/regionalWeekly").buildRegionalMapPoints>;
-  topic: string | undefined;
-}) {
-  return <RegionalReportMap points={points} topic={topic} compact />;
-}
 
 interface KpiPreviewCard {
   label: string;

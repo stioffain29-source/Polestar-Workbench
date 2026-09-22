@@ -20,9 +20,11 @@ const row = {
 
 const mockCreateOrResume = jest.fn();
 const mockGetJob = jest.fn();
+const mockReclaim = jest.fn();
 jest.mock("../../artifacts/api-server/src/lib/regionalReportJobService", () => ({
   createOrResumeRegionalReportJob: (...args: unknown[]) => mockCreateOrResume(...args),
   getRegionalReportJob: (...args: unknown[]) => mockGetJob(...args),
+  reclaimStaleRegionalReportJob: (...args: unknown[]) => mockReclaim(...args),
   toRegionalReportJob: (job: typeof row) => ({
     id: job.id,
     topic: job.topic,
@@ -57,6 +59,8 @@ afterAll(() => new Promise<void>((resolve, reject) => {
 beforeEach(() => {
   mockCreateOrResume.mockReset();
   mockGetJob.mockReset();
+  mockReclaim.mockReset();
+  mockReclaim.mockResolvedValue(undefined);
 });
 
 async function post(body: unknown) {
@@ -124,5 +128,33 @@ describe("regional report background job routes", () => {
     expect(found.status).toBe(200);
     expect(missing.status).toBe(404);
     expect(malformed.status).toBe(400);
+  });
+
+  // A worker orphaned by a deploy leaves its row "running" for good. Polling
+  // that row reported a stage that could never advance, which is what left the
+  // creation page reconnecting indefinitely.
+  it("reclaims an abandoned running job on read instead of reporting a dead stage", async () => {
+    const abandoned = { ...row, status: "running", stage: "collecting" };
+    const requeued = { ...row, status: "queued", stage: "queued" };
+    mockGetJob.mockResolvedValueOnce(abandoned);
+    mockReclaim.mockResolvedValueOnce(requeued);
+    const response = await fetch(`${baseUrl}/reports/regional-create/${requestId}`);
+    expect(response.status).toBe(200);
+    expect(mockReclaim).toHaveBeenCalledWith(requestId);
+    expect(await response.json()).toMatchObject({ status: "queued", stage: "queued" });
+  });
+
+  it("leaves a healthy running job untouched so a live worker is never fenced", async () => {
+    const healthy = { ...row, status: "running", stage: "building" };
+    mockGetJob.mockResolvedValueOnce(healthy);
+    mockReclaim.mockResolvedValueOnce(undefined);
+    const response = await fetch(`${baseUrl}/reports/regional-create/${requestId}`);
+    expect(await response.json()).toMatchObject({ status: "running", stage: "building" });
+  });
+
+  it("does not attempt reclaim for jobs that already settled", async () => {
+    mockGetJob.mockResolvedValueOnce({ ...row, status: "completed", stage: "completed", reportId: 9 });
+    await fetch(`${baseUrl}/reports/regional-create/${requestId}`);
+    expect(mockReclaim).not.toHaveBeenCalled();
   });
 });

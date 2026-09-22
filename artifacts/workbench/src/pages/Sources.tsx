@@ -2,9 +2,12 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   useListSources, useGetSourceHealth, useGetIntegrationStatus,
+  useGetDailyQualityStatus, useRunDailyQualityNow,
   getListSourcesQueryKey, getGetSourceHealthQueryKey, getGetDashboardOverviewQueryKey,
-  getListIncidentsQueryKey, getListStrikesQueryKey,
+  getListIncidentsQueryKey, getListStrikesQueryKey, getGetDailyQualityStatusQueryKey,
   createSource, updateSource, deleteSource, customFetch,
+  type DailyQualityTarget,
+  type DailyQualityFinding,
   type Source,
   type SourceInput,
   type SourceUpdate,
@@ -343,6 +346,181 @@ function ApacLocalSourceHealthPanel() {
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+// Daily tracker quality refresh. Every outcome is shown with its own wording:
+// a quiet feed is a SUCCESSFUL check and must never look like a broken one, and
+// a tracker with no collector is disclosed rather than counted as a pass.
+const DAILY_QUALITY_OUTCOMES: Record<string, { label: string; className: string }> = {
+  checked: { label: "Checked", className: "bg-emerald-100 text-emerald-900 border-emerald-300" },
+  no_new_records: { label: "Checked — no new records", className: "bg-emerald-50 text-emerald-800 border-emerald-200" },
+  source_failed: { label: "Source failed", className: "bg-red-100 text-red-900 border-red-300" },
+  provider_disabled: { label: "Provider unavailable", className: "bg-amber-100 text-amber-900 border-amber-300" },
+  no_collector: { label: "No collector", className: "bg-amber-100 text-amber-900 border-amber-300" },
+  skipped: { label: "Not reached", className: "bg-muted text-muted-foreground border-border" },
+  incomplete: { label: "Unfinished", className: "bg-amber-100 text-amber-900 border-amber-300" },
+  error: { label: "Check error", className: "bg-red-100 text-red-900 border-red-300" },
+};
+
+function DailyQualityTargetRow({ item }: { item: DailyQualityTarget }) {
+  const badge = DAILY_QUALITY_OUTCOMES[item.outcome] ?? DAILY_QUALITY_OUTCOMES["skipped"]!;
+  return (
+    <div className="px-4 py-2.5 grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-start">
+      <div className="min-w-0">
+        <div className="text-sm font-sans font-medium text-foreground">{item.label}</div>
+        {item.detail ? (
+          <div className="text-xs text-muted-foreground mt-0.5">{item.detail}</div>
+        ) : null}
+        <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground mt-1">
+          {item.checkedCount} checked · {item.excludedCount} excluded · {item.reviewCount} review
+        </div>
+      </div>
+      <span className={cn("text-[10px] font-sans uppercase tracking-widest border rounded-sm px-2 py-1 whitespace-nowrap", badge.className)}>
+        {badge.label}
+      </span>
+    </div>
+  );
+}
+
+function DailyQualityFindingRow({ item }: { item: DailyQualityFinding }) {
+  return (
+    <div className="px-4 py-2 text-xs">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span
+          className={cn(
+            "text-[10px] font-sans uppercase tracking-widest border rounded-sm px-1.5 py-0.5",
+            item.kind === "excluded"
+              ? "bg-red-50 text-red-900 border-red-200"
+              : "bg-amber-50 text-amber-900 border-amber-200",
+          )}
+        >
+          {item.kind === "excluded" ? "Excluded" : "Review"}
+        </span>
+        <span className="text-muted-foreground">{item.check}</span>
+        {item.incidentId ? <span className="text-muted-foreground">#{item.incidentId}</span> : null}
+        {item.sourceUrl ? (
+          <a href={item.sourceUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            source
+          </a>
+        ) : null}
+      </div>
+      {item.title ? <div className="text-foreground mt-0.5">{item.title}</div> : null}
+      <div className="text-muted-foreground mt-0.5">{item.reason}</div>
+      {item.beforeStatus || item.afterStatus ? (
+        <div className="text-[10px] text-muted-foreground mt-0.5">
+          {item.beforeStatus ?? "unset"} → {item.afterStatus ?? "unchanged"}
+          {item.ruleVersion ? ` · rules ${item.ruleVersion}` : ""}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DailyQualityPanel() {
+  const qc = useQueryClient();
+  const { data, isLoading } = useGetDailyQualityStatus({
+    // While a run is in flight, poll so a background completion lands in the UI
+    // on its own — an operator should never have to hard-reload to see it.
+    query: {
+      queryKey: getGetDailyQualityStatusQueryKey(),
+      refetchInterval: (q) => (q.state.data?.running ? 5_000 : false),
+    },
+  });
+  const [message, setMessage] = useState<string | null>(null);
+  const runNow = useRunDailyQualityNow({
+    mutation: {
+      onSuccess: async (result) => {
+        setMessage(
+          result.ran
+            ? `Checked ${result.checked}, excluded ${result.excluded}, ${result.review} for review.`
+            : "Another daily check is already running.",
+        );
+        // A completed run changes what the rest of the workbench should show.
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: getGetDailyQualityStatusQueryKey() }),
+          qc.invalidateQueries({ queryKey: getListIncidentsQueryKey() }),
+          qc.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
+          qc.invalidateQueries({ queryKey: getGetSourceHealthQueryKey() }),
+        ]);
+      },
+      onError: () => setMessage("Daily check could not be started."),
+    },
+  });
+
+  const findings = data?.findings ?? [];
+  return (
+    <div className="bg-card border border-border rounded-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border flex-wrap">
+        <div className="text-sm font-serif font-bold uppercase tracking-wide text-primary">Daily Tracker Quality Check</div>
+        <div className="text-xs text-muted-foreground ml-1">
+          Runs every 24 hours on the server; catches up after downtime
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto rounded-sm text-xs"
+          disabled={runNow.isPending || data?.running}
+          onClick={() => runNow.mutate()}
+        >
+          <RefreshCw className={cn("h-3 w-3 mr-1", runNow.isPending && "animate-spin")} />
+          {runNow.isPending ? "Running…" : "Run daily check now"}
+        </Button>
+      </div>
+      <div className="px-4 py-3 border-b border-border grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div>
+          <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Last attempt</div>
+          <div className="text-foreground mt-0.5">{fmtDateTime(data?.lastAttemptAt)}</div>
+          {data?.lastAttemptStatus ? (
+            <div className="text-muted-foreground">
+              {data.lastAttemptStatus}
+              {data.lastAttemptTrigger ? ` · ${data.lastAttemptTrigger}` : ""}
+            </div>
+          ) : null}
+        </div>
+        <div>
+          <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Last successful check</div>
+          <div className="text-foreground mt-0.5">{fmtDateTime(data?.lastSuccessAt)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Next due</div>
+          <div className="text-foreground mt-0.5">{fmtDateTime(data?.nextDueAt)}</div>
+        </div>
+        <div>
+          <div className="text-[10px] font-sans uppercase tracking-widest text-muted-foreground">Latest run</div>
+          <div className="text-foreground mt-0.5">
+            {data?.checkedCount ?? 0} checked · {data?.excludedCount ?? 0} excluded · {data?.reviewCount ?? 0} review
+          </div>
+        </div>
+      </div>
+      {data?.lastAttemptError ? (
+        <div className="px-4 py-2 border-b border-border bg-red-50 text-xs text-red-900">{data.lastAttemptError}</div>
+      ) : null}
+      {message ? (
+        <div className="px-4 py-2 border-b border-border bg-muted/40 text-xs text-muted-foreground">{message}</div>
+      ) : null}
+      {isLoading ? (
+        <div className="p-6 text-center text-sm text-muted-foreground">Loading daily check status…</div>
+      ) : (
+        <div className="divide-y divide-border">
+          {(data?.targets ?? []).map((t) => (
+            <DailyQualityTargetRow key={t.key} item={t} />
+          ))}
+        </div>
+      )}
+      <div className="px-4 py-2 border-t border-border bg-muted/40 text-[10px] font-sans uppercase tracking-widest text-muted-foreground">
+        Findings ({findings.length})
+      </div>
+      {findings.length === 0 ? (
+        <div className="px-4 py-3 text-sm text-muted-foreground">No findings from the latest check.</div>
+      ) : (
+        <div className="divide-y divide-border max-h-[420px] overflow-y-auto">
+          {findings.map((f) => (
+            <DailyQualityFindingRow key={f.id} item={f} />
+          ))}
+        </div>
       )}
     </div>
   );
@@ -690,6 +868,8 @@ export default function Sources() {
       <MaritimeSourceHealthPanel />
 
       <ApacLocalSourceHealthPanel />
+
+      <DailyQualityPanel />
 
       <div className="bg-card border border-border rounded-sm p-3 flex gap-2">
         <Select value={topic || "all"} onValueChange={(v) => setTopic(v === "all" ? "" : v)}>

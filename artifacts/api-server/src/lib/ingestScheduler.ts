@@ -23,6 +23,7 @@ import {
 } from "./ingestRunner";
 import { runIngestProcess } from "./ingestProcess";
 import { runCountryEngineAll } from "./countryEngine";
+import { runDailyQualityCheck } from "./dailyQualityRun";
 import { logger } from "./logger";
 
 // Automatic ingestion scheduler.
@@ -613,6 +614,39 @@ async function protestScheduleTick(reason: string): Promise<void> {
 }
 
 /**
+ * Ask the daily tracker quality refresh whether it is due, and run it if so.
+ *
+ * The due decision lives in the run (measured from the last SUCCESSFUL
+ * completion), so this can be polled freely: "not_due" and "locked" are both
+ * normal, quiet outcomes, and neither advances the completion clock. A failure
+ * is logged and swallowed — quality work must never take the scheduler down.
+ */
+async function qualityTick(reason: string): Promise<void> {
+  try {
+    const result = await runDailyQualityCheck({
+      trigger: reason === "boot-catchup" ? "boot-catchup" : "schedule",
+    });
+    if (!result.ran) {
+      logger.debug({ reason, why: result.reason }, "daily quality check not run");
+      return;
+    }
+    logger.info(
+      {
+        reason,
+        runId: result.runId,
+        status: result.status,
+        checked: result.checked,
+        excluded: result.excluded,
+        review: result.review,
+      },
+      "daily quality check finished",
+    );
+  } catch (err) {
+    logger.error({ err, reason }, "daily quality check failed");
+  }
+}
+
+/**
  * Start the automatic ingest scheduler. Safe to call once at server startup.
  * Returns immediately; all work happens in the background.
  */
@@ -1038,6 +1072,23 @@ export function startIngestScheduler(): void {
     PRICE_REFRESH_INTERVAL_MS,
   );
   priceTimer.unref();
+
+  // DAILY tracker quality refresh. The 24-hour cadence lives in the run itself
+  // (it compares now against the last SUCCESSFUL completion), so this timer only
+  // has to ask often enough to notice. Polling hourly is what makes the routine
+  // survive restarts: a process that was down when the run came due picks it up
+  // within the hour instead of waiting a further full day, and a skipped or
+  // failed attempt stays due rather than silently resetting the clock.
+  //
+  // It is deliberately NOT chained onto the ingest tick. Collection and quality
+  // work take separate advisory locks, so a long or wedged scrape cannot stop
+  // the quality sweep, and the existing 12-hour ingest and hourly price refresh
+  // above keep their own cadence untouched.
+  const qualityBootTimer = setTimeout(() => void qualityTick("boot-catchup"), 90_000);
+  qualityBootTimer.unref();
+
+  const qualityTimer = setInterval(() => void qualityTick("schedule"), 1 * MS_PER_HOUR);
+  qualityTimer.unref();
 
   logger.info({ intervalHours: hours }, "ingest scheduler started");
 }

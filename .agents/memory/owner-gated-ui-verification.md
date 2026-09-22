@@ -20,3 +20,8 @@ Controlled OIDC testing with a temporary authorised development identity was con
 **Why:** The current test runner can supply development OIDC claims, but an authenticated synthetic identity still needs the separate owner authorisation. This permits realistic editing tests without using the owner's credentials or changing the production access rule.
 
 **How to apply:** Follow the current Replit Auth testing guidance, grant only the temporary test identity the necessary development role, and use a separate temporary edition for mutations. Remove exactly those test records and sessions afterwards, and restore the normal issuer configuration. A plain app-preview screenshot still shows the login wall.
+
+Two traps when driving the owner-gated SPA with a synthetic session:
+
+- The stored session's user object must carry EVERY field of the API's auth-user contract, including the nullable image field. Omit one and the current-user endpoint fails schema validation and returns 500, so the SPA renders the login wall even though the cookie, user row and owner flag are all correct. Symptom to recognise: API routes accept the same cookie happily while only the browser looks logged out.
+- Long Workbench pages defeat text-based assertions: Playwright `innerText` and `text=` locators can miss panels far down the page that are genuinely present in the DOM. Assert on `page.content()` or `page.evaluate` over `document.querySelectorAll`, and click by walking the DOM. A panel "missing" from `innerText` on a long page is a harness artifact — check the served module and the HTML before concluding the component does not render.
