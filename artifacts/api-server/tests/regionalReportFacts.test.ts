@@ -13,6 +13,7 @@ import {
   selectGroundedRegionalEvents,
   validateRegionalExtraction,
 } from "../src/lib/regionalReportFacts";
+import { reassessRegionalSeverity } from "../src/lib/regionalReportSeverity";
 import { regionalAnalyticalInput } from "../src/lib/regionalReportEditorial";
 
 const sourceRow = (
@@ -86,6 +87,8 @@ const groundedEvent = (
     quote: "The terminal suspended cargo handling.",
   }],
   sourceRows: [sourceRow(Number(eventKey.replace(/\D/g, "")) || 1, "Japan")],
+  severityRationale: "Test fixture baseline.",
+  severityEvidence: [],
   ...overrides,
 });
 
@@ -123,6 +126,8 @@ describe("regional report structured-facts pipeline", () => {
     }, [packet()], "apac_weekly");
     expect(result.rejected).toEqual([]);
     expect(result.events).toHaveLength(1);
+    expect(result.events[0].severityRationale).toBeTruthy();
+    expect(result.events[0].severityEvidence).toEqual([]);
   });
 
   it("rejects candidates whose explicit decision is exclude", () => {
@@ -159,6 +164,171 @@ describe("regional report structured-facts pipeline", () => {
       .toThrow("A raw source headline was copied instead of an edited title for event-1.");
   });
 
+  it("rates LPG supply stress Moderate without confirmed material consequences", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "High",
+      category: "Energy",
+      confirmedFacts: [
+        "LPG supply stress is affecting Nepal.",
+        "Business curtailment is not confirmed and affected locations are unclear.",
+      ],
+    });
+    expect(assessment.severity).toBe("Moderate");
+    expect(assessment.evidence).toEqual(["LPG supply stress is affecting Nepal."]);
+  });
+
+  it("rates confirmed sustained multi-location LPG failure High", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Moderate",
+      confirmedFacts: ["LPG remained unavailable for two weeks across multiple cities."],
+    });
+    expect(assessment.severity).toBe("High");
+  });
+
+  it.each([
+    ["Airport fuel depot was attacked.", "Moderate"],
+    ["An attack interrupted the airport fuel depot and materially disrupted flights.", "High"],
+    ["Drone attacks damaged three oil pumping stations.", "High"],
+  ] as const)("reassesses Middle East infrastructure evidence: %s", (fact, severity) => {
+    expect(reassessRegionalSeverity({
+      severity: "Moderate",
+      category: "Security",
+      confirmedFacts: [fact],
+    }).severity).toBe(severity);
+  });
+
+  it("rates the saved Riyadh airport depot attack High on confirmed fire evidence", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Moderate",
+      category: "Security",
+      confirmedFacts: [
+        "An airport fuel depot in Riyadh was hit in an attack.",
+        "The strike set a fuel depot ablaze at an airport in the Saudi capital.",
+      ],
+    });
+    expect(assessment.severity).toBe("High");
+    expect(assessment.evidence).toEqual([
+      "An airport fuel depot in Riyadh was hit in an attack.",
+      "The strike set a fuel depot ablaze at an airport in the Saudi capital.",
+    ]);
+  });
+
+  it("does not treat nearby smoke as confirmed critical-infrastructure damage", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Moderate",
+      category: "Security",
+      confirmedFacts: [
+        "An airport fuel depot was attacked.",
+        "Smoke was observed nearby.",
+      ],
+    });
+    expect(assessment.severity).toBe("Moderate");
+  });
+
+  it.each([
+    "Flights faced major disruption after the airport attack.",
+    "Three Saudi pipeline pumping stations were damaged in attacks.",
+  ])("rates the confirmed live operational consequence High: %s", (fact) => {
+    expect(reassessRegionalSeverity({
+      severity: "Moderate",
+      category: "Security",
+      confirmedFacts: [fact],
+    }).severity).toBe("High");
+  });
+
+  it("rates airport-first major flight disruption High despite later recovery", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Moderate",
+      category: "Operational Disruption",
+      confirmedFacts: [
+        "Riyadh airport faced major flight disruption after flames and smoke were seen nearby.",
+        "Airport operations later recovered to normal.",
+      ],
+    });
+    expect(assessment.severity).toBe("High");
+    expect(assessment.evidence).toEqual([
+      "Riyadh airport faced major flight disruption after flames and smoke were seen nearby.",
+    ]);
+  });
+
+  it("can combine separate confirmed attack and critical-infrastructure damage facts", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Moderate",
+      confirmedFacts: [
+        "Drones attacked energy facilities near Riyadh.",
+        "Three oil pumping stations were damaged.",
+      ],
+    });
+    expect(assessment.severity).toBe("High");
+    expect(assessment.evidence).toHaveLength(2);
+  });
+
+  it("rejects incompatible flat quantities when extraction declares a source conflict", () => {
+    const conflictingPacket: RegionalFactPacket = {
+      ...packet(),
+      countryHint: "Saudi Arabia",
+      sources: [
+        {
+          id: "two",
+          text: "Two Saudi East-West pipeline stations damaged in drone attack",
+          reportedAt: "2026-09-16",
+        },
+        {
+          id: "three",
+          text: "Saudi pipeline attack damaged three pumping stations",
+          reportedAt: "2026-09-17",
+        },
+      ],
+    };
+    expect(() => validateRegionalExtraction({
+      candidates: [candidate({
+        eventCountry: "Saudi Arabia",
+        location: "Saudi Arabia",
+        eventIdentity: "pipeline station attack damage",
+        title: "Pipeline stations were damaged",
+        facts: [
+          {
+            statement: "A drone attack damaged two Saudi East-West pipeline stations.",
+            sourceId: "two",
+            quote: "Two Saudi East-West pipeline stations damaged in drone attack",
+          },
+          {
+            statement: "A Saudi pipeline attack damaged three pumping stations.",
+            sourceId: "three",
+            quote: "Saudi pipeline attack damaged three pumping stations",
+          },
+        ],
+        uncertainties: ["Sources differ on whether two stations or three pumping stations were damaged."],
+      })],
+    }, [conflictingPacket], "middle_east_weekly")).toThrow(
+      "Conflicting quantities for event-1 must be reconciled to a supported common fact or explicitly attributed.",
+    );
+  });
+
+  it("does not escalate forecast, uncertain, negated, or unconfirmed impacts", () => {
+    const assessment = reassessRegionalSeverity({
+      severity: "Low",
+      confirmedFacts: [
+        "Flights could be disrupted next week.",
+        "Damage to the pumping station is unconfirmed.",
+        "The airport reported no disruption.",
+      ],
+    });
+    expect(assessment.severity).toBe("Low");
+    expect(assessment.evidence).toEqual([]);
+  });
+
+  it("preserves supported casualty severity", () => {
+    expect(reassessRegionalSeverity({
+      severity: "High",
+      confirmedFacts: ["The attack killed three people and injured six."],
+    }).severity).toBe("High");
+    expect(reassessRegionalSeverity({
+      severity: "Extreme",
+      confirmedFacts: ["The attack killed 24 people."],
+    }).severity).toBe("Extreme");
+  });
+
   it("merges the same eventKey while retaining every source id", () => {
     const selected = selectGroundedRegionalEvents([
       groundedEvent("japan:terminal-suspension", { evidenceIds: [11] }),
@@ -185,6 +355,17 @@ describe("regional report structured-facts pipeline", () => {
     ]);
     expect(selected).toHaveLength(6);
     expect(selected.some((event) => event.eventKey === "malaysia:breach")).toBe(true);
+  });
+
+  it("allows seven or eight high-materiality Middle East events without padding", () => {
+    const events = Array.from({ length: 8 }, (_, index) => groundedEvent(`me:event-${index}`, {
+      country: index % 2 ? "Saudi Arabia" : "Iraq",
+      category: index === 0 ? "Cyber" : "Security",
+      severity: "High",
+    }));
+    expect(selectGroundedRegionalEvents(events, "middle_east_weekly")).toHaveLength(8);
+    expect(selectGroundedRegionalEvents(events.slice(0, 5), "middle_east_weekly")).toHaveLength(5);
+    expect(selectGroundedRegionalEvents(events)).toHaveLength(6);
   });
 
   it("drops unchanged electricity-rate context and broadens country coverage before a second same-market incident", () => {

@@ -1,7 +1,7 @@
 import { addDays, differenceInCalendarDays, format, isAfter, isValid, parse, parseISO } from "date-fns";
 import { consolidateCountryStories } from "./countrySameStory";
 import { incidentMapFallback } from "./incidentMapFallback";
-import { REGIONAL_EDITORIAL_VERSION, validateRegionalEditorialReport } from "./regionalEditorial";
+import { isRegionalFactualEdition, validateRegionalEditorialReport } from "./regionalEditorial";
 import { cleanRegionalSourceText } from "./regionalSourceText";
 
 export type RegionalWeeklyTopic = "apac_weekly" | "middle_east_weekly";
@@ -51,6 +51,8 @@ export interface RegionalDevelopment {
   dateVerified?: true;
   title: string;
   severity: "Insignificant" | "Low" | "Moderate" | "High" | "Extreme";
+  severityRationale?: string;
+  severityEvidence?: string[];
   category: RegionalIntelligenceCategory;
   whatChanged: string;
   operationalSignificance: string;
@@ -160,6 +162,9 @@ export interface RegionalCoverageManifest {
   forwardSearch: RegionalCoverageCheck;
   requiredGeographies: string[];
   searchedGeographies: string[];
+  requiredForwardDomains?: string[];
+  forwardDomains?: RegionalCoverageCheck[];
+  collectionPasses?: number;
 }
 
 export interface RegionalCanonicalReport {
@@ -171,6 +176,7 @@ export interface RegionalCanonicalReport {
   developments: RegionalDevelopment[];
   regionalOutlook: string;
   polestarOutlook: string;
+  polestarOutlookEvidenceKeys?: string[];
   riskPicture: string;
   domainBriefs: RegionalDomainBrief[];
   businessImplications: RegionalBusinessImplication[];
@@ -195,10 +201,13 @@ export function validateRegionalCanonicalStructure(
   report: RegionalCanonicalReport,
 ): string[] {
   const errors: string[] = [];
+  if (!report.coverageManifest || !isCompleteRegionalCoverage(report.coverageManifest)) {
+    errors.push("Regional collection coverage is incomplete; do not save or export the report.");
+  }
   const domains = new Set(report.domainBriefs.map((brief) => brief.domain));
   // Legacy snapshots used an explicit six-domain schema. New factual reports
   // omit unsupported domains rather than manufacturing "no change" paragraphs.
-  if (report.editorialVersion !== REGIONAL_EDITORIAL_VERSION) {
+  if (!isRegionalFactualEdition(report.editorialVersion)) {
     for (const domain of REQUIRED_REGIONAL_REPORT_DOMAINS) {
       if (!domains.has(domain)) errors.push(`Missing required intelligence domain: ${domain}.`);
     }
@@ -233,19 +242,21 @@ export function regionalCanonicalReportFromHardNumbers(
 }
 
 function isCompleteRegionalCoverage(manifest: RegionalCoverageManifest): boolean {
-  return manifest.requiredDomains.length === 7
+  if (![manifest.requiredDomains, manifest.domains, manifest.requiredGeographies, manifest.searchedGeographies]
+    .every(Array.isArray)) return false;
+  const completed = (check: RegionalCoverageCheck | undefined) => !!check
+    && check.status === "checked"
+    && Array.isArray(check.sourceNames) && check.sourceNames.length > 0
+    && Array.isArray(check.errors) && check.errors.length === 0;
+  return [7, 9].includes(manifest.requiredDomains.length)
+    && new Set(manifest.requiredDomains).size === manifest.requiredDomains.length
     && manifest.domains.length === manifest.requiredDomains.length
-    && manifest.domains.every((check) =>
-      check.status === "checked"
-      && check.sourceNames.length > 0
-      && check.errors.length === 0,
-    )
-    && manifest.forwardSearch.status === "checked"
-    && manifest.forwardSearch.sourceNames.length > 0
-    && manifest.forwardSearch.errors.length === 0
+    && manifest.requiredDomains.every((domain) => typeof domain === "string" && manifest.domains.some((check) => check?.domain === domain))
+    && manifest.domains.every(completed)
+    && completed(manifest.forwardSearch)
     && manifest.requiredGeographies.every((geography) =>
-      manifest.searchedGeographies.some((searched) =>
-        searched.toLowerCase().includes(geography.toLowerCase()),
+      typeof geography === "string" && manifest.searchedGeographies.some((searched) =>
+        typeof searched === "string" && searched.toLowerCase().includes(geography.toLowerCase()),
       ),
     );
 }

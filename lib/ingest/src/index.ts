@@ -49,7 +49,33 @@ export { classifyNewsConfidence } from "./newsConfidence";
 export type { Confidence } from "./newsConfidence";
 export { runNewsTopicIngest, classifyNewsItem, detectCountry } from "./newsTopic";
 export { runRegionalWeeklyCollection } from "./regionalWeekly";
-export type { RegionalWeeklyRun, RegionalWeeklyRegion, RegionalDomainRun } from "./regionalWeekly";
+export type {
+  RegionalWeeklyRun,
+  RegionalWeeklyRegion,
+  RegionalWeeklyCollectionOptions,
+  RegionalDomain,
+  RegionalDomainRun,
+} from "./regionalWeekly";
+export {
+  collectMiddleEastBreadth,
+  collectMiddleEastBreadthWithFetcher,
+  collectRegionalForwardSearch,
+  collectRegionalForwardSearchWithFetcher,
+  buildMiddleEastBreadthQueries,
+  buildRegionalForwardQueries,
+  deriveMiddleEastSearchedGeographies,
+  MIDDLE_EAST_REQUIRED_GEOGRAPHIES,
+  MIDDLE_EAST_REQUIRED_DOMAINS,
+  REGIONAL_FORWARD_AREAS,
+} from "./regionalCollector";
+export type {
+  RegionalForwardSource,
+  RegionalCoverageCheck,
+  RegionalCollectionResult,
+  RegionalFeedFetcher,
+  RegionalFeedResponse,
+  RegionalFeedItem,
+} from "./regionalCollector";
 export type { NewsTopicConfig, TopicFeed, CountryAlias, Classified } from "./newsTopic";
 export {
   runXSearchIngest,

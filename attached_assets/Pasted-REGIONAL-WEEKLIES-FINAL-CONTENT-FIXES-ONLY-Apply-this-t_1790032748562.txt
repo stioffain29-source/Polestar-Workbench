@@ -1,0 +1,413 @@
+REGIONAL WEEKLIES — FINAL CONTENT FIXES ONLY
+
+Apply this to:
+
+1. POLESTAR APAC WEEKLY
+2. POLESTAR MIDDLE EAST WEEKLY
+
+DO NOT redesign the reports.
+
+DO NOT change:
+
+cover
+branding
+pagination
+current page structure
+Carto Positron map style
+six item map format
+fonts
+header
+footer
+development card design
+
+The current formatting is now working.
+
+Only fix the intelligence content and judgement.
+
+
+==================================================
+APAC WEEKLY
+==================================================
+
+KEEP THE CURRENT FORMAT.
+
+KEEP SIX MAP ITEMS.
+
+KEEP THE CURRENT MIX OF COVERAGE:
+
+Security
+Weather and Natural Hazards
+Cyber
+Regulatory
+Energy / Operational
+Conflict
+
+The coverage breadth is now broadly correct.
+
+DO NOT rebuild APAC from scratch.
+
+Fix only these issues:
+
+
+1. NEPAL LPG SEVERITY
+
+Current:
+
+Nepal LPG Supply Shortage
+Severity: HIGH
+
+Reassess this against actual confirmed consequence.
+
+The current text says:
+
+supply stress is confirmed
+affected locations are unclear
+business curtailment is not confirmed
+
+That does NOT automatically support HIGH.
+
+HIGH should require confirmed material consequences such as:
+
+widespread supply failure
+significant business interruption
+major transport or industrial impact
+sustained shortages affecting multiple locations
+government emergency restrictions
+
+If those consequences are not evidenced, use MODERATE.
+
+Do not hard-code the answer.
+
+Apply the severity framework to the actual evidence.
+
+
+2. POLESTAR OUTLOOK
+
+The current APAC Outlook is too narrow because it concentrates almost entirely on Japan.
+
+Rewrite it as a genuine regional forward assessment.
+
+Target:
+
+120 to 160 words.
+
+It must synthesise the most important forward risks across the six selected developments.
+
+It should cover, where relevant:
+
+Pakistan security
+Japan weather disruption
+Nepal LPG supply
+Australia visa implementation
+Philippines cyber / platform recovery
+Myanmar conflict activity
+
+Do NOT write six mini country updates.
+
+Do NOT repeat the Key Developments.
+
+Explain:
+
+what matters most next
+where deterioration is plausible
+what would materially change the assessment
+where conditions may stabilise
+
+Keep it concise.
+
+
+3. APAC QUALITY CONTROL
+
+Before export confirm:
+
+six map items remain
+no duplicate developments
+severity matches actual consequence
+cyber remains represented
+weather remains represented
+regulatory remains represented
+7 Day Watch remains populated
+Outlook reflects the wider regional picture
+
+Then regenerate APAC Weekly.
+
+
+==================================================
+MIDDLE EAST WEEKLY
+==================================================
+
+KEEP THE CURRENT FORMAT.
+
+KEEP THE CURRENT PAGINATION.
+
+KEEP THE SIX ITEM MAP FORMAT.
+
+The layout is no longer the problem.
+
+The problem is COLLECTION BREADTH.
+
+The current Middle East report is too heavily concentrated on:
+
+Saudi energy infrastructure
+Bahrain energy
+Kuwait energy
+Syrian fuel pricing
+
+That is not sufficient for a Middle East regional weekly.
+
+
+1. EXPAND COLLECTION BEFORE WRITING
+
+Run a deliberate collection check across:
+
+SECURITY
+
+Saudi Arabia
+Iran
+Iraq
+Israel
+Lebanon
+Syria
+Jordan
+Yemen
+Gulf states
+
+Look for:
+
+missile and drone attacks
+terrorism
+armed conflict
+military activity
+cross border escalation
+civil unrest
+security restrictions
+
+
+MARITIME
+
+Explicitly search:
+
+Strait of Hormuz
+Red Sea
+Bab el Mandeb
+Gulf shipping
+container traffic
+oil and LNG shipping
+port disruption
+shipping restrictions
+insurance / routing changes
+maritime attacks
+
+
+POLITICAL AND REGULATORY
+
+Search for:
+
+government policy
+sanctions
+trade restrictions
+customs
+visa / immigration changes
+labour changes
+foreign investment controls
+fuel regulation
+market access
+political instability
+elections
+major government decisions
+
+
+CYBER AND DIGITAL INFRASTRUCTURE
+
+Search for:
+
+major cyber attacks
+ransomware
+government systems
+telecommunications
+cloud infrastructure
+ports
+airports
+energy infrastructure
+Iran linked cyber activity
+significant data breaches
+
+
+WEATHER AND NATURAL HAZARDS
+
+Search for:
+
+heavy rain
+flooding
+sandstorms
+extreme heat
+earthquakes
+severe storms
+weather disruption affecting aviation or roads
+
+
+AVIATION AND TRANSPORT
+
+Search for:
+
+airport disruption
+airspace restrictions
+flight cancellations
+road disruption
+border restrictions
+major logistics disruption
+
+
+2. DO NOT FORCE EMPTY CONTENT
+
+These categories must be CHECKED.
+
+They do not all have to appear in the report.
+
+Only include developments that meet the materiality threshold.
+
+Do not create filler.
+
+However, if the finished report still contains only energy infrastructure stories, run the collection again before generating.
+
+
+3. TARGET CONTENT
+
+Aim for:
+
+5 to 8 material developments
+
+Six works well where the evidence supports it.
+
+Do not force exactly six.
+
+Select the developments that best explain the regional operating picture.
+
+
+4. SEVERITY REASSESSMENT
+
+Reassess the existing Middle East developments.
+
+Do NOT default everything to MODERATE.
+
+Examples requiring review:
+
+Riyadh airport fuel depot attacked
+Riyadh flights materially disrupted
+three Saudi pumping stations damaged
+
+Assess:
+
+confirmed damage
+operational interruption
+critical infrastructure importance
+duration
+casualties
+transport consequence
+energy consequence
+follow on threat
+
+A critical infrastructure attack can be HIGH even if geographically localised.
+
+Do not inflate severity without evidence.
+
+Do not suppress severity simply because wider regional impact is not yet confirmed.
+
+
+5. 7 DAY WATCH
+
+Current result:
+
+0 items
+
+That is not acceptable unless a real forward search was completed and genuinely found nothing material.
+
+Run a separate forward search for the NEXT SEVEN DAYS covering:
+
+planned demonstrations
+political deadlines
+sanctions decisions
+military activity
+shipping restrictions
+airport or airspace changes
+weather warnings
+major events
+fuel or energy decisions
+regulatory implementation
+border restrictions
+
+Target:
+
+up to 5 useful items.
+
+Each must include:
+
+DATE
+LOCATION
+EVENT
+WHY IT MATTERS
+WHAT TO WATCH
+
+
+6. MIDDLE EAST OUTLOOK
+
+The current Outlook is too narrow.
+
+Rewrite as a concise regional forward judgement.
+
+Target:
+
+120 to 160 words.
+
+It should assess the interaction between:
+
+security threats
+energy infrastructure
+shipping
+aviation
+political / regulatory developments
+cyber where material
+weather where material
+
+Do not simply repeat Saudi infrastructure attacks.
+
+Explain what is most likely to matter next and what indicators would materially change the assessment.
+
+
+7. MIDDLE EAST QUALITY CONTROL
+
+Before export confirm:
+
+collection ran across all required domains
+maritime collection ran
+cyber collection ran
+weather collection ran
+political / regulatory collection ran
+regional security collection ran
+aviation collection ran
+severity was reassessed
+7 Day Watch search ran
+Outlook reflects more than Saudi energy infrastructure
+
+If any of those checks fail:
+
+DO NOT GENERATE THE REPORT.
+
+
+==================================================
+FINAL RULE
+==================================================
+
+APAC:
+
+KEEP THE CURRENT FORMAT AND SIX ITEM MAP.
+ONLY IMPROVE SEVERITY JUDGEMENT AND OUTLOOK.
+
+MIDDLE EAST:
+
+KEEP THE CURRENT FORMAT AND SIX ITEM MAP.
+FIX THE COLLECTION GAP, SEVERITY LOGIC, 7 DAY WATCH AND OUTLOOK.
+
+Do not touch any other Polestar product.
+
+Regenerate both reports and STOP.

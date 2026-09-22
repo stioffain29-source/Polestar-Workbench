@@ -26,6 +26,7 @@ import {
   type RegionalFactPacket,
 } from "./regionalReportFacts";
 import { regionalJson } from "./regionalAi";
+import { reassessRegionalSeverity } from "./regionalReportSeverity";
 
 const Section = z.object({
   text: z.string(),
@@ -55,7 +56,7 @@ Each section has a DIFFERENT purpose:
 regionalOutlook: 90-125 words (hard maximum 140), at most two paragraphs. Rank the week's most consequential exposure and contrast it with another distinct operating issue. Name at most three markets or places; this is not a roundup of every country/development. Do NOT repeat casualties or write travel advice.
 riskPicture: 100-160 words (hard maximum 180), at most three short paragraphs. Explain the transmission of the actual disruptions into business activity, distinguishing direct impact from a plausible contingent exposure. Compare the named risks; do not produce a country-by-country list or general essays about types of risk.
 businessImplications: 2-3 short paragraphs, TOTAL 110-135 words across ALL paragraphs combined (hard maximum 180). Organise by relevant business function, not countries. Each paragraph must identify the exposed function, a concrete decision and its trigger grounded in the facts. Do not repeat per-event impact paragraphs, invent service restoration times, evacuation needs or pricing changes. No paragraph for a function without evidence.
-polestarOutlook: 45-75 words (hard maximum 90), ONE paragraph. A crisp forward judgement ranking the most important unresolved risk, with ONE or at most TWO discriminating signals that would change the decision. Do NOT restate every development's indicators or repeat the opening.
+polestarOutlook: 120-160 words inclusive (aim 135-150), one or two connected paragraphs. A genuine REGIONAL forward assessment considering ALL selected developments; name at least three of their countries or locations. Organise around shared operating questions and compare related exposures across countries within sentences, rather than giving each country its own sentence in succession. Rank what matters most next, connect the risks across business functions, distinguish plausible deterioration from stabilisation and identify specific changes that would materially alter the assessment. Do not default to Japan alone or Saudi energy infrastructure alone. Do NOT write separate mini country updates, repeat Key Developments or repeat the opening. Link every selected eventKey in the section metadata, while synthesising their implications rather than listing them.
 For EACH development supply: operationalImpact<=35 words (which function is exposed, and how, not a repeat of the fact); polestarView<=30 words (a distinct, defensible judgement separating what is known from conditional consequences); outlook7Days<=25 words (one specific observable next signal). Do not add titles or whatChanged: those already come from verified facts.
 Keep current loss of service separate from possible consequences. For cyber, distinguish data exposure from service downtime; a hotel breach does not prove bookings halted, and a government platform outage does not prove all transport stopped. For LPG, do not invent prices, rationing, import causes or nationwide closure. A police-site bombing does not prove commercial road closure. Do not forecast escalation simply because an attack occurred.
 Historical source status must remain historical: "fighting was ongoing when the toll was reported" does NOT establish that fighting continues on the issue date. Do not turn an attack into confirmed business-access disruption, or say business activity "continues" to be impeded when that impact was never established. State those exposures conditionally. Do not use "Known:" or "Conditional:" scaffolding; write the distinction as ordinary sentences.
@@ -63,6 +64,18 @@ Cite each analytical section's supporting eventKeys in its metadata, never inlin
 Do not use source/outlet names, domains, URLs, raw headlines, sentence fragments, rhetorical filler, or count-based prose. No quotes or citation markers in rendered text.
 BANNED phrases: "The development is relevant to"; "Their regional importance comes from what could follow"; "the specific indicators are"; "the significance is confined to the named market"; "reporting placed the casualties at"; "selected evidence"; "the principal changes this week were".
 Write in direct, precise, sentence-cased analytical English. No template padding, no claim of uniform regional deterioration, no statement that a domain is empty, and no verbatim sentence repeated across sections. Return complete sentences without truncation.`;
+
+export function reassessRegionalEvents(events: GroundedRegionalEvent[]): GroundedRegionalEvent[] {
+  return events.map((event) => {
+    const assessment = reassessRegionalSeverity(event);
+    return {
+      ...event,
+      severity: assessment.severity,
+      severityRationale: assessment.rationale,
+      severityEvidence: assessment.evidence,
+    };
+  });
+}
 
 /** The analytical model sees only checked facts, never source rows or headline fields. */
 export function regionalAnalyticalInput(
@@ -72,7 +85,7 @@ export function regionalAnalyticalInput(
 ): { topic: RegionalWeeklyTopic; issueDate: string; events: RegionalEventFact[] } {
   return {
     topic, issueDate,
-    events: events.map((event) => ({
+    events: reassessRegionalEvents(events).map((event) => ({
       eventKey: event.eventKey,
       country: event.country,
       location: event.location,
@@ -110,6 +123,7 @@ export function assembleRegionalEditorialReport(
   futureEvents: RegionalFutureEventInput[],
   coverageManifest: RegionalCoverageManifest,
 ): RegionalCanonicalReport {
+  events = reassessRegionalEvents(events);
   const byKey = new Map(analysis.developments.map((row) => [row.eventKey, row]));
   if (byKey.size !== events.length || analysis.developments.length !== events.length) {
     throw new Error("The analytical development set differs from the verified event set.");
@@ -136,6 +150,8 @@ export function assembleRegionalEditorialReport(
       dateVerified: true,
       title: event.title,
       severity: event.severity,
+      severityRationale: event.severityRationale,
+      severityEvidence: event.severityEvidence,
       category: event.category,
       confirmedFacts: event.confirmedFacts,
       whatChanged: event.confirmedFacts.join(" "),
@@ -178,6 +194,7 @@ export function assembleRegionalEditorialReport(
     regionalOutlook: editedAnalysis(analysis.regionalOutlook.text),
     riskPicture: editedAnalysis(analysis.riskPicture.text),
     polestarOutlook: editedAnalysis(analysis.polestarOutlook.text),
+    polestarOutlookEvidenceKeys: analysis.polestarOutlook.evidenceKeys,
     businessImplications: analysis.businessImplications.map(({ heading, body }) => ({ heading, body: editedAnalysis(body) })),
     businessImplicationsNarrative: analysis.businessImplications.map((block) => editedAnalysis(block.body)).join("\n\n"),
     domainBriefs: [...domainBriefs.values()],
@@ -217,7 +234,7 @@ export async function finishRegionalEditorialReport(
   futureEvents: RegionalFutureEventInput[],
   coverageManifest: RegionalCoverageManifest,
 ) {
-  const selected = selectGroundedRegionalEvents(extracted.events);
+  const selected = selectGroundedRegionalEvents(reassessRegionalEvents(extracted.events), topic);
   if (selected.length < 5) {
     throw new Error(`Only ${selected.length} distinct events have adequate factual support. No thin or padded report was saved.`);
   }

@@ -439,9 +439,24 @@ describe("regional weekly products", () => {
       glanceMetrics: [],
       mapPoints: [{ lat: 35, lng: 139, label: "Japan", title: "Typhoon", severity: "High" as const, eventDate: "2026-09-17", summary: "Airport closure." }],
       visualSummary: { byCategory: [], byCountry: [] },
-      coverageManifest: {} as never,
+      coverageManifest: {
+        requiredDomains: ["security", "political", "regulatory", "operational", "energy", "weather", "cyber"],
+        domains: ["security", "political", "regulatory", "operational", "energy", "weather", "cyber"].map((domain) => ({
+          domain, status: "checked" as const, sourceNames: ["Verified search"],
+          itemsFetched: 1, candidatesAccepted: 1, errors: [],
+        })),
+        forwardSearch: {
+          domain: "forwardSearch", status: "checked" as const, sourceNames: ["Verified calendar"],
+          itemsFetched: 1, candidatesAccepted: 1, errors: [],
+        },
+        requiredGeographies: ["Japan"],
+        searchedGeographies: ["Japan"],
+      },
     };
     expect(validateRegionalCanonicalStructure(base)).toEqual([]);
+    expect(validateRegionalCanonicalStructure({ ...base, coverageManifest: {} as never })).toContain(
+      "Regional collection coverage is incomplete; do not save or export the report.",
+    );
     expect(validateRegionalCanonicalStructure({ ...base, mapPoints: [] })).toContain(
       "Regional report requires a risk map with at least one verified point.",
     );

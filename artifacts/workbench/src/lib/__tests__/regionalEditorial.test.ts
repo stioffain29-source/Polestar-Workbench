@@ -121,7 +121,7 @@ describe("regional structured editorial facts", () => {
     }));
     const report: RegionalCanonicalReport = {
       schemaVersion: "regional-weekly-canonical-v1",
-      editorialVersion: REGIONAL_EDITORIAL_VERSION,
+      editorialVersion: "regional-facts-v2",
       topic: "apac_weekly",
       issueDate: "2026-09-18",
       developments,

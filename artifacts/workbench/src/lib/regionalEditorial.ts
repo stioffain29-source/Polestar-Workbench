@@ -3,8 +3,13 @@ import type {
   RegionalDevelopment,
   RegionalIntelligenceCategory,
 } from "./regionalWeekly";
+import { REGIONAL_OUTLOOK_MAX_WORDS, validateRegionalContentPolicy } from "./regionalContentPolicy";
 
-export const REGIONAL_EDITORIAL_VERSION = "regional-facts-v2" as const;
+export const REGIONAL_EDITORIAL_VERSION = "regional-facts-v3" as const;
+
+export function isRegionalFactualEdition(version: string | undefined): boolean {
+  return version === "regional-facts-v2" || version === REGIONAL_EDITORIAL_VERSION;
+}
 
 /** Report facts are separate from source articles and from analytical judgement. */
 export interface RegionalEventFact {
@@ -25,7 +30,7 @@ export const REGIONAL_WORD_LIMITS = {
   regionalOutlook: 140,
   riskPicture: 180,
   businessImplicationsNarrative: 180,
-  polestarOutlook: 90,
+  polestarOutlook: REGIONAL_OUTLOOK_MAX_WORDS,
   title: 12,
   whatChanged: 65,
   operationalImpact: 40,
@@ -126,7 +131,7 @@ export function validateRegionalFactStatement(
 
 /** Validate the saved payload itself; never silently rewrite it during reload/export. */
 export function validateRegionalEditorialReport(report: RegionalCanonicalReport): string[] {
-  if (report.editorialVersion !== REGIONAL_EDITORIAL_VERSION) return [];
+  if (!isRegionalFactualEdition(report.editorialVersion)) return [];
   const errors: string[] = [];
   for (const key of ["regionalOutlook", "riskPicture", "businessImplicationsNarrative", "polestarOutlook"] as const) {
     const value = report[key];
@@ -136,7 +141,8 @@ export function validateRegionalEditorialReport(report: RegionalCanonicalReport)
   }
   const keys = report.developments.map((row) => row.eventKey);
   if (keys.some((key) => !key) || new Set(keys).size !== keys.length) errors.push("Developments must represent distinct identified events.");
-  if (report.developments.length < 5 || report.developments.length > 6) errors.push("The regional selection must contain five or six material events.");
+  const maximum = report.editorialVersion === REGIONAL_EDITORIAL_VERSION && report.topic === "middle_east_weekly" ? 8 : 6;
+  if (report.developments.length < 5 || report.developments.length > maximum) errors.push(`The regional selection must contain five to ${maximum} material events.`);
   const sourceIds = new Set<string>();
   for (const row of report.developments) {
     if (!row.confirmedFacts?.length || !row.evidenceIds?.length) errors.push(`Missing factual evidence for ${row.title}.`);
@@ -157,6 +163,9 @@ export function validateRegionalEditorialReport(report: RegionalCanonicalReport)
     if (!report.developments.some((row) => row.title === point.title && row.whatChanged === point.summary)) {
       errors.push("A map point is not derived from the final development set.");
     }
+  }
+  if (report.editorialVersion === REGIONAL_EDITORIAL_VERSION) {
+    errors.push(...validateRegionalContentPolicy(report));
   }
   return [...new Set(errors)];
 }

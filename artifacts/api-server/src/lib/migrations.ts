@@ -1,5 +1,7 @@
 import { db, incidentsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable, protestEventsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
+import regionalFinalContent from "./seed/regionalFinalContent.json";
+import { applyRegionalFinalContentCorrections } from "./regionalFinalContent";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import {
@@ -531,6 +533,14 @@ async function ensureIngestRunWriteFence(): Promise<void> {
  */
 export async function runDataMigrations(): Promise<void> {
   logger.info("runDataMigrations: starting");
+  // Apply the verified content-only pair only when both original report
+  // versions still match. No schema changes or other report products.
+  try {
+    await applyRegionalFinalContentCorrections(regionalFinalContent);
+  } catch (err) {
+    // A report-only correction must never disable unrelated ingest services.
+    logger.error({ err }, "Regional final content was not applied");
+  }
   // Ingestion safety is fail-closed. If this atomic installation fails, reject
   // startup migration readiness so index.ts does not start the scheduler.
   await ensureIngestRunWriteFence();

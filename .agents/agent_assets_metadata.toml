@@ -1451,3 +1451,31 @@ mtime_ms = 1789981225930
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/9635c184-6eea-4b96-8468-4ce2687c8b0a/3e291463-4623-4029-afa4-77d2850b4703"
 storage_version_token = "1789981739403056"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "4Mq9B9oCFSOFEZ5h1yfdh"
+uri = "file://screenshots/regional-final-content/apac_weekly.pdf"
+type = "pdf"
+title = "APAC Weekly — 22 September 2026"
+description = "Regenerated five-page PDF: six mapped developments, reassessed severity, four watch items and a 143-word regional Outlook."
+logical_id = "824a3fe4-8b5a-419a-9d54-f6237115bbaf"
+content_hash = "sha256:450ecf0ef65f084cab9cc0b1069af03952c8d9709ef2f4eea41acec9ab7c81c5"
+size = 1359641
+mtime_ms = 1790036589735
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/824a3fe4-8b5a-419a-9d54-f6237115bbaf/94fe5a2f-9a8a-4956-8058-474ed1f545a0"
+storage_version_token = "1790037192653849"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "eGWA6NeV01_ewDcjx0-kY"
+uri = "file://screenshots/regional-final-content/middle_east_weekly.pdf"
+type = "pdf"
+title = "Middle East Weekly — 22 September 2026"
+description = "Regenerated five-page PDF: six mapped developments, expanded source collection, three dated watch items and a 153-word regional Outlook."
+logical_id = "01bf8584-f349-4e24-b1ce-389654c65212"
+content_hash = "sha256:8c80d6a8a1a273236bf6fb97df71e9c42718bc7b03b8d2f47620dde55d53d199"
+size = 1895540
+mtime_ms = 1790036980390
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/01bf8584-f349-4e24-b1ce-389654c65212/311190b2-e0f0-4396-8285-cd0bb5ef3c07"
+storage_version_token = "1790037194210526"
+content_type = "application/pdf"

@@ -1,0 +1,210 @@
+POLESTAR APAC WEEKLY
+POLESTAR INSIGHTS
+REPORTING PERIOD: 16 SEPTEMBER 2026 - 22 SEPTEMBER 2026
+
+
+
+
+POLESTAR-ADVISORY.COM
+                                                                                              POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL OUTLOOK
+
+     This week's sharpest business exposure is Japan's typhoon disruption because widespread flight
+     cancellations create an immediate constraint on staff movement and time-sensitive shipments, with the
+     scale of evacuation guidance underscoring broader operational stress. That is a direct interruption rather
+     than a speculative downstream risk.
+
+     A different, slower-burn issue is Nepal's LPG shortage, which points to pressure on fuel-dependent
+     operations even though the affected locations and duration were not stated. Australia's tighter visa rules
+     are less acute operationally, but they can reshape near-term workforce planning by narrowing some entry
+     pathways.
+
+
+
+     WEEK AT A GLANCE
+
+
+        MATERIAL DEVELOPMENTS      MARKETS REQUIRING WATCH        HIGH OR EXTREME         7-DAY WATCH ITEMS
+                                                                  DEVELOPMENTS
+        6                          6                                                      4
+                                                                  2
+
+
+
+
+polestar-advisory.com                             info@polestar-advisory.com                                  Page 1 of 4
+                                                                                                                                  POLESTAR APAC WEEKLY
+
+
+
+
+     REGIONAL RISK PICTURE
+
+     The clearest transmission into business activity comes from Japan, where widespread flight cancellations
+     can delay employee travel, disrupt meetings and impede air-linked cargo movements. That is a present
+     service interruption. Nepal's LPG shortage is a different type of risk: the fact establishes supply stress, but
+     not where shortages are binding, so the immediate exposure is to fuel-dependent operations that may need
+     closer stock monitoring rather than assumed shutdowns.
+
+     Australia's visa changes work through compliance and labor access. Firms using visitor, student-family or
+     backpacker channels may face slower mobilization or narrower staffing options once the rules are applied
+     in practice.
+
+     Elsewhere, the facts are more conditional. The Philippines case confirms an LTFRB platform outage linked
+     to a data-breach probe, which may hinder permit-dependent workflows, but does not establish wider
+     transport stoppages. The Kohat attack and intensified strikes on the Shan-Karenni border elevate
+     duty-of-care and site-access risk, yet the packet does not confirm commercial disruption beyond the
+     incident locations.
+
+
+
+     KEY DEVELOPMENTS
+
+        PAKISTAN | KOHAT
+        KOHAT POLICE HEADQUARTERS ATTACKED
+        Security · Extreme · 19 Sep 2026
+        ASSESSMENT: A bomb and gun attack hit a police headquarters in Kohat, and fighting was still ongoing at the time of reporting. The source said the
+        death toll rose to at least 31, including 16 police personnel.
+        POLESTAR VIEW: The attack is severe, but the facts do not confirm broader commercial access disruption beyond the police-site incident.
+        7-DAY INDICATOR: Watch for any confirmed restrictions or closures affecting access around Kohat beyond the attack site.
+
+
+
+        NEPAL
+        NEPAL LPG SUPPLY SHORTAGE
+        Energy · Moderate · 20 Sep 2026
+        ASSESSMENT: Nepal is facing an LPG shortage linked to import problems.
+        POLESTAR VIEW: Supply stress is confirmed, but the packet does not show where shortages are binding or whether business activity is already
+        curtailed.
+        7-DAY INDICATOR: Look for official or supplier detail on affected areas and whether deliveries are being constrained.
+
+
+
+        JAPAN
+        FLIGHTS CANCELLED IN JAPAN
+        Weather & Natural Hazards · High · 21 Sep 2026
+        ASSESSMENT: Typhoon Dujuan caused widespread flight cancellations in Japan. Authorities urged 1.6 million people to evacuate as the typhoon
+        affected Japan.
+        POLESTAR VIEW: This is the week's clearest immediate business interruption; the open question is duration, not whether disruption occurred.
+        7-DAY INDICATOR: Monitor whether airlines restore schedules broadly or announce further cancellations.
+
+
+
+
+polestar-advisory.com                                              info@polestar-advisory.com                                                           Page 2 of 4
+                                                                                                                                POLESTAR APAC WEEKLY
+
+
+
+
+        PHILIPPINES
+        LTFRB PLATFORM GOES OFFLINE
+        Cyber · Moderate · 19 Sep 2026
+        ASSESSMENT: LTFRB was probing a data breach after its platform went offline.
+        POLESTAR VIEW: An outage and breach probe are confirmed, but the facts do not show transport services broadly halted or what data was exposed.
+        7-DAY INDICATOR: Check for platform restoration or official guidance on interim manual processing.
+
+
+
+        AUSTRALIA
+        AUSTRALIA TIGHTENS VISA RULES
+        Regulatory · Moderate · 19 Sep 2026
+        ASSESSMENT: Australia introduced tighter migration rules targeting visa hopping and some student family and visitor pathways. Backpackers were
+        affected by Australia's visa crackdown.
+        POLESTAR VIEW: The direct effect is regulatory tightening, while the practical business impact depends on which pathways remain usable once
+        implementation detail is clarified.
+        7-DAY INDICATOR: Watch for publication of rule details or implementation dates affecting targeted visa categories.
+
+
+
+        MYANMAR | SHAN-KARENNI BORDER
+        AIRSTRIKES INTENSIFY ON SHAN-KARENNI BORDER
+        Operational Disruption · Moderate · 16 Sep 2026
+        ASSESSMENT: Myanmar's military increased airstrikes and drone attacks along the Shan-Karenni border.
+        POLESTAR VIEW: Conflict intensity has increased, but the packet does not confirm infrastructure damage or specific business disruption.
+        7-DAY INDICATOR: Look for confirmed reports of specific sites hit or transport links affected near the border.
+
+
+
+
+     BUSINESS IMPLICATIONS
+
+     Logistics teams should review air-dependent movements in Japan and identify shipments or travel that
+     cannot tolerate cancellation, because widespread flight disruptions are already confirmed. In Nepal,
+     fuel-reliant operations should check LPG inventory buffers and supplier communication triggers, since the
+     shortage is linked to import problems but its geographic reach is still unclear.
+
+     HR and mobility functions should recheck visa pathway assumptions for roles or seasonal staffing that use
+     visitor, student-family or backpacker channels, because Australia has tightened migration rules aimed at
+     visa hopping and related pathways. Any hiring or deployment decision should wait for workable route
+     confirmation where eligibility may have narrowed.
+
+     Compliance and security teams should prepare manual workarounds where LTFRB platform access is
+     required, as the outage is confirmed while the scope of any data exposure remains unspecified. Firms with
+     personnel near Kohat or the Shan-Karenni border should refresh incident communication and movement
+     approval thresholds if local conditions deteriorate further.
+
+
+
+
+polestar-advisory.com                                               info@polestar-advisory.com                                                        Page 3 of 4
+                                                                                                                 POLESTAR APAC WEEKLY
+
+
+
+
+     7 DAY WATCH
+
+       27 Sep 2026 | ISLAMABAD, PAKISTAN — Planned PTI protest march
+       Why it matters: Movement and access in Islamabad, Pakistan may be affected by the scheduled activity.
+       Watch: Track route and venue advisories, transport changes and police restrictions.
+
+       24 Sep 2026 | JAKARTA, INDONESIA — Planned Farmers' Day demonstrations
+       Why it matters: The planned gathering may affect access or security around Jakarta, Indonesia.
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       24 Sep 2026 | JAKARTA, INDONESIA — Possible KSPSI employment-bill demonstration
+       Why it matters: The planned gathering may affect access or security around Jakarta, Indonesia.
+       Watch: Track venue advisories, organiser confirmation and any police restrictions.
+
+       28 Sep 2026 | INDIA — Planned banking strike
+       Why it matters: Branch and transaction services in India may be affected by the planned banking strike.
+       Watch: Check banks' branch and payment-service advisories before time-sensitive transactions.
+
+
+
+
+     POLESTAR OUTLOOK
+
+     The main regional risk is that short-lived disruption becomes a sustained constraint on movement, staffing
+     or essential services. Security conditions in Pakistan and the Myanmar conflict area merit the closest
+     attention for follow-on attacks or a widening of affected locations; neither establishes broader business
+     interruption on its own. Japan's flight cancellations and Nepal's LPG shortage require different recovery
+     tests: restored schedules would ease travel pressure, while dependable resupply would reduce fuel
+     exposure. Confirmed business curtailment or prolonged, multi-location shortages would materially worsen
+     that assessment.
+
+     Administrative capacity is the other regional pressure point. Australia's visa changes and restoration of the
+     Philippines' LTFRB platform could affect workforce planning and transaction processing even as
+     immediate disruptions ease. The clearest stabilisation signals would be service recovery and predictable
+     implementation requirements. New access restrictions, repeated cancellations or demonstrated
+     interruption to normal operations would justify a more cautious outlook.
+
+
+
+     DISCLAIMER
+
+     Polestar Advisory Pte. Ltd. is an independent company registered in Singapore. The information in this report is based on open
+     sources and is assessed as accurate at the time of writing. It is provided for general informational purposes only and does not
+     constitute advice or a comprehensive assessment of all risks. No reliance should be placed on this information for operational
+     decision-making without further independent verification.
+
+
+
+
+polestar-advisory.com                                     info@polestar-advisory.com                                                   Page 4 of 4
+

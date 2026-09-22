@@ -35,7 +35,7 @@ async function main(): Promise<void> {
       throw new Error("The report changed before analysis refresh began. Reload it before trying again.");
     }
     const today = new Date().toISOString().slice(0, 10);
-    const historicalRebuild = !!target && job.issueDate !== today;
+    const historicalRebuild = !!target && job.issueDate < today;
     const priorCoverageManifest = target
       ? getRegionalCoverageManifest(target.hardNumbers)
       : null;
@@ -58,9 +58,10 @@ async function main(): Promise<void> {
         )).returning({ id: regionalReportJobsTable.id });
         if (updated.length === 0) throw new Error("Regional report job ownership was lost.");
       },
-      historicalRebuild
-        ? { collect: false, coverageManifest: priorCoverageManifest! }
-        : undefined,
+      {
+        ...(historicalRebuild ? { collect: false, coverageManifest: priorCoverageManifest! } : {}),
+        ...(target ? { priorHardNumbers: target.hardNumbers } : {}),
+      },
     );
     await db.transaction(async (tx) => {
       let report: { id: number };

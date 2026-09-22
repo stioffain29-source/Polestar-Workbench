@@ -1,0 +1,24 @@
+[
+  {
+    "topic": "apac_weekly",
+    "pages": 5,
+    "developments": 6,
+    "mapItems": 6,
+    "watchItems": 4,
+    "outlookWords": 143,
+    "completeOutlookInPdf": true,
+    "allDevelopmentsInPdf": true,
+    "allWatchItemsInPdf": true
+  },
+  {
+    "topic": "middle_east_weekly",
+    "pages": 5,
+    "developments": 6,
+    "mapItems": 6,
+    "watchItems": 3,
+    "outlookWords": 153,
+    "completeOutlookInPdf": true,
+    "allDevelopmentsInPdf": true,
+    "allWatchItemsInPdf": true
+  }
+]

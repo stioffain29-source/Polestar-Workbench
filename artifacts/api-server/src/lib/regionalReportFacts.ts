@@ -17,6 +17,7 @@ import {
 } from "../../../workbench/src/lib/regionalEditorial";
 import { cleanRegionalSourceText } from "../../../workbench/src/lib/regionalSourceText";
 import { regionalJson } from "./regionalAi";
+import { reassessRegionalSeverity } from "./regionalReportSeverity";
 
 type SourceRow = RegionalIncident & { sourceUrl?: string | null; sourceMembers?: SourceRow[] };
 export interface RegionalFactPacket {
@@ -55,6 +56,8 @@ export type GroundedRegionalEvent = RegionalEventFact & {
   sourceEvidence: string[];
   quotations: z.infer<typeof ExtractedFact>[];
   sourceRows: SourceRow[];
+  severityRationale: string;
+  severityEvidence: string[];
 };
 
 function sourceText(row: SourceRow): string {
@@ -116,7 +119,7 @@ Provide 1-3 short, grammatical confirmed factual sentences (together <=60 words)
 - statement: YOUR OWN factual sentence about the event. No quotation marks, no copied headline, no "a report said", "one report", "another report", "the report described" or other meta-reporting wrapper. For example: "LTFRB is investigating a data breach after its platform went offline."
 - quote: the exact supporting source span, stored ONLY for audit. For the example above: "LTFRB probes data breach as platform goes offline". Expand the quote to cover EVERY fact, named route and number asserted in the statement, not just the last phrase. A statement naming Highway 401 needs a quote that contains Highway 401.
 Every fact and number must be supported by THAT quote. No inferred casualty totals, no stitched fragments, no invented closure, location, date, affected sector, attack actor, or cause. Distinguish confirmed loss of service from hypothetical wider effects.
-Casualties: pair number and casualty type correctly. If sources disagree, either use a clearly later explicit update without combining its death total with an older injury total, or say that sources give differing casualty figures; never imply a settled toll. A later publication timestamp alone does not prove an updated toll. Do not guess a missing number. Negative facts such as no reported injuries require a quoted source too.
+Casualties: pair number and casualty type correctly. If sources disagree, either use a clearly later explicit update without combining its death total with an older injury total, or say that sources give differing casualty figures; never imply a settled toll. This applies to every conflicting quantity: do not output two incompatible counts as simultaneous flat facts. State only the source-supported common fact without an unsettled count, or explicitly attribute the discrepancy. A later publication timestamp alone does not prove an updated toll. Do not guess a missing number. Negative facts such as no reported injuries require a quoted source too.
 Dates: eventDate/dateBasis are controlled by the caller. With dateBasis=reported, do not claim the event occurred on that date or supply any inferred date. Exclude explicitly older events/anniversaries even if recently published.
 location must occur in a supporting source, otherwise use the event country. eventIdentity is a concise stable event family keyed to the affected entity/action/place, not a headline or article ID. Treat different reports/updates of one LPG supply shortage as ONE identity, but do not merge unrelated same-country attacks. Avoid selecting vague duplicates of a better located event.
 List only material evidence limitations in uncertainties (e.g. service restoration unknown); do not invent missing facts as conditions.
@@ -163,6 +166,25 @@ export function validateRegionalExtraction(
       const errors = validateRegionalFactStatement(fact.statement, fact.quote, source.text, source.headline);
       if (errors.length) throw new Error(`Fact verification failed for ${packet.candidateId}: ${errors.join(" ")}`);
     }
+    const quantityWords: Record<string, string> = {
+      one: "1", two: "2", three: "3", four: "4", five: "5", six: "6",
+      seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12",
+    };
+    const quantities = (text: string) =>
+      [...text.matchAll(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi)]
+        .map((match) => quantityWords[match[0].toLowerCase()] ?? match[0]);
+    const quantityConflictStatements = row.uncertainties.filter((uncertainty) =>
+      /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict)|\bconflicting (?:quantity|count|number|figure)s?\b/i.test(uncertainty));
+    const disputedQuantities = new Set(quantityConflictStatements.flatMap(quantities));
+    const flatFactQuantities = new Set(row.facts.flatMap((fact) => quantities(fact.statement))
+      .filter((quantity) => disputedQuantities.has(quantity)));
+    const explicitlyAttributed = row.facts.some((fact) =>
+      /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict|report(?:ed)?|give|gave)|\baccording to\b/i.test(fact.statement));
+    if (quantityConflictStatements.length && flatFactQuantities.size > 1 && !explicitlyAttributed) {
+      throw new Error(
+        `Conflicting quantities for ${packet.candidateId} must be reconciled to a supported common fact or explicitly attributed.`,
+      );
+    }
     const confirmedFacts = row.facts.map((fact) => fact.statement.trim());
     if (regionalWordCount(confirmedFacts.join(" ")) > 65) throw new Error(`Factual summary is too long for ${packet.candidateId}.`);
     // An unsupported location cannot override country attribution or produce a false city map.
@@ -175,6 +197,12 @@ export function validateRegionalExtraction(
       summary: confirmedFacts.join(" "),
       occurredAt: packet.eventDate,
     };
+    const baselineSeverity = regionalWeeklySeverity(factIncident, topic);
+    const severityAssessment = reassessRegionalSeverity({
+      confirmedFacts,
+      severity: baselineSeverity,
+      category: regionalIntelligenceCategory(factIncident),
+    });
     events.push({
       candidateId: packet.candidateId,
       eventKey: `${row.eventCountry.toLowerCase()}:${row.eventIdentity.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
@@ -183,7 +211,7 @@ export function validateRegionalExtraction(
       eventDate: packet.eventDate,
       dateBasis: packet.dateBasis,
       category: regionalIntelligenceCategory(factIncident),
-      severity: regionalWeeklySeverity(factIncident, topic),
+      severity: severityAssessment.severity,
       title: row.title.trim(),
       confirmedFacts,
       evidenceIds: packet.members.flatMap((member) => member.id == null ? [] : [member.id]),
@@ -192,6 +220,8 @@ export function validateRegionalExtraction(
       sourceEvidence: [...new Set(packet.members.map((member) => member.source?.trim()).filter((name): name is string => !!name))],
       quotations: row.facts,
       sourceRows: packet.members,
+      severityRationale: severityAssessment.rationale,
+      severityEvidence: severityAssessment.evidence,
     });
   }
   return { events, rejected };
@@ -268,7 +298,10 @@ export async function verifyAndRepairRegionalExtraction(
 }
 
 /** Diversity is subordinate to demonstrated materiality; no invented domain fillers. */
-export function selectGroundedRegionalEvents(events: GroundedRegionalEvent[]): GroundedRegionalEvent[] {
+export function selectGroundedRegionalEvents(
+  events: GroundedRegionalEvent[],
+  topic: RegionalWeeklyTopic = "apac_weekly",
+): GroundedRegionalEvent[] {
   const rank: Record<string, number> = { Extreme: 4, High: 3, Moderate: 2, Low: 1, Insignificant: 0 };
   const isUnchangedPriceContext = (event: GroundedRegionalEvent) => {
     const text = event.confirmedFacts.join(" ");
@@ -291,8 +324,8 @@ export function selectGroundedRegionalEvents(events: GroundedRegionalEvent[]): G
   }
   const distinct = [...families.values()];
   const chosen: GroundedRegionalEvent[] = [];
-  const add = (event: GroundedRegionalEvent | undefined) => {
-    if (event && !chosen.includes(event) && chosen.length < 6) chosen.push(event);
+  const add = (event: GroundedRegionalEvent | undefined, limit = 6) => {
+    if (event && !chosen.includes(event) && chosen.length < limit) chosen.push(event);
   };
   add(distinct[0]);
   // A confirmed cyber outage/data loss must not vanish behind numerous attack articles.
@@ -310,5 +343,12 @@ export function selectGroundedRegionalEvents(events: GroundedRegionalEvent[]): G
     if (chosen.filter((selected) => selected.country === event.country).length < 2) add(event);
   }
   for (const event of distinct) add(event);
+  if (topic === "middle_east_weekly") {
+    // Six remains the normal map set. A seventh or eighth is retained only
+    // where confirmed evidence supports a High/Extreme development; never pad.
+    for (const event of distinct) {
+      if (event.severity === "High" || event.severity === "Extreme") add(event, 8);
+    }
+  }
   return chosen.sort((a, b) => distinct.indexOf(a) - distinct.indexOf(b));
 }

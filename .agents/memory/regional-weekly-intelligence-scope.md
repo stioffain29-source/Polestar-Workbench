@@ -7,7 +7,7 @@ APAC Weekly and Middle East Weekly are regional business-operating intelligence 
 
 **Why:** The owner amended both products to provide a complete regional operating picture while retaining the existing cover, branding and export workflow. APAC was rebuilt first; the owner subsequently approved repeating the same model for Middle East Weekly.
 
-**How to apply:** BOTH products run independent discovery passes for security/conflict, political, regulatory, business/operational disruption, energy/utilities, weather/hazards and cyber. Persist the discovery domain with each source record; do not infer report structure from a general incident feed. Cluster sources by underlying event before selecting by operational materiality, never article volume; preserve corroborating evidence. Target six genuinely distinct developments (five only after a complete seven-domain/geography/forward-search audit proves a true shortage), and map every selected, plottable development. Reject commentary, declarations without binding action, weak proposed laws, minor local crime/community stories, drills/false claims, aftermath-only incidents and events without demonstrated operating consequence. Keep preview/PDF parity.
+**How to apply:** Both products run independent broad-domain discovery rather than inferring coverage from a general incident feed. Middle East additionally searches maritime and aviation separately. Cluster sources by underlying event before selecting by operational materiality, never article volume; preserve corroborating evidence. Preserve APAC's balanced six-development selection in content-only refreshes. Middle East normally has six but may contain five to eight genuinely material developments; do not force category representation or fill a quota. Map every selected development. Reject commentary, declarations without binding action, weak proposed laws, minor local crime/community stories, drills/false claims, aftermath-only incidents and events without demonstrated operating consequence. Keep preview/PDF parity.
 
 Both Regional Weeklies reassess severity from the underlying facts at report time; inherited labels, dramatic wording and source volume do not control it. Consequences, intent, method, casualties and verified operating effects do. Bombing, missile and military-incursion semantics classify before transport or energy words, so a nearby airport, vehicle or pipeline reference cannot override the event itself.
 
@@ -104,3 +104,21 @@ The forward calendar is also source material, not already-edited report copy.
 **Why:** A scheduled-event record can contain a news headline and reader instructions rather than an event name; cleaning only past developments leaves that separate route for headline leakage.
 
 **How to apply:** Apply the same source-to-report boundary to 7 Day Watch. An institution issuing an advisory is not necessarily the event organiser, and a shared generic label does not establish that two gatherings are the same event.
+
+Closing Polestar Outlooks are 120–160-word regional forward assessments, not country-by-country recaps. Compare shared operating exposures, identify plausible deterioration and stabilisation, and name material triggers without inventing consequences.
+
+**Why:** Broad country coverage and valid length still allowed six miniature country updates, which the owner explicitly rejected. Source shortages and bare attacks also do not establish business curtailment or physical damage.
+
+**How to apply:** Organise paragraphs by shared operating questions rather than geography. Preserve the existing presentation during content-only revisions; reassess severity from demonstrated consequences, not dramatic wording or inherited ratings.
+
+An absence of event dates in news-search snippets is not evidence that no upcoming events exist.
+
+**Why:** A completed broad forward search returned mostly headline-only text; dated articles and public calendars established useful scheduled events that those snippets could not verify.
+
+**How to apply:** Enrich with actual dated source text or structured calendars. Preserve source-version/publication timestamps separately from event dates, admit only genuine in-window events, and never manufacture a publication timestamp from retrieval time.
+
+Validate collection coverage through the same saved-report reader used by preview and PDF, not just the editorial structure checks.
+
+**Why:** Human-friendly search-lane labels such as “Gulf states” hid individually searched countries from the saved coverage audit, so a structurally valid report could not render.
+
+**How to apply:** Derive audited geography from recorded successful queries, normalising explicit aliases. Never turn an umbrella label or the list of required countries into proof of completed searches. Keep report-correction failures isolated from unrelated services.
