@@ -102,7 +102,19 @@ function inferredEventFamilyKey(row: MapIncidentDedupeRow): string | null {
  * cannot merge. Every source URL from the collapsed rows is retained as marker
  * evidence.
  */
-export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(rows: T[]): T[] {
+/**
+ * Collapse same-event rows into one marker per development.
+ *
+ * Each returned representative carries `memberIds`: every source row folded
+ * into it. The representative itself is re-chosen on every call (highest
+ * severity, then newest), so a later poll can hand the same real-world event a
+ * DIFFERENT id — which would resurrect an already-reviewed marker if the map
+ * remembered only the representative's id. Callers dismiss the whole member
+ * set, never just the representative.
+ */
+export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(
+  rows: T[],
+): Array<T & { memberIds: number[] }> {
   const byScope = new Map<string, T[]>();
   for (const row of rows) {
     const key = `${row.topic}|${row.country.trim().toLowerCase()}`;
@@ -153,6 +165,7 @@ export function dedupeMapIncidents<T extends MapIncidentDedupeRow>(rows: T[]): T
       return {
         ...representative,
         corroborations: evidenceFor(members),
+        memberIds: [...new Set(members.map((member) => member.id))],
       };
     });
   });

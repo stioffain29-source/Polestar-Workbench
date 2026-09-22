@@ -53,6 +53,11 @@ function makeCentredLabelCanvas(opts: {
   letterSpacingPx: number;
   radius: number;
   circle: boolean;
+  // Outlined pills (e.g. a white "Not assessed" chip) lose their only visible
+  // boundary if the replacement canvas paints background and text alone, so the
+  // computed border is drawn INSIDE the measured box — the pill keeps exactly
+  // the width and height html2canvas laid out.
+  border?: { color: string; width: number } | null;
 }): HTMLCanvasElement {
   const scale = 3;
   const canvas = document.createElement("canvas");
@@ -66,22 +71,42 @@ function makeCentredLabelCanvas(opts: {
   if (!ctx) return canvas;
   ctx.scale(scale, scale);
 
+  const borderWidth = opts.border && opts.border.width > 0 ? opts.border.width : 0;
+  const tracePath = (inset: number) => {
+    if (opts.circle) {
+      ctx.beginPath();
+      ctx.arc(
+        opts.w / 2,
+        opts.h / 2,
+        Math.max(0, Math.min(opts.w, opts.h) / 2 - inset),
+        0,
+        Math.PI * 2,
+      );
+      ctx.closePath();
+      return;
+    }
+    const x0 = inset;
+    const y0 = inset;
+    const x1 = opts.w - inset;
+    const y1 = opts.h - inset;
+    const r = Math.max(0, Math.min(opts.radius, (x1 - x0) / 2, (y1 - y0) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x0 + r, y0);
+    ctx.arcTo(x1, y0, x1, y1, r);
+    ctx.arcTo(x1, y1, x0, y1, r);
+    ctx.arcTo(x0, y1, x0, y0, r);
+    ctx.arcTo(x0, y0, x1, y0, r);
+    ctx.closePath();
+  };
+
   ctx.fillStyle = opts.bg || "#999999";
-  if (opts.circle) {
-    ctx.beginPath();
-    ctx.arc(opts.w / 2, opts.h / 2, Math.min(opts.w, opts.h) / 2, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.fill();
-  } else {
-    const r = Math.max(0, Math.min(opts.radius, opts.w / 2, opts.h / 2));
-    ctx.beginPath();
-    ctx.moveTo(r, 0);
-    ctx.arcTo(opts.w, 0, opts.w, opts.h, r);
-    ctx.arcTo(opts.w, opts.h, 0, opts.h, r);
-    ctx.arcTo(0, opts.h, 0, 0, r);
-    ctx.arcTo(0, 0, opts.w, 0, r);
-    ctx.closePath();
-    ctx.fill();
+  tracePath(0);
+  ctx.fill();
+  if (borderWidth > 0 && opts.border) {
+    ctx.strokeStyle = opts.border.color;
+    ctx.lineWidth = borderWidth;
+    tracePath(borderWidth / 2);
+    ctx.stroke();
   }
 
   ctx.font = `${opts.fontWeight} ${opts.fontPx}px Roboto, Arial, sans-serif`;
@@ -136,6 +161,13 @@ function rasteriseChipsToCanvas(host: HTMLElement): void {
       letterSpacingPx: toNum(node.dataset.chipTracking, 0),
       radius: toNum(node.dataset.chipRadius, 2),
       circle: false,
+      // An outlined chip (white "Not assessed" pill) is defined by its border,
+      // so carry the computed border across; filled chips report 0 and are
+      // unaffected.
+      border: {
+        color: cs.borderTopColor || "transparent",
+        width: toNum(cs.borderTopWidth, 0),
+      },
     });
     canvas.style.display = "inline-block";
     canvas.style.verticalAlign = "middle";
@@ -240,17 +272,38 @@ async function rasterizeSvgsToCanvas(host: HTMLElement): Promise<void> {
     // 230px-wide chart with its 300-unit viewBox inflated/clipped the cards.
     // Opt-in keeps the existing render contracts of other report types intact.
     const rasterScope = svg.closest<HTMLElement>("[data-report-raster-scale]");
-    const w = rasterScope ? rect.width : vb.width > 0 ? vb.width : (Number.isFinite(attrW) && attrW > 0 ? attrW : rect.width) || 640;
-    const h = rasterScope ? rect.height : vb.height > 0 ? vb.height : (Number.isFinite(attrH) && attrH > 0 ? attrH : rect.height) || 240;
+    // Rasterise at the size the SVG actually occupies on the page. A chart
+    // authored as `viewBox="0 0 640 240" width="100%"` lays out at the export
+    // host's width (~515px); substituting a canvas sized to the 640-unit
+    // viewBox made the replacement WIDER than the capture frame, and
+    // html2canvas silently cropped the overflow — on the jet fuel chart that
+    // cut off the right-hand edge, hiding the most recent observation and the
+    // final axis tick. The laid-out box is what the preview shows, so it is
+    // what the PDF must capture. Fall back to the viewBox/attribute size only
+    // when the element has no measurable box.
+    const w = rasterScope
+      ? rect.width
+      : rect.width > 0
+        ? rect.width
+        : vb.width > 0
+          ? vb.width
+          : (Number.isFinite(attrW) && attrW > 0 ? attrW : 640);
+    const h = rasterScope
+      ? rect.height
+      : rect.width > 0 && rect.height > 0
+        ? rect.height
+        : vb.height > 0
+          ? vb.height
+          : (Number.isFinite(attrH) && attrH > 0 ? attrH : 240);
     if (w < 1 || h < 1) continue;
 
     const source = svg.cloneNode(true) as SVGSVGElement;
-    if (rasterScope) {
-      source.setAttribute("width", String(w));
-      source.setAttribute("height", String(h));
-      source.style.width = `${w}px`;
-      source.style.height = `${h}px`;
-    }
+    // An SVG serialised with a percentage width has no intrinsic size once it
+    // is loaded as an image, so always pin the clone to the measured box.
+    source.setAttribute("width", String(w));
+    source.setAttribute("height", String(h));
+    source.style.width = `${w}px`;
+    source.style.height = `${h}px`;
     const xml = new XMLSerializer().serializeToString(source);
     const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`;
     const img = new Image();

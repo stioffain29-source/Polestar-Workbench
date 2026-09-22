@@ -205,6 +205,11 @@ type Point = {
   rating: string;
   summary: string;
   corroborations: Corroboration[];
+  // Every incident row folded into this marker by dedupeMapIncidents (the
+  // representative can change between polls). Dismissing a marker records all
+  // of them, so a re-keyed representative cannot resurface as unreviewed.
+  // Empty for strike and maritime-security markers, which are not deduped.
+  memberIds: number[];
   // GDELT precision-enrichment fields — present only when the GDELT pass matched
   // this incident; the popup shows them when set and is silent otherwise.
   fatalities: number | null;
@@ -297,6 +302,27 @@ export default function MapPage() {
       return next;
     });
   };
+  // Dismiss the marker AND every incident row folded into it. The dedupe pass
+  // re-picks a representative on each poll, so remembering only the marker's
+  // current id let an already-reviewed development come back as new the moment
+  // a fresher member joined its cluster.
+  const clearPoints = (points: Point[]) => {
+    const ids: string[] = [];
+    for (const point of points) {
+      ids.push(point.id);
+      for (const memberId of point.memberIds) ids.push(`i-${memberId}`);
+    }
+    clearMarkers(ids);
+  };
+  // Reading the dismissal back has to be member-aware for the same reason
+  // writing it is: when a later poll promotes a different source row to
+  // representative, the marker arrives with an id that was never cleared, but
+  // the rows folded into it were. One predicate for every read (visibility,
+  // the new count, cluster rings and per-row tags) so the marker, its pulse
+  // and its popup can never disagree about whether it has been reviewed.
+  const isPointCleared = (point: Point) =>
+    clearedIds.has(point.id) ||
+    point.memberIds.some((memberId) => clearedIds.has(`i-${memberId}`));
 
   // Liveuamap live overlay — a separate reference layer, kept apart from the
   // curated incident data. It only fetches while the toggle is on (no paid call
@@ -374,6 +400,7 @@ export default function MapPage() {
           rating: i.severity,
           summary: i.summary,
           corroborations: i.corroborations ?? [],
+          memberIds: i.memberIds.length > 0 ? i.memberIds : [i.id],
           fatalities: i.fatalities ?? null,
           actors: i.actors ?? null,
           gdeltEventType: i.gdeltEventType ?? null,
@@ -402,6 +429,7 @@ export default function MapPage() {
           rating: maritimeTypeSeverityKey(r.type),
           summary: r.narrative ?? `${r.type} reported by the ICC IMB Piracy Reporting Centre.`,
           corroborations: [],
+          memberIds: [],
           fatalities: null,
           actors: null,
           gdeltEventType: null,
@@ -427,6 +455,7 @@ export default function MapPage() {
         rating: munitionRating(s.munition),
         summary: `${s.munition.replace(/_/g, " ")} on ${s.targetCategory.replace(/_/g, " ")} in ${s.country}.`,
         corroborations: [],
+        memberIds: [],
         fatalities: null,
         actors: null,
         gdeltEventType: null,
@@ -439,7 +468,7 @@ export default function MapPage() {
   // fetched set is the windowed set — no client-side date filtering needed.
   const windowedPoints = allPoints;
 
-  const visiblePoints = useMemo(
+  const filteredPoints = useMemo(
     () =>
       windowedPoints.filter(
         (p) =>
@@ -456,15 +485,42 @@ export default function MapPage() {
   // it's the same marker id and clearedIds has no notion of range at all.
   const blinkEnabled = range === "24h";
 
+  // The 24h view is a review queue: an incident stays on it until the analyst
+  // clears it, then drops off. Without this, clearing only silenced the pulse
+  // and every reviewed incident stayed on the map for a further 24 hours, so
+  // the day's intake piled up over the unreviewed markers it exists to expose.
+  // Longer ranges are the historical picture and always show everything.
+  // "Show cleared" puts the reviewed markers back without un-reviewing them.
+  const [showCleared, setShowCleared] = useState(false);
+  // A marker whose popup is currently open stays mounted even once cleared —
+  // clicking a marker clears it, and unmounting it mid-click would shut the
+  // popup the click just opened.
+  const [openMarkerId, setOpenMarkerId] = useState<string | null>(null);
+  const hideCleared = blinkEnabled && !showCleared;
+
+  const visiblePoints = useMemo(
+    () =>
+      hideCleared
+        ? filteredPoints.filter((p) => !isPointCleared(p) || p.id === openMarkerId)
+        : filteredPoints,
+    [hideCleared, filteredPoints, clearedIds, openMarkerId],
+  );
+
+  const clearedHiddenCount = useMemo(
+    () => (hideCleared ? filteredPoints.length - visiblePoints.length : 0),
+    [hideCleared, filteredPoints, visiblePoints],
+  );
+
   // Markers currently on screen that haven't been cleared yet — these are the
   // ones pulsing. Recomputed whenever the visible set or cleared set changes,
   // so a fresh ingest poll (new IDs) or a Clear click both update the count.
   // Empty outside the 24h view so the pulse ring, dot blink, and "New (N)"
   // legend/clear-all control all naturally switch off together.
-  const newMarkerIds = useMemo(
-    () => (blinkEnabled ? visiblePoints.filter((p) => !clearedIds.has(p.id)).map((p) => p.id) : []),
+  const newPoints = useMemo(
+    () => (blinkEnabled ? visiblePoints.filter((p) => !isPointCleared(p)) : []),
     [blinkEnabled, visiblePoints, clearedIds],
   );
+  const newMarkerIds = useMemo(() => newPoints.map((p) => p.id), [newPoints]);
 
   // The actual markers drawn on the map, clustered by their pixel distance
   // at the CURRENT zoom (see @/lib/mapClustering). Kept separate from
@@ -677,7 +733,7 @@ export default function MapPage() {
                 // (pulses until an analyst clears it) on the cluster itself
                 // whenever ANY member is still unread, and flag which specific
                 // rows are new inside the popup list below.
-                const clusterHasNew = blinkEnabled && members.some((m) => !clearedIds.has(m.id));
+                const clusterHasNew = blinkEnabled && members.some((m) => !isPointCleared(m));
                 return (
                   <Fragment key={p.id}>
                   {clusterHasNew && (
@@ -734,7 +790,7 @@ export default function MapPage() {
                             // give each row its own Create Spot Report link so
                             // an analyst never has to leave the cluster popup
                             // to act on one buried incident.
-                            const memberIsNew = blinkEnabled && !clearedIds.has(m.id);
+                            const memberIsNew = blinkEnabled && !isPointCleared(m);
                             return (
                               <li
                                 key={m.id}
@@ -748,7 +804,7 @@ export default function MapPage() {
                               >
                                 <div
                                   style={{ display: "flex", alignItems: "flex-start", cursor: memberIsNew ? "pointer" : "default" }}
-                                  onClick={memberIsNew ? () => clearMarkers([m.id]) : undefined}
+                                  onClick={memberIsNew ? () => clearPoints([m]) : undefined}
                                 >
                                   <span
                                     style={{
@@ -816,7 +872,7 @@ export default function MapPage() {
                 );
               }
               const s = markerStyle(p.rating);
-              const isNew = blinkEnabled && !clearedIds.has(p.id);
+              const isNew = blinkEnabled && !isPointCleared(p);
               return (
                 <Fragment key={p.id}>
                 {isNew && (
@@ -858,9 +914,12 @@ export default function MapPage() {
                   }}
                   eventHandlers={{
                     click: (event) => {
-                      if (isNew) clearMarkers([p.id]);
+                      setOpenMarkerId(p.id);
+                      if (isNew) clearPoints([p]);
                       event.target.openPopup();
                     },
+                    popupclose: () =>
+                      setOpenMarkerId((current) => (current === p.id ? null : current)),
                   }}
                 >
                   {false && <LeafletTooltip direction="top" offset={[0, -6]}>
@@ -1161,12 +1220,31 @@ export default function MapPage() {
           {newMarkerIds.length > 0 && (
             <button
               type="button"
-              onClick={() => clearMarkers(newMarkerIds)}
+              onClick={() => clearPoints(newPoints)}
               className="rounded-sm border border-border px-2 py-0.5 text-[11px] font-sans text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Stop the pulsing ring on every currently visible new marker"
+              title="Mark every currently visible new marker as reviewed and take it off the 24h view"
             >
               Clear all new
             </button>
+          )}
+          {blinkEnabled && (clearedHiddenCount > 0 || showCleared) && (
+            <span className="inline-flex items-center gap-1.5">
+              {hideCleared
+                ? `${clearedHiddenCount} reviewed hidden`
+                : "Showing reviewed markers"}
+              <button
+                type="button"
+                onClick={() => setShowCleared((prev) => !prev)}
+                className="rounded-sm border border-border px-2 py-0.5 text-[11px] font-sans text-muted-foreground hover:bg-muted hover:text-foreground"
+                title={
+                  hideCleared
+                    ? "Put the reviewed markers back on the map (they stay reviewed)"
+                    : "Hide the markers already reviewed on this view"
+                }
+              >
+                {hideCleared ? "Show reviewed" : "Hide reviewed"}
+              </button>
+            </span>
           )}
         </span>
       </div>

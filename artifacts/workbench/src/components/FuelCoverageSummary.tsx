@@ -72,17 +72,36 @@ const tableCellStyle: CSSProperties = {
 
 function severityPill(severity: FuelOperationalSeverity | null): ReactElement {
   const label = severity ? FUEL_OPERATIONAL_SEVERITY_LABELS[severity] : "Not assessed";
+  const background = severity ? severityColor(severity) : WHITE;
+  const foreground = severity ? WHITE : DUSK;
   return (
     <span
+      // Tagged so the PDF export path (embedReactChartInPdf) swaps this pill for
+      // a pixel-centred <canvas>: html2canvas draws CSS text baselines low, which
+      // pushed these severity labels out of their table rows in the exported
+      // coverage panel. On screen the inline-flex centring below keeps the label
+      // centred the same way, so preview == PDF.
+      data-raster-chip=""
+      data-chip-label={label}
+      data-chip-bg={background}
+      data-chip-fg={foreground}
+      data-chip-font="8"
+      data-chip-weight="700"
+      data-chip-radius="2"
+      data-chip-tracking="0.24"
+      data-chip-upper="1"
       style={{
-        display: "inline-block",
-        background: severity ? severityColor(severity) : WHITE,
-        color: severity ? WHITE : DUSK,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxSizing: "border-box",
+        background,
+        color: foreground,
         border: severity ? "none" : `1px solid ${POLAR}`,
-        padding: "2px 5px",
+        padding: "3px 5px",
         borderRadius: 2,
         fontSize: 8,
-        lineHeight: 1.1,
+        lineHeight: 1,
         fontWeight: 700,
         letterSpacing: "0.03em",
         textTransform: "uppercase",

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
 } from "recharts";
@@ -20,6 +20,42 @@ function formatAsOf(asOf: string, change?: string | null): string {
   if (isNaN(d.getTime())) return asOf;
   const monthly = (change ?? "").includes("MoM") || /-01$/.test(asOf);
   return format(d, monthly ? "MMM yyyy" : "dd MMM yyyy");
+}
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// The energy series arrive in arrears — IMF gas/coal and BLS electricity are
+// monthly workbooks released weeks after the month they cover, and even EIA's
+// daily Henry Hub spot lands several days late. A card showing only "As of
+// Jul 2026" therefore reads as a dead feed when the snapshot was in fact
+// refreshed today and the feed returned nothing newer. State when the series
+// was last checked so the lag is attributed to the source, not to this board.
+//
+// Says only what the refresh proves: at that moment the feed returned no later
+// observation. It makes no claim about the publisher's release schedule.
+//
+// Observation dates are bare calendar days while the refresh time is an instant,
+// so both are read in UTC (see the report-date timezone note): comparing them on
+// the VIEWER's calendar would flip the threshold for eastern viewers on a
+// late-evening refresh.
+function checkedNote(asOf: string, updatedAt?: string | null): string | null {
+  if (!updatedAt) return null;
+  const day = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOf);
+  const checked = new Date(updatedAt);
+  if (!day || isNaN(checked.getTime())) return null;
+  const observedUtc = Date.UTC(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
+  const checkedUtc = Date.UTC(
+    checked.getUTCFullYear(),
+    checked.getUTCMonth(),
+    checked.getUTCDate(),
+  );
+  const lagDays = Math.round((checkedUtc - observedUtc) / 86_400_000);
+  if (lagDays < 2) return null;
+  const label = `${String(checked.getUTCDate()).padStart(2, "0")} ${MONTH_ABBR[checked.getUTCMonth()]} ${checked.getUTCFullYear()}`;
+  return `Checked ${label} — the source feed returned no newer observation.`;
 }
 
 function PriceCard({ p }: { p: MarketPrice }) {
@@ -62,6 +98,11 @@ function PriceCard({ p }: { p: MarketPrice }) {
       <div className="text-[10px] text-muted-foreground font-sans mt-3 leading-snug">
         As of {formatAsOf(p.asOf, p.change)} · {p.source}
       </div>
+      {checkedNote(p.asOf, p.updatedAt) ? (
+        <div className="text-[10px] text-muted-foreground font-sans mt-1 leading-snug italic">
+          {checkedNote(p.asOf, p.updatedAt)}
+        </div>
+      ) : null}
     </div>
   );
 }

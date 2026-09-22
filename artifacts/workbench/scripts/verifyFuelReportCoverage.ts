@@ -237,6 +237,9 @@ async function bundleBrowser(): Promise<string> {
       ".svg": "dataurl",
       ".gif": "dataurl",
       ".webp": "dataurl",
+      // Stylesheet side-effect imports (leaflet) only need to resolve here; the
+      // harness rasterises jsPDF output, not a styled page.
+      ".css": "text",
     },
     define: {
       "import.meta.env.BASE_URL": '"/"',

@@ -19,6 +19,21 @@ window.__runFuelPdfExportVerify__ = async () => {
   const data = window.__FUEL_COVERAGE_VERIFY_DATA__;
   let captured: ArrayBuffer | null = null;
   let saveCalls = 0;
+  // The in-app fuel download does NOT call pdf.save(): it builds a Blob and
+  // clicks a hidden anchor. Intercept the object URL (and neutralise the
+  // click) so the harness captures the exact bytes the analyst downloads.
+  let capturedBlob: Blob | null = null;
+  const originalCreateObjectURL = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = ((value: Blob | MediaSource) => {
+    if (value instanceof Blob && value.type === "application/pdf") {
+      capturedBlob = value;
+      saveCalls++;
+      return "blob:fuel-export-verify";
+    }
+    return originalCreateObjectURL(value as Blob);
+  }) as typeof URL.createObjectURL;
+  URL.revokeObjectURL = (() => {}) as typeof URL.revokeObjectURL;
+  HTMLAnchorElement.prototype.click = function noopClick() {};
   const capture = function (this: jsPDF) {
     saveCalls++;
     captured = this.output("arraybuffer") as ArrayBuffer;
@@ -49,6 +64,9 @@ window.__runFuelPdfExportVerify__ = async () => {
         ? `${error.message}\n${error.stack ?? ""}`
         : String(error);
   }
+
+  const blob = capturedBlob as Blob | null;
+  if (!captured && blob) captured = await blob.arrayBuffer();
 
   let base64 = "";
   if (captured) {
