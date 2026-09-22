@@ -202,9 +202,6 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
-      '@workspace/db-ports':
-        specifier: workspace:*
-        version: link:../../lib/db-ports
       '@workspace/ingest':
         specifier: workspace:*
         version: link:../../lib/ingest
@@ -597,9 +594,6 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
-      '@workspace/db-ports':
-        specifier: workspace:*
-        version: link:../../lib/db-ports
       '@workspace/ingest':
         specifier: workspace:*
         version: link:../../lib/ingest
@@ -729,9 +723,6 @@ importers:
       '@workspace/country-engine':
         specifier: workspace:*
         version: link:../country-engine
-      '@workspace/db-ports':
-        specifier: workspace:*
-        version: link:../db-ports
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/pg@8.20.0)(pg@8.20.0)
@@ -754,12 +745,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
-
-  lib/db-ports:
-    dependencies:
-      '@workspace/api-client-react':
-        specifier: workspace:*
-        version: link:../api-client-react
 
   lib/ingest:
     dependencies:

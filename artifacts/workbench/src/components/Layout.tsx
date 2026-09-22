@@ -64,7 +64,6 @@ export default function Layout({ children }: LayoutProps) {
         { label: "Report Builder", href: "/reports", icon: FileText },
         { label: "Spot Reports", href: "/spot-reports", icon: Siren },
         { label: "Special Reports", href: "/special-reports", icon: FileText },
-        { label: "Ports & Logistics", href: "/db-ports", icon: Ship },
       ]
     },
     {

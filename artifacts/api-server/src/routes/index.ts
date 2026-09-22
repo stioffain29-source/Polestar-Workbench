@@ -31,7 +31,6 @@ import backfillRouter from "./backfill";
 import flashpointValidityAdminRouter from "./flashpointValidityAdmin";
 import cardsRouter from "./cards";
 import protestEventsRouter from "./protestEvents";
-import dbPortsRouter from "./dbPorts";
 import dailyQualityRouter from "./dailyQuality";
 import { requireOwner } from "../lib/ownerAccess";
 
@@ -79,7 +78,6 @@ router.use(officialMilitaryMaritimeSourcesRouter);
 router.use(integrationsRouter);
 router.use(cardsRouter);
 router.use(protestEventsRouter);
-router.use(dbPortsRouter);
 router.use(dailyQualityRouter);
 
 export default router;

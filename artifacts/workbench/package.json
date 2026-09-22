@@ -61,7 +61,6 @@
     "@vitejs/plugin-react": "catalog:",
     "@workspace/api-client-react": "workspace:*",
     "@workspace/db": "workspace:*",
-    "@workspace/db-ports": "workspace:*",
     "@workspace/ingest": "workspace:*",
     "@workspace/relevance": "workspace:*",
     "@workspace/replit-auth-web": "workspace:*",

@@ -31,6 +31,4 @@ export * from "./protestEvents";
 export * from "./protestScheduleState";
 export * from "./auth";
 export * from "./ingestRunFence";
-export * from "./dbPortsEditions";
-export * from "./dbPortsSettings";
 export * from "./dailyQuality";
