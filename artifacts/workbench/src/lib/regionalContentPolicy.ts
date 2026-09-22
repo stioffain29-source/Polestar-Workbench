@@ -56,7 +56,7 @@ export function regionalPipelineVoicePhrases(value: string): string[] {
 const ENERGY_PROSE =
   /\b(?:oil|gas|lng|crude|refiner\w*|pipelines?|petrochemical\w*|fuel|diesel|petrol|gasoline|electricity|power (?:plant|grid|station|supply)|energy)\b/i;
 
-/** Holidays can matter operationally, but they cannot be the watch itself. */
+/** Holidays carry real operating consequences, so they stay in the watch. */
 const OBSERVANCE =
   /\b(?:national day|independence day|revolution day|liberation day|republic day|founding day|unification day|public holiday|bank holiday|religious holiday|sukkot|rosh hashanah|yom kippur|passover|hanukkah|eid(?:\s+al[-\s]\w+)?|ramadan|ashura|mawlid|christmas|new year|lunar new year|diwali|vesak|feast of)\b/i;
 
@@ -79,10 +79,22 @@ export function validateRegionalForwardWatch(
     (items.length < REGIONAL_WATCH_MIN_ITEMS || items.length > REGIONAL_WATCH_MAX_ITEMS)) {
     errors.push(`7 Day Watch requires ${REGIONAL_WATCH_MIN_ITEMS} to ${REGIONAL_WATCH_MAX_ITEMS} forward items from the separate forward search.`);
   }
-  if (items.length > 0 && regionalObservanceWatchItems(items).length > Math.floor(items.length / 2)) {
-    errors.push("7 Day Watch must not consist mainly of public holidays and observances.");
-  }
   return errors;
+}
+
+/**
+ * Public holidays are legitimate operational information — closures, reduced
+ * cover and payment cut-offs all follow from them. A genuinely holiday-led
+ * week is therefore published with the calendar it actually has, and says so,
+ * rather than failing the whole report.
+ */
+export function regionalWatchObservanceNote(items: Array<{ trigger: string }>): string | null {
+  if (items.length === 0) return null;
+  const observances = regionalObservanceWatchItems(items);
+  if (observances.length <= Math.floor(items.length / 2)) return null;
+  return observances.length === items.length
+    ? "The week ahead is led by public holidays and observances. No other significant scheduled events were identified."
+    : "Public holidays and observances account for most of the week ahead. No further significant scheduled events were identified.";
 }
 
 export function regionalOutlookNamedCountries(

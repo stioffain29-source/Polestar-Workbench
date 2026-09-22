@@ -90,6 +90,7 @@ import {
 } from "./topicProseResolution";
 import { segmentEnergySituationProse } from "./energySituationLayout";
 import { isRegionalWeeklyTopic, type RegionalWeeklyTopic, type RegionalFutureEventInput } from "./regionalWeekly";
+import { regionalWatchObservanceNote } from "./regionalContentPolicy";
 import { buildApacBusinessImplications, buildApacGlanceMetrics, buildApacMapItems, buildApacWeeklyDevelopments, buildApacWeeklyWatchlist, buildRegionalBluf, buildRegionalBusinessRisk, buildRegionalBusinessImplicationsNarrative, buildRegionalDevelopments, buildRegionalDomainBriefs, buildRegionalGlanceItems, buildRegionalIntelligencePicture, buildRegionalOutlook, buildRegionalTravelImplications, buildRegionalVisualSummary, buildRegionalWatchlist, buildStructuredRegionalBluf, buildStructuredRegionalOutlook, clipTitleToMeaningfulWords, curateRegionalWeeklyIncidents, regionalCanonicalReportFromHardNumbers, resolveRegionalNarrative, validateRegionalWeeklyAssessment } from "./regionalWeekly";
 // Single source of truth for the Fast Facts cards so the on-screen
 // preview and this PDF exporter cannot drift.
@@ -1888,6 +1889,7 @@ export async function exportTopicReportPdf(
           Math.max(100, 50 + watchRows.reduce((height, row) => height + row.height, 0)),
         ));
         drawSectionHeading(ctx, "7 Day Watch");
+        const watchObservanceNote = regionalWatchObservanceNote(regionalCanonical.watchItems);
         if (regionalCanonical.watchItems.length === 0) {
           renderProse(ctx, "No qualifying watch items were identified in the reporting period.");
         } else {
@@ -1908,6 +1910,8 @@ export async function exportTopicReportPdf(
             ctx.y += 5;
           }
         }
+        // A holiday-led week is published with the calendar it has and says so.
+        if (watchObservanceNote) renderProse(ctx, watchObservanceNote);
       }
       if (show("polestar-view")) {
         ensureSpace(ctx, 40);

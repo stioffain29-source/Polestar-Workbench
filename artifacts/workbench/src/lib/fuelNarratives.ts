@@ -14,6 +14,7 @@ import {
   compareIncidentSignificance,
   incidentSeverityRank,
 } from "@workspace/country-engine";
+import { finalReportRepetitionUnits, finalReportUnitsRepeat } from "./finalReportEvidenceAudit";
 import { deriveFlagState } from "./shippingCountry";
 import { deriveFuelIncidentCountry } from "./fuelCountry";
 import { joinWithAnd } from "./proseLists";
@@ -2351,12 +2352,52 @@ function buildFuelWhatHappenedItems(facts: FuelCanonicalFacts): Array<{
   return rows.filter((item) => item.supportingEvidenceIds.length > 0);
 }
 
-function buildFuelWhatHappenedProse(facts: FuelCanonicalFacts): string {
-  const items = buildFuelWhatHappenedItems(facts);
+function buildFuelWhatHappenedProse(items: Array<{ text: string }>): string {
   if (items.length === 0) {
     return "No material fuel-market developments were confirmed in the reporting window; the assessment leans on market observations and standing route exposure until fresh operational reporting lands.";
   }
   return items.map((item) => item.text).join("\n\n");
+}
+
+/**
+ * Situation synthesises the week; What Happened lists the dated developments
+ * behind it. One lead event can therefore reach both in near-identical words.
+ * Fold the duplication at source: keep the synthesis and drop the dated item
+ * it already states, unless that would leave no dated evidence at all — then
+ * the record stays and the synthesis loses the sentence it duplicates. The
+ * fact is always stated exactly once, and never in neither.
+ */
+function consolidateFuelSituationAndWhatHappened<T extends { text: string }>(
+  situation: string,
+  items: T[],
+): { situation: string; whatHappenedItems: T[] } {
+  if (items.length === 0 || !situation.trim()) return { situation, whatHappenedItems: items };
+  let sentences = situation
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  let kept = [...items];
+  for (;;) {
+    let resolved = true;
+    for (let s = 0; s < sentences.length && resolved; s += 1) {
+      for (let i = 0; i < kept.length; i += 1) {
+        const repeats = finalReportRepetitionUnits(kept[i].text)
+          .some((unit) => finalReportUnitsRepeat(sentences[s], unit));
+        if (!repeats) continue;
+        // The synthesis can lose a sentence without losing a fact, because the
+        // dated record still carries it. A dated record cannot lose its date,
+        // detail or evidence id, so it is only dropped when the synthesis has
+        // nothing else left to say.
+        if (sentences.length > 1) sentences = sentences.filter((_, index) => index !== s);
+        else if (kept.length > 1) kept = kept.filter((_, index) => index !== i);
+        else return { situation, whatHappenedItems: items };
+        resolved = false;
+        break;
+      }
+    }
+    if (resolved) break;
+  }
+  return { situation: sentences.join(" "), whatHappenedItems: kept };
 }
 
 function buildFuelWhatMattersProse(facts: FuelCanonicalFacts): string {
@@ -2615,7 +2656,10 @@ export function buildFuelAnalyticalSections(
         .map((i) => i.raw),
     })
     ?? "No confirmed operational fuel constraint dominated the reporting window.";
-  const whatHappenedItems = buildFuelWhatHappenedItems(facts);
+  const { situation, whatHappenedItems } = consolidateFuelSituationAndWhatHappened(
+    buildFuelSituationAssessment(facts),
+    buildFuelWhatHappenedItems(facts),
+  );
   const watchNextItems = (() => {
     const out: string[][] = [];
     const potentialIndicator = facts.watchIndicators.find((indicator) => {
@@ -2646,8 +2690,8 @@ export function buildFuelAnalyticalSections(
   })();
   return {
     executiveSummary: buildFuelExecutiveSummary(facts),
-    situation: buildFuelSituationAssessment(facts),
-    whatHappened: buildFuelWhatHappenedProse(facts),
+    situation,
+    whatHappened: buildFuelWhatHappenedProse(whatHappenedItems),
     regionalHighlights,
     whatMatters: buildFuelWhatMattersProse(facts),
     polestarView: buildFuelPolestarJudgement(facts),

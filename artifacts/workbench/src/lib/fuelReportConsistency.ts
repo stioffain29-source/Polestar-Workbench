@@ -291,7 +291,7 @@ const INDICATOR_TOKENS: { key: "brent" | "wti" | "jet" | "crude"; re: RegExp }[]
 const CLAIM_QUALIFIER_RE =
   /\b(could|may|might|would|if\b|unless\b|conditional|contingen(?:cy|t)|potential|risk of|watch(?:ing)? for|monitor|previously|historically|last (?:week|month|year)|before the reporting period|was once)\b/i;
 
-function localClause(text: string, at: number): string {
+function localClauseBounds(text: string, at: number): { start: number; end: number } {
   const breaks = /\b(?:while|but|whereas|although|however)\b|[;:—]/gi;
   let start = 0;
   let end = text.length;
@@ -303,6 +303,11 @@ function localClause(text: string, at: number): string {
       break;
     }
   }
+  return { start, end };
+}
+
+function localClause(text: string, at: number): string {
+  const { start, end } = localClauseBounds(text, at);
   return text.slice(start, end);
 }
 
@@ -398,12 +403,24 @@ const CONDITION_CLAIMS: { key: string; re: RegExp; what: string }[] = [
 ];
 
 function pctNumbersIn(text: string): number[] {
-  const out: number[] = [];
+  return pctMatchesIn(text).map((match) => match.value);
+}
+
+function pctMatchesIn(text: string): Array<{ value: number; index: number }> {
+  const out: Array<{ value: number; index: number }> = [];
   const re = /(-?\d+(?:\.\d+)?)\s*%/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) out.push(parseFloat(m[1]));
+  while ((m = re.exec(text))) out.push({ value: parseFloat(m[1]), index: m.index });
   return out;
 }
+
+/** Wording that presents a figure as a movement in a price series. */
+const BENCHMARK_MOVE_RE =
+  /\b(up|down|higher|lower|rise|rises|rising|rose|risen|fall|falls|falling|fell|fallen|gain(?:ed|s)?|lost|losses|climb(?:ed|s)?|slipp?ed|slid|jump(?:ed|s)?|surg(?:ed|es)|drop(?:ped|s)?|declin\w*|increas\w*|decreas\w*|chang\w*|mov(?:e|ed|es|ement)|weaker|stronger|on the week|week[-\s]on[-\s]week|versus|against the prior|compared with)\b/i;
+
+/** Subjects that are quantities or terms, not a benchmark price series. */
+const NON_PRICE_SUBJECT_RE =
+  /\b(flows?|volumes?|shipments?|loadings?|cargo(?:es)?|exports?|imports?|deliver(?:y|ies)|throughput|runs?|utilisation|utilization|capacity|output|production|supply|demand|consumption|inventor(?:y|ies)|stocks?|tariffs?|dut(?:y|ies)|levy|levies|share|margins?|discounts?|premiums?|freight rates?)\b/i;
 
 /** Run the gate. Empty array = clean. */
 export function validateFuelReportConsistency(
@@ -536,11 +553,25 @@ export function validateFuelReportConsistency(
       }
     }
 
-    // Percentages are validated loosely: a % figure attached to a market
-    // indicator sentence must match a calculated pct within 0.15pp.
+    // Percentages. Only a figure presented as a MOVEMENT IN A BENCHMARK PRICE
+    // SERIES is traced to the calculated price feed, because a benchmark move
+    // is the only kind of percentage the feed can confirm. A percentage the
+    // reporting carries about something else — a cargo volume, a tariff, a
+    // refinery run rate, a margin — is evidence rather than a market claim, so
+    // it is left to the evidence checks. The subject is read from the words
+    // BEFORE the figure, so a non-price noun later in the clause cannot excuse
+    // a fabricated price move ("Brent fell 8% because supply increased").
     for (const sentence of sentences) {
       if (!INDICATOR_TOKENS.some((t) => t.re.test(sentence))) continue;
-      for (const pct of pctNumbersIn(sentence)) {
+      for (const { value: pct, index } of pctMatchesIn(sentence)) {
+        const { start, end } = localClauseBounds(sentence, index);
+        const clause = sentence.slice(start, end);
+        const subject = sentence.slice(start, index);
+        const claimsBenchmarkMove =
+          INDICATOR_TOKENS.some((t) => t.re.test(clause)) &&
+          BENCHMARK_MOVE_RE.test(clause) &&
+          !NON_PRICE_SUBJECT_RE.test(subject);
+        if (!claimsBenchmarkMove) continue;
         const traced = knownPcts.some((k) => Math.abs(k - pct) <= 0.15);
         if (!traced && knownPcts.length > 0) {
           issues.push({

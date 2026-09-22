@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   MIDDLE_EAST_COLLECTION_DOMAINS,
   REGIONAL_MAX_MAP_POINTS,
+  regionalWatchObservanceNote,
   selectRegionalMapDevelopments,
   validateRegionalContentPolicy,
 } from "../regionalContentPolicy";
@@ -285,15 +286,29 @@ describe("regional final-content policy", () => {
       );
     }
 
+    // Holidays are real operating information. A genuinely holiday-led week
+    // publishes the calendar it has, with a note saying nothing else is
+    // scheduled, instead of failing the whole report.
     const holidays = report("middle_east_weekly");
     holidays.watchItems = [
       watchItem(2, "National Day public holiday"),
       watchItem(3, "Eid al-Adha holiday closures"),
       watchItem(4, "A port maintenance closure takes effect"),
     ];
-    expect(validateRegionalContentPolicy(holidays)).toContain(
-      "7 Day Watch must not consist mainly of public holidays and observances.",
+    expect(validateRegionalContentPolicy(holidays)).toEqual([]);
+    expect(regionalWatchObservanceNote(holidays.watchItems)).toBe(
+      "Public holidays and observances account for most of the week ahead. No further significant scheduled events were identified.",
     );
+    expect(regionalWatchObservanceNote([
+      watchItem(2, "National Day public holiday"),
+      watchItem(3, "Eid al-Adha holiday closures"),
+    ])).toBe(
+      "The week ahead is led by public holidays and observances. No other significant scheduled events were identified.",
+    );
+    expect(regionalWatchObservanceNote([
+      watchItem(2, "A port maintenance closure takes effect"),
+      watchItem(3, "National Day public holiday"),
+    ])).toBeNull();
   });
 
   it("requires the eleven-domain forward search behind the Middle East watch", () => {

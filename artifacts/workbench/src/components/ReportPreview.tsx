@@ -42,6 +42,7 @@ import {
   type RegionalDevelopment,
   type RegionalFutureEventInput,
 } from "@/lib/regionalWeekly";
+import { regionalWatchObservanceNote } from "@/lib/regionalContentPolicy";
 import { pickRead } from "@/lib/pickRead";
 import { DISCLAIMER_TEXT, SEV_COLOR, SEV_LABEL, sevKey, SEV_RANK } from "@/lib/pdfChrome";
 import { topicCoverUrl } from "@/lib/coverImages";
@@ -1604,6 +1605,11 @@ export default function ReportPreview({
               <div data-regional-required="seven-day-watch">
                 <Section hidden={!show("watch-next")} title="7 Day Watch" allowBreak>
                   <RegionalWatchlist items={regionalWatchlist} />
+                  {regionalWatchObservanceNote(regionalWatchlist) && (
+                    <div style={{ fontSize: 11, color: DUSK, marginTop: 8, lineHeight: 1.4 }}>
+                      {regionalWatchObservanceNote(regionalWatchlist)}
+                    </div>
+                  )}
                 </Section>
               </div>
             </div>

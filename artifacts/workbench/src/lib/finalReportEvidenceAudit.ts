@@ -202,6 +202,23 @@ function crossSectionSimilarity(a: string, b: string): number {
   return common / Math.min(left.size, right.size);
 }
 
+/** The sentence and bullet units the repetition audit compares. */
+export function finalReportRepetitionUnits(text: string): string[] {
+  return repetitionUnits(text);
+}
+
+/**
+ * The repetition decision itself, exported so a builder can consolidate a
+ * duplicate before it ever reaches the gate. One predicate means the fix and
+ * the check that accepts it cannot drift apart.
+ */
+export function finalReportUnitsRepeat(left: string, right: string): boolean {
+  if (REPEATABLE_STATUS_RE.test(left) || REPEATABLE_STATUS_RE.test(right)) return false;
+  const flatten = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if (flatten(left) === flatten(right)) return true;
+  return crossSectionSimilarity(left, right) >= 0.72;
+}
+
 /**
  * Conservative final-text repetition audit shared by every report adapter.
  * It compares display-ready prose, never drafts. Exact repetitions always
@@ -220,12 +237,7 @@ export function auditFinalReportSectionRepetition(
     for (let rightIndex = leftIndex + 1; rightIndex < units.length; rightIndex += 1) {
       const right = units[rightIndex];
       if (left.section === right.section) continue;
-      const exact =
-        left.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
-        === right.text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      if (REPEATABLE_STATUS_RE.test(left.text) || REPEATABLE_STATUS_RE.test(right.text)) continue;
-      const similarity = crossSectionSimilarity(left.text, right.text);
-      if (!exact && similarity < 0.72) continue;
+      if (!finalReportUnitsRepeat(left.text, right.text)) continue;
       issues.push({
         code: "CROSS_SECTION_REPETITION",
         section: left.section === right.section ? left.section : "cross-section",

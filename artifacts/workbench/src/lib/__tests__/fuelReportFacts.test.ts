@@ -577,3 +577,122 @@ describe("validateFuelReportConsistency — indicator direction clause scoping",
     ).toBe(true);
   });
 });
+
+// A percentage is only traced to the price feed when the prose presents it as
+// a movement in a benchmark price series. Percentages the reporting itself
+// carries — volumes, flows, run rates — are evidence, not market claims.
+describe("validateFuelReportConsistency — percentage tracing", () => {
+  const priced = () =>
+    hardNumbers({
+      brent: { value: 80, change: "+1.0%" },
+      wti: { value: 76, change: "+1.2%" },
+    });
+
+  it("still blocks a benchmark price movement that no indicator supports", () => {
+    const issues = validateFuelReportConsistency(facts([inc()], priced()), {
+      marketRead: "Brent crude was down 6.1% on the week.",
+    });
+    expect(
+      issues.filter((i) => i.message.startsWith("Market percentage")),
+    ).toHaveLength(1);
+  });
+
+  it("accepts a quantity the reporting carries, not a price movement", () => {
+    const sourced = facts(
+      [
+        inc({
+          title: "Fuel supply cut as refinery runs fall after depot attack",
+          summary: "Crude runs at the refinery fell 6.1% after the attack cut diesel supply.",
+        }),
+      ],
+      priced(),
+    );
+    const issues = validateFuelReportConsistency(sourced, {
+      situation: "Crude runs at the refinery fell 6.1% after the attack.",
+    });
+    expect(issues.filter((i) => i.message.startsWith("Market percentage"))).toEqual([]);
+  });
+
+  it("a non-price word later in the clause does not excuse a fabricated price move", () => {
+    const issues = validateFuelReportConsistency(facts([inc()], priced()), {
+      situation: "Brent crude fell 8% because supply increased.",
+    });
+    expect(
+      issues.filter((i) => i.message.startsWith("Market percentage")),
+    ).toHaveLength(1);
+  });
+
+  it("accepts a quantity percentage that is not a price series at all", () => {
+    const issues = validateFuelReportConsistency(facts([inc()], priced()), {
+      situation: "Crude flows to Europe are down 6.1% since the attack.",
+    });
+    expect(issues.filter((i) => i.message.startsWith("Market percentage"))).toEqual([]);
+  });
+});
+
+// One lead event reaches both the Situation synthesis and the dated What
+// Happened record. The builder folds that duplication away itself, so the
+// export is never blocked for repeating a fact it is right to state once.
+describe("buildFuelCanonicalSections — Situation and What Happened do not repeat", () => {
+  it("consolidates the lead development instead of stating it twice", () => {
+    const { buildFuelCanonicalFacts, buildFuelCanonicalSections } =
+      jest.requireActual("../fuelCanonicalFacts");
+    const { auditFinalReportSectionRepetition } =
+      jest.requireActual("../finalReportEvidenceAudit");
+    const rows = [
+      {
+        id: "s1",
+        topic: "fuel",
+        country: "Saudi Arabia",
+        severity: "high",
+        occurredAt: "2026-09-17T09:00:00Z",
+        title: "Attack on East-West Pipeline halts oil shipments through Yanbu port",
+        summary: "Oil shipments through Yanbu port were halted after an attack on the East-West Pipeline.",
+      },
+      {
+        id: "s2",
+        topic: "fuel",
+        country: "Saudi Arabia",
+        severity: "high",
+        occurredAt: "2026-09-18T09:00:00Z",
+        title: "Saudi Arabia cancels some Europe-bound crude cargoes after pipeline attack",
+        summary: "Saudi Arabia cancelled late-September European cargoes and cut crude shipments to Europe.",
+      },
+      {
+        id: "s3",
+        topic: "fuel",
+        country: "Saudi Arabia",
+        severity: "moderate",
+        occurredAt: "2026-09-19T09:00:00Z",
+        title: "Yanbu crude loadings suspended as pipeline repairs continue",
+        summary: "Loadings at Yanbu remain suspended while repairs to the pipeline continue.",
+      },
+    ];
+    const canonical = buildFuelCanonicalFacts({
+      issueDate: "2026-09-22",
+      incidents: rows,
+      marketCards: [{ label: "Brent crude", value: 68, change: "+1.0%" }],
+    });
+    const sections = buildFuelCanonicalSections(canonical);
+    expect(sections.situation.trim()).not.toBe("");
+    expect(sections.whatHappened.trim()).not.toBe("");
+    expect(
+      auditFinalReportSectionRepetition({
+        situation: sections.situation,
+        whatHappened: sections.whatHappened,
+      }),
+    ).toEqual([]);
+    // Consolidation removes the repeated wording, never the dated evidence.
+    // Both distinct developments keep their own dated line and provenance
+    // entry (the third record is folded by the builder's own same-event
+    // ranking, which is not what this test is about).
+    const lines = sections.whatHappened.split("\n\n");
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    expect(sections.provenance.whatHappened).toHaveLength(lines.length);
+    expect(
+      sections.provenance.whatHappened.flatMap(
+        (entry: { supportingIncidentIds: string[] }) => entry.supportingIncidentIds,
+      ),
+    ).toEqual(expect.arrayContaining(["s1", "s2"]));
+  });
+});
