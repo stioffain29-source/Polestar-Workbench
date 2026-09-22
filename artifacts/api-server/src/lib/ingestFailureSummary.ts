@@ -51,6 +51,7 @@ function finalize(
 
 export function summarizeMarketPriceFailures(
   prices: MarketPriceSummary,
+  snapshot?: MarketSnapshotSummary,
 ): IngestFailureSummary {
   return finalize({
     topicFailures: [],
@@ -59,7 +60,12 @@ export function summarizeMarketPriceFailures(
       id: e.id,
       error: clip(e.error),
     })),
-    marketSnapshotErrors: [],
+    // The price tick now refreshes the live snapshot table as well, so its
+    // failures must surface here instead of looking like a clean run.
+    marketSnapshotErrors: (snapshot?.errors ?? []).map((e) => ({
+      key: e.key,
+      error: clip(e.error),
+    })),
   });
 }
 

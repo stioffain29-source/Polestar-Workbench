@@ -9,10 +9,15 @@ import type {
 jest.mock("../src/lib/regionalAi", () => ({ regionalJson: jest.fn() }));
 
 import {
+  describeRegionalVerificationShortfall,
   prepareRegionalFactPackets,
   selectGroundedRegionalEvents,
   validateRegionalExtraction,
+  verifyAndRepairRegionalExtraction,
 } from "../src/lib/regionalReportFacts";
+import { regionalJson } from "../src/lib/regionalAi";
+
+const mockedRegionalJson = regionalJson as unknown as jest.Mock<() => Promise<RegionalExtraction>>;
 import { reassessRegionalSeverity } from "../src/lib/regionalReportSeverity";
 import { regionalAnalyticalInput } from "../src/lib/regionalReportEditorial";
 
@@ -116,6 +121,7 @@ describe("regional report structured-facts pipeline", () => {
     expect(result.events).toEqual([]);
     expect(result.rejected).toEqual([{
       candidateId: "event-1",
+      kind: "excluded",
       reason: "The event jurisdiction is outside this region.",
     }]);
   });
@@ -145,23 +151,129 @@ describe("regional report structured-facts pipeline", () => {
       })],
     }, [packet()], "apac_weekly");
     expect(result.events).toEqual([]);
-    expect(result.rejected).toEqual([{ candidateId: "event-1", reason }]);
+    expect(result.rejected).toEqual([{ candidateId: "event-1", kind: "excluded", reason }]);
   });
 
   it("rejects mastheads and source debris in extracted copy", () => {
-    expect(() => validateRegionalExtraction({
+    const result = validateRegionalExtraction({
       candidates: [candidate({ title: "Reuters: terminal handling suspended" })],
-    }, [packet()], "apac_weekly")).toThrow(
-      "The extracted title is not edited factual copy: event-1.",
-    );
+    }, [packet()], "apac_weekly");
+    expect(result.events).toEqual([]);
+    expect(result.rejected).toEqual([{
+      candidateId: "event-1",
+      kind: "unverified",
+      reason: "The extracted title is not edited factual copy.",
+    }]);
   });
 
   it("rejects a title copied exactly from the raw source headline", () => {
     const title = "Yokohama terminal suspends cargo handling";
-    expect(() => validateRegionalExtraction({
+    const result = validateRegionalExtraction({
       candidates: [candidate({ title })],
-    }, [packet(`${title}\nThe terminal in Yokohama suspended cargo handling.`)], "apac_weekly"))
-      .toThrow("A raw source headline was copied instead of an edited title for event-1.");
+    }, [packet(`${title}\nThe terminal in Yokohama suspended cargo handling.`)], "apac_weekly");
+    expect(result.events).toEqual([]);
+    expect(result.rejected).toEqual([{
+      candidateId: "event-1",
+      kind: "unverified",
+      reason: "A raw source headline was copied instead of an edited title.",
+    }]);
+  });
+
+  it("drops only the unverifiable candidate and keeps every other event", () => {
+    const packets = [1, 2, 3].map((index) => ({ ...packet(), candidateId: `event-${index}` }));
+    const candidates = packets.map((row, index) => candidate({
+      candidateId: row.candidateId,
+      eventIdentity: `terminal suspension ${index}`,
+    }));
+    const statement = "\"Yokohama terminal halts all cargo handling after fire\", the report said.";
+    candidates[1] = candidate({
+      candidateId: "event-2",
+      facts: [{ statement, sourceId: "1", quote: "The terminal in Yokohama suspended cargo handling." }],
+    });
+
+    const result = validateRegionalExtraction({ candidates }, packets, "apac_weekly");
+    expect(result.events.map((event) => event.candidateId)).toEqual(["event-1", "event-3"]);
+    expect(result.rejected).toEqual([{
+      candidateId: "event-2",
+      kind: "unverified",
+      reason: expect.stringContaining("Fact verification failed:"),
+      evidence: { statement, quote: "The terminal in Yokohama suspended cargo handling." },
+    }]);
+    expect(result.rejected[0].reason)
+      .toContain("A quoted span this long reproduces source copy");
+  });
+
+  it("keeps a candidate that quotes a named vessel in an otherwise factual sentence", () => {
+    const text = "The bulk carrier MV Pacific Star resumed cargo handling in Yokohama.";
+    // The real extraction path always supplies the source headline, and the
+    // quoted name occurs inside it: that is naming, not reproduced copy.
+    const sourcePacket = {
+      ...packet(text),
+      sources: [{
+        id: "1",
+        text,
+        headline: "MV Pacific Star resumes cargo handling at Yokohama",
+        reportedAt: "2026-09-17",
+      }],
+    };
+    const result = validateRegionalExtraction({
+      candidates: [candidate({
+        facts: [{
+          statement: "The bulk carrier \"MV Pacific Star\" resumed cargo handling in Yokohama.",
+          sourceId: "1",
+          quote: "The bulk carrier MV Pacific Star resumed cargo handling in Yokohama.",
+        }],
+      })],
+    }, [sourcePacket], "apac_weekly");
+    expect(result.rejected).toEqual([]);
+    expect(result.events).toHaveLength(1);
+  });
+
+  it("states the verification arithmetic when too few candidates survive", () => {
+    const packets = [1, 2, 3, 4, 5, 6].map((index) => ({ ...packet(), candidateId: `event-${index}` }));
+    const message = describeRegionalVerificationShortfall(packets, {
+      events: [groundedEvent("japan:one"), groundedEvent("japan:two"), groundedEvent("japan:three")],
+      rejected: [
+        { candidateId: "event-4", kind: "excluded", reason: "The event jurisdiction is outside this region." },
+        { candidateId: "event-5", kind: "unverified", reason: "Fact verification failed: A numerical claim is not supported by its quotation." },
+        { candidateId: "event-6", kind: "unverified", reason: "The factual summary is too long." },
+      ],
+    }, 5);
+    expect(message).toContain("Only 3 of 6 regional candidates passed fact verification; 5 are required.");
+    expect(message).toContain("1 candidate was excluded as outside the region");
+    expect(message).toContain("2 candidates were dropped after the correction pass:");
+    expect(message).toContain("A numerical claim is not supported by its quotation.");
+    expect(message).toContain("The factual summary is too long.");
+    expect(message).toContain("No report was generated.");
+  });
+
+  it("drops a candidate the correction pass could not fix instead of failing the run", async () => {
+    const packets = [1, 2].map((index) => ({ ...packet(), candidateId: `event-${index}` }));
+    const broken = candidate({
+      candidateId: "event-2",
+      facts: [{
+        statement: "The terminal suspended cargo handling, one report said.",
+        sourceId: "1",
+        quote: "The terminal in Yokohama suspended cargo handling.",
+      }],
+    });
+    const extraction = {
+      candidates: [candidate({ candidateId: "event-1" }), broken],
+    };
+    mockedRegionalJson.mockResolvedValueOnce({ candidates: [broken] });
+
+    const result = await verifyAndRepairRegionalExtraction(extraction, packets, "apac_weekly", "2026-09-18");
+    expect(mockedRegionalJson).toHaveBeenCalledTimes(1);
+    expect(result.events.map((event) => event.candidateId)).toEqual(["event-1"]);
+    expect(result.rejected).toEqual([{
+      candidateId: "event-2",
+      kind: "unverified",
+      reason: expect.stringContaining("do not wrap or quote a headline in report-attribution text"),
+      evidence: {
+        statement: "The terminal suspended cargo handling, one report said.",
+        quote: "The terminal in Yokohama suspended cargo handling.",
+      },
+    }]);
   });
 
   it("rates LPG supply stress Moderate without confirmed material consequences", () => {
@@ -280,7 +392,7 @@ describe("regional report structured-facts pipeline", () => {
         },
       ],
     };
-    expect(() => validateRegionalExtraction({
+    const result = validateRegionalExtraction({
       candidates: [candidate({
         eventCountry: "Saudi Arabia",
         location: "Saudi Arabia",
@@ -300,9 +412,13 @@ describe("regional report structured-facts pipeline", () => {
         ],
         uncertainties: ["Sources differ on whether two stations or three pumping stations were damaged."],
       })],
-    }, [conflictingPacket], "middle_east_weekly")).toThrow(
-      "Conflicting quantities for event-1 must be reconciled to a supported common fact or explicitly attributed.",
-    );
+    }, [conflictingPacket], "middle_east_weekly");
+    expect(result.events).toEqual([]);
+    expect(result.rejected).toEqual([{
+      candidateId: "event-1",
+      kind: "unverified",
+      reason: "Conflicting quantities must be reconciled to a supported common fact or explicitly attributed.",
+    }]);
   });
 
   it("does not escalate forecast, uncertain, negated, or unconfirmed impacts", () => {

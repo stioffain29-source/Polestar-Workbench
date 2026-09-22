@@ -18,11 +18,17 @@ import {
   type RegionalWeeklyTopic,
 } from "../../../workbench/src/lib/regionalWeekly";
 import { finishRegionalEditorialReport } from "./regionalReportEditorial";
-import { extractRegionalReportFacts, prepareRegionalFactPackets, selectGroundedRegionalEvents } from "./regionalReportFacts";
+import {
+  describeRegionalVerificationShortfall,
+  extractRegionalReportFacts,
+  prepareRegionalFactPackets,
+  selectGroundedRegionalEvents,
+} from "./regionalReportFacts";
 import { extractRegionalForwardEvents } from "./regionalReportForward";
 import { refreshRegionalEditorialOutlook, savedRegionalEditorial } from "./regionalReportRefresh";
 import { regionalSourcesToIncidents } from "./regionalReportCollection";
 import { regionalEnergyConcentrated } from "../../../workbench/src/lib/regionalContentPolicy";
+import { REGIONAL_MINIMUM_DEVELOPMENTS } from "../../../workbench/src/lib/regionalEditorial";
 
 export type RegionalReportTopic = "apac_weekly" | "middle_east_weekly";
 export type RegionalReportBuildStage = "collecting" | "building" | "saving";
@@ -193,6 +199,11 @@ export async function buildRegionalReport(
       packets = nextPackets;
       extracted = await extractRegionalReportFacts(packets, topic, issueDate);
     }
+  }
+  // A candidate that fails verification is dropped, so the run only fails when
+  // too little survives — and then it says how much was lost and why.
+  if (extracted.events.length < REGIONAL_MINIMUM_DEVELOPMENTS) {
+    throw new Error(describeRegionalVerificationShortfall(packets, extracted, REGIONAL_MINIMUM_DEVELOPMENTS));
   }
   const result = await finishRegionalEditorialReport(
     packets, extracted, topic as RegionalWeeklyTopic, issueDate, futureEvents, coverageManifest);

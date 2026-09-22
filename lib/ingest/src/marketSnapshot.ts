@@ -195,9 +195,15 @@ function round(n: number, decimals: number): number {
  * across the three fertiliser specs).
  */
 export async function runMarketSnapshotIngest(
-  opts: { commit?: boolean } = {},
+  opts: { commit?: boolean; groups?: string[] } = {},
 ): Promise<MarketSnapshotSummary> {
   const commit = opts.commit ?? false;
+  // A caller can refresh a SUBSET of the board — the cheap daily fuel/energy
+  // CSVs without the monthly World Bank workbook — so a frequent tick can keep
+  // the live snapshot current without paying for the slow monthly fetch.
+  const specs = opts.groups?.length
+    ? SPECS.filter((spec) => opts.groups?.includes(spec.group))
+    : SPECS;
   const cosd = startDate();
   const anchor = new Date().toISOString().slice(0, 10);
   const logLines: string[] = [];
@@ -216,7 +222,7 @@ export async function runMarketSnapshotIngest(
   // World Bank Pink Sheet is one workbook covering all fertilisers — fetch once.
   let worldBank: Record<string, Series> | null = null;
   let worldBankErr: string | null = null;
-  if (SPECS.some((s) => s.fetch.kind === "worldbank")) {
+  if (specs.some((s) => s.fetch.kind === "worldbank")) {
     try {
       worldBank = await fetchWorldBankFertiliser(cosd, log);
       log(`  World Bank Pink Sheet fetched (${Object.keys(worldBank).join(", ")})`);
@@ -231,7 +237,7 @@ export async function runMarketSnapshotIngest(
     existingRows.map((row) => [`${row.group}:${row.key}`, row]),
   );
   let upserted = 0;
-  for (const spec of SPECS) {
+  for (const spec of specs) {
     try {
       let series: Series;
       if (spec.fetch.kind === "crude") {
@@ -349,7 +355,7 @@ export async function runMarketSnapshotIngest(
     }
   }
 
-  log(`market snapshot done: upserted=${upserted}/${SPECS.length} errors=${errors.length}`);
+  log(`market snapshot done: upserted=${upserted}/${specs.length} errors=${errors.length}`);
 
   // Live Source Health telemetry for the price feeds (energy + fertiliser only;
   // fuel feed health is already recorded by the report price ingest). Never
@@ -368,7 +374,7 @@ export async function runMarketSnapshotIngest(
   return {
     mode: commit ? "commit" : "dry-run",
     upserted,
-    considered: SPECS.length,
+    considered: specs.length,
     errors,
     rows,
     logLines,

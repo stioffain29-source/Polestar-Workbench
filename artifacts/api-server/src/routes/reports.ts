@@ -22,6 +22,8 @@ import {
   type RegionalReportJobInput,
   type RegionalReportJob,
 } from "@workspace/api-zod";
+import { runMarketSnapshotIngest } from "@workspace/ingest";
+import { logger } from "../lib/logger";
 import {
   mergeReportProvenance,
   REPORT_PROSE_KEYS,
@@ -92,13 +94,49 @@ function normalizeHardNumbers(value: unknown): FuelHardNumbers | undefined {
   return JSON.parse(JSON.stringify(value)) as FuelHardNumbers;
 }
 
-async function fuelHardNumbersAsOf(
-  issueDate: string,
-): Promise<FuelHardNumbers | undefined> {
-  const rows = await db
+/**
+ * How long the live fuel snapshot may go UNREFRESHED before a new report
+ * refreshes it itself. This measures whether the price pipeline has run
+ * recently, not whether the market moved: the daily series legitimately hold
+ * the same close over a weekend, but a snapshot nothing has rewritten for
+ * hours means the refresh path died, and a report seeded from it would ship
+ * week-old crude and jet prices that read as current.
+ */
+const FUEL_SNAPSHOT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+function readFuelSnapshotRows() {
+  return db
     .select()
     .from(marketPricesTable)
     .where(eq(marketPricesTable.group, "fuel"));
+}
+
+async function fuelHardNumbersAsOf(
+  issueDate: string,
+): Promise<FuelHardNumbers | undefined> {
+  let rows = await readFuelSnapshotRows();
+  const refreshedAt = rows.reduce<number | null>((oldest, row) => {
+    const at = row.updatedAt ? new Date(row.updatedAt).getTime() : NaN;
+    if (!Number.isFinite(at)) return oldest;
+    return oldest === null || at < oldest ? at : oldest;
+  }, null);
+  if (
+    rows.length === 0 ||
+    refreshedAt === null ||
+    Date.now() - refreshedAt > FUEL_SNAPSHOT_MAX_AGE_MS
+  ) {
+    try {
+      await runMarketSnapshotIngest({ commit: true, groups: ["fuel"] });
+      rows = await readFuelSnapshotRows();
+    } catch (err) {
+      // Prices that cannot be refreshed stay as they are; the report is still
+      // created, and the stored asOf dates keep saying how old they are.
+      logger.warn(
+        { err },
+        "fuel price snapshot refresh before report creation failed",
+      );
+    }
+  }
   const selected = ["brent", "wti", "jet"].map((key) => {
     const row = rows.find((candidate) => candidate.key === key);
     if (!row) return null;

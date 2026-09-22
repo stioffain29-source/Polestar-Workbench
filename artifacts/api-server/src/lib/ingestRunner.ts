@@ -278,6 +278,7 @@ export type MarketPricesRunResult =
       finishedAt: Date;
       durationMs: number;
       marketPrices: MarketPriceSummary;
+      marketSnapshot: MarketSnapshotSummary;
     }
   | { ran: false; reason: "locked" };
 
@@ -1610,6 +1611,14 @@ export async function runReliefWebReportsOnce(): Promise<ReliefWebReportsRunResu
 }
 
 /**
+ * Snapshot groups whose series publish daily and cost one small CSV each, so
+ * they are safe to refresh on every price tick. The monthly World Bank
+ * fertiliser workbook is deliberately excluded — it only advances monthly and
+ * is far heavier to fetch, so the full ingest keeps ownership of it.
+ */
+const DAILY_SNAPSHOT_GROUPS = ["fuel", "energy"];
+
+/**
  * Run ONLY the fuel-market price ingest (FRED), committing to the database.
  * Used by the scheduler's boot top-up so a report missing prices gets re-priced
  * on a cold start WITHOUT re-running the expensive incident scrape. Shares the
@@ -1625,12 +1634,29 @@ export async function runMarketPricesOnce(): Promise<MarketPricesRunResult> {
       logger.error({ err }, "market price ingest failed");
       marketPrices = emptyMarketPrices(err);
     }
+    // The market_prices SNAPSHOT table drives the Fuel/Energy monitors and
+    // seeds a newly created Fuel Watch. It used to be written only at the TAIL
+    // of the long full ingest, so any run that ended early left the board and
+    // every new report on week-old prices while this cheap top-up kept
+    // reporting healthy fresh values. It is the same daily fetch set, so it
+    // refreshes here too; the monthly World Bank workbook stays on the full run.
+    let marketSnapshot: MarketSnapshotSummary;
+    try {
+      marketSnapshot = await runMarketSnapshotIngest({
+        commit: true,
+        groups: DAILY_SNAPSHOT_GROUPS,
+      });
+    } catch (err) {
+      logger.error({ err }, "market snapshot ingest failed");
+      marketSnapshot = emptyMarketSnapshot(err);
+    }
     const finishedAt = new Date();
     return {
       startedAt,
       finishedAt,
       durationMs: finishedAt.getTime() - startedAt.getTime(),
       marketPrices,
+      marketSnapshot,
     };
   });
   if (!res.ran) return res;

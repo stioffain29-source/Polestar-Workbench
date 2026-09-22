@@ -573,11 +573,15 @@ async function priceTick(reason: string): Promise<void> {
       logger.info({ reason }, "price top-up skipped (already running)");
       return;
     }
-    const failures = summarizeMarketPriceFailures(result.marketPrices);
+    const failures = summarizeMarketPriceFailures(
+      result.marketPrices,
+      result.marketSnapshot,
+    );
     const payload = {
       reason,
       fuelReportsPriced: result.marketPrices.reportsUpdated,
       fuelPriceAsOf: result.marketPrices.latest.asOf,
+      snapshotRowsRefreshed: result.marketSnapshot.upserted,
       durationMs: result.durationMs,
       ingestFailures: failures,
     };

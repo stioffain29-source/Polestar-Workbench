@@ -27,6 +27,10 @@ export interface RegionalEventFact {
   uncertainties: string[];
 }
 
+/** A regional weekly carries five to eight verified developments. Below the
+ * floor the run fails; it is never padded with unverified material. */
+export const REGIONAL_MINIMUM_DEVELOPMENTS = 5;
+
 export const REGIONAL_WORD_LIMITS = {
   regionalOutlook: 140,
   riskPicture: 180,
@@ -97,6 +101,23 @@ function casualtyClaims(value: string): string[] {
   return output;
 }
 
+/** A quoted span this long is reproduced source copy, not a named ship, storm,
+ * operation or official designation, which is what quotation marks are for here. */
+const QUOTED_SPAN_WORD_LIMIT = 6;
+const REPORT_ATTRIBUTION =
+  /\b(?:(?:a|one|another|the|the same)\s+)?report(?:s|ing)?\s+(?:said|says|stated|added|described)\b/i;
+
+/** The spans a fact sentence puts in quotation marks. An unclosed quotation
+ * counts to its end, because that is exactly how pasted headline debris arrives. */
+export function regionalQuotedSpans(statement: string): string[] {
+  return statement
+    .replace(/[“”„‟]/g, '"')
+    .split('"')
+    .filter((_, index) => index % 2 === 1)
+    .map((span) => span.replace(/^[\s,;:.!?-]+|[\s,;:.!?-]+$/g, "").trim())
+    .filter(Boolean);
+}
+
 /** Exact source spans + number/role checks prevent headline debris becoming a toll. */
 export function validateRegionalFactStatement(
   statement: string,
@@ -113,7 +134,24 @@ export function validateRegionalFactStatement(
     errors.push("A fact must be a short, complete sentence.");
   }
   if (containsRegionalSourceLeak(statement)) errors.push("Publisher or scrape text remains in a fact.");
-  if (/["“”]|\b(?:(?:a|one|another|the|the same)\s+)?report(?:s|ing)?\s+(?:said|says|stated|added|described)\b/i.test(statement)) {
+  // Quotation marks are allowed around a named thing, so each rule below reports
+  // the abuse it actually found; the correction pass is only as good as this text.
+  const spans = regionalQuotedSpans(statement);
+  if (spans.some((span) => regionalWordCount(span) >= QUOTED_SPAN_WORD_LIMIT)) {
+    errors.push("A quoted span this long reproduces source copy; state the event in your own words and quote only a named ship, storm, operation or designation.");
+  }
+  // Reproduction means the span IS the headline, or nearly all of it. A name
+  // that merely occurs inside the headline ("MV Pacific Star") is not copying.
+  const headline = sourceHeadline ? normalizedRegionalQuote(sourceHeadline) : "";
+  if (headline && spans.some((span) => {
+    const normalized = normalizedRegionalQuote(span);
+    if (normalized.length < 12) return false;
+    return normalized.includes(headline)
+      || (headline.includes(normalized) && normalized.length >= headline.length * 0.7);
+  })) {
+    errors.push("A quoted span repeats the source headline; state the event in your own words.");
+  }
+  if (REPORT_ATTRIBUTION.test(statement)) {
     errors.push("Write the event as a factual sentence; do not wrap or quote a headline in report-attribution text.");
   }
   if (sourceHeadline && normalizedRegionalQuote(statement) === normalizedRegionalQuote(sourceHeadline)) {
@@ -144,7 +182,7 @@ export function validateRegionalEditorialReport(report: RegionalCanonicalReport)
   if (keys.some((key) => !key) || new Set(keys).size !== keys.length) errors.push("Developments must represent distinct identified events.");
   // Five to eight for the Middle East since the factual editions; APAC stays at six.
   const maximum = report.editorialVersion !== "regional-facts-v2" && report.topic === "middle_east_weekly" ? 8 : 6;
-  if (report.developments.length < 5 || report.developments.length > maximum) errors.push(`The regional selection must contain five to ${maximum} material events.`);
+  if (report.developments.length < REGIONAL_MINIMUM_DEVELOPMENTS || report.developments.length > maximum) errors.push(`The regional selection must contain five to ${maximum} material events.`);
   const sourceIds = new Set<string>();
   for (const row of report.developments) {
     if (!row.confirmedFacts?.length || !row.evidenceIds?.length) errors.push(`Missing factual evidence for ${row.title}.`);

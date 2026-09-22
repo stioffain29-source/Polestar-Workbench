@@ -50,6 +50,25 @@ describe("regional structured editorial facts", () => {
     )).toContain("A factual sentence must not be a copied source headline.");
   });
 
+  it("accepts a quoted name but rejects quoted headline copy", () => {
+    const source = "The bulk carrier MV Pacific Star resumed cargo handling in Yokohama.";
+    expect(validateRegionalFactStatement(
+      "The bulk carrier \"MV Pacific Star\" resumed cargo handling in Yokohama.",
+      source,
+      source,
+      "MV Pacific Star resumes cargo handling at Yokohama",
+    )).toEqual([]);
+    expect(validateRegionalFactStatement(
+      "\"Yokohama terminal halts all cargo handling after fire\" was confirmed by the operator.",
+      source,
+      source,
+      "Yokohama terminal halts all cargo handling after fire",
+    )).toEqual([
+      "A quoted span this long reproduces source copy; state the event in your own words and quote only a named ship, storm, operation or designation.",
+      "A quoted span repeats the source headline; state the event in your own words.",
+    ]);
+  });
+
   it("preserves casualty numbers together with their roles", () => {
     const quote = "The blast killed 15 people and injured 56 others.";
     expect(validateRegionalFactStatement(

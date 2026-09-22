@@ -18,6 +18,7 @@ import {
 import { cleanRegionalSourceText } from "../../../workbench/src/lib/regionalSourceText";
 import { regionalJson } from "./regionalAi";
 import { reassessRegionalSeverity } from "./regionalReportSeverity";
+import { logger } from "./logger";
 
 type SourceRow = RegionalIncident & { sourceUrl?: string | null; sourceMembers?: SourceRow[] };
 export interface RegionalFactPacket {
@@ -126,84 +127,116 @@ List only material evidence limitations in uncertainties (e.g. service restorati
 businessMateriality 0-5: 5=major verified loss of life or critical national service disruption; 4=implemented broad business effect or specific operational outage; 3=material local operating interruption, confirmed deliberate armed/bomb attack, or substantial customer-data exposure; 2=limited/indirect effect; 1=minor; 0=exclude. This is a selection score, not a severity rating.
 For excluded candidates set decision="exclude", give a reason, leave facts empty and irrelevant string fields empty. Sources/outlets/URLs must NEVER appear in title or factual statements. Do not write analysis or recommendations in facts.`;
 
-export function validateRegionalExtraction(
-  extracted: RegionalExtraction,
-  packets: RegionalFactPacket[],
+/** Why a candidate is not in the report. "excluded" is the extraction's own
+ * scope decision; "unverified" means its facts did not survive checking, and
+ * the offending sentence is kept so the drop can be explained afterwards. */
+export type RegionalRejectedCandidate = {
+  candidateId: string;
+  reason: string;
+  kind: "excluded" | "unverified";
+  evidence?: { statement: string; quote: string };
+};
+
+export interface RegionalExtractionResult {
+  events: GroundedRegionalEvent[];
+  rejected: RegionalRejectedCandidate[];
+}
+
+type CandidateOutcome =
+  | { outcome: "event"; event: GroundedRegionalEvent }
+  | { outcome: "rejected"; rejection: RegionalRejectedCandidate };
+
+const rejectCandidate = (
+  candidateId: string,
+  kind: RegionalRejectedCandidate["kind"],
+  reason: string,
+  evidence?: RegionalRejectedCandidate["evidence"],
+): CandidateOutcome => ({
+  outcome: "rejected",
+  rejection: { candidateId, kind, reason, ...(evidence ? { evidence } : {}) },
+});
+
+/** Each candidate stands or falls on its own evidence: an unverifiable sentence
+ * costs that candidate, never the whole report, and nothing unchecked is kept. */
+function groundRegionalCandidate(
+  row: RegionalExtraction["candidates"][number],
+  packet: RegionalFactPacket,
   topic: RegionalWeeklyTopic,
-): { events: GroundedRegionalEvent[]; rejected: Array<{ candidateId: string; reason: string }> } {
-  const results = new Map(extracted.candidates.map((row) => [row.candidateId, row]));
-  if (results.size !== packets.length || extracted.candidates.length !== packets.length
-    || packets.some((packet) => !results.has(packet.candidateId))) {
-    throw new Error("The source extraction omitted or duplicated a candidate; no report was saved.");
+  allowedCountries: Set<string>,
+): CandidateOutcome {
+  if (row.decision === "exclude" || !row.eventCountry || !allowedCountries.has(row.eventCountry)) {
+    return rejectCandidate(packet.candidateId, "excluded",
+      row.excludeReason || "The event jurisdiction is outside this region.");
   }
-  const allowedCountries = new Set(regionalCountryQuery(topic).split(","));
-  const events: GroundedRegionalEvent[] = [];
-  const rejected: Array<{ candidateId: string; reason: string }> = [];
-  for (const packet of packets) {
-    const row = results.get(packet.candidateId)!;
-    if (row.decision === "exclude" || !row.eventCountry || !allowedCountries.has(row.eventCountry)) {
-      rejected.push({ candidateId: packet.candidateId, reason: row.excludeReason || "The event jurisdiction is outside this region." });
-      continue;
+  if (row.eventCountry !== packet.countryHint && !packet.sources.some((source) =>
+    normalizedRegionalQuote(source.text).includes(normalizedRegionalQuote(row.eventCountry)))) {
+    return rejectCandidate(packet.candidateId, "excluded",
+      "A changed country attribution is not established by the source text.");
+  }
+  if (!row.title || !row.eventIdentity || row.facts.length < 1 || row.facts.length > 3) {
+    return rejectCandidate(packet.candidateId, "unverified", "Incomplete structured facts.");
+  }
+  if (containsRegionalSourceLeak(row.title) || regionalWordCount(row.title) > 12) {
+    return rejectCandidate(packet.candidateId, "unverified", "The extracted title is not edited factual copy.");
+  }
+  if (packet.sources.some((source) =>
+    normalizedRegionalQuote(source.text.split("\n")[0]) === normalizedRegionalQuote(row.title))) {
+    return rejectCandidate(packet.candidateId, "unverified",
+      "A raw source headline was copied instead of an edited title.");
+  }
+  for (const fact of row.facts) {
+    const source = packet.sources.find((entry) => entry.id === fact.sourceId);
+    if (!source) {
+      return rejectCandidate(packet.candidateId, "unverified", "An extracted fact cited an unknown source.",
+        { statement: fact.statement, quote: fact.quote });
     }
-    if (row.eventCountry !== packet.countryHint && !packet.sources.some((source) =>
-      normalizedRegionalQuote(source.text).includes(normalizedRegionalQuote(row.eventCountry!)))) {
-      rejected.push({ candidateId: packet.candidateId, reason: "A changed country attribution is not established by the source text." });
-      continue;
+    const errors = validateRegionalFactStatement(fact.statement, fact.quote, source.text, source.headline);
+    if (errors.length) {
+      return rejectCandidate(packet.candidateId, "unverified", `Fact verification failed: ${errors.join(" ")}`,
+        { statement: fact.statement, quote: fact.quote });
     }
-    if (!row.title || !row.eventIdentity || row.facts.length < 1 || row.facts.length > 3) {
-      throw new Error(`Incomplete structured facts for ${packet.candidateId}.`);
-    }
-    if (containsRegionalSourceLeak(row.title) || regionalWordCount(row.title) > 12) {
-      throw new Error(`The extracted title is not edited factual copy: ${packet.candidateId}.`);
-    }
-    if (packet.sources.some((source) =>
-      normalizedRegionalQuote(source.text.split("\n")[0]) === normalizedRegionalQuote(row.title))) {
-      throw new Error(`A raw source headline was copied instead of an edited title for ${packet.candidateId}.`);
-    }
-    for (const fact of row.facts) {
-      const source = packet.sources.find((source) => source.id === fact.sourceId);
-      if (!source) throw new Error(`An extracted fact cited an unknown source for ${packet.candidateId}.`);
-      const errors = validateRegionalFactStatement(fact.statement, fact.quote, source.text, source.headline);
-      if (errors.length) throw new Error(`Fact verification failed for ${packet.candidateId}: ${errors.join(" ")}`);
-    }
-    const quantityWords: Record<string, string> = {
-      one: "1", two: "2", three: "3", four: "4", five: "5", six: "6",
-      seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12",
-    };
-    const quantities = (text: string) =>
-      [...text.matchAll(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi)]
-        .map((match) => quantityWords[match[0].toLowerCase()] ?? match[0]);
-    const quantityConflictStatements = row.uncertainties.filter((uncertainty) =>
-      /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict)|\bconflicting (?:quantity|count|number|figure)s?\b/i.test(uncertainty));
-    const disputedQuantities = new Set(quantityConflictStatements.flatMap(quantities));
-    const flatFactQuantities = new Set(row.facts.flatMap((fact) => quantities(fact.statement))
-      .filter((quantity) => disputedQuantities.has(quantity)));
-    const explicitlyAttributed = row.facts.some((fact) =>
-      /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict|report(?:ed)?|give|gave)|\baccording to\b/i.test(fact.statement));
-    if (quantityConflictStatements.length && flatFactQuantities.size > 1 && !explicitlyAttributed) {
-      throw new Error(
-        `Conflicting quantities for ${packet.candidateId} must be reconciled to a supported common fact or explicitly attributed.`,
-      );
-    }
-    const confirmedFacts = row.facts.map((fact) => fact.statement.trim());
-    if (regionalWordCount(confirmedFacts.join(" ")) > 65) throw new Error(`Factual summary is too long for ${packet.candidateId}.`);
-    // An unsupported location cannot override country attribution or produce a false city map.
-    const location = row.location && packet.sources.some((source) =>
-      normalizedRegionalQuote(source.text).includes(normalizedRegionalQuote(row.location!)))
-      ? row.location : row.eventCountry;
-    const factIncident: RegionalIncident = {
-      country: row.eventCountry,
-      title: row.title,
-      summary: confirmedFacts.join(" "),
-      occurredAt: packet.eventDate,
-    };
-    const baselineSeverity = regionalWeeklySeverity(factIncident, topic);
-    const severityAssessment = reassessRegionalSeverity({
-      confirmedFacts,
-      severity: baselineSeverity,
-      category: regionalIntelligenceCategory(factIncident),
-    });
-    events.push({
+  }
+  const quantityWords: Record<string, string> = {
+    one: "1", two: "2", three: "3", four: "4", five: "5", six: "6",
+    seven: "7", eight: "8", nine: "9", ten: "10", eleven: "11", twelve: "12",
+  };
+  const quantities = (text: string) =>
+    [...text.matchAll(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi)]
+      .map((match) => quantityWords[match[0].toLowerCase()] ?? match[0]);
+  const quantityConflictStatements = row.uncertainties.filter((uncertainty) =>
+    /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict)|\bconflicting (?:quantity|count|number|figure)s?\b/i.test(uncertainty));
+  const disputedQuantities = new Set(quantityConflictStatements.flatMap(quantities));
+  const flatFactQuantities = new Set(row.facts.flatMap((fact) => quantities(fact.statement))
+    .filter((quantity) => disputedQuantities.has(quantity)));
+  const explicitlyAttributed = row.facts.some((fact) =>
+    /\b(?:sources?|reports?|accounts?)\s+(?:differ|disagree|conflict|report(?:ed)?|give|gave)|\baccording to\b/i.test(fact.statement));
+  if (quantityConflictStatements.length && flatFactQuantities.size > 1 && !explicitlyAttributed) {
+    return rejectCandidate(packet.candidateId, "unverified",
+      "Conflicting quantities must be reconciled to a supported common fact or explicitly attributed.");
+  }
+  const confirmedFacts = row.facts.map((fact) => fact.statement.trim());
+  if (regionalWordCount(confirmedFacts.join(" ")) > 65) {
+    return rejectCandidate(packet.candidateId, "unverified", "The factual summary is too long.");
+  }
+  // An unsupported location cannot override country attribution or produce a false city map.
+  const location = row.location && packet.sources.some((source) =>
+    normalizedRegionalQuote(source.text).includes(normalizedRegionalQuote(row.location)))
+    ? row.location : row.eventCountry;
+  const factIncident: RegionalIncident = {
+    country: row.eventCountry,
+    title: row.title,
+    summary: confirmedFacts.join(" "),
+    occurredAt: packet.eventDate,
+  };
+  const baselineSeverity = regionalWeeklySeverity(factIncident, topic);
+  const severityAssessment = reassessRegionalSeverity({
+    confirmedFacts,
+    severity: baselineSeverity,
+    category: regionalIntelligenceCategory(factIncident),
+  });
+  return {
+    outcome: "event",
+    event: {
       candidateId: packet.candidateId,
       eventKey: `${row.eventCountry.toLowerCase()}:${row.eventIdentity.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       country: row.eventCountry,
@@ -222,16 +255,64 @@ export function validateRegionalExtraction(
       sourceRows: packet.members,
       severityRationale: severityAssessment.rationale,
       severityEvidence: severityAssessment.evidence,
-    });
+    },
+  };
+}
+
+/** Every candidate is accounted for: it becomes an event or a recorded rejection. */
+export function validateRegionalExtraction(
+  extracted: RegionalExtraction,
+  packets: RegionalFactPacket[],
+  topic: RegionalWeeklyTopic,
+): RegionalExtractionResult {
+  const results = new Map(extracted.candidates.map((row) => [row.candidateId, row]));
+  const allowedCountries = new Set(regionalCountryQuery(topic).split(","));
+  const events: GroundedRegionalEvent[] = [];
+  const rejected: RegionalRejectedCandidate[] = [];
+  for (const packet of packets) {
+    const row = results.get(packet.candidateId);
+    if (!row) {
+      rejected.push({
+        candidateId: packet.candidateId,
+        kind: "unverified",
+        reason: "The extraction returned no decision for this candidate.",
+      });
+      continue;
+    }
+    const outcome = groundRegionalCandidate(row, packet, topic, allowedCountries);
+    if (outcome.outcome === "event") events.push(outcome.event);
+    else rejected.push(outcome.rejection);
   }
   return { events, rejected };
+}
+
+/** A report that cannot be filled fails on the verification arithmetic, not on
+ * one candidate's error string, so the creation screen says what was lost. */
+export function describeRegionalVerificationShortfall(
+  packets: RegionalFactPacket[],
+  extraction: RegionalExtractionResult,
+  minimum: number,
+): string {
+  const dropped = extraction.rejected.filter((rejection) => rejection.kind === "unverified");
+  const excluded = extraction.rejected.filter((rejection) => rejection.kind === "excluded");
+  const reasons = [...new Set(dropped.map((rejection) => rejection.reason.replace(/\s+/g, " ").trim()))];
+  return [
+    `Only ${extraction.events.length} of ${packets.length} regional candidates passed fact verification; ${minimum} are required.`,
+    excluded.length
+      ? `${excluded.length} ${excluded.length === 1 ? "candidate was" : "candidates were"} excluded as outside the region or unsupported by the source text.`
+      : "",
+    dropped.length
+      ? `${dropped.length} ${dropped.length === 1 ? "candidate was" : "candidates were"} dropped after the correction pass: ${reasons.slice(0, 4).join(" ")}`
+      : "",
+    "No report was generated.",
+  ].filter(Boolean).join(" ");
 }
 
 export async function extractRegionalReportFacts(
   packets: RegionalFactPacket[],
   topic: RegionalWeeklyTopic,
   issueDate: string,
-): Promise<ReturnType<typeof validateRegionalExtraction>> {
+): Promise<RegionalExtractionResult> {
   const input = {
     topic, issueDate,
     candidates: packets.map(({ members: _members, ...packet }) => packet),
@@ -245,26 +326,16 @@ export async function verifyAndRepairRegionalExtraction(
   packets: RegionalFactPacket[],
   topic: RegionalWeeklyTopic,
   issueDate: string,
-): Promise<ReturnType<typeof validateRegionalExtraction>> {
-  const ids = extracted.candidates.map((candidate) => candidate.candidateId);
-  if (ids.length !== packets.length || new Set(ids).size !== packets.length
-    || packets.some((packet) => !ids.includes(packet.candidateId))) {
-    throw new Error("The fact extraction omitted or duplicated candidates.");
-  }
-  const problems = packets.flatMap((packet) => {
-    const candidate = extracted.candidates.find((candidate) => candidate.candidateId === packet.candidateId)!;
-    try {
-      validateRegionalExtraction({ candidates: [candidate] }, [packet], topic);
-      return [];
-    } catch (error) {
-      return [{
-        candidateId: packet.candidateId,
-        problem: error instanceof Error ? error.message : "Invalid factual evidence.",
-        attempted: candidate,
-      }];
-    }
-  });
-  if (problems.length === 0) return validateRegionalExtraction(extracted, packets, topic);
+): Promise<RegionalExtractionResult> {
+  const firstPass = validateRegionalExtraction(extracted, packets, topic);
+  const problems = firstPass.rejected
+    .filter((rejection) => rejection.kind === "unverified")
+    .map((rejection) => ({
+      candidateId: rejection.candidateId,
+      problem: rejection.reason,
+      attempted: extracted.candidates.find((row) => row.candidateId === rejection.candidateId) ?? null,
+    }));
+  if (problems.length === 0) return firstPass;
   // One bounded correction pass over ONLY invalid candidates. Never silently
   // downgrade a failed quote/number check or fall back to an article headline.
   const repaired = await regionalJson(
@@ -278,23 +349,29 @@ export async function verifyAndRepairRegionalExtraction(
       previousAttempt: problems,
     },
   );
-  if (repaired.candidates.length !== problems.length
-    || new Set(repaired.candidates.map((candidate) => candidate.candidateId)).size !== problems.length
-    || repaired.candidates.some((candidate) => !problems.some((problem) => problem.candidateId === candidate.candidateId))) {
-    throw new Error("The fact correction did not return the exact failed candidate set.");
-  }
+  // A correction answering the wrong candidates is ignored rather than fatal:
+  // whatever is still unverified below is dropped with its reason recorded.
+  const corrections = new Map(repaired.candidates
+    .filter((candidate) => problems.some((problem) => problem.candidateId === candidate.candidateId))
+    .map((candidate) => [candidate.candidateId, candidate]));
   const corrected = {
-    candidates: extracted.candidates.map((candidate) =>
-      repaired.candidates.find((repair) => repair.candidateId === candidate.candidateId) ?? candidate),
+    candidates: [
+      ...extracted.candidates.map((candidate) => corrections.get(candidate.candidateId) ?? candidate),
+      ...[...corrections.values()].filter((candidate) =>
+        !extracted.candidates.some((row) => row.candidateId === candidate.candidateId)),
+    ],
   };
-  try {
-    return validateRegionalExtraction(corrected, packets, topic);
-  } catch (error) {
-    throw new Error(
-      error instanceof Error ? error.message : "The corrected facts failed verification.",
-      { cause: { problems, corrected } },
-    );
+  const verified = validateRegionalExtraction(corrected, packets, topic);
+  for (const rejection of verified.rejected) {
+    if (rejection.kind !== "unverified") continue;
+    logger.warn({
+      candidateId: rejection.candidateId,
+      reason: rejection.reason,
+      statement: rejection.evidence?.statement,
+      quote: rejection.evidence?.quote,
+    }, "regional fact verification dropped a candidate");
   }
+  return verified;
 }
 
 /** Diversity is subordinate to demonstrated materiality; no invented domain fillers. */
