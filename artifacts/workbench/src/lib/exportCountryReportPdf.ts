@@ -791,7 +791,7 @@ function drawStructuredItemCard(
 
   setRoboto(pdf, "bold");
   pdf.setFontSize(11);
-  const titleText = item.developmentTitle ?? item.title;
+  const titleText = item.developmentTitle ?? item.shortTitle ?? item.title;
   const titleLines: string[] = pdf.splitTextToSize(
     sanitize(titleText),
     innerW - chipW - 10,
@@ -814,11 +814,32 @@ function drawStructuredItemCard(
   const bodyLines: string[] = compact
     ? []
     : pdf.splitTextToSize(sanitize(item.businessImpact), innerW);
+  // The engine's assessed sentence and 7-day indicator, drawn exactly as the
+  // on-screen card draws them (same labels, same order, same omission rules).
+  const polestarLines: string[] =
+    !compact && item.polestarLine
+      ? pdf.splitTextToSize(sanitize(`Polestar View: ${item.polestarLine}`), innerW)
+      : [];
+  const indicatorLines: string[] =
+    !compact && item.sevenDayIndicator
+      ? pdf.splitTextToSize(
+          sanitize(`Next seven days: ${item.sevenDayIndicator}`),
+          innerW,
+        )
+      : [];
 
   const titleBlockH = Math.max(titleLines.length * 14, 18);
   const cardH = compact
     ? padY + titleBlockH + 6 + metaLines.length * 11 + padY
-    : padY + titleBlockH + 6 + metaLines.length * 11 + 6 + bodyLines.length * 12 + padY;
+    : padY +
+      titleBlockH +
+      6 +
+      metaLines.length * 11 +
+      6 +
+      bodyLines.length * 12 +
+      (polestarLines.length > 0 ? 6 + polestarLines.length * 12 : 0) +
+      (indicatorLines.length > 0 ? 4 + indicatorLines.length * 12 : 0) +
+      padY;
 
   if (ctx.y + cardH > ctx.H - ctx.BOTTOM) newPage(ctx);
   const top = ctx.y;
@@ -863,6 +884,17 @@ function drawStructuredItemCard(
     pdf.setFontSize(9);
     setText(pdf, DUSK);
     pdf.text(bodyLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+    if (polestarLines.length > 0) {
+      yy += bodyLines.length * 12 + 6;
+      pdf.text(polestarLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+      if (indicatorLines.length > 0) {
+        yy += polestarLines.length * 12 + 4;
+        pdf.text(indicatorLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+      }
+    } else if (indicatorLines.length > 0) {
+      yy += bodyLines.length * 12 + 4;
+      pdf.text(indicatorLines, MX + padX, yy + 8, { lineHeightFactor: 1.35 });
+    }
   }
 
   ctx.y = top + cardH + 10;
@@ -894,7 +926,7 @@ function renderJakartaWeeklyBrief(
   // — a headline section with nothing in it reads as a contradiction.
   const topThree = d.topThree;
   if (topThree.length > 0) {
-    drawSectionHeading(ctx, "Top Developments");
+    drawSectionHeading(ctx, "Key Developments");
     for (const item of topThree) drawStructuredItemCard(ctx, item, true, true);
   }
 
@@ -952,7 +984,7 @@ function renderStructuredBrief(
   // No developments → omit the section entirely (matches the on-screen body).
   const topThree = d.topThree;
   if (topThree.length > 0) {
-    drawSectionHeading(ctx, "Top Developments");
+    drawSectionHeading(ctx, "Key Developments");
     for (const it of topThree) drawStructuredItemCard(ctx, it, true);
     ctx.y += 4;
   }
@@ -969,12 +1001,6 @@ function renderStructuredBrief(
     d.recommendedActions,
     d.briefProseOverrides?.actionGroups,
   );
-  // Operating-risk flat list — editable under the reserved "business-impact"
-  // key, mirroring PngCountryReportBody exactly.
-  const businessImpact = overrideActionGroups(
-    [{ key: "business-impact", actions: d.businessImpact }],
-    d.briefProseOverrides?.actionGroups,
-  )[0].actions;
   if (
     d.executiveSummary.trim() !== "" ||
     incidentThemes.length > 0 ||
@@ -999,6 +1025,12 @@ function renderStructuredBrief(
     }
   }
 
+  // Business Implications — what the period means commercially. Same gate as
+  // the on-screen body: omitted when the engine produced nothing.
+  if ((d.businessImplications ?? "").trim() !== "") {
+    drawSectionWithProse(ctx, "Business Implications", d.businessImplications);
+  }
+
   // Actions & Outlook — merged block (owner ruling, 11 Aug 2026): Operational
   // Impact, Recommended Actions and the Outlook render as strands under ONE
   // section heading. Inclusion gates mirror PngCountryReportBody EXACTLY: each
@@ -1007,11 +1039,14 @@ function renderStructuredBrief(
   const operationalImpact =
     d.operationalImpactOverride ??
     buildOperationalImpactBullets(d.windowItems).slice(0, 5);
-  const hasActions =
-    d.proseVariant === "operating-risk"
-      ? d.businessImpact.length > 0
-      : recommendedActions.length > 0;
-  if (operationalImpact.length > 0 || hasActions || d.outlook.trim() !== "") {
+  const hasActions = recommendedActions.length > 0;
+  const sevenDayWatch = d.sevenDayWatch ?? [];
+  if (
+    operationalImpact.length > 0 ||
+    hasActions ||
+    d.outlook.trim() !== "" ||
+    sevenDayWatch.length > 0
+  ) {
     drawSectionHeading(ctx, "Actions & Outlook");
     if (operationalImpact.length > 0) {
       drawJakartaStrandLabel(ctx, "Operational Impact");
@@ -1019,13 +1054,9 @@ function renderStructuredBrief(
     }
     if (hasActions) {
       drawJakartaStrandLabel(ctx, "Recommended Actions");
-      if (d.proseVariant === "operating-risk") {
-        drawJakartaBulletList(ctx, businessImpact);
-      } else {
-        for (const group of recommendedActions) {
-          drawJakartaStrandLabel(ctx, group.heading);
-          drawJakartaBulletList(ctx, group.actions);
-        }
+      for (const group of recommendedActions) {
+        drawJakartaStrandLabel(ctx, group.heading);
+        drawJakartaBulletList(ctx, group.actions);
       }
     }
     if (d.outlook.trim() !== "") {
@@ -1044,6 +1075,21 @@ function renderStructuredBrief(
           "Forward-looking signals drawn from reporting that announces scheduled or planned activity. Dates shown are announcement dates, not confirmed event dates.",
         );
       }
+    }
+    if (sevenDayWatch.length > 0) {
+      drawJakartaStrandLabel(ctx, "7 Day Watch");
+      drawJakartaGridTable(
+        ctx,
+        ["Date", "Location", "Event", "Why it matters", "Watch"],
+        [0.14, 0.16, 0.24, 0.26, 0.2],
+        sevenDayWatch.map((row) => [
+          row.date,
+          row.location,
+          row.event,
+          row.whyItMatters,
+          row.watch,
+        ]),
+      );
     }
   }
 

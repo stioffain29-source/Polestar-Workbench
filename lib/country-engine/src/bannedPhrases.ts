@@ -26,6 +26,18 @@ export const BANNED_PHRASES: string[] = [
   "Exposed sites",
   "Current pattern",
   "Wider operating environment",
+  // Content-and-analysis upgrade — machine / database language. The report is
+  // written for a reader, so nothing may describe the collection pipeline, the
+  // feed, or the record set that produced it.
+  "validated development",
+  "validated event",
+  "source packet",
+  "supplied facts",
+  "reporting volume",
+  "event count",
+  "feed volume",
+  "the development is relevant to",
+  "the significance depends on whether",
 ];
 
 // §15 — banned Bottom Line Up Front openers. The BLUF must not begin with a

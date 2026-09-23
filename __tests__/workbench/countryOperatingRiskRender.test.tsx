@@ -110,13 +110,19 @@ function textOf(html: string): string {
 // (The Disclaimer + analytics block are appended by the page, not this body.)
 const SECTION_ORDER = [
   "Bottom Line Up Front",
-  "Top Developments",
+  "Key Developments",
   "Current Situation",
+  "Business Implications",
   "Operational Impact",
   "Recommended Actions",
   "Outlook: Next Seven Days",
   "Polestar View",
 ];
+
+// Section and strand headings are matched as whole elements: the development
+// cards carry their own "Polestar View" line, so a bare substring search would
+// find the card rather than the section.
+const heading = (title: string) => `>${title.replace("&", "&amp;")}<`;
 
 describe("PngCountryReportBody — country brief render", () => {
   const html = renderToStaticMarkup(
@@ -126,7 +132,7 @@ describe("PngCountryReportBody — country brief render", () => {
   it("renders the brief sections in the fixed order", () => {
     const positions = SECTION_ORDER.map((title) => ({
       title,
-      at: html.indexOf(title),
+      at: html.indexOf(heading(title)),
     }));
     for (const p of positions) {
       expect(p.at).toBeGreaterThanOrEqual(0); // every section present
@@ -146,15 +152,15 @@ describe("PngCountryReportBody — country brief render", () => {
         hiddenSections={["polestar-view", "outlook"]}
       />,
     );
-    expect(hiddenHtml).not.toContain("Polestar View");
-    expect(hiddenHtml).not.toContain("Outlook: Next Seven Days");
-    expect(hiddenHtml).toContain("Bottom Line Up Front");
-    expect(hiddenHtml).toContain("Top Developments");
-    expect(hiddenHtml).toContain("Current Situation");
+    expect(hiddenHtml).not.toContain(heading("Polestar View"));
+    expect(hiddenHtml).not.toContain(heading("Outlook: Next Seven Days"));
+    expect(hiddenHtml).toContain(heading("Bottom Line Up Front"));
+    expect(hiddenHtml).toContain(heading("Key Developments"));
+    expect(hiddenHtml).toContain(heading("Current Situation"));
     // The unhidden default render still carries them, proving the gate is what
     // removed them (not a build/data issue).
-    expect(html).toContain("Polestar View");
-    expect(html).toContain("Outlook: Next Seven Days");
+    expect(html).toContain(heading("Polestar View"));
+    expect(html).toContain(heading("Outlook: Next Seven Days"));
   });
 
   it("renders only the present incident themes inside Current Situation, in fixed order", () => {
@@ -196,7 +202,7 @@ describe("PngCountryReportBody — country brief render", () => {
   });
 
   it("renders Top 3 Developments tile cards carrying the window's localities", () => {
-    expect(html).toContain("Top Developments");
+    expect(html).toContain(heading("Key Developments"));
     const text = textOf(html);
     expect(
       ["Manila", "Cebu", "Davao", "Quezon City"].some((l) => text.includes(l)),
@@ -244,7 +250,7 @@ describe("PngCountryReportBody — analyst map/photo placement anchors", () => {
       html.indexOf(MAP_MARKER),
     );
     expect(html.indexOf(MAP_MARKER)).toBeLessThan(
-      html.indexOf("Top Developments"),
+      html.indexOf(heading("Key Developments")),
     );
     // inside-incident-details: the photo sits within the Current Situation section.
     expect(html.indexOf("Current Situation")).toBeLessThan(
@@ -384,7 +390,7 @@ describe("PngCountryReportBody — Disclaimer is page-appended, not in the body"
     const last = SECTION_ORDER[SECTION_ORDER.length - 1];
     expect(last).toBe("Polestar View");
     for (const title of SECTION_ORDER.slice(0, -1)) {
-      expect(html.indexOf(title)).toBeLessThan(html.indexOf(last));
+      expect(html.indexOf(heading(title))).toBeLessThan(html.indexOf(heading(last)));
     }
   });
 

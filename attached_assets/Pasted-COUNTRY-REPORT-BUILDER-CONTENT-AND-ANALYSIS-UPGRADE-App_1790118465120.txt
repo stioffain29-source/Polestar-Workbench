@@ -1,0 +1,634 @@
+COUNTRY REPORT BUILDER — CONTENT AND ANALYSIS UPGRADE
+
+Apply this to ALL Polestar Country Reports.
+
+This is a GENERIC BUILDER change.
+
+DO NOT hard-code:
+
+countries
+cities
+provinces
+industries
+specific incidents
+specific threats
+specific companies
+
+The selected country and reporting period must determine the content dynamically.
+
+DO NOT modify the map in this task.
+
+Map treatment will be handled separately.
+
+
+==================================================
+1. PURPOSE
+==================================================
+
+Country Reports are weekly COUNTRY INTELLIGENCE PRODUCTS.
+
+They are NOT:
+
+security incident summaries
+crime reports
+news digests
+feed summaries
+lists of whatever stories were collected
+
+The report must answer:
+
+WHAT CHANGED THIS WEEK?
+
+WHAT MATTERS TO A BUSINESS OPERATING IN THIS COUNTRY?
+
+WHERE IS THE EXPOSURE?
+
+WHAT SHOULD THE CLIENT WATCH NEXT?
+
+
+==================================================
+2. COLLECTION
+==================================================
+
+Before writing, deliberately check all of these areas:
+
+SECURITY
+
+violent crime
+terrorism
+armed conflict
+civil unrest
+communal violence
+kidnap
+serious organised crime
+site attacks
+security restrictions
+police or military activity where operationally relevant
+
+
+POLITICAL
+
+government stability
+elections
+protests
+political disputes
+major policy decisions
+public mobilisation
+politically driven disruption
+
+
+REGULATORY
+
+immigration
+visas
+labour
+taxation
+customs
+trade
+licensing
+foreign investment
+market access
+business compliance
+sector regulation
+
+
+WEATHER AND NATURAL HAZARDS
+
+flooding
+storms
+cyclones
+typhoons
+earthquakes
+landslides
+volcanic activity
+tsunami warnings
+drought
+extreme heat
+other material natural hazards
+
+
+CYBER AND DIGITAL INFRASTRUCTURE
+
+major cyber incidents
+ransomware
+government systems
+telecommunications
+banking
+internet outages
+critical infrastructure
+significant data breaches
+digital service disruption
+
+
+BUSINESS AND OPERATIONAL
+
+airports
+ports
+roads
+rail
+borders
+fuel
+power
+telecommunications
+supply chains
+industrial action
+site access
+logistics
+major infrastructure
+business continuity
+
+
+ALL categories must be checked.
+
+They do NOT all have to appear in the final report.
+
+Do not create filler.
+
+Only include developments that are materially relevant.
+
+
+==================================================
+3. COLLECTION MUST BE COUNTRY SPECIFIC
+==================================================
+
+The builder must use the selected country to determine:
+
+relevant cities
+regions
+transport corridors
+ports
+airports
+industrial areas
+commercial centres
+border areas
+major operating environments
+
+Do not use generic geography copied from another country report.
+
+Do not hard-code one country's locations into the builder.
+
+
+==================================================
+4. BOTTOM LINE UP FRONT
+==================================================
+
+Keep:
+
+BOTTOM LINE UP FRONT
+
+Target:
+
+100 to 130 words.
+
+This is the executive summary.
+
+It should identify:
+
+the most important change this week
+one or two secondary issues where material
+the principal business consequence
+whether conditions are worsening, improving or broadly stable
+
+Do NOT mention:
+
+validated event counts
+source counts
+reporting volume
+feed volume
+database records
+
+Do NOT write:
+
+“The most serious validated development…”
+
+“Reporting volume remained…”
+
+“1 validated event against 1…”
+
+The client wants the judgement, not the mechanics behind it.
+
+
+==================================================
+5. CURRENT SITUATION
+==================================================
+
+Target:
+
+250 to 400 words.
+
+This should provide the COUNTRY OPERATING PICTURE.
+
+Use analytical prose.
+
+Do not structure it as:
+
+Country:
+Incident:
+Country:
+Incident:
+
+Explain how the week's developments affect:
+
+people
+travel
+operations
+assets
+logistics
+supply chains
+workforce
+compliance
+continuity
+
+where relevant.
+
+Connect developments where there is a genuine relationship.
+
+Do not manufacture connections simply to fill space.
+
+
+==================================================
+6. KEY DEVELOPMENTS
+==================================================
+
+Where sufficient material exists, include:
+
+KEY DEVELOPMENTS
+
+Target:
+
+3 to 6 developments.
+
+Do NOT force six.
+
+A quiet country may have fewer.
+
+Each development must contain:
+
+LOCATION
+
+DATE
+
+SHORT TITLE
+
+CATEGORY
+
+CURRENT SEVERITY
+
+ASSESSMENT
+
+What happened and what is the current operational consequence?
+
+POLESTAR VIEW
+
+Why does this matter to business?
+
+7 DAY INDICATOR
+
+What specific change should be watched next?
+
+Do not use identical text across different developments.
+
+
+==================================================
+7. SEVERITY
+==================================================
+
+Use only:
+
+INSIGNIFICANT
+LOW
+MODERATE
+HIGH
+EXTREME
+
+Severity means CURRENT CONSEQUENCE.
+
+It does NOT mean:
+
+headline importance
+number of sources
+political importance
+media attention
+dramatic language
+
+LOW
+
+Limited local impact.
+
+MODERATE
+
+Credible disruption or threat requiring operational adjustment.
+
+HIGH
+
+Significant violence, disruption or restriction with material effects on people, assets, operations, travel or continuity.
+
+EXTREME
+
+Major or widespread impact, mass casualties, severe infrastructure loss or sustained large scale disruption.
+
+Geographically local events may still be HIGH.
+
+National policy changes may remain LOW or MODERATE where operational consequences are limited.
+
+
+==================================================
+8. BUSINESS IMPLICATIONS
+==================================================
+
+Create a proper:
+
+BUSINESS IMPLICATIONS
+
+section.
+
+Target:
+
+150 to 250 words.
+
+This should synthesise what the week's intelligence means for businesses operating in the country.
+
+Consider only where relevant:
+
+People and Travel
+
+Operations and Assets
+
+Supply Chain and Logistics
+
+Regulatory and Market Access
+
+Energy and Utilities
+
+Workforce
+
+Business Continuity
+
+Do not simply repeat the Key Developments.
+
+
+==================================================
+9. RECOMMENDED ACTIONS
+==================================================
+
+Recommended Actions must respond to THIS WEEK'S intelligence.
+
+Do not automatically generate the same headings every week.
+
+Use action areas only where required, such as:
+
+MOVEMENT
+
+TRAVEL
+
+SITE SECURITY
+
+LOGISTICS
+
+SUPPLY CHAIN
+
+WORKFORCE
+
+REGULATORY
+
+CYBER
+
+BUSINESS CONTINUITY
+
+Actions must be specific.
+
+Do NOT generate generic boilerplate such as:
+
+“check emergency contacts”
+
+“brief staff”
+
+“monitor the situation”
+
+“confirm journey plans”
+
+unless the evidence creates a specific reason to do so.
+
+
+==================================================
+10. 7 DAY WATCH
+==================================================
+
+Run a separate forward search for the NEXT SEVEN DAYS.
+
+Search for:
+
+planned protests
+industrial action
+elections
+political deadlines
+court decisions
+regulatory changes
+public holidays where operationally significant
+major gatherings
+security operations
+transport closures
+weather systems
+flood warnings
+fuel or power disruption
+border changes
+other scheduled events with business relevance
+
+Target:
+
+up to 5 useful items.
+
+Each item:
+
+DATE
+LOCATION
+EVENT
+
+WHY IT MATTERS
+
+WATCH
+
+Do not fill this section with low value calendar events if better forward risks exist.
+
+
+==================================================
+11. ACTIONS AND OUTLOOK
+==================================================
+
+Keep the existing ACTIONS & OUTLOOK concept if required by the current design.
+
+However, separate the functions clearly:
+
+RECOMMENDED ACTIONS
+
+What should the client do now?
+
+OUTLOOK: NEXT SEVEN DAYS
+
+What is likely to matter next?
+
+Do not mix current actions and forward assessment into the same paragraph.
+
+
+==================================================
+12. POLESTAR VIEW
+==================================================
+
+Keep:
+
+POLESTAR VIEW
+
+Target:
+
+100 to 140 words.
+
+This is the final analytical judgement.
+
+It should explain:
+
+what matters most
+where the genuine operating exposure sits
+what should drive client decisions
+what does NOT justify overreaction
+what would materially change the assessment
+
+Do not simply summarise the report again.
+
+
+==================================================
+13. ANALYST LANGUAGE
+==================================================
+
+Remove machine and database language.
+
+DO NOT use:
+
+validated development
+validated event
+source packet
+supplied facts
+reporting volume
+event count
+feed volume
+the development is relevant to
+the significance depends on whether
+
+where ordinary analytical English works better.
+
+Use language such as:
+
+Current reporting indicates…
+
+The immediate business exposure is…
+
+There is currently no evidence of wider disruption.
+
+The impact remains localised.
+
+The main concern is…
+
+Conditions would worsen if…
+
+The immediate operational effect is…
+
+
+==================================================
+14. REPORT LENGTH AND PAGINATION
+==================================================
+
+Do not force every country report to the same length.
+
+Target approximately:
+
+3 to 5 body pages plus cover
+
+depending on the week's intelligence.
+
+Quiet country:
+
+shorter report.
+
+Busy country:
+
+longer report.
+
+Do not pad pages.
+
+Do not create empty pages.
+
+Avoid:
+
+orphan headings
+half empty pages
+one paragraph occupying an entire page
+overcrowded development cards
+
+Content determines pagination.
+
+
+==================================================
+15. QUALITY CONTROL
+==================================================
+
+Before generating any Country Report confirm:
+
+Security collection completed
+
+Political collection completed
+
+Regulatory collection completed
+
+Weather / natural hazard collection completed
+
+Cyber collection completed
+
+Business / operational collection completed
+
+7 Day Watch forward search completed
+
+Also confirm:
+
+dates verified
+no duplicate developments
+severity reflects actual consequence
+no raw headlines in prose
+no source names in prose
+no feed or database language
+BLUF is concise
+Current Situation is analytical
+Business Implications are specific
+Recommended Actions are evidence based
+Outlook is forward looking
+Polestar View contains genuine judgement
+
+
+==================================================
+16. MAP
+==================================================
+
+DO NOT MODIFY:
+
+map design
+map selection logic
+map layout
+map styling
+map pagination
+
+Map treatment will be handled separately.
+
+
+==================================================
+17. SCOPE
+==================================================
+
+Apply this to the COUNTRY REPORT BUILDER itself.
+
+The same logic must work dynamically for EVERY country report.
+
+Do not create country specific code paths unless the existing country configuration genuinely requires them.
+
+Do not copy assumptions from one country into another.
+
+Generate Country Reports from each country's actual evidence and operating environment.
+
+STOP after implementing the generic Country Report changes.

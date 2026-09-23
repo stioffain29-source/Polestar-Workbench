@@ -2014,7 +2014,7 @@ export default function CountryReport() {
                 <option value="none">Hidden</option>
                 <option value="before-bluf">After Cover / Before BLUF</option>
                 <option value="after-bluf">After Bottom Line</option>
-                <option value="after-top3">After Top Developments</option>
+                <option value="after-top3">After Key Developments</option>
                 <option value="after-incident-details">After Incident Details</option>
                 <option value="before-outlook">Before Outlook</option>
                 <option value="before-polestar">Before Polestar View</option>
@@ -2031,7 +2031,7 @@ export default function CountryReport() {
                 <option value="none">Hidden</option>
                 <option value="cover">On cover</option>
                 <option value="after-bluf">After Bottom Line</option>
-                <option value="after-top3">After Top Developments</option>
+                <option value="after-top3">After Key Developments</option>
                 <option value="inside-incident-details">Inside Incident Details</option>
                 <option value="before-polestar">Before Polestar View</option>
               </select>

@@ -164,6 +164,11 @@ const CATEGORY_RULES: Array<[IssueCategory, RegExp]> = [
   // keep their primary category.
   ["Fire and accident", /(?:\bfire (?:breaks? out|broke out|guts?|gutted|destroy\w*|engulf\w*|raz\w*|rips? through|ripped through|sweeps? through|swept through|kills?|killed|injur\w*|burns? down|burn(?:ed|t) (?:down|through))|\b(?:catch(?:es)?|caught) fire\b|\bburn(?:s|ed|t)? down\b|\bburned to the ground\b|\bgutted by (?:a )?(?:fire|blaze)\b|\b(?:house|home|residential|school|market|factory|plant|warehouse|shop|store|mall|building|hotel|apartment|kitchen|hospital|mosque|church|slum|depot|mill)s? (?:fire|blaze)\b|\bblaze (?:destroy\w*|guts?|gutted|engulf\w*|kills?|injur\w*|rips? through|ripped through)\b|\bmassive (?:fire|blaze)\b|(?<!open(?:s|ed)? )\bfire (?:at|in|hits?) (?:a|an|the)\b|\b(?:electrical|gas[- ]cylinder|lpg) (?:fire|explosion)\b|\bgas leak\b|\b(?:workplace|industrial|work) accident\b|\belectrocut\w*\b)/i],
   ["Utilities", /\b(power (?:cut|outage|failure)|blackout|electricity (?:cut|outage)|water (?:supply|shortage|cut)|load[- ]shedding|utility|grid failure|gas supply)\b/i],
+  // Cyber sits AHEAD of Telecommunications: a ransomware attack that takes a
+  // network down is a cyber incident, not a telecoms fault. Cues are
+  // deliberately concrete (an attack, breach or intrusion that happened),
+  // never cyber-security commentary or awareness material.
+  ["Cyber incident", /\b(ransomware|cyber[- ]?attack\w*|cyber[- ]?incident|data breach|breached (?:its|their|the) (?:systems?|servers?|network)|hack(?:ed|ing) (?:into|of)?\s*(?:systems?|servers?|accounts?|database|network|website)|hackers?|phishing campaign|malware|ddos|denial[- ]of[- ]service|leaked (?:customer|user|personal) data|systems? (?:taken )?offline after (?:an? )?(?:attack|intrusion|breach)|IT systems? (?:outage|disruption) after)\b/i],
   ["Telecommunications", /\b(internet (?:outage|shutdown|blackout)|network (?:outage|down)|telecom\w*|mobile network|connectivity (?:loss|outage)|fibre cut|undersea cable)\b/i],
   ["Natural hazard", /\b(earthquake|quake|tsunami|volcan\w*|eruption|flood\w*|landslide|cyclone|typhoon|storm|drought|wildfire|bushfire|tremor|mudslide|heavy rain)\b/i],
   ["Health", /\b(outbreak|epidemic|pandemic|disease|cholera|measles|dengue|malaria|polio|covid|virus|contamin\w*|poisoning|health (?:emergency|crisis))\b/i],

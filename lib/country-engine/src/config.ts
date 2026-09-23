@@ -307,7 +307,10 @@ const THAILAND_CONFIG: CountryEngineConfig = {
 // persisted review queues instead of waiting for an analyst-triggered re-run.
 // v2: legal_process + preparedness_or_awareness gate rules (retire ~1.9k held
 // rows for Indonesia alone).
-export const COUNTRY_ENGINE_RULE_VERSION = "v4";
+// v5: six-domain collection categories (cyber), Key Developments 3-6 with
+// assessment / view / indicator lines, Business Implications, 7 Day Watch,
+// evidence-led recommendations and the widened banned-language list.
+export const COUNTRY_ENGINE_RULE_VERSION = "v5";
 
 export const COUNTRY_ENGINE_CONFIGS: Record<string, CountryEngineConfig> = {
   "papua-new-guinea": PNG_CONFIG,

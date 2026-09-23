@@ -70,10 +70,15 @@ import {
 import { buildAssessedThemeGroups } from "./countryThemeSynthesis";
 import {
   buildCountryNarrative,
+  classifyArticle,
   type CanonicalEvent,
   type CountryNarrative,
   type EngineResult,
 } from "@workspace/country-engine";
+import type {
+  ForwardEventInput,
+  SevenDayWatchItem,
+} from "@workspace/country-engine/narrative";
 import { getCountryEngineConfig } from "@workspace/country-engine/config";
 import {
   runQualityGate,
@@ -754,6 +759,15 @@ export interface PngReportItem {
   // config.jakartaProse; unset for every other theatre, so ItemCard falls back
   // to `title` and PNG / West Papua / Indonesia rendering is unchanged.
   developmentTitle?: string;
+  // Key Developments (country-report spec): a reader-facing short title
+  // (≤10 words) produced by the engine. ItemCard prefers developmentTitle,
+  // then this, then the raw headline.
+  shortTitle?: string;
+  // The engine's "why this matters for a business decision" line and the one
+  // change worth watching over the next seven days. Rendered only on the Key
+  // Developments cards; unset elsewhere.
+  polestarLine?: string;
+  sevenDayIndicator?: string;
   // The incident's own reported summary text. Carried through so the AI
   // per-incident analyst summary can be grounded on title + summary, and used as
   // the fingerprint/grounding input for the prose engine.
@@ -895,6 +909,12 @@ export interface PngReportDataset {
   // adjustment for the week, and what would raise concern. Rendered as one
   // flowing paragraph composed from the seven structured parts below.
   polestarView: string;
+  // What the period means commercially (150-250 words). Empty on a sparse
+  // week, in which case the renderers omit the section.
+  businessImplications: string;
+  // Announced forward activity for the 7 Day Watch table. Empty when the
+  // period produced no forward-looking reporting.
+  sevenDayWatch: SevenDayWatchItem[];
   reportingConfidence: ReportingConfidence;
   windowItems: PngReportItem[];
   // Incidents to analyse in "Incident Details" — every windowItem NOT promoted
@@ -1813,6 +1833,35 @@ export function buildStructuredReportDataset(
   const priorEngineResult: EngineResult | null = hasPreviousWindow
     ? runCountryEngine(previousWindowItems, engineSlug)
     : null;
+  // 7 Day Watch — announced or scheduled activity taken from this period's
+  // reporting through the SAME shared authority the upcoming-signals block
+  // uses. Every theatre is searched; nothing is predicted, so a period with no
+  // forward-looking reporting yields no rows and the section is omitted.
+  const forwardEvents: ForwardEventInput[] = buildUpcomingSignalRows(
+    (args.thirtyDay ?? []).map((i) => ({
+      title: i.displayTitle ?? i.title,
+      summary: i.summary ?? null,
+      country: config.countryName,
+      occurredAt: i.occurredAt,
+      sourceUrl: (i.resolvedUrl ?? i.sourceUrl ?? null) || null,
+    })),
+  ).map((row) => ({
+    // The authority reports WHEN THE ANNOUNCEMENT WAS PUBLISHED, not when the
+    // announced activity falls. The activity date is therefore left unstated
+    // and the announcement date is passed separately, so the table can never
+    // present one as the other.
+    date: null,
+    announcedOn: row.announcedAt,
+    location: row.country === "—" ? null : row.country,
+    title: row.signal,
+    // Classify the announced activity from its own text with the shared engine
+    // classifier, so the "why it matters" and "watch" lines follow the subject
+    // rather than defaulting to a single generic domain.
+    category: classifyArticle({ title: row.signal }, getCountryEngineConfig(engineSlug))
+      .issueCategory,
+    sourceId: row.sourceUrl ?? null,
+  }));
+
   const engineNarrative: CountryNarrative = buildCountryNarrative(
     engineResult.included,
     {
@@ -1820,6 +1869,7 @@ export function buildStructuredReportDataset(
       priorPeriodEvents: priorEngineResult ? priorEngineResult.included : null,
       windowStart: args.windowStart ? args.windowStart.toISOString() : null,
       coverageUnconfirmed: args.coverageUnconfirmed ?? false,
+      forwardEvents,
     },
   );
   // Credible map points for INCLUDED events only (§23). Never Unknown /
@@ -2168,6 +2218,9 @@ export function buildStructuredReportDataset(
   // Legacy builder deleted — the engine narrative block below is the sole
   // author of the Polestar View prose.
   let polestarView = "";
+  // Set from the engine narrative below; empty means "omit the section".
+  let businessImplications = "";
+  let sevenDayWatch: SevenDayWatchItem[] = [];
   // Jakarta carries a separate consolidated tactical payload; the generic
   // section overrides remain available to the other structured theatres.
   let incidentThemesOverride: { key: string; heading: string; paragraph: string }[] | undefined;
@@ -2401,11 +2454,15 @@ export function buildStructuredReportDataset(
       operationalImpactOverride = [];
       recommendedActions = [];
       incidentThemesOverride = [];
+      businessImplications = "";
+      sevenDayWatch = [];
     } else {
       bluf = n.bluf;
       executiveSummary = n.currentSituation;
       outlook = n.outlook;
       polestarView = n.polestarView;
+      businessImplications = n.businessImplications;
+      sevenDayWatch = n.sevenDayWatch;
       // Top-3 SELECTION comes from the engine; reorder the already-built
       // PngReportItem cards to match (engine eventId === PngReportItem.id) so the
       // card render keeps working while the choice is the engine's. Any engine
@@ -2420,9 +2477,14 @@ export function buildStructuredReportDataset(
           // sentence is evidence-linked in the engine (confirmed effect,
           // assessed relevance, or a category-derived implication); when the
           // engine has nothing to say the card keeps its deterministic line.
-          return td.businessSentence
-            ? { ...card, businessImpact: td.businessSentence }
-            : card;
+          const merged: PngReportItem = {
+            ...card,
+            ...(td.businessSentence ? { businessImpact: td.businessSentence } : {}),
+            shortTitle: td.shortTitle,
+            polestarLine: td.polestarSentence ?? undefined,
+            sevenDayIndicator: td.sevenDayIndicator ?? undefined,
+          };
+          return merged;
         })
         .filter((it): it is PngReportItem => Boolean(it));
       // If the engine's representative ids do not line up with the card ids (a
@@ -2580,6 +2642,8 @@ export function buildStructuredReportDataset(
       : config.topIncidentsHeading,
     proseVariant: config.proseVariant,
     polestarView,
+    businessImplications,
+    sevenDayWatch,
     reportingConfidence,
     windowItems,
     incidentDetailsItems,

@@ -383,7 +383,10 @@ function mostSignificant(events: CanonicalEvent[]): CanonicalEvent | null {
  * referenced in the written analysis and the QC cross-check cannot diverge.
  * Excludes commentary/background/not-an-incident/cancelled (§14).
  */
-function topRankedEvents(events: CanonicalEvent[]): CanonicalEvent[] {
+function topRankedEvents(
+  events: CanonicalEvent[],
+  limit = 3,
+): CanonicalEvent[] {
   const eligible = events.filter(
     (e) =>
       e.eventStatus !== "Commentary" &&
@@ -404,7 +407,7 @@ function topRankedEvents(events: CanonicalEvent[]): CanonicalEvent[] {
   for (const e of ranked) {
     if (picked.some((p) => isSameStory(p, e))) continue;
     picked.push(e);
-    if (picked.length === 3) break;
+    if (picked.length === limit) break;
   }
   return picked;
 }
@@ -492,6 +495,8 @@ export const CATEGORY_IMPLICATIONS: Partial<Record<IssueCategory, string>> = {
   Utilities: "affects power or water reliability for sites in the served area",
   Telecommunications:
     "affects connectivity and communications for operations in the served area",
+  "Cyber incident":
+    "bears on the security of business systems and the data held in them",
   Infrastructure:
     "affects the reliability of fixed infrastructure that local operations depend on",
   "Fire and accident": "highlights safety conditions around the site involved",
@@ -548,23 +553,24 @@ function trajectorySentence(
   variant = 0,
 ): string {
   const delta = events.length - priorPeriodEvents.length;
-  // §16 — comparative claims always carry the figures they rest on.
-  const figures = `(${events.length} validated ${events.length === 1 ? "event" : "events"} against ${priorPeriodEvents.length})`;
+  // Reader-facing comparison only. Counts, volumes and collection mechanics are
+  // banned from the written report, so the comparison is stated qualitatively;
+  // the figures behind it stay in the claim's supportingMetric.
   // Repetition guard: this sentence renders in both the BLUF and the Outlook —
   // the second surface uses alternate wording so the same sentence never
-  // appears verbatim twice. Same facts, same figures.
+  // appears verbatim twice.
   const volume =
     delta >= 2
       ? variant === 0
-        ? `Reporting volume increased compared with the previous period ${figures}`
-        : `Validated reporting ran higher than in the previous period ${figures}`
+        ? "Activity was more frequent than in the previous period"
+        : "The period ran busier than the one before it"
       : delta <= -2
         ? variant === 0
-          ? `Reporting volume fell compared with the previous period ${figures}`
-          : `Validated reporting ran lower than in the previous period ${figures}`
+          ? "Activity was less frequent than in the previous period"
+          : "The period ran quieter than the one before it"
         : variant === 0
-          ? `Reporting volume was broadly in line with the previous period ${figures}`
-          : `Validated reporting held near the previous period's level ${figures}`;
+          ? "Activity held at a similar level to the previous period"
+          : "The period held close to the level of the one before it";
   const worst = (list: CanonicalEvent[]): number =>
     list.reduce((m, e) => Math.max(m, severityRank(e.severity)), -1);
   const cur = worst(events);
@@ -619,12 +625,158 @@ function groupByCategory(
 }
 
 // ---------------------------------------------------------------------------
-// §14 — Top Three Developments
+// Key Developments (§14) — between three and six ranked developments, each
+// carrying location, date, short title, category, current severity, an
+// assessment, a business decision line and a seven-day indicator.
 // ---------------------------------------------------------------------------
+
+export const KEY_DEVELOPMENTS_MAX = 6;
+export const KEY_DEVELOPMENTS_MIN = 3;
+
+/**
+ * Business-facing exposure domains. Every issue category maps to exactly one,
+ * so the Key Developments decision lines and the Business Implications section
+ * describe the same evidence in the same terms.
+ */
+export const EXPOSURE_DOMAINS = [
+  "People and travel",
+  "Sites and assets",
+  "Logistics and supply chain",
+  "Workforce and labour",
+  "Utilities and connectivity",
+  "Regulatory and compliance",
+  "Continuity and environment",
+] as const;
+export type ExposureDomain = (typeof EXPOSURE_DOMAINS)[number];
+
+export const CATEGORY_DOMAIN: Record<IssueCategory, ExposureDomain> = {
+  "Violent crime": "People and travel",
+  "Theft and robbery": "Sites and assets",
+  "Organised crime": "Sites and assets",
+  "Communal or tribal violence": "People and travel",
+  Terrorism: "People and travel",
+  Insurgency: "People and travel",
+  "Political violence": "People and travel",
+  "Civil unrest": "People and travel",
+  "Strike or labour action": "Workforce and labour",
+  "Governance and regulatory": "Regulatory and compliance",
+  "Policing operation": "People and travel",
+  Aviation: "Logistics and supply chain",
+  Maritime: "Logistics and supply chain",
+  "Road and rail": "Logistics and supply chain",
+  Utilities: "Utilities and connectivity",
+  Telecommunications: "Utilities and connectivity",
+  "Cyber incident": "Utilities and connectivity",
+  Infrastructure: "Sites and assets",
+  "Fire and accident": "Sites and assets",
+  "Natural hazard": "Continuity and environment",
+  Health: "Workforce and labour",
+  "Supply chain": "Logistics and supply chain",
+  "Other operational disruption": "Continuity and environment",
+};
+
+// Why a development matters for a business DECISION (as opposed to what it
+// means operationally, which the assessment sentence already covers). Two
+// phrasings per domain so two developments in the same domain never print the
+// same line; PLACE is substituted with the event's own location.
+const DOMAIN_DECISION_LINES: Record<ExposureDomain, string[]> = {
+  "People and travel": [
+    "For a business, the decision this bears on is whether staff movement around PLACE still runs to its normal timing and routes.",
+    "The exposure here sits with people rather than property: anyone travelling to or working near PLACE carries it.",
+  ],
+  "Sites and assets": [
+    "The practical question for premises near PLACE is whether existing access control, guarding and damage response still match conditions.",
+    "Exposure here is asset-side: buildings, stock and vehicles held near PLACE are what stands to be lost.",
+  ],
+  "Logistics and supply chain": [
+    "Where freight or scheduled services run through PLACE, delivery timings should be treated as provisional rather than firm.",
+    "The commercial exposure is schedule reliability: commitments that depend on movement through PLACE are the ones at risk.",
+  ],
+  "Workforce and labour": [
+    "The exposure is staffing: shift cover, contractor availability and transport for people working around PLACE.",
+    "For a business this reads as a labour-continuity question wherever work near PLACE depends on people turning up.",
+  ],
+  "Utilities and connectivity": [
+    "Sites near PLACE that depend on uninterrupted power, connectivity or systems access hold the exposure.",
+    "The decision this informs is how long operations around PLACE can run on fallback arrangements alone.",
+  ],
+  "Regulatory and compliance": [
+    "The exposure is compliance-side: permissions, approvals and reporting duties held locally may need re-checking.",
+    "For a business the question is whether local obligations have changed in a way that affects existing commitments.",
+  ],
+  "Continuity and environment": [
+    "Continuity arrangements covering PLACE carry the exposure, particularly where one site or route takes the whole load.",
+    "The decision this bears on is how much slack is held in plans that depend on conditions around PLACE.",
+  ],
+};
+
+// The one specific change worth watching over the next seven days. Generic by
+// domain, made specific by the event's own place and category.
+const DOMAIN_INDICATORS: Record<ExposureDomain, string[]> = {
+  "People and travel": [
+    "Watch for further CATEGORY reported in or around PLACE in the coming seven days.",
+    "Watch whether security measures around PLACE are tightened or movement there is restricted.",
+  ],
+  "Sites and assets": [
+    "Watch for repeat incidents at comparable premises around PLACE over the next seven days.",
+    "Watch whether damage or losses at PLACE draw an official inspection or an enforcement response.",
+  ],
+  "Logistics and supply chain": [
+    "Watch whether services through PLACE return to schedule within the coming week.",
+    "Watch for backlog or diversion notices affecting movement through PLACE.",
+  ],
+  "Workforce and labour": [
+    "Watch whether the dispute or absence affecting PLACE spreads to other sites or is settled.",
+    "Watch for notice of further stoppages or staffing shortfalls around PLACE.",
+  ],
+  "Utilities and connectivity": [
+    "Watch whether supply or service around PLACE is restored and stays stable through the week.",
+    "Watch for further outages or system failures reported around PLACE.",
+  ],
+  "Regulatory and compliance": [
+    "Watch for a formal notice, ruling or enforcement step following the reporting around PLACE.",
+    "Watch whether the measures reported around PLACE are confirmed, widened or withdrawn.",
+  ],
+  "Continuity and environment": [
+    "Watch whether conditions around PLACE worsen or the warning in force is extended.",
+    "Watch for further disruption to routine operations around PLACE in the coming week.",
+  ],
+};
+
+/** A reader-facing short title (≤10 words) for a development card heading. */
+export function shortDevelopmentTitle(title: string): string {
+  const compact = compactTitle(title);
+  const words = compact.split(/\s+/).filter(Boolean);
+  if (words.length <= 10) return compact;
+  return words.slice(0, 10).join(" ").replace(/[,;:–—-]+$/, "");
+}
+
+/**
+ * Pick the first candidate line that has not already been used anywhere in the
+ * report and does not repeat text the reader has already seen. Returns null
+ * when every candidate would repeat — omit, never pad (§14).
+ */
+function pickUniqueLine(
+  candidates: string[],
+  used: Set<string>,
+  avoidText = "",
+): string | null {
+  const avoid = avoidText.toLowerCase();
+  for (const candidate of candidates) {
+    const key = candidate.trim().toLowerCase();
+    if (!key || used.has(key)) continue;
+    if (avoid && avoid.includes(key)) continue;
+    used.add(key);
+    return candidate;
+  }
+  return null;
+}
 
 export interface TopDevelopment {
   eventId: string;
   title: string;
+  // Reader-facing short title (≤10 words) for the development heading.
+  shortTitle: string;
   date: string | null;
   location: string;
   category: IssueCategory;
@@ -633,6 +785,11 @@ export interface TopDevelopment {
   // Proportionate, evidence-based; null when there is no basis (omit, not
   // invent — §14).
   businessSentence: string | null;
+  // Why the development matters for a business decision. Distinct per
+  // development; null when every available phrasing would repeat.
+  polestarSentence: string | null;
+  // The single change worth watching over the next seven days.
+  sevenDayIndicator: string | null;
 }
 
 export interface NarrativeResult<T> {
@@ -656,10 +813,14 @@ export function buildTopThree(
   // apart. Seeding the repeat-suppression with the BLUF text extends the §14
   // omit-never-pad rule across sections, not just within the three slots.
   blufText: string = "",
+  // Key Developments carry between three and six items when the period
+  // produced that much material evidence. Fewer is correct on a quiet week;
+  // padding to a fixed number is not.
+  limit: number = KEY_DEVELOPMENTS_MAX,
 ): NarrativeResult<TopDevelopment[]> {
   const claims: EvidenceRecord[] = [];
   // §14 excludes commentary/background/not-an-incident/cancelled from top slots.
-  const ranked = topRankedEvents(events);
+  const ranked = topRankedEvents(events, limit);
 
   // Repeat suppression: the derived category implication is generic to the
   // category, so printing it verbatim on more than one of the three slots is
@@ -667,9 +828,14 @@ export function buildTopThree(
   // later same-category items keep their harm/ongoing sentences (event-specific)
   // and otherwise omit rather than repeat (§14 — omit, never pad).
   const usedImplications = new Set<string>();
+  // Cross-item repetition guard for the decision lines and watch indicators:
+  // no two developments may print the same sentence.
+  const usedLines = new Set<string>();
 
   const value: TopDevelopment[] = ranked.map((e) => {
     const location = locationLabel(e);
+    const place = subNationalLocation(e) ?? "the affected area";
+    const domain = CATEGORY_DOMAIN[e.issueCategory];
     const factualSentence = e.eventSummary.trim();
     claims.push(
       makeClaim({
@@ -764,15 +930,76 @@ export function buildTopThree(
       }
     }
 
+    // Why it matters for a business decision — one line per development, never
+    // repeated across developments or lifted from the BLUF.
+    const polestarSentence = pickUniqueLine(
+      DOMAIN_DECISION_LINES[domain].map((t) => t.replace(/PLACE/g, place)),
+      usedLines,
+      blufText,
+    );
+    if (polestarSentence) {
+      claims.push(
+        makeClaim({
+          claimText: polestarSentence,
+          section: "Key Developments",
+          supportingEventIds: [e.eventId],
+          supportingSourceIds: e.supportingSourceIds,
+          claimType: "Assessment",
+          confidence: 65,
+        }),
+      );
+    }
+
+    // Seven-day indicator — the specific change worth watching next. Event
+    // attributes take precedence over the generic domain phrasings.
+    const indicatorCandidates: string[] = [];
+    const eventHarm = harmPhrase([e]);
+    if (e.eventStatus === "Ongoing") {
+      indicatorCandidates.push(
+        `Watch whether ${categoryPhrase(e.issueCategory)} around ${place} continues past this week or draws a formal response.`,
+      );
+    }
+    if (eventHarm) {
+      indicatorCandidates.push(
+        `Watch for further reported ${eventHarm} around ${place} over the next seven days.`,
+      );
+    }
+    if (e.confirmedOperationalEffect) {
+      indicatorCandidates.push(
+        `Watch whether the disruption reported around ${place} is lifted, extended or widened.`,
+      );
+    }
+    indicatorCandidates.push(
+      ...DOMAIN_INDICATORS[domain].map((t) =>
+        t.replace(/PLACE/g, place).replace(/CATEGORY/g, categoryPhrase(e.issueCategory)),
+      ),
+    );
+    const sevenDayIndicator = pickUniqueLine(indicatorCandidates, usedLines);
+    if (sevenDayIndicator) {
+      claims.push(
+        makeClaim({
+          claimText: sevenDayIndicator,
+          section: "Key Developments",
+          supportingEventIds: [e.eventId],
+          supportingSourceIds: e.supportingSourceIds,
+          claimType: "Forecast",
+          confidence: 60,
+        }),
+      );
+    }
+
     return {
       eventId: e.eventId,
       title: naturaliseTitle(e.eventTitle),
+      shortTitle: shortDevelopmentTitle(e.eventTitle),
       date: e.eventDate,
       location,
       category: e.issueCategory,
       severity: e.severity,
       factualSentence,
       businessSentence,
+      polestarSentence,
+      sevenDayIndicator,
     };
   });
 
@@ -783,7 +1010,8 @@ export function buildTopThree(
 // §15 — Bottom Line Up Front (≤120 words)
 // ---------------------------------------------------------------------------
 
-const BLUF_MAX_WORDS = 120;
+const BLUF_MIN_WORDS = 100;
+const BLUF_MAX_WORDS = 130;
 
 /**
  * §15 — Bottom Line Up Front. Approved three-part structure:
@@ -811,7 +1039,7 @@ export function buildBluf(
 
   if (events.length === 0) {
     const text = capWords(
-      `Reporting was limited in ${countryName} during the period, and no significant validated security events were recorded.`,
+      `Reporting was limited in ${countryName} during the period, and no significant security events were recorded.`,
       BLUF_MAX_WORDS,
     );
     claims.push(
@@ -828,7 +1056,9 @@ export function buildBluf(
   // §14/§15 — the BLUF anchors on the SAME ranked Top-3 selection as
   // buildTopThree so the lead sentence and the Top Developments section can
   // never diverge, and every Top-3 story is referenced in the analysis.
-  const topRanked = topRankedEvents(events);
+  // Three references keep the opening paragraph readable; the remaining key
+  // developments are carried by the Current Situation.
+  const topRanked = topRankedEvents(events, 3);
   const lead = topRanked[0] ?? mostSignificant(events)!;
   const byCat = groupByCategory(events);
   const topCategories = [...byCat.entries()]
@@ -877,7 +1107,7 @@ export function buildBluf(
     leadEventDateObj != null &&
     !Number.isNaN(leadEventDateObj.getTime()) &&
     leadEventDateObj < windowStartObj;
-  const s1 = `The most serious validated development in ${countryName} was ${describeEvent(lead, { withReportedDate: leadPredatesWindow })}.`;
+  const s1 = `The most serious development reported in ${countryName} was ${describeEvent(lead, { withReportedDate: leadPredatesWindow })}.`;
   // Repetition guard (owner-flagged): when the other top developments share the
   // lead's category and location, naming each in full reads as the same clause
   // three times ("violent crime in East Jakarta on ... and violent crime in
@@ -1042,6 +1272,63 @@ export function buildBluf(
     text = capWords(mandatory, blufCap);
   }
 
+  // The BLUF must read as a short assessment (100-130 words), not a stub.
+  // Top up from grounded candidates, skipping anything that repeats what has
+  // already been said.
+  const repeatPlaces = repeatSubLocations(events);
+  const harmedEvents = harmEvents(events);
+  const harmWord = harmPhrase(harmedEvents);
+  const nonSecurity = events.filter(
+    (ev) => CATEGORY_DOMAIN[ev.issueCategory] !== "People and travel",
+  );
+  const blufTopUps: { text: string; ids: string[]; claimType: ClaimType }[] = [];
+  if (repeatPlaces.length) {
+    blufTopUps.push({
+      text: `${joinAnd(repeatPlaces.slice(0, 2))} produced more than one report, so the pressure there is sustained rather than a single occurrence.`,
+      ids: events
+        .filter((ev) => {
+          const sub = subNationalLocation(ev);
+          return sub != null && repeatPlaces.slice(0, 2).includes(sub);
+        })
+        .map((ev) => ev.eventId),
+      claimType: "Assessment",
+    });
+  }
+  if (harmWord) {
+    blufTopUps.push({
+      text: `Some of the reporting involved ${harmWord}, which puts staff safety ahead of property questions for the coming week.`,
+      ids: harmedEvents.map((ev) => ev.eventId),
+      claimType: "Assessment",
+    });
+  }
+  if (nonSecurity.length) {
+    blufTopUps.push({
+      text: `Exposure is not confined to personal safety: ${joinAnd(unique(nonSecurity.map((ev) => CATEGORY_DOMAIN[ev.issueCategory].toLowerCase())).slice(0, 2))} were affected as well.`,
+      ids: nonSecurity.map((ev) => ev.eventId),
+      claimType: "Assessment",
+    });
+  }
+  blufTopUps.push({
+    text: `Conditions differ by location, so decisions should follow what is known about the specific destination rather than a single view of ${countryName}.`,
+    ids: events.map((ev) => ev.eventId),
+    claimType: "Assessment",
+  });
+  for (const candidate of blufTopUps) {
+    if (countWords(text) >= BLUF_MIN_WORDS) break;
+    if (overlapsExisting(candidate.text, [text])) continue;
+    if (countWords(`${text} ${candidate.text}`) > blufCap) continue;
+    text = `${text} ${candidate.text}`;
+    claims.push(
+      makeClaim({
+        claimText: candidate.text,
+        section: "Bottom Line Up Front",
+        supportingEventIds: candidate.ids,
+        claimType: candidate.claimType,
+        confidence: 70,
+      }),
+    );
+  }
+
   return { value: text, claims };
 }
 
@@ -1088,7 +1375,7 @@ export function buildCategoryIntro(
   );
 
   const eventWord = count === 1 ? "event" : "events";
-  const s1 = `${count} validated ${categoryPhrase(category)} ${eventWord} were recorded, mainly in ${joinAnd(locations) || notable.physicalCountry}.`;
+  const s1 = `${count} ${categoryPhrase(category)} ${eventWord} were reported, mainly in ${joinAnd(locations) || notable.physicalCountry}.`;
   const sevText =
     minSev === maxSev
       ? `Severity was rated ${minSev}.`
@@ -1145,20 +1432,39 @@ export function buildCategoryIntro(
 // §18 — Current Situation (≤120 words)
 // ---------------------------------------------------------------------------
 
-const CURRENT_SITUATION_MAX_WORDS = 120;
+const CURRENT_SITUATION_MIN_WORDS = 250;
+const CURRENT_SITUATION_MAX_WORDS = 400;
+
+// One candidate sentence for the Current Situation. `para` places it in the
+// finished paragraph structure; `priority` decides what survives the word
+// range (0 = mandatory, 1 = standard analysis, 2 = filler used only to reach
+// the 250-word floor).
+interface SituationSentence {
+  text: string;
+  para: number;
+  priority: 0 | 1 | 2;
+  ids: string[];
+  claimType: ClaimType;
+  confidence: number;
+}
 
 /**
- * §18 — Current Situation. Country-specific, references actual reported events.
- * If reporting was limited, say exactly that. ≤120 words.
+ * Current Situation — analytical prose of 250-400 words covering what happened,
+ * where, what changed, what it means and what remains uncertain. Every key
+ * development is named here, so the reader never meets a development in the
+ * cards that the analysis ignored.
  */
 export function buildCurrentSituation(
   events: CanonicalEvent[],
   countryName: string,
+  // The ranked key developments. Defaults to the engine's own ranking so
+  // callers that do not pass them still get a consistent narrative.
+  keyEvents: CanonicalEvent[] = [],
 ): NarrativeResult<string> {
   const claims: EvidenceRecord[] = [];
 
   if (events.length === 0) {
-    const text = `Reporting was limited in ${countryName} during the period. No significant validated security events were recorded.`;
+    const text = `Reporting was limited in ${countryName} during the period. No significant security events were recorded.`;
     claims.push(
       makeClaim({
         claimText: text,
@@ -1167,9 +1473,10 @@ export function buildCurrentSituation(
         confidence: 90,
       }),
     );
-    return { value: capWords(text, CURRENT_SITUATION_MAX_WORDS), claims };
+    return { value: text, claims };
   }
 
+  const allIds = events.map((e) => e.eventId);
   const byCat = groupByCategory(events);
   const principal = [...byCat.entries()]
     .sort((a, b) => b[1].length - a[1].length)
@@ -1182,88 +1489,356 @@ export function buildCurrentSituation(
     (l) => l.toLowerCase() !== countryName.toLowerCase(),
   );
 
-  const s1 = locations.length
-    ? `Security incidents in ${countryName} during the reporting period were concentrated in ${joinAnd(locations.slice(0, 3))}.`
-    : `Security incidents in ${countryName} during the reporting period were recorded at country level only, without located concentrations.`;
-  const s2 = `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} were the principal concerns.`;
+  const featured =
+    keyEvents.length > 0 ? keyEvents : topRankedEvents(events, KEY_DEVELOPMENTS_MAX);
+  const featuredIds = new Set(featured.map((e) => e.eventId));
 
-  // Assessed synthesis — repeat-location pressure and casualty framing, both
-  // drawn only from stored attributes.
-  const repeats = repeatSubLocations(events);
-  const repeatEvents = events.filter((e) => {
-    const sub = subNationalLocation(e);
-    return sub != null && repeats.slice(0, 2).includes(sub);
+  const lines: SituationSentence[] = [];
+
+  // Paragraph 1 — what defined the period.
+  lines.push({
+    text: locations.length
+      ? `Reporting in ${countryName} during the period was concentrated in ${joinAnd(locations.slice(0, 3))}.`
+      : `Reporting in ${countryName} during the period was recorded at country level only, without located concentrations.`,
+    para: 0,
+    priority: 0,
+    ids: allIds,
+    claimType: "Confirmed fact",
+    confidence: 85,
   });
-  const s2b = repeats.length
-    ? `${joinAnd(repeats.slice(0, 2))} generated repeat reporting within the period, so the pressure there is sustained rather than a one-off.`
-    : "";
-  const harmed = harmEvents(events);
-  const harm = harmPhrase(harmed);
-  const s2c = harm
-    ? `Some of the reporting involved ${harm}, which raises the stakes for staff working in or moving through the affected areas.`
-    : "";
-  const s3 =
-    locations.length > 1
-      ? "The incidents do not currently form a single nationwide pattern; risk varies by location, and movement decisions should be based on current conditions at the destination."
-      : "The incidents remain localised, and movement decisions should be based on current conditions at the destination.";
+  lines.push({
+    text: `${capitaliseFirst(joinAnd(principal.slice(0, 2)) || "Security events")} ${principal.length > 1 ? "were the principal concerns" : "was the principal concern"} across the period.`,
+    para: 0,
+    priority: 0,
+    ids: allIds,
+    claimType: "Assessment",
+    confidence: 75,
+  });
 
-  claims.push(
-    makeClaim({
-      claimText: s1,
-      section: "Current Situation",
-      supportingEventIds: events.map((e) => e.eventId),
+  // Paragraph 2 — the developments themselves, in ranked order. Each sentence
+  // carries category, place and date so the analysis and the development cards
+  // can never describe different sets.
+  const describeTemplates: ((
+    cat: string,
+    loc: string,
+    date: string,
+    harm: string,
+  ) => string)[] = [
+    (cat, loc, date, harm) => `On ${date}, ${cat} was reported in ${loc}${harm}.`,
+    (cat, loc, date, harm) =>
+      `${capitaliseFirst(cat)} in ${loc} followed on ${date}${harm}.`,
+    (cat, loc, date, harm) =>
+      `Reporting from ${loc} on ${date} described ${cat}${harm}.`,
+  ];
+  featured.forEach((e, idx) => {
+    const harm = harmPhrase([e]);
+    lines.push({
+      text: describeTemplates[idx % describeTemplates.length](
+        categoryPhrase(e.issueCategory),
+        locationLabel(e),
+        formatDate(e.eventDate),
+        harm ? `, with reported ${harm}` : "",
+      ),
+      para: 1,
+      priority: 0,
+      ids: [e.eventId],
       claimType: "Confirmed fact",
-      confidence: 85,
-    }),
-    makeClaim({
-      claimText: s2,
-      section: "Current Situation",
-      supportingEventIds: events.map((e) => e.eventId),
+      confidence: e.classificationConfidence,
+    });
+    const effect = e.confirmedOperationalEffect?.trim();
+    if (effect) {
+      lines.push({
+        text: /[.!?]$/.test(effect) ? effect : `${effect}.`,
+        para: 1,
+        priority: 1,
+        ids: [e.eventId],
+        claimType: "Confirmed fact",
+        confidence: e.classificationConfidence,
+      });
+    }
+  });
+
+  // Paragraph 3 — what the period shows as a whole.
+  const repeats = repeatSubLocations(events);
+  if (repeats.length) {
+    const repeatEvents = events.filter((e) => {
+      const sub = subNationalLocation(e);
+      return sub != null && repeats.slice(0, 2).includes(sub);
+    });
+    lines.push({
+      text: `${joinAnd(repeats.slice(0, 2))} produced more than one report within the period, so the pressure there is sustained rather than a one-off.`,
+      para: 2,
+      priority: 1,
+      ids: repeatEvents.map((e) => e.eventId),
       claimType: "Assessment",
       confidence: 75,
-    }),
+    });
+  }
+  const harmed = harmEvents(events);
+  const harm = harmPhrase(harmed);
+  if (harm) {
+    lines.push({
+      text: `Some of the reporting involved ${harm}, which raises the stakes for staff working in or moving through the affected areas.`,
+      para: 2,
+      priority: 1,
+      ids: harmed.map((e) => e.eventId),
+      claimType: "Assessment",
+      confidence: 75,
+    });
+  }
+  // Domain breadth — the report deliberately looks beyond security, so say so
+  // when the period actually produced non-security reporting.
+  const domainsPresent = unique(
+    events.map((e) => CATEGORY_DOMAIN[e.issueCategory] as string),
   );
-  if (s2b) {
-    claims.push(
-      makeClaim({
-        claimText: s2b,
-        section: "Current Situation",
-        supportingEventIds: repeatEvents.map((e) => e.eventId),
-        claimType: "Assessment",
-        confidence: 75,
-      }),
-    );
-  }
-  if (s2c) {
-    claims.push(
-      makeClaim({
-        claimText: s2c,
-        section: "Current Situation",
-        supportingEventIds: harmed.map((e) => e.eventId),
-        claimType: "Assessment",
-        confidence: 75,
-      }),
-    );
-  }
-  claims.push(
-    makeClaim({
-      claimText: s3,
-      section: "Current Situation",
-      supportingEventIds: events.map((e) => e.eventId),
+  const otherDomains = domainsPresent.filter((d) => d !== "People and travel");
+  if (otherDomains.length) {
+    lines.push({
+      text: `Alongside the security reporting, the period carried ${joinAnd(otherDomains.map((d) => d.toLowerCase()))} items, so exposure is not confined to personal safety alone.`,
+      para: 2,
+      priority: 1,
+      ids: events
+        .filter((e) => CATEGORY_DOMAIN[e.issueCategory] !== "People and travel")
+        .map((e) => e.eventId),
       claimType: "Assessment",
       confidence: 70,
-    }),
-  );
+    });
+  }
+  const ongoing = events.filter((e) => e.eventStatus === "Ongoing");
+  if (ongoing.length) {
+    lines.push({
+      text: `Part of the reporting described situations still running at the close of the period, so conditions in those places can change at short notice.`,
+      para: 2,
+      priority: 1,
+      ids: ongoing.map((e) => e.eventId),
+      claimType: "Assessment",
+      confidence: 72,
+    });
+  }
 
-  const text = capWords(
-    [s1, s2, s2b, s2c, s3].filter(Boolean).join(" "),
-    CURRENT_SITUATION_MAX_WORDS,
-  );
-  return { value: text, claims };
+  // Filler tier — remaining reporting, one sentence each, used only to reach
+  // the word floor. Still evidence-linked; nothing is invented.
+  const others = events.filter((e) => !featuredIds.has(e.eventId));
+  const otherTemplates: ((cat: string, loc: string, date: string) => string)[] = [
+    (cat, loc, date) => `Separately, ${cat} was reported in ${loc} on ${date}.`,
+    (cat, loc, date) => `${capitaliseFirst(cat)} was also reported in ${loc} on ${date}.`,
+    (cat, loc, date) => `A further report placed ${cat} in ${loc} on ${date}.`,
+  ];
+  others.slice(0, 10).forEach((e, idx) => {
+    lines.push({
+      text: otherTemplates[idx % otherTemplates.length](
+        categoryPhrase(e.issueCategory),
+        locationLabel(e),
+        formatDate(e.eventDate),
+      ),
+      para: 2,
+      priority: 2,
+      ids: [e.eventId],
+      claimType: "Confirmed fact",
+      confidence: e.classificationConfidence,
+    });
+  });
+
+  // Paragraph 4 — how far the picture extends, and what it does not show.
+  lines.push({
+    text:
+      locations.length > 1
+        ? "The reporting does not describe a single country-wide problem; conditions differ by location, and decisions should follow what is known about the destination itself."
+        : "The reporting remains localised, and decisions should follow what is known about the destination itself.",
+    para: 3,
+    priority: 0,
+    ids: allIds,
+    claimType: "Assessment",
+    confidence: 70,
+  });
+  lines.push({
+    text: `Nothing reported this period settles how long these conditions will hold, so the position set out here is the starting point for the coming week rather than a settled view.`,
+    para: 3,
+    priority: 1,
+    ids: allIds,
+    claimType: "Assessment",
+    confidence: 65,
+  });
+
+  // Assemble within the 250-400 word range: mandatory first, then standard
+  // analysis while it fits, then filler only until the floor is reached.
+  const picked: SituationSentence[] = lines.filter((l) => l.priority === 0);
+  const wordsOf = (list: SituationSentence[]): number =>
+    countWords(list.map((l) => l.text).join(" "));
+  for (const line of lines.filter((l) => l.priority === 1)) {
+    if (wordsOf([...picked, line]) > CURRENT_SITUATION_MAX_WORDS) continue;
+    picked.push(line);
+  }
+  for (const line of lines.filter((l) => l.priority === 2)) {
+    if (wordsOf(picked) >= CURRENT_SITUATION_MIN_WORDS) break;
+    if (wordsOf([...picked, line]) > CURRENT_SITUATION_MAX_WORDS) continue;
+    picked.push(line);
+  }
+  // Keep the authored order (paragraph, then position within the paragraph).
+  const ordered = lines.filter((l) => picked.includes(l));
+
+  for (const line of ordered) {
+    claims.push(
+      makeClaim({
+        claimText: line.text,
+        section: "Current Situation",
+        supportingEventIds: line.ids,
+        claimType: line.claimType,
+        confidence: line.confidence,
+      }),
+    );
+  }
+
+  const paragraphs: string[] = [];
+  for (const para of [0, 1, 2, 3]) {
+    const text = ordered
+      .filter((l) => l.para === para)
+      .map((l) => l.text)
+      .join(" ")
+      .trim();
+    if (text) paragraphs.push(text);
+  }
+  return { value: paragraphs.join("\n\n"), claims };
 }
 
 function capitaliseFirst(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+// ---------------------------------------------------------------------------
+// Business Implications (150-250 words) — what the period means commercially.
+// Written from the exposure domains the evidence actually produced; a domain
+// with no reporting behind it is never mentioned.
+// ---------------------------------------------------------------------------
+
+const BUSINESS_IMPLICATIONS_MIN_WORDS = 150;
+const BUSINESS_IMPLICATIONS_MAX_WORDS = 250;
+
+// Two sentences per domain: PLACES and CATEGORIES are substituted from the
+// events that put the domain in the report.
+const DOMAIN_IMPLICATIONS: Record<ExposureDomain, string> = {
+  "People and travel":
+    "Staff movement carries the clearest cost: CATEGORIES reported around PLACES bear on journey timing and pick-up arrangements. Where people already work there, the practical effect is slower movement and closer attention to routes rather than lost output.",
+  "Sites and assets":
+    "Premises and fixed assets around PLACES are exposed following reported CATEGORIES. The commercial consequence sits in damage, loss and whatever additional site protection is held for as long as conditions last.",
+  "Logistics and supply chain":
+    "Movement of goods is exposed where CATEGORIES touched PLACES. Delivery windows that depend on those routes are best treated as provisional, and commitments priced with that uncertainty included.",
+  "Workforce and labour":
+    "Workforce availability is exposed where CATEGORIES affected PLACES. The cost shows up in shift cover and in the management time spent keeping work staffed while the disruption runs.",
+  "Utilities and connectivity":
+    "Continuity of power, connectivity and systems access is exposed where CATEGORIES affected PLACES. Operations that cannot absorb an unplanned interruption carry the cost here first.",
+  "Regulatory and compliance":
+    "Compliance exposure follows the CATEGORIES reported around PLACES: permissions, approvals and reporting duties can move faster than commercial terms can be renegotiated.",
+  "Continuity and environment":
+    "Continuity planning is exposed where CATEGORIES affected PLACES, and most of all where one site, route or supplier carries the whole load.",
+};
+
+/**
+ * Business Implications — 150-250 words, built only from the exposure domains
+ * the period's evidence produced. Ordered by seriousness (worst severity, then
+ * reported harm, then breadth) so the heaviest exposure is read first.
+ */
+export function buildBusinessImplications(
+  events: CanonicalEvent[],
+  countryName: string,
+  // Text the reader has already seen (BLUF, Current Situation). Candidates
+  // that would repeat it are skipped.
+  refs: string[] = [],
+): NarrativeResult<string> {
+  const claims: EvidenceRecord[] = [];
+  if (events.length === 0) return { value: "", claims };
+
+  // Group the evidence by exposure domain and rank the domains.
+  const byDomain = new Map<ExposureDomain, CanonicalEvent[]>();
+  for (const e of events) {
+    const domain = CATEGORY_DOMAIN[e.issueCategory];
+    const list = byDomain.get(domain) ?? [];
+    list.push(e);
+    byDomain.set(domain, list);
+  }
+  const rankedDomains = [...byDomain.entries()]
+    .map(([domain, list]) => {
+      const worst = list.reduce((m, e) => Math.max(m, severityRank(e.severity)), 0);
+      const harm = list.reduce(
+        (n, e) => n + (e.casualties ?? 0) + (e.injuries ?? 0),
+        0,
+      );
+      return { domain, list, score: worst * 10000 + Math.min(harm, 99) * 100 + list.length };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const kept: { text: string; ids: string[]; claimType: ClaimType }[] = [];
+  const opening = `For businesses operating in ${countryName}, the period's reporting bears on ${joinAnd(rankedDomains.slice(0, 3).map((d) => d.domain.toLowerCase()))}.`;
+  kept.push({ text: opening, ids: events.map((e) => e.eventId), claimType: "Assessment" });
+
+  const wordsOf = (list: { text: string }[]): number =>
+    countWords(list.map((l) => l.text).join(" "));
+
+  for (const entry of rankedDomains) {
+    if (wordsOf(kept) >= BUSINESS_IMPLICATIONS_MAX_WORDS) break;
+    const places = unique(
+      entry.list.map((e) => subNationalLocation(e) ?? ""),
+    ).slice(0, 2);
+    const categories = unique(
+      entry.list.map((e) => categoryPhrase(e.issueCategory)),
+    ).slice(0, 2);
+    const text = DOMAIN_IMPLICATIONS[entry.domain]
+      .replace(/PLACES/g, places.length ? joinAnd(places) : "the affected areas")
+      .replace(/CATEGORIES/g, joinAnd(categories));
+    if (overlapsExisting(text, [...refs, ...kept.map((k) => k.text)])) continue;
+    if (wordsOf([...kept, { text }]) > BUSINESS_IMPLICATIONS_MAX_WORDS) continue;
+    kept.push({ text, ids: entry.list.map((e) => e.eventId), claimType: "Assessment" });
+  }
+
+  // Top-up candidates, each grounded in the same evidence, used only to reach
+  // the 150-word floor.
+  const confirmed = events.filter((e) => Boolean(e.confirmedOperationalEffect));
+  const harmed = harmEvents(events);
+  const topUps: { text: string; ids: string[]; claimType: ClaimType }[] = [];
+  if (confirmed.length) {
+    topUps.push({
+      text: "Disruption confirmed in the reporting is the part to plan around first, because it has already happened rather than being a possibility.",
+      ids: confirmed.map((e) => e.eventId),
+      claimType: "Assessment",
+    });
+  }
+  if (harmed.length) {
+    topUps.push({
+      text: "Where people were hurt, duty-of-care obligations move ahead of commercial considerations, including travel approvals and briefings for anyone sent into the area.",
+      ids: harmed.map((e) => e.eventId),
+      claimType: "Assessment",
+    });
+  }
+  topUps.push({
+    text: `Costs are most likely to appear as delay, rerouting and additional supervision rather than as a decision to stop working in ${countryName}.`,
+    ids: events.map((e) => e.eventId),
+    claimType: "Assessment",
+  });
+  topUps.push({
+    text: "No exposure beyond the areas and functions set out above was reported during the period.",
+    ids: events.map((e) => e.eventId),
+    claimType: "Assessment",
+  });
+  for (const candidate of topUps) {
+    if (wordsOf(kept) >= BUSINESS_IMPLICATIONS_MIN_WORDS) break;
+    if (overlapsExisting(candidate.text, [...refs, ...kept.map((k) => k.text)])) continue;
+    if (wordsOf([...kept, candidate]) > BUSINESS_IMPLICATIONS_MAX_WORDS) continue;
+    kept.push(candidate);
+  }
+
+  for (const line of kept) {
+    claims.push(
+      makeClaim({
+        claimText: line.text,
+        section: "Business Implications",
+        supportingEventIds: line.ids,
+        claimType: line.claimType,
+        confidence: 72,
+      }),
+    );
+  }
+
+  return { value: kept.map((l) => l.text).join(" "), claims };
 }
 
 // ---------------------------------------------------------------------------
@@ -1362,15 +1937,26 @@ export function buildOperationalImpact(
 // ---------------------------------------------------------------------------
 
 export type RecommendationGroup =
-  | "Movement"
+  | "Movement and travel"
   | "Site security"
-  | "Staff awareness"
-  | "Transport and logistics"
+  | "Workforce"
+  | "Logistics and supply chain"
+  | "Utilities and systems"
+  | "Regulatory and compliance"
   | "Escalation";
+
+// The evidence an action is written from: the places and categories of the
+// events that triggered it.
+export interface RecommendationContext {
+  places: string[];
+  categories: string[];
+}
 
 export interface ApprovedRecommendation {
   group: RecommendationGroup;
-  text: string;
+  // The action, written from the triggering evidence so it names real places
+  // and real hazards rather than a generic instruction.
+  text: (ctx: RecommendationContext) => string;
   // Predicate deciding whether at least one included event triggers this
   // recommendation.
   trigger: (events: CanonicalEvent[]) => CanonicalEvent[];
@@ -1402,6 +1988,30 @@ function isPolicing(e: CanonicalEvent): boolean {
 function isUnrest(e: CanonicalEvent): boolean {
   return hasCategory(e, "Civil unrest", "Strike or labour action");
 }
+function isPropertyCrime(e: CanonicalEvent): boolean {
+  return hasCategory(
+    e,
+    "Theft and robbery",
+    "Organised crime",
+    "Fire and accident",
+    "Infrastructure",
+  );
+}
+function isWorkforce(e: CanonicalEvent): boolean {
+  return hasCategory(e, "Strike or labour action", "Health");
+}
+function isUtility(e: CanonicalEvent): boolean {
+  return hasCategory(e, "Utilities", "Telecommunications", "Cyber incident");
+}
+function isCyber(e: CanonicalEvent): boolean {
+  return hasCategory(e, "Cyber incident");
+}
+function isRegulatory(e: CanonicalEvent): boolean {
+  return hasCategory(e, "Governance and regulatory");
+}
+function isHazard(e: CanonicalEvent): boolean {
+  return hasCategory(e, "Natural hazard");
+}
 function hasConfirmedEffect(e: CanonicalEvent): boolean {
   return Boolean(e.confirmedOperationalEffect);
 }
@@ -1410,103 +2020,138 @@ function hasRestriction(e: CanonicalEvent): boolean {
   return /curfew|closure|closed|restrict|roadblock|suspend|blockad/.test(text);
 }
 
+/** "Lae and Port Moresby", or a neutral fallback when nothing is located. */
+function placePhrase(places: string[]): string {
+  return places.length ? joinAnd(places) : "the affected areas";
+}
+
 /**
- * §20 — the approved recommendation menu, transcribed VERBATIM from the brief.
- * Each option carries the trigger condition that decides whether at least one
- * actual included event justifies it. Nothing outside this menu may be
- * recommended. Stronger measures (site closure, guard reinforcement, etc.) are
- * intentionally absent — they require event-specific evidence not modelled here.
+ * Generic instructions that say nothing about this week's evidence. They are
+ * banned outright: an action that would read the same in any report of any
+ * country is not a recommendation.
+ */
+const BOILERPLATE_ACTION_RE =
+  /\b(brief staff|monitor the situation|check emergency contacts|confirm journey plans)\b/i;
+
+/**
+ * The approved action areas. Each entry carries the trigger condition that
+ * decides whether at least one actual included event justifies it, and writes
+ * itself from that evidence. Nothing outside this set may be recommended.
  */
 export const APPROVED_RECOMMENDATIONS: ApprovedRecommendation[] = [
-  // MOVEMENT
+  // MOVEMENT AND TRAVEL
   {
-    group: "Movement",
-    text: "Confirm current route conditions before travel into affected districts.",
+    group: "Movement and travel",
+    text: ({ places }) =>
+      `Confirm road conditions on the approaches to ${placePhrase(places)} before travel, and hold a fallback route for each journey.`,
     trigger: (events) => events.filter((e) => isViolent(e) || isUnrest(e) || isPolicing(e)),
   },
   {
-    group: "Movement",
-    text: "Avoid non-essential after-hours movement where recent violence has occurred.",
+    group: "Movement and travel",
+    text: ({ places, categories }) =>
+      `Avoid non-essential travel around ${placePhrase(places)} after dark while ${joinAnd(categories)} continues to be reported there.`,
     trigger: (events) => events.filter((e) => isViolent(e)),
   },
   {
-    group: "Movement",
-    text: "Allow extra travel time where police activity or local gatherings are reported.",
+    group: "Movement and travel",
+    text: ({ places }) =>
+      `Build extra time into journeys through ${placePhrase(places)} where police activity or gatherings are reported.`,
     trigger: (events) => events.filter((e) => isPolicing(e) || isUnrest(e)),
   },
   {
-    group: "Movement",
-    text: "Maintain an alternative route where disruption has been confirmed.",
+    group: "Movement and travel",
+    text: ({ places }) =>
+      `Keep an alternative route available for movements into ${placePhrase(places)} while the reported disruption holds.`,
     trigger: (events) => events.filter((e) => hasConfirmedEffect(e) || hasRestriction(e)),
   },
   // SITE SECURITY
   {
     group: "Site security",
-    text: "Review access arrangements at sites close to reported incidents.",
+    text: ({ places, categories }) =>
+      `Review access control and guarding at sites within reach of ${placePhrase(places)} following the reported ${joinAnd(categories)}.`,
     trigger: (events) => events.filter((e) => isViolent(e) || hasRestriction(e)),
   },
   {
     group: "Site security",
-    text: "Confirm after-hours escalation procedures with guards and site managers.",
-    trigger: (events) => events.filter((e) => isViolent(e)),
+    text: ({ places }) =>
+      `Check perimeter lighting, locks and alarm response at premises near ${placePhrase(places)}.`,
+    trigger: (events) => events.filter((e) => isPropertyCrime(e)),
   },
   {
     group: "Site security",
-    text: "Check that emergency contacts and reporting lines remain current.",
+    text: ({ places }) =>
+      `Agree with site managers around ${placePhrase(places)} who decides on early closure, and on what trigger.`,
     trigger: (events) => events.filter((e) => isViolent(e) || isUnrest(e)),
   },
-  // STAFF AWARENESS
+  // WORKFORCE
   {
-    group: "Staff awareness",
-    text: "Brief affected staff on specific locations and current restrictions.",
+    group: "Workforce",
+    text: ({ places }) =>
+      `Arrange shift cover and safe transport for staff working near ${placePhrase(places)} while conditions there stay unsettled.`,
+    trigger: (events) => events.filter((e) => isWorkforce(e) || isUnrest(e) || isViolent(e)),
+  },
+  {
+    group: "Workforce",
+    text: ({ places, categories }) =>
+      `Tell people working around ${placePhrase(places)} exactly which areas and times the reported ${joinAnd(categories)} affects.`,
     trigger: (events) => events.filter((e) => hasRestriction(e) || isUnrest(e)),
   },
+  // LOGISTICS AND SUPPLY CHAIN
   {
-    group: "Staff awareness",
-    text: "Reinforce immediate reporting of roadblocks, violence or police activity.",
-    trigger: (events) => events.filter((e) => isViolent(e) || isPolicing(e) || isUnrest(e)),
-  },
-  {
-    group: "Staff awareness",
-    text: "Share only verified areas to avoid.",
-    trigger: (events) => events.filter((e) => isViolent(e) || hasRestriction(e)),
-  },
-  // TRANSPORT AND LOGISTICS
-  {
-    group: "Transport and logistics",
-    text: "Confirm airport, port and road status before affected movements.",
+    group: "Logistics and supply chain",
+    text: ({ places }) =>
+      `Confirm airport, port or road status before dispatching movements through ${placePhrase(places)}.`,
     trigger: (events) => events.filter((e) => isTransport(e) || hasRestriction(e)),
   },
   {
-    group: "Transport and logistics",
-    text: "Check supplier and delivery routes where disruption is reported.",
+    group: "Logistics and supply chain",
+    text: ({ places }) =>
+      `Ask suppliers routed through ${placePhrase(places)} to confirm delivery windows in writing this week.`,
     trigger: (events) => events.filter((e) => isTransport(e) || hasConfirmedEffect(e)),
   },
+  // UTILITIES AND SYSTEMS
   {
-    group: "Transport and logistics",
-    text: "Hold alternatives for time-sensitive journeys.",
-    trigger: (events) => events.filter((e) => isTransport(e) || hasRestriction(e)),
+    group: "Utilities and systems",
+    text: ({ places }) =>
+      `Test backup power, connectivity and systems access at sites that depend on services around ${placePhrase(places)}.`,
+    trigger: (events) => events.filter((e) => isUtility(e) || isHazard(e)),
+  },
+  {
+    group: "Utilities and systems",
+    text: () =>
+      "Verify account access, patching and offline backups for systems shared with locally affected organisations.",
+    trigger: (events) => events.filter((e) => isCyber(e)),
+  },
+  // REGULATORY AND COMPLIANCE
+  {
+    group: "Regulatory and compliance",
+    text: ({ categories }) =>
+      `Check whether the reported ${joinAnd(categories)} changes permits, approvals or reporting duties held locally.`,
+    trigger: (events) => events.filter((e) => isRegulatory(e)),
   },
   // ESCALATION
   {
     group: "Escalation",
-    text: "Escalate when violence approaches a business location or staff route.",
+    text: ({ places }) =>
+      `Escalate if violence is reported within reach of a business site or staff route around ${placePhrase(places)}.`,
     trigger: (events) => events.filter((e) => isViolent(e)),
   },
   {
     group: "Escalation",
-    text: "Escalate when official movement restrictions affect access.",
+    text: ({ places }) =>
+      `Escalate if official restrictions around ${placePhrase(places)} start to affect site access or staff movement.`,
     trigger: (events) => events.filter((e) => hasRestriction(e)),
   },
   {
     group: "Escalation",
-    text: "Escalate when a direct operational effect is confirmed.",
+    text: () =>
+      "Escalate if a supplier or service confirms an interruption that touches committed work.",
     trigger: (events) => events.filter((e) => hasConfirmedEffect(e)),
   },
 ];
 
 const RECOMMENDATIONS_MAX = 10;
-const RECOMMENDATION_MAX_WORDS = 22;
+const RECOMMENDATION_MAX_WORDS = 26;
 
 export interface Recommendation {
   group: RecommendationGroup;
@@ -1514,27 +2159,41 @@ export interface Recommendation {
 }
 
 /**
- * §20 — build recommendations from the approved menu only. Each returned action
- * is triggered by at least one actual included event; claims link them. Maximum
- * of 10 actions, each ≤22 words.
+ * Build recommended actions from the approved areas only. Each returned action
+ * is triggered by at least one actual included event and written from that
+ * event's own places and categories, so the list changes as the evidence
+ * changes. Generic boilerplate is rejected outright.
  */
 export function buildRecommendations(
   events: CanonicalEvent[],
 ): NarrativeResult<Recommendation[]> {
   const claims: EvidenceRecord[] = [];
   const value: Recommendation[] = [];
+  const seen = new Set<string>();
 
   for (const rec of APPROVED_RECOMMENDATIONS) {
     if (value.length >= RECOMMENDATIONS_MAX) break;
     const triggering = rec.trigger(events);
     if (triggering.length === 0) continue;
-    if (countWords(rec.text) > RECOMMENDATION_MAX_WORDS) continue; // menu is compliant; defensive
-    value.push({ group: rec.group, text: rec.text });
+    const places = unique(
+      triggering.map((e) => subNationalLocation(e) ?? ""),
+    ).slice(0, 2);
+    const categories = unique(
+      triggering.map((e) => categoryPhrase(e.issueCategory)),
+    ).slice(0, 2);
+    const text = rec.text({ places, categories }).replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    if (BOILERPLATE_ACTION_RE.test(text)) continue;
+    if (countWords(text) > RECOMMENDATION_MAX_WORDS) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    value.push({ group: rec.group, text });
     claims.push(
       makeClaim({
-        claimText: rec.text,
+        claimText: text,
         section: "Recommended Actions",
-        supportingEventIds: triggering.map((e) => e.eventId),
+        supportingEventIds: triggering.map((ev) => ev.eventId),
         claimType: "Recommendation",
         confidence: 75,
       }),
@@ -1697,7 +2356,8 @@ export function buildOutlook(
 // §22 — Pole Star View (≤180 words)
 // ---------------------------------------------------------------------------
 
-const POLESTAR_VIEW_MAX_WORDS = 180;
+const POLESTAR_VIEW_MIN_WORDS = 100;
+const POLESTAR_VIEW_MAX_WORDS = 140;
 
 export interface PolestarViewSections {
   bluf?: string;
@@ -1803,14 +2463,22 @@ export function buildPolestarView(
   // What actually happened this period — the honest anchor. Grounded in the
   // worst reported event's category and place so the View opens with substance
   // rather than a generic posture line.
-  const worstEvent = rankEvents(events)[0];
+  const ranked = rankEvents(events);
+  const worstEvent = ranked[0];
   const anchorPlace = locationLabel(worstEvent);
+  // Only claim the rest of the period was routine when ONE event actually sits
+  // above the others. With a shared worst severity the clause would be false.
+  const worstRank = severityRank(worstEvent.severity);
+  const soleWorst =
+    ranked.length > 1 &&
+    ranked.slice(1).every((e) => severityRank(e.severity) < worstRank);
+  const comparisonClause = soleWorst ? "; other items were routine by comparison" : "";
   // Never name the whole country as a "location" — if the worst event resolved
   // no sub-national place, anchor on the category alone.
   const anchorSentence =
     anchorPlace && anchorPlace !== worstEvent.physicalCountry
-      ? `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)} around ${anchorPlace}; other items were routine by comparison.`
-      : `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)}; other items were routine by comparison.`;
+      ? `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)} around ${anchorPlace}${comparisonClause}.`
+      : `The most serious reporting this period was ${categoryPhrase(worstEvent.issueCategory)}${comparisonClause}.`;
 
   // Candidate judgement sentences — each grounded, each tested for overlap.
   const candidates: { text: string; claimType: ClaimType }[] = [
@@ -1890,6 +2558,26 @@ export function buildPolestarView(
     }
   }
 
+  // Word floor: the View is a considered judgement of 100-140 words, so top up
+  // from the remaining grounded candidates until the floor is met.
+  if (countWords(kept.join(" ")) < POLESTAR_VIEW_MIN_WORDS) {
+    for (const c of candidates) {
+      if (countWords(kept.join(" ")) >= POLESTAR_VIEW_MIN_WORDS) break;
+      if (kept.includes(c.text)) continue;
+      if (countWords([...kept, c.text].join(" ")) > POLESTAR_VIEW_MAX_WORDS) continue;
+      kept.push(c.text);
+      claims.push(
+        makeClaim({
+          claimText: c.text,
+          section: "Pole Star View",
+          supportingEventIds: events.map((e) => e.eventId),
+          claimType: c.claimType,
+          confidence: 72,
+        }),
+      );
+    }
+  }
+
   // Guarantee at least one sentence even if everything overlapped.
   if (kept.length === 0) {
     const fallback = `On assessment, the concern remains ${scope}, and location-specific planning is the appropriate response.`;
@@ -1910,6 +2598,169 @@ export function buildPolestarView(
 }
 
 // ---------------------------------------------------------------------------
+// 7 Day Watch — a forward-looking table, separate from the Outlook prose. It
+// is built ONLY from reporting that announces scheduled or planned activity;
+// with no such reporting the section is empty and the renderers omit it.
+// Nothing here is predicted by the engine.
+// ---------------------------------------------------------------------------
+
+export const SEVEN_DAY_WATCH_MAX = 5;
+
+/** A forward-looking item taken from reporting, not generated by the engine. */
+export interface ForwardEventInput {
+  // ISO date of the announced activity, when the reporting states one. Null
+  // when the reporting announces activity without giving its date.
+  date: string | null;
+  // ISO date the announcement itself was reported. Used ONLY to label a row
+  // whose activity date is unstated; it is never presented as the event date.
+  announcedOn?: string | null;
+  location: string | null;
+  title: string;
+  category?: IssueCategory | null;
+  sourceId?: string | null;
+}
+
+export interface SevenDayWatchItem {
+  date: string;
+  location: string;
+  event: string;
+  whyItMatters: string;
+  watch: string;
+}
+
+// Why an announced activity matters, by exposure domain. Wording is distinct
+// from the Key Developments decision lines so the two sections never echo.
+const DOMAIN_WATCH_REASONS: Record<ExposureDomain, string[]> = {
+  "People and travel": [
+    "Activity of this kind draws a policing presence and can close nearby roads at short notice.",
+    "Crowds and the response to them are what affect journeys, not the event itself.",
+  ],
+  "Sites and assets": [
+    "Premises nearby can be caught by cordons, closures or opportunistic damage on the day.",
+    "Site access and deliveries are the first things to be curtailed if the day escalates.",
+  ],
+  "Logistics and supply chain": [
+    "Scheduled movements through the area are the exposure if access is restricted on the day.",
+    "Freight timings set before the date may not survive it.",
+  ],
+  "Workforce and labour": [
+    "Staff attendance and shift cover are the exposure if the action goes ahead.",
+    "Contractor availability tends to move before any formal announcement does.",
+  ],
+  "Utilities and connectivity": [
+    "Planned work or protest action at these sites can interrupt supply to unrelated users.",
+    "Dependent operations should know in advance how long they can run without the service.",
+  ],
+  "Regulatory and compliance": [
+    "A decision on the date can change permissions or reporting duties already relied on.",
+    "Commercial terms agreed before the date may need re-checking after it.",
+  ],
+  "Continuity and environment": [
+    "Conditions forecast for the date decide whether normal operating assumptions still hold.",
+    "Single-route and single-site arrangements are the ones exposed if the forecast holds.",
+  ],
+};
+
+const DOMAIN_WATCH_ACTIONS: Record<ExposureDomain, string[]> = {
+  "People and travel": [
+    "Confirm on the morning whether roads and access points are open.",
+    "Check whether the gathering is authorised and where it is due to assemble.",
+  ],
+  "Sites and assets": [
+    "Confirm guarding cover and closing arrangements for that day.",
+    "Check whether local authorities have set cordons around the area.",
+  ],
+  "Logistics and supply chain": [
+    "Reconfirm dispatch and delivery slots that fall on the date.",
+    "Check carrier notices for diversions around the area.",
+  ],
+  "Workforce and labour": [
+    "Confirm shift cover and transport arrangements for the date.",
+    "Check whether notice of the action has been formally served.",
+  ],
+  "Utilities and connectivity": [
+    "Confirm fallback power, connectivity and systems access before the date.",
+    "Check the provider's notice for the expected duration.",
+  ],
+  "Regulatory and compliance": [
+    "Confirm which local permissions the decision touches.",
+    "Check for a published notice or ruling on the day.",
+  ],
+  "Continuity and environment": [
+    "Confirm the current warning level before committing movements.",
+    "Check whether the site has the cover it needs if conditions hold.",
+  ],
+};
+
+/**
+ * Build the 7 Day Watch table from announced forward activity. At most five
+ * items, earliest first, undated items last. Returns an empty list when the
+ * period produced no forward-looking reporting — the section is then omitted
+ * rather than filled.
+ */
+export function buildSevenDayWatch(
+  forwardEvents: ForwardEventInput[],
+  countryName: string,
+): NarrativeResult<SevenDayWatchItem[]> {
+  const claims: EvidenceRecord[] = [];
+  const value: SevenDayWatchItem[] = [];
+  if (forwardEvents.length === 0) return { value, claims };
+
+  // Dedupe on title + date, then order earliest first with undated last.
+  const seen = new Set<string>();
+  const candidates = forwardEvents.filter((f) => {
+    const title = f.title?.trim();
+    if (!title) return false;
+    const key = `${title.toLowerCase()}|${f.date ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  candidates.sort((a, b) => {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    if (a.date) return -1;
+    if (b.date) return 1;
+    return 0;
+  });
+
+  const usedReasons = new Set<string>();
+  const usedActions = new Set<string>();
+  for (const f of candidates.slice(0, SEVEN_DAY_WATCH_MAX)) {
+    const domain = CATEGORY_DOMAIN[f.category ?? "Other operational disruption"];
+    const reason =
+      pickUniqueLine(DOMAIN_WATCH_REASONS[domain], usedReasons) ??
+      DOMAIN_WATCH_REASONS[domain][0];
+    const action =
+      pickUniqueLine(DOMAIN_WATCH_ACTIONS[domain], usedActions) ??
+      DOMAIN_WATCH_ACTIONS[domain][0];
+    const item: SevenDayWatchItem = {
+      date: f.date
+        ? formatDate(f.date)
+        : f.announcedOn
+          ? `Announced ${formatDate(f.announcedOn)}`
+          : "Date not stated",
+      location: f.location?.trim() || countryName,
+      event: shortDevelopmentTitle(f.title),
+      whyItMatters: reason,
+      watch: action,
+    };
+    value.push(item);
+    claims.push(
+      makeClaim({
+        claimText: `${item.event} (${item.location}, ${item.date}). ${item.whyItMatters}`,
+        section: "7 Day Watch",
+        supportingSourceIds: f.sourceId ? [f.sourceId] : [],
+        supportingMetric: f.sourceId ? null : `announced:${f.title}`,
+        claimType: "Forecast",
+        confidence: 60,
+      }),
+    );
+  }
+
+  return { value, claims };
+}
+
+// ---------------------------------------------------------------------------
 // buildCountryNarrative — assemble everything (§27 sparse handling)
 // ---------------------------------------------------------------------------
 
@@ -1926,17 +2777,27 @@ export interface BuildNarrativeOptions {
   // the book with "no further analysis is warranted" — the operating picture
   // is Not Assessed, not quiet.
   coverageUnconfirmed?: boolean;
+  // Announced or scheduled activity taken from reporting. Feeds the 7 Day
+  // Watch table; with none supplied, that section stays empty.
+  forwardEvents?: ForwardEventInput[];
 }
 
 export interface CountryNarrative {
   isSparse: boolean;
   bluf: string;
+  // The ranked key developments (3-6). `topThree` is the same array under its
+  // historical name so existing consumers keep working.
+  keyDevelopments: TopDevelopment[];
   topThree: TopDevelopment[];
   categoryIntros: { category: IssueCategory; text: string }[];
   currentSituation: string;
+  // What the period means commercially (150-250 words); empty on a sparse week.
+  businessImplications: string;
   operationalImpact: OperationalImpactEntry[];
   recommendations: Recommendation[];
   outlook: string;
+  // Announced forward activity; empty when nothing was reported.
+  sevenDayWatch: SevenDayWatchItem[];
   polestarView: string;
   // Present only for sparse reports (§27).
   shortReport: string | null;
@@ -1946,7 +2807,7 @@ export interface CountryNarrative {
 
 // §27 sparse short-report text.
 const SPARSE_REPORT_TEXT =
-  "Reporting was limited this period. No significant validated security events were recorded, and no further analysis is warranted.";
+  "Reporting was limited this period. No significant security events were recorded, and no further analysis is warranted.";
 
 /**
  * Assemble the full country narrative. `events` are the already validated,
@@ -1967,8 +2828,8 @@ export function buildCountryNarrative(
   // §27 — sparse handling.
   if (events.length === 0) {
     const shortReport = opts.coverageUnconfirmed
-      ? `No validated security event is on file for ${countryName} this period, but collection coverage could not be confirmed, so the absence of records cannot be read as a quiet week. ${countryName} is Not Assessed for this period until coverage is restored and a full reporting window has been observed.`
-      : `Reporting was limited in ${countryName} this period. No significant validated security events were recorded, and no further analysis is warranted.`;
+      ? `No significant security event was reported in ${countryName} this period, but collection coverage could not be confirmed, so the absence of records cannot be read as a quiet week. ${countryName} is Not Assessed for this period until coverage is restored and a full reporting window has been observed.`
+      : `Reporting was limited in ${countryName} this period. No significant security events were recorded, and no further analysis is warranted.`;
     claims.push(
       makeClaim({
         claimText: shortReport,
@@ -1981,12 +2842,15 @@ export function buildCountryNarrative(
     return {
       isSparse: true,
       bluf: "",
+      keyDevelopments: [],
       topThree: [],
       categoryIntros: [],
       currentSituation: "",
+      businessImplications: "",
       operationalImpact: [],
       recommendations: [],
       outlook: "",
+      sevenDayWatch: [],
       polestarView: "",
       shortReport,
       claims,
@@ -2012,9 +2876,27 @@ export function buildCountryNarrative(
     sectionWordCounts[`Category: ${category}`] = countWords(intro.value);
   }
 
-  const currentSituation = buildCurrentSituation(events, countryName);
+  // The Current Situation must name every key development, so it is fed the
+  // same ranked selection the cards render.
+  const keyEventIds = new Set(topThree.value.map((d) => d.eventId));
+  const keyEvents = topThree.value
+    .map((d) => events.find((ev) => ev.eventId === d.eventId))
+    .filter((ev): ev is CanonicalEvent => Boolean(ev));
+  void keyEventIds;
+  const currentSituation = buildCurrentSituation(events, countryName, keyEvents);
   claims.push(...currentSituation.claims);
   sectionWordCounts["Current Situation"] = countWords(currentSituation.value);
+
+  const businessImplications = buildBusinessImplications(events, countryName, [
+    bluf.value,
+    currentSituation.value,
+  ]);
+  claims.push(...businessImplications.claims);
+  if (businessImplications.value) {
+    sectionWordCounts["Business Implications"] = countWords(
+      businessImplications.value,
+    );
+  }
 
   const operationalImpact = buildOperationalImpact(byCat);
   claims.push(...operationalImpact.claims);
@@ -2031,6 +2913,9 @@ export function buildCountryNarrative(
   claims.push(...outlook.claims);
   sectionWordCounts["Outlook"] = countWords(outlook.value);
 
+  const sevenDayWatch = buildSevenDayWatch(opts.forwardEvents ?? [], countryName);
+  claims.push(...sevenDayWatch.claims);
+
   const polestarView = buildPolestarView(
     events,
     {
@@ -2045,12 +2930,15 @@ export function buildCountryNarrative(
   return {
     isSparse: false,
     bluf: bluf.value,
+    keyDevelopments: topThree.value,
     topThree: topThree.value,
     categoryIntros,
     currentSituation: currentSituation.value,
+    businessImplications: businessImplications.value,
     operationalImpact: operationalImpact.value,
     recommendations: recommendations.value,
     outlook: outlook.value,
+    sevenDayWatch: sevenDayWatch.value,
     polestarView: polestarView.value,
     shortReport: null,
     claims,

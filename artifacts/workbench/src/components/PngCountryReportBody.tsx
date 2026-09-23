@@ -7,6 +7,7 @@ import type {
   PngReportItem,
 } from "@/lib/pngReportDataset";
 import type { JakartaOperatingPictureRow } from "@/lib/jakartaBrief";
+import type { SevenDayWatchItem } from "@workspace/country-engine/narrative";
 import {
   buildCountryIncidentThemes,
   buildOperationalImpactBullets,
@@ -228,7 +229,7 @@ function ItemCard({
             lineHeight: "22px",
           }}
         >
-          {item.developmentTitle ?? item.title}
+          {item.developmentTitle ?? item.shortTitle ?? item.title}
         </div>
         <div style={{ flexShrink: 0 }}>
           <SeverityChip item={item} />
@@ -249,6 +250,16 @@ function ItemCard({
           {bodyText}
         </div>
       )}
+      {!compact && item.polestarLine ? (
+        <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 6, lineHeight: 1.5, textAlign: "left" }}>
+          <strong style={{ color: NAVY }}>Polestar View:</strong> {item.polestarLine}
+        </div>
+      ) : null}
+      {!compact && item.sevenDayIndicator ? (
+        <div style={{ fontFamily: ROBOTO, fontSize: 12, color: DUSK, marginTop: 4, lineHeight: 1.5, textAlign: "left" }}>
+          <strong style={{ color: NAVY }}>Next seven days:</strong> {item.sevenDayIndicator}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -364,6 +375,37 @@ function OperatingPictureTable({ rows }: { rows: JakartaOperatingPictureRow[] })
   );
 }
 
+function SevenDayWatchTable({ rows }: { rows: SevenDayWatchItem[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <table
+      data-pdf-keep="true"
+      style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed", marginTop: 4 }}
+    >
+      <thead>
+        <tr>
+          <th style={{ ...baseHeadCell, width: "14%" }}>Date</th>
+          <th style={{ ...baseHeadCell, width: "16%" }}>Location</th>
+          <th style={{ ...baseHeadCell, width: "24%" }}>Event</th>
+          <th style={{ ...baseHeadCell, width: "26%" }}>Why it matters</th>
+          <th style={{ ...baseHeadCell, width: "20%" }}>Watch</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={row.event + row.date} style={{ background: i % 2 === 1 ? ROW_TINT : "#fff" }}>
+            <td style={{ ...baseCell, fontWeight: 600, color: NAVY }}>{row.date}</td>
+            <td style={baseCell}>{row.location}</td>
+            <td style={baseCell}>{row.event}</td>
+            <td style={baseCell}>{row.whyItMatters}</td>
+            <td style={baseCell}>{row.watch}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function WatchLine({ label, text }: { label: string; text: string }) {
   return (
     <p
@@ -414,7 +456,14 @@ export default function PngCountryReportBody({
   editUi?: {
     sectionChrome: (key: string, hidden: boolean) => ReactNode;
     prose?: Partial<
-      Record<"bluf" | "executiveSummary" | "outlook" | "polestarView", ReactNode>
+      Record<
+        | "bluf"
+        | "executiveSummary"
+        | "businessImplications"
+        | "outlook"
+        | "polestarView",
+        ReactNode
+      >
     >;
     // Top 3 Developments curation chrome: per-card controls (remove from the
     // section, set severity) rendered inside each tile, and an "add a
@@ -442,7 +491,12 @@ export default function PngCountryReportBody({
   const hiddenStub = (key: string): ReactNode =>
     editUi && hidden.has(key) ? editUi.sectionChrome(key, true) : null;
   const prose = (
-    field: "bluf" | "executiveSummary" | "outlook" | "polestarView",
+    field:
+      | "bluf"
+      | "executiveSummary"
+      | "businessImplications"
+      | "outlook"
+      | "polestarView",
     node: ReactNode,
   ): ReactNode => editUi?.prose?.[field] ?? node;
 
@@ -463,13 +517,6 @@ export default function PngCountryReportBody({
     d.recommendedActions,
     d.briefProseOverrides?.actionGroups,
   );
-  // Operating-risk briefs (Indonesia / Thailand / Philippines / generic) render
-  // a FLAT recommended-actions list (businessImpact). It is editable through
-  // the same actionGroups store under the reserved key "business-impact".
-  const businessImpact = overrideActionGroups(
-    [{ key: "business-impact", actions: d.businessImpact }],
-    d.briefProseOverrides?.actionGroups,
-  )[0].actions;
   // Cap the generic Operational Impact list (≤5) and Outlook escalation
   // indicators (≤3). Jakarta returns below with its approved compact layout.
   const operationalImpact =
@@ -511,7 +558,7 @@ export default function PngCountryReportBody({
             headline section with nothing in it reads as a contradiction. */}
         {hiddenStub("top-3")}
         {show("top-3") && topThree.length > 0 && (
-          <Section title="Top Developments" extras={chrome("top-3")}>
+          <Section title="Key Developments" extras={chrome("top-3")}>
             <div>{topThree.map((it) => <ItemCard key={it.id} item={it} suppressEmptyLocation />)}</div>
           </Section>
         )}
@@ -572,7 +619,7 @@ export default function PngCountryReportBody({
           section is omitted entirely rather than rendered around a filler line. */}
       {hiddenStub("top-3")}
       {show("top-3") && (topThree.length > 0 || editUi?.top3Extras != null) && (
-        <Section title="Top Developments" extras={chrome("top-3")}>
+        <Section title="Key Developments" extras={chrome("top-3")}>
           <div>
             {topThree.map((it) => (
               <div key={it.id}>
@@ -627,6 +674,23 @@ export default function PngCountryReportBody({
       </Section>
       )}
       {mapAt("after-incident-details")}
+
+      {/* 4. Business Implications - what the period means commercially.
+          Omitted when the engine has nothing evidence-backed to say. */}
+      {hiddenStub("business-implications")}
+      {show("business-implications") &&
+        ((d.businessImplications ?? "").trim() !== "" ||
+          editUi?.prose?.businessImplications != null) && (
+        <Section title="Business Implications" extras={chrome("business-implications")}>
+          {prose(
+            "businessImplications",
+            (d.businessImplications ?? "").trim() !== "" ? (
+              <Prose text={d.businessImplications} />
+            ) : null,
+          )}
+        </Section>
+      )}
+
       {mapAt("before-outlook")}
 
       {/* 4. Actions & Outlook — the merged forward-looking block (owner ruling,
@@ -636,10 +700,9 @@ export default function PngCountryReportBody({
       {hiddenStub("actions-outlook")}
       {show("actions-outlook") &&
         (operationalImpact.length > 0 ||
-          (d.proseVariant === "operating-risk"
-            ? d.businessImpact.length > 0
-            : d.recommendedActions.length > 0) ||
+          d.recommendedActions.length > 0 ||
           d.outlook.trim() !== "" ||
+          (d.sevenDayWatch ?? []).length > 0 ||
           editUi?.prose?.outlook != null) && (
       <Section title="Actions & Outlook" extras={chrome("actions-outlook")}>
         {operationalImpact.length > 0 && (
@@ -648,24 +711,15 @@ export default function PngCountryReportBody({
             <BulletList items={operationalImpact} />
           </div>
         )}
-        {(d.proseVariant === "operating-risk"
-          ? d.businessImpact.length > 0
-          : recommendedActions.length > 0) && (
+        {recommendedActions.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             <StrandLabel>Recommended Actions</StrandLabel>
-            {d.proseVariant === "operating-risk" ? (
-              <>
-                <BulletList items={businessImpact} />
-                {editUi?.actionGroupEditor?.("business-impact", d.businessImpact)}
-              </>
-            ) : (
-              recommendedActions.map((g, idx) => (
-                <div key={g.key}>
-                  <ActionGroup heading={g.heading} actions={g.actions} />
-                  {editUi?.actionGroupEditor?.(g.key, d.recommendedActions[idx]?.actions ?? [])}
-                </div>
-              ))
-            )}
+            {recommendedActions.map((g, idx) => (
+              <div key={g.key}>
+                <ActionGroup heading={g.heading} actions={g.actions} />
+                {editUi?.actionGroupEditor?.(g.key, d.recommendedActions[idx]?.actions ?? [])}
+              </div>
+            ))}
           </div>
         )}
         {(d.outlook.trim() !== "" || editUi?.prose?.outlook != null) && (
@@ -699,6 +753,12 @@ export default function PngCountryReportBody({
             ) : null}
           </>
         )}
+        {(d.sevenDayWatch ?? []).length > 0 ? (
+          <div style={{ marginTop: 12 }}>
+            <StrandLabel>7 Day Watch</StrandLabel>
+            <SevenDayWatchTable rows={d.sevenDayWatch ?? []} />
+          </div>
+        ) : null}
       </Section>
       )}
       {mapAt("before-polestar")}

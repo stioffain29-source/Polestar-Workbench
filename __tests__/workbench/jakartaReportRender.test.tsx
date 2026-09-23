@@ -58,7 +58,7 @@ function textOf(html: string): string {
 
 const APPROVED_SECTIONS = [
   "Bottom Line Up Front",
-  "Top Developments",
+  "Key Developments",
   "Area Situation This Week",
   "Crime & Escalation Watch",
   "Recommended Actions",

@@ -60,6 +60,10 @@ export const ISSUE_CATEGORIES = [
   "Road and rail",
   "Utilities",
   "Telecommunications",
+  // Cyber and digital-infrastructure incidents (ransomware, data breach,
+  // intrusion, service-affecting cyber attack). Collection must check this
+  // domain for every country report, so the taxonomy has to carry it.
+  "Cyber incident",
   "Infrastructure",
   "Fire and accident",
   "Natural hazard",

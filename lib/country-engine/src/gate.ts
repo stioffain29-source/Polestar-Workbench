@@ -74,17 +74,40 @@ export interface QualityGateResult {
 // ---------------------------------------------------------------------------
 
 export const SECTION_WORD_LIMITS: Record<string, number> = {
-  "Bottom Line Up Front": 120,
+  "Bottom Line Up Front": 130,
   "Category Introduction": 90, // per category
-  "Current Situation": 120,
+  "Current Situation": 400,
+  "Business Implications": 250,
   "Operational Impact": 50, // per category
-  "Recommended Actions": 22, // per action
+  "Recommended Actions": 26, // per action
   Outlook: 150,
-  "Pole Star View": 180,
+  "Pole Star View": 140,
   "Map Read": 120,
 };
 
+// Section length FLOORS. A section that comes in short is visible but never
+// blocks an export: a quiet week is allowed to produce a short brief.
+export const SECTION_WORD_MINIMUMS: Record<string, number> = {
+  "Bottom Line Up Front": 100,
+  "Current Situation": 250,
+  "Business Implications": 150,
+  "Pole Star View": 100,
+};
+
 const RECOMMENDATIONS_MAX_ACTIONS = 10;
+
+// Key Developments must number between three and six when the period produced
+// the material for them.
+const KEY_DEVELOPMENTS_MIN = 3;
+const KEY_DEVELOPMENTS_MAX = 6;
+
+/**
+ * Generic instructions that say nothing about the period's evidence. The
+ * engine refuses to write them; the gate refuses to publish them, whatever
+ * route they arrived by (analyst edit, saved override, older cached prose).
+ */
+const BOILERPLATE_ACTION_RE =
+  /\b(brief staff|monitor the situation|check emergency contacts|confirm journey plans)\b/i;
 
 // §4 — permanent exclusion reasons that must never become Low-severity filler.
 // (The whole set is a subset of ExclusionReason; we key the check on the
@@ -411,13 +434,38 @@ export function checkNoBannedPhrases(report: QualityGateReport): GateFailure[] {
       text: op.text,
     });
   }
+  if (n.businessImplications) {
+    blocks.push({
+      section: "Business Implications",
+      text: n.businessImplications,
+    });
+  }
   for (const td of n.topThree) {
-    blocks.push({ section: "Top Developments", text: td.factualSentence });
+    blocks.push({ section: "Key Developments", text: td.factualSentence });
     if (td.businessSentence)
       blocks.push({
-        section: "Top Developments",
+        section: "Key Developments",
         text: td.businessSentence,
       });
+    if (td.polestarSentence)
+      blocks.push({
+        section: "Key Developments",
+        text: td.polestarSentence,
+      });
+    if (td.sevenDayIndicator)
+      blocks.push({
+        section: "Key Developments",
+        text: td.sevenDayIndicator,
+      });
+  }
+  for (const item of n.sevenDayWatch ?? []) {
+    blocks.push({
+      section: "7 Day Watch",
+      text: `${item.event} ${item.whyItMatters} ${item.watch}`,
+    });
+  }
+  for (const rec of n.recommendations) {
+    blocks.push({ section: "Recommended Actions", text: rec.text });
   }
 
   for (const block of blocks) {
@@ -444,6 +492,7 @@ export function checkNoUnsupportedTrend(
   const blocks: { section: string; text: string }[] = [
     { section: "Bottom Line Up Front", text: n.bluf },
     { section: "Current Situation", text: n.currentSituation },
+    { section: "Business Implications", text: n.businessImplications ?? "" },
     { section: "Outlook", text: n.outlook },
     { section: "Pole Star View", text: n.polestarView },
   ];
@@ -510,6 +559,64 @@ export function checkSectionWordCounts(
         section: "Recommended Actions",
       });
     }
+  }
+
+  // Section floors — visible, never blocking (a quiet week may run short).
+  for (const [section, minimum] of Object.entries(SECTION_WORD_MINIMUMS)) {
+    const count = report.sectionWordCounts[section];
+    if (count == null || count === 0) continue;
+    if (count < minimum) {
+      failures.push({
+        check: "section_word_floor",
+        severity: "warning",
+        message: `${section} has ${count} words, below the ${minimum}-word target.`,
+        section,
+      });
+    }
+  }
+  return failures;
+}
+
+/**
+ * CONTENT — the Key Developments section carries between three and six items
+ * when the period produced the evidence for them. Reported as a warning: a
+ * genuinely quiet week is allowed to show fewer, and padding it would be the
+ * worse failure.
+ */
+export function checkKeyDevelopmentCount(
+  report: QualityGateReport,
+): GateFailure[] {
+  const n = report.narrative;
+  if (n.isSparse) return [];
+  const count = n.topThree.length;
+  if (count >= KEY_DEVELOPMENTS_MIN && count <= KEY_DEVELOPMENTS_MAX) return [];
+  return [
+    {
+      check: "key_development_count",
+      severity: count > KEY_DEVELOPMENTS_MAX ? "critical" : "warning",
+      message: `Key Developments carries ${count} items; the section takes between ${KEY_DEVELOPMENTS_MIN} and ${KEY_DEVELOPMENTS_MAX}.`,
+      section: "Key Developments",
+    },
+  ];
+}
+
+/**
+ * CONTENT — no generic boilerplate action. An instruction that would read the
+ * same in any report of any country carries no information, so it blocks.
+ */
+export function checkNoBoilerplateActions(
+  report: QualityGateReport,
+): GateFailure[] {
+  const failures: GateFailure[] = [];
+  for (const rec of report.narrative.recommendations) {
+    const match = rec.text.match(BOILERPLATE_ACTION_RE);
+    if (!match) continue;
+    failures.push({
+      check: "no_boilerplate_action",
+      severity: "critical",
+      message: `Recommended action "${rec.text}" is generic boilerplate ("${match[0]}"); actions must be written from this period's evidence.`,
+      section: "Recommended Actions",
+    });
   }
   return failures;
 }
@@ -580,6 +687,8 @@ const ALL_CHECKS: ((r: QualityGateReport) => GateFailure[])[] = [
   checkSectionWordCounts,
   checkNoLowSeverityFiller,
   checkRecommendationsLinked,
+  checkKeyDevelopmentCount,
+  checkNoBoilerplateActions,
 ];
 
 /**

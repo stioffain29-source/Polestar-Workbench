@@ -364,9 +364,9 @@ describe("section word caps (§31)", () => {
     expect(countWords(value)).toBeLessThanOrEqual(90);
   });
 
-  it("current situation ≤120 words", () => {
+  it("current situation ≤400 words", () => {
     const { value } = buildCurrentSituation(events, "Papua New Guinea");
-    expect(countWords(value)).toBeLessThanOrEqual(120);
+    expect(countWords(value)).toBeLessThanOrEqual(400);
   });
 
   it("outlook ≤150 words", () => {
@@ -444,10 +444,13 @@ describe("buildTopThree (§14)", () => {
       makeEvent({ severity: "High" }),
     ];
     const { value } = buildTopThree(events);
-    expect(value).toHaveLength(3);
+    // Key Developments carries between three and six items.
+    expect(value.length).toBeGreaterThanOrEqual(3);
+    expect(value.length).toBeLessThanOrEqual(6);
     expect(value[0].severity).toBe("Extreme");
     for (const td of value) {
       expect(td.factualSentence.length).toBeGreaterThan(0);
+      expect(countWords(td.shortTitle)).toBeLessThanOrEqual(10);
     }
   });
 
@@ -612,13 +615,18 @@ describe("buildTopThree (§14)", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildRecommendations (§20)", () => {
-  const approvedTexts = new Set(APPROVED_RECOMMENDATIONS.map((r) => r.text));
+  const approvedGroups = new Set(APPROVED_RECOMMENDATIONS.map((r) => r.group));
 
-  it("only returns actions from the approved menu", () => {
+  it("only returns actions from the approved menu, never generic boilerplate", () => {
     const events = [makeEvent(), makeEvent({ issueCategory: "Civil unrest" })];
     const { value } = buildRecommendations(events);
+    expect(value.length).toBeGreaterThan(0);
     for (const rec of value) {
-      expect(approvedTexts.has(rec.text)).toBe(true);
+      expect(approvedGroups.has(rec.group)).toBe(true);
+      expect(rec.text.trim().length).toBeGreaterThan(0);
+      expect(rec.text).not.toMatch(
+        /brief staff|monitor the situation|check emergency contacts|confirm journey plans/i,
+      );
     }
   });
 
@@ -633,9 +641,9 @@ describe("buildRecommendations (§20)", () => {
   });
 
   it("returns no recommendations when nothing triggers them", () => {
-    // A monitor-only health event triggers none of the movement/violence menu.
+    // A monitor-only event in a category with no operational trigger.
     const e = makeEvent({
-      issueCategory: "Health",
+      issueCategory: "Other operational disruption",
       secondaryCategories: [],
       confirmedOperationalEffect: null,
     });
