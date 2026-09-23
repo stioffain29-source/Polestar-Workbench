@@ -1619,3 +1619,45 @@ mtime_ms = 1790059909688
 storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/515a37fc-1e03-488e-85c4-6b0c2a4a26fa/c3b65af3-b0ee-42f2-a597-d249eaca5f8e"
 storage_version_token = "1790059927644150"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "ha8nGCXI3NAh_SE5ayWt0"
+uri = "file://screenshots/picker-1-on-open.png"
+type = "image"
+title = "Linked Incidents — on opening New Spot Report"
+description = "Eight incidents listed straight away, before anything is typed."
+logical_id = "36647838-8566-48bd-a106-fb693ff10e37"
+content_hash = "sha256:d63335a41b839e98158b4b63de07bce259a7f586a12b3e959de79d17cc7e83e1"
+size = 72109
+mtime_ms = 1790141807662
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/36647838-8566-48bd-a106-fb693ff10e37/02932c0a-fe6a-4154-9c34-b5b2e788e5d1"
+storage_version_token = "1790141815586206"
+content_type = "image/png"
+
+[[outputs]]
+id = "tjtrr_Wx2J8FSLfiSrESS"
+uri = "file://screenshots/picker-2-search-jakarta.png"
+type = "image"
+title = "Linked Incidents — searching \"jakarta\""
+description = "Twelve matches returned from the full archive, not just the recent slice."
+logical_id = "ddddd65c-26ae-4385-a473-68fe8c807c13"
+content_hash = "sha256:58bbaffa440df53a14d7dce9c3acc5cab979a326bd9686eb269ad0c822a68626"
+size = 68969
+mtime_ms = 1790141809010
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/ddddd65c-26ae-4385-a473-68fe8c807c13/f78211d3-5953-4d40-b0bd-b0d45c8388e2"
+storage_version_token = "1790141816940466"
+content_type = "image/png"
+
+[[outputs]]
+id = "Vm-hJw2t4VlZyGffM793b"
+uri = "file://screenshots/picker-3-linked.png"
+type = "image"
+title = "Linked Incidents — after clicking a result"
+description = "The incident is attached to the report as a chip."
+logical_id = "de9b34fe-f01b-48d2-af81-21b028982dff"
+content_hash = "sha256:e151c2cd26e5551583fb98f3bde0d8be661fda90fb9df31b3a687b4d20f08295"
+size = 76911
+mtime_ms = 1790141810378
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:0dd4000f-972f-4f2c-8dc9-5edcdbcaee32/de9b34fe-f01b-48d2-af81-21b028982dff/7b6b3e0d-5c46-4caa-b2aa-d3545dc455b2"
+storage_version_token = "1790141818259384"
+content_type = "image/png"
