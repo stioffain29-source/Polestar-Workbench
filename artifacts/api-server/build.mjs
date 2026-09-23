@@ -19,6 +19,10 @@ async function buildAll() {
       path.resolve(artifactDir, "src/index.ts"),
       path.resolve(artifactDir, "src/ingestWorker.ts"),
       path.resolve(artifactDir, "src/regionalReportWorker.ts"),
+      // Country-engine reprocess runs in its own process: the work is CPU-bound
+      // over every country's 120-day window and used to stall the API's event
+      // loop for minutes after a rule-version publish.
+      path.resolve(artifactDir, "src/countryEngineWorker.ts"),
     ],
     platform: "node",
     bundle: true,

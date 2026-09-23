@@ -156,4 +156,5 @@
 - [Background job reclaim independence](background-job-reclaim-independence.md) — a durable job's recovery pass must arm its timer BEFORE its first pass and never sit behind migrations; status endpoint reclaims stale runs on read or the waiting page spins forever.
 - [PDF SVG rasterisation width](pdf-svg-raster-layout-width.md) — size the replacement canvas to the SVG's LAID-OUT box; a viewBox-sized one overflows the capture frame and gets cropped.
 - [Market price publisher lag](market-price-publisher-lag.md) — an old "as of" date is usually the source's release cadence; check upstream newest vs stored row before touching ingest.
+- [Country-engine reprocess worker](country-engine-reprocess-worker.md) — CPU-bound boot reprocess MUST fork (inline = silent dead app); write fence only accepts polestar-app:v2:*/maintenance/active ingest app names; one advisory lock per slug.
 - [24h map review queue](map-review-queue-clearing.md) — dismiss AND test every folded member id (representative is re-picked each poll); hide reviewed markers on 24h only.
