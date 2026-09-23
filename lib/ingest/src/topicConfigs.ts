@@ -986,6 +986,32 @@ const APAC_LOCAL_ALIASES: CountryAlias[] = [
   { canonical: "Singapore", aliases: ["singapore", "singapura"] },
   { canonical: "Timor-Leste", aliases: ["timor-leste", "timor leste", "east timor", "timor timur", "dili"] },
   { canonical: "Brunei", aliases: ["brunei"] },
+  {
+    // Myanmar's own entry must precede the COUNTRY_ALIASES spread below: that
+    // one knows the country and three cities, which is enough for wire
+    // coverage of the civil war but not for city reporting. Yangon stories
+    // name the TOWNSHIP, so without these a Sanchaung fire or an Insein raid
+    // never attributes to Myanmar at all.
+    canonical: "Myanmar",
+    aliases: [
+      "myanmar", "burma", "burmese", "yangon", "rangoon", "mandalay",
+      "naypyidaw", "nay pyi taw", "sittwe", "mawlamyine", "pathein",
+      "taunggyi", "monywa", "meiktila", "magway", "myitkyina", "lashio",
+      "myawaddy", "kyaukphyu", "hpa-an", "sagaing", "rakhine", "arakan",
+      "kachin", "shan state", "karen state", "kayah", "chin state",
+      "mon state", "ayeyarwady",
+      // Yangon townships. "Bahan" and "Dala" townships are deliberately
+      // omitted — both sit inside common Bahasa words ("bahan" = material,
+      // "dalam" = inside) carried by the Indonesian outlets on this topic —
+      // and "Bago" is omitted because Bago City in Negros Occidental would
+      // pull Philippine stories into Myanmar.
+      "sanchaung", "hlaing tharyar", "hlaingthaya", "insein", "thingangyun",
+      "mingaladon", "north okkalapa", "south okkalapa", "shwepyithar",
+      "thaketa", "tamwe", "kamayut", "mayangone", "botataung", "pazundaung",
+      "kyauktada", "lanmadaw", "kyimyindaing", "thanlyin", "twante",
+      "shwedagon",
+    ],
+  },
   { canonical: "Indonesia", aliases: INDONESIA_BROAD_ALIASES },
   // Wider regional-weekly discovery footprint. Existing country-specific
   // entries above retain precedence; these aliases let the six dedicated
@@ -1023,6 +1049,20 @@ const APAC_LOCAL_FEEDS: TopicFeed[] = [
   // Thailand
   { q: "", label: "Bangkok Post", directUrl: "https://www.bangkokpost.com/rss/data/most-recent.xml", sourceName: "Bangkok Post", defaultCountry: "Thailand" },
   { q: "", label: "Khaosod English", directUrl: "https://www.khaosodenglish.com/feed/", sourceName: "Khaosod English", defaultCountry: "Thailand" },
+  // Myanmar. Every other Myanmar feed in the pipeline is war-led or vertical
+  // (junta/airstrike, fuel, fertiliser, cyber), so the country's CITY
+  // reporting — fires, robbery, crackdowns, conscription sweeps, transport —
+  // had no path in at all. The Irrawaddy, Mizzima, Frontier and GNLM all 403
+  // an automated fetch, so these three are the live English desks.
+  { q: "", label: "Myanmar Now", directUrl: "https://myanmar-now.org/en/feed/", sourceName: "Myanmar Now", defaultCountry: "Myanmar" },
+  { q: "", label: "DVB English", directUrl: "https://english.dvb.no/feed/", sourceName: "DVB", defaultCountry: "Myanmar" },
+  { q: "", label: "BNI Online", directUrl: "https://www.bnionline.net/en/rss.xml", sourceName: "Burma News International", defaultCountry: "Myanmar" },
+  // Place-anchored city query. A nationwide "Myanmar" OR-query is rank-capped
+  // by wire coverage of the civil war, so the cities' own incidents never
+  // reach the feed however fresh the scrape is. Anchoring on the city names
+  // pulls the city's reporting instead. Myanmar has no Google News edition of
+  // its own, so this uses the US edition like the other Myanmar targets.
+  { label: "Myanmar cities", q: `(Yangon OR Rangoon OR Mandalay OR Naypyidaw) (fire OR blaze OR robbery OR murder OR stabbing OR arrested OR crackdown OR raid OR explosion OR bomb OR protest OR strike OR accident OR flood OR conscription) when:7d`, defaultCountry: "Myanmar", hl: "en-US", gl: "US", ceid: "US:en" },
   // Regional security / terrorism desk (multi-country → Unknown default)
   { q: "", label: "BenarNews", directUrl: "https://www.benarnews.org/english/rss", sourceName: "BenarNews", defaultCountry: "Unknown" },
   // Regional Weekly: independent discovery domains across both report
@@ -1175,6 +1215,38 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "water rationing", "water restriction", "water cut", "water outage",
     "water contamination", "el nino", "el niño",
     "kekeringan", "krisis air",
+    // fire — the dominant urban emergency in Yangon, Mandalay, Manila and
+    // Bangkok reporting, and the gate had NO fire vocabulary, so every
+    // structure fire was dropped while "arson" and "explosion" passed. Bound
+    // phrases only: the bare token "fire" sits inside "firearm", "fireworks",
+    // "misfire" and the benign "fired from".
+    "fire broke out", "house fire", "factory fire",
+    "market fire", "apartment fire", "warehouse fire", "shophouse fire",
+    "structure fire", "fire destroyed", "fire damaged", "fire kills",
+    "killed in a fire", "died in a fire", "gutted by fire", "razed by fire",
+    "engulfed in flames", "up in flames", "firefighters",
+    "blaze at", "blaze in", "blaze broke", "blaze that", "blaze destroyed",
+    "massive blaze", "huge blaze", "blaze engulfed",
+    "caught fire", "set on fire", "on fire in", "on fire after",
+    "building on fire", "house on fire", "shop on fire", "market on fire",
+    "factory on fire", "bus on fire", "car on fire",
+    "fire breakout", "fire breaks out", "fire broke",
+    "kebakaran", "sunog",
+    // Verb and plural forms the noun-only crime cues miss. hay.includes()
+    // is literal, so "robbery" does not match "robberies" and "theft" does
+    // not match "stolen" — the exact gap that dropped Mandalay's armed
+    // motorcycle robberies and a hospital equipment theft. Raids are bound
+    // to a qualifier because the bare token sits inside "braided"/"afraid".
+    "robberies", "thieves", "burglary", "break-in", "stolen from",
+    "stolen goods", "stolen vehicle", "stolen motorcycle",
+    "opened fire", "shot and killed", "detonated",
+    "explosive device", "car accident", "road crash",
+    "police raid", "military raid", "junta raid", "in a raid",
+    "during a raid", "raided a", "raided the",
+    // forced recruitment — the single largest driver of civilian movement
+    // risk in Myanmar's cities, reported as conscription sweeps at
+    // checkpoints and workplaces rather than as "crackdown".
+    "conscription", "forced recruitment", "forcibly recruited",
   ],
   deny: [
     ...COMMON_DENY,
@@ -1190,6 +1262,10 @@ export const APAC_LOCAL_CONFIG: NewsTopicConfig = {
     "lowongan kerja",
     // product demos (the "demo" homonym)
     "demo produk", "demo masak", "demo memasak",
+    // Ad-slot placeholders. The BNI Online feed interleaves its advertising
+    // slots as items, and one of them ("bni_election_parnorama_A") matched
+    // the "election" cue and was accepted as an incident.
+    "bni_", "taxonomy ads", "featured news ads", "headline news ads",
   ],
   countryAliases: APAC_LOCAL_ALIASES,
   // Direct outlets span national agencies, major dailies and small regional

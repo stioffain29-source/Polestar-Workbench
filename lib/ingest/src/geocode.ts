@@ -167,6 +167,43 @@ const CITY_COORDS: Record<string, { lat: number; lng: number; name?: string }> =
   sagaing: { lat: 21.88, lng: 95.98 },
   loikaw: { lat: 19.67, lng: 97.21 },
   "hpa-an": { lat: 16.89, lng: 97.63, name: "Hpa-An" },
+  bago: { lat: 17.34, lng: 96.48 },
+  mawlamyine: { lat: 16.49, lng: 97.63 },
+  pathein: { lat: 16.78, lng: 94.73 },
+  taunggyi: { lat: 20.79, lng: 97.04 },
+  monywa: { lat: 22.11, lng: 95.14 },
+  meiktila: { lat: 20.88, lng: 95.86 },
+  magway: { lat: 20.15, lng: 94.93 },
+  myawaddy: { lat: 16.69, lng: 98.51 },
+  kyaukphyu: { lat: 19.43, lng: 93.55, name: "Kyaukphyu" },
+  // Yangon townships. City reporting names the township ("a fire in
+  // Sanchaung", "a raid in Insein"), which resolved to the Myanmar centroid
+  // 550km up-country and so never appeared as Yangon on any map or brief.
+  // They all resolve to the city itself — township-level coordinates would
+  // imply a precision the source text does not carry.
+  sanchaung: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  "hlaing tharyar": { lat: 16.84, lng: 96.17, name: "Yangon" },
+  hlaingthaya: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  insein: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  thingangyun: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  mingaladon: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  "north okkalapa": { lat: 16.84, lng: 96.17, name: "Yangon" },
+  "south okkalapa": { lat: 16.84, lng: 96.17, name: "Yangon" },
+  shwepyithar: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  thaketa: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  tamwe: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  kamayut: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  mayangone: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  botataung: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  pazundaung: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  kyauktada: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  lanmadaw: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  kyimyindaing: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  shwedagon: { lat: 16.84, lng: 96.17, name: "Yangon" },
+  thanlyin: { lat: 16.75, lng: 96.26, name: "Thanlyin" },
+  // Twante sits across the river from Yangon, outside the city proper, so it
+  // keeps its own coordinates rather than being folded into Yangon.
+  twante: { lat: 16.71, lng: 95.93, name: "Twante" },
   // Nepal
   kathmandu: { lat: 27.72, lng: 85.32 },
   pokhara: { lat: 28.21, lng: 83.99 },
