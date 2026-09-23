@@ -32,6 +32,8 @@ import {
   ALL_SEVERITY_TOPICS,
   SEVERITY_BACKFILL_NOTE_PREFIXES,
   nextSeverityForRow,
+  mentionsBenefitTransfer,
+  isAssistanceAftermathItem,
   type SeverityTopic,
   detectStaleEventDate,
   geocode,
@@ -4933,6 +4935,124 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (sevErr) {
       logger.error({ err: sevErr }, "Severity re-rate failed");
+    }
+
+    // One-time DEMOTION of welfare / compensation AFTERMATH rows that the old
+    // classifier rated on their victim reference. "Beasiswa Keluarga ASN Korban
+    // Penembakan di Papua" (scholarships for the families of civil servants
+    // shot in Papua) is a payment announcement, but "korban penembakan" tripped
+    // the violence tiers, so West Papua carried High-severity map markers whose
+    // text is a cheque. classifySeverity now caps this class at Low; stored rows
+    // need the one-time heal because severity is written once at ingest.
+    //
+    // Deliberately NARROW rather than a full re-rate (bumping the marker above):
+    // it touches ONLY rows the guard itself identifies, and only ever downward,
+    // so it cannot quietly re-rate unrelated history as a side effect.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_assistance_aftermath_demote_v5";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        // Upward repair is only legitimate where an EARLIER, looser revision of
+        // this heal ran and could have flattened a benefit-titled row to a flat
+        // Low. Where it never ran (production, and any fresh environment) this
+        // pass is strictly demote-only, so it can never invent severity.
+        const priorHeal = await db.execute(sql`
+          SELECT 1 FROM app_migration_markers
+          WHERE key IN (
+            'severity_assistance_aftermath_demote_v1',
+            'severity_assistance_aftermath_demote_v2',
+            'severity_assistance_aftermath_demote_v3',
+            'severity_assistance_aftermath_demote_v4'
+          )
+          LIMIT 1
+        `);
+        const repairUpward = (priorHeal.rowCount ?? 0) > 0;
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, ALL_SEVERITY_TOPICS),
+              or(
+                ...SEVERITY_BACKFILL_NOTE_PREFIXES.map((prefix) =>
+                  like(incidentsTable.analystNotes, `${prefix}%`),
+                ),
+              ),
+            ),
+          );
+        const writes = candidates.flatMap((r) => {
+          // Scope: any machine row whose TITLE names a welfare transfer. That
+          // is the candidate class the guard reasons about, and it is
+          // deliberately WIDER than the guard's own verdict so this pass also
+          // REPAIRS a benefit-titled row that an earlier, looser revision of
+          // this heal flattened (a blackout-compensation story is a real
+          // disruption story, not aftermath copy).
+          if (!mentionsBenefitTransfer(r.title)) return [];
+          // Route the new tier through nextSeverityForRow rather than writing a
+          // flat "low": it applies the current classifier (cap included) and
+          // the structured GDELT fatality floor exactly like the main backfill,
+          // so a row with a confirmed toll can never be demoted below what that
+          // toll implies, and no tier is hand-picked here.
+          // Safe: the query above already scoped topic to ALL_SEVERITY_TOPICS.
+          const topic = r.topic as SeverityTopic;
+          const next = nextSeverityForRow({
+            title: r.title,
+            summary: r.summary,
+            topic,
+            fatalities: r.fatalities,
+          });
+          if (next === r.severity) return [];
+          const prevRank = SEVERITY_RANK[r.severity as Severity];
+          const goingUp = prevRank === undefined || SEVERITY_RANK[next] > prevRank;
+          if (goingUp) {
+            // Restore ONLY what an earlier revision could have written: it
+            // wrote a flat Low. Anything else is left alone — a general
+            // re-rate belongs to backfillSeverity, not to this narrow heal.
+            return repairUpward && r.severity === "low" ? [{ id: r.id, next }] : [];
+          }
+          // Downward: only rows the guard itself identifies as aftermath copy.
+          if (!isAssistanceAftermathItem(r.title, r.summary ?? "", topic)) return [];
+          return [{ id: r.id, next }];
+        });
+        // POOL-BOUNDED chunked writes (shared pg Pool is max:10).
+        const CHUNK = 8;
+        for (let i = 0; i < writes.length; i += CHUNK) {
+          const chunk = writes.slice(i, i + CHUNK);
+          await Promise.all(
+            chunk.map((w) =>
+              db
+                .update(incidentsTable)
+                .set({ severity: w.next })
+                .where(eq(incidentsTable.id, w.id)),
+            ),
+          );
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { marker: markerKey, scanned: candidates.length, demoted: writes.length },
+          "One-time demotion of assistance/compensation aftermath incidents",
+        );
+      }
+    } catch (assistErr) {
+      logger.error({ err: assistErr }, "Assistance-aftermath severity demotion failed");
     }
 
     // NOTE: an earlier boot migration (`delete_telegram_social_watch_v1`) purged

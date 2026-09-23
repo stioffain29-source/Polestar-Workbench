@@ -640,6 +640,155 @@ export function isBurialOrFuneralEvent(title: string, summary: string): boolean 
   return BURIAL_RE.test(`${title}\n${summary}`);
 }
 
+// ---------------------------------------------------------------------------
+// Assistance / compensation AFTERMATH guard.
+//
+// A welfare announcement for the families of an earlier attack ("Beasiswa
+// Keluarga ASN Korban Penembakan di Papua" — scholarships for the families of
+// civil servants shot in Papua) is a payment story, not a security event. Its
+// kinetic word only identifies WHO the beneficiaries are, but it sits in the
+// same clause as the handover, so every violence tier below fires and the row
+// stores as High. The shooting itself carries its own row and its own rating;
+// the cheque must not re-assert it as fresh High-severity violence.
+//
+// Precision rules:
+//   * The benefit must be an unambiguous welfare/relief TRANSFER (scholarship,
+//     compensation, ex-gratia, santunan, beasiswa). A bare "bantuan"/"help"/
+//     "aid" is deliberately excluded — far too broad.
+//   * It must appear in the TITLE, so a body-text mention of compensation
+//     inside a live attack report can never demote that report.
+//   * The kinetic token must sit INSIDE a bounded victim-reference phrase
+//     ("families of the shooting victims", "korban penembakan"). That span is
+//     stripped and the REMAINDER re-tested: any surviving violence, casualty
+//     count or live security action vetoes the demotion.
+//   * DEMOTE-ONLY, and only as far as Low. Nothing is ever up-rated, and a row
+//     already at or below Low is untouched.
+const BENEFIT_TRANSFER_RE =
+  /\b(?:scholarships?|bursar(?:y|ies)|compensation|ex[- ]gratia|condolence (?:payment|money|fund)s?|solatium|insurance payout|death benefits?|financial (?:aid|assistance|support)|relief (?:fund|funds|payment|package))\b|\b(?:beasiswa|santunan|tali asih|uang duka|kompensasi|asuransi|bantuan (?:sosial|keuangan|dana|tunai|pendidikan))\b/i;
+
+// Bounded spans in which a violence word is only describing the beneficiaries.
+const VICTIM_REFERENCE_SPAN_RE = new RegExp(
+  [
+    String.raw`\b(?:famil(?:y|ies)|kin|next of kin|relatives?|widows?|orphans?|survivors?|dependa(?:nt|nts|nt's)?|dependents?|heirs?|victims?)\b[^.!?]{0,40}?\bof\b\s+(?:the\s+|a\s+|an\s+)?(?:\w+\s+){0,3}?(?:shootings?|attacks?|killings?|murders?|ambush(?:es)?|violence|clash(?:es)?|bombings?|blasts?|stabbings?|massacres?|riots?|unrest|conflict|kidnapp?ings?|abductions?)\b`,
+    String.raw`\b(?:shooting|attack|killing|murder|ambush|bomb(?:ing)?|blast|stabbing|massacre|riot|violence|clash|conflict|kidnapp?ing|abduction)\s+victims?\b`,
+    String.raw`\bkorban\s+(?:\w+\s+){0,2}?(?:penembakan|tertembak|ditembak|penyerangan|serangan|kekerasan|penganiayaan|pembunuhan|bentrokan|kerusuhan|konflik|bom|ledakan|penculikan|penyanderaan)\b`,
+  ].join("|"),
+  "gi",
+);
+
+// Anything left after the victim reference is stripped that still denotes a
+// real event: a fresh killing, an act verb, an armed actor, or a live security
+// action. A hit here means the story is not merely a payment announcement.
+const KINETIC_RESIDUE_RE =
+  /\b(?:fighting|firefight|gun ?battle|shelling|airstrike|offensive|siege|militants?|insurgents?|pertempuran|shot|shoots|shooting|gunned|gunmen|gunman|opened fire|killed|kills|killing|murder(?:ed|s)?|massacre[ds]?|stabb(?:ed|ing)|attack(?:ed|ing|s)?|ambush(?:ed|es)?|clash(?:ed|es)?|riot(?:ed|ing|s)?|raid(?:ed|s)?|kidnapp?(?:ed|ing)|abduct(?:ed|ion)|hostage|bomb(?:ed|ing)|explosion|arrest(?:ed|s)?|detain(?:ed|s)?|manhunt|wounded|injured|ditembak|penembakan|menembak|ditangkap|penangkapan|penyerangan|bentrok(?:an)?|kerusuhan|tewas|meninggal|luka)\b/i;
+
+// Live-event framing INSIDE the victim reference. The span matcher tolerates a
+// few filler words before the event noun, so "victims of ONGOING militant
+// attack" would otherwise carry the live event away with the reference and
+// leave nothing for the vetoes below to catch. A reference to something still
+// happening is not an aftermath reference.
+const LIVE_FRAMING_RE =
+  /\b(?:ongoing|on-?going|active|fresh|latest|current|continuing|continues?|continued|still|renewed|escalating|unfolding|under ?way|today'?s|new|developing|berlangsung|terbaru|susulan|masih)\b/i;
+
+// Live framing does not have to sit INSIDE the matched span: "families of
+// militant attack victims amid ongoing fighting" strips the reference and
+// leaves the live qualifier behind. So the original text is also checked — but
+// only where the qualifier is ADJACENT to an event word, so an innocuous "new
+// scholarship fund" cannot block a legitimate demotion.
+const LIVE_EVENT_WORDS =
+  String.raw`(?:attacks?|fighting|firefights?|gun ?battles?|clash(?:es)?|violence|unrest|shootings?|militants?|insurgen\w+|riots?|conflict|offensives?|sieges?|shelling|airstrikes?|bombings?|blasts?|raids?|manhunts?|kekerasan|bentrokan|penembakan|serangan|konflik|pertempuran)`;
+// ONE vocabulary per direction, so a qualifier recognised BEFORE an event can
+// never be missed AFTER it (the drift that let "attack still in progress"
+// through).
+const LIVE_QUALIFIER_BEFORE =
+  String.raw`(?:ongoing|on-?going|active|fresh|latest|current|continuing|renewed|escalating|unfolding|under ?way|new|developing|berlangsung|terbaru|susulan)`;
+const LIVE_QUALIFIER_AFTER =
+  String.raw`(?:continues?|continuing|continued|ongoing|on-?going|under ?way|escalating|unfolding|rages?|raging|persists?|(?:still\s+)?(?:happening|in progress|active|going on|unfolding)|happening now|remains? active|berlanjut|berlangsung|masih berlangsung)`;
+const LIVE_EVENT_NEAR_RE = new RegExp(
+  [
+    String.raw`\b${LIVE_QUALIFIER_BEFORE}\b[^.!?]{0,20}?\b${LIVE_EVENT_WORDS}\b`,
+    String.raw`\b${LIVE_EVENT_WORDS}\b[^.!?]{0,25}?\b${LIVE_QUALIFIER_AFTER}\b`,
+  ].join("|"),
+  "i",
+);
+
+/**
+ * Remove every victim-reference span from one field, reporting whether
+ * anything was removed and whether any removed span described a LIVE event.
+ */
+function stripVictimReferences(text: string): {
+  rest: string;
+  stripped: boolean;
+  live: boolean;
+} {
+  let stripped = false;
+  let live = false;
+  const rest = text.replace(VICTIM_REFERENCE_SPAN_RE, (match) => {
+    stripped = true;
+    if (LIVE_FRAMING_RE.test(match)) live = true;
+    return " ";
+  });
+  return { rest, stripped, live };
+}
+
+/**
+ * True if the title names a welfare / relief TRANSFER at all. This is only the
+ * cheap first gate of isAssistanceAftermathItem below — on its own it says
+ * nothing about severity ("Businesses demand compensation for the blackout"
+ * matches, and is a real disruption story). Exported so a one-time DB heal can
+ * scope itself to the same candidate class the guard reasons about, and re-rate
+ * it through the canonical classifier.
+ */
+export function mentionsBenefitTransfer(title: string): boolean {
+  return BENEFIT_TRANSFER_RE.test(title);
+}
+
+/**
+ * True when the record is a welfare / compensation announcement whose only
+ * violence wording is a reference to who the beneficiaries are. Veto-guarded
+ * and title-anchored; returns false whenever anything about the text suggests a
+ * live event, so the demotion below can never suppress a real incident.
+ */
+export function isAssistanceAftermathItem(
+  title: string,
+  summary: string,
+  topic: SeverityTopic,
+): boolean {
+  if (!BENEFIT_TRANSFER_RE.test(title)) return false;
+  // Strip the two fields SEPARATELY: several tiers below distinguish
+  // title-led framing from body context, so the remainder must be re-rated as
+  // a title and a summary, not as one merged blob.
+  const t = stripVictimReferences(title);
+  const s = stripVictimReferences(summary);
+  // A victim reference must actually have been stripped. Without this the
+  // guard would fire on a benefit announced ALONGSIDE a live event ("Insurance
+  // payout offered as refinery fire spreads"), demoting a real incident.
+  if (!t.stripped && !s.stripped) return false;
+  // ...and the reference must be to a PAST event. "victims of ongoing militant
+  // attack" is a live incident wearing a reference's clothes — checked both
+  // inside the stripped span and, event-anchored, across the original text.
+  if (t.live || s.live) return false;
+  if (LIVE_EVENT_NEAR_RE.test(title) || LIVE_EVENT_NEAR_RE.test(summary)) return false;
+  const rest = `${t.rest}\n${s.rest}`;
+  if (
+    KINETIC_RESIDUE_RE.test(rest) ||
+    FATAL_SIGNAL_RE.test(rest) ||
+    PRESENT_TENSE_FATAL_RE.test(rest) ||
+    PRESENT_TENSE_FATAL_COUNT_RE.test(rest) ||
+    ID_FATAL_RE.test(rest) ||
+    ID_VIOLENCE_RE.test(rest)
+  ) {
+    return false;
+  }
+  // Whatever survives the strip must itself be unremarkable. Re-rating the
+  // remainder under the SAME topic reuses every tier the classifier already
+  // knows — fire, outage, strike, curfew, seizure, maritime attack — instead of
+  // maintaining a second, inevitably incomplete veto vocabulary here. So
+  // "Compensation for shooting victims as curfew imposed" keeps its rating: the
+  // curfew is still in the remainder.
+  return SEVERITY_RANK[classifySeverityUncapped(t.rest, s.rest, topic)] <= SEVERITY_RANK.low;
+}
+
 /**
  * Rate an incident's severity from its text.
  *
@@ -654,6 +803,21 @@ export function isBurialOrFuneralEvent(title: string, summary: string): boolean 
  *               casualty/emergency signals in the EXTREME tier above.
  */
 export function classifySeverity(
+  title: string,
+  summary: string,
+  topic: SeverityTopic,
+): Severity {
+  const base = classifySeverityUncapped(title, summary, topic);
+  // Demote-only cap for welfare/compensation aftermath copy (see
+  // isAssistanceAftermathItem). Applied to the RESULT so it can only ever lower
+  // a tier, never raise one, and rows already at or below Low are untouched.
+  if (SEVERITY_RANK[base] > SEVERITY_RANK.low && isAssistanceAftermathItem(title, summary, topic)) {
+    return "low";
+  }
+  return base;
+}
+
+function classifySeverityUncapped(
   title: string,
   summary: string,
   topic: SeverityTopic,

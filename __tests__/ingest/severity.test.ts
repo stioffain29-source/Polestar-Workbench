@@ -3,6 +3,8 @@ import {
   maxSeverity,
   severityFromFatalities,
   hasMassCasualtyToll,
+  isAssistanceAftermathItem,
+  ALL_SEVERITY_TOPICS,
 } from "@workspace/ingest";
 
 describe("classifySeverity", () => {
@@ -526,5 +528,203 @@ describe("hasMassCasualtyToll", () => {
     expect(hasMassCasualtyToll("Satu orang tewas dalam kecelakaan", "")).toBe(false);
     expect(hasMassCasualtyToll("Kerugian capai 32 miliar rupiah", "")).toBe(false);
     expect(hasMassCasualtyToll("Mengenang tragedi 1998", "")).toBe(false);
+  });
+});
+
+// Welfare / compensation aftermath copy. A scholarship or santunan handover to
+// the families of an earlier shooting is a payment story: the violence word
+// only names the beneficiaries, yet it used to store as High and paint a High
+// marker on the map whose text is a cheque.
+describe("assistance/compensation aftermath guard", () => {
+  it("demotes a Bahasa scholarship handover to shooting victims' families", () => {
+    expect(
+      classifySeverity("Beasiswa Keluarga ASN Korban Penembakan di Papua", "", "indonesia_local"),
+    ).toBe("low");
+    expect(
+      classifySeverity(
+        "Mentan berikan beasiswa keluarga ASN korban penembakan di Jayawijaya",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("low");
+    expect(
+      classifySeverity(
+        "Keluarga 3 ASN yang Jadi Korban Penembakan KKB Dapat Beasiswa dari Mentan Amran, Total Rp300 Juta",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("low");
+  });
+
+  it("demotes the English equivalent", () => {
+    expect(
+      classifySeverity(
+        "Scholarships for families of civil servant victims of a shooting in Papua",
+        "",
+        "apac_local",
+      ),
+    ).toBe("low");
+    expect(
+      classifySeverity("Compensation paid to families of the attack victims", "", "apac_local"),
+    ).toBe("low");
+  });
+
+  it("never demotes the underlying attack, even when a payment is announced with it", () => {
+    expect(
+      classifySeverity("KKB tembak mati tiga ASN di Jayawijaya", "", "indonesia_local"),
+    ).toBe("high");
+    expect(
+      classifySeverity(
+        "Tiga ASN tewas ditembak KKB, pemerintah beri santunan",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("high");
+    expect(
+      classifySeverity("Gunmen shot dead three civil servants in Papua", "", "apac_local"),
+    ).toBe("high");
+  });
+
+  it("is title-anchored — a body mention of compensation cannot demote a live report", () => {
+    expect(
+      classifySeverity(
+        "Gunmen kill three civil servants in Papua",
+        "The agriculture minister later announced scholarships for the families.",
+        "apac_local",
+      ),
+    ).toBe("high");
+  });
+
+  it("never up-rates: a forward-looking benefit announcement stays where it was", () => {
+    const withGuard = classifySeverity(
+      "Government plans scholarships for families of shooting victims",
+      "",
+      "indonesia_local",
+    );
+    expect(["insignificant", "low"]).toContain(withGuard);
+  });
+});
+
+describe("isAssistanceAftermathItem", () => {
+  it("fires only on benefit-led copy with no surviving event signal", () => {
+    expect(
+      isAssistanceAftermathItem("Beasiswa keluarga ASN korban penembakan", "", "indonesia_local"),
+    ).toBe(true);
+    expect(
+      isAssistanceAftermathItem("Santunan untuk keluarga korban kekerasan", "", "indonesia_local"),
+    ).toBe(true);
+    // A live event in the residue vetoes it.
+    expect(
+      isAssistanceAftermathItem(
+        "Santunan diberikan setelah dua warga ditembak",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe(false);
+    expect(
+      isAssistanceAftermathItem(
+        "Compensation announced after police arrested the gunman",
+        "",
+        "apac_local",
+      ),
+    ).toBe(false);
+    // No benefit term in the title at all.
+    expect(
+      isAssistanceAftermathItem("Shooting victims' families protest in Jayapura", "", "apac_local"),
+    ).toBe(false);
+  });
+
+  it("requires an actual victim reference — a benefit beside a LIVE event never demotes", () => {
+    // Nothing to strip: the violence/disruption is the event itself, not a
+    // description of who is being paid.
+    const live: [string, (typeof ALL_SEVERITY_TOPICS)[number]][] = [
+      ["Insurance payout offered as refinery fire spreads", "fuel"],
+      ["Relief package announced as nationwide blackout hits capital", "energy"],
+      ["Compensation announced as nationwide strike shuts airports", "flashpoint"],
+    ];
+    for (const [title, topic] of live) {
+      expect(isAssistanceAftermathItem(title, "", topic)).toBe(false);
+      expect(classifySeverity(title, "", topic)).not.toBe("low");
+    }
+  });
+
+  it("never treats a LIVE event as a victim reference", () => {
+    // The span matcher tolerates filler words before the event noun, so
+    // "victims of ongoing militant attack" must be rejected outright — the
+    // event is still happening, and stripping it would hide the incident.
+    const live: [string, (typeof ALL_SEVERITY_TOPICS)[number]][] = [
+      ["Compensation offered to victims of ongoing militant attack", "conflict"],
+      ["Scholarships for families of victims of fresh armed attack", "apac_local"],
+      ["Compensation for survivors of active armed clash", "apac_local"],
+    ];
+    for (const [title, topic] of live) {
+      expect(isAssistanceAftermathItem(title, "", topic)).toBe(false);
+      expect(classifySeverity(title, "", topic)).toBe("high");
+    }
+  });
+
+  it("rejects live framing that sits OUTSIDE the stripped span", () => {
+    // The qualifier need not be inside the victim reference: stripping the
+    // reference can leave "amid ongoing fighting" behind, and "new"/
+    // "developing" attacks are live events too.
+    const live: [string, (typeof ALL_SEVERITY_TOPICS)[number]][] = [
+      ["Compensation for victims of new militant attack", "conflict"],
+      ["Compensation for victims of developing militant attack", "conflict"],
+      ["Compensation for families of militant attack victims amid ongoing fighting", "conflict"],
+    ];
+    for (const [title, topic] of live) {
+      expect(isAssistanceAftermathItem(title, "", topic)).toBe(false);
+      expect(classifySeverity(title, "", topic)).toBe("high");
+    }
+  });
+
+  it("rejects post-event continuation phrasing", () => {
+    // A qualifier AFTER the event noun is as live as one before it.
+    const live: [string, (typeof ALL_SEVERITY_TOPICS)[number]][] = [
+      ["Compensation for victims of a militant attack still in progress", "conflict"],
+      ["Compensation for victims of a militant attack that is still happening", "conflict"],
+      ["Compensation for victims of a militant attack happening now", "conflict"],
+    ];
+    for (const [title, topic] of live) {
+      expect(isAssistanceAftermathItem(title, "", topic)).toBe(false);
+      expect(classifySeverity(title, "", topic)).toBe("high");
+    }
+  });
+
+  it("does not let an innocuous 'new' block a real aftermath demotion", () => {
+    // Event-anchored proximity, not a bare keyword scan: the benefit itself is
+    // allowed to be new.
+    expect(
+      isAssistanceAftermathItem(
+        "New scholarship fund for families of shooting victims",
+        "",
+        "apac_local",
+      ),
+    ).toBe(true);
+    expect(
+      classifySeverity("New scholarship fund for families of shooting victims", "", "apac_local"),
+    ).toBe("low");
+  });
+
+  it("re-rates the remainder as title + summary, not as one merged blob", () => {
+    // Merging the two fields used to make a body-text judicial mention look
+    // title-led, suppressing a live emergency declaration in the title.
+    expect(
+      classifySeverity(
+        "Compensation for attack victims as president declares martial law",
+        "Court sentenced former officials in an unrelated case.",
+        "flashpoint",
+      ),
+    ).toBe("extreme");
+  });
+
+  it("does not demote when the stripped remainder still carries a live event", () => {
+    // The victim span IS strippable here, but a curfew survives it.
+    expect(
+      isAssistanceAftermathItem("Compensation for shooting victims as curfew imposed", "", "apac_local"),
+    ).toBe(false);
+    expect(
+      classifySeverity("Compensation for shooting victims as curfew imposed", "", "apac_local"),
+    ).not.toBe("low");
   });
 });
