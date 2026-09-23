@@ -27,6 +27,28 @@ import {
 
 const router: IRouter = Router();
 
+/**
+ * Run an id-keyed query in batches and concatenate the results.
+ *
+ * Postgres accepts at most 65,535 bind parameters per statement, and drizzle's
+ * `inArray` spends one per id. Any read that fans out over "every incident we
+ * just selected" therefore breaks once the workspace grows past that many rows
+ * — with a hard 500, not a truncated result. 1,000 ids per statement keeps the
+ * round trips low while leaving the parameter budget untouchable.
+ */
+const ID_BATCH = 1000;
+async function selectInBatches<T>(
+  ids: number[],
+  query: (batch: number[]) => Promise<T[]>,
+): Promise<T[]> {
+  if (ids.length <= ID_BATCH) return ids.length === 0 ? [] : query(ids);
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_BATCH) {
+    out.push(...(await query(ids.slice(i, i + ID_BATCH))));
+  }
+  return out;
+}
+
 // Incident reads are live operational views. Express's generated ETag can make
 // an authenticated browser reuse a pre-backfill response because relevance
 // updates change which rows qualify without necessarily changing the response
@@ -97,20 +119,30 @@ function maritimeValidation(
 export async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const links = await db
-    .select({
-      incidentId: incidentCorroborationsTable.incidentId,
-      id: incidentCorroborationsTable.id,
-      provider: incidentCorroborationsTable.provider,
-      reportTitle: incidentCorroborationsTable.reportTitle,
-      sourceAgency: incidentCorroborationsTable.sourceAgency,
-      reportDate: incidentCorroborationsTable.reportDate,
-      url: incidentCorroborationsTable.url,
-      matchScore: incidentCorroborationsTable.matchScore,
-    })
-    .from(incidentCorroborationsTable)
-    .where(inArray(incidentCorroborationsTable.incidentId, ids))
-    .orderBy(desc(incidentCorroborationsTable.matchScore));
+  // An `inArray` over the whole id list sends ONE bind parameter per id, and
+  // Postgres refuses any statement with more than 65,535 of them. Unfiltered
+  // and country-superset incident fetches routinely exceed that, and the
+  // failure is not graceful: the whole /incidents request 500s, so every
+  // surface built on it (country reports, the spot-report incident picker,
+  // monitors) renders as "loading forever" or "no incidents". Query in
+  // batches and merge instead — the limit can never be reached however large
+  // the result set grows.
+  const links = await selectInBatches(ids, (batch) =>
+    db
+      .select({
+        incidentId: incidentCorroborationsTable.incidentId,
+        id: incidentCorroborationsTable.id,
+        provider: incidentCorroborationsTable.provider,
+        reportTitle: incidentCorroborationsTable.reportTitle,
+        sourceAgency: incidentCorroborationsTable.sourceAgency,
+        reportDate: incidentCorroborationsTable.reportDate,
+        url: incidentCorroborationsTable.url,
+        matchScore: incidentCorroborationsTable.matchScore,
+      })
+      .from(incidentCorroborationsTable)
+      .where(inArray(incidentCorroborationsTable.incidentId, batch))
+      .orderBy(desc(incidentCorroborationsTable.matchScore)),
+  );
   const byIncident = new Map<number, Omit<(typeof links)[number], "incidentId">[]>();
   for (const { incidentId, ...rest } of links) {
     const bucket = byIncident.get(incidentId);
@@ -121,18 +153,20 @@ export async function withCorroborations(rows: IncidentRow[]): Promise<unknown[]
     ...r,
     corroborations: byIncident.get(r.id) ?? [],
   }));
-  const semantics = await db
-    .select({ semantic: maritimeSemanticEvidenceTable })
-    .from(maritimeSemanticEvidenceTable)
-    .innerJoin(
-      incidentsTable,
-      eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
-    )
-    .where(and(
-      inArray(maritimeSemanticEvidenceTable.incidentId, ids),
-      currentMaritimeSemanticProjectionCondition(),
-    ))
-    .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt));
+  const semantics = await selectInBatches(ids, (batch) =>
+    db
+      .select({ semantic: maritimeSemanticEvidenceTable })
+      .from(maritimeSemanticEvidenceTable)
+      .innerJoin(
+        incidentsTable,
+        eq(incidentsTable.id, maritimeSemanticEvidenceTable.incidentId),
+      )
+      .where(and(
+        inArray(maritimeSemanticEvidenceTable.incidentId, batch),
+        currentMaritimeSemanticProjectionCondition(),
+      ))
+      .orderBy(desc(maritimeSemanticEvidenceTable.evaluatedAt)),
+  );
   const semanticByIncident = new Map<number, (typeof semantics)[number]["semantic"]>();
   for (const joined of semantics) {
     const row = joined.semantic;
