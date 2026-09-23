@@ -20,6 +20,16 @@ severity?: Severity;
 days?: number;
 search?: string;
 /**
+ * Cap the number of rows returned, newest first. The unbounded list is the entire relevance-passing archive (tens of thousands of rows, >100MB of JSON once corroborations are attached), which a browser cannot download and parse interactively. Any UI that only needs a recent slice or a search result MUST send this.
+ * @minimum 1
+ * @maximum 500
+ */
+limit?: number;
+/**
+ * Comma-separated incident ids. Returns exactly those rows (still subject to the relevance gate), so an editor can resolve the incidents a saved report links to without downloading the archive. Ignored beyond the first 200 ids.
+ */
+ids?: string;
+/**
  * Superset country pre-filter: comma-separated tokens. Returns rows whose country field contains ANY token (case-insensitive substring). Distinct from the exact `country` match — this is a loose OR filter used by the country report to scope the fetch (cutting payload and the corroboration join) without changing the client-side country match, which stays the authoritative gate.
  */
 countryLike?: string;

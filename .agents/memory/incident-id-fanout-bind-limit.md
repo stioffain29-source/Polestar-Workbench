@@ -31,3 +31,21 @@ widest call the UI actually makes, not a convenient small one.
 **Verifying owner-gated pages headlessly:** dev holds a long-lived owner session
 row, so a Playwright context can reuse the newest `sid` from the sessions table
 as a cookie (`secure:false`, domain `localhost`) instead of driving OIDC.
+
+## The same endpoint must also be bounded for interactive UI
+
+**Rule:** an interactive chooser caps its rows, searches server-side
+(debounced), and resolves rows it already references BY ID — never by
+filtering a full-archive fetch client-side.
+
+**Why:** the unfiltered incident list is the entire relevance-passing archive
+(>100MB once corroborations attach), so the component sits on its empty
+default while the browser parses, and "no results" copy is indistinguishable
+from real emptiness — a payload problem gets reported as missing data. Rows a
+saved report links to can be older than any recent window, so a windowed fetch
+alone silently drops them; the id filter keeps them without the payload.
+
+**How to apply:** distinguish loading from empty; treat the debounce gap as
+loading (results on screen must answer the text in the box, not the previous
+query); and where the server did the searching, do not re-filter its page
+locally — the row displays fewer fields than the server matched on.

@@ -13,6 +13,7 @@ import {
   type Incident,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { format } from "date-fns";
 import {
   ArrowLeft,
@@ -388,6 +389,9 @@ function emptyForm(): FormState {
 // recover it on load, so a draft survives navigation, a crash, a closed tab, or
 // a failed save. Its own key prefix keeps it isolated from Spot Report drafts.
 // ---------------------------------------------------------------------------
+// How many incidents the linking picker holds at once (see the picker query).
+const INCIDENT_PICKER_LIMIT = 50;
+
 const DRAFT_PREFIX = "polestar:special-report-draft:v2:";
 
 function draftKey(idOrNew: number | string): string {
@@ -522,7 +526,6 @@ export default function SpecialReportEditor() {
   const { data: report, isLoading } = useGetSpecialReport(id ?? 0, {
     query: { enabled: !isNew && id != null },
   } as never);
-  const { data: allIncidents = [] } = useListIncidents({});
 
   const create = useCreateSpecialReport();
   const update = useUpdateSpecialReport();
@@ -536,6 +539,37 @@ export default function SpecialReportEditor() {
     result: QualityResult;
   }>({ open: false, doExportAfter: false, result: { errors: [], warnings: [] } });
   const [incidentSearch, setIncidentSearch] = useState("");
+
+  // Bounded incident picker. The unfiltered /incidents call returns the whole
+  // relevance-passing archive with corroborations attached (>100MB of JSON),
+  // and until the browser finishes parsing it the picker sits on its empty
+  // default reading "No matching incidents". Newest slice by default, and the
+  // SERVER searches once the analyst types so older incidents stay reachable.
+  const debouncedIncidentSearch = useDebouncedValue(incidentSearch.trim(), 250);
+  const pickerParams = useMemo(
+    () =>
+      debouncedIncidentSearch.length >= 2
+        ? { search: debouncedIncidentSearch, limit: INCIDENT_PICKER_LIMIT }
+        : { limit: INCIDENT_PICKER_LIMIT },
+    [debouncedIncidentSearch],
+  );
+  const { data: pickerIncidents = [], isFetching: pickerFetching } =
+    useListIncidents(pickerParams as never);
+  // Already-linked incidents are resolved BY ID — they can be far older than
+  // any recent window, so a windowed fetch would silently drop their chips.
+  const linkedIdsParam = useMemo(
+    () => form.linkedIncidentIds.join(","),
+    [form.linkedIncidentIds],
+  );
+  const { data: linkedIncidentRows = [] } = useListIncidents(
+    { ids: linkedIdsParam } as never,
+    { query: { enabled: linkedIdsParam.length > 0 } } as never,
+  );
+  const allIncidents = useMemo(() => {
+    const byId = new Map<number, Incident>();
+    for (const i of [...linkedIncidentRows, ...pickerIncidents]) byId.set(i.id, i);
+    return [...byId.values()];
+  }, [linkedIncidentRows, pickerIncidents]);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -1238,14 +1272,25 @@ export default function SpecialReportEditor() {
     });
   }
 
+  // True while the box holds a query the fetched page does not answer yet.
+  const searchPending = incidentSearch.trim() !== debouncedIncidentSearch;
   const searchResults = useMemo(() => {
-    const q = incidentSearch.trim().toLowerCase();
+    const q = debouncedIncidentSearch.toLowerCase();
+    // Rows on screen must answer the text in the box; during the debounce the
+    // page still belongs to the previous query, so show nothing rather than
+    // unrelated incidents.
+    if (searchPending) return [];
     const base = allIncidents.filter((i) => !form.linkedIncidentIds.includes(i.id));
     if (!q) return base.slice(0, 8);
+    // Two or more characters is a server-side search, so the fetched page IS
+    // the result. A single character never reaches the server; narrow the
+    // recent slice in place instead.
+    if (q.length >= 2) return base.slice(0, 12);
     return base
       .filter(
         (i) =>
           i.title.toLowerCase().includes(q) ||
+          (i.displayTitle ?? "").toLowerCase().includes(q) ||
           (i.summary ?? "").toLowerCase().includes(q) ||
           (i.country ?? "").toLowerCase().includes(q) ||
           (i.location ?? "").toLowerCase().includes(q),
@@ -1567,7 +1612,11 @@ export default function SpecialReportEditor() {
             />
             <div className="mt-2 border border-border rounded-sm divide-y divide-border max-h-56 overflow-y-auto">
               {searchResults.length === 0 ? (
-                <div className="p-3 text-xs text-muted-foreground">No matching incidents.</div>
+                <div className="p-3 text-xs text-muted-foreground">
+                  {pickerFetching || searchPending
+                    ? "Loading incidents…"
+                    : "No matching incidents."}
+                </div>
               ) : (
                 searchResults.map((i) => (
                   <button

@@ -580,6 +580,23 @@ paths:
         - name: search
           in: query
           schema: { type: string }
+        - name: limit
+          in: query
+          description: >-
+            Cap the number of rows returned, newest first. The unbounded list is
+            the entire relevance-passing archive (tens of thousands of rows,
+            >100MB of JSON once corroborations are attached), which a browser
+            cannot download and parse interactively. Any UI that only needs a
+            recent slice or a search result MUST send this.
+          schema: { type: integer, minimum: 1, maximum: 500 }
+        - name: ids
+          in: query
+          description: >-
+            Comma-separated incident ids. Returns exactly those rows (still
+            subject to the relevance gate), so an editor can resolve the
+            incidents a saved report links to without downloading the archive.
+            Ignored beyond the first 200 ids.
+          schema: { type: string }
         - name: countryLike
           in: query
           description: >-

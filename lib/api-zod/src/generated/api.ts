@@ -1105,6 +1105,8 @@ export const AdminCollectProtestEventsResponse = zod.object({
 
 export const listIncidentsQueryDaysMax = 365;
 
+export const listIncidentsQueryLimitMax = 500;
+
 
 
 export const ListIncidentsQueryParams = zod.object({
@@ -1113,6 +1115,8 @@ export const ListIncidentsQueryParams = zod.object({
   "severity": zod.enum(['insignificant', 'low', 'moderate', 'high', 'extreme']).optional(),
   "days": zod.coerce.number().min(1).max(listIncidentsQueryDaysMax).optional().describe('Limit to incidents within the past N days'),
   "search": zod.coerce.string().optional(),
+  "limit": zod.coerce.number().min(1).max(listIncidentsQueryLimitMax).optional().describe('Cap the number of rows returned, newest first. The unbounded list is the entire relevance-passing archive (tens of thousands of rows, >100MB of JSON once corroborations are attached), which a browser cannot download and parse interactively. Any UI that only needs a recent slice or a search result MUST send this.'),
+  "ids": zod.coerce.string().optional().describe('Comma-separated incident ids. Returns exactly those rows (still subject to the relevance gate), so an editor can resolve the incidents a saved report links to without downloading the archive. Ignored beyond the first 200 ids.'),
   "countryLike": zod.coerce.string().optional().describe('Superset country pre-filter: comma-separated tokens. Returns rows whose country field contains ANY token (case-insensitive substring). Distinct from the exact `country` match — this is a loose OR filter used by the country report to scope the fetch (cutting payload and the corroboration join) without changing the client-side country match, which stays the authoritative gate.')
 })
 

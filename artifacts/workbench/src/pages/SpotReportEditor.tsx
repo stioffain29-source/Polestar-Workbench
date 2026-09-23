@@ -15,6 +15,7 @@ import {
   type Incident,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { format } from "date-fns";
 import { ArrowLeft, ArrowUp, ArrowDown, FileText, FileType, FileDown, ImagePlus, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -259,6 +260,11 @@ function emptyForm(): FormState {
 // draft survives a navigation, a crash, a closed tab, or a failed save. The
 // copy is cleared the moment a real server save succeeds.
 // ---------------------------------------------------------------------------
+// How many incidents the linking picker holds at once. Small on purpose: the
+// list is a chooser, not a browser, and the endpoint behind it returns the
+// whole archive when it is not capped.
+const INCIDENT_PICKER_LIMIT = 50;
+
 const DRAFT_PREFIX = "polestar:spot-report-draft:";
 
 function draftKey(idOrNew: number | string): string {
@@ -398,7 +404,6 @@ export default function SpotReportEditor() {
   const { data: report, isLoading } = useGetSpotReport(id ?? 0, {
     query: { enabled: !isNew && id != null },
   } as never);
-  const { data: allIncidents = [] } = useListIncidents({});
 
   const create = useCreateSpotReport({
     mutation: {
@@ -426,6 +431,45 @@ export default function SpotReportEditor() {
     result: QualityResult;
   }>({ open: false, format: null, result: { errors: [], warnings: [] } });
   const [incidentSearch, setIncidentSearch] = useState("");
+
+  // The incident picker must NEVER fetch the unfiltered list. /incidents with
+  // no params returns every relevance-passing row in the archive with its
+  // corroborations attached — tens of thousands of rows, >100MB of JSON — and
+  // while the browser downloads and parses that the picker holds its empty
+  // default and reads "No matching incidents", which looks like a data
+  // problem rather than a payload problem. Take the newest slice by default
+  // and hand typing to the SERVER's search so older incidents stay reachable.
+  const debouncedIncidentSearch = useDebouncedValue(incidentSearch.trim(), 250);
+  const pickerParams = useMemo(
+    () =>
+      debouncedIncidentSearch.length >= 2
+        ? { search: debouncedIncidentSearch, limit: INCIDENT_PICKER_LIMIT }
+        : { limit: INCIDENT_PICKER_LIMIT },
+    [debouncedIncidentSearch],
+  );
+  const { data: pickerIncidents = [], isFetching: pickerFetching } =
+    useListIncidents(pickerParams as never);
+  // Incidents this report already links to (or that arrived as query-string
+  // ids) are resolved BY ID, because they can be far older than any recent
+  // window and would otherwise vanish from the chips on reopen.
+  const linkedIdsParam = useMemo(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const fromUrl = (sp.get("incidentIds") || sp.get("incidentId") || "")
+      .split(",")
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isFinite(n));
+    return [...new Set([...form.linkedIncidentIds, ...fromUrl])].join(",");
+  }, [form.linkedIncidentIds]);
+  const { data: linkedIncidentRows = [], isFetching: linkedFetching } =
+    useListIncidents(
+      { ids: linkedIdsParam } as never,
+      { query: { enabled: linkedIdsParam.length > 0 } } as never,
+    );
+  const allIncidents = useMemo(() => {
+    const byId = new Map<number, Incident>();
+    for (const i of [...linkedIncidentRows, ...pickerIncidents]) byId.set(i.id, i);
+    return [...byId.values()];
+  }, [linkedIncidentRows, pickerIncidents]);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
@@ -588,8 +632,12 @@ export default function SpotReportEditor() {
       prefilled.current = true;
       return;
     }
-    if (allIncidents.length === 0) return; // wait for incident data
-    const linked = allIncidents.filter((i) => ids.includes(i.id));
+    // Resolve ONLY from the by-id query. The picker's recent page can arrive
+    // first and will not contain an older incident, so judging "not found"
+    // against the merged set would mark the prefill done and permanently
+    // ignore the id response that is still in flight.
+    if (linkedFetching) return;
+    const linked = linkedIncidentRows.filter((i) => ids.includes(i.id));
     if (linked.length === 0) {
       prefilled.current = true;
       return;
@@ -616,7 +664,7 @@ export default function SpotReportEditor() {
       mapEnabled: true,
     }));
     prefilled.current = true;
-  }, [isNew, allIncidents]);
+  }, [isNew, linkedIncidentRows, linkedFetching]);
 
   const linkedIncidents = useMemo(
     () => allIncidents.filter((i) => form.linkedIncidentIds.includes(i.id)),
@@ -1000,14 +1048,26 @@ export default function SpotReportEditor() {
     });
   }
 
+  // True while the box holds a query the fetched page does not answer yet.
+  const searchPending = incidentSearch.trim() !== debouncedIncidentSearch;
   const searchResults = useMemo(() => {
-    const q = incidentSearch.trim().toLowerCase();
+    const q = debouncedIncidentSearch.toLowerCase();
+    // The rows on screen must answer the text in the box. During the debounce
+    // the page still belongs to the PREVIOUS query, so show nothing (the
+    // empty state reads as loading) rather than unrelated incidents.
+    if (searchPending) return [];
     const base = allIncidents.filter((i) => !form.linkedIncidentIds.includes(i.id));
     if (!q) return base.slice(0, 8);
+    // Two or more characters is a server-side search, so the fetched page IS
+    // the result — filtering it again locally would drop rows matched on
+    // fields this row does not show. A single character never reaches the
+    // server; narrow the recent slice in place instead.
+    if (q.length >= 2) return base.slice(0, 12);
     return base
       .filter(
         (i) =>
           i.title.toLowerCase().includes(q) ||
+          (i.displayTitle ?? "").toLowerCase().includes(q) ||
           (i.summary ?? "").toLowerCase().includes(q) ||
           (i.country ?? "").toLowerCase().includes(q) ||
           (i.location ?? "").toLowerCase().includes(q),
@@ -1419,7 +1479,11 @@ export default function SpotReportEditor() {
             />
             <div className="mt-2 border border-border rounded-sm divide-y divide-border max-h-56 overflow-y-auto">
               {searchResults.length === 0 ? (
-                <div className="p-3 text-xs text-muted-foreground">No matching incidents.</div>
+                <div className="p-3 text-xs text-muted-foreground">
+                  {pickerFetching || searchPending
+                    ? "Loading incidents…"
+                    : "No matching incidents."}
+                </div>
               ) : (
                 searchResults.map((i) => (
                   <button

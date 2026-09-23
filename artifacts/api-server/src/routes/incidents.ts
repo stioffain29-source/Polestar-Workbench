@@ -271,7 +271,7 @@ router.get("/incidents", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { topic, country, severity, days, search, countryLike } = parsed.data;
+  const { topic, country, severity, days, search, countryLike, limit, ids } = parsed.data;
   const conditions = [];
   if (topic) conditions.push(eq(incidentsTable.topic, topic));
   if (country) conditions.push(eq(incidentsTable.country, country));
@@ -281,13 +281,39 @@ router.get("/incidents", async (req, res): Promise<void> => {
     conditions.push(gte(incidentsTable.occurredAt, since));
   }
   if (search) {
+    // Match the fields an operator can actually see in a picker row: the
+    // rendered (translated) title as well as the original, plus the place. A
+    // search that ignored display_title would miss every locally-reported
+    // incident the translation pass rewrote.
     conditions.push(
       or(
         ilike(incidentsTable.title, `%${search}%`),
+        ilike(incidentsTable.displayTitle, `%${search}%`),
         ilike(incidentsTable.summary, `%${search}%`),
         ilike(incidentsTable.country, `%${search}%`),
+        ilike(incidentsTable.location, `%${search}%`),
       )!,
     );
+  }
+  // Explicit id list: how an editor resolves the incidents a saved report
+  // already links to. Those rows can be arbitrarily old, so they must be
+  // fetchable directly rather than hoped for inside a recent-window fetch.
+  // Note `!== undefined`: an ids filter that parses to nothing (empty string,
+  // junk) must return NOTHING, not silently fall through to the unbounded
+  // archive query — the caller asked for specific rows.
+  if (ids !== undefined) {
+    const wanted = ids
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^[0-9]+$/.test(s))
+      .map((s) => parseInt(s, 10))
+      .filter((n) => Number.isSafeInteger(n) && n > 0)
+      .slice(0, 200);
+    if (wanted.length === 0) {
+      res.json([]);
+      return;
+    }
+    conditions.push(inArray(incidentsTable.id, wanted));
   }
   // Superset country pre-filter: an OR of case-insensitive substring matches on
   // the `country` field for each comma-separated token. DISTINCT from the exact
@@ -313,11 +339,21 @@ router.get("/incidents", async (req, res): Promise<void> => {
     }
   }
   if (!wantsRaw(req.query)) conditions.push(defaultRelevanceCondition());
-  const rows = await db
+  // `limit` takes the newest N. Unbounded, this endpoint returns the whole
+  // relevance-passing archive — tens of thousands of rows and >100MB of JSON
+  // once corroborations are attached — which a browser cannot download and
+  // parse while someone waits, so any interactive picker must send a limit.
+  // The generated zod coerces `limit` to a number with min/max but cannot
+  // express "integer", so the whole-number half of the contract is enforced
+  // here rather than handed to the database as a fraction.
+  const rowLimit =
+    limit == null ? undefined : Math.max(1, Math.min(500, Math.floor(limit)));
+  const selection = db
     .select()
     .from(incidentsTable)
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(incidentsTable.occurredAt));
+  const rows = await (rowLimit ? selection.limit(rowLimit) : selection);
   res.json(await withCorroborations(rows));
 });
 
