@@ -156,20 +156,36 @@ function buildWherePredicate(node: unknown): Pred {
     : (r) => preds.every((p) => p(r));
 }
 
-function resolveSelect(table: unknown, where: unknown): Promise<Row[]> {
+// LIMIT/OFFSET are honoured because the list route PAGES its scan when a
+// promotable/eligible filter is applied: a stub that ignored them would return
+// every row on the first page and the multi-page path would never be exercised.
+function resolveSelect(
+  table: unknown,
+  where: unknown,
+  take: number | null,
+  skip: number,
+): Promise<Row[]> {
+  const page = (rows: Row[]) =>
+    rows.slice(skip, take === null ? undefined : skip + take);
   if (table === incidentsTable)
-    return Promise.resolve(incidents.map((r) => ({ ...r })));
+    return Promise.resolve(page(incidents).map((r) => ({ ...r })));
   if (table === socialRawTable) {
     const pred = buildWherePredicate(where);
     const rows = socialItems.filter((r) => pred(r));
-    return Promise.resolve(rows.map((r) => ({ ...r })));
+    return Promise.resolve(page(rows).map((r) => ({ ...r })));
   }
   return Promise.resolve([]);
 }
 
 function selectChain(): Record<string, unknown> {
-  const state: { table: unknown; where: unknown } = { table: null, where: null };
-  const settle = () => resolveSelect(state.table, state.where);
+  const state: {
+    table: unknown;
+    where: unknown;
+    take: number | null;
+    skip: number;
+  } = { table: null, where: null, take: null, skip: 0 };
+  const settle = () =>
+    resolveSelect(state.table, state.where, state.take, state.skip);
   const chain: Record<string, unknown> = {
     from: (t: unknown) => {
       state.table = t;
@@ -180,7 +196,14 @@ function selectChain(): Record<string, unknown> {
       return chain;
     },
     orderBy: () => chain,
-    limit: () => chain,
+    limit: (n: unknown) => {
+      state.take = typeof n === "number" ? n : null;
+      return chain;
+    },
+    offset: (n: unknown) => {
+      state.skip = typeof n === "number" ? n : 0;
+      return chain;
+    },
     groupBy: () => chain,
     then: (res: (v: Row[]) => unknown, rej?: (e: unknown) => unknown) =>
       settle().then(res, rej),
@@ -351,12 +374,19 @@ function seedFlashpointIncidents(n: number): void {
       topic: "flashpoint",
       title: `Existing flashpoint incident ${i}`,
       country: "Papua New Guinea",
-      occurredAt: new Date("2026-06-15T00:00:00Z"),
+      occurredAt: new Date(Date.now() - 7 * 86_400_000),
       severity: "low",
       relevanceStatus: "relevant",
     });
   }
 }
+
+// Promotion requires a RECENT post date (see the post-date gate in
+// lib/ingest/src/socialPromote.ts), so fixtures are dated relative to the run.
+// A pinned calendar date would quietly age past the window and turn every
+// promote assertion here into a `too-old` rejection.
+const DAY = 86_400_000;
+const RECENT = () => new Date(Date.now() - 2 * DAY);
 
 function seedSocialRawItem(over: Partial<Row> = {}): Row {
   const item: Row = {
@@ -367,8 +397,8 @@ function seedSocialRawItem(over: Partial<Row> = {}): Row {
     pageName: "Papua News Desk",
     sourceTier: "official",
     externalId: `fb_${Math.random().toString(36).slice(2)}`,
-    postedAt: new Date("2026-06-20T00:00:00Z"),
-    incidentDate: new Date("2026-06-20T00:00:00Z"),
+    postedAt: RECENT(),
+    incidentDate: RECENT(),
     caption: "Armed robbery and shooting at a store in Port Moresby",
     imageUrls: [],
     links: [],
@@ -452,6 +482,43 @@ describe("Facebook OSINT posts never inflate the incident count", () => {
     expect(await flashpointIncidentCount()).toBe(before);
   });
 
+  // Dating honesty: a scraped group returns PINNED posts years old, and some
+  // posts carry no timestamp at all. Promoting either used to file an incident
+  // dated TODAY. Both are now refused at the route with the same pure resolver
+  // the batch pass uses; the row itself stays as reviewable context.
+  it("refuses to promote a pinned years-old post as a current incident", async () => {
+    seedFlashpointIncidents(2);
+    const item = seedSocialRawItem({
+      sourceTier: "official",
+      incidentDate: null,
+      postedAt: new Date("2022-06-29T00:00:00Z"),
+    });
+    const before = incidents.length;
+    const { status, json } = await promote(item.id as number);
+    expect(status).toBe(409);
+    expect(String(json.error)).toMatch(/days old/i);
+    expect(json.reason).toBe("too-old");
+    // Nothing written: the row stays context, no incident is minted.
+    expect(incidents.length).toBe(before);
+    expect(item.promotedIncidentId).toBeNull();
+  });
+
+  it("refuses to promote an undated post rather than stamping it with today", async () => {
+    seedFlashpointIncidents(2);
+    const item = seedSocialRawItem({
+      sourceTier: "official",
+      incidentDate: null,
+      postedAt: null,
+    });
+    const before = incidents.length;
+    const { status, json } = await promote(item.id as number);
+    expect(status).toBe(409);
+    expect(String(json.error)).toMatch(/no usable date/i);
+    expect(json.reason).toBe("no-date");
+    expect(incidents.length).toBe(before);
+    expect(item.promotedIncidentId).toBeNull();
+  });
+
   it("adds exactly one incident when a credible item is promoted and back-links it", async () => {
     seedFlashpointIncidents(4);
     const item = seedSocialRawItem({ sourceTier: "official" });
@@ -515,8 +582,8 @@ describe("Facebook OSINT posts never inflate the incident count", () => {
       country: "Papua New Guinea",
       province: "National Capital District",
       category: "Civil unrest / protest",
-      occurredAt: new Date("2026-06-20T00:00:00Z"),
-      incidentDate: new Date("2026-06-20T00:00:00Z"),
+      occurredAt: RECENT(),
+      incidentDate: RECENT(),
     });
     const before = await flashpointIncidentCount();
 
@@ -590,6 +657,79 @@ describe("GET /social-raw review + eligibility filters", () => {
     expect(eligible.length).toBe(1);
     expect(eligible[0].promotable).toBe(true);
     expect(eligible[0].promotedIncidentId).toBeNull();
+  });
+
+  // The stored `promotable` flag predates the post-date gate (it means
+  // security-relevant AND credible). A read that still called an undated or
+  // years-old row promotable would invite a click the promote route rejects, so
+  // the route re-derives the flag with the same resolver before answering.
+  it("reports a date-blocked row as not promotable, whatever the stored flag says", async () => {
+    seedSocialRawItem({
+      promotable: true,
+      incidentDate: null,
+      postedAt: new Date("2022-06-29T00:00:00Z"),
+    });
+    seedSocialRawItem({
+      promotable: true,
+      incidentDate: null,
+      postedAt: null,
+    });
+    seedSocialRawItem({ promotable: true }); // recent -> untouched
+
+    const rows = await listSocialRaw("");
+    const pinned = rows.find((r) => r.postedAt != null && !r.incidentDate);
+    expect(rows.filter((r) => r.promotable).length).toBe(1);
+    expect(pinned?.promotable).toBe(false);
+  });
+
+  // The actionable queue must agree with the promote route: a row the server
+  // would refuse on its date is not "eligible", and it must still appear in the
+  // complement rather than falling out of both views.
+  it("keeps a date-blocked row out of ?eligible=true and inside its complement", async () => {
+    const pinned = seedSocialRawItem({
+      promotable: true,
+      promotedIncidentId: null,
+      incidentDate: null,
+      postedAt: new Date("2022-06-29T00:00:00Z"),
+      caption: "pinned 2022 post",
+    });
+    seedSocialRawItem({
+      promotable: true,
+      promotedIncidentId: null,
+      caption: "recent post",
+    });
+
+    const eligible = await listSocialRaw("?eligible=true");
+    expect(eligible.map((r) => r.caption)).toEqual(["recent post"]);
+
+    const complement = await listSocialRaw("?eligible=");
+    expect(complement.map((r) => r.id)).toContain(pinned.id);
+
+    const promotableOnly = await listSocialRaw("?promotable=true");
+    expect(promotableOnly.map((r) => r.caption)).toEqual(["recent post"]);
+  });
+
+  // The date filter runs in JS over a PAGED scan, so a long run of date-blocked
+  // rows must not truncate the answer: the scan has to keep going until the
+  // caller's limit is filled or the table is exhausted.
+  it("finds an eligible row beyond the first scan page", async () => {
+    const pinned = new Date("2022-06-29T00:00:00Z");
+    for (let i = 0; i < 600; i += 1)
+      seedSocialRawItem({
+        promotable: true,
+        promotedIncidentId: null,
+        incidentDate: null,
+        postedAt: pinned,
+        caption: `pinned ${i}`,
+      });
+    seedSocialRawItem({
+      promotable: true,
+      promotedIncidentId: null,
+      caption: "recent post on page two",
+    });
+
+    const eligible = await listSocialRaw("?eligible=true");
+    expect(eligible.map((r) => r.caption)).toEqual(["recent post on page two"]);
   });
 
   it("?eligible= (empty -> false) returns the complement: not promotable OR already promoted", async () => {

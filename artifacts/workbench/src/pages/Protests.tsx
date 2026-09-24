@@ -778,6 +778,39 @@ function OsintTierBadge({ tier }: { tier: string }) {
   );
 }
 
+// Explicit "UNVERIFIED" mark for a post no credible source stands behind:
+// nothing about it has been confirmed beyond the fact that it was posted. Shown
+// alongside the tier badge so a reader skimming the table can never mistake a
+// retained context post for checked reporting.
+function UnverifiedBadge() {
+  return (
+    <span
+      className="px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm border"
+      style={{ borderColor: "#A33232", color: "#A33232" }}
+      title="No declared credible source, linked credible outlet, or cross-feed corroboration. Retained as context only."
+    >
+      Unverified
+    </span>
+  );
+}
+
+// How the server's promote date gate sees this row. The window length lives on
+// the server (it re-checks and refuses), and `promotable` already arrives with
+// that gate applied — so this reads the server's answer rather than mirroring
+// the window here, where the two could drift apart. A row the server counts as
+// security-relevant AND credible yet not promotable is blocked on its date: the
+// post is undated, or it falls outside the promote window.
+function osintDateState(it: SocialRawItem): "ok" | "undated" | "too-old" {
+  // No publication date is visible on its own: the gate refuses the row on
+  // provenance whatever its credibility, so say so even for a row that is also
+  // unverified or not security-relevant.
+  if (!it.postedAt) return "undated";
+  if (it.promotable) return "ok";
+  // The stored flag means security-relevant AND credible, so for such a row the
+  // only thing that can have cleared it here is the server's date gate.
+  return it.securityRelevant && it.credible ? "too-old" : "ok";
+}
+
 function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLoading: boolean }) {
   const promote = usePromoteSocialRawItem();
   const updateStatus = useUpdateSocialRawReviewStatus();
@@ -939,9 +972,14 @@ function FacebookOsintPanel({ items, isLoading }: { items: SocialRawItem[]; isLo
       <p className="text-[11px] text-muted-foreground font-sans leading-snug">
         Public Facebook posts for Papua New Guinea and Indonesian Papua, monitored
         as ADDITIVE context — never incidents, so they never affect any incident
-        count. Only a security-relevant, credible post can be promoted (to a
-        flashpoint or conflict incident), which links the new incident back to the
-        source post; the server re-derives eligibility and blocks duplicates of
+        count, and nothing here reaches a report unless it is promoted. Anything
+        no credible source stands behind is marked UNVERIFIED. Only a
+        security-relevant, credible post published inside the server's promote
+        window can be promoted (to a flashpoint or conflict incident), which
+        links the new incident back to the source post; an undated or older post
+        — a pinned years-old group post, for instance — is kept as context but
+        can never be filed as a current incident. The server re-derives
+        eligibility, applies that date gate, and blocks duplicates of
         already-tracked incidents. Captions are sanitised; no comments, author
         profiles, or personal contact data are stored.
       </p>
@@ -1065,6 +1103,13 @@ function OsintActions({
           Not eligible to promote
         </span>
       )}
+      {!decided && osintDateState(it) !== "ok" && (
+        <span className="text-muted-foreground text-[10px]">
+          {osintDateState(it) === "undated"
+            ? "Undated post — cannot be promoted"
+            : "Outside the promote window — cannot be filed as current"}
+        </span>
+      )}
     </div>
   );
 }
@@ -1107,15 +1152,32 @@ function OsintTable({
               "—";
             const where = it.location || it.province || it.country || "—";
             const keywords = it.detectedKeywords ?? [];
+            const dateState = osintDateState(it);
             return (
               <tr key={it.id} className="hover:bg-muted/30 align-top">
                 <td className="p-2 whitespace-nowrap">
-                  <OsintTierBadge tier={it.sourceTier} />
+                  <span className="flex flex-wrap items-center gap-1">
+                    <OsintTierBadge tier={it.sourceTier} />
+                    {!it.credible && <UnverifiedBadge />}
+                  </span>
                   <span className="block text-[10px] text-muted-foreground mt-0.5">
                     {it.pageName || it.pageHandle}
                   </span>
                 </td>
-                <td className="p-2 text-xs whitespace-nowrap">{when}</td>
+                <td className="p-2 text-xs whitespace-nowrap">
+                  {dateState === "undated" ? (
+                    <span className="text-muted-foreground">Undated</span>
+                  ) : (
+                    when
+                  )}
+                  {dateState !== "ok" && (
+                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                      {dateState === "undated"
+                        ? "no post date — cannot be promoted"
+                        : "outside promote window"}
+                    </span>
+                  )}
+                </td>
                 <td className="p-2 text-xs">{where}</td>
                 <td className="p-2 text-xs">
                   {it.category}

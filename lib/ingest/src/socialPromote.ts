@@ -177,9 +177,129 @@ export type SocialPromoteDecision =
     }
   | {
       promote: false;
-      reason: "not-security" | "not-credible" | "duplicate";
+      reason: "no-date" | "too-old" | "not-security" | "not-credible" | "duplicate";
       duplicateOf?: number;
     };
+
+// ---------------------------------------------------------------------------
+// Post-date gate (dating honesty)
+// ---------------------------------------------------------------------------
+// A promoted row becomes an incident dated `occurredAt`, which every window,
+// monitor, report and map then treats as WHEN IT HAPPENED. Social scrapers do
+// not only return fresh posts: group actors also return PINNED posts, which can
+// be years old, and some posts carry no usable timestamp at all. The old
+// fallback chain ended in `?? new Date()`, so an undated (or pinned-ancient)
+// post would have been stamped with TODAY — fabricating a current incident out
+// of old or unknown-dated material.
+//
+// So promotion now requires a real, recent post date. A row that fails is NOT
+// deleted or hidden: it stays in social_raw as reviewable OSINT context,
+// exactly like a non-credible row.
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const SOCIAL_PROMOTE_MAX_AGE_DAYS_DEFAULT = 14;
+/**
+ * How far ahead of "now" a timestamp may sit before it is treated as unusable.
+ *
+ * A precise timestamp in the future is a clock or parse artefact, so it gets
+ * only a clock-skew allowance. A DATE-ONLY value is different: it arrives as
+ * UTC midnight, and the tracked theatres run ahead of UTC (Indonesia +7..+9,
+ * PNG +10), so a post made "today" local time legitimately reads as up to ten
+ * hours ahead. Only that case gets the wider allowance — a blanket one-day
+ * tolerance would also wave through a precise timestamp most of a day ahead.
+ */
+const FUTURE_TOLERANCE_PRECISE_MS = 1 * HOUR_MS;
+const FUTURE_TOLERANCE_DATE_ONLY_MS = 12 * HOUR_MS;
+
+/** True when the value carries no time component — i.e. a parsed date-only field. */
+function isDateOnly(d: Date): boolean {
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  );
+}
+
+function futureToleranceMs(d: Date): number {
+  return isDateOnly(d) ? FUTURE_TOLERANCE_DATE_ONLY_MS : FUTURE_TOLERANCE_PRECISE_MS;
+}
+
+/**
+ * Maximum age (in days) of a social post that may still be promoted as a
+ * current incident. Default 14 — two weekly report windows, so a post too old
+ * to affect the current window can never enter as "current". Override with
+ * SOCIAL_PROMOTE_MAX_AGE_DAYS (clamped to 1..90).
+ */
+export function socialPromoteMaxAgeDays(): number {
+  const raw = process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS;
+  const n = raw ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return SOCIAL_PROMOTE_MAX_AGE_DAYS_DEFAULT;
+  return Math.min(90, Math.max(1, n));
+}
+
+export type SocialPostDate =
+  | { kind: "ok"; date: Date }
+  | { kind: "no-date" }
+  | { kind: "too-old"; date: Date; ageDays: number };
+
+/** Coerce a stored timestamp to a usable Date, or null if it is unusable. */
+function asDate(raw: Date | string | null | undefined): Date | null {
+  if (!raw) return null;
+  const date = raw instanceof Date ? raw : new Date(raw);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+/**
+ * Resolve the date a social row would be filed under, or say why it cannot be
+ * filed at all. Pure (injectable `now`) so the gate is unit-testable and
+ * IDENTICAL in the batch pass and the manual promote route.
+ *
+ * TWO dates are checked, because they answer different questions and either one
+ * alone can be fabricated:
+ *
+ *  - `postedAt` is PROVENANCE: when the post was published. A row with no
+ *    postedAt is undated — nothing establishes that it describes something
+ *    current — and a years-old post cannot report a current event however
+ *    recent its caption sounds. The classifier infers `incidentDate` from
+ *    caption text ("Monday", "29 June"), so a PINNED 2022 post whose caption
+ *    names a day can carry a current-looking incidentDate; checking provenance
+ *    first is what stops that.
+ *  - `incidentDate ?? postedAt` is the OCCURRENCE date the incident would be
+ *    filed under. A fresh post about an event three months ago is still not a
+ *    current incident, so this is bounded by the same window.
+ *
+ * `no-date` covers every unusable timestamp: missing, unparseable, and
+ * future-dated beyond the tolerance for its precision (see
+ * FUTURE_TOLERANCE_PRECISE_MS) — filing one would put an incident in the
+ * future.
+ */
+export function resolveSocialPostDate(
+  item: Pick<SocialPromoteInput, "incidentDate" | "postedAt">,
+  opts: { maxAgeDays?: number; now?: number } = {},
+): SocialPostDate {
+  const maxAgeDays = opts.maxAgeDays ?? socialPromoteMaxAgeDays();
+  const now = opts.now ?? Date.now();
+
+  const ageOf = (d: Date) => (now - d.getTime()) / DAY_MS;
+
+  // 1. Provenance: the post itself must be dated, real, and recent.
+  const posted = asDate(item.postedAt);
+  if (!posted) return { kind: "no-date" };
+  if (now - posted.getTime() < -futureToleranceMs(posted))
+    return { kind: "no-date" };
+  const postedAge = ageOf(posted);
+  if (postedAge > maxAgeDays)
+    return { kind: "too-old", date: posted, ageDays: postedAge };
+
+  // 2. Occurrence: the date the incident would carry.
+  const date = asDate(item.incidentDate) ?? posted;
+  if (now - date.getTime() < -futureToleranceMs(date)) return { kind: "no-date" };
+  const ageDays = ageOf(date);
+  if (ageDays > maxAgeDays) return { kind: "too-old", date, ageDays };
+  return { kind: "ok", date };
+}
 
 /**
  * Decide whether a single social_raw row should become an incident, RE-DERIVING
@@ -190,10 +310,18 @@ export type SocialPromoteDecision =
 export function decideSocialPromotion(
   item: SocialPromoteInput,
   candidates: readonly IncidentCandidate[],
+  dateOpts: { maxAgeDays?: number; now?: number } = {},
 ): SocialPromoteDecision {
   const category = (item.category ?? "Other security") as IncidentCategory;
-  const postDate =
-    item.incidentDate ?? item.postedAt ?? item.createdAt ?? new Date();
+
+  // Dating honesty first: an old or undated post can never enter as a current
+  // incident, whatever its credibility. Checked BEFORE eligibility so the skip
+  // reason names the real blocker.
+  const resolved = resolveSocialPostDate(item, dateOpts);
+  if (resolved.kind !== "ok") {
+    return { promote: false, reason: resolved.kind };
+  }
+  const postDate = resolved.date;
 
   const post = {
     text: `${item.caption ?? ""} ${item.location ?? ""}`.trim(),
@@ -296,6 +424,10 @@ export interface SocialPromoteSummary {
   mode: "commit" | "dry-run";
   unpromotedConsidered: number;
   skippedAlreadyPromoted: number;
+  /** Post carried no usable timestamp (or a future one) — cannot be dated. */
+  skippedNoDate: number;
+  /** Post is older than socialPromoteMaxAgeDays() — e.g. a pinned old post. */
+  skippedTooOld: number;
   skippedNotSecurity: number;
   skippedNotCredible: number;
   skippedDuplicate: number;
@@ -325,6 +457,8 @@ export function emptySocialPromoteSummary(
     mode,
     unpromotedConsidered: 0,
     skippedAlreadyPromoted: 0,
+    skippedNoDate: 0,
+    skippedTooOld: 0,
     skippedNotSecurity: 0,
     skippedNotCredible: 0,
     skippedDuplicate: 0,
@@ -421,7 +555,9 @@ export async function runSocialPromote(
     const candidates = byCountry.get(key) ?? [];
     const decision = decideSocialPromotion(item, candidates);
     if (!decision.promote) {
-      if (decision.reason === "not-security") summary.skippedNotSecurity++;
+      if (decision.reason === "no-date") summary.skippedNoDate++;
+      else if (decision.reason === "too-old") summary.skippedTooOld++;
+      else if (decision.reason === "not-security") summary.skippedNotSecurity++;
       else if (decision.reason === "not-credible") summary.skippedNotCredible++;
       else summary.skippedDuplicate++;
       continue;
@@ -454,7 +590,7 @@ export async function runSocialPromote(
   summary.bySource = [...bySource.entries()].sort();
 
   log(
-    `  considered=${summary.unpromotedConsidered} already-promoted=${summary.skippedAlreadyPromoted} not-security=${summary.skippedNotSecurity} not-credible=${summary.skippedNotCredible} duplicate=${summary.skippedDuplicate} new=${summary.newToInsert}`,
+    `  considered=${summary.unpromotedConsidered} already-promoted=${summary.skippedAlreadyPromoted} no-date=${summary.skippedNoDate} too-old=${summary.skippedTooOld} (max ${socialPromoteMaxAgeDays()}d) not-security=${summary.skippedNotSecurity} not-credible=${summary.skippedNotCredible} duplicate=${summary.skippedDuplicate} new=${summary.newToInsert}`,
   );
 
   if (commit && toInsert.length > 0) {
@@ -539,7 +675,12 @@ export async function runSocialPromote(
             ok: true,
             collected: summary.unpromotedConsidered,
             retained: summary.inserted,
+            // Every reason a considered row was NOT promoted, so
+            // collected = retained + rejected stays a true account of the
+            // backlog (the date gate rejects the bulk of a historical import).
             rejected:
+              summary.skippedNoDate +
+              summary.skippedTooOld +
               summary.skippedNotSecurity +
               summary.skippedNotCredible +
               summary.skippedDuplicate,

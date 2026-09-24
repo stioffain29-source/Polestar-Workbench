@@ -460,11 +460,14 @@ export {
   SOCIAL_PROMOTE_HEALTH_NAME,
   SOCIAL_PROMOTE_HEALTH_TOPIC,
   socialPromoteWarnThreshold,
+  resolveSocialPostDate,
+  socialPromoteMaxAgeDays,
 } from "./socialPromote";
 export type {
   SocialPromoteSummary,
   SocialPromoteInput,
   SocialPromoteDecision,
+  SocialPostDate,
 } from "./socialPromote";
 export {
   runFacebookOsintReclassify,

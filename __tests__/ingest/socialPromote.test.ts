@@ -5,12 +5,21 @@ import {
   socialPromoteMarker,
   markerSocialRawId,
   runSocialPromote,
+  resolveSocialPostDate,
+  socialPromoteMaxAgeDays,
   SOCIAL_PROMOTE_MARKER_PREFIX,
   type SocialPromoteInput,
 } from "@workspace/ingest";
 import type { IncidentCandidate } from "@workspace/ingest";
 import { RELEVANCE_RULE_VERSION } from "@workspace/relevance";
 import { db } from "@workspace/db";
+
+// Promotion now requires a RECENT post date (an old or undated post can never
+// be filed as a current incident), so the fixtures are dated relative to the
+// run instead of being pinned to a calendar date that silently ages out of the
+// window and turns every promote assertion into a `too-old` skip.
+const DAY = 86_400_000;
+const BASE = Date.now() - 2 * DAY;
 
 // A minimal social_raw row fixture. Callers override the fields the test cares
 // about. Defaults to a promotable Facebook local-media row.
@@ -31,9 +40,9 @@ function row(over: Partial<SocialPromoteInput> = {}): SocialPromoteInput {
     location: "Port Moresby",
     caption: "Crowds gathered outside parliament to protest fuel prices.",
     businessImpact: "Roads around the CBD were blocked for several hours.",
-    incidentDate: new Date("2026-07-01T00:00:00.000Z"),
-    postedAt: new Date("2026-07-01T02:00:00.000Z"),
-    createdAt: new Date("2026-07-01T03:00:00.000Z"),
+    incidentDate: new Date(BASE),
+    postedAt: new Date(BASE + 2 * 3_600_000),
+    createdAt: new Date(BASE + 3 * 3_600_000),
     url: "https://facebook.com/postcourier/posts/1",
     ...over,
   };
@@ -48,8 +57,8 @@ function inc(over: Partial<IncidentCandidate> = {}): IncidentCandidate {
     country: "Papua New Guinea",
     province: "National Capital District",
     category: "Civil unrest / protest",
-    occurredAt: new Date("2026-07-01T00:00:00.000Z"),
-    incidentDate: new Date("2026-07-01T00:00:00.000Z"),
+    occurredAt: new Date(BASE),
+    incidentDate: new Date(BASE),
     ...over,
   };
 }
@@ -192,8 +201,8 @@ describe("decideSocialPromotion", () => {
     const d = decideSocialPromotion(nonCredible, [
       inc({
         id: 901,
-        occurredAt: new Date("2026-07-07T00:00:00.000Z"),
-        incidentDate: new Date("2026-07-07T00:00:00.000Z"),
+        occurredAt: new Date(BASE + 6 * DAY),
+        incidentDate: new Date(BASE + 6 * DAY),
       }),
     ]);
     expect(d.promote).toBe(true);
@@ -236,6 +245,152 @@ describe("decideSocialPromotion", () => {
     const d = decideSocialPromotion(row({ sourceTier: "official" }), [inc()]);
     expect(d.promote).toBe(true);
     if (d.promote) expect(d.row.validityStatus).toBe("needs_review");
+  });
+});
+
+// The post-date gate. Group scrapers return PINNED posts that can be years old,
+// and some posts carry no usable timestamp at all. Before this gate the date
+// chain ended in `?? new Date()`, so either case would have been filed as an
+// incident dated TODAY — a fabricated current event. These rows stay in
+// social_raw as context; only promotion is refused.
+describe("decideSocialPromotion — post-date gate", () => {
+  it("refuses an undated post rather than stamping it with today", () => {
+    const d = decideSocialPromotion(
+      row({ incidentDate: null, postedAt: null }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "no-date" });
+  });
+
+  it("refuses a pinned years-old group post", () => {
+    const d = decideSocialPromotion(
+      row({
+        incidentDate: null,
+        postedAt: new Date("2022-06-29T00:00:00.000Z"),
+      }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "too-old" });
+  });
+
+  // The classifier infers `incidentDate` from caption text, so a pinned post
+  // whose caption names a day ("Monday", "29 June") can carry a current-looking
+  // event date. Provenance decides: a post published years ago is not reporting
+  // something that happened this week.
+  it("refuses a years-old post even when its inferred event date looks current", () => {
+    const d = decideSocialPromotion(
+      row({
+        incidentDate: new Date(Date.now() - 2 * DAY),
+        postedAt: new Date("2022-06-29T00:00:00.000Z"),
+      }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "too-old" });
+  });
+
+  it("refuses a post with no publication date even when an event date was inferred", () => {
+    const d = decideSocialPromotion(
+      row({ incidentDate: new Date(Date.now() - 2 * DAY), postedAt: null }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "no-date" });
+  });
+
+  it("refuses a fresh post about an event outside the window", () => {
+    // Published today, but the event it describes is three months old — real
+    // reporting, still not a CURRENT incident.
+    const d = decideSocialPromotion(
+      row({
+        incidentDate: new Date(Date.now() - 90 * DAY),
+        postedAt: new Date(Date.now() - 1 * DAY),
+      }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "too-old" });
+  });
+
+  it("refuses a future-dated post (clock or parse artefact)", () => {
+    const d = decideSocialPromotion(
+      row({ incidentDate: null, postedAt: new Date(Date.now() + 5 * DAY) }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "no-date" });
+  });
+
+  it("still promotes a post inside the window", () => {
+    const d = decideSocialPromotion(
+      row({ incidentDate: null, postedAt: new Date(Date.now() - 13 * DAY) }),
+      [],
+    );
+    expect(d.promote).toBe(true);
+    // Filed under its real post date, never today's.
+    if (d.promote) {
+      const filed = (d.row.occurredAt as Date).getTime();
+      expect(Math.round((Date.now() - filed) / DAY)).toBe(13);
+    }
+  });
+
+  it("checks the date BEFORE credibility so the skip names the real blocker", () => {
+    const d = decideSocialPromotion(
+      row({
+        sourceTier: "osint",
+        detectedCredibleDomains: [],
+        corroborated: false,
+        incidentDate: null,
+        postedAt: null,
+      }),
+      [],
+    );
+    expect(d).toEqual({ promote: false, reason: "no-date" });
+  });
+
+  // Future tolerance is sized to PRECISION, not to a flat day. A date-only
+  // field parses to UTC midnight, and the tracked theatres run ahead of UTC
+  // (Indonesia +7..+9, PNG +10), so a post made "today" local reads as hours
+  // ahead — that is real. A precise timestamp hours ahead is not.
+  it("tolerates a date-only value hours ahead of UTC but not a precise future timestamp", () => {
+    const HOUR = 3_600_000;
+    const dateOnly = new Date(Date.UTC(2026, 8, 25)); // exact UTC midnight
+    const at = (d: Date, hoursBefore: number) => ({ now: d.getTime() - hoursBefore * HOUR });
+    const item = (postedAt: Date) => ({ incidentDate: null, postedAt });
+
+    // A PNG post dated today, read 10h before UTC midnight rolls over.
+    expect(resolveSocialPostDate(item(dateOnly), at(dateOnly, 10)).kind).toBe("ok");
+    // Beyond any tracked offset — a parse artefact.
+    expect(resolveSocialPostDate(item(dateOnly), at(dateOnly, 20)).kind).toBe("no-date");
+
+    const precise = new Date(dateOnly.getTime() + 9 * HOUR + 7 * 60_000);
+    // Clock skew is tolerated; hours into the future is not.
+    expect(resolveSocialPostDate(item(precise), at(precise, 0.5)).kind).toBe("ok");
+    expect(resolveSocialPostDate(item(precise), at(precise, 3)).kind).toBe("no-date");
+  });
+
+  it("honours an injected window (same resolver the manual route uses)", () => {
+    const item = row({ incidentDate: null, postedAt: new Date(BASE) });
+    expect(resolveSocialPostDate(item, { maxAgeDays: 1 }).kind).toBe("too-old");
+    expect(resolveSocialPostDate(item, { maxAgeDays: 30 }).kind).toBe("ok");
+    expect(
+      decideSocialPromotion(item, [], { maxAgeDays: 1 }),
+    ).toEqual({ promote: false, reason: "too-old" });
+  });
+});
+
+describe("socialPromoteMaxAgeDays", () => {
+  const original = process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS;
+  afterEach(() => {
+    if (original === undefined) delete process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS;
+    else process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS = original;
+  });
+
+  it("defaults to 14 days and clamps an override to 1..90", () => {
+    delete process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS;
+    expect(socialPromoteMaxAgeDays()).toBe(14);
+    process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS = "3";
+    expect(socialPromoteMaxAgeDays()).toBe(3);
+    process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS = "900";
+    expect(socialPromoteMaxAgeDays()).toBe(90);
+    process.env.SOCIAL_PROMOTE_MAX_AGE_DAYS = "nonsense";
+    expect(socialPromoteMaxAgeDays()).toBe(14);
   });
 });
 

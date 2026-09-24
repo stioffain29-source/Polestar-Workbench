@@ -10,6 +10,8 @@ import {
   classifySeverity,
   buildSocialIncidentTitle,
   buildSocialIncidentSummary,
+  resolveSocialPostDate,
+  socialPromoteMaxAgeDays,
   type IncidentCandidate,
   type IncidentCategory,
   type SeverityTopic,
@@ -41,6 +43,8 @@ const router: IRouter = Router();
 // gate on admin/ingest and source mutations is additional and unchanged.
 const SOURCE_NAME = "facebook_osint";
 const DEFAULT_LIMIT = 100;
+// Page size for the ordered scan behind the JS-side promotable/eligible filter.
+const SCAN_PAGE_SIZE = 500;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // Candidate-gather window for the duplicate-block. Wider than the strict
 // duplicate window (4 days) so pickDuplicate applies the real bar; over-fetching
@@ -91,6 +95,22 @@ const LIST_COLUMNS = {
   createdAt: socialRawTable.createdAt,
 };
 
+// The stored `promotable` flag answers "security-relevant AND credible?" only —
+// it is computed at ingest, before the post-date gate exists. The server also
+// refuses to promote an undated or out-of-window post, so a read that reported
+// those rows as promotable would invite a click the promote route then rejects.
+// Re-derive the flag here, with the SAME resolver the promote route uses, so
+// every reader sees the server's actual answer instead of mirroring the window
+// length client-side and drifting when it is configured differently.
+function withDatePolicy<T extends { promotable: boolean; postedAt: Date | null; incidentDate: Date | null }>(
+  row: T,
+): T {
+  if (!row.promotable) return row;
+  return resolveSocialPostDate(row).kind === "ok"
+    ? row
+    : { ...row, promotable: false };
+}
+
 router.get("/social-raw", async (req, res): Promise<void> => {
   const parsed = ListSocialRawItemsQueryParams.safeParse(req.query);
   if (!parsed.success) {
@@ -103,8 +123,6 @@ router.get("/social-raw", async (req, res): Promise<void> => {
   const conditions = [eq(socialRawTable.sourceName, SOURCE_NAME)];
   if (country) conditions.push(eq(socialRawTable.country, country));
   if (category) conditions.push(eq(socialRawTable.category, category));
-  if (promotable !== undefined)
-    conditions.push(eq(socialRawTable.promotable, promotable));
   if (promoted !== undefined)
     conditions.push(
       promoted
@@ -113,29 +131,58 @@ router.get("/social-raw", async (req, res): Promise<void> => {
     );
   if (reviewFlagged !== undefined)
     conditions.push(eq(socialRawTable.reviewFlag, reviewFlagged));
-  // `eligible` = promotable AND not yet promoted (the actionable queue). When
-  // false, surface the complement (not promotable OR already promoted).
-  if (eligible !== undefined)
-    conditions.push(
-      eligible
-        ? and(
-            eq(socialRawTable.promotable, true),
-            isNull(socialRawTable.promotedIncidentId),
-          )!
-        : or(
-            eq(socialRawTable.promotable, false),
-            isNotNull(socialRawTable.promotedIncidentId),
-          )!,
-    );
 
-  const rows = await db
-    .select(LIST_COLUMNS)
-    .from(socialRawTable)
-    .where(conditions.length > 1 ? and(...conditions) : conditions[0])
-    .orderBy(desc(socialRawTable.postedAt), desc(socialRawTable.id))
-    .limit(limit ?? DEFAULT_LIMIT);
+  // `promotable` and `eligible` are filtered in JS, AFTER the date policy is
+  // applied — deliberately not in SQL. The stored column answers only
+  // "security-relevant AND credible", so filtering on it in SQL would put
+  // date-blocked rows in the actionable queue (and let them eat the limit)
+  // while the complement filter lost them entirely. Re-expressing the date gate
+  // in SQL would fork the rule into a second dialect that drifts, so the
+  // resolver stays the ONE authority and the scan comes to it.
+  const wants = limit ?? DEFAULT_LIMIT;
+  const filtersInJs = promotable !== undefined || eligible !== undefined;
+  const where = conditions.length > 1 ? and(...conditions) : conditions[0];
 
-  res.json(rows);
+  const scan = (take: number, skip: number) =>
+    db
+      .select(LIST_COLUMNS)
+      .from(socialRawTable)
+      .where(where)
+      .orderBy(desc(socialRawTable.postedAt), desc(socialRawTable.id))
+      .limit(take)
+      .offset(skip);
+
+  type ListRow = Awaited<ReturnType<typeof scan>>[number];
+
+  const matches = (r: ListRow): boolean => {
+    if (promotable !== undefined && r.promotable !== promotable) return false;
+    // `eligible` = promotable AND not yet promoted (the actionable queue). When
+    // false, surface the complement (not promotable OR already promoted).
+    if (eligible !== undefined) {
+      const isEligible = r.promotable && r.promotedIncidentId === null;
+      if (isEligible !== eligible) return false;
+    }
+    return true;
+  };
+
+  let out: ListRow[];
+  if (!filtersInJs) {
+    out = (await scan(wants, 0)).map(withDatePolicy);
+  } else {
+    // Scan in ordered pages until the caller's limit is filled or the source's
+    // rows run out, so a run of date-blocked rows can never truncate the answer
+    // — a fixed scan cap would underfill the page once the table outgrew it.
+    out = [];
+    for (let skip = 0; out.length < wants; skip += SCAN_PAGE_SIZE) {
+      const page = await scan(SCAN_PAGE_SIZE, skip);
+      if (page.length === 0) break;
+      out.push(...page.map(withDatePolicy).filter(matches));
+      if (page.length < SCAN_PAGE_SIZE) break;
+    }
+    out = out.slice(0, wants);
+  }
+
+  res.json(out);
 });
 
 // Set the analyst review DECISION (Ignore / Keep-as-Context / re-open). Public
@@ -184,7 +231,7 @@ router.patch("/social-raw/:id/review-status", requireAdminToken, async (req, res
     .where(eq(socialRawTable.id, id))
     .returning(LIST_COLUMNS);
 
-  res.json(updated);
+  res.json(updated ? withDatePolicy(updated) : updated);
 });
 
 router.post("/social-raw/:id/promote", requireAdminToken, async (req, res): Promise<void> => {
@@ -233,11 +280,27 @@ router.post("/social-raw/:id/promote", requireAdminToken, async (req, res): Prom
     return;
   }
 
+  // Dating honesty gate — the SAME pure resolver the batch pass uses. A post
+  // with no usable timestamp, or one older than the promote window (a pinned
+  // years-old group post is the classic case), must never become a current
+  // incident: the old fallback would have stamped it with today's date. The row
+  // stays in social_raw as reviewable context; only promotion is refused.
+  const resolvedDate = resolveSocialPostDate(item);
+  if (resolvedDate.kind !== "ok") {
+    res.status(409).json({
+      error:
+        resolvedDate.kind === "no-date"
+          ? "Item cannot be promoted — the post carries no usable date, so an incident would be dated today"
+          : `Item cannot be promoted — the post is ${Math.round(resolvedDate.ageDays)} days old (limit ${socialPromoteMaxAgeDays()} days), so it is not a current incident`,
+      reason: resolvedDate.kind,
+    });
+    return;
+  }
+
   // Armed/violent-crime categories file under conflict; protest / policing /
   // governance categories under flashpoint.
   const topic = categoryToTopic(category);
-  const postDate =
-    item.incidentDate ?? item.postedAt ?? item.createdAt ?? new Date();
+  const postDate = resolvedDate.date;
 
   // Duplicate-block: re-derived against live incidents so a promote can never
   // double-count an event already tracked. Read-only candidate gather over a

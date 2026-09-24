@@ -155,4 +155,5 @@
 - [Market price publisher lag](market-price-publisher-lag.md) — an old "as of" date is usually the source's release cadence; check upstream newest vs stored row before touching ingest.
 - [Country-engine reprocess worker](country-engine-reprocess-worker.md) — CPU-bound boot reprocess MUST fork (inline = silent dead app); write fence only accepts polestar-app:v2:*/maintenance/active ingest app names; one advisory lock per slug.
 - [24h map review queue](map-review-queue-clearing.md) — dismiss AND test every folded member id (representative is re-picked each poll); hide reviewed markers on 24h only.
+- [Social promote dating honesty](social-promote-dating-honesty.md) — a scraped post needs REAL provenance inside the promote window (pinned/undated never default to now); one resolver for every path.
 - [Apify paid-run safety](apify-paid-run-safety.md) — never retry a run-START (each retry = another PAID run); poll+abort+maxTotalChargeUsd; paid-source cadence gate and boot trigger must share ONE heartbeat clock.
