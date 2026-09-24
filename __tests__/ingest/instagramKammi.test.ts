@@ -8,7 +8,11 @@
 //     zero), with string counts coerced and negatives/garbage rejected;
 //   - epoch-second and epoch-ms timestamps both parse.
 
-import { normaliseInstagramPost } from "@workspace/ingest";
+import {
+  normaliseInstagramPost,
+  kammiIntervalHours,
+  withinKammiCadence,
+} from "@workspace/ingest";
 
 describe("normaliseInstagramPost", () => {
   it("returns null for non-objects / id-less items", () => {
@@ -71,5 +75,41 @@ describe("normaliseInstagramPost", () => {
       commentsCount: "-5",
     });
     expect(n!.engagement).toEqual({ reactions: 1234 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cadence gate. The KAMMI Instagram scraper is a PAID Apify run and used to
+// fire on every full ingest, so several ingest ticks in a day paid for several
+// identical scrapes of an account that posts a few times a week. The collector
+// now self-throttles to one run per interval (default daily).
+// ---------------------------------------------------------------------------
+describe("KAMMI Instagram cadence gate", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("defaults to daily and takes a positive override only", () => {
+    delete process.env.KAMMI_INTERVAL_HOURS;
+    expect(kammiIntervalHours()).toBe(24);
+    process.env.KAMMI_INTERVAL_HOURS = "6";
+    expect(kammiIntervalHours()).toBe(6);
+    process.env.KAMMI_INTERVAL_HOURS = "0";
+    expect(kammiIntervalHours()).toBe(24);
+    process.env.KAMMI_INTERVAL_HOURS = "not a number";
+    expect(kammiIntervalHours()).toBe(24);
+  });
+
+  it("skips a run inside the interval and allows one outside it", () => {
+    const now = new Date("2026-09-24T12:00:00Z").getTime();
+    const hoursAgo = (h: number) => new Date(now - h * 3_600_000);
+    expect(withinKammiCadence(hoursAgo(3), 24, now)).toBe(true);
+    expect(withinKammiCadence(hoursAgo(23.9), 24, now)).toBe(true);
+    expect(withinKammiCadence(hoursAgo(24.1), 24, now)).toBe(false);
+  });
+
+  it("never blocks the first run (no heartbeat yet)", () => {
+    expect(withinKammiCadence(null, 24)).toBe(false);
   });
 });

@@ -5,7 +5,11 @@ import {
   isGdeltStructuredEnabled,
   readKammiSourceConfig,
   isKammiSourceActive,
+  kammiIntervalHours,
+  KAMMI_IG_HEALTH_NAME,
   facebookOsintIntervalHours,
+  isFacebookOsintActive,
+  readFacebookOsintConfig,
   FACEBOOK_OSINT_HEALTH_NAME,
 } from "@workspace/ingest";
 import { sql } from "drizzle-orm";
@@ -314,17 +318,19 @@ function kammiSourceActive(): boolean {
 }
 
 /**
- * Hours since the newest KAMMI-sourced incident (or null when none exist). KAMMI
- * incidents are written ONLY inside a full ingest worker (via
- * runKammiSourceIngest), so — like strikes, the land topics and AIS movement — a
- * stale-but-populated feed should force a boot catch-up. Uses created_at
- * (insertion heartbeat) so a quiet protest week does not look stale. Keyed on
- * the KAMMI marker (analyst_notes LIKE '%@kammi.pusat%'). Only considered when
- * kammiSourceActive(); no rows is otherwise not a trigger.
+ * Hours since the last SUCCESSFUL KAMMI pull (or null when it has never run).
+ * KAMMI is collected ONLY inside a full ingest worker (via
+ * runKammiSourceIngest), so — like strikes, the land topics and AIS movement —
+ * a stale feed should force a boot catch-up. Keyed off the Source Health
+ * heartbeat, the SAME clock the collector's own cadence gate uses: keying off
+ * the newest KAMMI incident instead would make every quiet week (no qualifying
+ * posts) look stale forever, so every cold start would launch the whole ingest
+ * chain only for the collector to cadence-skip the pull it was launched for.
+ * Only considered when kammiSourceActive().
  */
-async function hoursSinceNewestKammiIncident(): Promise<number | null> {
+async function hoursSinceLastKammiRun(): Promise<number | null> {
   const res = await db.execute(
-    sql`SELECT MAX(created_at) AS last FROM incidents WHERE analyst_notes LIKE '%@kammi.pusat%'`,
+    sql`SELECT MAX(last_success_at) AS last FROM sources WHERE name = ${KAMMI_IG_HEALTH_NAME}`,
   );
   const row = res.rows[0] as { last: Date | string | null } | undefined;
   if (!row?.last) return null;
@@ -339,10 +345,7 @@ async function hoursSinceNewestKammiIncident(): Promise<number | null> {
  * so gating on its freshness would force a needless scrape on every cold start.
  */
 function facebookOsintActive(): boolean {
-  const v = process.env["FACEBOOK_OSINT_ENABLED"]?.trim().toLowerCase();
-  const off = v === "false" || v === "0" || v === "off" || v === "no";
-  if (off) return false;
-  return (process.env["FACEBOOK_API_KEY"]?.trim().length ?? 0) > 0;
+  return isFacebookOsintActive(readFacebookOsintConfig());
 }
 
 /**
@@ -911,12 +914,15 @@ export function startIngestScheduler(): void {
           // feed is active — otherwise no KAMMI incidents exist by design and
           // gating on them would force a needless scrape on every cold start. No
           // KAMMI rows while active IS a trigger (initial population).
+          // Keyed off the KAMMI cadence (default 24h), NOT the generic
+          // interval: the collector self-throttles to that interval, so a
+          // shorter trigger would launch the whole ingest chain for a pull it
+          // would then skip. Never-run while active IS a trigger.
           const kammiActive = kammiSourceActive();
-          const kammiAge = kammiActive
-            ? await hoursSinceNewestKammiIncident()
-            : null;
+          const kammiAge = kammiActive ? await hoursSinceLastKammiRun() : null;
           const kammiStale =
-            kammiActive && (kammiAge === null || kammiAge >= hours);
+            kammiActive &&
+            (kammiAge === null || kammiAge >= kammiIntervalHours());
           // Facebook OSINT (social_raw) also refreshes ONLY inside a full
           // ingest. Same shape as KAMMI social-watch: a stale feed is a reason
           // to run, but ONLY when the source is active — otherwise the table is

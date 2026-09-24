@@ -65,6 +65,9 @@ const DEFAULT_PAGE_HANDLE = "PNGFacts";
 const DEFAULT_PROVIDER = "apify";
 const DEFAULT_ACTOR = "apify~facebook-posts-scraper";
 const DEFAULT_SEARCH_ACTOR = "apify~facebook-search-scraper";
+// Public GROUP posts need their own actor — the posts scraper reads pages only.
+// This is the actor that produced every Facebook-sourced incident so far.
+const DEFAULT_GROUP_ACTOR = "apify~facebook-groups-scraper";
 const DEFAULT_API_BASE = "https://api.apify.com";
 
 // Synthetic page handle stamped on rows that came from the keyword post-search
@@ -109,6 +112,48 @@ const DEFAULT_SEARCH_TERMS = [
   "Jayapura clash",
 ];
 
+// Curated, OVERRIDABLE Papua / PNG public GROUPS. Unlike the page list above,
+// these are the sources that have actually produced promoted incidents: POM
+// ALERT and PNG NEWS & CURRENT AFFAIRS (Port Moresby / national PNG), PNG
+// CURRENT ISSUES, Info Kejadian Kota Jayapura (Papua) and BERITA KRIMINAL
+// INDONESIA (national Indonesian crime reporting that carries Papua items).
+// Every group is unverified "osint": a post still needs a linked credible
+// domain or a cross-feed corroboration before it can promote. Override via
+// FACEBOOK_GROUP_URLS ("url|tier|Name" per entry); set it blank to disable the
+// group pass.
+const DEFAULT_GROUPS: FacebookPageSource[] = [
+  {
+    handle: "1043537399722202",
+    url: "https://www.facebook.com/groups/1043537399722202/",
+    name: "POM ALERT",
+    tier: "osint",
+  },
+  {
+    handle: "170941220106027",
+    url: "https://www.facebook.com/groups/170941220106027/",
+    name: "PNG NEWS & CURRENT AFFAIRS",
+    tier: "osint",
+  },
+  {
+    handle: "2167066716719724",
+    url: "https://www.facebook.com/groups/2167066716719724/",
+    name: "PNG CURRENT ISSUES (PNGCI)",
+    tier: "osint",
+  },
+  {
+    handle: "info.kejadian.kota.jayapura",
+    url: "https://www.facebook.com/groups/info.kejadian.kota.jayapura/",
+    name: "Info Kejadian Kota Jayapura dan Sekitarnya | IKKJ",
+    tier: "osint",
+  },
+  {
+    handle: "388493939419875",
+    url: "https://www.facebook.com/groups/388493939419875/",
+    name: "BERITA KRIMINAL INDONESIA",
+    tier: "osint",
+  },
+];
+
 const SOURCE_NAME = "facebook_osint";
 const PLATFORM = "facebook";
 
@@ -118,6 +163,9 @@ const HEALTH_TOPIC = "flashpoint";
 export { FACEBOOK_OSINT_HEALTH_NAME } from "./optionalIntegrations";
 
 const MAX_ITEMS_DEFAULT = 40;
+// Posts pulled per GROUP per run. The group actor charges per returned post, so
+// this is the main cost dial; a daily pull only needs one day of posting.
+const GROUP_MAX_ITEMS_DEFAULT = 10;
 const FETCH_TIMEOUT_MS = 30000;
 const FETCH_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 2500;
@@ -157,12 +205,33 @@ export interface FacebookOsintConfig {
   provider: string;
   apiKey: string;
   apiBase: string;
+  /**
+   * Which environment key the collector is running on: the dedicated
+   * FACEBOOK_API_KEY, the shared APIFY_TOKEN fallback, or none at all. Both are
+   * Apify tokens; the distinction only governs which passes run by default (see
+   * `pagesEnabled` / `searchEnabled`).
+   */
+  keySource: "facebook" | "apify" | "none";
   /** Apify actor for the per-page post pull. */
   actor: string;
   /** Apify actor for the keyword post-search pass. */
   searchActor: string;
+  /** Apify actor for the public-GROUP post pull. */
+  groupActor: string;
   /** Every monitored public page (curated default, configurable). */
   pages: FacebookPageSource[];
+  /** Every monitored public group (curated default, configurable). */
+  groups: FacebookPageSource[];
+  /** True when the page pass is switched on AND has at least one page. */
+  pagesEnabled: boolean;
+  /** True when the group pass is switched on AND has at least one group. */
+  groupsEnabled: boolean;
+  /** Posts pulled per group per run (cost cap for the paid group actor). */
+  groupMaxItems: number;
+  /** Hard per-run charge ceiling handed to Apify (maxTotalChargeUsd). */
+  maxChargeUsd: number;
+  /** How long to wait for one actor run before aborting it. */
+  runMaxWaitMs: number;
   /** Keyword post-search terms (empty disables the search pass). */
   searchTerms: string[];
   /** True when the search pass is switched on AND has at least one term. */
@@ -222,6 +291,72 @@ function resolvePages(): FacebookPageSource[] {
   return DEFAULT_PAGES;
 }
 
+/**
+ * Derive a stable handle for a group from its URL (the group slug or numeric
+ * id), falling back to a slug of its display name. Mirrors the manual Apify
+ * importer so a group collected either way lands on the SAME `page_handle` and
+ * its history stays continuous.
+ */
+export function deriveGroupHandle(
+  url: string,
+  name?: string | null,
+): string {
+  try {
+    const segs = new URL(url).pathname.split("/").filter(Boolean);
+    const gi = segs.indexOf("groups");
+    const slug = gi >= 0 ? segs[gi + 1] : segs[0];
+    if (slug) return slug.slice(0, 80);
+  } catch {
+    // fall through to the name-based slug
+  }
+  const slug = (name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+  return slug || "facebook-group";
+}
+
+/**
+ * The group slug / numeric id in a Facebook URL (`/groups/{handle}/...`), or ""
+ * when the URL names no group. Unlike {@link deriveGroupHandle} this never
+ * guesses: a page URL, a bare post URL or junk all return "", so a post is
+ * never attributed to a group it did not come from.
+ */
+export function groupHandleFromUrl(url: string): string {
+  try {
+    const segs = new URL(url).pathname.split("/").filter(Boolean);
+    const gi = segs.indexOf("groups");
+    if (gi < 0) return "";
+    return (segs[gi + 1] ?? "").slice(0, 80);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Resolve the monitored groups: FACEBOOK_GROUP_URLS ("url|tier|Name" per entry,
+ * tier+name optional) when set, else the curated DEFAULT_GROUPS. An explicitly
+ * blank list disables the group pass.
+ */
+function resolveGroups(): FacebookPageSource[] {
+  const raw = process.env.FACEBOOK_GROUP_URLS;
+  if (raw === undefined) return DEFAULT_GROUPS;
+  return raw
+    .split(/[;,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [url, tier, name] = entry.split("|").map((x) => x?.trim());
+      return {
+        handle: deriveGroupHandle(url!, name ?? null),
+        url: url!,
+        name: name || null,
+        tier: normaliseSourceTier(tier),
+      };
+    });
+}
+
 /** Resolve the post-search terms (unset → curated default; blank → disabled). */
 function resolveSearchTerms(): string[] {
   const raw = process.env.FACEBOOK_SEARCH_TERMS;
@@ -234,10 +369,24 @@ function resolveSearchTerms(): string[] {
 
 export function readFacebookOsintConfig(): FacebookOsintConfig {
   const enabled = envFlag("FACEBOOK_OSINT_ENABLED", true);
-  const apiKey = process.env.FACEBOOK_API_KEY?.trim() || "";
+  // Both candidates are Apify API tokens. FACEBOOK_API_KEY is the dedicated key
+  // for this collector; APIFY_TOKEN is the shared account token that already
+  // drives the manual importer and the Instagram feed, and it is what the group
+  // pull below has always run on. Prefer the dedicated key, fall back to the
+  // shared one, so a missing FACEBOOK_API_KEY no longer silently switches the
+  // whole collector off.
+  const dedicatedKey = process.env.FACEBOOK_API_KEY?.trim() || "";
+  const sharedKey = process.env.APIFY_TOKEN?.trim() || "";
+  const apiKey = dedicatedKey || sharedKey;
+  const keySource: FacebookOsintConfig["keySource"] = dedicatedKey
+    ? "facebook"
+    : sharedKey
+      ? "apify"
+      : "none";
   const configured = enabled && apiKey.length > 0;
 
   const pages = resolvePages();
+  const groups = resolveGroups();
   const primary = pages[0] ?? {
     handle: DEFAULT_PAGE_HANDLE,
     url: `https://www.facebook.com/${DEFAULT_PAGE_HANDLE}`,
@@ -246,23 +395,63 @@ export function readFacebookOsintConfig(): FacebookOsintConfig {
   };
 
   const searchTerms = resolveSearchTerms();
+  // The page + keyword-search passes are PAID Apify actors that have never
+  // produced a promoted incident here, so they run by default only on the
+  // dedicated key that was provisioned for them. On the shared APIFY_TOKEN the
+  // collector restricts itself to the group pass (the one that does produce
+  // incidents) unless switched on explicitly. Both remain overridable.
+  const extraPassesDefault = keySource === "facebook";
+  const pagesEnabled =
+    envFlag("FACEBOOK_PAGES_ENABLED", extraPassesDefault) && pages.length > 0;
   const searchEnabled =
-    envFlag("FACEBOOK_SEARCH_ENABLED", true) && searchTerms.length > 0;
+    envFlag("FACEBOOK_SEARCH_ENABLED", extraPassesDefault) &&
+    searchTerms.length > 0;
+  const groupsEnabled =
+    envFlag("FACEBOOK_GROUPS_ENABLED", true) && groups.length > 0;
 
   const maxRaw = Number(process.env.FACEBOOK_OSINT_MAX_ITEMS);
   const maxItems = Number.isFinite(maxRaw)
     ? Math.min(120, Math.max(5, Math.trunc(maxRaw)))
     : MAX_ITEMS_DEFAULT;
 
+  // Per-group cap, kept deliberately small: the group actor charges per post
+  // returned, and a daily pull only has to cover one day of posting.
+  const groupMaxRaw = Number(process.env.FACEBOOK_GROUP_MAX_ITEMS);
+  const groupMaxItems = Number.isFinite(groupMaxRaw)
+    ? Math.min(50, Math.max(1, Math.trunc(groupMaxRaw)))
+    : GROUP_MAX_ITEMS_DEFAULT;
+
+  // Hard per-run ceiling handed to Apify itself, so even a misconfigured limit
+  // or a runaway actor cannot spend more than this on one run.
+  const chargeRaw = Number(process.env.FACEBOOK_MAX_CHARGE_USD);
+  const maxChargeUsd =
+    Number.isFinite(chargeRaw) && chargeRaw > 0
+      ? Math.min(5, chargeRaw)
+      : MAX_CHARGE_USD_DEFAULT;
+  const waitRaw = Number(process.env.FACEBOOK_RUN_MAX_WAIT_MS);
+  const runMaxWaitMs =
+    Number.isFinite(waitRaw) && waitRaw > 0
+      ? Math.trunc(waitRaw)
+      : APIFY_RUN_MAX_WAIT_MS_DEFAULT;
+
   return {
     enabled,
     provider: process.env.FACEBOOK_PROVIDER?.trim() || DEFAULT_PROVIDER,
     apiKey,
+    keySource,
     apiBase: process.env.FACEBOOK_API_BASE?.trim() || DEFAULT_API_BASE,
     actor: process.env.FACEBOOK_ACTOR?.trim() || DEFAULT_ACTOR,
     searchActor:
       process.env.FACEBOOK_SEARCH_ACTOR?.trim() || DEFAULT_SEARCH_ACTOR,
+    groupActor:
+      process.env.FACEBOOK_GROUP_ACTOR?.trim() || DEFAULT_GROUP_ACTOR,
     pages,
+    groups,
+    pagesEnabled,
+    groupsEnabled,
+    groupMaxItems,
+    maxChargeUsd,
+    runMaxWaitMs,
     searchTerms,
     searchEnabled,
     pageHandle: primary.handle,
@@ -277,7 +466,12 @@ export function readFacebookOsintConfig(): FacebookOsintConfig {
 export function isFacebookOsintActive(
   cfg = readFacebookOsintConfig(),
 ): boolean {
-  return cfg.enabled && cfg.configured;
+  // A key alone is not enough: with every pass switched off the collector would
+  // attempt nothing, never record a successful heartbeat, and so look
+  // permanently stale to the boot scheduler — which would re-run the whole
+  // ingest chain on every cold start for a source that collects nothing.
+  const anyPass = cfg.groupsEnabled || cfg.pagesEnabled || cfg.searchEnabled;
+  return cfg.enabled && cfg.configured && anyPass;
 }
 
 // --- Scope resolution (PNG + Indonesian Papua keyword filter) ----------------
@@ -340,7 +534,7 @@ export interface RawFacebookPost {
   /** Public page/group URL the post belongs to, when the provider supplies it. */
   pageUrl?: string | null;
   sourceTier?: SourceTier;
-  origin?: "page" | "search";
+  origin?: "page" | "search" | "group";
 }
 
 function asString(v: unknown): string {
@@ -615,17 +809,148 @@ function redactToken(msg: string, token: string): string {
   return msg.split(token).join("[redacted]").replace(/token=[^&\s]+/gi, "token=[redacted]");
 }
 
-async function fetchApifyDataset(
+/**
+ * Start an Apify actor run, WAIT for it to finish, then read its dataset.
+ *
+ * Deliberately NOT the synchronous run-sync endpoint: these scrapers regularly
+ * run longer than a single HTTP fetch, and the retry around a timed-out
+ * run-sync call starts (and PAYS for) a whole new run each attempt while
+ * discarding the results of the one already running. Starting asynchronously
+ * and polling means one run per pass, whatever it costs in wall time.
+ *
+ * Every run carries a hard per-run charge ceiling (maxTotalChargeUsd) so a
+ * misconfigured limit or a runaway actor cannot quietly spend the account's
+ * credits. A run that has not finished within the budget is aborted, so an
+ * abandoned run does not keep spending after we stop waiting. The token rides
+ * as a query param per Apify's API and is scrubbed from every thrown error.
+ */
+async function runApifyActor(
   cfg: FacebookOsintConfig,
   actor: string,
   input: Record<string, unknown>,
+  limit: number,
 ): Promise<unknown> {
-  const url = `${cfg.apiBase}/v2/acts/${encodeURIComponent(
-    actor,
-  )}/run-sync-get-dataset-items?token=${encodeURIComponent(cfg.apiKey)}`;
+  const startUrl =
+    `${cfg.apiBase}/v2/acts/${encodeURIComponent(actor)}/runs` +
+    `?token=${encodeURIComponent(cfg.apiKey)}` +
+    `&maxTotalChargeUsd=${encodeURIComponent(String(cfg.maxChargeUsd))}`;
+  // START IS NEVER RETRIED. Starting a run is not idempotent: a timeout or a
+  // lost response can mean Apify accepted (and is charging for) a run we never
+  // saw, so a retry would pay twice. Everything AFTER the start — polling and
+  // the dataset read — is safely retryable and keeps the shared backoff.
+  const startJson = await apifyPostJson(startUrl, input, 1);
+  const run = parseApifyRun(startJson);
+  if (!run) throw new Error("Apify run start returned no run id");
 
+  try {
+    const deadline = Date.now() + cfg.runMaxWaitMs;
+    let status = run.status;
+    let datasetId = run.datasetId;
+    while (!APIFY_TERMINAL_STATES.has(status)) {
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `run ${run.id} still ${status} after ${Math.round(cfg.runMaxWaitMs / 1000)}s`,
+        );
+      }
+      await sleep(APIFY_RUN_POLL_MS);
+      const pollUrl =
+        `${cfg.apiBase}/v2/actor-runs/${encodeURIComponent(run.id)}` +
+        `?token=${encodeURIComponent(cfg.apiKey)}`;
+      const polled = parseApifyRun(
+        await apifyGetJsonRedacted(pollUrl, cfg.apiKey),
+      );
+      if (!polled) continue;
+      status = polled.status;
+      if (polled.datasetId) datasetId = polled.datasetId;
+    }
+    if (status !== "SUCCEEDED") throw new Error(`run ${run.id} ended ${status}`);
+    if (!datasetId) throw new Error(`run ${run.id} produced no dataset`);
+    return await fetchApifyDatasetItems(cfg.apiKey, datasetId, {
+      limit,
+      apiBase: cfg.apiBase,
+    });
+  } catch (err) {
+    // Whatever went wrong after the start — budget exhausted, polling failed,
+    // dataset unreadable — we stop waiting on this run, so abort it rather than
+    // leave an actor running (and spending) with nobody reading its output.
+    // Aborting an already-finished run is a harmless no-op.
+    await abortApifyRun(cfg, run.id);
+    throw err;
+  }
+}
+
+/** Apify actor-run states that will not change again. */
+const APIFY_TERMINAL_STATES = new Set([
+  "SUCCEEDED",
+  "FAILED",
+  "ABORTED",
+  "TIMED-OUT",
+]);
+const APIFY_RUN_POLL_MS = 5_000;
+const APIFY_RUN_MAX_WAIT_MS_DEFAULT = 180_000;
+const MAX_CHARGE_USD_DEFAULT = 0.5;
+
+interface ApifyRunInfo {
+  id: string;
+  status: string;
+  datasetId: string;
+}
+
+/** Extract {id,status,defaultDatasetId} from an Apify run response. */
+function parseApifyRun(json: unknown): ApifyRunInfo | null {
+  if (!json || typeof json !== "object") return null;
+  const data = (json as Record<string, unknown>).data;
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const id = asString(d.id);
+  if (!id) return null;
+  return {
+    id,
+    status: asString(d.status),
+    datasetId: asString(d.defaultDatasetId),
+  };
+}
+
+/**
+ * Best-effort abort of a still-running run so a budget-exhausted pass stops
+ * spending. NEVER throws — a failed abort must not mask the timeout that
+ * triggered it.
+ */
+async function abortApifyRun(
+  cfg: FacebookOsintConfig,
+  runId: string,
+): Promise<void> {
+  try {
+    const url =
+      `${cfg.apiBase}/v2/actor-runs/${encodeURIComponent(runId)}/abort` +
+      `?token=${encodeURIComponent(cfg.apiKey)}`;
+    await apifyPostJson(url, undefined);
+  } catch {
+    // Swallow: abort is best-effort cleanup only.
+  }
+}
+
+/** GET with the token scrubbed from any thrown error. */
+async function apifyGetJsonRedacted(
+  url: string,
+  token: string,
+): Promise<unknown> {
+  try {
+    return await apifyGetJson(url);
+  } catch (err) {
+    throw new Error(
+      redactToken(err instanceof Error ? err.message : String(err), token),
+    );
+  }
+}
+
+async function apifyPostJson(
+  url: string,
+  input: Record<string, unknown> | undefined,
+  attempts: number = FETCH_ATTEMPTS,
+): Promise<unknown> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < FETCH_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
     try {
@@ -848,15 +1173,69 @@ async function fetchFacebookPosts(
   let attempted = 0;
   let ok = 0;
 
-  for (const page of cfg.pages) {
+  // --- Public GROUP pass ----------------------------------------------------
+  // One actor call covers every group (the actor applies `resultsLimit` per
+  // start URL), so a daily pull is a single actor start instead of one per
+  // group. Input shape is deliberately the minimal, proven one — extra input
+  // fields are rejected by this actor.
+  if (cfg.groupsEnabled) {
     attempted++;
     try {
-      const json = await fetchApifyDataset(cfg, cfg.actor, {
-        startUrls: [{ url: page.url }],
-        resultsLimit: cfg.maxItems,
-        maxPosts: cfg.maxItems,
-        onlyPostsNewerThanXDaysAgo: 30,
-      });
+      const json = await runApifyActor(
+        cfg,
+        cfg.groupActor,
+        {
+          startUrls: cfg.groups.map((g) => ({ url: g.url })),
+          resultsLimit: cfg.groupMaxItems,
+          viewOption: "RECENT_ACTIVITY",
+        },
+        cfg.groups.length * cfg.groupMaxItems,
+      );
+      const fetched = toPosts(json);
+      for (const p of fetched) {
+        // Attribute each post to the group it came from. The scraper echoes the
+        // source group as `inputUrl` / `groupUrl` (surfaced as pageUrl) and the
+        // post permalink itself carries /groups/{handle}/. Match on the EXACT
+        // derived handle from either — a substring test would mis-file a post
+        // whose URL merely contains another group's id. Unmatched posts keep
+        // their own derived handle rather than another group's.
+        const fromHandle = groupHandleFromUrl(p.pageUrl ?? "");
+        const postHandle = groupHandleFromUrl(p.url);
+        const match =
+          cfg.groups.find(
+            (g) => g.handle === fromHandle || g.handle === postHandle,
+          ) ?? null;
+        posts.push({
+          ...p,
+          pageHandle:
+            match?.handle ?? (fromHandle || postHandle || "facebook-group"),
+          pageName: match?.name ?? p.pageName ?? null,
+          sourceTier: match?.tier ?? "osint",
+          origin: "group",
+        });
+      }
+      ok++;
+    } catch (err) {
+      errors.push(
+        `groups: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  for (const page of cfg.pagesEnabled ? cfg.pages : []) {
+    attempted++;
+    try {
+      const json = await runApifyActor(
+        cfg,
+        cfg.actor,
+        {
+          startUrls: [{ url: page.url }],
+          resultsLimit: cfg.maxItems,
+          maxPosts: cfg.maxItems,
+          onlyPostsNewerThanXDaysAgo: 30,
+        },
+        cfg.maxItems,
+      );
       const fetched = toPosts(json);
       for (const p of fetched) {
         posts.push({
@@ -878,14 +1257,22 @@ async function fetchFacebookPosts(
   if (cfg.searchEnabled && cfg.searchTerms.length > 0) {
     attempted++;
     try {
-      const json = await fetchApifyDataset(cfg, cfg.searchActor, {
-        searchQueries: cfg.searchTerms,
-        query: cfg.searchTerms.join(" OR "),
-        resultsLimit: cfg.maxItems,
-        maxPosts: cfg.maxItems,
-        maxPostsPerQuery: Math.max(5, Math.ceil(cfg.maxItems / cfg.searchTerms.length)),
-        onlyPostsNewerThanXDaysAgo: 30,
-      });
+      const json = await runApifyActor(
+        cfg,
+        cfg.searchActor,
+        {
+          searchQueries: cfg.searchTerms,
+          query: cfg.searchTerms.join(" OR "),
+          resultsLimit: cfg.maxItems,
+          maxPosts: cfg.maxItems,
+          maxPostsPerQuery: Math.max(
+            5,
+            Math.ceil(cfg.maxItems / cfg.searchTerms.length),
+          ),
+          onlyPostsNewerThanXDaysAgo: 30,
+        },
+        cfg.maxItems,
+      );
       const fetched = toPosts(json);
       for (const p of fetched) {
         posts.push({
@@ -1532,7 +1919,7 @@ export async function runFacebookOsintIngest(
   summary.logLines = logLines;
   summary.errors = errors;
   log(
-    `facebook-osint — mode=${commit ? "COMMIT" : "DRY-RUN"} active=${summary.active} pages=${cfg.pages.length} search=${cfg.searchEnabled ? cfg.searchTerms.length : 0}`,
+    `facebook-osint — mode=${commit ? "COMMIT" : "DRY-RUN"} active=${summary.active} key=${cfg.keySource} groups=${cfg.groupsEnabled ? cfg.groups.length : 0} pages=${cfg.pagesEnabled ? cfg.pages.length : 0} search=${cfg.searchEnabled ? cfg.searchTerms.length : 0}`,
   );
 
   // --- Cadence gate: when active + committing, skip the (PAID) Apify fetch if
@@ -1598,7 +1985,11 @@ export async function runFacebookOsintIngest(
     defaultPageName: cfg.pageName,
     defaultPageUrl: cfg.pageUrl,
     resolveActor: (post) =>
-      post.origin === "search" ? cfg.searchActor : cfg.actor,
+      post.origin === "search"
+        ? cfg.searchActor
+        : post.origin === "group"
+          ? cfg.groupActor
+          : cfg.actor,
     log,
   });
   summary.inScope = persisted.inScope;
@@ -1656,7 +2047,10 @@ async function recordSourceHealthForPage(
   const searchNote = cfg.searchEnabled
     ? ` + ${cfg.searchTerms.length} keyword post-search term(s)`
     : "";
-  const notes = `${cfg.pages.length} public Facebook page(s)${searchNote} monitored as supporting OSINT CONTEXT for the PNG/Indonesian-Papua theatres — NEVER incidents. Promotion to an incident is explicit, gated (security category AND a credibility signal) and server-re-derived.`;
+  const groupNote = cfg.groupsEnabled
+    ? `${cfg.groups.length} public Facebook group(s) + `
+    : "";
+  const notes = `${groupNote}${cfg.pagesEnabled ? cfg.pages.length : 0} public Facebook page(s)${searchNote} monitored as supporting OSINT CONTEXT for the PNG/Indonesian-Papua theatres — NEVER incidents. Promotion to an incident is explicit, gated (security category AND a credibility signal) and server-re-derived.`;
   if (!cfg.configured) {
     await recordSourceHealth(
       HEALTH_TOPIC,

@@ -129,6 +129,8 @@ export {
   isApifyAuthError,
   ApifyStartAuthError,
   KAMMI_IG_HEALTH_NAME,
+  kammiIntervalHours,
+  withinKammiCadence,
 } from "./kammiSource";
 export type {
   KammiSourceSummary,
@@ -360,6 +362,8 @@ export {
   isFacebookOsintActive,
   facebookOsintIntervalHours,
   withinFacebookCadence,
+  deriveGroupHandle,
+  groupHandleFromUrl,
   classifyPost,
   classifyPostBroad,
   resolveScope,

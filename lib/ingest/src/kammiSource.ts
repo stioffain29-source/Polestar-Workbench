@@ -1,4 +1,5 @@
-import { db, incidentsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+import { db, incidentsTable, sourcesTable } from "@workspace/db";
 import type { InsertIncident } from "@workspace/db";
 import { sanitiseCaption } from "./text";
 import { translateCaptionToEnglish } from "./captionTranslate";
@@ -49,6 +50,51 @@ const DEFAULT_INSTAGRAM_ACTOR = "apify~instagram-scraper";
 const DEFAULT_INSTAGRAM_BASE = "https://api.apify.com";
 
 export const KAMMI_IG_HEALTH_NAME = "KAMMI Instagram";
+
+/**
+ * Hours between live KAMMI Instagram pulls (default daily). The Apify scraper
+ * is PAID per run, and this collector used to fire on every full ingest — so a
+ * day with several ingest ticks paid for several identical scrapes of an
+ * account that posts a few times a week. Override with KAMMI_INTERVAL_HOURS.
+ */
+export function kammiIntervalHours(): number {
+  const raw = process.env.KAMMI_INTERVAL_HOURS;
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 24;
+}
+
+/**
+ * The pure cadence DECISION: true when a prior successful run exists AND it is
+ * more recent than the interval — i.e. the paid fetch should be skipped. A null
+ * heartbeat (never run) returns false so an initial-population run always
+ * proceeds. `now` is injectable for tests.
+ */
+export function withinKammiCadence(
+  lastRun: Date | null,
+  intervalHours: number,
+  now: number = Date.now(),
+): boolean {
+  if (!lastRun) return false;
+  return (now - lastRun.getTime()) / 3_600_000 < intervalHours;
+}
+
+/**
+ * Timestamp of the last SUCCESSFUL KAMMI pull, or null when it has never run.
+ * Keyed off the Source Health heartbeat (it advances on every successful run,
+ * including a 0-insert one) rather than the newest KAMMI incident, which does
+ * not advance when the account posts nothing relevant — keying off incidents
+ * would re-spend the paid scrape on every ingest tick during a quiet week.
+ */
+async function lastSuccessfulKammiRunAt(): Promise<Date | null> {
+  const [row] = await db
+    .select({
+      last: sql<Date | string | null>`max(${sourcesTable.lastSuccessAt})`,
+    })
+    .from(sourcesTable)
+    .where(eq(sourcesTable.name, KAMMI_IG_HEALTH_NAME));
+  const last = row?.last ?? null;
+  return last ? new Date(last) : null;
+}
 
 const MAX_ITEMS_DEFAULT = 40;
 const FETCH_TIMEOUT_MS = 20000;
@@ -541,6 +587,22 @@ export async function runKammiSourceIngest(
       "  not configured (set INSTAGRAM_API_KEY or APIFY_TOKEN; KAMMI_ENABLED/INSTAGRAM_ENABLED not off) — no-op.",
     );
     return summary;
+  }
+
+  // --- Cadence gate: at most one PAID scrape per interval (default daily).
+  // Applies to the committing scheduled path only; a dry-run still fetches so a
+  // manual check is never silently skipped. Keyed off the Source Health
+  // heartbeat, which a failed run leaves untouched (so the next tick retries).
+  if (commit) {
+    const intervalHours = kammiIntervalHours();
+    const lastRun = await lastSuccessfulKammiRunAt();
+    if (withinKammiCadence(lastRun, intervalHours)) {
+      const ageHours = (Date.now() - lastRun!.getTime()) / 3_600_000;
+      log(
+        `  cadence: last successful run ${ageHours.toFixed(1)}h ago < ${intervalHours}h interval — skipping (no fetch, no Apify spend).`,
+      );
+      return summary;
+    }
   }
 
   let posts: RawInstagramPost[];

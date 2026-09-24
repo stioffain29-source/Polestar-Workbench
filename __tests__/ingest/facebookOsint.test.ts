@@ -36,6 +36,8 @@ import {
   applySecurityEventGuard,
   facebookOsintIntervalHours,
   withinFacebookCadence,
+  deriveGroupHandle,
+  groupHandleFromUrl,
   type RawFacebookPost,
   type IncidentCandidate,
 } from "@workspace/ingest";
@@ -1066,5 +1068,179 @@ describe("withinFacebookCadence", () => {
 
   it("treats the exact boundary as due (not within)", () => {
     expect(withinFacebookCadence(hoursAgo(24), 24, now)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Key resolution + pass gating. The collection that actually produced promoted
+// incidents is the public-GROUP pull, which has always run on the shared
+// APIFY_TOKEN. A missing dedicated FACEBOOK_API_KEY must therefore no longer
+// switch the collector off — but it must also not silently start paying for the
+// page + keyword-search actors, which have produced nothing here.
+// ---------------------------------------------------------------------------
+describe("Facebook OSINT key resolution and pass gating", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  function clearKeys(): void {
+    delete process.env.FACEBOOK_API_KEY;
+    delete process.env.APIFY_TOKEN;
+    delete process.env.FACEBOOK_OSINT_ENABLED;
+    delete process.env.FACEBOOK_PAGES_ENABLED;
+    delete process.env.FACEBOOK_SEARCH_ENABLED;
+    delete process.env.FACEBOOK_GROUPS_ENABLED;
+    delete process.env.FACEBOOK_GROUP_URLS;
+  }
+
+  it("falls back to APIFY_TOKEN when FACEBOOK_API_KEY is absent", () => {
+    clearKeys();
+    process.env.APIFY_TOKEN = "shared_token";
+    const cfg = readFacebookOsintConfig();
+    expect(cfg.configured).toBe(true);
+    expect(cfg.keySource).toBe("apify");
+    expect(isFacebookOsintActive(cfg)).toBe(true);
+  });
+
+  it("prefers the dedicated key when both are present", () => {
+    clearKeys();
+    process.env.FACEBOOK_API_KEY = "dedicated";
+    process.env.APIFY_TOKEN = "shared_token";
+    expect(readFacebookOsintConfig().keySource).toBe("facebook");
+  });
+
+  it("stays inactive when neither key is set", () => {
+    clearKeys();
+    const cfg = readFacebookOsintConfig();
+    expect(cfg.keySource).toBe("none");
+    expect(cfg.configured).toBe(false);
+  });
+
+  it("runs only the group pass on the shared token, all passes on the dedicated key", () => {
+    clearKeys();
+    process.env.APIFY_TOKEN = "shared_token";
+    const shared = readFacebookOsintConfig();
+    expect(shared.groupsEnabled).toBe(true);
+    expect(shared.pagesEnabled).toBe(false);
+    expect(shared.searchEnabled).toBe(false);
+
+    process.env.FACEBOOK_API_KEY = "dedicated";
+    const dedicated = readFacebookOsintConfig();
+    expect(dedicated.groupsEnabled).toBe(true);
+    expect(dedicated.pagesEnabled).toBe(true);
+    expect(dedicated.searchEnabled).toBe(true);
+  });
+
+  it("honours explicit pass switches over the key-derived default", () => {
+    clearKeys();
+    process.env.APIFY_TOKEN = "shared_token";
+    process.env.FACEBOOK_PAGES_ENABLED = "true";
+    process.env.FACEBOOK_GROUPS_ENABLED = "false";
+    const cfg = readFacebookOsintConfig();
+    expect(cfg.pagesEnabled).toBe(true);
+    expect(cfg.groupsEnabled).toBe(false);
+  });
+
+  it("defaults to the Papua/PNG groups that have produced incidents", () => {
+    clearKeys();
+    process.env.APIFY_TOKEN = "shared_token";
+    const handles = readFacebookOsintConfig().groups.map((g) => g.handle);
+    expect(handles).toEqual(
+      expect.arrayContaining([
+        "1043537399722202",
+        "170941220106027",
+        "info.kejadian.kota.jayapura",
+        "388493939419875",
+      ]),
+    );
+    // Unverified by construction: a group post still needs a credible domain or
+    // a cross-feed corroboration before it can promote.
+    for (const g of readFacebookOsintConfig().groups) {
+      expect(g.tier).toBe("osint");
+    }
+  });
+
+  it("caps the per-group pull and takes an override list", () => {
+    clearKeys();
+    process.env.APIFY_TOKEN = "shared_token";
+    expect(readFacebookOsintConfig().groupMaxItems).toBe(10);
+    process.env.FACEBOOK_GROUP_MAX_ITEMS = "999";
+    expect(readFacebookOsintConfig().groupMaxItems).toBe(50);
+    process.env.FACEBOOK_GROUP_MAX_ITEMS = "0";
+    expect(readFacebookOsintConfig().groupMaxItems).toBe(1);
+
+    process.env.FACEBOOK_GROUP_URLS =
+      "https://www.facebook.com/groups/testgroup/|osint|Test Group";
+    const cfg = readFacebookOsintConfig();
+    expect(cfg.groups).toEqual([
+      {
+        handle: "testgroup",
+        url: "https://www.facebook.com/groups/testgroup/",
+        name: "Test Group",
+        tier: "osint",
+      },
+    ]);
+
+    process.env.FACEBOOK_GROUP_URLS = "";
+    expect(readFacebookOsintConfig().groupsEnabled).toBe(false);
+  });
+});
+
+describe("deriveGroupHandle", () => {
+  it("uses the group slug / numeric id from the URL", () => {
+    expect(
+      deriveGroupHandle("https://www.facebook.com/groups/1043537399722202/"),
+    ).toBe("1043537399722202");
+    expect(
+      deriveGroupHandle(
+        "https://www.facebook.com/groups/info.kejadian.kota.jayapura/permalink/123",
+      ),
+    ).toBe("info.kejadian.kota.jayapura");
+  });
+
+  it("falls back to a slug of the display name, then a constant", () => {
+    expect(deriveGroupHandle("not a url", "POM ALERT")).toBe("pom-alert");
+    expect(deriveGroupHandle("not a url", null)).toBe("facebook-group");
+  });
+});
+
+describe("groupHandleFromUrl", () => {
+  it("returns the group handle only for real group URLs", () => {
+    expect(
+      groupHandleFromUrl(
+        "https://www.facebook.com/groups/1043537399722202/posts/998877/",
+      ),
+    ).toBe("1043537399722202");
+    expect(
+      groupHandleFromUrl(
+        "https://www.facebook.com/groups/info.kejadian.kota.jayapura/",
+      ),
+    ).toBe("info.kejadian.kota.jayapura");
+    // A page post, a bare post URL and junk name no group — never guess one.
+    expect(groupHandleFromUrl("https://www.facebook.com/PNGFacts/posts/1")).toBe(
+      "",
+    );
+    expect(groupHandleFromUrl("https://www.facebook.com/123456")).toBe("");
+    expect(groupHandleFromUrl("not a url")).toBe("");
+  });
+});
+
+describe("isFacebookOsintActive requires at least one enabled pass", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("is inactive when keyed but every pass is switched off", () => {
+    delete process.env.FACEBOOK_API_KEY;
+    delete process.env.FACEBOOK_OSINT_ENABLED;
+    process.env.APIFY_TOKEN = "shared_token";
+    process.env.FACEBOOK_GROUP_URLS = "";
+    process.env.FACEBOOK_PAGES_ENABLED = "false";
+    process.env.FACEBOOK_SEARCH_ENABLED = "false";
+    const cfg = readFacebookOsintConfig();
+    expect(cfg.configured).toBe(true);
+    expect(isFacebookOsintActive(cfg)).toBe(false);
   });
 });
