@@ -789,6 +789,154 @@ export function isAssistanceAftermathItem(
   return SEVERITY_RANK[classifySeverityUncapped(t.rest, s.rest, topic)] <= SEVERITY_RANK.low;
 }
 
+// ---------------------------------------------------------------------------
+// Non-human (wildlife / livestock) victim guard.
+//
+// "Polisi siapkan red notice dua WNA kasus pembunuhan penyu di Raja Ampat"
+// (police prepare a red notice for two foreign nationals over a turtle killing)
+// is a wildlife-crime story, but "pembunuhan" is a Bahasa fatal token, so the
+// HIGH tier fired and Raja Ampat carried a High-severity marker for a poached
+// turtle. The English forms ("turtle killings", "elephant shot dead") reach the
+// same tiers through the bare FATAL_SIGNAL / shooting vocabulary.
+//
+// Precision rules mirror the assistance-aftermath guard above:
+//   * The killing word must sit DIRECTLY beside an animal victim, separated
+//     only by determiners, counts or species adjectives ("pembunuhan penyu",
+//     "killing of a protected hawksbill turtle", "dua ekor penyu mati"). A verb
+//     between the two breaks the binding, so "warga tewas diserang gajah" (a
+//     person killed by an elephant) is NOT an animal-victim killing.
+//   * DIRECTION decides the vocabulary. Kill word FIRST and the animal is the
+//     object ("menembak gajah"). Animal FIRST and an active verb usually makes
+//     the animal the ATTACKER ("Tiger killed farmer", "harimau membunuh
+//     petani"), so that direction accepts only passive / stative / nominal
+//     forms. Either direction is abandoned when a human role or victim noun
+//     follows the span ("police killed dog owner").
+//   * Those spans are STRIPPED and the remainder re-rated under the SAME topic,
+//     so any surviving human casualty, weapon, fire, riot or disruption signal
+//     vetoes the demotion ("turtle killings spark riot in Sorong" stays High).
+//   * DEMOTE-ONLY, and only as far as Low. A row already at or below Low is
+//     untouched and nothing is ever up-rated.
+const ANIMAL_VICTIM_TOKENS = String.raw`(?:penyu|kura-kura|satwa(?:\s+liar)?|hewan|binatang|ternak|sapi|kerbau|kambing|domba|ayam|unggas|anjing|kucing|monyet|kera|orangutan|gajah|harimau|badak|trenggiling|buaya|komodo|rusa|burung|kakatua|cendrawasih|ikan|hiu|lumba-lumba|duyung|ular|babi hutan|beruang|kanguru|kuskus|bekantan|turtles?|tortoises?|hatchlings?|elephants?|tigers?|rhinos?|rhinoceros(?:es)?|pangolins?|orangutans?|dugongs?|dolphins?|whales?|sharks?|crocodiles?|komodo dragons?|deer|monkeys?|apes?|birds?|cockatoos?|eagles?|cattle|livestock|cows?|buffalo(?:e?s)?|goats?|sheep|pigs?|boars?|dogs?|cats?|horses?|fish(?:es)?|poultry|chickens?|snakes?|bears?|kangaroos?|wildlife|animals?)`;
+
+// Killing / slaughter / poaching vocabulary for the KILL-FIRST direction
+// ("pembunuhan penyu", "killing of a turtle", "menembak gajah"), where the
+// animal that follows is the object of the verb.
+const ANIMAL_KILL_TOKENS = String.raw`(?:pembunuh(?:an)?|pembantaian|penyembelihan|perburuan|pemburu|dibunuh|membunuh|bunuh|terbunuh|dibantai|membantai|disembelih|menyembelih|diburu|memburu|ditembak|menembak|penembakan|dipanah|ditombak|dimutilasi|mati|tewas|killings?|killed|kills?|slaughter(?:ed|ing|s)?|butcher(?:ed|ing)?|hunt(?:ed|ing|s)?|poach(?:ed|ing|ers?)?|shot|shooting|speared|harpooned|clubbed|slain|beheaded|mutilated|deaths?|dead)`;
+
+// ANIMAL-FIRST is the dangerous direction: "Tiger killed farmer" has exactly
+// the shape of "turtle killings", and an active verb after an animal usually
+// makes the animal the ATTACKER and a person the casualty. So this direction
+// accepts ONLY passive, stative or nominal forms ("penyu mati", "turtle was
+// killed", "turtle killings"), never a bare active "kills"/"killed"/
+// "membunuh"/"menerkam".
+const ANIMAL_PASSIVE_KILL_TOKENS = String.raw`(?:dibunuh|terbunuh|dibantai|disembelih|diburu|ditembak|dipanah|ditombak|dimutilasi|mati|tewas|killings?|deaths?|dead|slaughters?|poaching|(?:was|were|been|being)\s+(?:killed|shot|slaughtered|butchered|poached|hunted|speared|clubbed|beheaded|mutilated))`;
+
+// A human role or victim noun immediately after the matched span means the
+// person, not the animal, is the subject of the sentence ("police killed dog
+// owner", "tiger killings farmer"). Blocks the match outright.
+const HUMAN_NOUN_AHEAD = String.raw`(?!\s+(?:of\s+)?(?:a|an|the|his|her|their|two|three|\d+)?\s*(?:owners?|handlers?|keepers?|traders?|breeders?|farmers?|hunters?|poachers?|sellers?|vendors?|riders?|walkers?|catchers?|man|men|woman|women|boys?|girls?|child|children|villagers?|residents?|workers?|rangers?|tourists?|drivers?|students?|police|officers?|soldiers?|people|persons?|victims?|pemilik|pedagang|peternak|penjual|pemburu|pawang|petani|warga|pria|wanita|anak|balita|pekerja|penjaga|nelayan|turis|polisi|tentara|siswa|korban)\b)`;
+
+// The ONLY words allowed between the killing word and its animal victim:
+// determiners, counts, classifiers and species adjectives. A verb or any other
+// noun breaks the binding, which is what keeps a human victim mauled or shot
+// near an animal out of this guard.
+const ANIMAL_VICTIM_FILLER = String.raw`(?:of|a|an|the|to|two|three|four|several|some|protected|endangered|rare|baby|juvenile|young|wild|sea|green|hawksbill|leatherback|olive|ridley|found|discovered|\d{1,4}|dua|tiga|empat|satu|seekor|ekor|beberapa|dilindungi|langka|liar|laut|hijau|sisik|belimbing|ditemukan)`;
+
+const ANIMAL_VICTIM_SPAN_RE = new RegExp(
+  [
+    String.raw`\b${ANIMAL_KILL_TOKENS}\b(?:\s+${ANIMAL_VICTIM_FILLER}\b){0,5}\s+${ANIMAL_VICTIM_TOKENS}\b${HUMAN_NOUN_AHEAD}`,
+    String.raw`\b${ANIMAL_VICTIM_TOKENS}\b(?:\s+${ANIMAL_VICTIM_FILLER}\b){0,5}\s+${ANIMAL_PASSIVE_KILL_TOKENS}\b${HUMAN_NOUN_AHEAD}`,
+  ].join("|"),
+  "gi",
+);
+
+const ANIMAL_GUARD_RESIDUE_RE =
+  /\b(?:terbakar|kebakaran|membakar|dibakar|ledakan|meledak|tenggelam|karam|tabrakan|kecelakaan|banjir|gempa|longsor|tsunami|evakuasi|dievakuasi|lumpuh|ditutup|mogok|unjuk rasa|demo(?:nstrasi)?|fires?|blazes?|burn(?:ed|t|ing)|engulfed|explosions?|blasts?|crashe?[sd]?|collisions?|collapsed?|floods?|flooding|earthquakes?|quakes?|landslides?|capsiz(?:ed|ing)|sank|sinking|drown(?:ed|ing)|evacuat(?:ed|ion)|rescued)\b/i;
+
+// A human casualty noun sitting just BEFORE the animal span means the killing
+// verb is shared ("Two people and 73 pet cats were killed in a fire"), so the
+// strip would carry the human deaths away with the animals. Authority roles
+// (police, soldiers, suspects) are deliberately absent — they are usually the
+// investigators in a wildlife-crime story, not casualties.
+const HUMAN_CASUALTY_NOUN_RE =
+  /\b(?:people|persons?|man|men|woman|women|couple|child|children|infants?|toddlers?|elderly|mothers?|fathers?|daughters?|sons?|wi(?:fe|ves)|husbands?|residents?|villagers?|workers?|passengers?|crew|farmers?|fishermen|fisherman|students?|tourists?|victims?|warga|orang|pria|wanita|anak|balita|ibu|ayah|istri|suami|penumpang|petani|nelayan|korban)\b/i;
+
+// A coordinator in the same clause as the span means the killing verb is
+// shared with something the strip would delete ("killed three dogs AND two
+// villagers", "cats were killed ALONGSIDE a mother and daughter"). The human
+// lexicon above cannot list every way a person is named, so ANY coordination
+// abandons the demotion. Rejecting a coordinated animals-only headline is a
+// safe false negative — the row simply keeps the tier it already had.
+// "or" / "atau" is deliberately absent: it coordinates alternatives
+// ("pembunuhan satwa atau binatang dilindungi"), not additional victims.
+const SHARED_PREDICATE_COORDINATOR_RE =
+  /(?:\band\b|\balongside\b|\bas well as\b|\btogether with\b|\balong with\b|\bplus\b|&|\bdan\b|\bserta\b|\bbersama\b|\bbeserta\b|\bmaupun\b)/i;
+
+/**
+ * True if the text binds a killing word directly to an animal victim. Only the
+ * cheap first gate of isNonHumanVictimKilling below — on its own it says
+ * nothing about severity ("turtle killings spark riot" matches, and is a real
+ * unrest story). Exported so a one-time DB heal can scope itself to the same
+ * candidate class the guard reasons about.
+ */
+export function mentionsAnimalVictimKilling(text: string): boolean {
+  ANIMAL_VICTIM_SPAN_RE.lastIndex = 0;
+  return ANIMAL_VICTIM_SPAN_RE.test(text);
+}
+
+/**
+ * True when the record's only lethal wording is the killing of an animal —
+ * wildlife crime, poaching or livestock slaughter — with nothing else in the
+ * text that rates above Low. Strip-and-re-rate guarded exactly like
+ * isAssistanceAftermathItem, so it can never suppress a human casualty.
+ */
+export function isNonHumanVictimKilling(
+  title: string,
+  summary: string,
+  topic: SeverityTopic,
+): boolean {
+  const strip = (text: string): { rest: string; stripped: boolean; shared: boolean } => {
+    let stripped = false;
+    let shared = false;
+    ANIMAL_VICTIM_SPAN_RE.lastIndex = 0;
+    // No capturing groups in the span pattern, so the callback's second
+    // argument is the match offset.
+    const rest = text.replace(ANIMAL_VICTIM_SPAN_RE, (match: string, offset: number) => {
+      stripped = true;
+      // Only the surrounding CLAUSE can share the killing verb, so both
+      // windows stop at sentence punctuation.
+      const before = text.slice(Math.max(0, offset - 40), offset).split(/[.!?]/).pop() ?? "";
+      const after = (text.slice(offset + match.length, offset + match.length + 30).split(/[.!?]/)[0] ??
+        "");
+      if (
+        HUMAN_CASUALTY_NOUN_RE.test(before) ||
+        SHARED_PREDICATE_COORDINATOR_RE.test(before) ||
+        SHARED_PREDICATE_COORDINATOR_RE.test(after)
+      ) {
+        shared = true;
+      }
+      return " ";
+    });
+    return { rest, stripped, shared };
+  };
+  const t = strip(title);
+  const s = strip(summary);
+  if (!t.stripped && !s.stripped) return false;
+  // A casualty named alongside the animals shares the killing verb, so
+  // stripping the animal span would delete those deaths with it.
+  if (t.shared || s.shared) return false;
+  // Bahasa disaster / disruption residue. The re-rate below is the main veto,
+  // but the classifier's fire, sinking and collision tiers are English-led, so
+  // a Bahasa livestock-ship fire ("Kapal ternak terbakar, 500 sapi mati") would
+  // strip to an unremarkable remainder and demote a real maritime incident.
+  // Any of these surviving the strip cancels the demotion.
+  if (ANIMAL_GUARD_RESIDUE_RE.test(`${t.rest}\n${s.rest}`)) return false;
+  // Whatever survives the strip must itself be unremarkable — the same
+  // re-rating discipline the aftermath guard uses, so every tier the classifier
+  // already knows (fire, riot, weapon, outage, seizure) vetoes the demotion.
+  return SEVERITY_RANK[classifySeverityUncapped(t.rest, s.rest, topic)] <= SEVERITY_RANK.low;
+}
+
 /**
  * Rate an incident's severity from its text.
  *
@@ -812,6 +960,12 @@ export function classifySeverity(
   // isAssistanceAftermathItem). Applied to the RESULT so it can only ever lower
   // a tier, never raise one, and rows already at or below Low are untouched.
   if (SEVERITY_RANK[base] > SEVERITY_RANK.low && isAssistanceAftermathItem(title, summary, topic)) {
+    return "low";
+  }
+  // Demote-only cap for wildlife / livestock killings (see
+  // isNonHumanVictimKilling). Same discipline: applied to the RESULT, never
+  // raises a tier, and leaves rows already at or below Low alone.
+  if (SEVERITY_RANK[base] > SEVERITY_RANK.low && isNonHumanVictimKilling(title, summary, topic)) {
     return "low";
   }
   return base;

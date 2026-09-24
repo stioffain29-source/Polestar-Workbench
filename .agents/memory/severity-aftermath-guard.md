@@ -33,6 +33,31 @@ its own row and its own rating.
    an early return — an early "low" would RAISE a row the classifier had put at
    insignificant.
 
+**Same shape, non-human victims:** the Bahasa fatal vocabulary has no
+human-victim binding (the English one does), so a poached turtle or a
+slaughtered tapir rates the same as a shot civilian and puts a red High marker
+on a dive site. The guard is the same strip-and-re-rate, but adjacency alone
+does NOT establish who the victim is — DIRECTION does:
+
+* Kill word FIRST, animal after: the animal is the object ("pembunuhan penyu").
+  Any kill vocabulary is safe here.
+* Animal FIRST: an active verb makes the animal the ATTACKER ("Tiger killed
+  farmer", "harimau membunuh petani"), so this direction may accept only
+  passive / stative / nominal forms ("turtle killings", "penyu mati", "turtle
+  was killed").
+* Either direction dies when a human role noun FOLLOWS the span ("police killed
+  dog owner") or a human casualty noun sits just BEFORE it — a conjunction
+  shares one verb ("two people and 73 cats were killed in a fire"), so the
+  strip would carry the human deaths away with the animals.
+* Allow enough filler slots for "killing of a protected hawksbill turtle" (four
+  determiner/adjective words) or the guard silently misses the English form.
+
+**Re-rating the remainder is only as good as the classifier's vocabulary.** The
+fire / sinking / collision / flood tiers are English-led, so a Bahasa remainder
+("Kapal ternak terbakar") reads as unremarkable and the demotion swallows a
+real incident. Any strip-and-re-rate guard that will see local-language text
+needs its own local-language residue veto alongside the re-rate.
+
 **Healing stored rows:** severity is written once at ingest, so a classifier
 change never reaches history by itself. A heal must compute the new tier
 through the shared per-row function (classifier + structured fatality floor),

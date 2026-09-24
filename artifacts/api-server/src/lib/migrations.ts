@@ -34,6 +34,8 @@ import {
   nextSeverityForRow,
   mentionsBenefitTransfer,
   isAssistanceAftermathItem,
+  mentionsAnimalVictimKilling,
+  isNonHumanVictimKilling,
   type SeverityTopic,
   detectStaleEventDate,
   geocode,
@@ -5053,6 +5055,97 @@ export async function runDataMigrations(): Promise<void> {
       }
     } catch (assistErr) {
       logger.error({ err: assistErr }, "Assistance-aftermath severity demotion failed");
+    }
+
+    // One-time DEMOTION of WILDLIFE / LIVESTOCK killings the old classifier
+    // rated as human violence. "Polisi siapkan red notice dua WNA kasus
+    // pembunuhan penyu di Raja Ampat" (a poached turtle) tripped the Bahasa
+    // fatal tier and stored as High, so the map carried a red High marker over
+    // Raja Ampat for a turtle. classifySeverity now caps that class at Low;
+    // stored rows need the heal because severity is written once at ingest.
+    //
+    // STRICTLY demote-only and narrow: the SQL prefilter keeps only machine
+    // rows already above Low, and each row must be identified by the guard
+    // itself before its tier is recomputed through the canonical classifier.
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_markers (
+          key text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+      const markerKey = "severity_animal_victim_demote_v1";
+      const existingMarker = await db.execute(sql`
+        SELECT 1 FROM app_migration_markers WHERE key = ${markerKey}
+      `);
+      if ((existingMarker.rowCount ?? 0) === 0) {
+        const candidates = await db
+          .select({
+            id: incidentsTable.id,
+            topic: incidentsTable.topic,
+            title: incidentsTable.title,
+            summary: incidentsTable.summary,
+            severity: incidentsTable.severity,
+            fatalities: incidentsTable.fatalities,
+          })
+          .from(incidentsTable)
+          .where(
+            and(
+              inArray(incidentsTable.topic, ALL_SEVERITY_TOPICS),
+              sql`${incidentsTable.severity} IN ('moderate', 'high', 'extreme')`,
+              or(
+                ...SEVERITY_BACKFILL_NOTE_PREFIXES.map((prefix) =>
+                  like(incidentsTable.analystNotes, `${prefix}%`),
+                ),
+              ),
+            ),
+          );
+        const writes = candidates.flatMap((r) => {
+          const summary = r.summary ?? "";
+          // Cheap gate first: a killing word bound to an animal victim.
+          if (!mentionsAnimalVictimKilling(`${r.title}\n${summary}`)) return [];
+          // Safe: the query above already scoped topic to ALL_SEVERITY_TOPICS.
+          const topic = r.topic as SeverityTopic;
+          // Then the guard's own verdict — the remainder must rate at or below
+          // Low, so a story where the animal killing sits beside a riot, a fire
+          // or a human casualty is left alone.
+          if (!isNonHumanVictimKilling(r.title, summary, topic)) return [];
+          // Route the new tier through the shared re-rater so the structured
+          // fatality floor still applies and no tier is hand-picked here.
+          const next = nextSeverityForRow({
+            title: r.title,
+            summary: r.summary,
+            topic,
+            fatalities: r.fatalities,
+          });
+          const prevRank = SEVERITY_RANK[r.severity as Severity];
+          if (prevRank === undefined || SEVERITY_RANK[next] >= prevRank) return [];
+          return [{ id: r.id, next }];
+        });
+        // POOL-BOUNDED chunked writes (shared pg Pool is max:10).
+        const CHUNK = 8;
+        for (let i = 0; i < writes.length; i += CHUNK) {
+          const chunk = writes.slice(i, i + CHUNK);
+          await Promise.all(
+            chunk.map((w) =>
+              db
+                .update(incidentsTable)
+                .set({ severity: w.next })
+                .where(eq(incidentsTable.id, w.id)),
+            ),
+          );
+        }
+        await db.execute(sql`
+          INSERT INTO app_migration_markers (key) VALUES (${markerKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+        logger.info(
+          { marker: markerKey, scanned: candidates.length, demoted: writes.length },
+          "One-time demotion of wildlife/livestock killing incidents",
+        );
+      }
+    } catch (animalErr) {
+      logger.error({ err: animalErr }, "Wildlife-victim severity demotion failed");
     }
 
     // NOTE: an earlier boot migration (`delete_telegram_social_watch_v1`) purged

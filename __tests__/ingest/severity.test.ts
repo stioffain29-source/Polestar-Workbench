@@ -4,6 +4,7 @@ import {
   severityFromFatalities,
   hasMassCasualtyToll,
   isAssistanceAftermathItem,
+  isNonHumanVictimKilling,
   ALL_SEVERITY_TOPICS,
 } from "@workspace/ingest";
 
@@ -726,5 +727,103 @@ describe("isAssistanceAftermathItem", () => {
     expect(
       classifySeverity("Compensation for shooting victims as curfew imposed", "", "apac_local"),
     ).not.toBe("low");
+  });
+});
+
+describe("wildlife / livestock victim guard", () => {
+  it("demotes the Raja Ampat turtle-killing red notice", () => {
+    expect(
+      classifySeverity(
+        "Polisi siapkan red notice dua WNA kasus pembunuhan penyu di Raja Ampat",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("low");
+  });
+
+  it("demotes the English wildlife-crime forms", () => {
+    expect(
+      classifySeverity(
+        "Police probe the killing of a protected hawksbill turtle in Raja Ampat",
+        "",
+        "apac_local",
+      ),
+    ).toBe("low");
+    expect(
+      classifySeverity("Two foreign nationals face charges over turtle killings", "", "apac_local"),
+    ).toBe("low");
+    expect(
+      classifySeverity("Dua ekor penyu mati ditemukan di perairan Raja Ampat", "", "indonesia_local"),
+    ).toBe("low");
+  });
+
+  it("does not fire when a PERSON is the casualty near an animal", () => {
+    expect(
+      isNonHumanVictimKilling("Warga tewas diserang gajah liar di Lampung", "", "indonesia_local"),
+    ).toBe(false);
+    expect(
+      isNonHumanVictimKilling("Petani tewas diterkam harimau di Jambi", "", "indonesia_local"),
+    ).toBe(false);
+  });
+
+  it("does not fire when the ANIMAL is the attacker and a person is the casualty", () => {
+    for (const [title, topic] of [
+      ["Tiger killed farmer in Jambi", "apac_local"],
+      ["Crocodile killed child near village in Merauke", "indonesia_local"],
+      ["Elephant kills handler in Lampung", "indonesia_local"],
+      ["Two elephants killed a ranger", "apac_local"],
+      ["Harimau membunuh petani di Jambi", "indonesia_local"],
+      ["Buaya menerkam warga hingga tewas di Merauke", "indonesia_local"],
+      ["Police killed dog owner in Jayapura", "apac_local"],
+    ] as const) {
+      expect(isNonHumanVictimKilling(title, "", topic)).toBe(false);
+    }
+  });
+
+  it("does not fire when a killing verb is SHARED with other victims", () => {
+    for (const [title, topic] of [
+      ["Militants killed three dogs and two villagers", "apac_local"],
+      ["Poachers killed three elephants and a ranger", "apac_local"],
+      ["Three dogs were killed alongside a mother and daughter", "apac_local"],
+      ["A mother and daughter along with 73 pet cats were killed in a house", "apac_local"],
+      ["Dua warga dan tiga ekor sapi mati di Lampung", "indonesia_local"],
+    ] as const) {
+      expect(isNonHumanVictimKilling(title, "", topic)).toBe(false);
+    }
+  });
+
+  it("does not fire when the animals died with people in a disaster", () => {
+    expect(
+      isNonHumanVictimKilling(
+        "Married couple, 73 cats die in Bangkok townhouse fire",
+        "Two people and 73 pet cats were killed in a fire that engulfed a townhouse in Bangkok.",
+        "apac_local",
+      ),
+    ).toBe(false);
+  });
+
+  it("never demotes when the remainder still carries a real event", () => {
+    expect(
+      classifySeverity("Turtle killings spark riot in Sorong", "", "indonesia_local"),
+    ).toBe("high");
+    expect(
+      classifySeverity(
+        "Polisi tembak mati pemburu penyu di Raja Ampat",
+        "",
+        "indonesia_local",
+      ),
+    ).toBe("high");
+  });
+
+  it("leaves human killings untouched", () => {
+    expect(
+      classifySeverity("KKB tembak mati tiga ASN di Jayawijaya", "", "indonesia_local"),
+    ).toBe("high");
+  });
+
+  it("never up-rates: a quiet wildlife item stays where it was", () => {
+    expect(["insignificant", "low"]).toContain(
+      classifySeverity("Penyu dilindungi ditemukan mati di pantai Sorong", "", "indonesia_local"),
+    );
   });
 });

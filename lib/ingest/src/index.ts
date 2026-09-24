@@ -514,7 +514,7 @@ export {
 export type { GdeltEnrichSummary } from "./gdeltEnrich";
 export { recordSourceHealth, FAILURE_ESCALATION_THRESHOLD } from "./sourceHealth";
 export type { FeedHealth } from "./sourceHealth";
-export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, ALL_SEVERITY_TOPICS, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal, hasConfirmedKillingSignal, hasMassCasualtyToll, isMaritimeVesselAttack, isAssistanceAftermathItem, mentionsBenefitTransfer } from "./severity";
+export { classifySeverity, maxSeverity, severityFromFatalities, SEVERITY_RANK, ALL_SEVERITY_TOPICS, isReactionLed, isPresentTenseFatalOrPluralStrike, isNaturalCauseDeath, isFatalKineticAttack, isJudicialDeath, isBiographicalOrIllnessDeath, hasIndonesianViolenceSignal, hasConfirmedKillingSignal, hasMassCasualtyToll, isMaritimeVesselAttack, isAssistanceAftermathItem, mentionsBenefitTransfer, isNonHumanVictimKilling, mentionsAnimalVictimKilling } from "./severity";
 export type { Severity, SeverityTopic } from "./severity";
 export { runSeverityBackfill, nextSeverityForRow, SEVERITY_BACKFILL_NOTE_PREFIXES } from "./backfillSeverity";
 export type { SeverityBackfillSummary, BackfillRow } from "./backfillSeverity";
