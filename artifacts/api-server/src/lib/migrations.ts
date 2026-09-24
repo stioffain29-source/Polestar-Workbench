@@ -3,6 +3,7 @@ import path from "node:path";
 import { db, incidentsTable, countryReportsTable, countryBaselinesTable, sourcesTable, strikesTable, cardTemplatesTable, brandSettingsTable, socialRawTable, protestEventsTable } from "@workspace/db";
 import type { CardContent, InsertBrandSettings } from "@workspace/db";
 import regionalFinalContent from "./seed/regionalFinalContent.json";
+import { repairFacebookOsintHealthRow } from "./facebookHealthRepair";
 import { applyRegionalFinalContentCorrections } from "./regionalFinalContent";
 import { sql, eq, or, ne, isNull, inArray, and, like, not } from "drizzle-orm";
 import { evaluateIncidentRelevance, hitsSlopExclude, RELEVANCE_RULE_VERSION } from "@workspace/relevance";
@@ -375,37 +376,11 @@ async function repairFlashpointSeedUrls(): Promise<void> {
 // Idempotent repairs for dashboard source-health noise. Runs every boot so a
 // deployment picks up fixes without waiting for the next ingest cycle.
 async function repairSourceHealthDashboardNoise(): Promise<void> {
-  // Facebook OSINT without an API key is intentionally off — never alarm red.
-  if (!(process.env.FACEBOOK_API_KEY?.trim())) {
-    await db
-      .update(sourcesTable)
-      .set({
-        status: "not_configured",
-        errorMessage: "Integration not configured",
-        consecutiveFailures: 0,
-        lastSuccessAt: null,
-        lastFailureAt: null,
-        failureReason: null,
-      })
-      .where(eq(sourcesTable.name, FACEBOOK_OSINT_HEALTH_NAME));
-  }
-  // Legacy rows that read "Integration not configured" but were escalated to failing.
-  await db
-    .update(sourcesTable)
-    .set({
-      status: "not_configured",
-      consecutiveFailures: 0,
-      lastSuccessAt: null,
-      lastFailureAt: null,
-      failureReason: null,
-    })
-    .where(
-      and(
-        eq(sourcesTable.name, FACEBOOK_OSINT_HEALTH_NAME),
-        sql`${sourcesTable.status} <> 'not_configured'`,
-        sql`${sourcesTable.errorMessage} ilike '%integration not configured%'`,
-      ),
-    );
+  // Facebook OSINT that is intentionally off must not alarm red — but an ACTIVE
+  // collector's row must be left alone, because resetting it nulls the
+  // last_success_at heartbeat that throttles a PAID pull. Both halves live in
+  // repairFacebookOsintHealthRow(), which asks the collector's own predicate.
+  await repairFacebookOsintHealthRow();
 
   // Kathmandu Post direct RSS serves malformed XML — clear stale parse failures
   // once the Google-News site-scope URL is in place (repairFlashpointSeedUrls).

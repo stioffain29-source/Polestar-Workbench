@@ -63,3 +63,23 @@ PER start URL, so the per-run cost scales with groups x limit.
 Group attribution must compare the EXACT `/groups/{handle}` segment derived
 from the post's input URL or permalink. A substring test mis-files a post whose
 URL happens to contain another group's id.
+
+## A health-row "repair" can silently disarm the cadence gate
+
+A boot-time repair that resets a paid source's Source Health row (to keep the
+dashboard from alarming red when the integration is off) typically nulls
+`last_success_at`. That column is the cadence clock: null reads as "never run",
+which is deliberately a reason to RUN, so every boot re-fires the paid pull.
+Observed: three paid runs inside fifteen minutes, plus a dashboard reporting a
+working collector as "not configured".
+
+**Why:** the repair asked a single dedicated-key env var, while the collector
+also accepts the shared account token — so the repair's idea of "configured"
+was narrower than the collector's.
+
+**How to apply:** any boot repair, seed or migration that touches a paid
+collector's health row must ask the COLLECTOR's own active/configured predicate,
+never re-derive configuration from one env var. When a source collects but its
+health row shows never-run, suspect a boot repair before suspecting the
+collector — and check the provider's run list for repeats a few minutes apart,
+which is the cheapest confirmation that a throttle is not holding.
